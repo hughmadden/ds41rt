@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: build-release-artifacts.sh SOURCE_DIR ROLE CUDA_ARCH OUTPUT_DIR" >&2
+  exit 2
+}
+
+[[ $# -eq 4 ]] || usage
+source_dir="$(realpath "$1")"
+role="$2"
+cuda_arch="$3"
+output_dir="$(realpath -m "$4")"
+
+case "$role" in
+  coordinator)
+    sparkinfer_aot=OFF
+    coordinator_aot=ON
+    w8a16_aot=ON
+    nccl=OFF
+    xgrammar=ON
+    ;;
+  expert)
+    sparkinfer_aot=ON
+    coordinator_aot=OFF
+    w8a16_aot=OFF
+    nccl=ON
+    xgrammar=OFF
+    ;;
+  *)
+    echo "ROLE must be coordinator or expert" >&2
+    exit 2
+    ;;
+esac
+[[ "$cuda_arch" =~ ^[0-9]+$ ]] || {
+  echo "CUDA_ARCH must be numeric" >&2
+  exit 2
+}
+[[ -f "$source_dir/rust/Cargo.toml" && -f "$source_dir/native/CMakeLists.txt" ]] || {
+  echo "SOURCE_DIR is not a DS4RT source tree: $source_dir" >&2
+  exit 2
+}
+[[ -f "$source_dir/THIRD_PARTY_NOTICES.md" ]] || {
+  echo "SOURCE_DIR is missing THIRD_PARTY_NOTICES.md" >&2
+  exit 2
+}
+python3 "$source_dir/scripts/verify-sparkinfer-source.py" \
+  --source "$source_dir/third_party/sparkinfer" \
+  --lock "$source_dir/third_party/sparkinfer.lock.json"
+if [[ "$xgrammar" == ON ]]; then
+  python3 "$source_dir/scripts/verify-xgrammar-source.py" \
+    --source "$source_dir/third_party/xgrammar" \
+    --lock "$source_dir/third_party/xgrammar.lock.json"
+fi
+
+build_root="$(mktemp -d /tmp/ds4rt-release-build.XXXXXX)"
+trap 'rm -rf "$build_root"' EXIT
+mkdir -p "$build_root/source"
+tar \
+  -C "$source_dir" \
+  --exclude=.git \
+  --exclude='*/.git' \
+  --exclude='.venv*' \
+  --exclude='*/.venv*' \
+  --exclude=.mypy_cache \
+  --exclude='*/.mypy_cache' \
+  --exclude=.pytest_cache \
+  --exclude='*/.pytest_cache' \
+  --exclude=.ruff_cache \
+  --exclude='*/.ruff_cache' \
+  --exclude=__pycache__ \
+  --exclude='*/__pycache__' \
+  --exclude='*.pyc' \
+  --exclude='*.pyo' \
+  --exclude=.ds4rt-cache \
+  --exclude=.ds4rt-release \
+  --exclude=.ds4rt-release-image \
+  --exclude=.ds4rt-wip \
+  --exclude=dist \
+  --exclude=rust/target \
+  --exclude='native/build*' \
+  -cf - . |
+  tar -C "$build_root/source" -xf -
+
+python3 "$build_root/source/scripts/verify-sparkinfer-source.py" \
+  --source "$build_root/source/third_party/sparkinfer" \
+  --lock "$build_root/source/third_party/sparkinfer.lock.json" \
+  --require-no-python-cache
+if [[ "$xgrammar" == ON ]]; then
+  python3 "$build_root/source/scripts/verify-xgrammar-source.py" \
+    --source "$build_root/source/third_party/xgrammar" \
+    --lock "$build_root/source/third_party/xgrammar.lock.json"
+fi
+
+export PYO3_PYTHON=python3
+cargo build \
+  --manifest-path "$build_root/source/rust/Cargo.toml" \
+  -p ds4rt-daemon \
+  --release
+
+cmake \
+  -S "$build_root/source/native" \
+  -B "$build_root/native" \
+  -G Ninja \
+  -DDS4RT_ENABLE_CUDA=ON \
+  -DDS4RT_ENABLE_RDMA=ON \
+  -DDS4RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
+  -DDS4RT_ENABLE_SPARKINFER_COORDINATOR_AOT="$coordinator_aot" \
+  -DDS4RT_ENABLE_DS4_FLASH_AOT=ON \
+  -DDS4RT_ENABLE_W8A16_AOT="$w8a16_aot" \
+  -DDS4RT_SPARKINFER_SOURCE_DIR="$build_root/source/third_party/sparkinfer" \
+  -DDS4RT_SPARKINFER_LOCK_FILE="$build_root/source/third_party/sparkinfer.lock.json" \
+  -DDS4RT_ENABLE_NCCL="$nccl" \
+  -DDS4RT_ENABLE_XGRAMMAR="$xgrammar" \
+  -DDS4RT_XGRAMMAR_SOURCE_DIR="$build_root/source/third_party/xgrammar" \
+  -DDS4RT_XGRAMMAR_LOCK_FILE="$build_root/source/third_party/xgrammar.lock.json" \
+  -DPython3_EXECUTABLE="$(command -v python3)" \
+  -DDS4RT_CUDA_ARCHITECTURES="$cuda_arch"
+cmake --build "$build_root/native"
+
+install -d "$output_dir"
+install -m 0755 "$build_root/source/rust/target/release/ds4rt" "$output_dir/ds4rt"
+install -m 0755 "$build_root/native/libds4rt_native.so" "$output_dir/libds4rt_native.so"
+install -m 0644 \
+  "$build_root/source/THIRD_PARTY_NOTICES.md" \
+  "$output_dir/THIRD_PARTY_NOTICES.md"
+install -m 0644 \
+  "$build_root/source/third_party/sparkinfer/LICENSE" \
+  "$output_dir/SPARKINFER_LICENSE"
+install -m 0644 \
+  "$build_root/source/third_party/xgrammar/LICENSE" \
+  "$output_dir/XGRAMMAR_LICENSE"
+install -m 0644 \
+  "$build_root/source/third_party/xgrammar.lock.json" \
+  "$output_dir/XGRAMMAR_PROVENANCE.json"
+python3 "$build_root/source/scripts/sparkinfer-release-provenance.py" \
+  --source "$build_root/source/third_party/sparkinfer" \
+  --lock "$build_root/source/third_party/sparkinfer.lock.json" \
+  --license "$output_dir/SPARKINFER_LICENSE" \
+  --notices "$output_dir/THIRD_PARTY_NOTICES.md" \
+  --write "$output_dir/SPARKINFER_PROVENANCE.json"
+(
+  cd "$output_dir"
+  sha256sum \
+    THIRD_PARTY_NOTICES.md \
+    SPARKINFER_PROVENANCE.json \
+    SPARKINFER_LICENSE >SPARKINFER_SHA256SUMS
+  sha256sum -c SPARKINFER_SHA256SUMS
+  sha256sum \
+    THIRD_PARTY_NOTICES.md \
+    XGRAMMAR_PROVENANCE.json \
+    XGRAMMAR_LICENSE >XGRAMMAR_SHA256SUMS
+  sha256sum -c XGRAMMAR_SHA256SUMS
+)
+test -x "$output_dir/ds4rt"
+test -s "$output_dir/libds4rt_native.so"
+test -s "$output_dir/THIRD_PARTY_NOTICES.md"
+test -s "$output_dir/SPARKINFER_PROVENANCE.json"
+test -s "$output_dir/SPARKINFER_LICENSE"
+test -s "$output_dir/SPARKINFER_SHA256SUMS"
+test -s "$output_dir/XGRAMMAR_PROVENANCE.json"
+test -s "$output_dir/XGRAMMAR_LICENSE"
+test -s "$output_dir/XGRAMMAR_SHA256SUMS"

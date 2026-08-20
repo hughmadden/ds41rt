@@ -1,0 +1,156 @@
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch@sha256:ca73b4795f0d3ae27e9cd81b1b1f1b7fc6c0a129f7d51a359d2326e95af48a3d
+FROM ${BASE_IMAGE}
+
+ARG BASE_IMAGE
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python
+ENV UV_PYTHON_CACHE_DIR=/opt/uv/cache
+ENV VIRTUAL_ENV=/opt/ds4rt/quant-venv
+ENV CARGO_HOME=/opt/cargo
+ENV RUSTUP_HOME=/opt/rustup
+ENV PATH=/opt/ds4rt/quant-venv/bin:/opt/cargo/bin:${PATH}
+ENV PYTHON_GIL=0
+# GPTQModel's coordinator default includes SM75, but the vendored EXL3 source
+# uses cp.async and MMA instructions that require SM80+. Both deployed
+# Blackwell variants consume the same SM120 code object, so compile only that
+# immutable serving/quantization target rather than a host-dependent fatbin.
+ENV TORCH_CUDA_ARCH_LIST=12.0
+ENV DS4RT_QUANT_BASE_IMAGE=${BASE_IMAGE}
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      bash ca-certificates git jq tini build-essential ninja-build \
+      pkg-config libpcre2-dev \
+      rdma-core ibverbs-providers libibverbs-dev \
+      iproute2 pciutils && \
+    rm -rf /var/lib/apt/lists/*
+
+# uv installs the same native free-threaded CPython release on both platforms.
+# The hashed universal dependency lock then selects only native wheels for the
+# active architecture; no host virtual environment enters the image.
+RUN python3 -m pip install --no-cache-dir "uv==0.11.30" && \
+    uv python install 3.14.6t && \
+    uv venv --python 3.14.6t "${VIRTUAL_ENV}"
+
+ARG TARGETARCH
+ARG RUST_TOOLCHAIN=1.97.1
+ARG RUSTUP_INIT_AMD64_SHA256=4acc9acc76d5079515b46346a485974457b5a79893cfb01112423c89aeb5aa10
+ARG RUSTUP_INIT_ARM64_SHA256=9732d6c5e2a098d3521fca8145d826ae0aaa067ef2385ead08e6feac88fa5792
+
+RUN case "${TARGETARCH}" in \
+      amd64) rust_target=x86_64-unknown-linux-gnu; rustup_sha="${RUSTUP_INIT_AMD64_SHA256}" ;; \
+      arm64) rust_target=aarch64-unknown-linux-gnu; rustup_sha="${RUSTUP_INIT_ARM64_SHA256}" ;; \
+      *) echo "unsupported Rust target architecture: ${TARGETARCH}" >&2; exit 2 ;; \
+    esac && \
+    curl -fsSL "https://static.rust-lang.org/rustup/dist/${rust_target}/rustup-init" \
+      -o /tmp/rustup-init && \
+    echo "${rustup_sha}  /tmp/rustup-init" | sha256sum -c - && \
+    chmod +x /tmp/rustup-init && \
+    /tmp/rustup-init -y --no-modify-path --profile minimal \
+      --default-toolchain "${RUST_TOOLCHAIN}" && \
+    rm -f /tmp/rustup-init && \
+    rustc --version && cargo --version
+
+COPY quantization/requirements.amd64.lock /opt/ds4rt/quantization/requirements.amd64.lock
+COPY quantization/requirements.arm64.lock /opt/ds4rt/quantization/requirements.arm64.lock
+COPY quantization/build-requirements.lock /opt/ds4rt/quantization/build-requirements.lock
+COPY quantization/normalize_nvidia_cusparselt.py /opt/ds4rt/quantization/normalize_nvidia_cusparselt.py
+
+ARG DS4RT_QUANT_ROLE
+ARG DS4RT_QUANT_TARGET_PLATFORM
+ARG DS4RT_QUANT_CUDA_ARCH
+ARG DS4RT_QUANT_MIN_GPUS=1
+ARG DS4RT_QUANT_REQUIREMENTS_SHA256
+ARG DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256
+
+ENV DS4RT_QUANT_ROLE=${DS4RT_QUANT_ROLE}
+ENV DS4RT_QUANT_TARGET_PLATFORM=${DS4RT_QUANT_TARGET_PLATFORM}
+ENV DS4RT_QUANT_CUDA_ARCH=${DS4RT_QUANT_CUDA_ARCH}
+ENV DS4RT_QUANT_MIN_GPUS=${DS4RT_QUANT_MIN_GPUS}
+ENV DS4RT_QUANT_PYTHON_VERSION=3.14.6
+ENV DS4RT_QUANT_REQUIREMENTS_SHA256=${DS4RT_QUANT_REQUIREMENTS_SHA256}
+ENV DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256=${DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256}
+ENV DS4RT_QUANT_REQUIREMENTS_LOCK=/opt/ds4rt/quantization/requirements.${TARGETARCH}.lock
+ENV PYTHONPATH=/opt/ds4rt/third_party/gptqmodel:/opt/ds4rt/python
+
+LABEL org.opencontainers.image.title="DS4RT quantization"
+LABEL io.ds4rt.quantization.base_image=${BASE_IMAGE}
+LABEL io.ds4rt.quantization.role=${DS4RT_QUANT_ROLE}
+LABEL io.ds4rt.quantization.target_platform=${DS4RT_QUANT_TARGET_PLATFORM}
+LABEL io.ds4rt.quantization.cuda_arch=${DS4RT_QUANT_CUDA_ARCH}
+LABEL io.ds4rt.quantization.requirements_sha256=${DS4RT_QUANT_REQUIREMENTS_SHA256}
+LABEL io.ds4rt.quantization.build_requirements_sha256=${DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256}
+
+RUN case "${TARGETARCH}:${DS4RT_QUANT_ROLE}:${DS4RT_QUANT_TARGET_PLATFORM}:${DS4RT_QUANT_CUDA_ARCH}" in \
+      "amd64:coordinator:linux/amd64:120"|"arm64:expert:linux/arm64:121") ;; \
+      *) echo "invalid native quantization target contract" >&2; exit 2 ;; \
+    esac && \
+    echo "${DS4RT_QUANT_REQUIREMENTS_SHA256}  ${DS4RT_QUANT_REQUIREMENTS_LOCK}" | sha256sum -c - && \
+    echo "${DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256}  /opt/ds4rt/quantization/build-requirements.lock" | sha256sum -c - && \
+    uv pip install --python "${VIRTUAL_ENV}/bin/python" \
+      --require-hashes \
+      --build-constraints /opt/ds4rt/quantization/build-requirements.lock \
+      --index https://download.pytorch.org/whl/cu130 \
+      --index-strategy unsafe-best-match \
+      -r "${DS4RT_QUANT_REQUIREMENTS_LOCK}" && \
+    python /opt/ds4rt/quantization/normalize_nvidia_cusparselt.py --apply && \
+    uv pip check --python "${VIRTUAL_ENV}/bin/python" && \
+    rm -rf "${UV_PYTHON_CACHE_DIR}"
+
+COPY scripts/verify-gptqmodel-source.py /opt/ds4rt/scripts/verify-gptqmodel-source.py
+COPY third_party/gptqmodel.lock.json /opt/ds4rt/third_party/gptqmodel.lock.json
+COPY third_party/gptqmodel /opt/ds4rt/third_party/gptqmodel
+
+ARG DS4RT_GPTQMODEL_COMMIT
+LABEL io.ds4rt.gptqmodel.revision=${DS4RT_GPTQMODEL_COMMIT}
+
+RUN python /opt/ds4rt/scripts/verify-gptqmodel-source.py \
+      --source /opt/ds4rt/third_party/gptqmodel \
+      --lock /opt/ds4rt/third_party/gptqmodel.lock.json && \
+    locked_revision="$(python /opt/ds4rt/scripts/verify-gptqmodel-source.py \
+      --source /opt/ds4rt/third_party/gptqmodel \
+      --lock /opt/ds4rt/third_party/gptqmodel.lock.json \
+      --print-revision)" && \
+    [ -n "${DS4RT_GPTQMODEL_COMMIT}" ] && \
+    [ "${DS4RT_GPTQMODEL_COMMIT}" = "${locked_revision}" ] && \
+    uv pip install --python "${VIRTUAL_ENV}/bin/python" --no-deps \
+      --editable /opt/ds4rt/third_party/gptqmodel && \
+    uv pip check --python "${VIRTUAL_ENV}/bin/python" && \
+    python /opt/ds4rt/scripts/verify-gptqmodel-source.py \
+      --source /opt/ds4rt/third_party/gptqmodel \
+      --lock /opt/ds4rt/third_party/gptqmodel.lock.json && \
+    python -c 'import importlib.util, pathlib, sys; assert sys._is_gil_enabled() is False; source = pathlib.Path("/opt/ds4rt/third_party/gptqmodel").resolve(); module = pathlib.Path(importlib.util.find_spec("gptqmodel").origin).resolve(); assert module.is_relative_to(source), (module, source)'
+
+COPY python /opt/ds4rt/python
+COPY quantization/preflight.py /opt/ds4rt/quantization/preflight.py
+COPY quantization/deepseek_v4_layer_boundary_store.py /opt/ds4rt/quantization/deepseek_v4_layer_boundary_store.py
+COPY quantization/deepseek_v4_mtp_prefix_store.py /opt/ds4rt/quantization/deepseek_v4_mtp_prefix_store.py
+COPY quantization/exl3_worker.py /opt/ds4rt/quantization/exl3_worker.py
+COPY quantization/collect_deepseek_v4_route_screen.py /opt/ds4rt/quantization/collect_deepseek_v4_route_screen.py
+COPY quantization/quantize_flash_gptqmodel.py /opt/ds4rt/quantization/quantize_flash_gptqmodel.py
+COPY quantization/quantize_flash_dspark_overlay.py /opt/ds4rt/quantization/quantize_flash_dspark_overlay.py
+COPY quantization/run_flash_gptqmodel_pipeline.py /opt/ds4rt/quantization/run_flash_gptqmodel_pipeline.py
+COPY quantization/canonicalize_gptqmodel_artifact.py /opt/ds4rt/quantization/canonicalize_gptqmodel_artifact.py
+COPY quantization/canonicalize_gptqmodel_composite_artifact.py /opt/ds4rt/quantization/canonicalize_gptqmodel_composite_artifact.py
+COPY quantization/validate_projection_checkpoint_block.py /opt/ds4rt/quantization/validate_projection_checkpoint_block.py
+COPY quantization/validate_exl3_remote_real_family.py /opt/ds4rt/quantization/validate_exl3_remote_real_family.py
+COPY docker/quantization-entrypoint.sh /usr/local/bin/ds4rt-quantization-entrypoint
+
+RUN chmod +x \
+      /opt/ds4rt/quantization/preflight.py \
+      /opt/ds4rt/quantization/exl3_worker.py \
+      /opt/ds4rt/quantization/collect_deepseek_v4_route_screen.py \
+      /opt/ds4rt/quantization/quantize_flash_gptqmodel.py \
+      /opt/ds4rt/quantization/quantize_flash_dspark_overlay.py \
+      /opt/ds4rt/quantization/run_flash_gptqmodel_pipeline.py \
+      /opt/ds4rt/quantization/canonicalize_gptqmodel_artifact.py \
+      /opt/ds4rt/quantization/canonicalize_gptqmodel_composite_artifact.py \
+      /opt/ds4rt/quantization/validate_projection_checkpoint_block.py \
+      /opt/ds4rt/quantization/validate_exl3_remote_real_family.py \
+      /usr/local/bin/ds4rt-quantization-entrypoint
+
+WORKDIR /workspace
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/ds4rt-quantization-entrypoint"]
+CMD ["bash"]

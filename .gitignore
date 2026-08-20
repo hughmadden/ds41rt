@@ -1,0 +1,45 @@
+.venv/
+target/
+rust/target/
+native/build/
+native/build-cuda/
+native/build-cuda-*/
+native/build-rdma/
+build/
+dist/
+.ds4rt-release/
+.ds4rt-release-image/
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+*.dll
+*.a
+*.o
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.env
+.ds4rt-cache/
+# Tool-evaluation output generated in the repository root.
+data/benchmarks.sqlite
+runs/
+reports/phase0_artifacts/*.tmp
+reports/phase0_artifacts/benchmarks/*.tmp
+reports/phase0_artifacts/model_catalog_python.json
+reports/phase0_artifacts/loadplan_range.*.json
+reports/phase0_artifacts/logs/
+reports/phase0_artifacts/run/
+reports/phase0_artifacts/load_tensor_smoke_*.json
+reports/phase0_artifacts/tensor_classification_summary_python.md
+reports/phase0_artifacts/transport_capabilities.json
+reports/phase0_artifacts/serve/
+reports/phase0_artifacts/tests/
+reports/phase0_artifacts/smoke/
+# Content-addressed calibration/replay payloads stay in durable local storage;
+# commit their manifests and hashes, not raw activation rows.
+reports/quantization/router-replay-inputs/*.bf16
+reports/quantization/router-replay-inputs/*.bin
+.ds4rt-wip/

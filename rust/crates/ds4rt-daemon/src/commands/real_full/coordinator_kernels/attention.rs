@@ -1,0 +1,7463 @@
+use super::*;
+use crate::python_graph_capture::{
+    attention_python_capture_enabled, coordinator_python_capture_enabled,
+    coordinator_python_capture_startup_open, launch_python_graph_capture,
+    query_python_bool_during_startup, PythonBoolQuery, PythonDeviceBufferArg,
+    PythonGraphCaptureLaunch, PythonKernelArg,
+};
+use anyhow::{Context, Result};
+use ds4rt_core::{
+    CoordinatorGraphInstancePlan, CoordinatorGraphKey, CoordinatorGraphShape, KvCacheDType,
+    LayerId, LayerWaveMode, COORDINATOR_GRAPH_INSTANCE_COUNT,
+    COORDINATOR_GRAPH_PREFILL_BUCKET_ROWS, GLM52_FIRST_K_DENSE_REPLACE, GLM52_HIDDEN_BF16_BYTES,
+    GLM52_HIDDEN_SIZE, GLM52_MLA_KV_LORA_RANK, GLM52_MLA_MXFP4_DS_BYTES_PER_TOKEN,
+    GLM52_MLA_QK_ROPE_HEAD_DIM, GLM52_ROUTED_SCALING_FACTOR, GLM52_TOP_K,
+};
+use ds4rt_ffi::{
+    Ds4rtCudaGraphCaptureInfo, Ds4rtDeviceBuffer, Ds4rtHostBuffer, NativeLibrary,
+    DS4RT_CUDA_GENERIC_KV_PAGE_SIZE, DS4RT_CUDA_ROUTER_TOPK_MAX_K, DS4RT_CUDA_SAMPLE_TOPK_MAX_K,
+};
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::env;
+use std::ffi::c_void;
+use std::path::{Path, PathBuf};
+use std::slice;
+use std::sync::{Mutex, OnceLock};
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) const CPU_REFERENCE_CAUSAL_ATTENTION_BACKEND: &str =
+    "cpu-reference-causal-attention";
+#[allow(dead_code)]
+pub(in crate::commands::real_full) const CUDA_REFERENCE_CAUSAL_ATTENTION_BACKEND: &str =
+    "cuda-reference-causal-attention-f32";
+pub(in crate::commands::real_full) const CPU_REFERENCE_CAUSAL_ATTENTION_BF16_BACKEND: &str =
+    "cpu-reference-causal-attention-bf16";
+pub(in crate::commands::real_full) const CUDA_REFERENCE_CAUSAL_ATTENTION_BF16_BACKEND: &str =
+    "cuda-reference-causal-attention-bf16";
+#[allow(dead_code)]
+pub(in crate::commands::real_full) const CPU_REFERENCE_ROPE_BACKEND: &str = "cpu-reference-rope";
+#[allow(dead_code)]
+pub(in crate::commands::real_full) const CUDA_REFERENCE_ROPE_BACKEND: &str =
+    "cuda-reference-rope-f32";
+pub(in crate::commands::real_full) const CPU_REFERENCE_ROPE_BF16_BACKEND: &str =
+    "cpu-reference-rope-bf16";
+pub(in crate::commands::real_full) const CUDA_REFERENCE_ROPE_BF16_BACKEND: &str =
+    "cuda-reference-rope-bf16";
+#[allow(dead_code)]
+pub(in crate::commands::real_full) const CPU_REFERENCE_MLA_ROPE_ATTENTION_BACKEND: &str =
+    "cpu-reference-mla-rope-attention";
+pub(in crate::commands::real_full) const CPU_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND: &str =
+    "cpu-reference-mla-rope-attention-bf16";
+pub(in crate::commands::real_full) const CUDA_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND: &str =
+    "cuda-reference-mla-rope-attention-bf16";
+pub(in crate::commands::real_full) const B12X_MLA_ROPE_ATTENTION_BF16_BACKEND: &str =
+    "b12x-mla-rope-attention-bf16";
+pub(in crate::commands::real_full) const FLASHINFER_MLA_ROPE_ATTENTION_BF16_BACKEND: &str =
+    "flashinfer-mla-rope-attention-bf16";
+pub(in crate::commands::real_full) const FLASHINFER_CUDNN_MLA_ROPE_ATTENTION_BF16_BACKEND: &str =
+    "flashinfer-cudnn-mla-rope-attention-bf16";
+pub(in crate::commands::real_full) const FLASHINFER_COMPRESSED_MLA_DECODE_BF16_BACKEND: &str =
+    "flashinfer-compressed-mla-decode-bf16";
+pub(in crate::commands::real_full) const FLASHINFER_COMPRESSED_MLA_DECODE_FP8_BACKEND: &str =
+    "flashinfer-compressed-mla-decode-fp8-unpacked";
+pub(in crate::commands::real_full) const FLASHINFER_PACKED_FP8_MLA_DECODE_BACKEND: &str =
+    "flashinfer-packed-fp8-mla-decode-sm120";
+pub(in crate::commands::real_full) const FLASHINFER_COMPRESSED_MLA_DECODE_NVFP4_BACKEND: &str =
+    "flashinfer-compressed-mla-decode-nvfp4-unpacked";
+pub(in crate::commands::real_full) const CUDA_REFERENCE_MLA_KV_CACHE_UNPACK_BF16_BACKEND: &str =
+    "cuda-reference-mla-kv-cache-unpack-bf16";
+pub(in crate::commands::real_full) const CUDA_REFERENCE_MLA_KV_PROJECTED_SPLIT_BF16_BACKEND: &str =
+    "cuda-reference-mla-kv-projected-split-bf16";
+pub(in crate::commands::real_full) const CUDA_REFERENCE_MLA_KV_PREPARE_BF16_BACKEND: &str =
+    "cuda-reference-mla-kv-prepare-bf16";
+const B12X_MLA_CAPTURE_MODULE: &str = "b12x_mla_capture";
+const B12X_MLA_CAPTURE_FUNCTION: &str = "capture_mla_rope_attention";
+const FLASHINFER_MLA_PREPARE_FUNCTION: &str = "prepare_flashinfer_mla_rope_attention";
+const FLASHINFER_MLA_CAPTURE_FUNCTION: &str = "capture_flashinfer_mla_rope_attention";
+const FLASHINFER_CUDNN_MLA_PREPARE_FUNCTION: &str = "prepare_flashinfer_cudnn_mla_rope_attention";
+const FLASHINFER_CUDNN_MLA_CAPTURE_FUNCTION: &str = "capture_flashinfer_cudnn_mla_rope_attention";
+const FLASHINFER_COMPRESSED_MLA_PREPARE_FUNCTION: &str =
+    "prepare_flashinfer_compressed_mla_decode_chunk";
+const FLASHINFER_COMPRESSED_MLA_CAPTURE_FUNCTION: &str =
+    "capture_flashinfer_compressed_mla_decode_chunk";
+const FLASHINFER_PACKED_FP8_MLA_PREPARE_FUNCTION: &str = "prepare_flashinfer_packed_fp8_mla_decode";
+const FLASHINFER_PACKED_FP8_MLA_CAPTURE_FUNCTION: &str = "capture_flashinfer_packed_fp8_mla_decode";
+const FLASHINFER_PACKED_FP8_MLA_PREFILL_PREPARE_FUNCTION: &str =
+    "prepare_flashinfer_packed_fp8_mla_prefill";
+const FLASHINFER_PACKED_FP8_MLA_PREFILL_CAPTURE_FUNCTION: &str =
+    "capture_flashinfer_packed_fp8_mla_prefill";
+const SPARKINFER_NVFP4_MLA_DECODE_PREPARE_FUNCTION: &str = "prepare_sparkinfer_nvfp4_mla_decode";
+const SPARKINFER_NVFP4_MLA_DECODE_CAPTURE_FUNCTION: &str = "capture_sparkinfer_nvfp4_mla_decode";
+const SPARKINFER_NVFP4_MLA_PREFILL_PREPARE_FUNCTION: &str = "prepare_sparkinfer_nvfp4_mla_prefill";
+const SPARKINFER_NVFP4_MLA_PREFILL_CAPTURE_FUNCTION: &str = "capture_sparkinfer_nvfp4_mla_prefill";
+const SPARKINFER_GLM_H64_QUERY_PLAN_FUNCTION: &str =
+    "plan_sparkinfer_glm_h64_bf16_query_projection";
+const SPARKINFER_GLM_H64_QUERY_PREPARE_FUNCTION: &str =
+    "prepare_sparkinfer_glm_h64_bf16_query_projection";
+const SPARKINFER_GLM_H64_QUERY_CAPTURE_FUNCTION: &str =
+    "capture_sparkinfer_glm_h64_bf16_query_projection";
+const FLASHINFER_SINGLE_PREFILL_TMP_BYTES: usize = 32 * 1024 * 1024;
+const FLASHINFER_CUDNN_PREFILL_TMP_BYTES: usize = 128 * 1024 * 1024;
+const FLASHINFER_MLA_SUFFIX_QUERY_FLOOR_ROWS: usize = 512;
+const DEFAULT_FLASHINFER_CUDNN_MLA_SUFFIX_QUERY_CAPACITY: usize = 2_048;
+const MAX_FLASHINFER_CUDNN_MLA_SUFFIX_QUERY_CAPACITY: usize = 2_048;
+const FLASHINFER_CUDNN_MLA_SUFFIX_QUERY_CAPACITY_ENV: &str =
+    "DS4RT_REAL_FULL_CUDNN_MLA_SUFFIX_QUERY_CAPACITY";
+const FLASHINFER_CUDNN_MLA_SUFFIX_MAX_ROW_CAPACITY: usize =
+    COORDINATOR_GRAPH_PREFILL_BUCKET_ROWS[COORDINATOR_GRAPH_PREFILL_BUCKET_ROWS.len() - 1];
+const FLASHINFER_COMPRESSED_MLA_MAX_CHUNK_ROWS: usize = 2_048;
+const FLASHINFER_COMPRESSED_MLA_EXACT_TAIL_ROWS: usize = 32;
+const FLASHINFER_PACKED_FP8_MLA_ROW_BYTES: usize = 656;
+const FLASHINFER_PACKED_FP8_MLA_BUCKETS: [usize; 4] = [128, 512, 1_024, 2_048];
+const FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS: usize = 16;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct SparkinferGlmH64QueryPlanKey {
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    latent_dim: usize,
+    device_id: i32,
+}
+
+const fn sparkinfer_glm_h64_packed_decode_candidate(query_rows: usize) -> bool {
+    query_rows >= 2 && query_rows <= FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS
+}
+
+fn flashinfer_packed_fp8_mla_startup_capture_query_rows() -> std::ops::RangeInclusive<usize> {
+    2..=FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS
+}
+
+fn use_sparkinfer_glm_h64_packed_decode_query_projection(
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    latent_dim: usize,
+    device_id: i32,
+) -> Result<bool> {
+    static PLANS: OnceLock<Mutex<HashMap<SparkinferGlmH64QueryPlanKey, bool>>> = OnceLock::new();
+
+    // H64 is qualified only for packed decode M=2..16. Returning before the
+    // Python policy query keeps M=1 and every non-decode caller on the native
+    // route regardless of auto/force policy.
+    if !sparkinfer_glm_h64_packed_decode_candidate(query_rows) {
+        return Ok(false);
+    }
+    let key = SparkinferGlmH64QueryPlanKey {
+        query_rows,
+        heads,
+        nope_dim,
+        latent_dim,
+        device_id,
+    };
+    let plans = PLANS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut plans = plans
+        .lock()
+        .map_err(|_| anyhow::anyhow!("SparkInfer GLM H64 query planner cache is poisoned"))?;
+    if let Some(use_sparkinfer) = plans.get(&key) {
+        return Ok(*use_sparkinfer);
+    }
+    let kwargs = [
+        ("workload", PythonKernelArg::Str("packed_decode")),
+        ("query_rows", PythonKernelArg::Usize(query_rows)),
+        ("heads", PythonKernelArg::Usize(heads)),
+        ("nope_dim", PythonKernelArg::Usize(nope_dim)),
+        ("latent_dim", PythonKernelArg::Usize(latent_dim)),
+        ("device_id", PythonKernelArg::I64(i64::from(device_id))),
+    ];
+    let use_sparkinfer = query_python_bool_during_startup(PythonBoolQuery {
+        module: B12X_MLA_CAPTURE_MODULE,
+        function: SPARKINFER_GLM_H64_QUERY_PLAN_FUNCTION,
+        kwargs: &kwargs,
+    })
+    .with_context(|| {
+        format!("planning GLM H64 BF16 query projection workload=packed_decode M={query_rows}")
+    })?;
+    plans.insert(key, use_sparkinfer);
+    Ok(use_sparkinfer)
+}
+const REAL_FULL_ATTENTION_CUDA_TIMING_ENV: &str = "DS4RT_REAL_FULL_ATTENTION_CUDA_TIMING";
+const W8A16_ASYNC_ATTENTION_ENV: &str = "DS4RT_COORDINATOR_W8A16_ASYNC_ATTENTION";
+const PACKED_FP8_MLA_DIRECT_HIDDEN_OUTPUT_ENV: &str =
+    "DS4RT_REAL_FULL_PACKED_FP8_MLA_DIRECT_HIDDEN_OUTPUT";
+
+const DS4RT_B12X_MLA_MODULE_ENV: &str = "DS4RT_B12X_MLA_MODULE";
+const DS4RT_B12X_MLA_FUNCTION_ENV: &str = "DS4RT_B12X_MLA_FUNCTION";
+
+struct AttentionCudaEventTimeline {
+    library: &'static NativeLibrary,
+    events: Vec<*mut c_void>,
+}
+
+fn parse_flashinfer_cudnn_mla_suffix_query_capacity(value: &str) -> Option<usize> {
+    value.trim().parse::<usize>().ok().filter(|capacity| {
+        capacity.is_power_of_two()
+            && (FLASHINFER_MLA_SUFFIX_QUERY_FLOOR_ROWS
+                ..=MAX_FLASHINFER_CUDNN_MLA_SUFFIX_QUERY_CAPACITY)
+                .contains(capacity)
+    })
+}
+
+fn packed_fp8_mla_direct_hidden_output_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        env::var(PACKED_FP8_MLA_DIRECT_HIDDEN_OUTPUT_ENV)
+            .map(|value| !matches!(value.as_str(), "0" | "false" | "FALSE" | "no" | "NO"))
+            .unwrap_or(true)
+    })
+}
+
+fn w8a16_async_attention_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        env::var(W8A16_ASYNC_ATTENTION_ENV)
+            .map(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
+            .unwrap_or(false)
+    })
+}
+
+fn flashinfer_cudnn_mla_suffix_query_capacity() -> usize {
+    static CAPACITY: OnceLock<usize> = OnceLock::new();
+    *CAPACITY.get_or_init(|| {
+        env::var(FLASHINFER_CUDNN_MLA_SUFFIX_QUERY_CAPACITY_ENV)
+            .ok()
+            .as_deref()
+            .and_then(parse_flashinfer_cudnn_mla_suffix_query_capacity)
+            .unwrap_or(DEFAULT_FLASHINFER_CUDNN_MLA_SUFFIX_QUERY_CAPACITY)
+    })
+}
+
+impl AttentionCudaEventTimeline {
+    fn enabled() -> bool {
+        env::var(REAL_FULL_ATTENTION_CUDA_TIMING_ENV)
+            .map(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
+            .unwrap_or(false)
+    }
+
+    fn new(library: &'static NativeLibrary, count: usize) -> Result<Self> {
+        let mut timeline = Self {
+            library,
+            events: Vec::with_capacity(count),
+        };
+        for _ in 0..count {
+            timeline.events.push(
+                library
+                    .cuda_event_create()
+                    .context("creating attention CUDA timing event")?,
+            );
+        }
+        Ok(timeline)
+    }
+
+    unsafe fn record(&self, index: usize, stream: *mut c_void, label: &str) -> Result<()> {
+        self.library
+            .cuda_event_record(self.events[index], stream)
+            .with_context(|| format!("recording attention CUDA timing event {label}"))
+    }
+
+    unsafe fn elapsed_ms(&self, start: usize, end: usize, label: &str) -> Result<f64> {
+        self.library
+            .cuda_event_elapsed_ms(self.events[start], self.events[end])
+            .map(f64::from)
+            .with_context(|| format!("reading attention CUDA timing interval {label}"))
+    }
+}
+
+impl Drop for AttentionCudaEventTimeline {
+    fn drop(&mut self) {
+        for event in self.events.drain(..) {
+            let _ = unsafe { self.library.cuda_event_destroy(event) };
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FlashinferMlaCaptureShape {
+    rows: usize,
+    query_row_offset: usize,
+    query_rows: usize,
+    kv_prefix_padding: usize,
+    query_prefix_padding: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FlashinferCudnnMlaSuffixBuffers {
+    q: Ds4rtDeviceBuffer,
+    k: Ds4rtDeviceBuffer,
+    workspace: Ds4rtDeviceBuffer,
+    output: Ds4rtDeviceBuffer,
+    q_nope: Ds4rtDeviceBuffer,
+    q_rope: Ds4rtDeviceBuffer,
+    k_nope: Ds4rtDeviceBuffer,
+    k_rope: Ds4rtDeviceBuffer,
+    values: Ds4rtDeviceBuffer,
+}
+
+#[derive(Default)]
+struct FlashinferCudnnMlaSuffixWorkspace {
+    q: ReusableDeviceBuffer,
+    k: ReusableDeviceBuffer,
+    workspace: ReusableDeviceBuffer,
+    output: ReusableDeviceBuffer,
+    q_nope: ReusableDeviceBuffer,
+    q_rope: ReusableDeviceBuffer,
+    k_nope: ReusableDeviceBuffer,
+    k_rope: ReusableDeviceBuffer,
+    values: ReusableDeviceBuffer,
+    initialized: bool,
+}
+
+thread_local! {
+    static FLASHINFER_CUDNN_MLA_SUFFIX_WORKSPACE: RefCell<FlashinferCudnnMlaSuffixWorkspace> =
+        RefCell::new(FlashinferCudnnMlaSuffixWorkspace::default());
+    static FLASHINFER_CUDNN_MLA_SUFFIX_PREWARMED: Cell<bool> = const { Cell::new(false) };
+}
+
+impl FlashinferCudnnMlaSuffixWorkspace {
+    fn ensure(
+        &mut self,
+        library: &'static NativeLibrary,
+    ) -> Result<FlashinferCudnnMlaSuffixBuffers> {
+        const MAX_HEADS: usize = 64;
+        const NOPE_DIM: usize = 192;
+        const ROPE_DIM: usize = 64;
+        const V_DIM: usize = 256;
+        const QK_DIM: usize = NOPE_DIM + ROPE_DIM;
+
+        let tensor_bytes = |rows: usize, heads: usize, dim: usize, label: &str| {
+            rows.checked_mul(heads)
+                .and_then(|values| values.checked_mul(dim))
+                .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+                .with_context(|| format!("{label} byte count overflow"))
+        };
+        let q_rows = flashinfer_cudnn_mla_suffix_query_capacity();
+        let kv_rows = FLASHINFER_CUDNN_MLA_SUFFIX_MAX_ROW_CAPACITY;
+        self.q.ensure_capacity(
+            library,
+            tensor_bytes(q_rows, MAX_HEADS, QK_DIM, "cuDNN MLA shared query")?,
+            "FlashInfer/cuDNN MLA shared query",
+        )?;
+        self.k.ensure_capacity(
+            library,
+            tensor_bytes(kv_rows, MAX_HEADS, QK_DIM, "cuDNN MLA shared key")?,
+            "FlashInfer/cuDNN MLA shared key",
+        )?;
+        self.workspace.ensure_capacity(
+            library,
+            FLASHINFER_CUDNN_PREFILL_TMP_BYTES,
+            "FlashInfer/cuDNN MLA shared workspace",
+        )?;
+        self.output.ensure_capacity(
+            library,
+            tensor_bytes(q_rows, MAX_HEADS, V_DIM, "cuDNN MLA shared output")?,
+            "FlashInfer/cuDNN MLA shared output",
+        )?;
+        self.q_nope.ensure_capacity(
+            library,
+            tensor_bytes(q_rows, MAX_HEADS, NOPE_DIM, "cuDNN MLA shared q_nope")?,
+            "FlashInfer/cuDNN MLA shared q_nope",
+        )?;
+        self.q_rope.ensure_capacity(
+            library,
+            tensor_bytes(q_rows, MAX_HEADS, ROPE_DIM, "cuDNN MLA shared q_rope")?,
+            "FlashInfer/cuDNN MLA shared q_rope",
+        )?;
+        self.k_nope.ensure_capacity(
+            library,
+            tensor_bytes(kv_rows, MAX_HEADS, NOPE_DIM, "cuDNN MLA shared k_nope")?,
+            "FlashInfer/cuDNN MLA shared k_nope",
+        )?;
+        self.k_rope.ensure_capacity(
+            library,
+            tensor_bytes(kv_rows, 1, ROPE_DIM, "cuDNN MLA shared k_rope")?,
+            "FlashInfer/cuDNN MLA shared k_rope",
+        )?;
+        self.values.ensure_capacity(
+            library,
+            tensor_bytes(kv_rows, MAX_HEADS, V_DIM, "cuDNN MLA shared values")?,
+            "FlashInfer/cuDNN MLA shared values",
+        )?;
+        Ok(FlashinferCudnnMlaSuffixBuffers {
+            q: self.q.buffer,
+            k: self.k.buffer,
+            workspace: self.workspace.buffer,
+            output: self.output.buffer,
+            q_nope: self.q_nope.buffer,
+            q_rope: self.q_rope.buffer,
+            k_nope: self.k_nope.buffer,
+            k_rope: self.k_rope.buffer,
+            values: self.values.buffer,
+        })
+    }
+
+    fn initialize_for_capture(
+        &mut self,
+        library: &'static NativeLibrary,
+    ) -> Result<FlashinferCudnnMlaSuffixBuffers> {
+        let buffers = self.ensure(library)?;
+        if !self.initialized {
+            for buffer in [
+                buffers.q_nope,
+                buffers.q_rope,
+                buffers.k_nope,
+                buffers.k_rope,
+                buffers.values,
+            ] {
+                library
+                    .cuda_zero_bytes(buffer, buffer.bytes)
+                    .context("zeroing shared cuDNN MLA suffix capture input")?;
+            }
+            self.initialized = true;
+        }
+        Ok(buffers)
+    }
+}
+
+fn flashinfer_cudnn_mla_suffix_buffers(
+    library: &'static NativeLibrary,
+) -> Result<FlashinferCudnnMlaSuffixBuffers> {
+    FLASHINFER_CUDNN_MLA_SUFFIX_WORKSPACE.with(|workspace| {
+        workspace
+            .try_borrow_mut()
+            .map_err(|_| anyhow::anyhow!("cuDNN MLA suffix workspace is already borrowed"))?
+            .ensure(library)
+    })
+}
+
+#[allow(dead_code, clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_rope_attention_rows(
+    q_nope: &[f32],
+    q_rope: &[f32],
+    k_nope: &[f32],
+    k_rope: &[f32],
+    values: &[f32],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<MlaRopeAttentionOutput> {
+    validate_mla_rope_attention_inputs(
+        q_nope, q_rope, k_nope, k_rope, values, rows, heads, nope_dim, rope_dim, v_dim, scale,
+    )?;
+    Ok(cpu_mla_rope_attention_rows(
+        q_nope, q_rope, k_nope, k_rope, values, rows, heads, nope_dim, rope_dim, v_dim, scale,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn mla_rope_attention_rows_bf16(
+    q_nope_bf16: &[u8],
+    q_rope_bf16: &[u8],
+    k_nope_bf16: &[u8],
+    k_rope_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<MlaRopeAttentionOutput> {
+    validate_mla_rope_attention_bf16_inputs(
+        q_nope_bf16,
+        q_rope_bf16,
+        k_nope_bf16,
+        k_rope_bf16,
+        values_bf16,
+        rows,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+        scale,
+    )?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_mla_rope_attention_rows_bf16(
+            q_nope_bf16,
+            q_rope_bf16,
+            k_nope_bf16,
+            k_rope_bf16,
+            values_bf16,
+            rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+            scale,
+        );
+    }
+    Ok(cpu_mla_rope_attention_rows_bf16(
+        q_nope_bf16,
+        q_rope_bf16,
+        k_nope_bf16,
+        k_rope_bf16,
+        values_bf16,
+        rows,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+        scale,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_rope_attention_rows_bf16_for_layer(
+    layer_id: usize,
+    q_nope_bf16: &[u8],
+    q_rope_bf16: &[u8],
+    k_nope_bf16: &[u8],
+    k_rope_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<MlaRopeAttentionOutput> {
+    validate_mla_rope_attention_bf16_inputs(
+        q_nope_bf16,
+        q_rope_bf16,
+        k_nope_bf16,
+        k_rope_bf16,
+        values_bf16,
+        rows,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+        scale,
+    )?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_mla_rope_attention_rows_bf16_for_layer(
+            layer_id,
+            q_nope_bf16,
+            q_rope_bf16,
+            k_nope_bf16,
+            k_rope_bf16,
+            values_bf16,
+            rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+            scale,
+        );
+    }
+    Ok(cpu_mla_rope_attention_rows_bf16(
+        q_nope_bf16,
+        q_rope_bf16,
+        k_nope_bf16,
+        k_rope_bf16,
+        values_bf16,
+        rows,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+        scale,
+    ))
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn rope_rows(
+    input: &[f32],
+    positions: &[usize],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<RopeOutput> {
+    let positions = validate_rope_inputs(input, positions, rows, heads, rotary_dim, theta)?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_rope_rows(input, &positions, rows, heads, rotary_dim, theta);
+    }
+    Ok(cpu_rope_rows(
+        input, &positions, rows, heads, rotary_dim, theta,
+    ))
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn rope_rows_bf16(
+    input_bf16: &[u8],
+    positions: &[usize],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<RopeOutput> {
+    let positions =
+        validate_rope_bf16_inputs(input_bf16, positions, rows, heads, rotary_dim, theta)?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_rope_rows_bf16(input_bf16, &positions, rows, heads, rotary_dim, theta);
+    }
+    Ok(cpu_rope_rows_bf16(
+        input_bf16, &positions, rows, heads, rotary_dim, theta,
+    ))
+}
+
+pub(in crate::commands::real_full) fn rope_rows_bf16_for_layer(
+    layer_id: usize,
+    input_bf16: &[u8],
+    positions: &[usize],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<RopeOutput> {
+    let positions =
+        validate_rope_bf16_inputs(input_bf16, positions, rows, heads, rotary_dim, theta)?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_rope_rows_bf16_for_layer(
+            layer_id, input_bf16, &positions, rows, heads, rotary_dim, theta,
+        );
+    }
+    Ok(cpu_rope_rows_bf16(
+        input_bf16, &positions, rows, heads, rotary_dim, theta,
+    ))
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn causal_attention_rows(
+    queries: &[f32],
+    keys: &[f32],
+    values: &[f32],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<CausalAttentionOutput> {
+    validate_causal_attention_inputs(queries, keys, values, rows, heads, qk_dim, v_dim, scale)?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_causal_attention_rows(
+            queries, keys, values, rows, heads, qk_dim, v_dim, scale,
+        );
+    }
+    Ok(cpu_causal_attention_rows(
+        queries, keys, values, rows, heads, qk_dim, v_dim, scale,
+    ))
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn causal_attention_rows_bf16(
+    queries_bf16: &[u8],
+    keys_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<CausalAttentionOutput> {
+    validate_causal_attention_bf16_inputs(
+        queries_bf16,
+        keys_bf16,
+        values_bf16,
+        rows,
+        heads,
+        qk_dim,
+        v_dim,
+        scale,
+    )?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_causal_attention_rows_bf16(
+            queries_bf16,
+            keys_bf16,
+            values_bf16,
+            rows,
+            heads,
+            qk_dim,
+            v_dim,
+            scale,
+        );
+    }
+    Ok(cpu_causal_attention_rows_bf16(
+        queries_bf16,
+        keys_bf16,
+        values_bf16,
+        rows,
+        heads,
+        qk_dim,
+        v_dim,
+        scale,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn causal_attention_rows_bf16_for_layer(
+    layer_id: usize,
+    queries_bf16: &[u8],
+    keys_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<CausalAttentionOutput> {
+    validate_causal_attention_bf16_inputs(
+        queries_bf16,
+        keys_bf16,
+        values_bf16,
+        rows,
+        heads,
+        qk_dim,
+        v_dim,
+        scale,
+    )?;
+    if cuda_reference_kernels_enabled() {
+        return cuda_causal_attention_rows_bf16_for_layer(
+            layer_id,
+            queries_bf16,
+            keys_bf16,
+            values_bf16,
+            rows,
+            heads,
+            qk_dim,
+            v_dim,
+            scale,
+        );
+    }
+    Ok(cpu_causal_attention_rows_bf16(
+        queries_bf16,
+        keys_bf16,
+        values_bf16,
+        rows,
+        heads,
+        qk_dim,
+        v_dim,
+        scale,
+    ))
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn validate_causal_attention_inputs(
+    queries: &[f32],
+    keys: &[f32],
+    values: &[f32],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<()> {
+    if rows == 0 || heads == 0 || qk_dim == 0 || v_dim == 0 {
+        anyhow::bail!(
+            "real full causal attention requires non-zero shape, got rows={rows} heads={heads} qk_dim={qk_dim} v_dim={v_dim}"
+        );
+    }
+    if !scale.is_finite() {
+        anyhow::bail!("real full causal attention scale must be finite");
+    }
+    let qk_values = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(qk_dim))
+        .context("real full causal attention q/k shape overflows usize while validating coordinator kernel input")?;
+    if queries.len() != qk_values {
+        anyhow::bail!(
+            "real full causal attention query length mismatch: expected {} got {}",
+            qk_values,
+            queries.len()
+        );
+    }
+    if keys.len() != qk_values {
+        anyhow::bail!(
+            "real full causal attention key length mismatch: expected {} got {}",
+            qk_values,
+            keys.len()
+        );
+    }
+    let value_count = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .context("real full causal attention value shape overflows usize while validating coordinator kernel input")?;
+    if values.len() != value_count {
+        anyhow::bail!(
+            "real full causal attention value length mismatch: expected {} got {}",
+            value_count,
+            values.len()
+        );
+    }
+    Ok(())
+}
+
+pub(in crate::commands::real_full) fn validate_causal_attention_bf16_inputs(
+    queries_bf16: &[u8],
+    keys_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<()> {
+    if rows == 0 || heads == 0 || qk_dim == 0 || v_dim == 0 {
+        anyhow::bail!(
+            "real full BF16 causal attention requires non-zero shape, got rows={rows} heads={heads} qk_dim={qk_dim} v_dim={v_dim}"
+        );
+    }
+    if !scale.is_finite() {
+        anyhow::bail!("real full BF16 causal attention scale must be finite");
+    }
+    let qk_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(qk_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("real full BF16 causal attention q/k shape overflows usize while validating coordinator kernel input")?;
+    if queries_bf16.len() != qk_bytes {
+        anyhow::bail!(
+            "real full BF16 causal attention query byte length mismatch: expected {} got {}",
+            qk_bytes,
+            queries_bf16.len()
+        );
+    }
+    if keys_bf16.len() != qk_bytes {
+        anyhow::bail!(
+            "real full BF16 causal attention key byte length mismatch: expected {} got {}",
+            qk_bytes,
+            keys_bf16.len()
+        );
+    }
+    let value_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("real full BF16 causal attention value shape overflows usize while validating coordinator kernel input")?;
+    if values_bf16.len() != value_bytes {
+        anyhow::bail!(
+            "real full BF16 causal attention value byte length mismatch: expected {} got {}",
+            value_bytes,
+            values_bf16.len()
+        );
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn validate_rope_inputs(
+    input: &[f32],
+    positions: &[usize],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<Vec<u32>> {
+    if rows == 0 || heads == 0 || rotary_dim == 0 || rotary_dim % 2 != 0 {
+        anyhow::bail!(
+            "real full RoPE requires non-zero rows/heads and positive even rotary_dim, got rows={rows} heads={heads} rotary_dim={rotary_dim}"
+        );
+    }
+    if !theta.is_finite() || theta <= 0.0 {
+        anyhow::bail!("real full RoPE theta must be finite and positive");
+    }
+    if positions.len() != rows {
+        anyhow::bail!(
+            "real full RoPE positions length mismatch: expected {} got {}",
+            rows,
+            positions.len()
+        );
+    }
+    let expected_values = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rotary_dim))
+        .context(
+            "real full RoPE shape overflows usize while validating coordinator kernel input",
+        )?;
+    if input.len() != expected_values {
+        anyhow::bail!(
+            "real full RoPE input length mismatch: expected {} got {}",
+            expected_values,
+            input.len()
+        );
+    }
+    positions
+        .iter()
+        .map(|position| {
+            u32::try_from(*position).with_context(|| {
+                format!("real full RoPE position {position} does not fit CUDA u32 index")
+            })
+        })
+        .collect()
+}
+
+pub(in crate::commands::real_full) fn validate_rope_bf16_inputs(
+    input_bf16: &[u8],
+    positions: &[usize],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<Vec<u32>> {
+    if rows == 0 || heads == 0 || rotary_dim == 0 || rotary_dim % 2 != 0 {
+        anyhow::bail!(
+            "real full BF16 RoPE requires non-zero rows/heads and positive even rotary_dim, got rows={rows} heads={heads} rotary_dim={rotary_dim}"
+        );
+    }
+    if !theta.is_finite() || theta <= 0.0 {
+        anyhow::bail!("real full BF16 RoPE theta must be finite and positive");
+    }
+    if positions.len() != rows {
+        anyhow::bail!(
+            "real full BF16 RoPE positions length mismatch: expected {} got {}",
+            rows,
+            positions.len()
+        );
+    }
+    let expected_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rotary_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context(
+            "real full BF16 RoPE shape overflows usize while validating coordinator kernel input",
+        )?;
+    if input_bf16.len() != expected_bytes {
+        anyhow::bail!(
+            "real full BF16 RoPE input byte length mismatch: expected {} got {}",
+            expected_bytes,
+            input_bf16.len()
+        );
+    }
+    positions
+        .iter()
+        .map(|position| {
+            u32::try_from(*position).with_context(|| {
+                format!("real full BF16 RoPE position {position} does not fit CUDA u32 index")
+            })
+        })
+        .collect()
+}
+
+#[allow(dead_code, clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn validate_mla_rope_attention_inputs(
+    q_nope: &[f32],
+    q_rope: &[f32],
+    k_nope: &[f32],
+    k_rope: &[f32],
+    values: &[f32],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<()> {
+    if rows == 0 || heads == 0 || nope_dim == 0 || rope_dim == 0 || v_dim == 0 {
+        anyhow::bail!(
+            "real full MLA/RoPE attention requires non-zero shape, got rows={rows} heads={heads} nope_dim={nope_dim} rope_dim={rope_dim} v_dim={v_dim}"
+        );
+    }
+    if rope_dim % 2 != 0 {
+        anyhow::bail!("real full MLA/RoPE attention rope_dim must be even, got {rope_dim}");
+    }
+    if !scale.is_finite() {
+        anyhow::bail!("real full MLA/RoPE attention scale must be finite");
+    }
+    let row_heads = rows
+        .checked_mul(heads)
+        .context("real full MLA/RoPE attention row-head shape overflows usize")?;
+    let nope_values = row_heads
+        .checked_mul(nope_dim)
+        .context("real full MLA/RoPE attention no-RPE shape overflows usize")?;
+    let rope_values = row_heads
+        .checked_mul(rope_dim)
+        .context("real full MLA/RoPE attention q-RoPE shape overflows usize")?;
+    let shared_rope_values = rows
+        .checked_mul(rope_dim)
+        .context("real full MLA/RoPE attention shared k-RoPE shape overflows usize")?;
+    let value_count = row_heads
+        .checked_mul(v_dim)
+        .context("real full MLA/RoPE attention value shape overflows usize")?;
+    if q_nope.len() != nope_values {
+        anyhow::bail!(
+            "real full MLA/RoPE attention q_nope length mismatch: expected {} got {}",
+            nope_values,
+            q_nope.len()
+        );
+    }
+    if k_nope.len() != nope_values {
+        anyhow::bail!(
+            "real full MLA/RoPE attention k_nope length mismatch: expected {} got {}",
+            nope_values,
+            k_nope.len()
+        );
+    }
+    if q_rope.len() != rope_values {
+        anyhow::bail!(
+            "real full MLA/RoPE attention q_rope length mismatch: expected {} got {}",
+            rope_values,
+            q_rope.len()
+        );
+    }
+    if k_rope.len() != shared_rope_values {
+        anyhow::bail!(
+            "real full MLA/RoPE attention k_rope length mismatch: expected {} got {}",
+            shared_rope_values,
+            k_rope.len()
+        );
+    }
+    if values.len() != value_count {
+        anyhow::bail!(
+            "real full MLA/RoPE attention value length mismatch: expected {} got {}",
+            value_count,
+            values.len()
+        );
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn validate_mla_rope_attention_bf16_inputs(
+    q_nope_bf16: &[u8],
+    q_rope_bf16: &[u8],
+    k_nope_bf16: &[u8],
+    k_rope_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<()> {
+    if rows == 0 || heads == 0 || nope_dim == 0 || rope_dim == 0 || v_dim == 0 {
+        anyhow::bail!(
+            "real full BF16 MLA/RoPE attention requires non-zero shape, got rows={rows} heads={heads} nope_dim={nope_dim} rope_dim={rope_dim} v_dim={v_dim}"
+        );
+    }
+    if rope_dim % 2 != 0 {
+        anyhow::bail!("real full BF16 MLA/RoPE attention rope_dim must be even, got {rope_dim}");
+    }
+    if !scale.is_finite() {
+        anyhow::bail!("real full BF16 MLA/RoPE attention scale must be finite");
+    }
+    let row_heads = rows.checked_mul(heads).context(
+        "real full BF16 MLA/RoPE attention row/head shape overflows usize while validating input",
+    )?;
+    let nope_bytes = row_heads
+        .checked_mul(nope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context(
+            "real full BF16 MLA/RoPE attention no-RPE shape overflows usize while validating input",
+        )?;
+    if q_nope_bf16.len() != nope_bytes {
+        anyhow::bail!(
+            "real full BF16 MLA/RoPE attention q_nope byte length mismatch: expected {} got {}",
+            nope_bytes,
+            q_nope_bf16.len()
+        );
+    }
+    if k_nope_bf16.len() != nope_bytes {
+        anyhow::bail!(
+            "real full BF16 MLA/RoPE attention k_nope byte length mismatch: expected {} got {}",
+            nope_bytes,
+            k_nope_bf16.len()
+        );
+    }
+    let q_rope_bytes = row_heads
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context(
+            "real full BF16 MLA/RoPE attention q_rope shape overflows usize while validating input",
+        )?;
+    if q_rope_bf16.len() != q_rope_bytes {
+        anyhow::bail!(
+            "real full BF16 MLA/RoPE attention q_rope byte length mismatch: expected {} got {}",
+            q_rope_bytes,
+            q_rope_bf16.len()
+        );
+    }
+    let k_rope_bytes = rows
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context(
+            "real full BF16 MLA/RoPE attention shared k_rope shape overflows usize while validating input",
+        )?;
+    if k_rope_bf16.len() != k_rope_bytes {
+        anyhow::bail!(
+            "real full BF16 MLA/RoPE attention k_rope byte length mismatch: expected {} got {}",
+            k_rope_bytes,
+            k_rope_bf16.len()
+        );
+    }
+    let value_bytes = row_heads
+        .checked_mul(v_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context(
+            "real full BF16 MLA/RoPE attention value shape overflows usize while validating input",
+        )?;
+    if values_bf16.len() != value_bytes {
+        anyhow::bail!(
+            "real full BF16 MLA/RoPE attention value byte length mismatch: expected {} got {}",
+            value_bytes,
+            values_bf16.len()
+        );
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn cpu_mla_rope_attention_rows(
+    q_nope: &[f32],
+    q_rope: &[f32],
+    k_nope: &[f32],
+    k_rope: &[f32],
+    values: &[f32],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> MlaRopeAttentionOutput {
+    let mut output = vec![0.0_f32; rows * heads * v_dim];
+    for row in 0..rows {
+        for head in 0..heads {
+            let q_nope_start = (row * heads + head) * nope_dim;
+            let q_rope_start = (row * heads + head) * rope_dim;
+            let q_nope_vec = &q_nope[q_nope_start..q_nope_start + nope_dim];
+            let q_rope_vec = &q_rope[q_rope_start..q_rope_start + rope_dim];
+            let mut scores = Vec::with_capacity(row + 1);
+            for key_row in 0..=row {
+                let k_nope_start = (key_row * heads + head) * nope_dim;
+                let k_rope_start = key_row * rope_dim;
+                let nope_score = q_nope_vec
+                    .iter()
+                    .zip(k_nope[k_nope_start..k_nope_start + nope_dim].iter())
+                    .map(|(left, right)| left * right)
+                    .sum::<f32>();
+                let rope_score = q_rope_vec
+                    .iter()
+                    .zip(k_rope[k_rope_start..k_rope_start + rope_dim].iter())
+                    .map(|(left, right)| left * right)
+                    .sum::<f32>();
+                scores.push((nope_score + rope_score) * scale);
+            }
+            let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            let mut weights = scores
+                .iter()
+                .map(|score| (score - max_score).exp())
+                .collect::<Vec<_>>();
+            let weight_sum = weights.iter().sum::<f32>().max(1.0e-12);
+            for weight in &mut weights {
+                *weight /= weight_sum;
+            }
+            let out_start = (row * heads + head) * v_dim;
+            for (weight, key_row) in weights.iter().zip(0..=row) {
+                let value_start = (key_row * heads + head) * v_dim;
+                for value_index in 0..v_dim {
+                    output[out_start + value_index] += weight * values[value_start + value_index];
+                }
+            }
+        }
+    }
+    MlaRopeAttentionOutput {
+        values: output,
+        backend: CPU_REFERENCE_MLA_ROPE_ATTENTION_BACKEND,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn cpu_mla_rope_attention_rows_bf16(
+    q_nope_bf16: &[u8],
+    q_rope_bf16: &[u8],
+    k_nope_bf16: &[u8],
+    k_rope_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> MlaRopeAttentionOutput {
+    let mut output = cpu_mla_rope_attention_rows(
+        &bf16_values_to_f32(q_nope_bf16),
+        &bf16_values_to_f32(q_rope_bf16),
+        &bf16_values_to_f32(k_nope_bf16),
+        &bf16_values_to_f32(k_rope_bf16),
+        &bf16_values_to_f32(values_bf16),
+        rows,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+        scale,
+    );
+    output.backend = CPU_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND;
+    output
+}
+
+pub(in crate::commands::real_full) fn cpu_rope_rows(
+    input: &[f32],
+    positions: &[u32],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> RopeOutput {
+    let mut output = vec![0.0_f32; input.len()];
+    let pair_count = rotary_dim / 2;
+    for (row, position) in positions.iter().copied().enumerate().take(rows) {
+        for head in 0..heads {
+            let row_head_start = (row * heads + head) * rotary_dim;
+            for pair in 0..pair_count {
+                let offset = row_head_start + pair * 2;
+                let angle = position as f32 * theta.powf(-2.0 * pair as f32 / rotary_dim as f32);
+                let cos = angle.cos();
+                let sin = angle.sin();
+                let even = input[offset];
+                let odd = input[offset + 1];
+                output[offset] = even * cos - odd * sin;
+                output[offset + 1] = even * sin + odd * cos;
+            }
+        }
+    }
+    RopeOutput {
+        values: output,
+        backend: CPU_REFERENCE_ROPE_BACKEND,
+    }
+}
+
+pub(in crate::commands::real_full) fn cpu_rope_rows_bf16(
+    input_bf16: &[u8],
+    positions: &[u32],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> RopeOutput {
+    let mut output = cpu_rope_rows(
+        &bf16_values_to_f32(input_bf16),
+        positions,
+        rows,
+        heads,
+        rotary_dim,
+        theta,
+    );
+    output.backend = CPU_REFERENCE_ROPE_BF16_BACKEND;
+    output
+}
+
+pub(in crate::commands::real_full) fn cpu_causal_attention_rows(
+    queries: &[f32],
+    keys: &[f32],
+    values: &[f32],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> CausalAttentionOutput {
+    let mut output = vec![0.0_f32; rows * heads * v_dim];
+    for row in 0..rows {
+        for head in 0..heads {
+            let q_start = (row * heads + head) * qk_dim;
+            let query = &queries[q_start..q_start + qk_dim];
+            let mut scores = Vec::with_capacity(row + 1);
+            for key_row in 0..=row {
+                let k_start = (key_row * heads + head) * qk_dim;
+                let key = &keys[k_start..k_start + qk_dim];
+                let score = query
+                    .iter()
+                    .zip(key.iter())
+                    .map(|(query, key)| query * key)
+                    .sum::<f32>()
+                    * scale;
+                scores.push(score);
+            }
+            let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            let mut weights = scores
+                .iter()
+                .map(|score| (score - max_score).exp())
+                .collect::<Vec<_>>();
+            let weight_sum = weights.iter().sum::<f32>().max(1.0e-12);
+            for weight in &mut weights {
+                *weight /= weight_sum;
+            }
+            let out_start = (row * heads + head) * v_dim;
+            for (weight, key_row) in weights.iter().zip(0..=row) {
+                let value_start = (key_row * heads + head) * v_dim;
+                let value = &values[value_start..value_start + v_dim];
+                for value_index in 0..v_dim {
+                    output[out_start + value_index] += weight * value[value_index];
+                }
+            }
+        }
+    }
+    CausalAttentionOutput {
+        values: output,
+        backend: CPU_REFERENCE_CAUSAL_ATTENTION_BACKEND,
+    }
+}
+
+pub(in crate::commands::real_full) fn cpu_causal_attention_rows_bf16(
+    queries_bf16: &[u8],
+    keys_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> CausalAttentionOutput {
+    let mut output = cpu_causal_attention_rows(
+        &bf16_values_to_f32(queries_bf16),
+        &bf16_values_to_f32(keys_bf16),
+        &bf16_values_to_f32(values_bf16),
+        rows,
+        heads,
+        qk_dim,
+        v_dim,
+        scale,
+    );
+    output.backend = CPU_REFERENCE_CAUSAL_ATTENTION_BF16_BACKEND;
+    output
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn cuda_rope_rows(
+    input: &[f32],
+    positions: &[u32],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<RopeOutput> {
+    let library = cuda_native_library()?;
+    let input_bytes = std::mem::size_of_val(input);
+    let position_bytes = std::mem::size_of_val(positions);
+    let mut workspace = lock_coordinator_cuda_workspace()?;
+    let input_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::A,
+        input_bytes,
+        "RoPE input",
+    )?;
+    let position_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::B,
+        position_bytes,
+        "RoPE positions",
+    )?;
+    let output_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::C,
+        input_bytes,
+        "RoPE output",
+    )?;
+
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            f32_bytes(input),
+            "RoPE input",
+        )
+        .context("copying RoPE input to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            u32_bytes(positions),
+            "RoPE positions",
+        )
+        .context("copying RoPE positions to device")?;
+    library
+        .cuda_rope_f32(
+            input_buffer,
+            position_buffer,
+            output_buffer,
+            rows,
+            heads,
+            rotary_dim,
+            theta,
+        )
+        .context("executing CUDA RoPE")?;
+    let mut out_bytes = vec![0_u8; input_bytes];
+    library
+        .copy_d2h(&mut out_bytes, output_buffer)
+        .context("copying RoPE output to host")?;
+
+    Ok(RopeOutput {
+        values: f32_vec_from_bytes(&out_bytes)?,
+        backend: CUDA_REFERENCE_ROPE_BACKEND,
+    })
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn cuda_rope_rows_bf16(
+    input_bf16: &[u8],
+    positions: &[u32],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<RopeOutput> {
+    let library = cuda_native_library()?;
+    let input_bytes = input_bf16.len();
+    let position_bytes = std::mem::size_of_val(positions);
+    let mut workspace = lock_coordinator_cuda_workspace()?;
+    let input_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::A,
+        input_bytes,
+        "BF16 RoPE input",
+    )?;
+    let position_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::B,
+        position_bytes,
+        "BF16 RoPE positions",
+    )?;
+    let output_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::C,
+        input_bytes,
+        "BF16 RoPE output",
+    )?;
+
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            input_bf16,
+            "BF16 RoPE input",
+        )
+        .context("copying BF16 RoPE input to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            u32_bytes(positions),
+            "BF16 RoPE positions",
+        )
+        .context("copying BF16 RoPE positions to device")?;
+    library
+        .cuda_rope_bf16(
+            input_buffer,
+            position_buffer,
+            output_buffer,
+            rows,
+            heads,
+            rotary_dim,
+            theta,
+        )
+        .context("executing CUDA BF16 RoPE")?;
+    let mut out_bytes = vec![0_u8; input_bytes];
+    library
+        .copy_d2h(&mut out_bytes, output_buffer)
+        .context("copying BF16 RoPE output to host")?;
+
+    Ok(RopeOutput {
+        values: bf16_values_to_f32(&out_bytes),
+        backend: CUDA_REFERENCE_ROPE_BF16_BACKEND,
+    })
+}
+
+pub(in crate::commands::real_full) fn rope_graph_input_bytes(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    rotary_dim: usize,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rotary_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .with_context(|| format!("{context} input graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn rope_graph_position_bytes(
+    graph_key: &CoordinatorGraphKey,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(std::mem::size_of::<u32>())
+        .with_context(|| format!("{context} position graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn rope_graph_signature(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> CoordinatorCudaGraphSignature {
+    CoordinatorCudaGraphSignature::rope_bf16(
+        graph_key.row_bucket.row_capacity * heads * rotary_dim * std::mem::size_of::<u16>(),
+        graph_key.row_bucket.row_capacity,
+        heads,
+        rotary_dim,
+        theta,
+    )
+}
+
+pub(in crate::commands::real_full) fn cuda_rope_rows_bf16_for_layer(
+    layer_id: usize,
+    input_bf16: &[u8],
+    positions: &[u32],
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<RopeOutput> {
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let input_bytes = input_bf16.len();
+    let graph_input_bytes = rope_graph_input_bytes(
+        &graph_key,
+        heads,
+        rotary_dim,
+        "CUDA BF16 layer RoPE graph-slot",
+    )?;
+    let graph_position_bytes =
+        rope_graph_position_bytes(&graph_key, "CUDA BF16 layer RoPE graph-slot")?;
+    let signature = rope_graph_signature(&graph_key, heads, rotary_dim, theta);
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        let input_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            graph_input_bytes,
+            "BF16 layer RoPE input",
+        )?;
+        let position_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            graph_position_bytes,
+            "BF16 layer RoPE positions",
+        )?;
+        let output_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::C,
+            graph_input_bytes,
+            "BF16 layer RoPE output",
+        )?;
+
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::A,
+                input_bf16,
+                "BF16 layer RoPE input",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer RoPE input to device")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::B,
+                u32_bytes(positions),
+                "BF16 layer RoPE positions",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer RoPE positions to device")?;
+        capture_or_update_layer_rope_bf16_graph(
+            library,
+            slot,
+            signature,
+            input_buffer,
+            position_buffer,
+            output_buffer,
+            rows,
+            heads,
+            rotary_dim,
+            theta,
+            "BF16 layer RoPE",
+        )?;
+        let mut out_bytes = vec![0_u8; input_bytes];
+        unsafe {
+            library
+                .copy_d2h_async(&mut out_bytes, output_buffer, cuda_stream)
+                .context("async copying BF16 layer RoPE output to host")?;
+            library
+                .cuda_stream_synchronize(cuda_stream)
+                .context("synchronizing BF16 layer RoPE graph slot stream")?;
+        }
+
+        Ok(RopeOutput {
+            values: bf16_values_to_f32(&out_bytes),
+            backend: CUDA_REFERENCE_ROPE_BF16_BACKEND,
+        })
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn rope_bf16_device_buffers_for_layer(
+    layer_id: usize,
+    input_buffer: Ds4rtDeviceBuffer,
+    position_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<&'static str> {
+    validate_rope_bf16_device_buffers(
+        input_buffer,
+        position_buffer,
+        output_buffer,
+        rows,
+        heads,
+        rotary_dim,
+        theta,
+    )?;
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let signature = rope_graph_signature(&graph_key, heads, rotary_dim, theta);
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        capture_or_update_layer_rope_bf16_graph(
+            library,
+            slot,
+            signature,
+            input_buffer,
+            position_buffer,
+            output_buffer,
+            rows,
+            heads,
+            rotary_dim,
+            theta,
+            "BF16 layer RoPE device-buffer",
+        )?;
+        unsafe {
+            library
+                .cuda_stream_synchronize(cuda_stream)
+                .context("synchronizing BF16 layer RoPE device-buffer graph slot stream")?;
+        }
+        Ok(CUDA_REFERENCE_ROPE_BF16_BACKEND)
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn validate_rope_bf16_device_buffers(
+    input_buffer: Ds4rtDeviceBuffer,
+    position_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+) -> Result<()> {
+    if rows == 0 || heads == 0 || rotary_dim == 0 || rotary_dim % 2 != 0 {
+        anyhow::bail!(
+            "CUDA BF16 layer RoPE device-buffer requires nonzero rows/heads and positive even rotary_dim, got rows={rows} heads={heads} rotary_dim={rotary_dim}"
+        );
+    }
+    if !theta.is_finite() || theta <= 0.0 {
+        anyhow::bail!("CUDA BF16 layer RoPE device-buffer theta must be finite and positive");
+    }
+    let input_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rotary_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer RoPE device-buffer input bytes overflow usize")?;
+    let position_bytes = rows
+        .checked_mul(std::mem::size_of::<u32>())
+        .context("CUDA BF16 layer RoPE device-buffer position bytes overflow usize")?;
+    let buffers = [
+        ("input", input_buffer, input_bytes),
+        ("positions", position_buffer, position_bytes),
+        ("output", output_buffer, input_bytes),
+    ];
+    for (label, buffer, required_bytes) in buffers {
+        if buffer.ptr.is_null() {
+            anyhow::bail!("CUDA BF16 layer RoPE device-buffer {label} is null");
+        }
+        if buffer.bytes < required_bytes {
+            anyhow::bail!(
+                "CUDA BF16 layer RoPE device-buffer {label} has {} bytes, expected at least {required_bytes}",
+                buffer.bytes
+            );
+        }
+        if buffer.device_id != input_buffer.device_id {
+            anyhow::bail!(
+                "CUDA BF16 layer RoPE device-buffer {label} is on CUDA device {}, expected {}",
+                buffer.device_id,
+                input_buffer.device_id
+            );
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn capture_or_update_layer_rope_bf16_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    input_buffer: Ds4rtDeviceBuffer,
+    position_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    rotary_dim: usize,
+    theta: f32,
+    label: &'static str,
+) -> Result<()> {
+    if !slot.has_captured_graph(CoordinatorCudaGraphProgram::LayerRopeBf16, signature) {
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} inputs before graph capture"))?;
+        slot.capture_graph(
+            library,
+            CoordinatorCudaGraphProgram::LayerRopeBf16,
+            signature,
+            |library, cuda_stream, _workspace| unsafe {
+                library
+                    .cuda_rope_bf16_async(
+                        input_buffer,
+                        position_buffer,
+                        output_buffer,
+                        rows,
+                        heads,
+                        rotary_dim,
+                        theta,
+                        cuda_stream,
+                    )
+                    .with_context(|| format!("capturing async CUDA {label}"))?;
+                Ok(())
+            },
+        )?;
+    } else {
+        let (graph_raw, exec_raw) = slot
+            .captured_graph_raw_handles(CoordinatorCudaGraphProgram::LayerRopeBf16, signature)
+            .context("coordinator CUDA graph slot lost captured RoPE graph before update")?;
+        unsafe {
+            library
+                .cuda_graph_update_rope_bf16_node(
+                    graph_raw,
+                    exec_raw,
+                    0,
+                    input_buffer,
+                    position_buffer,
+                    output_buffer,
+                    rows,
+                    heads,
+                    rotary_dim,
+                    theta,
+                )
+                .with_context(|| format!("updating captured CUDA {label} graph node"))?;
+        }
+    }
+    slot.launch_captured_graph(
+        library,
+        CoordinatorCudaGraphProgram::LayerRopeBf16,
+        signature,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn cuda_mla_rope_attention_rows_bf16(
+    q_nope_bf16: &[u8],
+    q_rope_bf16: &[u8],
+    k_nope_bf16: &[u8],
+    k_rope_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<MlaRopeAttentionOutput> {
+    let library = cuda_native_library()?;
+    let nope_bytes = q_nope_bf16.len();
+    let q_rope_bytes = q_rope_bf16.len();
+    let k_rope_bytes = k_rope_bf16.len();
+    let value_bytes = values_bf16.len();
+    let mut workspace = lock_coordinator_cuda_workspace()?;
+    let q_nope_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::A,
+        nope_bytes,
+        "BF16 MLA/RoPE q_nope",
+    )?;
+    let q_rope_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::B,
+        q_rope_bytes,
+        "BF16 MLA/RoPE q_rope",
+    )?;
+    let k_nope_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::C,
+        nope_bytes,
+        "BF16 MLA/RoPE k_nope",
+    )?;
+    let k_rope_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::D,
+        k_rope_bytes,
+        "BF16 MLA/RoPE k_rope",
+    )?;
+    let value_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::E,
+        value_bytes,
+        "BF16 MLA/RoPE values",
+    )?;
+    let output_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::F,
+        value_bytes,
+        "BF16 MLA/RoPE output",
+    )?;
+
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            q_nope_bf16,
+            "BF16 MLA/RoPE q_nope",
+        )
+        .context("copying BF16 MLA/RoPE q_nope to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            q_rope_bf16,
+            "BF16 MLA/RoPE q_rope",
+        )
+        .context("copying BF16 MLA/RoPE q_rope to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::C,
+            k_nope_bf16,
+            "BF16 MLA/RoPE k_nope",
+        )
+        .context("copying BF16 MLA/RoPE k_nope to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::D,
+            k_rope_bf16,
+            "BF16 MLA/RoPE k_rope",
+        )
+        .context("copying BF16 MLA/RoPE k_rope to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::E,
+            values_bf16,
+            "BF16 MLA/RoPE values",
+        )
+        .context("copying BF16 MLA/RoPE values to device")?;
+    library
+        .cuda_mla_rope_attention_bf16(
+            q_nope_buffer,
+            q_rope_buffer,
+            k_nope_buffer,
+            k_rope_buffer,
+            value_buffer,
+            output_buffer,
+            rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+            scale,
+        )
+        .context("executing CUDA BF16 MLA/RoPE attention")?;
+    let mut out_bytes = vec![0_u8; value_bytes];
+    library
+        .copy_d2h(&mut out_bytes, output_buffer)
+        .context("copying BF16 MLA/RoPE attention output to host")?;
+
+    Ok(MlaRopeAttentionOutput {
+        values: bf16_values_to_f32(&out_bytes),
+        backend: CUDA_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn cuda_mla_rope_attention_rows_bf16_for_layer(
+    layer_id: usize,
+    q_nope_bf16: &[u8],
+    q_rope_bf16: &[u8],
+    k_nope_bf16: &[u8],
+    k_rope_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<MlaRopeAttentionOutput> {
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let value_bytes = values_bf16.len();
+    let nope_graph_bytes = mla_rope_attention_graph_nope_bytes(
+        &graph_key,
+        heads,
+        nope_dim,
+        "CUDA BF16 layer MLA/RoPE attention graph-slot",
+    )?;
+    let q_rope_graph_bytes = mla_rope_attention_graph_q_rope_bytes(
+        &graph_key,
+        heads,
+        rope_dim,
+        "CUDA BF16 layer MLA/RoPE attention graph-slot",
+    )?;
+    let k_rope_graph_bytes = mla_rope_attention_graph_k_rope_bytes(
+        &graph_key,
+        rope_dim,
+        "CUDA BF16 layer MLA/RoPE attention graph-slot",
+    )?;
+    let value_graph_bytes = mla_rope_attention_graph_value_bytes(
+        &graph_key,
+        heads,
+        v_dim,
+        "CUDA BF16 layer MLA/RoPE attention graph-slot",
+    )?;
+    let signature =
+        mla_rope_attention_graph_signature(&graph_key, heads, nope_dim, rope_dim, v_dim, scale);
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        let q_nope_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            nope_graph_bytes,
+            "BF16 layer MLA/RoPE q_nope",
+        )?;
+        let q_rope_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            q_rope_graph_bytes,
+            "BF16 layer MLA/RoPE q_rope",
+        )?;
+        let k_nope_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::C,
+            nope_graph_bytes,
+            "BF16 layer MLA/RoPE k_nope",
+        )?;
+        let k_rope_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::D,
+            k_rope_graph_bytes,
+            "BF16 layer MLA/RoPE k_rope",
+        )?;
+        let value_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::E,
+            value_graph_bytes,
+            "BF16 layer MLA/RoPE values",
+        )?;
+        let output_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::F,
+            value_graph_bytes,
+            "BF16 layer MLA/RoPE output",
+        )?;
+
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::A,
+                q_nope_bf16,
+                "BF16 layer MLA/RoPE q_nope",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer MLA/RoPE q_nope to device")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::B,
+                q_rope_bf16,
+                "BF16 layer MLA/RoPE q_rope",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer MLA/RoPE q_rope to device")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::C,
+                k_nope_bf16,
+                "BF16 layer MLA/RoPE k_nope",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer MLA/RoPE k_nope to device")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::D,
+                k_rope_bf16,
+                "BF16 layer MLA/RoPE k_rope",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer MLA/RoPE k_rope to device")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::E,
+                values_bf16,
+                "BF16 layer MLA/RoPE values",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer MLA/RoPE values to device")?;
+        let backend =
+            if b12x_mla_rope_attention_bf16_supported(rows, heads, nope_dim, rope_dim, v_dim) {
+                capture_or_update_layer_b12x_mla_rope_attention_bf16_graph(
+                    library,
+                    slot,
+                    signature,
+                    q_nope_buffer,
+                    q_rope_buffer,
+                    k_nope_buffer,
+                    k_rope_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                    "BF16 layer b12x MLA/RoPE attention",
+                )?;
+                B12X_MLA_ROPE_ATTENTION_BF16_BACKEND
+            } else {
+                capture_or_update_layer_mla_rope_attention_bf16_graph(
+                    library,
+                    slot,
+                    signature,
+                    q_nope_buffer,
+                    q_rope_buffer,
+                    k_nope_buffer,
+                    k_rope_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                    "BF16 layer MLA/RoPE attention",
+                )?;
+                CUDA_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND
+            };
+        let mut out_bytes = vec![0_u8; value_bytes];
+        unsafe {
+            library
+                .copy_d2h_async(&mut out_bytes, output_buffer, cuda_stream)
+                .context("async copying BF16 layer MLA/RoPE attention output to host")?;
+            library
+                .cuda_stream_synchronize(cuda_stream)
+                .context("synchronizing BF16 layer MLA/RoPE attention graph slot stream")?;
+        }
+
+        Ok(MlaRopeAttentionOutput {
+            values: bf16_values_to_f32(&out_bytes),
+            backend,
+        })
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_rope_attention_device_buffers_bf16_for_layer(
+    layer_id: usize,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<&'static str> {
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    validate_mla_rope_attention_device_buffers(
+        rows,
+        q_nope_buffer,
+        q_rope_buffer,
+        k_nope_buffer,
+        k_rope_buffer,
+        value_buffer,
+        output_buffer,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+    )?;
+    let signature =
+        mla_rope_attention_graph_signature(&graph_key, heads, nope_dim, rope_dim, v_dim, scale);
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        let backend =
+            if flashinfer_mla_rope_attention_bf16_supported(rows, heads, nope_dim, rope_dim, v_dim)
+            {
+                let exact_signature = flashinfer_mla_graph_signature(
+                    rows,
+                    0,
+                    rows,
+                    graph_key.row_bucket.row_capacity,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                )?;
+                if capture_or_update_layer_flashinfer_mla_rope_attention_bf16_graph(
+                    library,
+                    slot,
+                    exact_signature,
+                    q_nope_buffer,
+                    q_rope_buffer,
+                    k_nope_buffer,
+                    k_rope_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    0,
+                    rows,
+                    graph_key.row_bucket.row_capacity,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                    "BF16 layer FlashInfer MLA/RoPE attention device-buffer",
+                    false,
+                )? {
+                    FLASHINFER_MLA_ROPE_ATTENTION_BF16_BACKEND
+                } else {
+                    capture_or_update_layer_mla_rope_attention_bf16_graph(
+                        library,
+                        slot,
+                        signature,
+                        q_nope_buffer,
+                        q_rope_buffer,
+                        k_nope_buffer,
+                        k_rope_buffer,
+                        value_buffer,
+                        output_buffer,
+                        rows,
+                        heads,
+                        nope_dim,
+                        rope_dim,
+                        v_dim,
+                        scale,
+                        "BF16 layer MLA/RoPE attention device-buffer",
+                    )?;
+                    CUDA_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND
+                }
+            } else if b12x_mla_rope_attention_bf16_supported(rows, heads, nope_dim, rope_dim, v_dim)
+            {
+                capture_or_update_layer_b12x_mla_rope_attention_bf16_graph(
+                    library,
+                    slot,
+                    signature,
+                    q_nope_buffer,
+                    q_rope_buffer,
+                    k_nope_buffer,
+                    k_rope_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                    "BF16 layer b12x MLA/RoPE attention device-buffer",
+                )?;
+                B12X_MLA_ROPE_ATTENTION_BF16_BACKEND
+            } else {
+                capture_or_update_layer_mla_rope_attention_bf16_graph(
+                    library,
+                    slot,
+                    signature,
+                    q_nope_buffer,
+                    q_rope_buffer,
+                    k_nope_buffer,
+                    k_rope_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                    "BF16 layer MLA/RoPE attention device-buffer",
+                )?;
+                CUDA_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND
+            };
+        unsafe {
+            library.cuda_stream_synchronize(cuda_stream).context(
+                "synchronizing BF16 layer MLA/RoPE attention device-buffer graph slot stream",
+            )?;
+        }
+        Ok(backend)
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn capture_or_update_layer_mla_rope_attention_bf16_suffix_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    query_row_offset: usize,
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+    label: &'static str,
+) -> Result<()> {
+    let program = CoordinatorCudaGraphProgram::LayerMlaRopeAttentionBf16Suffix;
+    if !slot.has_captured_graph(program, signature) {
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} inputs before graph capture"))?;
+        slot.capture_graph(
+            library,
+            program,
+            signature,
+            |library, cuda_stream, _workspace| unsafe {
+                library
+                    .cuda_mla_rope_attention_bf16_suffix_async(
+                        q_nope_buffer,
+                        q_rope_buffer,
+                        k_nope_buffer,
+                        k_rope_buffer,
+                        value_buffer,
+                        output_buffer,
+                        rows,
+                        query_row_offset,
+                        query_rows,
+                        heads,
+                        nope_dim,
+                        rope_dim,
+                        v_dim,
+                        scale,
+                        cuda_stream,
+                    )
+                    .with_context(|| format!("capturing async CUDA {label}"))?;
+                Ok(())
+            },
+        )?;
+    } else {
+        let (graph_raw, exec_raw) = slot
+            .captured_graph_raw_handles(program, signature)
+            .context(
+                "coordinator CUDA graph slot lost captured MLA/RoPE suffix attention graph before update",
+            )?;
+        unsafe {
+            library
+                .cuda_graph_update_mla_rope_attention_bf16_suffix_node(
+                    graph_raw,
+                    exec_raw,
+                    0,
+                    q_nope_buffer,
+                    q_rope_buffer,
+                    k_nope_buffer,
+                    k_rope_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    query_row_offset,
+                    query_rows,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                )
+                .with_context(|| format!("updating captured CUDA {label} graph node"))?;
+        }
+    }
+    slot.launch_captured_graph(library, program, signature)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_rope_attention_suffix_device_buffers_bf16_for_layer(
+    layer_id: usize,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    query_row_offset: usize,
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<&'static str> {
+    if query_rows == 0 {
+        anyhow::bail!("CUDA BF16 layer MLA/RoPE suffix attention requires query rows");
+    }
+    if query_row_offset > rows || query_rows > rows - query_row_offset {
+        anyhow::bail!(
+            "CUDA BF16 layer MLA/RoPE suffix attention query rows {}..{} exceed rows {rows}",
+            query_row_offset,
+            query_row_offset.saturating_add(query_rows)
+        );
+    }
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    validate_mla_rope_attention_device_buffers_with_output_rows(
+        rows,
+        query_rows,
+        q_nope_buffer,
+        q_rope_buffer,
+        k_nope_buffer,
+        k_rope_buffer,
+        value_buffer,
+        output_buffer,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+    )?;
+    let signature = mla_rope_attention_suffix_graph_signature(
+        &graph_key, query_rows, heads, nope_dim, rope_dim, v_dim, scale,
+    );
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        let backend = if flashinfer_cudnn_mla_rope_attention_bf16_supported(
+            rows, heads, nope_dim, rope_dim, v_dim,
+        ) {
+            let exact_signature = flashinfer_mla_graph_signature(
+                rows,
+                query_row_offset,
+                query_rows,
+                graph_key.row_bucket.row_capacity,
+                heads,
+                nope_dim,
+                rope_dim,
+                v_dim,
+                scale,
+            )?;
+            let captured = capture_or_update_layer_flashinfer_mla_rope_attention_bf16_graph(
+                library,
+                slot,
+                exact_signature,
+                q_nope_buffer,
+                q_rope_buffer,
+                k_nope_buffer,
+                k_rope_buffer,
+                value_buffer,
+                output_buffer,
+                rows,
+                query_row_offset,
+                query_rows,
+                graph_key.row_bucket.row_capacity,
+                heads,
+                nope_dim,
+                rope_dim,
+                v_dim,
+                scale,
+                "BF16 layer FlashInfer/cuDNN MLA/RoPE suffix attention device-buffer",
+                false,
+            )?;
+            anyhow::ensure!(
+                    captured,
+                    "FlashInfer/cuDNN MLA suffix graph bucket={} query_bucket={} was not captured during startup",
+                    graph_key.row_bucket.row_capacity,
+                    flashinfer_mla_capture_shape(
+                        rows,
+                        query_row_offset,
+                        query_rows,
+                        graph_key.row_bucket.row_capacity,
+                    )?
+                    .query_rows,
+                );
+            FLASHINFER_CUDNN_MLA_ROPE_ATTENTION_BF16_BACKEND
+        } else {
+            capture_or_update_layer_mla_rope_attention_bf16_suffix_graph(
+                library,
+                slot,
+                signature,
+                q_nope_buffer,
+                q_rope_buffer,
+                k_nope_buffer,
+                k_rope_buffer,
+                value_buffer,
+                output_buffer,
+                rows,
+                query_row_offset,
+                query_rows,
+                heads,
+                nope_dim,
+                rope_dim,
+                v_dim,
+                scale,
+                "BF16 layer MLA/RoPE suffix attention device-buffer",
+            )?;
+            CUDA_REFERENCE_MLA_ROPE_ATTENTION_BF16_BACKEND
+        };
+        unsafe {
+            library.cuda_stream_synchronize(cuda_stream).context(
+                "synchronizing BF16 layer MLA/RoPE suffix attention device-buffer graph slot stream",
+            )?;
+        }
+        Ok(backend)
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_kv_cache_unpack_bf16_device_buffers_for_layer(
+    layer_id: usize,
+    payload_buffer: Ds4rtDeviceBuffer,
+    kv_latent_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    dsa_key_buffer: Option<Ds4rtDeviceBuffer>,
+    rows: usize,
+    kv_lora_rank: usize,
+    rope_dim: usize,
+    dsa_dim: usize,
+    payload_stride_bytes: usize,
+) -> Result<&'static str> {
+    validate_mla_kv_cache_unpack_bf16_device_buffers(
+        payload_buffer,
+        kv_latent_buffer,
+        k_rope_buffer,
+        dsa_key_buffer,
+        rows,
+        kv_lora_rank,
+        rope_dim,
+        dsa_dim,
+        payload_stride_bytes,
+    )?;
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let signature = CoordinatorCudaGraphSignature::mla_kv_cache_unpack_bf16(
+        graph_key.row_bucket.row_capacity,
+        payload_stride_bytes,
+        kv_lora_rank,
+        rope_dim,
+        dsa_dim,
+    );
+    match with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        capture_or_update_layer_mla_kv_cache_unpack_bf16_graph(
+            library,
+            slot,
+            signature,
+            payload_buffer,
+            kv_latent_buffer,
+            k_rope_buffer,
+            dsa_key_buffer,
+            rows,
+            kv_lora_rank,
+            rope_dim,
+            dsa_dim,
+            payload_stride_bytes,
+            "BF16 layer MLA KV cache unpack device-buffer",
+        )?;
+        unsafe {
+            library
+                .cuda_stream_synchronize(cuda_stream)
+                .context("synchronizing BF16 layer MLA KV cache unpack graph slot stream")?;
+        }
+        Ok(CUDA_REFERENCE_MLA_KV_CACHE_UNPACK_BF16_BACKEND)
+    }) {
+        Ok(backend) => Ok(backend),
+        Err(_error) => mla_kv_cache_unpack_bf16_device_buffers_direct(
+            payload_buffer,
+            kv_latent_buffer,
+            k_rope_buffer,
+            dsa_key_buffer,
+            rows,
+            kv_lora_rank,
+            rope_dim,
+            dsa_dim,
+            payload_stride_bytes,
+            "BF16 layer MLA KV cache unpack device-buffer",
+        ),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mla_kv_cache_unpack_bf16_device_buffers_direct(
+    payload_buffer: Ds4rtDeviceBuffer,
+    kv_latent_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    dsa_key_buffer: Option<Ds4rtDeviceBuffer>,
+    rows: usize,
+    kv_lora_rank: usize,
+    rope_dim: usize,
+    dsa_dim: usize,
+    payload_stride_bytes: usize,
+    label: &str,
+) -> Result<&'static str> {
+    let library = cuda_native_library()?;
+    library
+        .cuda_mla_kv_cache_unpack_bf16(
+            payload_buffer,
+            kv_latent_buffer,
+            k_rope_buffer,
+            dsa_key_buffer,
+            rows,
+            kv_lora_rank,
+            rope_dim,
+            dsa_dim,
+            payload_stride_bytes,
+        )
+        .with_context(|| format!("executing CUDA {label} direct fallback"))?;
+    Ok(CUDA_REFERENCE_MLA_KV_CACHE_UNPACK_BF16_BACKEND)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_kv_prepare_bf16_device_buffers_for_layer(
+    layer_id: usize,
+    projected_buffer: Ds4rtDeviceBuffer,
+    positions_buffer: Ds4rtDeviceBuffer,
+    norm_weight_buffer: Ds4rtDeviceBuffer,
+    prepared_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    projected_stride_bytes: usize,
+    prepared_stride_bytes: usize,
+    eps: f32,
+    theta: f32,
+) -> Result<&'static str> {
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        unsafe {
+            library
+                .cuda_mla_kv_prepare_bf16_async(
+                    projected_buffer,
+                    positions_buffer,
+                    norm_weight_buffer,
+                    prepared_buffer,
+                    rows,
+                    projected_stride_bytes,
+                    prepared_stride_bytes,
+                    eps,
+                    theta,
+                    cuda_stream,
+                )
+                .context("launching async MLA KV cache preparation")?;
+            library
+                .cuda_stream_synchronize(cuda_stream)
+                .context("synchronizing MLA KV cache preparation stream")?;
+        }
+        Ok(CUDA_REFERENCE_MLA_KV_PREPARE_BF16_BACKEND)
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_kv_projected_split_bf16_device_buffers_for_layer(
+    layer_id: usize,
+    projected_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    v_dim: usize,
+) -> Result<&'static str> {
+    validate_mla_kv_projected_split_bf16_device_buffers(
+        projected_buffer,
+        k_nope_buffer,
+        value_buffer,
+        rows,
+        heads,
+        nope_dim,
+        v_dim,
+    )?;
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let signature = CoordinatorCudaGraphSignature::mla_kv_projected_split_bf16(
+        graph_key.row_bucket.row_capacity,
+        heads,
+        nope_dim,
+        v_dim,
+    );
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        capture_or_update_layer_mla_kv_projected_split_bf16_graph(
+            library,
+            slot,
+            signature,
+            projected_buffer,
+            k_nope_buffer,
+            value_buffer,
+            rows,
+            heads,
+            nope_dim,
+            v_dim,
+            "BF16 layer MLA KV projected split device-buffer",
+        )?;
+        unsafe {
+            library
+                .cuda_stream_synchronize(cuda_stream)
+                .context("synchronizing BF16 layer MLA KV projected split graph slot stream")?;
+        }
+        Ok(CUDA_REFERENCE_MLA_KV_PROJECTED_SPLIT_BF16_BACKEND)
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_query_split_rope_bf16_device_buffers_for_layer(
+    layer_id: usize,
+    projected_buffer: Ds4rtDeviceBuffer,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_unrotated_buffer: Ds4rtDeviceBuffer,
+    position: u32,
+    q_rope_rotated_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    theta: f32,
+) -> Result<&'static str> {
+    anyhow::ensure!(
+        rows == 1,
+        "fused MLA query split/RoPE requires exactly one row, got {rows}"
+    );
+    validate_mla_kv_projected_split_bf16_device_buffers(
+        projected_buffer,
+        q_nope_buffer,
+        q_rope_unrotated_buffer,
+        rows,
+        heads,
+        nope_dim,
+        rope_dim,
+    )?;
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let signature = CoordinatorCudaGraphSignature::mla_query_split_rope_bf16(
+        rows, heads, nope_dim, rope_dim, theta,
+    );
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let positions_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::C,
+            std::mem::size_of::<u32>(),
+            "fused MLA decode query position",
+        )?;
+        validate_rope_bf16_device_buffers(
+            q_rope_unrotated_buffer,
+            positions_buffer,
+            q_rope_rotated_buffer,
+            rows,
+            heads,
+            rope_dim,
+            theta,
+        )?;
+        let stream = slot.stream_ptr();
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::C,
+                &position.to_ne_bytes(),
+                "fused MLA decode query position",
+                stream,
+            )
+            .context("staging fused MLA decode query position")?;
+        let capture_identity = mla_graph_capture_identity(&[
+            projected_buffer.ptr as usize,
+            q_nope_buffer.ptr as usize,
+            q_rope_unrotated_buffer.ptr as usize,
+            positions_buffer.ptr as usize,
+            q_rope_rotated_buffer.ptr as usize,
+            rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            theta.to_bits() as usize,
+        ]);
+        let program = CoordinatorCudaGraphProgram::LayerMlaQuerySplitRopeBf16;
+        slot.capture_or_update_graph_exec(
+            library,
+            program,
+            signature,
+            capture_identity,
+            |library, stream, _workspace| unsafe {
+                library
+                    .cuda_mla_kv_projected_split_bf16_async(
+                        projected_buffer,
+                        q_nope_buffer,
+                        q_rope_unrotated_buffer,
+                        rows,
+                        heads,
+                        nope_dim,
+                        rope_dim,
+                        stream,
+                    )
+                    .context("capturing fused MLA decode query split")?;
+                library
+                    .cuda_rope_bf16_async(
+                        q_rope_unrotated_buffer,
+                        positions_buffer,
+                        q_rope_rotated_buffer,
+                        rows,
+                        heads,
+                        rope_dim,
+                        theta,
+                        stream,
+                    )
+                    .context("capturing fused MLA decode query RoPE")?;
+                Ok(())
+            },
+        )?;
+        slot.launch_captured_graph_identity(library, program, signature, capture_identity)?;
+        // Packed/compressed attention consumes these buffers on the same stream
+        // and performs the single synchronization for the complete decode chain.
+        Ok("cuda-mla-query-split-rope-bf16-graph")
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn mla_query_split_rope_bf16_device_positions_for_layer(
+    layer_id: usize,
+    projected_buffer: Ds4rtDeviceBuffer,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_unrotated_buffer: Ds4rtDeviceBuffer,
+    positions_buffer: Ds4rtDeviceBuffer,
+    q_rope_rotated_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    theta: f32,
+) -> Result<&'static str> {
+    anyhow::ensure!(
+        rows > 1,
+        "batched fused MLA query split/RoPE requires at least two rows, got {rows}"
+    );
+    validate_mla_kv_projected_split_bf16_device_buffers(
+        projected_buffer,
+        q_nope_buffer,
+        q_rope_unrotated_buffer,
+        rows,
+        heads,
+        nope_dim,
+        rope_dim,
+    )?;
+    validate_rope_bf16_device_buffers(
+        q_rope_unrotated_buffer,
+        positions_buffer,
+        q_rope_rotated_buffer,
+        rows,
+        heads,
+        rope_dim,
+        theta,
+    )?;
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let signature = CoordinatorCudaGraphSignature::mla_query_split_rope_bf16(
+        rows, heads, nope_dim, rope_dim, theta,
+    );
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let program = CoordinatorCudaGraphProgram::LayerMlaQuerySplitRopeBf16;
+        if !slot.has_captured_graph(program, signature) {
+            slot.stream_synchronize()
+                .context("synchronizing batched MLA query split/RoPE inputs before capture")?;
+            slot.capture_graph(
+                library,
+                program,
+                signature,
+                |library, stream, _workspace| unsafe {
+                    library
+                        .cuda_mla_kv_projected_split_bf16_async(
+                            projected_buffer,
+                            q_nope_buffer,
+                            q_rope_unrotated_buffer,
+                            rows,
+                            heads,
+                            nope_dim,
+                            rope_dim,
+                            stream,
+                        )
+                        .context("capturing batched MLA query split")?;
+                    library
+                        .cuda_rope_bf16_async(
+                            q_rope_unrotated_buffer,
+                            positions_buffer,
+                            q_rope_rotated_buffer,
+                            rows,
+                            heads,
+                            rope_dim,
+                            theta,
+                            stream,
+                        )
+                        .context("capturing batched MLA query RoPE")?;
+                    Ok(())
+                },
+            )?;
+        } else {
+            let (graph_raw, exec_raw) = slot
+                .captured_graph_raw_handles(program, signature)
+                .context("batched MLA query split/RoPE graph disappeared before update")?;
+            unsafe {
+                library
+                    .cuda_graph_update_mla_kv_projected_split_bf16_node(
+                        graph_raw,
+                        exec_raw,
+                        0,
+                        projected_buffer,
+                        q_nope_buffer,
+                        q_rope_unrotated_buffer,
+                        rows,
+                        heads,
+                        nope_dim,
+                        rope_dim,
+                    )
+                    .context("updating batched MLA query split graph node")?;
+                library
+                    .cuda_graph_update_rope_bf16_node(
+                        graph_raw,
+                        exec_raw,
+                        1,
+                        q_rope_unrotated_buffer,
+                        positions_buffer,
+                        q_rope_rotated_buffer,
+                        rows,
+                        heads,
+                        rope_dim,
+                        theta,
+                    )
+                    .context("updating batched MLA query RoPE graph node")?;
+            }
+        }
+        slot.launch_captured_graph(library, program, signature)?;
+        let stream = slot.stream_ptr();
+        unsafe {
+            library
+                .cuda_stream_synchronize(stream)
+                .context("synchronizing batched MLA query split/RoPE graph stream")?;
+        }
+        Ok("cuda-mla-query-split-rope-bf16-batched-graph")
+    })
+}
+
+pub(in crate::commands::real_full) fn b12x_mla_rope_attention_bf16_shape_supported(
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+) -> bool {
+    rows > 0
+        && rows <= 512
+        && heads == 8
+        && nope_dim == GLM52_MLA_KV_LORA_RANK
+        && rope_dim == GLM52_MLA_QK_ROPE_HEAD_DIM
+        && v_dim == GLM52_MLA_KV_LORA_RANK
+}
+
+fn flashinfer_mla_rope_attention_bf16_supported(
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+) -> bool {
+    coordinator_python_capture_enabled()
+        && rows > 0
+        && rows <= 2_048
+        && flashinfer_glm52_attention_heads_supported(heads)
+        && nope_dim == 192
+        && rope_dim == GLM52_MLA_QK_ROPE_HEAD_DIM
+        && v_dim == 256
+}
+
+fn flashinfer_cudnn_mla_rope_attention_bf16_supported(
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+) -> bool {
+    coordinator_python_capture_enabled()
+        && rows > 1
+        && flashinfer_glm52_attention_heads_supported(heads)
+        && nope_dim == 192
+        && rope_dim == GLM52_MLA_QK_ROPE_HEAD_DIM
+        && v_dim == 256
+}
+
+pub(in crate::commands::real_full) fn prewarm_flashinfer_cudnn_mla_suffix_graphs_for_worker(
+) -> Result<()> {
+    if !coordinator_python_capture_enabled()
+        || FLASHINFER_CUDNN_MLA_SUFFIX_PREWARMED.with(Cell::get)
+    {
+        return Ok(());
+    }
+    anyhow::ensure!(
+        coordinator_python_capture_startup_open(),
+        "FlashInfer/cuDNN MLA suffix graphs were not prewarmed before Python capture closed"
+    );
+
+    let library = cuda_native_library()?;
+    FLASHINFER_CUDNN_MLA_SUFFIX_WORKSPACE.with(|workspace| {
+        workspace
+            .try_borrow_mut()
+            .map_err(|_| anyhow::anyhow!("cuDNN MLA suffix workspace is already borrowed"))?
+            .initialize_for_capture(library)
+    })?;
+
+    const HEADS: usize = 64;
+    const NOPE_DIM: usize = 192;
+    const ROPE_DIM: usize = 64;
+    const V_DIM: usize = 256;
+    const SCALE: f32 = 0.0625;
+    let query_capacity = flashinfer_cudnn_mla_suffix_query_capacity();
+    let prewarm_start = std::time::Instant::now();
+    for row_capacity in COORDINATOR_GRAPH_PREFILL_BUCKET_ROWS {
+        let query_rows = (row_capacity / 2).max(1).min(query_capacity);
+        let query_row_offset = row_capacity - query_rows;
+        let graph_key = coord_attention_graph_key_for_layer_rows(0, row_capacity)?;
+        with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+            let signature = flashinfer_mla_graph_signature(
+                row_capacity,
+                query_row_offset,
+                query_rows,
+                row_capacity,
+                HEADS,
+                NOPE_DIM,
+                ROPE_DIM,
+                V_DIM,
+                SCALE,
+            )?;
+            let captured = capture_or_update_layer_flashinfer_mla_rope_attention_bf16_graph(
+                library,
+                slot,
+                signature,
+                Ds4rtDeviceBuffer::default(),
+                Ds4rtDeviceBuffer::default(),
+                Ds4rtDeviceBuffer::default(),
+                Ds4rtDeviceBuffer::default(),
+                Ds4rtDeviceBuffer::default(),
+                Ds4rtDeviceBuffer::default(),
+                row_capacity,
+                query_row_offset,
+                query_rows,
+                row_capacity,
+                HEADS,
+                NOPE_DIM,
+                ROPE_DIM,
+                V_DIM,
+                SCALE,
+                "startup FlashInfer/cuDNN MLA suffix attention",
+                true,
+            )?;
+            anyhow::ensure!(
+                captured,
+                "failed to capture startup FlashInfer/cuDNN MLA suffix graph row_bucket={row_capacity}"
+            );
+            slot.stream_synchronize()
+                .context("synchronizing startup FlashInfer/cuDNN MLA suffix graph")
+        })?;
+    }
+    FLASHINFER_CUDNN_MLA_SUFFIX_PREWARMED.with(|prewarmed| prewarmed.set(true));
+    eprintln!(
+        "real_full_startup_attention_prewarm_done row_buckets={} query_capacity={} elapsed_ms={:.3}",
+        COORDINATOR_GRAPH_PREFILL_BUCKET_ROWS.len(),
+        query_capacity,
+        prewarm_start.elapsed().as_secs_f64() * 1_000.0,
+    );
+    Ok(())
+}
+
+fn flashinfer_glm52_attention_heads_supported(heads: usize) -> bool {
+    matches!(heads, 16 | 64)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(in crate::commands::real_full) struct FlashinferTargetKvPageTable {
+    pub(in crate::commands::real_full) physical_pages: Ds4rtDeviceBuffer,
+    pub(in crate::commands::real_full) mapping_key: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(in crate::commands::real_full) enum FlashinferCompressedMlaKvInput {
+    SplitBf16 {
+        latent: Ds4rtDeviceBuffer,
+        rope: Ds4rtDeviceBuffer,
+    },
+    Interleaved {
+        payload: Ds4rtDeviceBuffer,
+        dtype: KvCacheDType,
+        row_stride_bytes: usize,
+        row_offset: usize,
+        physical_page_table: Option<FlashinferTargetKvPageTable>,
+        force_staged_hidden_projection: bool,
+    },
+}
+
+#[derive(Clone, Copy)]
+struct FlashinferCompressedMlaDecodeBuffers {
+    q_nope: Ds4rtDeviceBuffer,
+    q_rope: Ds4rtDeviceBuffer,
+    kv: Ds4rtDeviceBuffer,
+    partial: Ds4rtDeviceBuffer,
+    partial_lse: Ds4rtDeviceBuffer,
+    accumulator: Ds4rtDeviceBuffer,
+    accumulator_lse: Ds4rtDeviceBuffer,
+    workspace: Ds4rtDeviceBuffer,
+}
+
+#[derive(Clone, Copy)]
+struct FlashinferPackedFp8MlaDecodeBuffers {
+    q: Ds4rtDeviceBuffer,
+    kv: Ds4rtDeviceBuffer,
+    indices: Ds4rtDeviceBuffer,
+    topk_length: Ds4rtDeviceBuffer,
+    index_base: Ds4rtDeviceBuffer,
+    output: Ds4rtDeviceBuffer,
+    out_lse: Ds4rtDeviceBuffer,
+    mid_out: Ds4rtDeviceBuffer,
+    mid_lse: Ds4rtDeviceBuffer,
+}
+
+#[derive(Clone, Copy)]
+struct FlashinferPackedFp8MlaFullGraphBuffers {
+    flashinfer: FlashinferPackedFp8MlaDecodeBuffers,
+    q_nope: Ds4rtDeviceBuffer,
+    q_absorbed: Ds4rtDeviceBuffer,
+    q_rope: Ds4rtDeviceBuffer,
+    q_rope_staging: Ds4rtDeviceBuffer,
+    physical_page_table: Option<Ds4rtDeviceBuffer>,
+    kv_b_weight: Ds4rtDeviceBuffer,
+    value_weight: Ds4rtDeviceBuffer,
+    final_output: Ds4rtDeviceBuffer,
+    hidden_projection: Option<FlashinferMlaHiddenProjection>,
+    hidden_projection_w4a16: Option<Ds4rtB12xCoordinatorW4a16Buffers>,
+    hidden_projection_w8a16_packed_o: Option<Ds4rtB12xCoordinatorW4a16Buffers>,
+}
+
+#[derive(Clone, Copy)]
+struct FlashinferPackedFp8MlaFullGraphGeometry {
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    rank: usize,
+    weight_head_stride: usize,
+    combined_query_row_bytes: usize,
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::commands::real_full) struct FlashinferMlaHiddenProjection {
+    pub(in crate::commands::real_full) weight: Ds4rtDeviceBuffer,
+    pub(in crate::commands::real_full) output: Ds4rtDeviceBuffer,
+    pub(in crate::commands::real_full) hidden_dim: usize,
+    pub(in crate::commands::real_full) w4a16: Option<CoordinatorW4a16ProjectionBuffers>,
+    pub(in crate::commands::real_full) w8a16: Option<CoordinatorW8a16ProjectionBuffers>,
+}
+
+pub(in crate::commands::real_full) struct FlashinferCompressedMlaDecodeLaunch {
+    pub(in crate::commands::real_full) backend: &'static str,
+    pub(in crate::commands::real_full) hidden_projection_fused: bool,
+    pub(in crate::commands::real_full) ready_event: Option<Arc<CoordinatorCudaEvent>>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn flashinfer_compressed_mla_decode_device_buffers(
+    layer_id: usize,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    kv_input: FlashinferCompressedMlaKvInput,
+    kv_b_weight: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    query_row_offset: usize,
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+    hidden_projection: Option<FlashinferMlaHiddenProjection>,
+) -> Result<FlashinferCompressedMlaDecodeLaunch> {
+    anyhow::ensure!(
+        attention_python_capture_enabled(),
+        "FlashInfer compressed MLA decode requires attention Python graph capture"
+    );
+    anyhow::ensure!(
+        (1..=FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS).contains(&query_rows),
+        "FlashInfer compressed MLA suffix requires 1..={} query rows, got {query_rows}",
+        FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS,
+    );
+    anyhow::ensure!(
+        query_row_offset < rows && query_row_offset + query_rows == rows,
+        "FlashInfer compressed MLA decode query must be the final KV row"
+    );
+    anyhow::ensure!(
+        flashinfer_glm52_attention_heads_supported(heads)
+            && rope_dim == GLM52_MLA_QK_ROPE_HEAD_DIM
+            && GLM52_MLA_KV_LORA_RANK == 512,
+        "FlashInfer compressed GLM-5.2 decode requires heads=16 or 64, rope_dim=64, and rank=512"
+    );
+    let bf16_bytes = std::mem::size_of::<u16>();
+    let q_nope_row_bytes = heads
+        .checked_mul(nope_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("FlashInfer compressed MLA decode q_nope row bytes overflow")?;
+    let q_rope_row_bytes = heads
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("FlashInfer compressed MLA decode q_rope row bytes overflow")?;
+    let q_nope = device_buffer_byte_view(
+        q_nope_buffer,
+        0,
+        query_rows
+            .checked_mul(q_nope_row_bytes)
+            .context("FlashInfer compressed MLA suffix q_nope bytes overflow")?,
+        "FlashInfer compressed MLA decode compact q_nope suffix",
+    )?;
+    let q_rope = device_buffer_byte_view(
+        q_rope_buffer,
+        0,
+        query_rows
+            .checked_mul(q_rope_row_bytes)
+            .context("FlashInfer compressed MLA suffix q_rope bytes overflow")?,
+        "FlashInfer compressed MLA decode compact q_rope suffix",
+    )?;
+    let rank = GLM52_MLA_KV_LORA_RANK;
+    let head_width = nope_dim
+        .checked_add(v_dim)
+        .context("FlashInfer compressed MLA decode KV-B head width overflow")?;
+    let weight_head_stride = head_width
+        .checked_mul(rank)
+        .context("FlashInfer compressed MLA decode KV-B head stride overflow")?;
+    let weight_bytes = heads
+        .checked_mul(weight_head_stride)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("FlashInfer compressed MLA decode KV-B weight bytes overflow")?;
+    anyhow::ensure!(
+        kv_b_weight.bytes >= weight_bytes,
+        "FlashInfer compressed MLA decode KV-B weight has {} bytes, expected at least {weight_bytes}",
+        kv_b_weight.bytes
+    );
+    let value_weight_offset = nope_dim
+        .checked_mul(rank)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("FlashInfer compressed MLA decode value-weight offset overflow")?;
+    let value_weight = device_buffer_byte_view(
+        kv_b_weight,
+        value_weight_offset,
+        kv_b_weight
+            .bytes
+            .checked_sub(value_weight_offset)
+            .context("FlashInfer compressed MLA decode value-weight view exceeds KV-B weight")?,
+        "FlashInfer compressed MLA decode value weights",
+    )?;
+    let latent_bytes = heads
+        .checked_mul(rank)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("FlashInfer compressed MLA decode latent scratch bytes overflow")?;
+    let lse_bytes = heads
+        .checked_mul(std::mem::size_of::<f32>())
+        .context("FlashInfer compressed MLA decode LSE scratch bytes overflow")?;
+    let kv_row_bytes = rank
+        .checked_add(rope_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("FlashInfer compressed MLA decode KV row bytes overflow")?;
+    let kv_staging_bytes = FLASHINFER_COMPRESSED_MLA_MAX_CHUNK_ROWS
+        .checked_mul(kv_row_bytes)
+        .context("FlashInfer compressed MLA decode KV staging bytes overflow")?;
+    let output_bytes = heads
+        .checked_mul(v_dim)
+        .and_then(|values| values.checked_mul(query_rows))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("FlashInfer compressed MLA decode output bytes overflow")?;
+    let _ = device_buffer_byte_view(
+        output_buffer,
+        0,
+        output_bytes,
+        "FlashInfer compressed MLA decode output",
+    )?;
+
+    if let FlashinferCompressedMlaKvInput::Interleaved {
+        payload,
+        dtype: KvCacheDType::Fp8,
+        row_stride_bytes,
+        row_offset,
+        physical_page_table,
+        force_staged_hidden_projection,
+    } = kv_input
+    {
+        if rows <= FLASHINFER_COMPRESSED_MLA_MAX_CHUNK_ROWS {
+            // A speculative rewind can make the same long layer-78 prefix
+            // non-contiguous after startup. That path must use the chunked
+            // compressed fallback even though startup itself sees a packed
+            // contiguous prefix. Seed its Python-backed graphs while capture
+            // is open so the later adaptive retry never captures at runtime.
+            if query_rows == 1 {
+                prewarm_flashinfer_compressed_mla_decode_fallback_graphs(
+                    layer_id, heads, nope_dim, rope_dim, v_dim, rank, scale,
+                )?;
+            }
+            return flashinfer_packed_fp8_mla_decode_device_buffers(
+                layer_id,
+                q_nope,
+                q_rope,
+                payload,
+                row_stride_bytes,
+                row_offset,
+                physical_page_table,
+                kv_b_weight,
+                value_weight,
+                output_buffer,
+                rows,
+                query_rows,
+                heads,
+                nope_dim,
+                rope_dim,
+                v_dim,
+                rank,
+                weight_head_stride,
+                scale,
+                hidden_projection,
+                force_staged_hidden_projection,
+            );
+        }
+    }
+
+    anyhow::ensure!(
+        query_rows == 1,
+        "non-packed FlashInfer compressed MLA decode requires one query row"
+    );
+
+    // Compressed decode graphs are universal across layers and context lengths.
+    // Keep them in their own one-row slot: scalar target-attention operations
+    // have different scratch envelopes and must not evict these startup graphs.
+    let graph_key = coord_compressed_attention_decode_graph_key_for_layer(layer_id)?;
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let q_absorbed = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::H,
+            latent_bytes.max(heads * (nope_dim + rope_dim) * bf16_bytes),
+            "FlashInfer compressed MLA absorbed query",
+        )?;
+        let q_rope_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::I,
+            (heads * (nope_dim + rope_dim) * bf16_bytes).max(q_rope_row_bytes),
+            "FlashInfer compressed MLA RoPE query",
+        )?;
+        let workspace = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::J,
+            FLASHINFER_SINGLE_PREFILL_TMP_BYTES,
+            "FlashInfer compressed MLA workspace",
+        )?;
+        let kv_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::K,
+            kv_staging_bytes.max(output_bytes),
+            "FlashInfer compressed MLA KV staging",
+        )?;
+        let partial = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::L,
+            latent_bytes.max(q_nope_row_bytes),
+            "FlashInfer compressed MLA partial state",
+        )?;
+        let partial_lse = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::M,
+            lse_bytes.max(q_rope_row_bytes),
+            "FlashInfer compressed MLA partial LSE",
+        )?;
+        let accumulator = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::N,
+            latent_bytes.max(q_nope_row_bytes),
+            "FlashInfer compressed MLA accumulated state",
+        )?;
+        let accumulator_lse = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::O,
+            lse_bytes.max(rope_dim * bf16_bytes),
+            "FlashInfer compressed MLA accumulated LSE",
+        )?;
+        let _expanded_value_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::P,
+            output_bytes,
+            "FlashInfer expanded MLA value staging",
+        )?;
+
+        let buffers = FlashinferCompressedMlaDecodeBuffers {
+            q_nope: q_absorbed,
+            q_rope: q_rope_staging,
+            kv: kv_staging,
+            partial,
+            partial_lse,
+            accumulator,
+            accumulator_lse,
+            workspace,
+        };
+        ensure_flashinfer_compressed_mla_decode_graphs(
+            library, slot, buffers, heads, rank, rope_dim, scale,
+        )?;
+
+        let stream = slot.stream_ptr();
+        unsafe {
+            library
+                .cuda_matmul_bf16_strided_batched_cublas_async(
+                    q_nope,
+                    kv_b_weight,
+                    q_absorbed,
+                    heads,
+                    1,
+                    nope_dim,
+                    rank,
+                    nope_dim,
+                    weight_head_stride,
+                    rank,
+                    stream,
+                )
+                .context("absorbing FlashInfer compressed MLA decode queries")?;
+            library
+                .copy_d2d_async(q_rope_staging, q_rope, q_rope_row_bytes, stream)
+                .context("staging FlashInfer compressed MLA RoPE query")?;
+        }
+
+        let mut row_offset = 0_usize;
+        let mut first_chunk = true;
+        while row_offset < rows {
+            let chunk_rows = flashinfer_compressed_mla_decode_chunk_rows(rows - row_offset);
+            stage_flashinfer_compressed_mla_kv_chunk(
+                library, kv_input, kv_staging, row_offset, chunk_rows, rank, rope_dim, stream,
+            )?;
+            let signature = CoordinatorCudaGraphSignature::flashinfer_compressed_mla_decode_bf16(
+                chunk_rows, heads, rank, rope_dim, scale,
+            );
+            let program = if first_chunk {
+                CoordinatorCudaGraphProgram::LayerFlashinferCompressedMlaDecodeBf16Init
+            } else {
+                CoordinatorCudaGraphProgram::LayerFlashinferCompressedMlaDecodeBf16Merge
+            };
+            slot.launch_captured_graph(library, program, signature)
+                .with_context(|| {
+                    format!(
+                        "launching FlashInfer compressed MLA decode chunk rows={chunk_rows} offset={row_offset}"
+                    )
+                })?;
+            first_chunk = false;
+            row_offset += chunk_rows;
+        }
+
+        unsafe {
+            library
+                .cuda_linear_bf16_strided_batched_cublas_async(
+                    accumulator,
+                    value_weight,
+                    output_buffer,
+                    heads,
+                    1,
+                    rank,
+                    v_dim,
+                    rank,
+                    weight_head_stride,
+                    v_dim,
+                    stream,
+                )
+                .context("expanding FlashInfer compressed MLA decode values")?;
+            library
+                .cuda_stream_synchronize(stream)
+                .context("synchronizing FlashInfer compressed MLA decode stream")?;
+        }
+        let backend = match kv_input {
+            FlashinferCompressedMlaKvInput::SplitBf16 { .. }
+            | FlashinferCompressedMlaKvInput::Interleaved {
+                dtype: KvCacheDType::Bf16,
+                ..
+            } => FLASHINFER_COMPRESSED_MLA_DECODE_BF16_BACKEND,
+            FlashinferCompressedMlaKvInput::Interleaved {
+                dtype: KvCacheDType::Fp8,
+                ..
+            } => FLASHINFER_COMPRESSED_MLA_DECODE_FP8_BACKEND,
+            FlashinferCompressedMlaKvInput::Interleaved {
+                dtype: KvCacheDType::Nvfp4,
+                ..
+            } => FLASHINFER_COMPRESSED_MLA_DECODE_NVFP4_BACKEND,
+            FlashinferCompressedMlaKvInput::Interleaved { dtype, .. } => {
+                anyhow::bail!("unsupported compressed MLA cache dtype {}", dtype.label())
+            }
+        };
+        Ok(FlashinferCompressedMlaDecodeLaunch {
+            backend,
+            hidden_projection_fused: false,
+            ready_event: None,
+        })
+    })
+}
+
+fn flashinfer_direct_packed_fp8_mla_capacity_supported(bytes: usize) -> bool {
+    bytes % FLASHINFER_PACKED_FP8_MLA_ROW_BYTES == 0
+        && bytes / FLASHINFER_PACKED_FP8_MLA_ROW_BYTES % DS4RT_CUDA_GENERIC_KV_PAGE_SIZE == 0
+}
+
+#[allow(clippy::too_many_arguments)]
+fn flashinfer_packed_fp8_mla_decode_device_buffers(
+    layer_id: usize,
+    q_nope: Ds4rtDeviceBuffer,
+    q_rope: Ds4rtDeviceBuffer,
+    packed_kv: Ds4rtDeviceBuffer,
+    packed_kv_row_stride_bytes: usize,
+    packed_kv_row_offset: usize,
+    physical_page_table: Option<FlashinferTargetKvPageTable>,
+    kv_b_weight: Ds4rtDeviceBuffer,
+    value_weight: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    rank: usize,
+    weight_head_stride: usize,
+    scale: f32,
+    hidden_projection: Option<FlashinferMlaHiddenProjection>,
+    force_staged_hidden_projection: bool,
+) -> Result<FlashinferCompressedMlaDecodeLaunch> {
+    anyhow::ensure!(
+        (1..=FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS).contains(&query_rows),
+        "packed FP8 MLA requires 1..={} query rows, got {query_rows}",
+        FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS,
+    );
+    anyhow::ensure!(
+        packed_kv_row_stride_bytes >= FLASHINFER_PACKED_FP8_MLA_ROW_BYTES,
+        "packed FP8 MLA cache row stride {packed_kv_row_stride_bytes} is smaller than the {}-byte FlashInfer GLM ABI",
+        FLASHINFER_PACKED_FP8_MLA_ROW_BYTES
+    );
+    let packed_visible_kv = if let Some(page_table) = physical_page_table {
+        let required_page_bytes = rows
+            .checked_add(DS4RT_CUDA_GENERIC_KV_PAGE_SIZE - 1)
+            .map(|rows| rows / DS4RT_CUDA_GENERIC_KV_PAGE_SIZE)
+            .and_then(|pages| pages.checked_mul(std::mem::size_of::<u32>()))
+            .context("packed FP8 MLA physical page-table bytes overflow")?;
+        anyhow::ensure!(
+            packed_kv_row_offset == 0
+                && !page_table.physical_pages.ptr.is_null()
+                && page_table.physical_pages.bytes >= required_page_bytes
+                && page_table.physical_pages.device_id == packed_kv.device_id
+                && page_table.mapping_key != 0,
+            "paged packed FP8 MLA page-table contract is invalid"
+        );
+        None
+    } else {
+        let packed_end_row = packed_kv_row_offset
+            .checked_add(rows)
+            .context("packed FP8 MLA source row range overflow")?;
+        let packed_source_bytes = packed_end_row
+            .checked_mul(packed_kv_row_stride_bytes)
+            .context("packed FP8 MLA source byte count overflow")?;
+        anyhow::ensure!(
+            packed_kv.bytes >= packed_source_bytes,
+            "packed FP8 MLA cache has {} bytes, expected at least {packed_source_bytes}",
+            packed_kv.bytes
+        );
+        let packed_visible_offset = packed_kv_row_offset
+            .checked_mul(packed_kv_row_stride_bytes)
+            .context("packed FP8 MLA visible source offset overflow")?;
+        Some(device_buffer_byte_view(
+            packed_kv,
+            packed_visible_offset,
+            rows.checked_mul(packed_kv_row_stride_bytes)
+                .context("packed FP8 MLA visible source bytes overflow")?,
+            "packed FP8 MLA visible cache rows",
+        )?)
+    };
+    let bucket_rows = FLASHINFER_PACKED_FP8_MLA_BUCKETS
+        .iter()
+        .copied()
+        .find(|bucket| rows <= *bucket)
+        .with_context(|| format!("packed FP8 MLA has no graph bucket for {rows} rows"))?;
+    let bf16_bytes = std::mem::size_of::<u16>();
+    let max_query_rows = FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS;
+    let max_latent_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rank))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA maximum latent byte count overflow")?;
+    let combined_query_row_bytes = rank
+        .checked_add(rope_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA combined query row byte count overflow")?;
+    let max_combined_query_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(combined_query_row_bytes))
+        .context("packed FP8 MLA maximum combined query byte count overflow")?;
+    let q_nope_input_bytes = query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(nope_dim))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA q-nope input byte count overflow")?;
+    let max_q_nope_input_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(nope_dim))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA maximum q-nope input byte count overflow")?;
+    let q_rope_input_bytes = query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rope_dim))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA q-rope input byte count overflow")?;
+    let max_q_rope_input_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rope_dim))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA maximum q-rope input byte count overflow")?;
+    let attention_output_bytes = query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA attention output byte count overflow")?;
+    let max_attention_output_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA maximum attention output byte count overflow")?;
+    let max_hidden_projection_output_bytes = hidden_projection
+        .map(|projection| {
+            projection
+                .hidden_dim
+                .checked_mul(max_query_rows)
+                .and_then(|values| values.checked_mul(bf16_bytes))
+                .context("packed FP8 MLA maximum hidden projection output byte count overflow")
+        })
+        .transpose()?
+        .unwrap_or(0);
+    let max_lse_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<f32>()))
+        .context("packed FP8 MLA maximum LSE byte count overflow")?;
+    let max_bucket_rows = *FLASHINFER_PACKED_FP8_MLA_BUCKETS
+        .last()
+        .expect("packed FP8 MLA bucket table is nonempty");
+    let max_splits = max_bucket_rows / 64;
+    let max_indices_capacity_bytes = max_query_rows
+        .checked_mul(max_bucket_rows)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<i32>()))
+        .context("packed FP8 MLA maximum index byte count overflow")?;
+    let max_mid_out_capacity_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(max_splits))
+        .and_then(|values| values.checked_mul(rank))
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("packed FP8 MLA maximum split output byte count overflow")?;
+    let max_mid_lse_capacity_bytes = max_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(max_splits))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<f32>()))
+        .context("packed FP8 MLA maximum split LSE byte count overflow")?;
+    let topk_length_capacity_bytes = max_query_rows
+        .checked_mul(std::mem::size_of::<i32>())
+        .context("packed FP8 MLA maximum top-k length byte count overflow")?;
+    let index_base_offset = topk_length_capacity_bytes;
+    let indices_offset = index_base_offset
+        .checked_add(topk_length_capacity_bytes)
+        .context("packed FP8 MLA index-base metadata offset overflow")?;
+    let mid_lse_offset = indices_offset
+        .checked_add(max_indices_capacity_bytes)
+        .context("packed FP8 MLA metadata offset overflow")?;
+    let metadata_capacity_bytes = topk_length_capacity_bytes
+        .checked_add(topk_length_capacity_bytes)
+        .and_then(|bytes| bytes.checked_add(max_indices_capacity_bytes))
+        .and_then(|bytes| bytes.checked_add(max_mid_lse_capacity_bytes))
+        .context("packed FP8 MLA maximum metadata byte count overflow")?;
+    let max_packed_kv_bytes = max_bucket_rows
+        .checked_mul(FLASHINFER_PACKED_FP8_MLA_ROW_BYTES)
+        .context("packed FP8 MLA staging byte count overflow")?;
+    if let Some(projection) = hidden_projection {
+        let input_width = heads
+            .checked_mul(v_dim)
+            .context("packed FP8 MLA hidden projection input width overflow")?;
+        let output_bytes = projection
+            .hidden_dim
+            .checked_mul(query_rows)
+            .and_then(|values| values.checked_mul(bf16_bytes))
+            .context("packed FP8 MLA hidden projection output bytes overflow")?;
+        anyhow::ensure!(
+            projection.hidden_dim > 0 && projection.output.bytes >= output_bytes,
+            "packed FP8 MLA hidden projection output buffer has {} bytes, expected at least {output_bytes}",
+            projection.output.bytes
+        );
+        if let Some(w8a16) = projection.w8a16 {
+            let weight_bytes = projection
+                .hidden_dim
+                .checked_mul(input_width)
+                .context("packed FP8 MLA W8A16 hidden projection weight bytes overflow")?;
+            let scale_bytes = projection
+                .hidden_dim
+                .checked_mul(input_width / 256)
+                .and_then(|values| values.checked_mul(std::mem::size_of::<f32>()))
+                .context("packed FP8 MLA W8A16 hidden projection scale bytes overflow")?;
+            anyhow::ensure!(
+                input_width % 256 == 0
+                    && w8a16.weight.bytes >= weight_bytes
+                    && w8a16.scales.bytes >= scale_bytes,
+                "packed FP8 MLA W8A16 hidden projection buffers are too small: weight={}/{} scales={}/{}",
+                w8a16.weight.bytes,
+                weight_bytes,
+                w8a16.scales.bytes,
+                scale_bytes
+            );
+        } else {
+            let weight_bytes = projection
+                .hidden_dim
+                .checked_mul(input_width)
+                .and_then(|values| values.checked_mul(bf16_bytes))
+                .context("packed FP8 MLA hidden projection weight bytes overflow")?;
+            anyhow::ensure!(
+                projection.weight.bytes >= weight_bytes,
+                "packed FP8 MLA hidden projection weight buffer has {} bytes, expected at least {weight_bytes}",
+                projection.weight.bytes
+            );
+        }
+    }
+
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, 1)?;
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let q_absorbed = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::H,
+            max_latent_bytes,
+            "FlashInfer packed FP8 MLA absorbed query",
+        )?;
+        let q_combined = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::I,
+            max_combined_query_bytes,
+            "FlashInfer packed FP8 MLA combined query",
+        )?;
+        let mid_out = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::J,
+            max_mid_out_capacity_bytes,
+            "FlashInfer packed FP8 MLA split output",
+        )?;
+        let kv_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::K,
+            max_packed_kv_bytes,
+            "FlashInfer packed FP8 MLA cache staging",
+        )?;
+        let direct_capacity_bytes = packed_kv_row_offset
+            .checked_add(max_bucket_rows)
+            .and_then(|rows| rows.checked_mul(FLASHINFER_PACKED_FP8_MLA_ROW_BYTES))
+            .context("direct packed FP8 MLA bucket capacity overflow")?;
+        let direct_packed_kv = packed_kv_row_stride_bytes == FLASHINFER_PACKED_FP8_MLA_ROW_BYTES
+            && packed_kv.bytes >= direct_capacity_bytes
+            && flashinfer_direct_packed_fp8_mla_capacity_supported(packed_kv.bytes);
+        anyhow::ensure!(
+            physical_page_table.is_none() || direct_packed_kv,
+            "paged packed FP8 MLA requires direct access to the full cache plane"
+        );
+        let attention_kv = if direct_packed_kv {
+            packed_kv
+        } else {
+            kv_staging
+        };
+        let partial = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::L,
+            max_latent_bytes,
+            "FlashInfer packed FP8 MLA latent output",
+        )?;
+        let partial_lse = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::M,
+            max_lse_bytes,
+            "FlashInfer packed FP8 MLA output LSE",
+        )?;
+        let q_nope_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::N,
+            max_q_nope_input_bytes.max(max_attention_output_bytes),
+            "FlashInfer packed FP8 MLA q-nope and output staging",
+        )?;
+        let q_rope_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::O,
+            max_q_rope_input_bytes.max(max_hidden_projection_output_bytes),
+            "FlashInfer packed FP8 MLA q-rope and hidden output staging",
+        )?;
+        let metadata = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::P,
+            metadata_capacity_bytes,
+            "FlashInfer packed FP8 MLA indices and split LSE",
+        )?;
+        let topk_length = device_buffer_byte_view(
+            metadata,
+            0,
+            topk_length_capacity_bytes,
+            "FlashInfer packed FP8 MLA valid length",
+        )?;
+        let indices = device_buffer_byte_view(
+            metadata,
+            indices_offset,
+            max_indices_capacity_bytes,
+            "FlashInfer packed FP8 MLA indices",
+        )?;
+        let index_base = device_buffer_byte_view(
+            metadata,
+            index_base_offset,
+            topk_length_capacity_bytes,
+            "FlashInfer packed FP8 MLA physical index bases",
+        )?;
+        let mid_lse = device_buffer_byte_view(
+            metadata,
+            mid_lse_offset,
+            max_mid_lse_capacity_bytes,
+            "FlashInfer packed FP8 MLA split LSE",
+        )?;
+        let buffers = FlashinferPackedFp8MlaDecodeBuffers {
+            q: q_combined,
+            kv: attention_kv,
+            indices,
+            topk_length,
+            index_base,
+            output: partial,
+            out_lse: partial_lse,
+            mid_out,
+            mid_lse,
+        };
+        let q_combined_rope = device_buffer_byte_view(
+            q_combined,
+            rank * bf16_bytes,
+            q_combined
+                .bytes
+                .checked_sub(rank * bf16_bytes)
+                .context("packed FP8 MLA RoPE query view exceeds combined query")?,
+            "FlashInfer packed FP8 MLA RoPE query destination",
+        )?;
+        // A request owns its compact target page list, so its device pointer
+        // changes when an execution lane is rebound. Capturing that pointer in
+        // every query-width graph would require one graph identity per request
+        // lane and leaves cached-prefix admission shapes uncovered. Stage the
+        // small page list into graph-slot-owned storage instead. The D2D copy
+        // remains outside the graph on the same stream; the captured physical
+        // index expansion then consumes only this stable pointer.
+        let stable_physical_page_table = if let Some(page_table) = physical_page_table {
+            let physical_pool_pages = packed_kv
+                .bytes
+                .checked_div(FLASHINFER_PACKED_FP8_MLA_ROW_BYTES)
+                .and_then(|rows| {
+                    rows.checked_add(DS4RT_CUDA_GENERIC_KV_PAGE_SIZE - 1)
+                        .map(|rows| rows / DS4RT_CUDA_GENERIC_KV_PAGE_SIZE)
+                })
+                .context("packed FP8 MLA physical pool page count overflow")?;
+            let stable_page_table_bytes = physical_pool_pages
+                .checked_mul(std::mem::size_of::<u32>())
+                .context("packed FP8 MLA stable page-table bytes overflow")?;
+            anyhow::ensure!(
+                page_table.physical_pages.bytes >= stable_page_table_bytes,
+                "packed FP8 MLA source page table has {} bytes, needs {stable_page_table_bytes}",
+                page_table.physical_pages.bytes,
+            );
+            let stable_page_table = slot.buffer(
+                library,
+                CoordinatorCudaScratchSlot::V,
+                stable_page_table_bytes,
+                "FlashInfer packed FP8 MLA stable physical page table",
+            )?;
+            let mapping_identity = (
+                page_table.physical_pages.ptr as usize,
+                page_table.mapping_key,
+            );
+            if slot.stable_packed_fp8_mla_page_mapping != Some(mapping_identity) {
+                let stream = slot.stream_ptr();
+                unsafe {
+                    library
+                        .copy_d2d_async(
+                            stable_page_table,
+                            page_table.physical_pages,
+                            stable_page_table_bytes,
+                            stream,
+                        )
+                        .context("staging FlashInfer packed FP8 MLA physical page table")?;
+                }
+                slot.stable_packed_fp8_mla_page_mapping = Some(mapping_identity);
+            }
+            Some(stable_page_table)
+        } else {
+            None
+        };
+        // Query split/RoPE and packed attention are ordered on this same stream,
+        // so BF16 or native W8A16 O projection may overwrite the now-consumed Q
+        // allocation. The W4 launch contract still owns a staging destination;
+        // keep it on the explicit staged/copy path until that contract is
+        // redesigned.
+        let direct_hidden_output = query_rows == 1
+            && !force_staged_hidden_projection
+            && packed_fp8_mla_direct_hidden_output_enabled()
+            && hidden_projection.is_some_and(|projection| projection.w4a16.is_none());
+        let requested_hidden_projection_output =
+            hidden_projection.map(|projection| projection.output);
+        let (hidden_projection_output, hidden_projection) = stage_flashinfer_hidden_projection(
+            hidden_projection,
+            q_rope_staging,
+            direct_hidden_output,
+        );
+        let hidden_projection_w4a16 = (query_rows == 1)
+            .then(|| hidden_projection.and_then(|projection| projection.w4a16))
+            .flatten()
+            .map(|projection| {
+                coordinator_w4a16_launch_buffers(
+                    library,
+                    slot,
+                    projection,
+                    q_nope_staging,
+                    q_rope_staging,
+                    CoordinatorCudaScratchSlot::S,
+                )
+            })
+            .transpose()?;
+        let available_hidden_projection_w8a16_packed_o = hidden_projection
+            .and_then(|projection| projection.w8a16)
+            .filter(|projection| projection.packed_layout)
+            // The grouped packed-O workspace is isolated in scratch T/U. It
+            // must not resize shared attention slots after startup because
+            // that would invalidate otherwise-unrelated DSA graph captures.
+            .filter(|_| query_rows >= 9 || coordinator_python_capture_startup_open())
+            .map(|projection| {
+                coordinator_w8a16_packed_o_launch_buffers(
+                    library,
+                    slot,
+                    projection,
+                    q_nope_staging,
+                    q_rope_staging,
+                    CoordinatorCudaScratchSlot::U,
+                )
+            })
+            .transpose()?;
+        let hidden_projection_w8a16_packed_o = (query_rows >= 9)
+            .then_some(available_hidden_projection_w8a16_packed_o)
+            .flatten();
+        let full_graph_buffers = FlashinferPackedFp8MlaFullGraphBuffers {
+            flashinfer: buffers,
+            q_nope: q_nope_staging,
+            q_absorbed,
+            q_rope: q_rope_staging,
+            q_rope_staging: q_combined_rope,
+            physical_page_table: stable_physical_page_table,
+            kv_b_weight,
+            value_weight,
+            final_output: q_nope_staging,
+            hidden_projection,
+            hidden_projection_w4a16,
+            hidden_projection_w8a16_packed_o,
+        };
+        // Direct one-row O projection removes a small D2D copy, but its CUDA
+        // graph identity includes the request-owned output pointer. Startup
+        // covers the recurrent pointer set; unusual prefill chunk shapes can
+        // select another rotation later, after the Python graph-capture bridge
+        // has closed. Pre-capture a stable scratch-output identity per layer so
+        // those requests can fall back without turning a valid API request
+        // into a 502.
+        let stable_one_row_graph_buffers = direct_hidden_output.then(|| {
+            let stable_hidden_projection =
+                hidden_projection.map(|projection| FlashinferMlaHiddenProjection {
+                    output: q_rope_staging,
+                    ..projection
+                });
+            FlashinferPackedFp8MlaFullGraphBuffers {
+                hidden_projection: stable_hidden_projection,
+                hidden_projection_w4a16: None,
+                ..full_graph_buffers
+            }
+        });
+        let full_graph_geometry = FlashinferPackedFp8MlaFullGraphGeometry {
+            query_rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+            rank,
+            weight_head_stride,
+            combined_query_row_bytes,
+        };
+        let use_sparkinfer_h64_query_projection =
+            use_sparkinfer_glm_h64_packed_decode_query_projection(
+                query_rows,
+                heads,
+                nope_dim,
+                rank,
+                kv_b_weight.device_id,
+            )?;
+        let capture_identity = flashinfer_packed_fp8_mla_capture_identity(
+            full_graph_buffers,
+            use_sparkinfer_h64_query_projection,
+        );
+        if coordinator_python_capture_startup_open() {
+            if query_rows == 1 {
+                ensure_flashinfer_packed_fp8_mla_decode_graphs(
+                    library,
+                    slot,
+                    full_graph_buffers,
+                    full_graph_geometry,
+                    scale,
+                    rows,
+                    !direct_packed_kv,
+                    if direct_packed_kv {
+                        packed_kv_row_offset
+                    } else {
+                        0
+                    },
+                    use_sparkinfer_h64_query_projection,
+                    capture_identity,
+                )?;
+                if let Some(stable_graph_buffers) = stable_one_row_graph_buffers {
+                    let stable_capture_identity = flashinfer_packed_fp8_mla_capture_identity(
+                        stable_graph_buffers,
+                        use_sparkinfer_h64_query_projection,
+                    );
+                    ensure_flashinfer_packed_fp8_mla_decode_graphs(
+                        library,
+                        slot,
+                        stable_graph_buffers,
+                        full_graph_geometry,
+                        scale,
+                        rows,
+                        !direct_packed_kv,
+                        if direct_packed_kv {
+                            packed_kv_row_offset
+                        } else {
+                            0
+                        },
+                        use_sparkinfer_h64_query_projection,
+                        stable_capture_identity,
+                    )?;
+                }
+            } else {
+                // Later batched startup passes can resize shared attention
+                // scratch after the serial one-row sweep, which clears every
+                // graph in this slot. Re-establish the stable one-row identity
+                // from the final workspace addresses. Production one-row
+                // requests may own a different hidden-output pointer, but
+                // they already fall back to this staged destination and copy
+                // the result on the same stream.
+                let one_row_hidden_projection =
+                    full_graph_buffers.hidden_projection.map(|projection| {
+                        FlashinferMlaHiddenProjection {
+                            output: q_rope_staging,
+                            ..projection
+                        }
+                    });
+                let one_row_graph_buffers = FlashinferPackedFp8MlaFullGraphBuffers {
+                    hidden_projection: one_row_hidden_projection,
+                    hidden_projection_w4a16: None,
+                    hidden_projection_w8a16_packed_o: None,
+                    ..full_graph_buffers
+                };
+                let one_row_use_sparkinfer_h64_query_projection =
+                    use_sparkinfer_glm_h64_packed_decode_query_projection(
+                        1,
+                        heads,
+                        nope_dim,
+                        rank,
+                        kv_b_weight.device_id,
+                    )?;
+                ensure_flashinfer_packed_fp8_mla_decode_graphs(
+                    library,
+                    slot,
+                    one_row_graph_buffers,
+                    FlashinferPackedFp8MlaFullGraphGeometry {
+                        query_rows: 1,
+                        ..full_graph_geometry
+                    },
+                    scale,
+                    rows,
+                    !direct_packed_kv,
+                    if direct_packed_kv {
+                        packed_kv_row_offset
+                    } else {
+                        0
+                    },
+                    one_row_use_sparkinfer_h64_query_projection,
+                    flashinfer_packed_fp8_mla_capture_identity(
+                        one_row_graph_buffers,
+                        one_row_use_sparkinfer_h64_query_projection,
+                    ),
+                )?;
+            }
+
+            // The guaranteed recurrent startup request visits every layer with
+            // one query row. Use that pass to capture every exact packed suffix
+            // width before the Python capture bridge closes. These widths are
+            // shared by speculative decode and short prefill suffixes, so the
+            // active dSpark checkpoint's per-sequence draft limit cannot bound
+            // the runtime query width.
+            // W8 target suffixes use a stable scratch destination so startup
+            // can capture M=2--8 without binding those graphs to a one-row
+            // request allocation. Production copies the projected result to
+            // the request-owned output on this same stream before synchronizing
+            // it. W4 and BF16 retain their prior external path.
+            let batched_hidden_projection = full_graph_buffers
+                .hidden_projection
+                .filter(|projection| projection.w8a16.is_some())
+                .map(|projection| FlashinferMlaHiddenProjection {
+                    output: q_rope_staging,
+                    ..projection
+                });
+            let batched_graph_buffers = FlashinferPackedFp8MlaFullGraphBuffers {
+                hidden_projection: batched_hidden_projection,
+                hidden_projection_w4a16: None,
+                ..full_graph_buffers
+            };
+            for capture_query_rows in flashinfer_packed_fp8_mla_startup_capture_query_rows() {
+                let capture_graph_buffers = FlashinferPackedFp8MlaFullGraphBuffers {
+                    hidden_projection_w8a16_packed_o: (capture_query_rows >= 9)
+                        .then_some(available_hidden_projection_w8a16_packed_o)
+                        .flatten(),
+                    ..batched_graph_buffers
+                };
+                let batched_use_sparkinfer_h64_query_projection =
+                    use_sparkinfer_glm_h64_packed_decode_query_projection(
+                        capture_query_rows,
+                        heads,
+                        nope_dim,
+                        rank,
+                        kv_b_weight.device_id,
+                    )?;
+                let batched_capture_identity = flashinfer_packed_fp8_mla_capture_identity(
+                    capture_graph_buffers,
+                    batched_use_sparkinfer_h64_query_projection,
+                );
+                ensure_flashinfer_packed_fp8_mla_decode_graphs(
+                    library,
+                    slot,
+                    capture_graph_buffers,
+                    FlashinferPackedFp8MlaFullGraphGeometry {
+                        query_rows: capture_query_rows,
+                        ..full_graph_geometry
+                    },
+                    scale,
+                    rows,
+                    !direct_packed_kv,
+                    if direct_packed_kv {
+                        packed_kv_row_offset
+                    } else {
+                        0
+                    },
+                    batched_use_sparkinfer_h64_query_projection,
+                    batched_capture_identity,
+                )?;
+            }
+        }
+
+        let stream = slot.stream_ptr();
+        let cuda_timeline = AttentionCudaEventTimeline::enabled()
+            .then(|| AttentionCudaEventTimeline::new(library, 3))
+            .transpose()?;
+        let async_w8a16_handoff = query_rows == 1
+            && hidden_projection.is_some_and(|projection| projection.w8a16.is_some())
+            && w8a16_async_attention_enabled()
+            && cuda_timeline.is_none();
+        unsafe {
+            if let Some(timeline) = cuda_timeline.as_ref() {
+                timeline.record(0, stream, "start")?;
+            }
+            library
+                .copy_d2d_async(q_nope_staging, q_nope, q_nope_input_bytes, stream)
+                .context("staging FlashInfer packed FP8 MLA q-nope input")?;
+            library
+                .copy_d2d_async(q_rope_staging, q_rope, q_rope_input_bytes, stream)
+                .context("staging FlashInfer packed FP8 MLA q-rope input")?;
+            if !direct_packed_kv {
+                library
+                    .copy_d2d_2d_async(
+                        kv_staging,
+                        FLASHINFER_PACKED_FP8_MLA_ROW_BYTES,
+                        packed_visible_kv.expect("validated contiguous packed KV staging"),
+                        packed_kv_row_stride_bytes,
+                        FLASHINFER_PACKED_FP8_MLA_ROW_BYTES,
+                        rows,
+                        stream,
+                    )
+                    .context("compacting FlashInfer packed FP8 MLA cache rows")?;
+            }
+        }
+        let prefix_rows = rows - query_rows;
+        let runtime_index_base = i32::try_from(if direct_packed_kv {
+            packed_kv_row_offset
+        } else {
+            0
+        })
+        .context("packed FP8 MLA physical index base does not fit i32")?
+        .to_ne_bytes();
+        let mut metadata_header =
+            [0_u8; FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS * std::mem::size_of::<i32>() * 2];
+        for query_index in 0..query_rows {
+            let valid_length = i32::try_from(prefix_rows + query_index + 1)
+                .context("packed FP8 MLA valid length does not fit i32")?
+                .to_ne_bytes();
+            let byte_offset = query_index * std::mem::size_of::<i32>();
+            metadata_header[byte_offset..byte_offset + valid_length.len()]
+                .copy_from_slice(&valid_length);
+            let base_offset = index_base_offset + byte_offset;
+            metadata_header[base_offset..base_offset + runtime_index_base.len()]
+                .copy_from_slice(&runtime_index_base);
+        }
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::P,
+                &metadata_header,
+                "FlashInfer packed FP8 MLA valid lengths and physical index bases",
+                stream,
+            )
+            .context("staging FlashInfer packed FP8 MLA metadata header")?;
+        unsafe {
+            if let Some(timeline) = cuda_timeline.as_ref() {
+                timeline.record(1, stream, "staged")?;
+            }
+        }
+
+        let signature = CoordinatorCudaGraphSignature::flashinfer_packed_fp8_mla_decode(
+            bucket_rows,
+            query_rows,
+            heads,
+            rank,
+            rope_dim,
+            scale,
+            if hidden_projection_w4a16.is_some() {
+                2
+            } else if hidden_projection.is_some_and(|projection| projection.w8a16.is_some()) {
+                3
+            } else {
+                usize::from(hidden_projection.is_some())
+            },
+        );
+        let program = CoordinatorCudaGraphProgram::LayerFlashinferPackedFp8MlaDecode;
+        let (launch_capture_identity, launch_hidden_projection, launch_hidden_projection_output) =
+            if slot.has_captured_graph_identity(program, signature, capture_identity) {
+                (
+                    capture_identity,
+                    hidden_projection,
+                    hidden_projection_output,
+                )
+            } else if let Some(stable_graph_buffers) = stable_one_row_graph_buffers {
+                (
+                    flashinfer_packed_fp8_mla_capture_identity(
+                        stable_graph_buffers,
+                        use_sparkinfer_h64_query_projection,
+                    ),
+                    stable_graph_buffers.hidden_projection,
+                    requested_hidden_projection_output,
+                )
+            } else {
+                (
+                    capture_identity,
+                    hidden_projection,
+                    hidden_projection_output,
+                )
+            };
+        slot.launch_captured_graph_identity(
+            library,
+            program,
+            signature,
+            launch_capture_identity,
+        )
+        .with_context(|| {
+            format!(
+                "launching FlashInfer packed FP8 MLA decode rows={rows} query_rows={query_rows} bucket={bucket_rows}"
+            )
+        })?;
+        unsafe {
+            if hidden_projection.is_none() {
+                library
+                    .copy_d2d_async(
+                        output_buffer,
+                        q_nope_staging,
+                        attention_output_bytes,
+                        stream,
+                    )
+                    .context("copying FlashInfer packed FP8 MLA attention output")?;
+            } else if let (Some(projection), Some(copy_output)) =
+                (launch_hidden_projection, launch_hidden_projection_output)
+            {
+                library
+                    .copy_d2d_async(
+                        copy_output,
+                        projection.output,
+                        query_rows * projection.hidden_dim * std::mem::size_of::<u16>(),
+                        stream,
+                    )
+                    .context(
+                        "copying FlashInfer packed FP8 MLA hidden projection output after graph",
+                    )?;
+            }
+            if let Some(timeline) = cuda_timeline.as_ref() {
+                timeline.record(2, stream, "full graph")?;
+            }
+        }
+        let ready_event = if async_w8a16_handoff {
+            Some(slot.record_output_ready_event(library)?)
+        } else {
+            unsafe {
+                library
+                    .cuda_stream_synchronize(stream)
+                    .context("synchronizing FlashInfer packed FP8 MLA decode stream")?;
+            }
+            None
+        };
+        if let Some(timeline) = cuda_timeline.as_ref() {
+            unsafe {
+                eprintln!(
+                    "real_full_packed_fp8_attention_cuda_timing layer_id={layer_id} rows={rows} bucket_rows={bucket_rows} direct_kv={direct_packed_kv} staging_ms={:.3} full_graph_ms={:.3} total_ms={:.3}",
+                    timeline.elapsed_ms(0, 1, "staging")?,
+                    timeline.elapsed_ms(1, 2, "full graph")?,
+                    timeline.elapsed_ms(0, 2, "total")?,
+                );
+            }
+        }
+        Ok(FlashinferCompressedMlaDecodeLaunch {
+            backend: FLASHINFER_PACKED_FP8_MLA_DECODE_BACKEND,
+            hidden_projection_fused: hidden_projection.is_some(),
+            ready_event,
+        })
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn launch_sparkinfer_glm_h64_query_projection(
+    function: &'static str,
+    cuda_stream: *mut c_void,
+    q_nope: Ds4rtDeviceBuffer,
+    weight: Ds4rtDeviceBuffer,
+    q_pe: Ds4rtDeviceBuffer,
+    out: Ds4rtDeviceBuffer,
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    latent_dim: usize,
+    weight_head_stride: usize,
+) -> Result<()> {
+    anyhow::ensure!(
+        latent_dim > 0 && weight_head_stride % latent_dim == 0,
+        "GLM H64 query weight head stride {weight_head_stride} is not divisible by latent dim {latent_dim}"
+    );
+    let weight_head_width = weight_head_stride / latent_dim;
+    let python_buffers = [
+        python_device_buffer_arg("q_nope", q_nope),
+        python_device_buffer_arg("weight", weight),
+        python_device_buffer_arg("q_pe", q_pe),
+        python_device_buffer_arg("out", out),
+    ];
+    let kwargs = [
+        ("query_rows", PythonKernelArg::Usize(query_rows)),
+        ("heads", PythonKernelArg::Usize(heads)),
+        ("nope_dim", PythonKernelArg::Usize(nope_dim)),
+        ("rope_dim", PythonKernelArg::Usize(rope_dim)),
+        ("latent_dim", PythonKernelArg::Usize(latent_dim)),
+        (
+            "weight_head_width",
+            PythonKernelArg::Usize(weight_head_width),
+        ),
+    ];
+    launch_python_graph_capture(PythonGraphCaptureLaunch {
+        module: B12X_MLA_CAPTURE_MODULE,
+        function,
+        cuda_stream,
+        buffers: &python_buffers,
+        kwargs: &kwargs,
+    })
+    .with_context(|| {
+        format!(
+            "launching SparkInfer GLM H64 BF16 query projection function={function} M={query_rows}"
+        )
+    })
+}
+
+fn stage_flashinfer_hidden_projection(
+    projection: Option<FlashinferMlaHiddenProjection>,
+    staging_output: Ds4rtDeviceBuffer,
+    direct_output: bool,
+) -> (
+    Option<Ds4rtDeviceBuffer>,
+    Option<FlashinferMlaHiddenProjection>,
+) {
+    if direct_output {
+        return (None, projection);
+    }
+    let external_output = projection.map(|projection| projection.output);
+    let staged_projection = projection.map(|projection| FlashinferMlaHiddenProjection {
+        output: staging_output,
+        ..projection
+    });
+    (external_output, staged_projection)
+}
+
+fn ensure_flashinfer_packed_fp8_mla_decode_graphs(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    buffers: FlashinferPackedFp8MlaFullGraphBuffers,
+    geometry: FlashinferPackedFp8MlaFullGraphGeometry,
+    scale: f32,
+    capture_rows: usize,
+    initialize_kv: bool,
+    capture_index_base: usize,
+    use_sparkinfer_h64_query_projection: bool,
+    capture_identity: usize,
+) -> Result<()> {
+    let query_rows = geometry.query_rows;
+    let heads = geometry.heads;
+    let rank = geometry.rank;
+    let rope_dim = geometry.rope_dim;
+    for bucket_rows in FLASHINFER_PACKED_FP8_MLA_BUCKETS {
+        let signature = CoordinatorCudaGraphSignature::flashinfer_packed_fp8_mla_decode(
+            bucket_rows,
+            query_rows,
+            heads,
+            rank,
+            rope_dim,
+            scale,
+            if buffers.hidden_projection_w4a16.is_some() {
+                2
+            } else if buffers
+                .hidden_projection
+                .is_some_and(|projection| projection.w8a16.is_some())
+            {
+                3
+            } else {
+                usize::from(buffers.hidden_projection.is_some())
+            },
+        );
+        let program = CoordinatorCudaGraphProgram::LayerFlashinferPackedFp8MlaDecode;
+        if slot.has_captured_graph_identity(program, signature, capture_identity) {
+            continue;
+        }
+        anyhow::ensure!(
+            coordinator_python_capture_startup_open(),
+            "FlashInfer packed FP8 MLA decode graph bucket={bucket_rows} was not captured during startup"
+        );
+        let kv_capacity_rows = if initialize_kv {
+            bucket_rows
+        } else {
+            buffers.flashinfer.kv.bytes / FLASHINFER_PACKED_FP8_MLA_ROW_BYTES
+        };
+        let kwargs = [
+            ("bucket_rows", PythonKernelArg::Usize(bucket_rows)),
+            ("kv_capacity_rows", PythonKernelArg::Usize(kv_capacity_rows)),
+            ("query_rows", PythonKernelArg::Usize(query_rows)),
+            ("heads", PythonKernelArg::Usize(heads)),
+            ("nope_dim", PythonKernelArg::Usize(rank)),
+            ("rope_dim", PythonKernelArg::Usize(rope_dim)),
+            ("scale", PythonKernelArg::F64(scale as f64)),
+            ("initialize_kv", PythonKernelArg::Bool(initialize_kv)),
+        ];
+        let capture_length = i32::try_from(if initialize_kv {
+            bucket_rows
+        } else {
+            capture_rows.min(bucket_rows)
+        })
+        .context("packed FP8 MLA capture bucket exceeds i32")?
+        .to_ne_bytes();
+        let capture_index_base = i32::try_from(capture_index_base)
+            .context("packed FP8 MLA capture physical index base exceeds i32")?
+            .to_ne_bytes();
+        let capture_index_base_offset =
+            FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS * std::mem::size_of::<i32>();
+        let mut capture_header =
+            [0_u8; FLASHINFER_PACKED_FP8_MLA_MAX_QUERY_ROWS * std::mem::size_of::<i32>() * 2];
+        for query_index in 0..query_rows {
+            let byte_offset = query_index * std::mem::size_of::<i32>();
+            capture_header[byte_offset..byte_offset + capture_length.len()]
+                .copy_from_slice(&capture_length);
+            let base_offset = capture_index_base_offset + byte_offset;
+            capture_header[base_offset..base_offset + capture_index_base.len()]
+                .copy_from_slice(&capture_index_base);
+        }
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::P,
+                &capture_header,
+                "FlashInfer packed FP8 MLA capture metadata header",
+                slot.stream_ptr(),
+            )
+            .with_context(|| {
+                format!(
+                    "staging packed FP8 MLA capture metadata for bucket={bucket_rows} query_rows={query_rows}"
+                )
+            })?;
+        slot.stream_synchronize().with_context(|| {
+            format!("synchronizing packed FP8 MLA bucket={bucket_rows} before prepare")
+        })?;
+        let python_buffers = flashinfer_packed_fp8_mla_python_buffers(buffers.flashinfer);
+        launch_python_graph_capture(PythonGraphCaptureLaunch {
+            module: B12X_MLA_CAPTURE_MODULE,
+            function: FLASHINFER_PACKED_FP8_MLA_PREPARE_FUNCTION,
+            cuda_stream: slot.stream_ptr(),
+            buffers: &python_buffers,
+            kwargs: &kwargs,
+        })
+        .with_context(|| {
+            format!("preparing packed FP8 MLA bucket={bucket_rows} query_rows={query_rows}")
+        })?;
+        unsafe {
+            if let Some(physical_pages) = buffers.physical_page_table {
+                library
+                    .cuda_generic_kv_page_table_expand_indices_async(
+                        buffers.flashinfer.indices,
+                        physical_pages,
+                        query_rows,
+                        bucket_rows,
+                        bucket_rows,
+                        slot.stream_ptr(),
+                    )
+                    .context("initializing paged packed FP8 MLA physical indices")?;
+            } else if !initialize_kv {
+                library
+                    .cuda_generic_kv_page_table_init_offsets_async(
+                        buffers.flashinfer.indices,
+                        buffers.flashinfer.index_base,
+                        query_rows,
+                        bucket_rows,
+                        slot.stream_ptr(),
+                    )
+                    .context("initializing packed FP8 MLA physical indices")?;
+            }
+            if use_sparkinfer_h64_query_projection {
+                launch_sparkinfer_glm_h64_query_projection(
+                    SPARKINFER_GLM_H64_QUERY_PREPARE_FUNCTION,
+                    slot.stream_ptr(),
+                    buffers.q_nope,
+                    buffers.kv_b_weight,
+                    buffers.q_rope,
+                    buffers.flashinfer.q,
+                    geometry.query_rows,
+                    geometry.heads,
+                    geometry.nope_dim,
+                    geometry.rope_dim,
+                    geometry.rank,
+                    geometry.weight_head_stride,
+                )?;
+            }
+            enqueue_flashinfer_packed_fp8_mla_query_routed(
+                library,
+                slot.stream_ptr(),
+                buffers,
+                geometry,
+                use_sparkinfer_h64_query_projection,
+            )?;
+        }
+        launch_python_graph_capture(PythonGraphCaptureLaunch {
+            module: B12X_MLA_CAPTURE_MODULE,
+            function: FLASHINFER_PACKED_FP8_MLA_CAPTURE_FUNCTION,
+            cuda_stream: slot.stream_ptr(),
+            buffers: &python_buffers,
+            kwargs: &kwargs,
+        })
+        .with_context(|| {
+            format!("warming packed FP8 MLA decode bucket={bucket_rows} query_rows={query_rows}")
+        })?;
+        unsafe {
+            enqueue_flashinfer_packed_fp8_mla_output(
+                library,
+                slot.stream_ptr(),
+                buffers,
+                geometry,
+            )?;
+        }
+        slot.stream_synchronize().with_context(|| {
+            format!("synchronizing prepared packed FP8 MLA bucket={bucket_rows}")
+        })?;
+        slot.capture_or_update_graph_exec(
+            library,
+            program,
+            signature,
+            capture_identity,
+            |library, cuda_stream, _workspace| {
+                unsafe {
+                    if let Some(physical_pages) = buffers.physical_page_table {
+                        library
+                            .cuda_generic_kv_page_table_expand_indices_async(
+                                buffers.flashinfer.indices,
+                                physical_pages,
+                                query_rows,
+                                bucket_rows,
+                                bucket_rows,
+                                cuda_stream,
+                            )
+                            .context("capturing paged packed FP8 MLA physical-index init")?;
+                    } else if !initialize_kv {
+                        library
+                            .cuda_generic_kv_page_table_init_offsets_async(
+                                buffers.flashinfer.indices,
+                                buffers.flashinfer.index_base,
+                                query_rows,
+                                bucket_rows,
+                                cuda_stream,
+                            )
+                            .context("capturing packed FP8 MLA physical-index init")?;
+                    }
+                    enqueue_flashinfer_packed_fp8_mla_query_routed(
+                        library,
+                        cuda_stream,
+                        buffers,
+                        geometry,
+                        use_sparkinfer_h64_query_projection,
+                    )?;
+                }
+                launch_python_graph_capture(PythonGraphCaptureLaunch {
+                    module: B12X_MLA_CAPTURE_MODULE,
+                    function: FLASHINFER_PACKED_FP8_MLA_CAPTURE_FUNCTION,
+                    cuda_stream,
+                    buffers: &python_buffers,
+                    kwargs: &kwargs,
+                })
+                .with_context(|| {
+                    format!(
+                        "capturing packed FP8 MLA decode bucket={bucket_rows} query_rows={query_rows}"
+                    )
+                })?;
+                unsafe {
+                    enqueue_flashinfer_packed_fp8_mla_output(
+                        library,
+                        cuda_stream,
+                        buffers,
+                        geometry,
+                    )?;
+                }
+                Ok(())
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn flashinfer_packed_fp8_mla_capture_identity(
+    buffers: FlashinferPackedFp8MlaFullGraphBuffers,
+    use_sparkinfer_h64_query_projection: bool,
+) -> usize {
+    let (hidden_weight, hidden_output) = buffers
+        .hidden_projection
+        .map(|projection| {
+            (
+                projection.weight.ptr as usize,
+                projection.output.ptr as usize,
+            )
+        })
+        .unwrap_or((0, 0));
+    let hidden_w4a16 = buffers.hidden_projection_w4a16;
+    let hidden_w8a16_packed_o = buffers.hidden_projection_w8a16_packed_o;
+    let hidden_w8a16 = buffers
+        .hidden_projection
+        .and_then(|projection| projection.w8a16);
+    mla_graph_capture_identity(&[
+        buffers.flashinfer.q.ptr as usize,
+        buffers.flashinfer.kv.ptr as usize,
+        buffers.flashinfer.indices.ptr as usize,
+        buffers.flashinfer.topk_length.ptr as usize,
+        buffers.flashinfer.index_base.ptr as usize,
+        buffers.flashinfer.output.ptr as usize,
+        buffers.flashinfer.out_lse.ptr as usize,
+        buffers.flashinfer.mid_out.ptr as usize,
+        buffers.flashinfer.mid_lse.ptr as usize,
+        buffers.q_nope.ptr as usize,
+        buffers.q_absorbed.ptr as usize,
+        buffers.q_rope.ptr as usize,
+        buffers.q_rope_staging.ptr as usize,
+        buffers
+            .physical_page_table
+            .map_or(0, |page_table| page_table.ptr as usize),
+        buffers.kv_b_weight.ptr as usize,
+        buffers.value_weight.ptr as usize,
+        buffers.final_output.ptr as usize,
+        hidden_weight,
+        hidden_output,
+        hidden_w4a16.map_or(0, |w4a16| w4a16.weight.ptr as usize),
+        hidden_w4a16.map_or(0, |w4a16| w4a16.scale.ptr as usize),
+        hidden_w4a16.map_or(0, |w4a16| w4a16.global_scale.ptr as usize),
+        hidden_w4a16.map_or(0, |w4a16| w4a16.c_tmp.ptr as usize),
+        hidden_w4a16.map_or(0, |w4a16| w4a16.locks.ptr as usize),
+        hidden_w8a16_packed_o.map_or(0, |w8a16| w8a16.c_tmp.ptr as usize),
+        hidden_w8a16_packed_o.map_or(0, |w8a16| w8a16.packed_route_indices.ptr as usize),
+        hidden_w8a16_packed_o.map_or(0, |w8a16| w8a16.locks.ptr as usize),
+        hidden_w8a16.map_or(0, |w8a16| w8a16.weight.ptr as usize),
+        hidden_w8a16.map_or(0, |w8a16| w8a16.scales.ptr as usize),
+        hidden_w8a16.map_or(0, |w8a16| usize::from(w8a16.packed_layout)),
+        usize::from(use_sparkinfer_h64_query_projection),
+    ])
+}
+
+unsafe fn enqueue_flashinfer_packed_fp8_mla_query_routed(
+    library: &'static NativeLibrary,
+    stream: *mut c_void,
+    buffers: FlashinferPackedFp8MlaFullGraphBuffers,
+    geometry: FlashinferPackedFp8MlaFullGraphGeometry,
+    use_sparkinfer_h64_query_projection: bool,
+) -> Result<()> {
+    if !use_sparkinfer_h64_query_projection {
+        return enqueue_flashinfer_packed_fp8_mla_query(library, stream, buffers, geometry);
+    }
+    launch_sparkinfer_glm_h64_query_projection(
+        SPARKINFER_GLM_H64_QUERY_CAPTURE_FUNCTION,
+        stream,
+        buffers.q_nope,
+        buffers.kv_b_weight,
+        buffers.q_rope,
+        buffers.flashinfer.q,
+        geometry.query_rows,
+        geometry.heads,
+        geometry.nope_dim,
+        geometry.rope_dim,
+        geometry.rank,
+        geometry.weight_head_stride,
+    )
+}
+
+unsafe fn enqueue_flashinfer_packed_fp8_mla_query(
+    library: &'static NativeLibrary,
+    stream: *mut c_void,
+    buffers: FlashinferPackedFp8MlaFullGraphBuffers,
+    geometry: FlashinferPackedFp8MlaFullGraphGeometry,
+) -> Result<()> {
+    let bf16_bytes = std::mem::size_of::<u16>();
+    let q_nope_row_bytes = geometry.heads * geometry.nope_dim * bf16_bytes;
+    let q_absorbed_row_bytes = geometry.heads * geometry.rank * bf16_bytes;
+    for query_index in 0..geometry.query_rows {
+        let q_nope = device_buffer_byte_view(
+            buffers.q_nope,
+            query_index * q_nope_row_bytes,
+            q_nope_row_bytes,
+            "FlashInfer packed FP8 MLA q-nope row",
+        )?;
+        let q_absorbed = device_buffer_byte_view(
+            buffers.q_absorbed,
+            query_index * q_absorbed_row_bytes,
+            q_absorbed_row_bytes,
+            "FlashInfer packed FP8 MLA absorbed query row",
+        )?;
+        library
+            .cuda_matmul_bf16_strided_batched_cublas_async(
+                q_nope,
+                buffers.kv_b_weight,
+                q_absorbed,
+                geometry.heads,
+                1,
+                geometry.nope_dim,
+                geometry.rank,
+                geometry.nope_dim,
+                geometry.weight_head_stride,
+                geometry.rank,
+                stream,
+            )
+            .context("absorbing FlashInfer packed FP8 MLA suffix query")?;
+    }
+    library
+        .copy_d2d_2d_async(
+            buffers.flashinfer.q,
+            geometry.combined_query_row_bytes,
+            buffers.q_absorbed,
+            geometry.rank * bf16_bytes,
+            geometry.rank * bf16_bytes,
+            geometry.query_rows * geometry.heads,
+            stream,
+        )
+        .context("staging FlashInfer packed FP8 MLA latent query")?;
+    library
+        .copy_d2d_2d_async(
+            buffers.q_rope_staging,
+            geometry.combined_query_row_bytes,
+            buffers.q_rope,
+            geometry.rope_dim * bf16_bytes,
+            geometry.rope_dim * bf16_bytes,
+            geometry.query_rows * geometry.heads,
+            stream,
+        )
+        .context("staging FlashInfer packed FP8 MLA RoPE query")
+}
+
+unsafe fn enqueue_flashinfer_packed_fp8_mla_output(
+    library: &'static NativeLibrary,
+    stream: *mut c_void,
+    buffers: FlashinferPackedFp8MlaFullGraphBuffers,
+    geometry: FlashinferPackedFp8MlaFullGraphGeometry,
+) -> Result<()> {
+    if geometry.query_rows == 1 {
+        library
+            .cuda_linear_bf16_strided_batched_cublas_async(
+                buffers.flashinfer.output,
+                buffers.value_weight,
+                buffers.final_output,
+                geometry.heads,
+                1,
+                geometry.rank,
+                geometry.v_dim,
+                geometry.rank,
+                geometry.weight_head_stride,
+                geometry.v_dim,
+                stream,
+            )
+            .context("expanding FlashInfer packed FP8 MLA suffix values")?;
+    } else {
+        // Target verification produces query-major [Q,H,K] latent rows. One
+        // head-major M=Q batched GEMM is bitwise equal to Q separate M=1
+        // calls for this BF16 cublas contract while traversing each per-head
+        // 512x512 value weight once. The two vectorized transposes preserve
+        // the row-major [Q,H,V] ABI consumed by the recurrent-parity O kernel.
+        library
+            .cuda_transpose_rows_heads_bf16_async(
+                buffers.flashinfer.output,
+                buffers.q_absorbed,
+                geometry.query_rows,
+                geometry.heads,
+                geometry.rank,
+                stream,
+            )
+            .context("transposing packed FP8 MLA latent suffix to head-major layout")?;
+        library
+            .cuda_linear_bf16_strided_batched_cublas_async(
+                buffers.q_absorbed,
+                buffers.value_weight,
+                buffers.flashinfer.q,
+                geometry.heads,
+                geometry.query_rows,
+                geometry.rank,
+                geometry.v_dim,
+                geometry.query_rows * geometry.rank,
+                geometry.weight_head_stride,
+                geometry.query_rows * geometry.v_dim,
+                stream,
+            )
+            .context("batching packed FP8 MLA suffix value expansion")?;
+        library
+            .cuda_transpose_heads_rows_bf16_async(
+                buffers.flashinfer.q,
+                buffers.final_output,
+                geometry.query_rows,
+                geometry.heads,
+                geometry.v_dim,
+                stream,
+            )
+            .context("restoring packed FP8 MLA suffix values to query-major layout")?;
+    }
+    if buffers
+        .hidden_projection
+        .is_some_and(|projection| projection.w8a16.is_some())
+    {
+        let projection = buffers
+            .hidden_projection
+            .expect("W8A16 hidden projection is present");
+        let w8a16 = projection.w8a16.expect("W8A16 buffers are present");
+        let input_dim = geometry.heads * geometry.v_dim;
+        // Scalar decode and the qualified adaptive widths retain recurrent
+        // arithmetic. The grouped packed-O kernel is flat at roughly 0.039 ms
+        // through M=16, but differs in a handful of BF16 values and failed the
+        // complete weighted trajectory when applied to M=2..8. Use it only to
+        // replace the pathological M separate launches at the qualified
+        // adaptive M=9..16 widths.
+        if w8a16.packed_layout && geometry.query_rows >= 9 {
+            let packed_o = buffers
+                .hidden_projection_w8a16_packed_o
+                .context("packed W8A16 O launch buffers are missing")?;
+            library
+                .cuda_w8a16_packed_o_initialize_launch_buffers_async(
+                    &packed_o,
+                    geometry.query_rows,
+                    16,
+                    stream,
+                )
+                .context("initializing packed FP8 MLA grouped W8A16 O metadata")?;
+            library
+                .cuda_w8a16_packed_o_async(&packed_o, geometry.query_rows, stream)
+                .context("projecting packed FP8 MLA output with grouped W8A16 O")?;
+        } else if w8a16.packed_layout && geometry.query_rows == 1 {
+            library
+                .cuda_linear_w8a16_group256_m1_warp_packed_async(
+                    buffers.final_output,
+                    w8a16.weight,
+                    w8a16.scales,
+                    projection.output,
+                    input_dim,
+                    projection.hidden_dim,
+                    stream,
+                )
+                .context("projecting packed FP8 MLA output with packed recurrent W8A16")?;
+        } else if w8a16.packed_layout && geometry.query_rows >= 4 {
+            library
+                .cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async(
+                    buffers.final_output,
+                    w8a16.weight,
+                    w8a16.scales,
+                    projection.output,
+                    geometry.query_rows,
+                    input_dim,
+                    projection.hidden_dim,
+                    stream,
+                )
+                .context("projecting packed FP8 MLA output with packed parity-batched W8A16")?;
+        } else if w8a16.packed_layout {
+            let input_row_bytes = input_dim * std::mem::size_of::<u16>();
+            let output_row_bytes = projection.hidden_dim * std::mem::size_of::<u16>();
+            for row in 0..geometry.query_rows {
+                let input_row = device_buffer_byte_view(
+                    buffers.final_output,
+                    row * input_row_bytes,
+                    input_row_bytes,
+                    "packed W8A16 O recurrent input row",
+                )?;
+                let output_row = device_buffer_byte_view(
+                    projection.output,
+                    row * output_row_bytes,
+                    output_row_bytes,
+                    "packed W8A16 O recurrent output row",
+                )?;
+                library
+                    .cuda_linear_w8a16_group256_m1_warp_packed_async(
+                        input_row,
+                        w8a16.weight,
+                        w8a16.scales,
+                        output_row,
+                        input_dim,
+                        projection.hidden_dim,
+                        stream,
+                    )
+                    .context("projecting packed FP8 MLA output with packed recurrent W8A16")?;
+            }
+        } else if geometry.query_rows == 1 {
+            library
+                .cuda_linear_w8a16_group256_m1_simt_async(
+                    buffers.final_output,
+                    w8a16.weight,
+                    w8a16.scales,
+                    projection.output,
+                    input_dim,
+                    projection.hidden_dim,
+                    3,
+                    stream,
+                )
+                .context("projecting packed FP8 MLA output with recurrent W8A16")?;
+        } else {
+            library
+                .cuda_linear_w8a16_group256_m1_parity_batched_async(
+                    buffers.final_output,
+                    w8a16.weight,
+                    w8a16.scales,
+                    projection.output,
+                    geometry.query_rows,
+                    input_dim,
+                    projection.hidden_dim,
+                    stream,
+                )
+                .context("projecting packed FP8 MLA output with parity-batched W8A16")?;
+        }
+    } else if let Some(w4a16) = buffers.hidden_projection_w4a16 {
+        if coordinator_w4a16_o_proj_tn64_enabled() {
+            library
+                .cuda_b12x_coordinator_w4a16_o_proj_m1_tn64_async(&w4a16, stream)
+                .context("projecting packed FP8 MLA decode output with W4A16 TN64")?;
+        } else {
+            library
+                .cuda_b12x_coordinator_w4a16_o_proj_m1_async(&w4a16, stream)
+                .context("projecting packed FP8 MLA decode output with W4A16")?;
+        }
+    } else if let Some(projection) = buffers.hidden_projection {
+        library
+            .cuda_linear_bf16_cublas_async(
+                buffers.final_output,
+                projection.weight,
+                None,
+                projection.output,
+                geometry.query_rows,
+                geometry.heads * geometry.v_dim,
+                projection.hidden_dim,
+                stream,
+            )
+            .context("projecting packed FP8 MLA decode output to hidden width")?;
+    }
+    Ok(())
+}
+
+fn coordinator_w4a16_o_proj_tn64_enabled() -> bool {
+    std::env::var("DS4RT_B12X_COORDINATOR_W4A16_O_PROJ_TN64")
+        .map(|value| value != "0")
+        .unwrap_or(true)
+}
+
+fn flashinfer_packed_fp8_mla_python_buffers(
+    buffers: FlashinferPackedFp8MlaDecodeBuffers,
+) -> [PythonDeviceBufferArg<'static>; 8] {
+    [
+        python_device_buffer_arg("q", buffers.q),
+        python_device_buffer_arg("kv", buffers.kv),
+        python_device_buffer_arg("indices", buffers.indices),
+        python_device_buffer_arg("topk_length", buffers.topk_length),
+        python_device_buffer_arg("output", buffers.output),
+        python_device_buffer_arg("out_lse", buffers.out_lse),
+        python_device_buffer_arg("mid_out", buffers.mid_out),
+        python_device_buffer_arg("mid_lse", buffers.mid_lse),
+    ]
+}
+
+fn flashinfer_compressed_mla_decode_chunk_rows(remaining_rows: usize) -> usize {
+    if remaining_rows <= FLASHINFER_COMPRESSED_MLA_EXACT_TAIL_ROWS {
+        return remaining_rows;
+    }
+    let largest_power_of_two = 1_usize << (usize::BITS - 1 - remaining_rows.leading_zeros());
+    largest_power_of_two.min(FLASHINFER_COMPRESSED_MLA_MAX_CHUNK_ROWS)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ensure_flashinfer_compressed_mla_decode_graphs(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    buffers: FlashinferCompressedMlaDecodeBuffers,
+    heads: usize,
+    rank: usize,
+    rope_dim: usize,
+    scale: f32,
+) -> Result<()> {
+    for rows in (1..=FLASHINFER_COMPRESSED_MLA_EXACT_TAIL_ROWS).chain([
+        64,
+        128,
+        256,
+        512,
+        1_024,
+        FLASHINFER_COMPRESSED_MLA_MAX_CHUNK_ROWS,
+    ]) {
+        let signature = CoordinatorCudaGraphSignature::flashinfer_compressed_mla_decode_bf16(
+            rows, heads, rank, rope_dim, scale,
+        );
+        let init_program = CoordinatorCudaGraphProgram::LayerFlashinferCompressedMlaDecodeBf16Init;
+        let merge_program =
+            CoordinatorCudaGraphProgram::LayerFlashinferCompressedMlaDecodeBf16Merge;
+        let init_captured = slot.has_captured_graph(init_program, signature);
+        let merge_captured = slot.has_captured_graph(merge_program, signature);
+        if init_captured && merge_captured {
+            continue;
+        }
+        anyhow::ensure!(
+            coordinator_python_capture_startup_open(),
+            "FlashInfer compressed MLA decode graph rows={rows} was not captured during startup"
+        );
+
+        let python_buffers = flashinfer_compressed_mla_python_buffers(buffers);
+        let kwargs = [
+            ("rows", PythonKernelArg::Usize(rows)),
+            ("heads", PythonKernelArg::Usize(heads)),
+            ("nope_dim", PythonKernelArg::Usize(rank)),
+            ("rope_dim", PythonKernelArg::Usize(rope_dim)),
+            ("scale", PythonKernelArg::F64(scale as f64)),
+        ];
+        slot.stream_synchronize().with_context(|| {
+            format!("synchronizing FlashInfer compressed MLA rows={rows} before prepare")
+        })?;
+        launch_python_graph_capture(PythonGraphCaptureLaunch {
+            module: B12X_MLA_CAPTURE_MODULE,
+            function: FLASHINFER_COMPRESSED_MLA_PREPARE_FUNCTION,
+            cuda_stream: slot.stream_ptr(),
+            buffers: &python_buffers,
+            kwargs: &kwargs,
+        })
+        .with_context(|| format!("preparing FlashInfer compressed MLA rows={rows}"))?;
+        slot.stream_synchronize().with_context(|| {
+            format!("synchronizing prepared FlashInfer compressed MLA rows={rows}")
+        })?;
+
+        if !init_captured {
+            slot.capture_graph(
+                library,
+                init_program,
+                signature,
+                |_library, cuda_stream, _workspace| {
+                    launch_python_graph_capture(PythonGraphCaptureLaunch {
+                        module: B12X_MLA_CAPTURE_MODULE,
+                        function: FLASHINFER_COMPRESSED_MLA_CAPTURE_FUNCTION,
+                        cuda_stream,
+                        buffers: &python_buffers,
+                        kwargs: &kwargs,
+                    })
+                    .with_context(|| {
+                        format!("capturing FlashInfer compressed MLA init rows={rows}")
+                    })?;
+                    unsafe {
+                        library.copy_d2d_async(
+                            buffers.accumulator,
+                            buffers.partial,
+                            heads * rank * std::mem::size_of::<u16>(),
+                            cuda_stream,
+                        )?;
+                        library.copy_d2d_async(
+                            buffers.accumulator_lse,
+                            buffers.partial_lse,
+                            heads * std::mem::size_of::<f32>(),
+                            cuda_stream,
+                        )?;
+                    }
+                    Ok(())
+                },
+            )?;
+        }
+        if !merge_captured {
+            slot.capture_graph(
+                library,
+                merge_program,
+                signature,
+                |_library, cuda_stream, _workspace| {
+                    launch_python_graph_capture(PythonGraphCaptureLaunch {
+                        module: B12X_MLA_CAPTURE_MODULE,
+                        function: FLASHINFER_COMPRESSED_MLA_CAPTURE_FUNCTION,
+                        cuda_stream,
+                        buffers: &python_buffers,
+                        kwargs: &kwargs,
+                    })
+                    .with_context(|| {
+                        format!("capturing FlashInfer compressed MLA merge rows={rows}")
+                    })?;
+                    unsafe {
+                        library.cuda_mla_merge_state_bf16_async(
+                            buffers.accumulator,
+                            buffers.accumulator_lse,
+                            buffers.partial,
+                            buffers.partial_lse,
+                            heads,
+                            rank,
+                            cuda_stream,
+                        )?;
+                    }
+                    Ok(())
+                },
+            )?;
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn prewarm_flashinfer_compressed_mla_decode_fallback_graphs(
+    layer_id: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    rank: usize,
+    scale: f32,
+) -> Result<()> {
+    if !coordinator_python_capture_startup_open() {
+        return Ok(());
+    }
+
+    let bf16_bytes = std::mem::size_of::<u16>();
+    let latent_bytes = heads
+        .checked_mul(rank)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("compressed MLA fallback latent bytes overflow")?;
+    let lse_bytes = heads
+        .checked_mul(std::mem::size_of::<f32>())
+        .context("compressed MLA fallback LSE bytes overflow")?;
+    let q_nope_row_bytes = heads
+        .checked_mul(nope_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("compressed MLA fallback q_nope bytes overflow")?;
+    let q_rope_row_bytes = heads
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("compressed MLA fallback q_rope bytes overflow")?;
+    let query_projection_bytes = heads
+        .checked_mul(
+            nope_dim
+                .checked_add(rope_dim)
+                .context("compressed MLA fallback query width overflow")?,
+        )
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("compressed MLA fallback query projection bytes overflow")?;
+    let kv_row_bytes = rank
+        .checked_add(rope_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("compressed MLA fallback KV row bytes overflow")?;
+    let output_bytes = heads
+        .checked_mul(v_dim)
+        .and_then(|values| values.checked_mul(bf16_bytes))
+        .context("compressed MLA fallback output bytes overflow")?;
+    let kv_staging_bytes = FLASHINFER_COMPRESSED_MLA_MAX_CHUNK_ROWS
+        .checked_mul(kv_row_bytes)
+        .context("compressed MLA fallback KV staging bytes overflow")?;
+
+    let graph_key = coord_compressed_attention_decode_graph_key_for_layer(layer_id)?;
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let q_absorbed = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::H,
+            latent_bytes.max(query_projection_bytes),
+            "FlashInfer compressed MLA absorbed query",
+        )?;
+        let q_rope_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::I,
+            query_projection_bytes.max(q_rope_row_bytes),
+            "FlashInfer compressed MLA RoPE query",
+        )?;
+        let workspace = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::J,
+            FLASHINFER_SINGLE_PREFILL_TMP_BYTES,
+            "FlashInfer compressed MLA workspace",
+        )?;
+        let kv_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::K,
+            kv_staging_bytes.max(output_bytes),
+            "FlashInfer compressed MLA KV staging",
+        )?;
+        let partial = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::L,
+            latent_bytes.max(q_nope_row_bytes),
+            "FlashInfer compressed MLA partial state",
+        )?;
+        let partial_lse = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::M,
+            lse_bytes.max(q_rope_row_bytes),
+            "FlashInfer compressed MLA partial LSE",
+        )?;
+        let accumulator = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::N,
+            latent_bytes.max(q_nope_row_bytes),
+            "FlashInfer compressed MLA accumulated state",
+        )?;
+        let accumulator_lse = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::O,
+            lse_bytes.max(rope_dim * bf16_bytes),
+            "FlashInfer compressed MLA accumulated LSE",
+        )?;
+        let _expanded_value_staging = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::P,
+            output_bytes,
+            "FlashInfer expanded MLA value staging",
+        )?;
+
+        ensure_flashinfer_compressed_mla_decode_graphs(
+            library,
+            slot,
+            FlashinferCompressedMlaDecodeBuffers {
+                q_nope: q_absorbed,
+                q_rope: q_rope_staging,
+                kv: kv_staging,
+                partial,
+                partial_lse,
+                accumulator,
+                accumulator_lse,
+                workspace,
+            },
+            heads,
+            rank,
+            rope_dim,
+            scale,
+        )
+    })
+}
+
+fn flashinfer_compressed_mla_python_buffers(
+    buffers: FlashinferCompressedMlaDecodeBuffers,
+) -> [PythonDeviceBufferArg<'static>; 6] {
+    [
+        python_device_buffer_arg("q_nope", buffers.q_nope),
+        python_device_buffer_arg("q_rope", buffers.q_rope),
+        python_device_buffer_arg("kv", buffers.kv),
+        python_device_buffer_arg("partial", buffers.partial),
+        python_device_buffer_arg("partial_lse", buffers.partial_lse),
+        python_device_buffer_arg("workspace", buffers.workspace),
+    ]
+}
+
+fn python_device_buffer_arg(
+    name: &'static str,
+    buffer: Ds4rtDeviceBuffer,
+) -> PythonDeviceBufferArg<'static> {
+    PythonDeviceBufferArg {
+        name,
+        ptr: buffer.ptr,
+        bytes: buffer.bytes,
+        device_id: buffer.device_id,
+        flags: buffer.flags,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stage_flashinfer_compressed_mla_kv_chunk(
+    library: &'static NativeLibrary,
+    input: FlashinferCompressedMlaKvInput,
+    staging: Ds4rtDeviceBuffer,
+    row_offset: usize,
+    rows: usize,
+    rank: usize,
+    rope_dim: usize,
+    cuda_stream: *mut c_void,
+) -> Result<()> {
+    let bf16_bytes = std::mem::size_of::<u16>();
+    let latent_row_bytes = rank * bf16_bytes;
+    let rope_row_bytes = rope_dim * bf16_bytes;
+    let staging_row_bytes = latent_row_bytes + rope_row_bytes;
+    match input {
+        FlashinferCompressedMlaKvInput::SplitBf16 { latent, rope } => {
+            let latent_offset = row_offset
+                .checked_mul(latent_row_bytes)
+                .context("FlashInfer compressed MLA latent chunk offset overflow")?;
+            let rope_offset = row_offset
+                .checked_mul(rope_row_bytes)
+                .context("FlashInfer compressed MLA RoPE chunk offset overflow")?;
+            let latent_source = device_buffer_byte_view(
+                latent,
+                latent_offset,
+                latent
+                    .bytes
+                    .checked_sub(latent_offset)
+                    .context("FlashInfer compressed MLA latent chunk exceeds source buffer")?,
+                "FlashInfer compressed MLA latent chunk source",
+            )?;
+            let rope_source = device_buffer_byte_view(
+                rope,
+                rope_offset,
+                rope.bytes
+                    .checked_sub(rope_offset)
+                    .context("FlashInfer compressed MLA RoPE chunk exceeds source buffer")?,
+                "FlashInfer compressed MLA RoPE chunk source",
+            )?;
+            let rope_destination = device_buffer_byte_view(
+                staging,
+                latent_row_bytes,
+                staging.bytes - latent_row_bytes,
+                "FlashInfer compressed MLA interleaved RoPE destination",
+            )?;
+            unsafe {
+                library.copy_d2d_2d_async(
+                    staging,
+                    staging_row_bytes,
+                    latent_source,
+                    latent_row_bytes,
+                    latent_row_bytes,
+                    rows,
+                    cuda_stream,
+                )?;
+                library.copy_d2d_2d_async(
+                    rope_destination,
+                    staging_row_bytes,
+                    rope_source,
+                    rope_row_bytes,
+                    rope_row_bytes,
+                    rows,
+                    cuda_stream,
+                )?;
+            }
+        }
+        FlashinferCompressedMlaKvInput::Interleaved {
+            payload,
+            dtype,
+            row_stride_bytes,
+            row_offset: payload_row_offset,
+            physical_page_table,
+            ..
+        } => {
+            anyhow::ensure!(
+                physical_page_table.is_none(),
+                "paged compressed MLA KV must use direct packed attention instead of contiguous chunk staging"
+            );
+            let source_offset = payload_row_offset
+                .checked_add(row_offset)
+                .context("FlashInfer compressed MLA packed source row offset overflow")?
+                .checked_mul(row_stride_bytes)
+                .context("FlashInfer compressed MLA packed chunk offset overflow")?;
+            let source = device_buffer_byte_view(
+                payload,
+                source_offset,
+                payload
+                    .bytes
+                    .checked_sub(source_offset)
+                    .context("FlashInfer compressed MLA chunk exceeds packed source buffer")?,
+                "FlashInfer compressed MLA packed chunk source",
+            )?;
+            unsafe {
+                match dtype {
+                    KvCacheDType::Bf16 => library.copy_d2d_2d_async(
+                        staging,
+                        staging_row_bytes,
+                        source,
+                        row_stride_bytes,
+                        staging_row_bytes,
+                        rows,
+                        cuda_stream,
+                    )?,
+                    KvCacheDType::Fp8 => library.cuda_mla_kv_unpack_fp8_ds_mla_async(
+                        source,
+                        staging,
+                        rows,
+                        row_stride_bytes,
+                        staging_row_bytes,
+                        cuda_stream,
+                    )?,
+                    KvCacheDType::Nvfp4 => library.cuda_mla_kv_unpack_mxfp4_ds_mla_async(
+                        source,
+                        staging,
+                        rows,
+                        row_stride_bytes,
+                        staging_row_bytes,
+                        cuda_stream,
+                    )?,
+                    unsupported => anyhow::bail!(
+                        "FlashInfer compressed MLA decode does not support {} cache rows",
+                        unsupported.label()
+                    ),
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn capture_or_update_layer_flashinfer_mla_rope_attention_bf16_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    query_row_offset: usize,
+    query_rows: usize,
+    row_capacity: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+    label: &'static str,
+    inputs_are_staged: bool,
+) -> Result<bool> {
+    if !inputs_are_staged {
+        validate_mla_rope_attention_device_buffers_with_output_rows(
+            rows,
+            query_rows,
+            q_nope_buffer,
+            q_rope_buffer,
+            k_nope_buffer,
+            k_rope_buffer,
+            value_buffer,
+            output_buffer,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+        )?;
+    }
+    if query_row_offset > rows || query_rows > rows - query_row_offset {
+        anyhow::bail!(
+            "FlashInfer MLA query rows {}..{} exceed KV rows {rows}",
+            query_row_offset,
+            query_row_offset.saturating_add(query_rows)
+        );
+    }
+    if row_capacity < rows {
+        anyhow::bail!(
+            "FlashInfer MLA graph row capacity {row_capacity} is smaller than rows {rows}"
+        );
+    }
+    let capture_shape =
+        flashinfer_mla_capture_shape(rows, query_row_offset, query_rows, row_capacity)?;
+    let capture_rows = capture_shape.rows;
+    let capture_query_rows = capture_shape.query_rows;
+    let full_query = query_row_offset == 0 && query_rows == rows;
+    let dynamic_suffix = !full_query;
+    anyhow::ensure!(
+        !inputs_are_staged || dynamic_suffix,
+        "pre-staged FlashInfer/cuDNN MLA inputs are only valid for suffix capture"
+    );
+    let qk_dim = nope_dim
+        .checked_add(rope_dim)
+        .context("FlashInfer MLA qk dimension overflow")?;
+    let q_capacity_rows = if dynamic_suffix {
+        capture_query_rows
+    } else {
+        row_capacity
+    };
+    let q_capacity_bytes = q_capacity_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(qk_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA query scratch capacity overflow")?;
+    let k_bytes = row_capacity
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(qk_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA key scratch bytes overflow")?;
+    let output_bytes = query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA output scratch bytes overflow")?;
+    let output_capacity_rows = if dynamic_suffix {
+        capture_query_rows
+    } else {
+        row_capacity
+    };
+    let output_capacity_bytes = output_capacity_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA output scratch capacity overflow")?;
+    let capture_output_bytes = capture_query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA captured output bytes overflow")?;
+    let signature = if full_query {
+        CoordinatorCudaGraphSignature::mla_rope_attention_bf16(
+            capture_output_bytes,
+            capture_rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+            scale,
+        )
+    } else if capture_rows != rows || capture_query_rows != query_rows {
+        CoordinatorCudaGraphSignature::mla_rope_attention_bf16_suffix(
+            capture_output_bytes,
+            capture_rows,
+            capture_query_rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+            scale,
+        )
+    } else {
+        signature
+    };
+    let shared_suffix = if dynamic_suffix {
+        let query_capacity = flashinfer_cudnn_mla_suffix_query_capacity();
+        anyhow::ensure!(
+            capture_query_rows <= query_capacity,
+            "FlashInfer/cuDNN MLA suffix query bucket {capture_query_rows} exceeds rolling capacity {}",
+            query_capacity
+        );
+        anyhow::ensure!(
+            row_capacity <= FLASHINFER_CUDNN_MLA_SUFFIX_MAX_ROW_CAPACITY,
+            "FlashInfer/cuDNN MLA suffix row capacity {row_capacity} exceeds shared capacity {}",
+            FLASHINFER_CUDNN_MLA_SUFFIX_MAX_ROW_CAPACITY
+        );
+        Some(flashinfer_cudnn_mla_suffix_buffers(library)?)
+    } else {
+        None
+    };
+    let q_buffer = if let Some(buffers) = shared_suffix {
+        buffers.q
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::H,
+            q_capacity_bytes,
+            "FlashInfer MLA contiguous query",
+        )?
+    };
+    let k_buffer = if let Some(buffers) = shared_suffix {
+        buffers.k
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::I,
+            k_bytes,
+            "FlashInfer MLA contiguous key",
+        )?
+    };
+    let workspace_buffer = if let Some(buffers) = shared_suffix {
+        buffers.workspace
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::J,
+            FLASHINFER_SINGLE_PREFILL_TMP_BYTES,
+            "FlashInfer MLA single-prefill workspace",
+        )?
+    };
+    let output_scratch = if let Some(buffers) = shared_suffix {
+        buffers.output
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::K,
+            output_capacity_bytes,
+            "FlashInfer MLA output",
+        )?
+    };
+    let q_nope_row_bytes = heads
+        .checked_mul(nope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA q_nope row bytes overflow")?;
+    let q_rope_row_bytes = heads
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA q_rope row bytes overflow")?;
+    let q_nope_bytes = query_rows
+        .checked_mul(q_nope_row_bytes)
+        .context("FlashInfer MLA q_nope bytes overflow")?;
+    let q_rope_bytes = query_rows
+        .checked_mul(q_rope_row_bytes)
+        .context("FlashInfer MLA q_rope bytes overflow")?;
+    let k_nope_bytes = rows
+        .checked_mul(q_nope_row_bytes)
+        .context("FlashInfer MLA k_nope bytes overflow")?;
+    let k_rope_bytes = rows
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA k_rope bytes overflow")?;
+    let value_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA value bytes overflow")?;
+    let q_nope_capacity_bytes = q_capacity_rows
+        .checked_mul(q_nope_row_bytes)
+        .context("FlashInfer MLA q_nope staging capacity overflow")?;
+    let q_rope_capacity_bytes = q_capacity_rows
+        .checked_mul(q_rope_row_bytes)
+        .context("FlashInfer MLA q_rope staging capacity overflow")?;
+    let k_nope_capacity_bytes = row_capacity
+        .checked_mul(q_nope_row_bytes)
+        .context("FlashInfer MLA k_nope staging capacity overflow")?;
+    let k_rope_capacity_bytes = row_capacity
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA k_rope staging capacity overflow")?;
+    let q_nope_staging = if let Some(buffers) = shared_suffix {
+        buffers.q_nope
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::L,
+            q_nope_capacity_bytes,
+            "FlashInfer MLA q_nope staging",
+        )?
+    };
+    let q_rope_staging = if let Some(buffers) = shared_suffix {
+        buffers.q_rope
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::M,
+            q_rope_capacity_bytes,
+            "FlashInfer MLA q_rope staging",
+        )?
+    };
+    let k_nope_staging = if let Some(buffers) = shared_suffix {
+        buffers.k_nope
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::N,
+            k_nope_capacity_bytes,
+            "FlashInfer MLA k_nope staging",
+        )?
+    };
+    let k_rope_staging = if let Some(buffers) = shared_suffix {
+        buffers.k_rope
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::O,
+            k_rope_capacity_bytes,
+            "FlashInfer MLA k_rope staging",
+        )?
+    };
+    let value_staging = if let Some(buffers) = shared_suffix {
+        buffers.values
+    } else {
+        slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::P,
+            row_capacity
+                .checked_mul(heads)
+                .and_then(|values| values.checked_mul(v_dim))
+                .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+                .context("FlashInfer MLA value staging capacity overflow")?,
+            "FlashInfer MLA value staging",
+        )?
+    };
+    let query_lengths = dynamic_suffix
+        .then(|| {
+            slot.buffer(
+                library,
+                CoordinatorCudaScratchSlot::Q,
+                std::mem::size_of::<u32>(),
+                "FlashInfer/cuDNN MLA query lengths",
+            )
+        })
+        .transpose()?;
+    let kv_lengths = dynamic_suffix
+        .then(|| {
+            slot.buffer(
+                library,
+                CoordinatorCudaScratchSlot::R,
+                std::mem::size_of::<u32>(),
+                "FlashInfer/cuDNN MLA KV lengths",
+            )
+        })
+        .transpose()?;
+    let q_nope_offset = query_row_offset
+        .checked_mul(q_nope_row_bytes)
+        .context("FlashInfer MLA q_nope suffix offset overflow")?;
+    let q_rope_offset = query_row_offset
+        .checked_mul(q_rope_row_bytes)
+        .context("FlashInfer MLA q_rope suffix offset overflow")?;
+    let q_nope_source = if inputs_are_staged {
+        Ds4rtDeviceBuffer::default()
+    } else {
+        device_buffer_byte_view(
+            q_nope_buffer,
+            q_nope_offset,
+            q_nope_bytes,
+            "FlashInfer MLA q_nope suffix source",
+        )?
+    };
+    let q_rope_source = if inputs_are_staged {
+        Ds4rtDeviceBuffer::default()
+    } else {
+        device_buffer_byte_view(
+            q_rope_buffer,
+            q_rope_offset,
+            q_rope_bytes,
+            "FlashInfer MLA q_rope suffix source",
+        )?
+    };
+    let query_staging_prefix_rows = if dynamic_suffix {
+        0
+    } else {
+        capture_shape.query_prefix_padding
+    };
+    let q_nope_staging_offset = query_staging_prefix_rows
+        .checked_mul(q_nope_row_bytes)
+        .context("FlashInfer MLA q_nope staging offset overflow")?;
+    let q_rope_staging_offset = query_staging_prefix_rows
+        .checked_mul(q_rope_row_bytes)
+        .context("FlashInfer MLA q_rope staging offset overflow")?;
+    let q_nope_destination = device_buffer_byte_view(
+        q_nope_staging,
+        q_nope_staging_offset,
+        q_nope_bytes,
+        "FlashInfer MLA q_nope staging destination",
+    )?;
+    let q_rope_destination = device_buffer_byte_view(
+        q_rope_staging,
+        q_rope_staging_offset,
+        q_rope_bytes,
+        "FlashInfer MLA q_rope staging destination",
+    )?;
+    let cuda_stream = slot.stream_ptr();
+    if dynamic_suffix {
+        let query_rows =
+            u32::try_from(query_rows).context("FlashInfer/cuDNN MLA query rows exceed u32")?;
+        let rows = u32::try_from(rows).context("FlashInfer/cuDNN MLA KV rows exceed u32")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::Q,
+                &query_rows.to_ne_bytes(),
+                "FlashInfer/cuDNN MLA query lengths",
+                cuda_stream,
+            )
+            .context("staging FlashInfer/cuDNN MLA query length")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::R,
+                &rows.to_ne_bytes(),
+                "FlashInfer/cuDNN MLA KV lengths",
+                cuda_stream,
+            )
+            .context("staging FlashInfer/cuDNN MLA KV length")?;
+    }
+    unsafe {
+        if !inputs_are_staged {
+            if capture_query_rows != query_rows {
+                library.cuda_zero_bytes_async(
+                    q_nope_staging,
+                    capture_query_rows * q_nope_row_bytes,
+                    cuda_stream,
+                )?;
+                library.cuda_zero_bytes_async(
+                    q_rope_staging,
+                    capture_query_rows * q_rope_row_bytes,
+                    cuda_stream,
+                )?;
+            }
+            library.copy_d2d_async(q_nope_destination, q_nope_source, q_nope_bytes, cuda_stream)?;
+            library.copy_d2d_async(q_rope_destination, q_rope_source, q_rope_bytes, cuda_stream)?;
+            let k_nope_row_bytes = q_nope_row_bytes;
+            let k_rope_row_bytes = rope_dim * std::mem::size_of::<u16>();
+            let value_row_bytes = heads * v_dim * std::mem::size_of::<u16>();
+            let kv_staging_prefix_rows = if dynamic_suffix {
+                0
+            } else {
+                capture_shape.kv_prefix_padding
+            };
+            let k_nope_destination = device_buffer_byte_view(
+                k_nope_staging,
+                kv_staging_prefix_rows * k_nope_row_bytes,
+                k_nope_bytes,
+                "FlashInfer MLA k_nope staging destination",
+            )?;
+            let k_rope_destination = device_buffer_byte_view(
+                k_rope_staging,
+                kv_staging_prefix_rows * k_rope_row_bytes,
+                k_rope_bytes,
+                "FlashInfer MLA k_rope staging destination",
+            )?;
+            let value_destination = device_buffer_byte_view(
+                value_staging,
+                kv_staging_prefix_rows * value_row_bytes,
+                value_bytes,
+                "FlashInfer MLA value staging destination",
+            )?;
+            if kv_staging_prefix_rows > 0 {
+                library.cuda_zero_bytes_async(
+                    k_nope_staging,
+                    kv_staging_prefix_rows * k_nope_row_bytes,
+                    cuda_stream,
+                )?;
+                library.cuda_zero_bytes_async(
+                    k_rope_staging,
+                    kv_staging_prefix_rows * k_rope_row_bytes,
+                    cuda_stream,
+                )?;
+                library.cuda_zero_bytes_async(
+                    value_staging,
+                    kv_staging_prefix_rows * value_row_bytes,
+                    cuda_stream,
+                )?;
+            }
+            library.copy_d2d_async(k_nope_destination, k_nope_buffer, k_nope_bytes, cuda_stream)?;
+            library.copy_d2d_async(k_rope_destination, k_rope_buffer, k_rope_bytes, cuda_stream)?;
+            library.copy_d2d_async(value_destination, value_buffer, value_bytes, cuda_stream)?;
+            if capture_rows > rows {
+                let padded_rows = capture_rows - rows;
+                if kv_staging_prefix_rows == 0 {
+                    let k_nope_padding = device_buffer_byte_view(
+                        k_nope_staging,
+                        k_nope_bytes,
+                        padded_rows * k_nope_row_bytes,
+                        "FlashInfer MLA k_nope padding",
+                    )?;
+                    let k_rope_padding = device_buffer_byte_view(
+                        k_rope_staging,
+                        k_rope_bytes,
+                        padded_rows * k_rope_row_bytes,
+                        "FlashInfer MLA k_rope padding",
+                    )?;
+                    let value_padding = device_buffer_byte_view(
+                        value_staging,
+                        value_bytes,
+                        padded_rows * value_row_bytes,
+                        "FlashInfer MLA value padding",
+                    )?;
+                    library.cuda_zero_bytes_async(
+                        k_nope_padding,
+                        k_nope_padding.bytes,
+                        cuda_stream,
+                    )?;
+                    library.cuda_zero_bytes_async(
+                        k_rope_padding,
+                        k_rope_padding.bytes,
+                        cuda_stream,
+                    )?;
+                    library.cuda_zero_bytes_async(
+                        value_padding,
+                        value_padding.bytes,
+                        cuda_stream,
+                    )?;
+                }
+            }
+        }
+    }
+    let mut buffers = vec![
+        PythonDeviceBufferArg {
+            name: "q_nope",
+            ptr: q_nope_staging.ptr,
+            bytes: q_nope_staging.bytes,
+            device_id: q_nope_staging.device_id,
+            flags: q_nope_staging.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "q_rope",
+            ptr: q_rope_staging.ptr,
+            bytes: q_rope_staging.bytes,
+            device_id: q_rope_staging.device_id,
+            flags: q_rope_staging.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "k_nope",
+            ptr: k_nope_staging.ptr,
+            bytes: k_nope_staging.bytes,
+            device_id: k_nope_staging.device_id,
+            flags: k_nope_staging.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "k_rope",
+            ptr: k_rope_staging.ptr,
+            bytes: k_rope_staging.bytes,
+            device_id: k_rope_staging.device_id,
+            flags: k_rope_staging.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "values",
+            ptr: value_staging.ptr,
+            bytes: value_staging.bytes,
+            device_id: value_staging.device_id,
+            flags: value_staging.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "q",
+            ptr: q_buffer.ptr,
+            bytes: q_buffer.bytes,
+            device_id: q_buffer.device_id,
+            flags: q_buffer.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "k",
+            ptr: k_buffer.ptr,
+            bytes: k_buffer.bytes,
+            device_id: k_buffer.device_id,
+            flags: k_buffer.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "workspace",
+            ptr: workspace_buffer.ptr,
+            bytes: workspace_buffer.bytes,
+            device_id: workspace_buffer.device_id,
+            flags: workspace_buffer.flags,
+        },
+        PythonDeviceBufferArg {
+            name: "output",
+            ptr: output_scratch.ptr,
+            bytes: output_scratch.bytes,
+            device_id: output_scratch.device_id,
+            flags: output_scratch.flags,
+        },
+    ];
+    if let (Some(query_lengths), Some(kv_lengths)) = (query_lengths, kv_lengths) {
+        buffers.extend([
+            PythonDeviceBufferArg {
+                name: "query_lengths",
+                ptr: query_lengths.ptr,
+                bytes: query_lengths.bytes,
+                device_id: query_lengths.device_id,
+                flags: query_lengths.flags,
+            },
+            PythonDeviceBufferArg {
+                name: "kv_lengths",
+                ptr: kv_lengths.ptr,
+                bytes: kv_lengths.bytes,
+                device_id: kv_lengths.device_id,
+                flags: kv_lengths.flags,
+            },
+        ]);
+    }
+    let kwargs = if dynamic_suffix {
+        vec![
+            ("row_capacity", PythonKernelArg::Usize(capture_rows)),
+            ("query_capacity", PythonKernelArg::Usize(capture_query_rows)),
+            ("heads", PythonKernelArg::Usize(heads)),
+            ("nope_dim", PythonKernelArg::Usize(nope_dim)),
+            ("rope_dim", PythonKernelArg::Usize(rope_dim)),
+            ("v_dim", PythonKernelArg::Usize(v_dim)),
+            ("scale", PythonKernelArg::F64(scale as f64)),
+        ]
+    } else {
+        vec![
+            ("rows", PythonKernelArg::Usize(capture_rows)),
+            (
+                "query_row_offset",
+                PythonKernelArg::Usize(capture_shape.query_row_offset),
+            ),
+            ("query_rows", PythonKernelArg::Usize(capture_query_rows)),
+            ("heads", PythonKernelArg::Usize(heads)),
+            ("nope_dim", PythonKernelArg::Usize(nope_dim)),
+            ("rope_dim", PythonKernelArg::Usize(rope_dim)),
+            ("v_dim", PythonKernelArg::Usize(v_dim)),
+            ("scale", PythonKernelArg::F64(scale as f64)),
+        ]
+    };
+    let program = if full_query {
+        CoordinatorCudaGraphProgram::LayerFlashinferMlaRopeAttentionBf16
+    } else {
+        CoordinatorCudaGraphProgram::LayerFlashinferCudnnMlaRopeAttentionBf16Suffix
+    };
+    let mut capture_identity_parts = vec![
+        q_nope_staging.ptr as usize,
+        q_rope_staging.ptr as usize,
+        k_nope_staging.ptr as usize,
+        k_rope_staging.ptr as usize,
+        value_staging.ptr as usize,
+        q_buffer.ptr as usize,
+        k_buffer.ptr as usize,
+        workspace_buffer.ptr as usize,
+        output_scratch.ptr as usize,
+    ];
+    if let Some(query_lengths) = query_lengths {
+        capture_identity_parts.push(query_lengths.ptr as usize);
+    }
+    if let Some(kv_lengths) = kv_lengths {
+        capture_identity_parts.push(kv_lengths.ptr as usize);
+    }
+    let capture_identity = mla_graph_capture_identity(&capture_identity_parts);
+    let prepare_function = if dynamic_suffix {
+        FLASHINFER_CUDNN_MLA_PREPARE_FUNCTION
+    } else {
+        FLASHINFER_MLA_PREPARE_FUNCTION
+    };
+    let capture_function = if dynamic_suffix {
+        FLASHINFER_CUDNN_MLA_CAPTURE_FUNCTION
+    } else {
+        FLASHINFER_MLA_CAPTURE_FUNCTION
+    };
+    let graph_is_captured = slot.has_captured_graph_identity(program, signature, capture_identity);
+    if !graph_is_captured && !coordinator_python_capture_startup_open() {
+        return Ok(false);
+    }
+    if !graph_is_captured {
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} before prepare"))?;
+        launch_python_graph_capture(PythonGraphCaptureLaunch {
+            module: B12X_MLA_CAPTURE_MODULE,
+            function: prepare_function,
+            cuda_stream: slot.stream_ptr(),
+            buffers: &buffers,
+            kwargs: &kwargs,
+        })
+        .with_context(|| format!("preparing Python {label}"))?;
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing prepared {label}"))?;
+    }
+    slot.capture_or_update_graph_exec(
+        library,
+        program,
+        signature,
+        capture_identity,
+        |_library, cuda_stream, _workspace| {
+            launch_python_graph_capture(PythonGraphCaptureLaunch {
+                module: B12X_MLA_CAPTURE_MODULE,
+                function: capture_function,
+                cuda_stream,
+                buffers: &buffers,
+                kwargs: &kwargs,
+            })
+            .with_context(|| format!("capturing Python {label}"))?;
+            Ok(())
+        },
+    )?;
+    slot.launch_captured_graph_identity(library, program, signature, capture_identity)?;
+    let output_row_bytes = heads
+        .checked_mul(v_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA output row bytes overflow")?;
+    let output_source = device_buffer_byte_view(
+        output_scratch,
+        (if dynamic_suffix {
+            0
+        } else {
+            capture_shape.query_prefix_padding
+        })
+        .checked_mul(output_row_bytes)
+        .context("FlashInfer MLA output prefix offset overflow")?,
+        output_bytes,
+        "FlashInfer MLA real output rows",
+    )?;
+    if !inputs_are_staged {
+        unsafe {
+            library
+                .copy_d2d_async(
+                    output_buffer,
+                    output_source,
+                    output_bytes,
+                    slot.stream_ptr(),
+                )
+                .with_context(|| format!("copying {label} output"))?;
+        }
+    }
+    Ok(true)
+}
+
+fn mla_graph_capture_identity(parts: &[usize]) -> usize {
+    parts.iter().fold(0xcbf29ce484222325_usize, |hash, part| {
+        hash.wrapping_mul(0x100000001b3_usize) ^ part
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn flashinfer_mla_graph_signature(
+    rows: usize,
+    query_row_offset: usize,
+    query_rows: usize,
+    row_capacity: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<CoordinatorCudaGraphSignature> {
+    let capture_shape =
+        flashinfer_mla_capture_shape(rows, query_row_offset, query_rows, row_capacity)?;
+    let output_bytes = capture_shape
+        .query_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("FlashInfer MLA graph signature output byte count overflow")?;
+    if query_row_offset == 0 && query_rows == rows {
+        Ok(CoordinatorCudaGraphSignature::mla_rope_attention_bf16(
+            output_bytes,
+            capture_shape.rows,
+            heads,
+            nope_dim,
+            rope_dim,
+            v_dim,
+            scale,
+        ))
+    } else {
+        Ok(
+            CoordinatorCudaGraphSignature::mla_rope_attention_bf16_suffix(
+                output_bytes,
+                capture_shape.rows,
+                capture_shape.query_rows,
+                heads,
+                nope_dim,
+                rope_dim,
+                v_dim,
+                scale,
+            ),
+        )
+    }
+}
+
+fn flashinfer_mla_capture_shape(
+    rows: usize,
+    query_row_offset: usize,
+    query_rows: usize,
+    row_capacity: usize,
+) -> Result<FlashinferMlaCaptureShape> {
+    anyhow::ensure!(query_rows > 0, "FlashInfer MLA capture requires query rows");
+    anyhow::ensure!(
+        query_row_offset <= rows && query_rows == rows - query_row_offset,
+        "FlashInfer MLA capture requires a terminal query suffix"
+    );
+    let full_query = query_row_offset == 0 && query_rows == rows;
+    let capture_query_rows = if full_query {
+        row_capacity
+    } else {
+        query_rows
+            .max(FLASHINFER_MLA_SUFFIX_QUERY_FLOOR_ROWS.min(row_capacity))
+            .checked_next_power_of_two()
+            .context("FlashInfer MLA query row bucket overflow")?
+    };
+    let query_prefix_padding = capture_query_rows - query_rows;
+    let (capture_rows, capture_query_row_offset, kv_prefix_padding, query_prefix_padding) =
+        if full_query {
+            (capture_query_rows, 0, 0, 0)
+        } else {
+            let kv_prefix_padding = row_capacity - rows;
+            (
+                row_capacity,
+                row_capacity - capture_query_rows,
+                kv_prefix_padding,
+                query_prefix_padding,
+            )
+        };
+    anyhow::ensure!(
+        capture_rows <= row_capacity,
+        "FlashInfer MLA padded rows {capture_rows} exceed graph capacity {row_capacity}"
+    );
+    Ok(FlashinferMlaCaptureShape {
+        rows: capture_rows,
+        query_row_offset: capture_query_row_offset,
+        query_rows: capture_query_rows,
+        kv_prefix_padding,
+        query_prefix_padding,
+    })
+}
+
+fn b12x_mla_rope_attention_bf16_supported(
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+) -> bool {
+    coordinator_python_capture_enabled()
+        && b12x_mla_rope_attention_bf16_shape_supported(rows, heads, nope_dim, rope_dim, v_dim)
+}
+
+fn b12x_mla_capture_module() -> String {
+    env::var(DS4RT_B12X_MLA_MODULE_ENV).unwrap_or_else(|_| B12X_MLA_CAPTURE_MODULE.to_owned())
+}
+
+fn b12x_mla_capture_function() -> String {
+    env::var(DS4RT_B12X_MLA_FUNCTION_ENV).unwrap_or_else(|_| B12X_MLA_CAPTURE_FUNCTION.to_owned())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn capture_or_update_layer_b12x_mla_rope_attention_bf16_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+    label: &'static str,
+) -> Result<()> {
+    validate_mla_rope_attention_device_buffers(
+        rows,
+        q_nope_buffer,
+        q_rope_buffer,
+        k_nope_buffer,
+        k_rope_buffer,
+        value_buffer,
+        output_buffer,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+    )?;
+    let program = CoordinatorCudaGraphProgram::LayerB12xMlaRopeAttentionBf16;
+    if !slot.has_captured_graph(program, signature) {
+        let module = b12x_mla_capture_module();
+        let function = b12x_mla_capture_function();
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} inputs before graph capture"))?;
+        slot.capture_graph(
+            library,
+            program,
+            signature,
+            |_library, cuda_stream, _workspace| {
+                let buffers = [
+                    PythonDeviceBufferArg {
+                        name: "q_nope",
+                        ptr: q_nope_buffer.ptr,
+                        bytes: q_nope_buffer.bytes,
+                        device_id: q_nope_buffer.device_id,
+                        flags: q_nope_buffer.flags,
+                    },
+                    PythonDeviceBufferArg {
+                        name: "q_rope",
+                        ptr: q_rope_buffer.ptr,
+                        bytes: q_rope_buffer.bytes,
+                        device_id: q_rope_buffer.device_id,
+                        flags: q_rope_buffer.flags,
+                    },
+                    PythonDeviceBufferArg {
+                        name: "k_nope",
+                        ptr: k_nope_buffer.ptr,
+                        bytes: k_nope_buffer.bytes,
+                        device_id: k_nope_buffer.device_id,
+                        flags: k_nope_buffer.flags,
+                    },
+                    PythonDeviceBufferArg {
+                        name: "k_rope",
+                        ptr: k_rope_buffer.ptr,
+                        bytes: k_rope_buffer.bytes,
+                        device_id: k_rope_buffer.device_id,
+                        flags: k_rope_buffer.flags,
+                    },
+                    PythonDeviceBufferArg {
+                        name: "values",
+                        ptr: value_buffer.ptr,
+                        bytes: value_buffer.bytes,
+                        device_id: value_buffer.device_id,
+                        flags: value_buffer.flags,
+                    },
+                    PythonDeviceBufferArg {
+                        name: "output",
+                        ptr: output_buffer.ptr,
+                        bytes: output_buffer.bytes,
+                        device_id: output_buffer.device_id,
+                        flags: output_buffer.flags,
+                    },
+                ];
+                let kwargs = [
+                    ("rows", PythonKernelArg::Usize(rows)),
+                    ("heads", PythonKernelArg::Usize(heads)),
+                    ("nope_dim", PythonKernelArg::Usize(nope_dim)),
+                    ("rope_dim", PythonKernelArg::Usize(rope_dim)),
+                    ("v_dim", PythonKernelArg::Usize(v_dim)),
+                    ("scale", PythonKernelArg::F64(scale as f64)),
+                ];
+                launch_python_graph_capture(PythonGraphCaptureLaunch {
+                    module: module.as_str(),
+                    function: function.as_str(),
+                    cuda_stream,
+                    buffers: &buffers,
+                    kwargs: &kwargs,
+                })
+                .with_context(|| format!("capturing Python b12x {label}"))?;
+                Ok(())
+            },
+        )?;
+    }
+    slot.launch_captured_graph(library, program, signature)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn capture_or_update_layer_mla_rope_attention_bf16_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+    label: &'static str,
+) -> Result<()> {
+    if !slot.has_captured_graph(
+        CoordinatorCudaGraphProgram::LayerMlaRopeAttentionBf16,
+        signature,
+    ) {
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} inputs before graph capture"))?;
+        slot.capture_graph(
+            library,
+            CoordinatorCudaGraphProgram::LayerMlaRopeAttentionBf16,
+            signature,
+            |library, cuda_stream, _workspace| unsafe {
+                library
+                    .cuda_mla_rope_attention_bf16_async(
+                        q_nope_buffer,
+                        q_rope_buffer,
+                        k_nope_buffer,
+                        k_rope_buffer,
+                        value_buffer,
+                        output_buffer,
+                        rows,
+                        heads,
+                        nope_dim,
+                        rope_dim,
+                        v_dim,
+                        scale,
+                        cuda_stream,
+                    )
+                    .with_context(|| format!("capturing async CUDA {label}"))?;
+                Ok(())
+            },
+        )?;
+    } else {
+        let (graph_raw, exec_raw) = slot
+            .captured_graph_raw_handles(
+                CoordinatorCudaGraphProgram::LayerMlaRopeAttentionBf16,
+                signature,
+            )
+            .context(
+                "coordinator CUDA graph slot lost captured MLA/RoPE attention graph before update",
+            )?;
+        unsafe {
+            library
+                .cuda_graph_update_mla_rope_attention_bf16_node(
+                    graph_raw,
+                    exec_raw,
+                    0,
+                    q_nope_buffer,
+                    q_rope_buffer,
+                    k_nope_buffer,
+                    k_rope_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    heads,
+                    nope_dim,
+                    rope_dim,
+                    v_dim,
+                    scale,
+                )
+                .with_context(|| format!("updating captured CUDA {label} graph node"))?;
+        }
+    }
+    slot.launch_captured_graph(
+        library,
+        CoordinatorCudaGraphProgram::LayerMlaRopeAttentionBf16,
+        signature,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn capture_or_update_layer_mla_kv_cache_unpack_bf16_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    payload_buffer: Ds4rtDeviceBuffer,
+    kv_latent_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    dsa_key_buffer: Option<Ds4rtDeviceBuffer>,
+    rows: usize,
+    kv_lora_rank: usize,
+    rope_dim: usize,
+    dsa_dim: usize,
+    payload_stride_bytes: usize,
+    label: &'static str,
+) -> Result<()> {
+    if !slot.has_captured_graph(
+        CoordinatorCudaGraphProgram::LayerMlaKvCacheUnpackBf16,
+        signature,
+    ) {
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} inputs before graph capture"))?;
+        slot.capture_graph(
+            library,
+            CoordinatorCudaGraphProgram::LayerMlaKvCacheUnpackBf16,
+            signature,
+            |library, cuda_stream, _workspace| unsafe {
+                library
+                    .cuda_mla_kv_cache_unpack_bf16_async(
+                        payload_buffer,
+                        kv_latent_buffer,
+                        k_rope_buffer,
+                        dsa_key_buffer,
+                        rows,
+                        kv_lora_rank,
+                        rope_dim,
+                        dsa_dim,
+                        payload_stride_bytes,
+                        cuda_stream,
+                    )
+                    .with_context(|| format!("capturing async CUDA {label}"))?;
+                Ok(())
+            },
+        )?;
+    } else {
+        let (graph_raw, exec_raw) = slot
+            .captured_graph_raw_handles(
+                CoordinatorCudaGraphProgram::LayerMlaKvCacheUnpackBf16,
+                signature,
+            )
+            .context(
+                "coordinator CUDA graph slot lost captured MLA KV cache unpack graph before update",
+            )?;
+        unsafe {
+            library
+                .cuda_graph_update_mla_kv_cache_unpack_bf16_node(
+                    graph_raw,
+                    exec_raw,
+                    0,
+                    payload_buffer,
+                    kv_latent_buffer,
+                    k_rope_buffer,
+                    dsa_key_buffer,
+                    rows,
+                    kv_lora_rank,
+                    rope_dim,
+                    dsa_dim,
+                    payload_stride_bytes,
+                )
+                .with_context(|| format!("updating captured CUDA {label} graph node"))?;
+        }
+    }
+    slot.launch_captured_graph(
+        library,
+        CoordinatorCudaGraphProgram::LayerMlaKvCacheUnpackBf16,
+        signature,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn capture_or_update_layer_mla_kv_projected_split_bf16_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    projected_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    v_dim: usize,
+    label: &'static str,
+) -> Result<()> {
+    if !slot.has_captured_graph(
+        CoordinatorCudaGraphProgram::LayerMlaKvProjectedSplitBf16,
+        signature,
+    ) {
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} inputs before graph capture"))?;
+        slot.capture_graph(
+            library,
+            CoordinatorCudaGraphProgram::LayerMlaKvProjectedSplitBf16,
+            signature,
+            |library, cuda_stream, _workspace| unsafe {
+                library
+                    .cuda_mla_kv_projected_split_bf16_async(
+                        projected_buffer,
+                        k_nope_buffer,
+                        value_buffer,
+                        rows,
+                        heads,
+                        nope_dim,
+                        v_dim,
+                        cuda_stream,
+                    )
+                    .with_context(|| format!("capturing async CUDA {label}"))?;
+                Ok(())
+            },
+        )?;
+    } else {
+        let (graph_raw, exec_raw) = slot
+            .captured_graph_raw_handles(
+                CoordinatorCudaGraphProgram::LayerMlaKvProjectedSplitBf16,
+                signature,
+            )
+            .context(
+                "coordinator CUDA graph slot lost captured MLA KV projected split graph before update",
+            )?;
+        unsafe {
+            library
+                .cuda_graph_update_mla_kv_projected_split_bf16_node(
+                    graph_raw,
+                    exec_raw,
+                    0,
+                    projected_buffer,
+                    k_nope_buffer,
+                    value_buffer,
+                    rows,
+                    heads,
+                    nope_dim,
+                    v_dim,
+                )
+                .with_context(|| format!("updating captured CUDA {label} graph node"))?;
+        }
+    }
+    slot.launch_captured_graph(
+        library,
+        CoordinatorCudaGraphProgram::LayerMlaKvProjectedSplitBf16,
+        signature,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn validate_mla_rope_attention_device_buffers(
+    rows: usize,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+) -> Result<()> {
+    validate_mla_rope_attention_device_buffers_with_output_rows(
+        rows,
+        rows,
+        q_nope_buffer,
+        q_rope_buffer,
+        k_nope_buffer,
+        k_rope_buffer,
+        value_buffer,
+        output_buffer,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_mla_rope_attention_device_buffers_with_output_rows(
+    rows: usize,
+    output_rows: usize,
+    q_nope_buffer: Ds4rtDeviceBuffer,
+    q_rope_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+) -> Result<()> {
+    let q_nope_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(nope_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA/RoPE attention device-buffer q_nope bytes overflow usize")?;
+    let q_rope_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rope_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA/RoPE attention device-buffer q_rope bytes overflow usize")?;
+    let k_rope_bytes = rows
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA/RoPE attention device-buffer k_rope bytes overflow usize")?;
+    let value_bytes = rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA/RoPE attention device-buffer value bytes overflow usize")?;
+    let output_bytes = output_rows
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA/RoPE attention device-buffer output bytes overflow usize")?;
+    let buffers = [
+        ("q_nope", q_nope_buffer, q_nope_bytes),
+        ("q_rope", q_rope_buffer, q_rope_bytes),
+        ("k_nope", k_nope_buffer, q_nope_bytes),
+        ("k_rope", k_rope_buffer, k_rope_bytes),
+        ("values", value_buffer, value_bytes),
+        ("output", output_buffer, output_bytes),
+    ];
+    for (label, buffer, required_bytes) in buffers {
+        if buffer.ptr.is_null() {
+            anyhow::bail!("CUDA BF16 layer MLA/RoPE attention device-buffer {label} is null");
+        }
+        if buffer.bytes < required_bytes {
+            anyhow::bail!(
+                "CUDA BF16 layer MLA/RoPE attention device-buffer {label} has {} bytes, expected at least {required_bytes}",
+                buffer.bytes
+            );
+        }
+        if buffer.device_id != q_nope_buffer.device_id {
+            anyhow::bail!(
+                "CUDA BF16 layer MLA/RoPE attention device-buffer {label} is on CUDA device {}, expected {}",
+                buffer.device_id,
+                q_nope_buffer.device_id
+            );
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn validate_mla_kv_cache_unpack_bf16_device_buffers(
+    payload_buffer: Ds4rtDeviceBuffer,
+    kv_latent_buffer: Ds4rtDeviceBuffer,
+    k_rope_buffer: Ds4rtDeviceBuffer,
+    dsa_key_buffer: Option<Ds4rtDeviceBuffer>,
+    rows: usize,
+    kv_lora_rank: usize,
+    rope_dim: usize,
+    dsa_dim: usize,
+    payload_stride_bytes: usize,
+) -> Result<()> {
+    if rows == 0 || kv_lora_rank == 0 || rope_dim == 0 {
+        anyhow::bail!(
+            "CUDA BF16 layer MLA KV cache unpack requires nonzero rows/ranks, got rows={rows} kv_lora_rank={kv_lora_rank} rope_dim={rope_dim}"
+        );
+    }
+    if payload_stride_bytes == 0 || payload_stride_bytes % std::mem::size_of::<u16>() != 0 {
+        anyhow::bail!(
+            "CUDA BF16 layer MLA KV cache unpack payload stride must be positive and BF16-aligned, got {payload_stride_bytes}"
+        );
+    }
+    let packed_width = kv_lora_rank
+        .checked_add(rope_dim)
+        .and_then(|width| width.checked_add(dsa_dim))
+        .context("CUDA BF16 layer MLA KV cache unpack packed width overflow usize")?;
+    let payload_stride_values = payload_stride_bytes / std::mem::size_of::<u16>();
+    if payload_stride_values < packed_width {
+        anyhow::bail!(
+            "CUDA BF16 layer MLA KV cache unpack payload stride is too small: stride_values={payload_stride_values} packed_width={packed_width}"
+        );
+    }
+    let payload_bytes = rows
+        .checked_mul(payload_stride_bytes)
+        .context("CUDA BF16 layer MLA KV cache unpack payload bytes overflow usize")?;
+    let kv_latent_bytes = rows
+        .checked_mul(kv_lora_rank)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA KV cache unpack kv_latent bytes overflow usize")?;
+    let k_rope_bytes = rows
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA KV cache unpack k_rope bytes overflow usize")?;
+    let buffers = [
+        ("payload", payload_buffer, payload_bytes),
+        ("kv_latent", kv_latent_buffer, kv_latent_bytes),
+        ("k_rope", k_rope_buffer, k_rope_bytes),
+    ];
+    for (label, buffer, required_bytes) in buffers {
+        if buffer.ptr.is_null() {
+            anyhow::bail!("CUDA BF16 layer MLA KV cache unpack device-buffer {label} is null");
+        }
+        if buffer.bytes < required_bytes {
+            anyhow::bail!(
+                "CUDA BF16 layer MLA KV cache unpack device-buffer {label} has {} bytes, expected at least {required_bytes}",
+                buffer.bytes
+            );
+        }
+        if buffer.device_id != payload_buffer.device_id {
+            anyhow::bail!(
+                "CUDA BF16 layer MLA KV cache unpack device-buffer {label} is on CUDA device {}, expected {}",
+                buffer.device_id,
+                payload_buffer.device_id
+            );
+        }
+    }
+    if dsa_dim == 0 {
+        return Ok(());
+    }
+    let dsa_key_buffer =
+        dsa_key_buffer.context("CUDA BF16 layer MLA KV cache unpack dsa_key buffer is required")?;
+    let dsa_key_bytes = rows
+        .checked_mul(dsa_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA KV cache unpack dsa_key bytes overflow usize")?;
+    if dsa_key_buffer.ptr.is_null() {
+        anyhow::bail!("CUDA BF16 layer MLA KV cache unpack device-buffer dsa_key is null");
+    }
+    if dsa_key_buffer.bytes < dsa_key_bytes {
+        anyhow::bail!(
+            "CUDA BF16 layer MLA KV cache unpack device-buffer dsa_key has {} bytes, expected at least {dsa_key_bytes}",
+            dsa_key_buffer.bytes
+        );
+    }
+    if dsa_key_buffer.device_id != payload_buffer.device_id {
+        anyhow::bail!(
+            "CUDA BF16 layer MLA KV cache unpack device-buffer dsa_key is on CUDA device {}, expected {}",
+            dsa_key_buffer.device_id,
+            payload_buffer.device_id
+        );
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn validate_mla_kv_projected_split_bf16_device_buffers(
+    projected_buffer: Ds4rtDeviceBuffer,
+    k_nope_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    v_dim: usize,
+) -> Result<()> {
+    if rows == 0 || heads == 0 || nope_dim == 0 || v_dim == 0 {
+        anyhow::bail!(
+            "CUDA BF16 layer MLA KV projected split requires nonzero shape, got rows={rows} heads={heads} nope_dim={nope_dim} v_dim={v_dim}"
+        );
+    }
+    let row_heads = rows
+        .checked_mul(heads)
+        .context("CUDA BF16 layer MLA KV projected split row-head count overflow usize")?;
+    let projected_width = nope_dim
+        .checked_add(v_dim)
+        .context("CUDA BF16 layer MLA KV projected split output width overflow usize")?;
+    let projected_bytes = row_heads
+        .checked_mul(projected_width)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA KV projected split input bytes overflow usize")?;
+    let k_nope_bytes = row_heads
+        .checked_mul(nope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA KV projected split k_nope bytes overflow usize")?;
+    let value_bytes = row_heads
+        .checked_mul(v_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .context("CUDA BF16 layer MLA KV projected split value bytes overflow usize")?;
+    let buffers = [
+        ("projected", projected_buffer, projected_bytes),
+        ("k_nope", k_nope_buffer, k_nope_bytes),
+        ("values", value_buffer, value_bytes),
+    ];
+    for (label, buffer, required_bytes) in buffers {
+        if buffer.ptr.is_null() {
+            anyhow::bail!("CUDA BF16 layer MLA KV projected split device-buffer {label} is null");
+        }
+        if buffer.bytes < required_bytes {
+            anyhow::bail!(
+                "CUDA BF16 layer MLA KV projected split device-buffer {label} has {} bytes, expected at least {required_bytes}",
+                buffer.bytes
+            );
+        }
+        if buffer.device_id != projected_buffer.device_id {
+            anyhow::bail!(
+                "CUDA BF16 layer MLA KV projected split device-buffer {label} is on CUDA device {}, expected {}",
+                buffer.device_id,
+                projected_buffer.device_id
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(in crate::commands::real_full) fn mla_rope_attention_graph_nope_bytes(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    nope_dim: usize,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(nope_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .with_context(|| format!("{context} no-RPE graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn mla_rope_attention_graph_q_rope_bytes(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    rope_dim: usize,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(rope_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .with_context(|| format!("{context} q_rope graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn mla_rope_attention_graph_k_rope_bytes(
+    graph_key: &CoordinatorGraphKey,
+    rope_dim: usize,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(rope_dim)
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .with_context(|| format!("{context} k_rope graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn mla_rope_attention_graph_value_bytes(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    v_dim: usize,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .with_context(|| format!("{context} value graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn mla_rope_attention_graph_signature(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> CoordinatorCudaGraphSignature {
+    CoordinatorCudaGraphSignature::mla_rope_attention_bf16(
+        graph_key.row_bucket.row_capacity * heads * v_dim * std::mem::size_of::<u16>(),
+        graph_key.row_bucket.row_capacity,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+        scale,
+    )
+}
+
+pub(in crate::commands::real_full) fn mla_rope_attention_suffix_graph_signature(
+    graph_key: &CoordinatorGraphKey,
+    query_rows: usize,
+    heads: usize,
+    nope_dim: usize,
+    rope_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> CoordinatorCudaGraphSignature {
+    CoordinatorCudaGraphSignature::mla_rope_attention_bf16_suffix(
+        graph_key.row_bucket.row_capacity * heads * v_dim * std::mem::size_of::<u16>(),
+        graph_key.row_bucket.row_capacity,
+        query_rows,
+        heads,
+        nope_dim,
+        rope_dim,
+        v_dim,
+        scale,
+    )
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn cuda_causal_attention_rows(
+    queries: &[f32],
+    keys: &[f32],
+    values: &[f32],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<CausalAttentionOutput> {
+    let library = cuda_native_library()?;
+    let qk_bytes = std::mem::size_of_val(queries);
+    let value_bytes = std::mem::size_of_val(values);
+    let mut workspace = lock_coordinator_cuda_workspace()?;
+    let query_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::A,
+        qk_bytes,
+        "causal attention queries",
+    )?;
+    let key_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::B,
+        qk_bytes,
+        "causal attention keys",
+    )?;
+    let value_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::C,
+        value_bytes,
+        "causal attention values",
+    )?;
+    let output_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::D,
+        value_bytes,
+        "causal attention output",
+    )?;
+
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            f32_bytes(queries),
+            "causal attention queries",
+        )
+        .context("copying causal attention queries to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            f32_bytes(keys),
+            "causal attention keys",
+        )
+        .context("copying causal attention keys to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::C,
+            f32_bytes(values),
+            "causal attention values",
+        )
+        .context("copying causal attention values to device")?;
+    library
+        .cuda_causal_attention_f32(
+            query_buffer,
+            key_buffer,
+            value_buffer,
+            output_buffer,
+            rows,
+            heads,
+            qk_dim,
+            v_dim,
+            scale,
+        )
+        .context("executing CUDA causal attention")?;
+    let mut out_bytes = vec![0_u8; value_bytes];
+    library
+        .copy_d2h(&mut out_bytes, output_buffer)
+        .context("copying causal attention output to host")?;
+
+    Ok(CausalAttentionOutput {
+        values: f32_vec_from_bytes(&out_bytes)?,
+        backend: CUDA_REFERENCE_CAUSAL_ATTENTION_BACKEND,
+    })
+}
+
+#[allow(dead_code)]
+pub(in crate::commands::real_full) fn cuda_causal_attention_rows_bf16(
+    queries_bf16: &[u8],
+    keys_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<CausalAttentionOutput> {
+    let library = cuda_native_library()?;
+    let qk_bytes = queries_bf16.len();
+    let value_bytes = values_bf16.len();
+    let mut workspace = lock_coordinator_cuda_workspace()?;
+    let query_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::A,
+        qk_bytes,
+        "BF16 causal attention queries",
+    )?;
+    let key_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::B,
+        qk_bytes,
+        "BF16 causal attention keys",
+    )?;
+    let value_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::C,
+        value_bytes,
+        "BF16 causal attention values",
+    )?;
+    let output_buffer = workspace.buffer(
+        library,
+        CoordinatorCudaScratchSlot::D,
+        value_bytes,
+        "BF16 causal attention output",
+    )?;
+
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            queries_bf16,
+            "BF16 causal attention queries",
+        )
+        .context("copying BF16 causal attention queries to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            keys_bf16,
+            "BF16 causal attention keys",
+        )
+        .context("copying BF16 causal attention keys to device")?;
+    workspace
+        .copy_h2d_to_slot(
+            library,
+            CoordinatorCudaScratchSlot::C,
+            values_bf16,
+            "BF16 causal attention values",
+        )
+        .context("copying BF16 causal attention values to device")?;
+    library
+        .cuda_causal_attention_bf16(
+            query_buffer,
+            key_buffer,
+            value_buffer,
+            output_buffer,
+            rows,
+            heads,
+            qk_dim,
+            v_dim,
+            scale,
+        )
+        .context("executing CUDA BF16 causal attention")?;
+    let mut out_bytes = vec![0_u8; value_bytes];
+    library
+        .copy_d2h(&mut out_bytes, output_buffer)
+        .context("copying BF16 causal attention output to host")?;
+
+    Ok(CausalAttentionOutput {
+        values: bf16_values_to_f32(&out_bytes),
+        backend: CUDA_REFERENCE_CAUSAL_ATTENTION_BF16_BACKEND,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn cuda_causal_attention_rows_bf16_for_layer(
+    layer_id: usize,
+    queries_bf16: &[u8],
+    keys_bf16: &[u8],
+    values_bf16: &[u8],
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> Result<CausalAttentionOutput> {
+    let graph_key = coord_attention_graph_key_for_layer_rows(layer_id, rows)?;
+    let value_bytes = values_bf16.len();
+    let qk_graph_bytes = causal_attention_graph_qk_bytes(
+        &graph_key,
+        heads,
+        qk_dim,
+        "CUDA BF16 layer causal attention graph-slot",
+    )?;
+    let value_graph_bytes = causal_attention_graph_value_bytes(
+        &graph_key,
+        heads,
+        v_dim,
+        "CUDA BF16 layer causal attention graph-slot",
+    )?;
+    let signature = causal_attention_graph_signature(&graph_key, heads, qk_dim, v_dim, scale);
+    with_coordinator_cuda_graph_slot(&graph_key, |library, slot| {
+        let cuda_stream = slot.stream_ptr();
+        let query_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::A,
+            qk_graph_bytes,
+            "BF16 layer causal attention queries",
+        )?;
+        let key_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::B,
+            qk_graph_bytes,
+            "BF16 layer causal attention keys",
+        )?;
+        let value_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::C,
+            value_graph_bytes,
+            "BF16 layer causal attention values",
+        )?;
+        let output_buffer = slot.buffer(
+            library,
+            CoordinatorCudaScratchSlot::D,
+            value_graph_bytes,
+            "BF16 layer causal attention output",
+        )?;
+
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::A,
+                queries_bf16,
+                "BF16 layer causal attention queries",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer causal attention queries to device")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::B,
+                keys_bf16,
+                "BF16 layer causal attention keys",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer causal attention keys to device")?;
+        slot.workspace
+            .copy_h2d_to_slot_async(
+                library,
+                CoordinatorCudaScratchSlot::C,
+                values_bf16,
+                "BF16 layer causal attention values",
+                cuda_stream,
+            )
+            .context("async copying BF16 layer causal attention values to device")?;
+        capture_or_update_layer_causal_attention_bf16_graph(
+            library,
+            slot,
+            signature,
+            query_buffer,
+            key_buffer,
+            value_buffer,
+            output_buffer,
+            rows,
+            heads,
+            qk_dim,
+            v_dim,
+            scale,
+            "BF16 layer causal attention",
+        )?;
+        let mut out_bytes = vec![0_u8; value_bytes];
+        unsafe {
+            library
+                .copy_d2h_async(&mut out_bytes, output_buffer, cuda_stream)
+                .context("async copying BF16 layer causal attention output to host")?;
+            library
+                .cuda_stream_synchronize(cuda_stream)
+                .context("synchronizing BF16 layer causal attention graph slot stream")?;
+        }
+
+        Ok(CausalAttentionOutput {
+            values: bf16_values_to_f32(&out_bytes),
+            backend: CUDA_REFERENCE_CAUSAL_ATTENTION_BF16_BACKEND,
+        })
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::commands::real_full) fn capture_or_update_layer_causal_attention_bf16_graph(
+    library: &'static NativeLibrary,
+    slot: &mut CoordinatorCudaGraphWorkspaceSlot,
+    signature: CoordinatorCudaGraphSignature,
+    query_buffer: Ds4rtDeviceBuffer,
+    key_buffer: Ds4rtDeviceBuffer,
+    value_buffer: Ds4rtDeviceBuffer,
+    output_buffer: Ds4rtDeviceBuffer,
+    rows: usize,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+    label: &'static str,
+) -> Result<()> {
+    if !slot.has_captured_graph(
+        CoordinatorCudaGraphProgram::LayerCausalAttentionBf16,
+        signature,
+    ) {
+        slot.stream_synchronize()
+            .with_context(|| format!("synchronizing {label} inputs before graph capture"))?;
+        slot.capture_graph(
+            library,
+            CoordinatorCudaGraphProgram::LayerCausalAttentionBf16,
+            signature,
+            |library, cuda_stream, _workspace| unsafe {
+                library
+                    .cuda_causal_attention_bf16_async(
+                        query_buffer,
+                        key_buffer,
+                        value_buffer,
+                        output_buffer,
+                        rows,
+                        heads,
+                        qk_dim,
+                        v_dim,
+                        scale,
+                        cuda_stream,
+                    )
+                    .with_context(|| format!("capturing async CUDA {label}"))?;
+                Ok(())
+            },
+        )?;
+    } else {
+        let (graph_raw, exec_raw) = slot
+            .captured_graph_raw_handles(
+                CoordinatorCudaGraphProgram::LayerCausalAttentionBf16,
+                signature,
+            )
+            .context(
+                "coordinator CUDA graph slot lost captured causal attention graph before update",
+            )?;
+        unsafe {
+            library
+                .cuda_graph_update_causal_attention_bf16_node(
+                    graph_raw,
+                    exec_raw,
+                    0,
+                    query_buffer,
+                    key_buffer,
+                    value_buffer,
+                    output_buffer,
+                    rows,
+                    heads,
+                    qk_dim,
+                    v_dim,
+                    scale,
+                )
+                .with_context(|| format!("updating captured CUDA {label} graph node"))?;
+        }
+    }
+    slot.launch_captured_graph(
+        library,
+        CoordinatorCudaGraphProgram::LayerCausalAttentionBf16,
+        signature,
+    )
+}
+
+pub(in crate::commands::real_full) fn causal_attention_graph_qk_bytes(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    qk_dim: usize,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(qk_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .with_context(|| format!("{context} q/k graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn causal_attention_graph_value_bytes(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    v_dim: usize,
+    context: &str,
+) -> Result<usize> {
+    graph_key
+        .row_bucket
+        .row_capacity
+        .checked_mul(heads)
+        .and_then(|values| values.checked_mul(v_dim))
+        .and_then(|values| values.checked_mul(std::mem::size_of::<u16>()))
+        .with_context(|| format!("{context} value graph buffer bytes overflow usize"))
+}
+
+pub(in crate::commands::real_full) fn causal_attention_graph_signature(
+    graph_key: &CoordinatorGraphKey,
+    heads: usize,
+    qk_dim: usize,
+    v_dim: usize,
+    scale: f32,
+) -> CoordinatorCudaGraphSignature {
+    CoordinatorCudaGraphSignature::causal_attention_bf16(
+        graph_key.row_bucket.row_capacity * heads * v_dim * std::mem::size_of::<u16>(),
+        graph_key.row_bucket.row_capacity,
+        heads,
+        qk_dim,
+        v_dim,
+        scale,
+    )
+}
+
+pub(in crate::commands::real_full) fn is_glm52_attention_linear_weight_subpath(
+    subpath: &str,
+) -> bool {
+    [
+        "self_attn.q_a_proj.weight",
+        "self_attn.q_b_proj.weight",
+        "self_attn.kv_a_proj_with_mqa.weight",
+        "self_attn.kv_b_proj.weight",
+        "self_attn.o_proj.weight",
+        "self_attn.indexer.weights_proj.weight",
+        "self_attn.indexer.wk.weight",
+        "self_attn.indexer.wq_b.weight",
+    ]
+    .iter()
+    .any(|prefix| subpath.starts_with(prefix))
+}
+
+#[cfg(test)]
+mod flashinfer_capture_shape_tests {
+    use super::{
+        flashinfer_direct_packed_fp8_mla_capacity_supported,
+        flashinfer_glm52_attention_heads_supported, flashinfer_mla_capture_shape,
+        flashinfer_mla_graph_signature, flashinfer_packed_fp8_mla_startup_capture_query_rows,
+        parse_flashinfer_cudnn_mla_suffix_query_capacity,
+        sparkinfer_glm_h64_packed_decode_candidate, stage_flashinfer_hidden_projection,
+        FlashinferMlaCaptureShape, FlashinferMlaHiddenProjection,
+    };
+    use ds4rt_ffi::Ds4rtDeviceBuffer;
+
+    #[test]
+    fn sparkinfer_h64_is_confined_to_packed_decode_m2_through_m16() {
+        assert!(!sparkinfer_glm_h64_packed_decode_candidate(0));
+        assert!(!sparkinfer_glm_h64_packed_decode_candidate(1));
+        for query_rows in 2..=16 {
+            assert!(sparkinfer_glm_h64_packed_decode_candidate(query_rows));
+        }
+        assert!(!sparkinfer_glm_h64_packed_decode_candidate(17));
+        assert!(!sparkinfer_glm_h64_packed_decode_candidate(2_048));
+    }
+
+    #[test]
+    fn glm52_flashinfer_accepts_full_and_tp4_head_counts() {
+        assert!(flashinfer_glm52_attention_heads_supported(64));
+        assert!(flashinfer_glm52_attention_heads_supported(16));
+        assert!(!flashinfer_glm52_attention_heads_supported(8));
+        assert!(!flashinfer_glm52_attention_heads_supported(32));
+    }
+
+    #[test]
+    fn direct_packed_mla_capacity_requires_complete_physical_pages() {
+        const ROW_BYTES: usize = 656;
+        assert!(flashinfer_direct_packed_fp8_mla_capacity_supported(
+            64 * ROW_BYTES
+        ));
+        assert!(!flashinfer_direct_packed_fp8_mla_capacity_supported(
+            65 * ROW_BYTES
+        ));
+        assert!(!flashinfer_direct_packed_fp8_mla_capacity_supported(
+            64 * ROW_BYTES + 1
+        ));
+    }
+
+    #[test]
+    fn cudnn_mla_suffix_query_capacity_accepts_supported_powers_of_two() {
+        assert_eq!(
+            parse_flashinfer_cudnn_mla_suffix_query_capacity("512"),
+            Some(512)
+        );
+        assert_eq!(
+            parse_flashinfer_cudnn_mla_suffix_query_capacity(" 1024 "),
+            Some(1024)
+        );
+        assert_eq!(
+            parse_flashinfer_cudnn_mla_suffix_query_capacity("2048"),
+            Some(2048)
+        );
+        assert_eq!(
+            parse_flashinfer_cudnn_mla_suffix_query_capacity("768"),
+            None
+        );
+        assert_eq!(
+            parse_flashinfer_cudnn_mla_suffix_query_capacity("4096"),
+            None
+        );
+    }
+
+    #[test]
+    fn packed_fp8_mla_startup_covers_decode_and_short_prefill_widths() {
+        let widths = flashinfer_packed_fp8_mla_startup_capture_query_rows().collect::<Vec<_>>();
+        assert_eq!(widths, (2..=16).collect::<Vec<_>>());
+        assert!(
+            widths.contains(&12),
+            "model availability probe uses short-prefill M=12"
+        );
+    }
+
+    #[test]
+    fn packed_projection_preserves_external_output_while_staging_graph_output() {
+        let external_output = buffer_at(0x1000);
+        let staging_output = buffer_at(0x2000);
+        let projection = FlashinferMlaHiddenProjection {
+            weight: buffer_at(0x3000),
+            output: external_output,
+            hidden_dim: 6_144,
+            w4a16: None,
+            w8a16: None,
+        };
+
+        let (copy_destination, staged) =
+            stage_flashinfer_hidden_projection(Some(projection), staging_output, false);
+
+        assert_eq!(copy_destination.unwrap().ptr, external_output.ptr);
+        assert_eq!(staged.unwrap().output.ptr, staging_output.ptr);
+    }
+
+    #[test]
+    fn packed_projection_can_write_directly_to_external_output() {
+        let external_output = buffer_at(0x1000);
+        let projection = FlashinferMlaHiddenProjection {
+            weight: buffer_at(0x3000),
+            output: external_output,
+            hidden_dim: 6_144,
+            w4a16: None,
+            w8a16: None,
+        };
+
+        let (copy_destination, direct) =
+            stage_flashinfer_hidden_projection(Some(projection), buffer_at(0x2000), true);
+
+        assert!(copy_destination.is_none());
+        assert_eq!(direct.unwrap().output.ptr, external_output.ptr);
+    }
+
+    fn buffer_at(address: usize) -> Ds4rtDeviceBuffer {
+        Ds4rtDeviceBuffer {
+            ptr: address as *mut std::ffi::c_void,
+            bytes: 1,
+            device_id: 0,
+            flags: 0,
+        }
+    }
+
+    #[test]
+    fn pads_full_prefill_to_graph_bucket() {
+        for query_rows in 2..=16 {
+            assert_eq!(
+                flashinfer_mla_capture_shape(query_rows, 0, query_rows, 16).unwrap(),
+                FlashinferMlaCaptureShape {
+                    rows: 16,
+                    query_row_offset: 0,
+                    query_rows: 16,
+                    kv_prefix_padding: 0,
+                    query_prefix_padding: 0,
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn graph_signature_reuses_padded_bucket() {
+        let first = flashinfer_mla_graph_signature(18, 0, 18, 32, 64, 192, 64, 256, 0.125).unwrap();
+        let second =
+            flashinfer_mla_graph_signature(24, 0, 24, 32, 64, 192, 64, 256, 0.125).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn legacy_capture_shape_left_pads_partial_suffix_to_reusable_bucket() {
+        assert_eq!(
+            flashinfer_mla_capture_shape(999, 768, 231, 1_024).unwrap(),
+            FlashinferMlaCaptureShape {
+                rows: 1_024,
+                query_row_offset: 512,
+                query_rows: 512,
+                kv_prefix_padding: 25,
+                query_prefix_padding: 281,
+            }
+        );
+    }
+
+    #[test]
+    fn right_pads_full_prefill_to_power_of_two() {
+        assert_eq!(
+            flashinfer_mla_capture_shape(487, 0, 487, 512).unwrap(),
+            FlashinferMlaCaptureShape {
+                rows: 512,
+                query_row_offset: 0,
+                query_rows: 512,
+                kv_prefix_padding: 0,
+                query_prefix_padding: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn legacy_capture_shape_pads_small_power_of_two_suffix_to_reusable_bucket() {
+        assert_eq!(
+            flashinfer_mla_capture_shape(768, 512, 256, 1_024).unwrap(),
+            FlashinferMlaCaptureShape {
+                rows: 1_024,
+                query_row_offset: 512,
+                query_rows: 512,
+                kv_prefix_padding: 256,
+                query_prefix_padding: 256,
+            }
+        );
+    }
+
+    #[test]
+    fn legacy_suffix_graph_signature_reuses_fixed_prefill_bucket() {
+        let small =
+            flashinfer_mla_graph_signature(1_088, 1_024, 64, 2_048, 64, 192, 64, 256, 0.125)
+                .unwrap();
+        let large =
+            flashinfer_mla_graph_signature(1_280, 1_024, 256, 2_048, 64, 192, 64, 256, 0.125)
+                .unwrap();
+        assert_eq!(small, large);
+    }
+}

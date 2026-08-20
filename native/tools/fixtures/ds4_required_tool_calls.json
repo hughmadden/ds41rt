@@ -1,0 +1,71 @@
+{
+  "name": "deepseek_v4_required_tool_calls",
+  "model_vocab_size": 129280,
+  "stop_token_ids": [1, 128803, 128804],
+  "structural_tag": {
+    "type": "structural_tag",
+    "format": {
+      "type": "tag",
+      "begin": "\n\n<｜DSML｜tool_calls>\n",
+      "content": {
+        "type": "tags_with_separator",
+        "tags": [
+          {
+            "type": "tag",
+            "begin": "<｜DSML｜invoke name=\"lookup\">\n",
+            "content": {
+              "type": "json_schema",
+              "json_schema": {
+                "type": "object",
+                "properties": {
+                  "city": {"type": "string"},
+                  "units": {"type": "string", "enum": ["metric", "imperial"]}
+                },
+                "required": ["city", "units"],
+                "additionalProperties": false
+              },
+              "style": "deepseek_xml",
+              "any_order": false
+            },
+            "end": "\n</｜DSML｜invoke>"
+          },
+          {
+            "type": "tag",
+            "begin": "<｜DSML｜invoke name=\"search\">\n",
+            "content": {
+              "type": "json_schema",
+              "json_schema": {
+                "type": "object",
+                "properties": {
+                  "query": {"type": "string"},
+                  "limit": {"type": "integer", "minimum": 1, "maximum": 10}
+                },
+                "required": ["query", "limit"],
+                "additionalProperties": false
+              },
+              "style": "deepseek_xml",
+              "any_order": false
+            },
+            "end": "\n</｜DSML｜invoke>"
+          }
+        ],
+        "separator": "\n",
+        "at_least_one": true,
+        "stop_after_first": false
+      },
+      "end": "\n</｜DSML｜tool_calls>"
+    }
+  },
+  "samples": [
+    {
+      "name": "lookup",
+      "text": "\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name=\"lookup\">\n<｜DSML｜parameter name=\"city\" string=\"true\">Taipei</｜DSML｜parameter>\n<｜DSML｜parameter name=\"units\" string=\"true\">metric</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>",
+      "token_ids": [271, 30, 128825, 72461, 4941, 12548, 1018, 30, 128825, 40148, 5406, 2329, 1281, 12533, 1425, 3816, 30, 128825, 41523, 2329, 1281, 37399, 4, 3418, 1281, 11476, 3320, 90791, 67312, 1718, 128825, 41523, 1018, 30, 128825, 41523, 2329, 1281, 45850, 4, 3418, 1281, 11476, 3320, 23992, 1718, 128825, 41523, 1018, 1718, 128825, 40148, 5406, 1018, 1718, 128825, 72461, 4941, 12548, 32]
+    },
+    {
+      "name": "search",
+      "text": "\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name=\"search\">\n<｜DSML｜parameter name=\"query\" string=\"true\">RDMA ring buffers</｜DSML｜parameter>\n<｜DSML｜parameter name=\"limit\" string=\"false\">4</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>",
+      "token_ids": [271, 30, 128825, 72461, 4941, 12548, 1018, 30, 128825, 40148, 5406, 2329, 1281, 14346, 3816, 30, 128825, 41523, 2329, 1281, 12066, 4, 3418, 1281, 11476, 3320, 42696, 8564, 11592, 84152, 1718, 128825, 41523, 1018, 30, 128825, 41523, 2329, 1281, 39673, 4, 3418, 1281, 19836, 3320, 22, 1718, 128825, 41523, 1018, 1718, 128825, 40148, 5406, 1018, 1718, 128825, 72461, 4941, 12548, 32]
+    }
+  ]
+}

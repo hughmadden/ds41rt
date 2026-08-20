@@ -1,0 +1,119 @@
+{
+  "schema": "ds4rt.public-benchmark.v1",
+  "measured_at_utc": "2026-08-21",
+  "model": {
+    "id": "wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1",
+    "revision": "7a63f24905223aff19212d65226be708950823ac",
+    "expert_format": "exl3",
+    "expert_bits_per_weight": 2
+  },
+  "hardware": {
+    "coordinator": "1x NVIDIA RTX PRO 6000 Blackwell Workstation Edition 96 GB",
+    "experts": "4x NVIDIA DGX Spark GB10",
+    "expert_parallelism": "tp4 intermediate-dimension slices",
+    "fabric": "dedicated 400-Gb/s path; native verbs"
+  },
+  "runtime": {
+    "profile": "balanced",
+    "target_kv": "fp8",
+    "dspark": "adaptive",
+    "temperature": 0.0,
+    "thinking": false,
+    "measured_engine_revision": "54e66dedf49615cc9d1e5e8a5c3c49969663c115",
+    "sparkinfer_revision": "584c52a6d4779f7771dfc3f327cf3f338e2c0b1f",
+    "coordinator_image_id": "sha256:a6df287110e55a424c22537fb1f7f20146f7d2e628c96df38cee437430c99e6e",
+    "required_gates": [
+      "full_attention",
+      "numeric_progression",
+      "zero_request_time_graph_captures"
+    ]
+  },
+  "headline": {
+    "semantic_blend_decode_tps": 38.0775,
+    "semantic_blend_generations": 35,
+    "semantic_blend_repeat_decode_tps": [
+      38.6774,
+      38.0067,
+      38.3484,
+      37.9373,
+      37.4395
+    ],
+    "code_slice_decode_tps": 52.4968,
+    "draft_tokens": 5577,
+    "accepted_draft_tokens": 3568,
+    "draft_acceptance_fraction": 0.6398,
+    "artificial_repeat_decode": {
+      "word": "orchid",
+      "requested_repetitions": 100,
+      "warmups": 1,
+      "timed_samples": 5,
+      "sample_decode_tps": [68.0913, 67.5094, 67.9949, 66.8150, 67.3867],
+      "aggregate_decode_tps": 67.5563,
+      "median_decode_tps": 67.5094,
+      "max_decode_tps": 68.0913,
+      "draft_acceptance_fraction": 0.9537,
+      "all_exact_repetition_count": true
+    },
+    "artificial_retained_prefill": {
+      "cached_context_tokens": 32768,
+      "new_tokens": 32768,
+      "median_tokens_per_second": 2038.984,
+      "prefix_construction_included": false,
+      "content_pattern": "repeated alpha token"
+    },
+    "prefill_8k_tps_samples": [1458.8788, 1443.3834],
+    "prefill_8k_tps_median": 1451.1311,
+    "tool_eval": {
+      "measured_at_utc": "2026-08-21",
+      "run_id": "2026-08-21T04-07-45.291768Z_2961465c",
+      "version": "2.3.2.dev3+g5df1e9e0c",
+      "scenarios": 69,
+      "parallel": 1,
+      "thinking": false,
+      "score_100": 86,
+      "raw_points": 118,
+      "raw_points_possible": 138,
+      "pass": 54,
+      "partial": 10,
+      "fail": 5,
+      "backend_failures": 0,
+      "safety_gate_passed": false,
+      "safety_warning_scenarios": ["TC-34", "TC-42", "TC-58", "TC-60"]
+    }
+  },
+  "prefill_ktokens_per_second": {
+    "suffix_tokens": [1024, 2048, 4096, 8192, 16384, 32768],
+    "fresh": [0.745360, 0.911984, 1.220426, 1.451131, 1.618935, 1.663550],
+    "cached_32768": [0.949674, 1.334865, 1.629941, 1.726259, 2.014784, 2.038984],
+    "cached_65536": [0.935347, 1.317281, 1.647412, 1.769340, 1.951717, 1.920672],
+    "cached_131072": [0.893831, 1.265949, 1.643530, 1.735328, 1.791213, 1.758171],
+    "cached_262144": [0.819388, 1.153725, 1.389809, 1.488494, 1.407974, 1.492494],
+    "samples_per_cell": 2,
+    "fresh_warmups_per_cell": 1,
+    "retained_prefix_construction_included": false,
+    "retained_content_pattern": "repeated alpha token",
+    "all_attention_complete": true,
+    "all_numeric_progression_passed": true,
+    "all_zero_runtime_captures": true
+  },
+  "decode_tokens_per_second": {
+    "tool": "llama-benchy 0.4.0",
+    "prompt_tokens": 2048,
+    "generated_tokens": 128,
+    "exact_generated_tokens": true,
+    "runs_per_cell": 3,
+    "warmup_per_cell": true,
+    "prefix_caching_enabled": false,
+    "context_depth_tokens": [0, 4096, 8192],
+    "c1": [37.6252, 30.2401, 29.6502],
+    "c2_aggregate": [49.0108, 44.5816, 47.4702],
+    "c4_aggregate": [54.2436, 53.8030, 50.6252],
+    "completed_requests": 63,
+    "request_errors": 0
+  },
+  "startup_seconds": {
+    "measured_at_utc": "2026-08-18",
+    "cold_coalesced_expert_reads": 64.75,
+    "warm_reused_experts_and_capture_metadata_range": [60.89, 61.31]
+  }
+}

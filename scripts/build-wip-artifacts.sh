@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: build-wip-artifacts.sh SOURCE_DIR ROLE CUDA_ARCH BUILD_DIR OUTPUT_DIR" >&2
+  exit 2
+}
+
+[[ $# -eq 5 ]] || usage
+source_dir="$(realpath "$1")"
+role="$2"
+cuda_arch="$3"
+build_dir="$(realpath -m "$4")"
+output_dir="$(realpath -m "$5")"
+
+case "$role" in
+  coordinator)
+    sparkinfer_aot=OFF
+    coordinator_aot=ON
+    w8a16_aot=ON
+    nccl=OFF
+    xgrammar=ON
+    ;;
+  expert)
+    sparkinfer_aot=ON
+    coordinator_aot=OFF
+    w8a16_aot=OFF
+    nccl=ON
+    xgrammar=OFF
+    ;;
+  *)
+    echo "ROLE must be coordinator or expert" >&2
+    exit 2
+    ;;
+esac
+[[ "$cuda_arch" =~ ^[0-9]+$ ]] || {
+  echo "CUDA_ARCH must be numeric" >&2
+  exit 2
+}
+[[ -f "$source_dir/rust/Cargo.toml" && -f "$source_dir/native/CMakeLists.txt" ]] || {
+  echo "SOURCE_DIR is not a DS4RT source tree: $source_dir" >&2
+  exit 2
+}
+
+python3 "$source_dir/scripts/verify-sparkinfer-source.py" \
+  --source "$source_dir/third_party/sparkinfer" \
+  --lock "$source_dir/third_party/sparkinfer.lock.json"
+if [[ "$xgrammar" == ON ]]; then
+  python3 "$source_dir/scripts/verify-xgrammar-source.py" \
+    --source "$source_dir/third_party/xgrammar" \
+    --lock "$source_dir/third_party/xgrammar.lock.json"
+fi
+
+mkdir -p "$build_dir" "$output_dir"
+export PYO3_PYTHON=python3
+export PYTHONPATH="$source_dir/third_party/sparkinfer:$source_dir/python/reference/ds4rt_reference:$source_dir/python/reference${PYTHONPATH:+:$PYTHONPATH}"
+export CARGO_TARGET_DIR="$build_dir/cargo-target"
+
+cargo build \
+  --quiet \
+  --manifest-path "$source_dir/rust/Cargo.toml" \
+  -p ds4rt-daemon \
+  --release
+
+cmake \
+  -S "$source_dir/native" \
+  -B "$build_dir/native" \
+  -G Ninja \
+  -DDS4RT_ENABLE_CUDA=ON \
+  -DDS4RT_ENABLE_RDMA=ON \
+  -DDS4RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
+  -DDS4RT_ENABLE_SPARKINFER_COORDINATOR_AOT="$coordinator_aot" \
+  -DDS4RT_ENABLE_DS4_FLASH_AOT=ON \
+  -DDS4RT_ENABLE_W8A16_AOT="$w8a16_aot" \
+  -DDS4RT_SPARKINFER_SOURCE_DIR="$source_dir/third_party/sparkinfer" \
+  -DDS4RT_SPARKINFER_LOCK_FILE="$source_dir/third_party/sparkinfer.lock.json" \
+  -DDS4RT_ENABLE_NCCL="$nccl" \
+  -DDS4RT_ENABLE_XGRAMMAR="$xgrammar" \
+  -DDS4RT_XGRAMMAR_SOURCE_DIR="$source_dir/third_party/xgrammar" \
+  -DDS4RT_XGRAMMAR_LOCK_FILE="$source_dir/third_party/xgrammar.lock.json" \
+  -DPython3_EXECUTABLE="$(command -v python3)" \
+  -DDS4RT_CUDA_ARCHITECTURES="$cuda_arch"
+cmake --build "$build_dir/native"
+
+install -m 0755 "$CARGO_TARGET_DIR/release/ds4rt" "$output_dir/ds4rt"
+install -m 0755 "$build_dir/native/libds4rt_native.so" "$output_dir/libds4rt_native.so"
+(
+  cd "$output_dir"
+  sha256sum ds4rt libds4rt_native.so >ARTIFACT_SHA256SUMS
+  sha256sum -c ARTIFACT_SHA256SUMS
+)
