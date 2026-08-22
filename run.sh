@@ -527,7 +527,7 @@ mkdir -p "$state_dir/kernel-cache" "$state_dir/catalog-cache"
 docker_args=(
   run -d
   --name "$coordinator_container"
-  --restart unless-stopped
+  --restart no
   --gpus device="$RELEASE_COORDINATOR_GPU_UUID"
   --net=host
   --ipc=host

@@ -206,7 +206,7 @@ ensure_local_container() {
     return
   fi
   local -a args=(
-    run -d --name "$coordinator_container" --restart unless-stopped
+    run -d --name "$coordinator_container" --restart no
     --gpus device="$RELEASE_COORDINATOR_GPU_UUID"
     --net=host --ipc=host --security-opt seccomp=unconfined
     --ulimit memlock=-1:-1 --cap-add IPC_LOCK
@@ -240,7 +240,7 @@ if docker container inspect "$container" >/dev/null 2>&1; then
 fi
 hf_home="${HF_HOME:-$HOME/.cache/huggingface}"
 args=(
-  run -d --name "$container" --restart unless-stopped
+  run -d --name "$container" --restart no
   --gpus all --net=host --ipc=host --security-opt seccomp=unconfined
   --ulimit memlock=-1:-1 --cap-add IPC_LOCK
   -v "$hf_home:$hf_home:ro" -v "$hf_home:/root/.cache/huggingface:ro"
