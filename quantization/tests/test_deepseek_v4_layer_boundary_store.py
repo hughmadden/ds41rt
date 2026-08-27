@@ -440,6 +440,115 @@ def test_discovers_only_contiguous_complete_projection_layers(tmp_path: Path) ->
     assert all(len(entries) == 6 for entries in discovered.values())
 
 
+def test_discovery_uses_selected_k3_and_audits_superseded_k2(
+    tmp_path: Path,
+) -> None:
+    store = _boundary_store(tmp_path)
+    journal = tmp_path / "errors.jsonl"
+    entries = _projection_entries(
+        tmp_path / "projections",
+        journal,
+        layer_index=0,
+    )
+    module = "model.layers.0.mlp.experts.0.gate_proj"
+    original = next(entry for entry in entries if entry["module"] == module)
+    for path in store.projection_store._paths(original["request_sha256"]):
+        path.unlink()
+
+    policy_sha256 = "c" * 64
+    candidate_request = build_projection_request(
+        module_full_name=module,
+        layer_index=0,
+        input_weight=torch.arange(8, dtype=torch.float32).reshape(4, 2),
+        hessian=torch.eye(4, dtype=torch.float32),
+        sample_count=32,
+        quantizer_contract={
+            "bits": 2,
+            "codebook": "mcg",
+            "inline_mixed": {
+                "role": "candidate_k2",
+                "base_bits": 2,
+                "upgrade_bits": 3,
+                "policy_sha256": policy_sha256,
+            },
+        },
+        family_join=FAMILY_JOIN,
+        route_evidence=None,
+    )
+    metrics = _quantizer_metrics()
+    candidate_ledger = {
+        "schema": "ds4rt.exl3-error-ledger",
+        "schema_version": 1,
+        "record_kind": "projection",
+        "module": module,
+        "processor_layer_index": 0,
+        "bits": 2,
+        "provenance": {"family_join": FAMILY_JOIN},
+        "sample_count": 32,
+        "quantizer_metrics": metrics,
+    }
+    append_exl3_error_journal(
+        Path(f"{journal}.k2-candidates"), candidate_ledger
+    )
+    tensors = {
+        "trellis": torch.arange(8, dtype=torch.int16).reshape(1, 1, 8),
+        "suh": torch.ones(4, dtype=torch.float16),
+        "svh": torch.ones(4, dtype=torch.float16),
+        "mcg": torch.tensor([123], dtype=torch.int32),
+    }
+    result = {
+        "duration_seconds": 1.0,
+        "proxy_error": 0.1,
+        "device_names": ["cuda:0"],
+        "quantizer_metrics": metrics,
+        "ledger_record": candidate_ledger,
+        "execution_contract": None,
+        "execution_result": {"kind": "test"},
+    }
+    store.projection_store.commit(candidate_request, tensors, result)
+
+    selected_request = build_projection_request(
+        module_full_name=module,
+        layer_index=0,
+        input_weight=torch.arange(8, dtype=torch.float32).reshape(4, 2),
+        hessian=torch.eye(4, dtype=torch.float32),
+        sample_count=32,
+        quantizer_contract={
+            "bits": 3,
+            "codebook": "mcg",
+            "inline_mixed": {
+                "role": "selected_k3",
+                "base_bits": 2,
+                "upgrade_bits": 3,
+                "policy_sha256": policy_sha256,
+                "tier_plan_sha256": "d" * 64,
+                "candidate_request_sha256": candidate_request[
+                    "request_sha256"
+                ],
+            },
+        },
+        family_join=FAMILY_JOIN,
+        route_evidence=None,
+    )
+    selected_ledger = {**candidate_ledger, "bits": 3}
+    selected_record_sha256 = append_exl3_error_journal(
+        journal, selected_ledger
+    )
+    store.projection_store.commit(
+        selected_request,
+        tensors,
+        {**result, "ledger_record": selected_ledger},
+    )
+
+    discovered = store.discover_completed_projection_layers()
+
+    selected = next(
+        entry for entry in discovered[0] if entry["module"] == module
+    )
+    assert selected["request_sha256"] == selected_request["request_sha256"]
+    assert selected["record_sha256"] == selected_record_sha256
+
+
 def test_discovery_rejects_impossible_retained_projection_metric(
     tmp_path: Path,
 ) -> None:

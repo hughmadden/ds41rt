@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 from contextlib import contextmanager
 import hashlib
 import json
@@ -13,6 +14,7 @@ import re
 import shutil
 import sys
 import urllib.parse
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -22,12 +24,21 @@ from deepseek_v4_layer_boundary_store import (
     DeepSeekV4LayerBoundaryStore,
     LayerBoundaryStop,
 )
-from deepseek_v4_mtp_prefix_store import DeepSeekV4MTPPrefixStore, sha256_file
+from deepseek_v4_mtp_prefix_store import (
+    ANCHOR_SELECTION_CONTRACT,
+    SEQUENCE_REPLAY_BATCH_CONTRACT,
+    DeepSeekV4MTPPrefixStore,
+    sha256_file,
+)
 from preflight import report_identity_sha256
 
-PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
+PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v7"
 LEGACY_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v5"
-SUPPORTED_PLAN_SCHEMAS = frozenset((LEGACY_PLAN_SCHEMA, PLAN_SCHEMA))
+PREVIOUS_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
+SUPPORTED_PLAN_SCHEMAS = frozenset(
+    (LEGACY_PLAN_SCHEMA, PREVIOUS_PLAN_SCHEMA, PLAN_SCHEMA)
+)
+STRICT_STORAGE_PLAN_SCHEMAS = frozenset((PREVIOUS_PLAN_SCHEMA, PLAN_SCHEMA))
 RUN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-run-v5"
 BASE_PREFIX_RUN_SCHEMA = "ds4rt-deepseek-v4-base-prefix-run-v1"
 ARTIFACT_MANIFEST_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-artifact-v1"
@@ -81,6 +92,9 @@ RUN_FILENAME = "ds4rt-gptqmodel-run.json"
 BASE_PREFIX_RUN_FILENAME = "ds4rt-base-prefix-run.json"
 ARTIFACT_MANIFEST_FILENAME = "ds4rt-gptqmodel-artifact.json"
 ERROR_JOURNAL_FILENAME = ".ds4rt-exl3-error-journal.jsonl"
+INLINE_MIXED_CANDIDATE_JOURNAL_FILENAME = (
+    f"{ERROR_JOURNAL_FILENAME}.k2-candidates"
+)
 DIRECT_STATE_PREFLIGHT_FILENAME = "lazy-direct-state-preflight.json"
 PROJECTION_CHECKPOINT_DIRNAME = "projection-checkpoints"
 ACTIVE_LAYER_SOURCE_DIRNAME = "active-layer-source"
@@ -91,10 +105,16 @@ CAPTURE_FRONTIER_DIRNAME = "layer-capture-frontier"
 CAPTURE_BATCH_SPOOL_DIRNAME = "capture-batch-journal"
 POST_QUANT_REPLAY_DIRNAME = "post-quant-replay"
 MTP_ACTIVATION_DIRNAME = "mtp-layer-activations"
+INLINE_MIXED_TIER_PLAN_DIRNAME = "inline-mixed-tier-plans"
+INLINE_MIXED_SCHEMA = "gptqmodel.exl3-inline-mixed"
+INLINE_MIXED_SCORE = (
+    "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1"
+)
 CAPTURE_FRONTIER_CONTRACT = "ds4rt.exl3-capture-frontier-v1"
 HOST_RSS_LIMIT_BYTES = 150 * 1024**3
 CUDA_ALLOCATION_LIMIT_BYTES = 82 * 1024**3
 MEMORY_TELEMETRY_INTERVAL_BATCHES = 64
+DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL = 64
 EXECUTION_UPGRADE_FILENAME = "ds4rt-execution-upgrade.json"
 EXECUTION_UPGRADE_HISTORY_DIRNAME = "execution-upgrade-history"
 EXECUTION_UPGRADE_SCHEMA = "ds4rt-deepseek-v4-execution-upgrade-v1"
@@ -107,6 +127,8 @@ MTP_EXECUTION_MODES = (
     MTP_EXECUTION_INTEGRATED,
     MTP_EXECUTION_EXTERNAL_OVERLAY,
 )
+DEFAULT_MTP_ANCHOR_SAMPLE_COUNT = 327_680
+DEFAULT_MTP_ANCHOR_SAMPLE_SEED = 20_260_809
 
 
 class LaunchError(RuntimeError):
@@ -119,6 +141,51 @@ def natural_route_recipe(bits: int) -> str:
     if bits == 3:
         return "deepseek_v4_exl3_trellis_3bpw_v4_flash_natural_route"
     raise LaunchError("EXL3 bitrate must be integer K2 or K3")
+
+
+def _mixed_policy(
+    *,
+    namespace: str,
+    base_bits: int,
+    target_bpw: str | None,
+    projection_ratio: tuple[int, int, int],
+    tier_plan_root: Path,
+) -> dict[str, Any] | None:
+    """Build exact-rational private metadata while keeping standard bits integer."""
+
+    if target_bpw is None:
+        return None
+    try:
+        target = Fraction(str(target_bpw))
+    except (ValueError, ZeroDivisionError) as error:
+        raise LaunchError("mixed target BPW must be an exact decimal or fraction") from error
+    extra = target - base_bits
+    if not 0 < extra < 1:
+        raise LaunchError("mixed target BPW must lie strictly between K and K+1")
+    if base_bits != 2:
+        raise LaunchError("inline mixed quantization currently supports K2/K3")
+    if (
+        len(projection_ratio) != 3
+        or any(isinstance(value, bool) or int(value) <= 0 for value in projection_ratio)
+    ):
+        raise LaunchError("mixed gate:up:down ratio must contain three positive integers")
+    return {
+        "schema": INLINE_MIXED_SCHEMA,
+        "schema_version": 1,
+        "namespace": namespace,
+        "base_bits": base_bits,
+        "upgrade_bits": base_bits + 1,
+        "extra_bits": {
+            "numerator": extra.numerator,
+            "denominator": extra.denominator,
+        },
+        "target_bpw": f"{target.numerator}/{target.denominator}",
+        "projection_ratio": dict(
+            zip(("w1", "w3", "w2"), map(int, projection_ratio))
+        ),
+        "score_kind": INLINE_MIXED_SCORE,
+        "tier_plan_root": os.fspath(tier_plan_root),
+    }
 
 
 @contextmanager
@@ -141,15 +208,29 @@ def capture_frontier_scope(root: Path):
 
 
 @contextmanager
-def capture_batch_spool_scope(root: Path):
+def capture_batch_spool_scope(root: Path, *, checkpoint_interval: int):
     """Bind additive Hessian recovery records to the immutable run state."""
 
     variable = "GPTQMODEL_EXL3_CAPTURE_BATCH_SPOOL"
+    interval_variable = "GPTQMODEL_EXL3_CAPTURE_BATCH_CHECKPOINT_INTERVAL"
     expected = os.fspath(root)
     previous = os.environ.get(variable)
+    previous_interval = os.environ.get(interval_variable)
     if previous not in {None, expected}:
         raise LaunchError(f"{variable} conflicts with the immutable run state")
+    if (
+        isinstance(checkpoint_interval, bool)
+        or not isinstance(checkpoint_interval, int)
+        or checkpoint_interval <= 0
+    ):
+        raise LaunchError("capture batch checkpoint interval is invalid")
+    expected_interval = str(checkpoint_interval)
+    if previous_interval not in {None, expected_interval}:
+        raise LaunchError(
+            f"{interval_variable} conflicts with the authorized execution"
+        )
     os.environ[variable] = expected
+    os.environ[interval_variable] = expected_interval
     try:
         yield
     finally:
@@ -157,6 +238,10 @@ def capture_batch_spool_scope(root: Path):
             os.environ.pop(variable, None)
         else:
             os.environ[variable] = previous
+        if previous_interval is None:
+            os.environ.pop(interval_variable, None)
+        else:
+            os.environ[interval_variable] = previous_interval
 
 
 @contextmanager
@@ -856,7 +941,7 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
     mtp_execution_mode = getattr(
         args,
         "mtp_execution_mode",
-        MTP_EXECUTION_EXTERNAL_OVERLAY,
+        MTP_EXECUTION_INTEGRATED,
     )
     if mtp_execution_mode not in MTP_EXECUTION_MODES:
         raise LaunchError("MTP execution mode is invalid")
@@ -929,6 +1014,61 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         if raw_active_source is not None
         else run_state / ACTIVE_LAYER_SOURCE_DIRNAME
     )
+    projection_ratio = tuple(
+        getattr(args, "mixed_projection_ratio", (3, 5, 8))
+    )
+    tier_plan_root = run_state / INLINE_MIXED_TIER_PLAN_DIRNAME
+    base_mixed_policy = _mixed_policy(
+        namespace="base",
+        base_bits=bits,
+        target_bpw=getattr(args, "base_target_bpw", None),
+        projection_ratio=projection_ratio,
+        tier_plan_root=tier_plan_root,
+    )
+    mtp_mixed_policy = _mixed_policy(
+        namespace="mtp",
+        base_bits=bits,
+        target_bpw=getattr(args, "mtp_target_bpw", None),
+        projection_ratio=projection_ratio,
+        tier_plan_root=tier_plan_root,
+    )
+    if mtp_mixed_policy is not None and mtp_execution_mode != MTP_EXECUTION_INTEGRATED:
+        raise LaunchError("mixed dSpark quantization requires integrated MTP execution")
+    inline_mixed = {
+        namespace: policy
+        for namespace, policy in (
+            ("base", base_mixed_policy),
+            ("mtp", mtp_mixed_policy),
+        )
+        if policy is not None
+    }
+    mtp_anchor_selection = {
+        "contract": ANCHOR_SELECTION_CONTRACT,
+        "count": int(
+            getattr(
+                args,
+                "mtp_anchor_sample_count",
+                DEFAULT_MTP_ANCHOR_SAMPLE_COUNT,
+            )
+        ),
+        "seed": int(
+            getattr(
+                args,
+                "mtp_anchor_sample_seed",
+                DEFAULT_MTP_ANCHOR_SAMPLE_SEED,
+            )
+        ),
+    }
+    mtp_sequence_anchor_cap = int(
+        getattr(args, "mtp_sequence_anchor_cap", 0)
+    )
+    if mtp_anchor_selection["count"] <= 0 or mtp_sequence_anchor_cap < 0:
+        raise LaunchError("integrated MTP anchor selection is invalid")
+    mtp_replay_batching = {
+        "contract": SEQUENCE_REPLAY_BATCH_CONTRACT,
+        "source_sequence_anchor_cap": mtp_sequence_anchor_cap or None,
+        "proposal_rows_per_anchor": 5,
+    }
     if remote_workers is not None:
         remote_workers["assignment_store"] = os.fspath(
             run_state / REMOTE_ASSIGNMENT_DIRNAME
@@ -983,7 +1123,18 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         "operator_contract": "ds4rt-deepseek-v4-target-plus-joint-mtp-v1",
         "route_evidence_contract": ROUTE_EVIDENCE_CONTRACT,
         "zero_route_recovery_contract": ZERO_ROUTE_RECOVERY_CONTRACT,
+        "mtp_anchor_selection": mtp_anchor_selection,
+        "mtp_replay_batching": mtp_replay_batching,
     }
+    if inline_mixed:
+        family_join["inline_mixed"] = {
+            namespace: {
+                key: value
+                for key, value in policy.items()
+                if key != "tier_plan_root"
+            }
+            for namespace, policy in inline_mixed.items()
+        }
     if evidence is not None:
         family_join["calibration_evidence"] = evidence
         family_join["quantization_toolchain"] = toolchain
@@ -1016,8 +1167,17 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
             "mtp_prefix_store": os.fspath(prefix_store),
             "active_layer_source": os.fspath(active_source),
             "target_batch_size": args.batch_size,
+            "capture_batch_checkpoint_interval": (
+                getattr(
+                    args,
+                    "capture_batch_checkpoint_interval",
+                    DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL,
+                )
+            ),
             "mtp_replay_batch_size": args.mtp_replay_batch_size,
             "mtp_execution_mode": mtp_execution_mode,
+            "mtp_anchor_selection": mtp_anchor_selection,
+            "mtp_replay_batching": mtp_replay_batching,
             "projection_checkpoint": {
                 "contract": PROJECTION_CHECKPOINT_CONTRACT,
                 "root": os.fspath(projection_root),
@@ -1046,8 +1206,17 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         "offload_dir": os.fspath(offload),
         "mtp_prefix_store": os.fspath(prefix_store),
         "target_batch_size": args.batch_size,
+        "capture_batch_checkpoint_interval": (
+            getattr(
+                args,
+                "capture_batch_checkpoint_interval",
+                DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL,
+            )
+        ),
         "mtp_replay_batch_size": args.mtp_replay_batch_size,
         "mtp_execution_mode": mtp_execution_mode,
+        "mtp_anchor_selection": mtp_anchor_selection,
+        "mtp_replay_batching": mtp_replay_batching,
         "projection_checkpoint": provenance["run"]["projection_checkpoint"],
         "layer_boundary": layer_boundary,
         "memory_safety": {
@@ -1056,6 +1225,7 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
             "telemetry_interval_batches": MEMORY_TELEMETRY_INTERVAL_BATCHES,
             "spill_policy": "fail-closed-no-cpu-or-managed-memory",
         },
+        "inline_mixed": inline_mixed,
         "remote_workers": remote_workers,
         "exl3": {
             "bits": bits,
@@ -1296,7 +1466,16 @@ def _validate_plan(plan: dict[str, Any]) -> None:
     exl3 = plan.get("exl3")
     if not isinstance(exl3, dict) or exl3.get("bits") not in {2, 3}:
         raise LaunchError("plan EXL3 bitrate is invalid")
-    if plan.get("schema") == PLAN_SCHEMA:
+    capture_checkpoint_interval = plan.get(
+        "capture_batch_checkpoint_interval", 1
+    )
+    if (
+        isinstance(capture_checkpoint_interval, bool)
+        or not isinstance(capture_checkpoint_interval, int)
+        or capture_checkpoint_interval <= 0
+    ):
+        raise LaunchError("plan capture checkpoint interval is invalid")
+    if plan.get("schema") in STRICT_STORAGE_PLAN_SCHEMAS:
         checkpoint = plan.get("projection_checkpoint")
         path_fields = (
             "output",
@@ -1324,6 +1503,75 @@ def _validate_plan(plan: dict[str, Any]) -> None:
             "spill_policy": "fail-closed-no-cpu-or-managed-memory",
         }:
             raise LaunchError("plan memory-safety contract is invalid")
+    inline_mixed = plan.get("inline_mixed", {})
+    if not isinstance(inline_mixed, dict) or not set(inline_mixed).issubset(
+        {"base", "mtp"}
+    ):
+        raise LaunchError("plan inline-mixed policies are invalid")
+    expected_tier_root = os.fspath(
+        Path(plan["run_state_dir"]) / INLINE_MIXED_TIER_PLAN_DIRNAME
+    )
+    for namespace, policy in inline_mixed.items():
+        extra = policy.get("extra_bits") if isinstance(policy, dict) else None
+        ratio = policy.get("projection_ratio") if isinstance(policy, dict) else None
+        if (
+            policy.get("schema") != INLINE_MIXED_SCHEMA
+            or policy.get("schema_version") != 1
+            or policy.get("namespace") != namespace
+            or policy.get("base_bits") != exl3["bits"]
+            or policy.get("upgrade_bits") != exl3["bits"] + 1
+            or policy.get("tier_plan_root") != expected_tier_root
+            or policy.get("score_kind") != INLINE_MIXED_SCORE
+            or not isinstance(extra, dict)
+            or set(extra) != {"numerator", "denominator"}
+            or any(
+                isinstance(extra.get(key), bool)
+                or not isinstance(extra.get(key), int)
+                or extra[key] <= 0
+                for key in ("numerator", "denominator")
+            )
+            or not isinstance(ratio, dict)
+            or set(ratio) != {"w1", "w3", "w2"}
+            or any(
+                isinstance(value, bool) or not isinstance(value, int) or value <= 0
+                for value in ratio.values()
+            )
+        ):
+            raise LaunchError("plan inline-mixed policy contract is invalid")
+        fraction = Fraction(extra["numerator"], extra["denominator"])
+        if not 0 < fraction < 1:
+            raise LaunchError("plan inline-mixed target is outside K2/K3")
+    if "mtp" in inline_mixed and plan.get("mtp_execution_mode") != MTP_EXECUTION_INTEGRATED:
+        raise LaunchError("plan mixed dSpark policy is not integrated")
+    selection = plan.get("mtp_anchor_selection")
+    batching = plan.get("mtp_replay_batching")
+    family_join = plan.get("ledger_provenance", {}).get("family_join", {})
+    run = plan.get("ledger_provenance", {}).get("run", {})
+    if (
+        not isinstance(selection, dict)
+        or selection.get("contract") != ANCHOR_SELECTION_CONTRACT
+        or isinstance(selection.get("count"), bool)
+        or not isinstance(selection.get("count"), int)
+        or selection["count"] <= 0
+        or isinstance(selection.get("seed"), bool)
+        or not isinstance(selection.get("seed"), int)
+        or not isinstance(batching, dict)
+        or batching.get("contract") != SEQUENCE_REPLAY_BATCH_CONTRACT
+        or batching.get("proposal_rows_per_anchor") != 5
+        or (
+            batching.get("source_sequence_anchor_cap") is not None
+            and (
+                isinstance(batching["source_sequence_anchor_cap"], bool)
+                or not isinstance(batching["source_sequence_anchor_cap"], int)
+                or batching["source_sequence_anchor_cap"] <= 0
+            )
+        )
+        or family_join.get("mtp_anchor_selection") != selection
+        or family_join.get("mtp_replay_batching") != batching
+        or run.get("mtp_anchor_selection") != selection
+        or run.get("mtp_replay_batching") != batching
+    ):
+        raise LaunchError("plan integrated MTP replay contract is invalid")
 
 
 def _regular_directory(path: Path, label: str) -> None:
@@ -1339,6 +1587,20 @@ def _empty_or_missing_directory(path: Path, label: str) -> None:
     _regular_directory(path, label)
     if any(path.iterdir()):
         raise LaunchError(f"{label} is not empty: {path}")
+
+
+def _export_stage_path(plan: dict[str, Any]) -> Path:
+    """Return a staging path that can be atomically renamed to the output.
+
+    The run-state and final output are commonly separate container bind mounts.
+    Even when both host paths reside on the same filesystem, Linux exposes the
+    mounts as distinct devices inside the container and ``os.replace`` fails
+    with ``EXDEV``.  A hidden sibling of the output necessarily shares the
+    output mount and preserves atomic directory publication.
+    """
+
+    output = Path(plan["output"])
+    return output.parent / f".{output.name}.{EXPORT_STAGE_DIRNAME}"
 
 
 def _initialize_empty_error_journal(run_state: Path) -> None:
@@ -1364,7 +1626,11 @@ def _initialize_empty_error_journal(run_state: Path) -> None:
         os.close(directory)
 
 
-def _validate_run_state_entries(run_state: Path) -> None:
+def _validate_run_state_entries(
+    run_state: Path,
+    *,
+    inline_mixed: bool,
+) -> None:
     allowed = {
         PLAN_FILENAME,
         EXECUTION_UPGRADE_FILENAME,
@@ -1382,6 +1648,13 @@ def _validate_run_state_entries(run_state: Path) -> None:
         EXPORT_STAGE_DIRNAME,
         BASE_PREFIX_RUN_FILENAME,
     }
+    if inline_mixed:
+        allowed.update(
+            {
+                INLINE_MIXED_CANDIDATE_JOURNAL_FILENAME,
+                INLINE_MIXED_TIER_PLAN_DIRNAME,
+            }
+        )
     unexpected = sorted(
         path.name for path in run_state.iterdir() if path.name not in allowed
     )
@@ -1399,6 +1672,10 @@ def _validate_run_state_entries(run_state: Path) -> None:
         path = run_state / name
         if path.exists() and (not path.is_file() or path.is_symlink()):
             raise LaunchError(f"run-state entry is not a regular file: {path}")
+    if inline_mixed:
+        path = run_state / INLINE_MIXED_CANDIDATE_JOURNAL_FILENAME
+        if path.exists() and (not path.is_file() or path.is_symlink()):
+            raise LaunchError(f"run-state entry is not a regular file: {path}")
     for name in (
         PROJECTION_CHECKPOINT_DIRNAME,
         ACTIVE_LAYER_SOURCE_DIRNAME,
@@ -1412,6 +1689,10 @@ def _validate_run_state_entries(run_state: Path) -> None:
         EXPORT_STAGE_DIRNAME,
     ):
         path = run_state / name
+        if path.exists():
+            _regular_directory(path, "run-state entry")
+    if inline_mixed:
+        path = run_state / INLINE_MIXED_TIER_PLAN_DIRNAME
         if path.exists():
             _regular_directory(path, "run-state entry")
 
@@ -1579,7 +1860,10 @@ def prepare_run(plan: dict[str, Any], *, resume: bool) -> bool:
         saved_plan = read_json_object(run_state / PLAN_FILENAME)
         if saved_plan != plan:
             raise LaunchError("run-state plan differs from the requested run")
-        _validate_run_state_entries(run_state)
+        _validate_run_state_entries(
+            run_state,
+            inline_mixed=bool(plan.get("inline_mixed")),
+        )
         journal = run_state / ERROR_JOURNAL_FILENAME
         if not journal.is_file() or journal.is_symlink():
             raise LaunchError(f"run-state error journal is unavailable: {journal}")
@@ -1590,16 +1874,19 @@ def prepare_run(plan: dict[str, Any], *, resume: bool) -> bool:
             (prefix_root, "MTP prefix-store directory"),
         ):
             _regular_directory(path, label)
-        export_stage = run_state / EXPORT_STAGE_DIRNAME
+        export_stage = _export_stage_path(plan)
         if export_stage.exists() or export_stage.is_symlink():
-            # This directory is unpublished scratch beneath an exact, validated
-            # run state. Projection checkpoints, prefix data, and error evidence
-            # remain intact, so rebuilding it never repeats trellis search.
+            _regular_directory(export_stage, "partial export directory")
+            # Keep unpublished, regular files so GPTQModel can authenticate and
+            # reuse complete shards. Partial, corrupt, or differently planned
+            # shards are rewritten by the streaming writer before publication.
             _artifact_paths(export_stage)
-            shutil.rmtree(export_stage)
         return False
 
     _empty_or_missing_directory(output, "output directory")
+    _empty_or_missing_directory(
+        _export_stage_path(plan), "partial export directory"
+    )
     _empty_or_missing_directory(run_state, "run-state directory")
     _empty_or_missing_directory(
         projection_root, "projection-checkpoint directory"
@@ -1725,7 +2012,10 @@ def build_execution_upgrade(
     _regular_directory(run_state, "run-state directory")
     plan = read_json_object(run_state / PLAN_FILENAME)
     _validate_plan(plan)
-    _validate_run_state_entries(run_state)
+    _validate_run_state_entries(
+        run_state,
+        inline_mixed=bool(plan.get("inline_mixed")),
+    )
 
     source = snapshot_identity(args.snapshot)
     texts, corpus = calibration_stream(args.calibration_jsonl)
@@ -1736,6 +2026,36 @@ def build_execution_upgrade(
         "mtp_prefix_store": os.fspath(
             args.mtp_prefix_store.expanduser().resolve()
         ),
+    }
+    upgrade_bits = getattr(args, "bits", 2)
+    upgrade_ratio = tuple(
+        getattr(args, "mixed_projection_ratio", (3, 5, 8))
+    )
+    expected_inline_mixed = {
+        namespace: policy
+        for namespace, policy in (
+            (
+                "base",
+                _mixed_policy(
+                    namespace="base",
+                    base_bits=upgrade_bits,
+                    target_bpw=getattr(args, "base_target_bpw", None),
+                    projection_ratio=upgrade_ratio,
+                    tier_plan_root=run_state / INLINE_MIXED_TIER_PLAN_DIRNAME,
+                ),
+            ),
+            (
+                "mtp",
+                _mixed_policy(
+                    namespace="mtp",
+                    base_bits=upgrade_bits,
+                    target_bpw=getattr(args, "mtp_target_bpw", None),
+                    projection_ratio=upgrade_ratio,
+                    tier_plan_root=run_state / INLINE_MIXED_TIER_PLAN_DIRNAME,
+                ),
+            ),
+        )
+        if policy is not None
     }
     if plan.get("schema") == PLAN_SCHEMA:
         raw_checkpoint = getattr(args, "projection_checkpoint_dir", None)
@@ -1759,7 +2079,17 @@ def build_execution_upgrade(
         or plan.get("source") != source
         or plan.get("corpus") != corpus
         or plan.get("exl3", {}).get("bits") != getattr(args, "bits", 2)
+        or plan.get("inline_mixed", {}) != expected_inline_mixed
         or plan.get("target_batch_size") != args.batch_size
+        or (
+            "capture_batch_checkpoint_interval" in plan
+            and plan["capture_batch_checkpoint_interval"]
+            != getattr(
+                args,
+                "capture_batch_checkpoint_interval",
+                DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL,
+            )
+        )
         or plan.get("mtp_replay_batch_size") != args.mtp_replay_batch_size
         or plan.get("mtp_execution_mode", MTP_EXECUTION_INTEGRATED)
         != getattr(args, "mtp_execution_mode", MTP_EXECUTION_INTEGRATED)
@@ -1812,6 +2142,11 @@ def build_execution_upgrade(
             "projection_restore": "packed-checkpoint-direct-v1",
             "quantization_algorithm": "declared-seeded-true-sequential-v1",
             "concurrent_rng": "projection-local-generator-v1",
+            "capture_batch_checkpoint_interval": getattr(
+                args,
+                "capture_batch_checkpoint_interval",
+                DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL,
+            ),
             "remote_workers": "unchanged-parent-plan",
             "mtp_execution": (
                 "sampled-external-overlay-handoff"
@@ -2014,7 +2349,7 @@ def publish_export(
         raise LaunchError("MTP replay batch count must be positive")
     output = Path(plan["output"])
     run_state = Path(plan["run_state_dir"])
-    export_stage = run_state / EXPORT_STAGE_DIRNAME
+    export_stage = _export_stage_path(plan)
     if output.exists() or output.is_symlink():
         raise LaunchError(f"output appeared before artifact publication: {output}")
     atomic_json(export_stage / PLAN_FILENAME, plan)
@@ -2051,6 +2386,17 @@ def publish_export(
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def _make_quantize_config_metadata_portable(quantize_config: Any) -> None:
+    """Remove coordinator-local state paths before serializing an artifact."""
+
+    meta = copy.deepcopy(getattr(quantize_config, "meta", None) or {})
+    mixed = meta.get("ds4rt_inline_mixed")
+    if isinstance(mixed, dict):
+        mixed.pop("tier_plan_root", None)
+        meta["ds4rt_inline_mixed"] = mixed
+    quantize_config.meta = meta
 
 
 def publish_base_prefix_completion(
@@ -2192,11 +2538,12 @@ def execute(
         return
     import torch
     from gptqmodel import GPTQModel
+    from gptqmodel.looper.exllamav3_processor import EXL3Processor
     from gptqmodel.models.definitions.deepseek_v4 import DeepSeekV4QModel
     from gptqmodel.quantization import AutoModuleDecoderConfig, EXL3Config
 
     run_state = Path(plan["run_state_dir"])
-    export_stage = run_state / EXPORT_STAGE_DIRNAME
+    export_stage = _export_stage_path(plan)
     offload = Path(plan["offload_dir"])
     prefix_root = Path(plan["mtp_prefix_store"])
     os.environ["GPTQMODEL_EXL3_ERROR_JOURNAL"] = os.fspath(
@@ -2208,8 +2555,12 @@ def execute(
     if not coordinator_devices:
         raise LaunchError("quantization plan has no coordinator GPU")
     primary_device = coordinator_devices[0]
+    qcfg_meta = {"ds4rt_error_ledger": plan["ledger_provenance"]}
+    base_mixed_policy = plan.get("inline_mixed", {}).get("base")
+    if base_mixed_policy is not None:
+        qcfg_meta["ds4rt_inline_mixed"] = base_mixed_policy
     qcfg = EXL3Config(
-        bits=float(plan["exl3"]["bits"]),
+        bits=int(plan["exl3"]["bits"]),
         codebook="mcg",
         out_scales="auto",
         module_include=[BASE_EXPERT_PATTERN],
@@ -2222,7 +2573,7 @@ def execute(
         dense_vram_strategy_devices=[primary_device],
         moe_vram_strategy="balanced",
         moe_vram_strategy_devices=coordinator_devices,
-        meta={"ds4rt_error_ledger": plan["ledger_provenance"]},
+        meta=qcfg_meta,
     )
     model = GPTQModel.load(
         plan["source"]["path"],
@@ -2319,10 +2670,23 @@ def execute(
             "output_dtype": "torch.bfloat16",
         },
     )
+    capture_checkpoint_interval = int(
+        plan.get("capture_batch_checkpoint_interval", 1)
+    )
+    execution_upgrade_path = run_state / EXECUTION_UPGRADE_FILENAME
+    if execution_upgrade_path.exists():
+        execution_upgrade = _read_execution_upgrade(run_state, plan)
+        capture_checkpoint_interval = int(
+            execution_upgrade.get("change_contract", {}).get(
+                "capture_batch_checkpoint_interval",
+                capture_checkpoint_interval,
+            )
+        )
     with capture_frontier_scope(
         run_state / CAPTURE_FRONTIER_DIRNAME
     ), capture_batch_spool_scope(
-        run_state / CAPTURE_BATCH_SPOOL_DIRNAME
+        run_state / CAPTURE_BATCH_SPOOL_DIRNAME,
+        checkpoint_interval=capture_checkpoint_interval,
     ), memory_safety_scope(plan["memory_safety"]):
         model.set_mtp_target_tap_sink(prefix_store)
         try:
@@ -2364,9 +2728,17 @@ def execute(
                     prefix_manifest_path=prefix_store.manifest_path,
                 )
                 return
+            selection = plan["mtp_anchor_selection"]
+            batching = plan["mtp_replay_batching"]
             replay_batches = prefix_store.replay_dataset(
                 replay_batch_size=plan["mtp_replay_batch_size"],
                 device="cpu",
+                anchor_sample_count=selection["count"],
+                anchor_sample_seed=selection["seed"],
+                batch_by_source_sequence=True,
+                source_sequence_anchor_cap=batching[
+                    "source_sequence_anchor_cap"
+                ],
             )
             if not replay_batches:
                 raise LaunchError(
@@ -2376,6 +2748,15 @@ def execute(
                 runtime,
                 calibration_embedding_device="cpu",
             )
+            mtp_mixed_policy = plan.get("inline_mixed", {}).get("mtp")
+            mtp_meta = copy.deepcopy(
+                getattr(mtp_model.quantize_config, "meta", None) or {}
+            )
+            if mtp_mixed_policy is None:
+                mtp_meta.pop("ds4rt_inline_mixed", None)
+            else:
+                mtp_meta["ds4rt_inline_mixed"] = mtp_mixed_policy
+            mtp_model.quantize_config.meta = mtp_meta
             mtp_model.configure_mtp_activation_store(
                 os.fspath(run_state / MTP_ACTIVATION_DIRNAME),
                 provenance={
@@ -2387,13 +2768,42 @@ def execute(
                     "replay_batch_size": plan["mtp_replay_batch_size"],
                     "replay_batches": len(replay_batches),
                     "replay_positions": replay_batches.position_count,
+                    "anchor_selection": replay_batches.anchor_selection_identity,
+                    "replay_batching": replay_batches.replay_batching_identity,
                 },
             )
-            mtp_model.quantize(
-                replay_batches,
-                batch_size=1,
-                calibration_sort=None,
+            restored_mtp = (
+                EXL3Processor.restore_completed_checkpoint_tree_if_complete(
+                    model=mtp_model,
+                    block_namespace="mtp",
+                    layer_count=len(geometry["dspark_target_layer_ids"]),
+                    experts_per_layer=geometry["n_routed_experts"],
+                    error_journal_path=run_state / ERROR_JOURNAL_FILENAME,
+                )
             )
+            if restored_mtp:
+                print(
+                    json.dumps(
+                        {
+                            "event": "mtp-packed-checkpoint-tree-restored",
+                            "layers": len(geometry["dspark_target_layer_ids"]),
+                            "projections": (
+                                len(geometry["dspark_target_layer_ids"])
+                                * geometry["n_routed_experts"]
+                                * 3
+                            ),
+                            "plan_sha256": plan["plan_sha256"],
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+            else:
+                mtp_model.quantize(
+                    replay_batches,
+                    batch_size=1,
+                    calibration_sort=None,
+                )
         finally:
             model.set_mtp_target_tap_sink(None)
     boundary_controller.materialize_deferred_prefix(
@@ -2401,7 +2811,9 @@ def execute(
         force=True,
     )
     model.attach_mtp_quantization_model(mtp_model)
-    export_stage.mkdir()
+    _make_quantize_config_metadata_portable(model.quantize_config)
+    _make_quantize_config_metadata_portable(mtp_model.quantize_config)
+    export_stage.mkdir(exist_ok=True)
     model.save(os.fspath(export_stage), max_shard_size="8GB")
     publish_export(
         plan,
@@ -2457,6 +2869,25 @@ def parse_args() -> argparse.Namespace:
         help="integer EXL3 trellis bitrate for every routed expert family",
     )
     parser.add_argument(
+        "--base-target-bpw",
+        help=(
+            "exact mixed target such as 2.1; standard EXL3 bits remain integer "
+            "K2 while selected projections are encoded at K3"
+        ),
+    )
+    parser.add_argument(
+        "--mtp-target-bpw",
+        help="exact integrated dSpark mixed target such as 2.2",
+    )
+    parser.add_argument(
+        "--mixed-projection-ratio",
+        nargs=3,
+        type=int,
+        default=(3, 5, 8),
+        metavar=("GATE", "UP", "DOWN"),
+        help="allocation ratio for K3 gate/up/down projections",
+    )
+    parser.add_argument(
         "--coordinator-gpu-count",
         type=int,
         choices=(1, 2),
@@ -2464,14 +2895,41 @@ def parse_args() -> argparse.Namespace:
         help="exact visible coordinator GPU count bound by the preflight report",
     )
     parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument(
+        "--capture-batch-checkpoint-interval",
+        type=int,
+        default=DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL,
+        help=(
+            "number of calibration batches durably grouped per recovery "
+            "checkpoint; the final short group is always forced durable"
+        ),
+    )
     parser.add_argument("--mtp-replay-batch-size", type=int, default=4)
+    parser.add_argument(
+        "--mtp-anchor-sample-count",
+        type=int,
+        default=DEFAULT_MTP_ANCHOR_SAMPLE_COUNT,
+        help="deterministic eligible-anchor sample used by integrated dSpark",
+    )
+    parser.add_argument(
+        "--mtp-anchor-sample-seed",
+        type=int,
+        default=DEFAULT_MTP_ANCHOR_SAMPLE_SEED,
+    )
+    parser.add_argument(
+        "--mtp-sequence-anchor-cap",
+        type=int,
+        default=0,
+        help="optional cap per source sequence; zero keeps each sequence joint",
+    )
     parser.add_argument(
         "--mtp-execution-mode",
         choices=MTP_EXECUTION_MODES,
-        default=MTP_EXECUTION_EXTERNAL_OVERLAY,
+        default=MTP_EXECUTION_INTEGRATED,
         help=(
-            "quantize MTP inline, or exit cleanly after the audited target-prefix "
-            "boundary for quantize_flash_dspark_overlay.py"
+            "quantize MTP inline in the same resumable process (default), or "
+            "explicitly exit after the audited target-prefix boundary for the "
+            "legacy quantize_flash_dspark_overlay.py recovery path"
         ),
     )
     parser.add_argument(
@@ -2520,10 +2978,14 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if (
         args.batch_size <= 0
+        or args.capture_batch_checkpoint_interval <= 0
         or args.mtp_replay_batch_size <= 0
         or args.remote_timeout_seconds <= 0
         or not 1 <= args.remote_max_attempts <= 10
         or not args.remote_token_env
+        or any(value <= 0 for value in args.mixed_projection_ratio)
+        or args.mtp_anchor_sample_count <= 0
+        or args.mtp_sequence_anchor_cap < 0
         or (args.stop_after_layer is not None and args.stop_after_layer < 0)
     ):
         parser.error("batch sizes and remote-worker limits must be positive")

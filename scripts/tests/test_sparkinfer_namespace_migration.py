@@ -35,7 +35,7 @@ CUTLASS_PACKAGES = (
     "nvidia-cutlass-dsl-libs-cu12",
     "nvidia-cutlass-dsl-libs-cu13",
 )
-QUALIFIED_CUTLASS_VERSION = "4.6.1"
+QUALIFIED_CUTLASS_VERSION = "4.6.2"
 METADATA_FREE_PYTHON_CACHE_MARKERS = (
     ".mypy_cache",
     ".pytest_cache",
@@ -338,7 +338,7 @@ def test_standalone_bootstrap_imports_verified_submodule() -> None:
         (ROOT / "third_party" / "sparkinfer").resolve()
     )
     assert re.fullmatch(r"[0-9a-f]{40}", revision)
-    assert Version(version) == Version("1.1.0")
+    assert Version(version) == Version("1.2.6")
 
 
 def test_live_launchers_override_stale_cmake_sparkinfer_cache_entries() -> None:

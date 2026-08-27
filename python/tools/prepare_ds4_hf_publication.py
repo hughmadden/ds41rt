@@ -9,8 +9,15 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import sys
 import tempfile
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+    validate_inline_mixed_policy,
+)
 
 
 CONFIG_MAX_BYTES = 1024 * 1024
@@ -102,8 +109,59 @@ def public_quantization_configs(snapshot: Path) -> tuple[bytes, bytes]:
     # metadata.  The public model has neither that ledger nor any reason to
     # expose local paths and build topology, matching the corrected v0 layout.
     public_external = dict(full_external)
+    bits = public_external.get("bits")
+    if (
+        isinstance(bits, bool)
+        or not isinstance(bits, (int, float))
+        or not float(bits).is_integer()
+        or int(bits) not in (2, 3)
+    ):
+        raise ValueError(
+            "public GPTQModel EXL3 bits must name the integer K2 or K3 base tier"
+        )
+    # Hugging Face quantization integrations treat this as a discrete tier.
+    # GPTQModel historically rendered it as 2.0/3.0, which is numerically
+    # equivalent in Python but rejected by standard schema consumers. Mixed
+    # average bitrate remains in the exact-rational inline-mixed metadata.
+    public_external["bits"] = int(bits)
     public_meta = dict(public_external.get("meta", {}))
-    public_meta.pop("ds4rt_error_ledger", None)
+    private_ledger = public_meta.pop("ds4rt_error_ledger", None)
+    inline_mixed = public_meta.get("ds4rt_inline_mixed")
+    if inline_mixed is not None:
+        if isinstance(inline_mixed, dict):
+            inline_mixed = dict(inline_mixed)
+            inline_mixed.pop("tier_plan_root", None)
+        validate_inline_mixed_policy(inline_mixed)
+        public_meta["ds4rt_inline_mixed"] = inline_mixed
+    family_join = (
+        private_ledger.get("family_join")
+        if isinstance(private_ledger, dict)
+        else None
+    )
+    namespace_policies = (
+        family_join.get("inline_mixed")
+        if isinstance(family_join, dict)
+        else None
+    )
+    if namespace_policies is not None:
+        if not isinstance(namespace_policies, dict) or not namespace_policies:
+            raise ValueError("inline mixed namespace provenance is not an object")
+        portable_namespaces: dict[str, dict[str, Any]] = {}
+        for namespace, raw_policy in namespace_policies.items():
+            if namespace not in {"base", "mtp"} or not isinstance(raw_policy, dict):
+                raise ValueError("inline mixed namespace provenance is invalid")
+            policy = dict(raw_policy)
+            policy.pop("tier_plan_root", None)
+            validate_inline_mixed_policy(policy, namespace=namespace)
+            portable_namespaces[namespace] = policy
+        if inline_mixed is None or portable_namespaces.get("base") != inline_mixed:
+            raise ValueError(
+                "inline mixed base metadata differs from namespace provenance"
+            )
+        # The compatibility key above continues to describe the target/base
+        # experts. This additive map preserves the integrated dSpark bitrate
+        # after the private error ledger is removed from the public artifact.
+        public_meta["ds4rt_inline_mixed_namespaces"] = portable_namespaces
     public_external["meta"] = public_meta
     public_declaration = dict(public_external)
     public_declaration.pop("tensor_storage")

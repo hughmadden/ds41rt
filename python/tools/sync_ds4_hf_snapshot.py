@@ -232,7 +232,7 @@ refs.mkdir(parents=True, exist_ok=True)
 temporary = refs / f".main.{os.getpid()}.tmp"
 try:
     with temporary.open("x", encoding="utf-8") as handle:
-        handle.write(revision + "\n")
+        handle.write(revision)
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, refs / "main")

@@ -71,9 +71,28 @@ def test_flash_exports_shape_specific_joint_dspark_direct_kernels() -> None:
 
 
 def test_flash_mixed_decode_uses_direct_routes_without_splitting_tiers() -> None:
+    assert MODULE.FLASH_MIXED_EXACT_DECODE_REGIMES == tuple(range(1, 13))
+    assert MODULE.FLASH_MIXED_DIRECT_CAPACITY == 12
+    assert MODULE.FLASH_MIXED_REGIMES == (
+        *range(1, 13),
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+    )
     source = SCRIPT.read_text()
-    assert "direct_topk = rows <= FLASH_DIRECT_M6_CAPACITY" in source
+    assert "for rows in FLASH_MIXED_REGIMES:" in source
+    assert "direct_topk = rows <= FLASH_MIXED_DIRECT_CAPACITY" in source
     assert "direct_topk_routes=direct_topk" in source
+    assert "tier0_num_experts=228" in source
+    assert "tier1_num_experts=48" in source
+    assert "tier0_bits=2" in source
+    assert "tier1_bits=3" in source
+    assert "route_num_experts=profile.num_experts" in source
     assert "EXL3_{macro}_DIRECT_TOPK" in source
     assert "tier0:K2,tier1:K3,full_rotation:1,one_grid:1" in source
 

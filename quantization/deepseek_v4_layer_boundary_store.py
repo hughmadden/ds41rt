@@ -473,13 +473,128 @@ class DeepSeekV4LayerBoundaryStore:
         grouped: dict[int, dict[str, dict[str, str]]] = {}
         mtp_entries: dict[str, dict[str, str]] = {}
         try:
-            inspected = self.projection_store.inspect_committed_manifests()
+            inspected = tuple(
+                self.projection_store.inspect_committed_manifests()
+            )
         except ValueError as error:
             raise LayerBoundaryError(
                 "cannot discover committed EXL3 projection checkpoints"
             ) from error
+        superseded_candidates: dict[str, dict[str, Any]] = {}
+        for request, _result in inspected:
+            quantizer_contract = request.get("quantizer_contract")
+            inline_mixed = (
+                quantizer_contract.get("inline_mixed")
+                if isinstance(quantizer_contract, dict)
+                else None
+            )
+            if not isinstance(inline_mixed, dict) or inline_mixed.get(
+                "role"
+            ) != "selected_k3":
+                continue
+            candidate_request_sha256 = inline_mixed.get(
+                "candidate_request_sha256"
+            )
+            selected = {
+                "module": request.get("module"),
+                "base_bits": inline_mixed.get("base_bits"),
+                "upgrade_bits": inline_mixed.get("upgrade_bits"),
+                "policy_sha256": inline_mixed.get("policy_sha256"),
+                "tier_plan_sha256": inline_mixed.get("tier_plan_sha256"),
+                "selected_request_sha256": request.get("request_sha256"),
+            }
+            if (
+                not isinstance(candidate_request_sha256, str)
+                or re.fullmatch(r"[0-9a-f]{64}", candidate_request_sha256)
+                is None
+                or not isinstance(selected["module"], str)
+                or isinstance(selected["base_bits"], bool)
+                or not isinstance(selected["base_bits"], int)
+                or isinstance(selected["upgrade_bits"], bool)
+                or not isinstance(selected["upgrade_bits"], int)
+                or selected["upgrade_bits"] <= selected["base_bits"]
+                or quantizer_contract.get("bits") != selected["upgrade_bits"]
+                or not isinstance(selected["policy_sha256"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", selected["policy_sha256"])
+                is None
+                or not isinstance(selected["tier_plan_sha256"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", selected["tier_plan_sha256"])
+                is None
+                or not isinstance(selected["selected_request_sha256"], str)
+                or re.fullmatch(
+                    r"[0-9a-f]{64}", selected["selected_request_sha256"]
+                )
+                is None
+            ):
+                raise LayerBoundaryError(
+                    "inline-mixed selected checkpoint evidence is invalid"
+                )
+            previous = superseded_candidates.setdefault(
+                candidate_request_sha256, selected
+            )
+            if previous != selected:
+                raise LayerBoundaryError(
+                    "inline-mixed candidate has conflicting selected checkpoints"
+                )
+        candidate_journal = (
+            _read_error_journal(
+                Path(f"{self.error_journal_path}.k2-candidates")
+            )
+            if superseded_candidates
+            else set()
+        )
         for request, result in inspected:
             module_name = request.get("module")
+            ledger_record = result.get("ledger_record")
+            provenance = (
+                ledger_record.get("provenance")
+                if isinstance(ledger_record, dict)
+                else None
+            )
+            record_sha256 = (
+                sha256_bytes(canonical_json_bytes(ledger_record))
+                if isinstance(ledger_record, dict)
+                else None
+            )
+            request_sha256 = request.get("request_sha256")
+            quantizer_contract = request.get("quantizer_contract")
+            inline_mixed = (
+                quantizer_contract.get("inline_mixed")
+                if isinstance(quantizer_contract, dict)
+                else None
+            )
+            selected = (
+                superseded_candidates.get(request_sha256)
+                if isinstance(request_sha256, str)
+                and isinstance(inline_mixed, dict)
+                and inline_mixed.get("role") == "candidate_k2"
+                else None
+            )
+            if selected is not None:
+                if (
+                    not isinstance(ledger_record, dict)
+                    or ledger_record.get("record_kind") != "projection"
+                    or ledger_record.get("module") != module_name
+                    or request.get("family_join") != self.family_join
+                    or not isinstance(provenance, dict)
+                    or provenance.get("family_join") != self.family_join
+                    or record_sha256 not in candidate_journal
+                    or record_sha256 in journal
+                    or selected["module"] != module_name
+                    or selected["base_bits"] != quantizer_contract.get("bits")
+                    or selected["base_bits"] != inline_mixed.get("base_bits")
+                    or selected["upgrade_bits"]
+                    != inline_mixed.get("upgrade_bits")
+                    or selected["policy_sha256"]
+                    != inline_mixed.get("policy_sha256")
+                ):
+                    raise LayerBoundaryError(
+                        f"inline-mixed candidate evidence differs for {module_name}"
+                    )
+                # The selected K3 request binds this K2 request by digest. Its
+                # separately validated candidate ledger remains useful for
+                # error analysis, but it is not a second resident projection.
+                continue
             match = (
                 _PROJECTION_MODULE.fullmatch(module_name)
                 if isinstance(module_name, str)
@@ -494,24 +609,12 @@ class DeepSeekV4LayerBoundaryStore:
                 logical_layer = int(mtp_match.group("layer"))
                 expert_index = int(mtp_match.group("expert"))
                 projection = mtp_match.group("projection")
-                ledger_record = result.get("ledger_record")
-                provenance = (
-                    ledger_record.get("provenance")
-                    if isinstance(ledger_record, dict)
-                    else None
-                )
                 route_evidence = request.get("route_evidence")
                 ledger_route_evidence = (
                     ledger_record.get("route_evidence")
                     if isinstance(ledger_record, dict)
                     else None
                 )
-                record_sha256 = (
-                    sha256_bytes(canonical_json_bytes(ledger_record))
-                    if isinstance(ledger_record, dict)
-                    else None
-                )
-                request_sha256 = request.get("request_sha256")
                 if (
                     not 0 <= logical_layer < self.dspark_block_count
                     or not 0 <= expert_index < self.routed_experts
@@ -563,18 +666,6 @@ class DeepSeekV4LayerBoundaryStore:
                 )
             layer_index = int(match.group("layer"))
             expert_index = int(match.group("expert"))
-            ledger_record = result.get("ledger_record")
-            provenance = (
-                ledger_record.get("provenance")
-                if isinstance(ledger_record, dict)
-                else None
-            )
-            record_sha256 = (
-                sha256_bytes(canonical_json_bytes(ledger_record))
-                if isinstance(ledger_record, dict)
-                else None
-            )
-            request_sha256 = request.get("request_sha256")
             if (
                 not 0 <= expert_index < self.routed_experts
                 or request.get("processor_layer_index") != layer_index

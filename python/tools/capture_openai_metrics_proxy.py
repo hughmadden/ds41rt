@@ -104,8 +104,15 @@ async def main() -> None:
                 record = {
                     "id": terminal.get("id"),
                     "status": upstream.status,
+                    "requested_model": request_json.get("model"),
                     "requested_max_tokens": request_json.get("max_tokens"),
+                    "requested_min_tokens": request_json.get("min_tokens"),
+                    "requested_ignore_eos": request_json.get("ignore_eos"),
                     "requested_stream": request_json.get("stream"),
+                    "requested_temperature": request_json.get("temperature"),
+                    "requested_enable_thinking": request_json.get(
+                        "enable_thinking"
+                    ),
                     "prompt_tokens": metrics.get("prompt_tokens"),
                     "output_tokens": metrics.get("output_tokens"),
                     "mtp_verify_cycles": real_full.get("mtp_verify_cycles"),

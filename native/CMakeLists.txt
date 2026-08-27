@@ -375,6 +375,7 @@ if(DS4RT_ENABLE_DS4_FLASH_AOT)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   set(DS4RT_DS4_FLASH_AOT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ds4_flash_aot")
   set(DS4RT_DS4_FLASH_AOT_PREFILL_REGIMES 2 4 8 16 32 64 128 256 512 1024 2048)
+  set(DS4RT_DS4_FLASH_AOT_MIXED_EXACT_DECODE_REGIMES 3 5 6 7 9 10 11 12)
   set(DS4RT_DS4_FLASH_AOT_OBJECTS
     "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_w4a16_decode_m1_fused_sum.o"
     "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_exl3_k2_decode_m1.o"
@@ -415,6 +416,12 @@ if(DS4RT_ENABLE_DS4_FLASH_AOT)
       "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_w4a16_prefill_m${regime}_topk6.h"
       "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_exl3_k2_prefill_m${regime}_topk6.h"
       "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_exl3_k3_prefill_m${regime}_topk6.h"
+      "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_exl3_mixed_k2_k3_m${regime}.h")
+  endforeach()
+  foreach(regime IN LISTS DS4RT_DS4_FLASH_AOT_MIXED_EXACT_DECODE_REGIMES)
+    list(APPEND DS4RT_DS4_FLASH_AOT_OBJECTS
+      "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_exl3_mixed_k2_k3_m${regime}.o")
+    list(APPEND DS4RT_DS4_FLASH_AOT_HEADERS
       "${DS4RT_DS4_FLASH_AOT_DIR}/ds4_flash_tp4_exl3_mixed_k2_k3_m${regime}.h")
   endforeach()
   add_custom_command(

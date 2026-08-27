@@ -276,7 +276,7 @@ def test_composite_layer_binding_fails_closed(
 
 
 def test_sliding_layer_binding_runs_four_bound_stages_in_order(monkeypatch) -> None:
-    from b12x.attention import compressed_mla, dsv4_producer
+    from b12x.attention import compressed_sparse_mla as compressed_mla, dsv4_producer
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 

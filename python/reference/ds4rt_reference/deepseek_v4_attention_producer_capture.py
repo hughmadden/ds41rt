@@ -136,7 +136,7 @@ class DeepseekV4AttentionIndexerContract:
         "causal-completed-c4-group-lengths",
         "direct-physical-slot-topk",
     )
-    selector_owner: str = "sparkinfer.attention.nsa_indexer"
+    selector_owner: str = "b12x.attention.dsa_indexer"
     status: str = "qualified-index-query-and-physical-selection-not-active"
 
     @property
@@ -372,7 +372,7 @@ def qualify_deepseek_v4_attention_indexer_contract(**kwargs: Any) -> bool:
     )
     import inspect
     import torch
-    from b12x.attention import dsv4_producer, nsa_indexer
+    from b12x.attention import dsa_indexer, dsv4_producer
 
     geometry = contract.geometry
     sparkinfer_plan = dsv4_producer.plan_indexer(
@@ -435,7 +435,7 @@ def qualify_deepseek_v4_attention_indexer_contract(**kwargs: Any) -> bool:
         )
     required_selector_surface = {"plan", "bind_paged", "index_topk_fp8"}
     missing_selector = required_selector_surface.difference(
-        nsa_indexer.META.entry_points
+        dsa_indexer.META.entry_points
     )
     if missing_selector:
         raise RuntimeError(
@@ -443,12 +443,12 @@ def qualify_deepseek_v4_attention_indexer_contract(**kwargs: Any) -> bool:
             + ", ".join(sorted(missing_selector))
         )
     if (
-        int(nsa_indexer.INDEX_HEAD_DIM) != DS4_INDEX_HEAD_DIM
-        or int(nsa_indexer.PAGED_INDEX_PAGE_SIZE) != DS4_INDEX_PAGE_TOKENS
+        int(dsa_indexer.INDEX_HEAD_DIM) != DS4_INDEX_HEAD_DIM
+        or int(dsa_indexer.PAGED_INDEX_PAGE_SIZE) != DS4_INDEX_PAGE_TOKENS
     ):
         raise RuntimeError("pinned SparkInfer DSV4 index-cache geometry drifted")
     if "output_physical_slots" not in inspect.signature(
-        nsa_indexer.bind_paged
+        dsa_indexer.bind_paged
     ).parameters:
         raise RuntimeError(
             "pinned SparkInfer paged index selector lost physical-slot output"

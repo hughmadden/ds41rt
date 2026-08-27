@@ -491,7 +491,10 @@ ds4rt_status_t check_aot_launch(int result, const char* label) {
     prefix##_Tensor_locks_i32_flat_t locks{buffers->locks.ptr};                                \
     return cute_dsl_##prefix##_wrapper(                                                         \
         &module_name, buffers->input.ptr, buffers->input.ptr, buffers->input.ptr,               \
-        buffers->w13_weight.ptr, buffers->w2_weight.ptr, &fc1, &activated, &fc2,                \
+        buffers->w13_weight.ptr, buffers->w2_weight.ptr,                                        \
+        static_cast<int64_t>(buffers->w13_weight.bytes / sizeof(int32_t)),                       \
+        static_cast<int64_t>(buffers->w2_weight.bytes / sizeof(int32_t)),                        \
+        &fc1, &activated, &fc2,                                                                  \
         buffers->w13_scale.ptr, buffers->w2_scale.ptr, buffers->w13_global_scale.ptr,           \
         buffers->w2_global_scale.ptr,                                                           \
         &packed_routes, &block_experts, &route_count, &activation_amax, 0,                     \

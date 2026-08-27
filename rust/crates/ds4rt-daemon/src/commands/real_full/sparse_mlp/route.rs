@@ -13,10 +13,10 @@ use ds4rt_ffi::{
     DS4RT_ROUTE_SHARD_WIRE_NVFP4_E2M1_FP8_E4M3,
 };
 use ds4rt_loader::{
-    dtype_byte_width, exl3_expert, exl3_expert_trellis_bits, is_deepseek_v4_exl3_recipe,
-    is_deepseek_v4_mixed_exl3_recipe, load_tensor_bytes, load_tensor_rows, native_fp4_expert,
-    Exl3Projection, Exl3Tp4ResidentGeometry, LoadedTensor, LoadedTensorRows,
-    DEEPSEEK_V4_EXL3_RECIPE, DEEPSEEK_V4_EXL3_T12_LUT_BYTES,
+    dtype_byte_width, exl3_expert, exl3_expert_trellis_bits, exl3_projection_trellis_bits,
+    is_deepseek_v4_exl3_recipe, is_deepseek_v4_mixed_exl3_recipe, load_tensor_bytes,
+    load_tensor_rows, native_fp4_expert, Exl3Projection, Exl3Tp4ResidentGeometry, LoadedTensor,
+    LoadedTensorRows, DEEPSEEK_V4_EXL3_RECIPE, DEEPSEEK_V4_EXL3_T12_LUT_BYTES,
 };
 use ds4rt_transport::{protocol_v2_verbs_host_execution_lanes, ExpertProtocolV2StreamPlan};
 use io_uring::{opcode, types, IoUring};
@@ -763,7 +763,7 @@ impl RouteTensorCache {
                     + cuda
                         .ds4_flash_exl3_mixed_expert_slabs
                         .values()
-                        .map(|slab| (slab.tier0_expert_ids.len() + slab.tier1_expert_ids.len()) * 3)
+                        .map(|_| DS4_FLASH_ROUTED_EXPERTS * 3)
                         .sum::<usize>();
                 let managed_projection_entries = cuda
                     .expert_slabs
@@ -3273,8 +3273,14 @@ struct RouteCudaDs4FlashExl3LayerExpertSlab {
 
 struct RouteCudaDs4FlashExl3MixedLayerExpertSlab {
     layer_id: usize,
-    tier0_expert_ids: Vec<usize>,
-    tier1_expert_ids: Vec<usize>,
+    tier0_gate_expert_ids: Vec<usize>,
+    tier1_gate_expert_ids: Vec<usize>,
+    tier0_up_expert_ids: Vec<usize>,
+    tier1_up_expert_ids: Vec<usize>,
+    tier0_down_expert_ids: Vec<usize>,
+    tier1_down_expert_ids: Vec<usize>,
+    tier0_slots: usize,
+    tier1_slots: usize,
     tier0_w13_trellis: Arc<OwnedDeviceAllocation>,
     tier0_w2_trellis: Arc<OwnedDeviceAllocation>,
     tier1_w13_trellis: Arc<OwnedDeviceAllocation>,
@@ -3286,6 +3292,7 @@ struct RouteCudaDs4FlashExl3MixedLayerExpertSlab {
     up_suh: Arc<OwnedDeviceAllocation>,
     intermediate_rotations: Arc<OwnedDeviceAllocation>,
     down_svh: Arc<OwnedDeviceAllocation>,
+    trellis_lut: Arc<OwnedDeviceAllocation>,
     global_to_combined: Arc<OwnedDeviceAllocation>,
     descriptor_map: Arc<OwnedDeviceAllocation>,
 }
@@ -5223,20 +5230,58 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
                 && is_deepseek_v4_mixed_exl3_recipe(&catalog.facts.quantization_recipe),
             "mixed K2/K3 EXL3 slabs require a DeepSeek V4 Flash mixed artifact"
         );
-        let mut tier0_expert_ids = Vec::new();
-        let mut tier1_expert_ids = Vec::new();
+        let mut tier0_gate_expert_ids = Vec::new();
+        let mut tier1_gate_expert_ids = Vec::new();
+        let mut tier0_up_expert_ids = Vec::new();
+        let mut tier1_up_expert_ids = Vec::new();
+        let mut tier0_down_expert_ids = Vec::new();
+        let mut tier1_down_expert_ids = Vec::new();
         for expert_id in 0..catalog.facts.routed_experts {
-            match exl3_expert_trellis_bits(catalog, layer_id, expert_id)? {
-                2 => tier0_expert_ids.push(expert_id),
-                3 => tier1_expert_ids.push(expert_id),
-                bits => anyhow::bail!("unsupported mixed EXL3 tier K{bits}"),
+            let expert = exl3_expert(catalog, layer_id, expert_id)?;
+            for (projection, tier0, tier1) in [
+                (
+                    expert.gate,
+                    &mut tier0_gate_expert_ids,
+                    &mut tier1_gate_expert_ids,
+                ),
+                (
+                    expert.up,
+                    &mut tier0_up_expert_ids,
+                    &mut tier1_up_expert_ids,
+                ),
+                (
+                    expert.down,
+                    &mut tier0_down_expert_ids,
+                    &mut tier1_down_expert_ids,
+                ),
+            ] {
+                match exl3_projection_trellis_bits(projection)? {
+                    2 => tier0.push(expert_id),
+                    3 => tier1.push(expert_id),
+                    bits => anyhow::bail!("unsupported mixed EXL3 tier K{bits}"),
+                }
             }
         }
+        for (name, tier0, tier1) in [
+            ("gate", &tier0_gate_expert_ids, &tier1_gate_expert_ids),
+            ("up", &tier0_up_expert_ids, &tier1_up_expert_ids),
+            ("down", &tier0_down_expert_ids, &tier1_down_expert_ids),
+        ] {
+            anyhow::ensure!(
+                !tier0.is_empty()
+                    && !tier1.is_empty()
+                    && tier0.len() + tier1.len() == catalog.facts.routed_experts,
+                "mixed EXL3 layer {layer_id} {name} is not a complete nonempty K2/K3 partition"
+            );
+        }
+        let tier0_slots = tier0_gate_expert_ids.len().max(tier0_up_expert_ids.len());
+        let tier1_slots = tier1_gate_expert_ids.len().max(tier1_up_expert_ids.len());
+        let total_slots = tier0_slots
+            .checked_add(tier1_slots)
+            .context("mixed EXL3 projection slot count overflow")?;
         anyhow::ensure!(
-            !tier0_expert_ids.is_empty()
-                && !tier1_expert_ids.is_empty()
-                && tier0_expert_ids.len() + tier1_expert_ids.len() == catalog.facts.routed_experts,
-            "mixed EXL3 layer {layer_id} is not a complete nonempty K2/K3 partition"
+            total_slots >= catalog.facts.routed_experts && tier0_slots <= 256 && tier1_slots <= 256,
+            "mixed EXL3 layer {layer_id} has invalid projection slot geometry"
         );
         let allocate = |bytes: usize, label: &str| {
             OwnedDeviceAllocation::new(
@@ -5254,25 +5299,29 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
                 .and_then(|bytes| bytes.checked_mul(experts))
                 .context("mixed EXL3 tier projection size overflow")
         };
-        let tier0_projection = projection_bytes(tier0_expert_ids.len(), 2)?;
-        let tier1_projection = projection_bytes(tier1_expert_ids.len(), 3)?;
+        let tier0_w13_bytes =
+            projection_bytes(tier0_gate_expert_ids.len() + tier0_up_expert_ids.len(), 2)?;
+        let tier0_w2_bytes = projection_bytes(tier0_down_expert_ids.len(), 2)?;
+        let tier1_w13_bytes =
+            projection_bytes(tier1_gate_expert_ids.len() + tier1_up_expert_ids.len(), 3)?;
+        let tier1_w2_bytes = projection_bytes(tier1_down_expert_ids.len(), 3)?;
         let hidden_rotation_bytes =
-            DS4_FLASH_ROUTED_EXPERTS * DS4_FLASH_HIDDEN_SIZE * std::mem::size_of::<u16>();
-        let intermediate_rotation_bytes = DS4_FLASH_ROUTED_EXPERTS
-            * 3
-            * DS4_FLASH_LOCAL_INTERMEDIATE_SIZE
-            * std::mem::size_of::<u16>();
-        let tier0_w13_trellis = allocate(2 * tier0_projection, "K2 W13 trellis")?;
-        let tier0_w2_trellis = allocate(tier0_projection, "K2 W2 trellis")?;
-        let tier1_w13_trellis = allocate(2 * tier1_projection, "K3 W13 trellis")?;
-        let tier1_w2_trellis = allocate(tier1_projection, "K3 W2 trellis")?;
+            total_slots * DS4_FLASH_HIDDEN_SIZE * std::mem::size_of::<u16>();
+        let intermediate_rotation_bytes =
+            total_slots * 3 * DS4_FLASH_LOCAL_INTERMEDIATE_SIZE * std::mem::size_of::<u16>();
+        let tier0_w13_trellis = allocate(tier0_w13_bytes, "K2 W13 trellis")?;
+        let tier0_w2_trellis = allocate(tier0_w2_bytes, "K2 W2 trellis")?;
+        let tier1_w13_trellis = allocate(tier1_w13_bytes, "K3 W13 trellis")?;
+        let tier1_w2_trellis = allocate(tier1_w2_bytes, "K3 W2 trellis")?;
         let dummy_scale = allocate(16, "dummy scale")?;
+        let tier0_scale_count = tier0_slots.max(tier0_down_expert_ids.len());
+        let tier1_scale_count = tier1_slots.max(tier1_down_expert_ids.len());
         let tier0_global_scale = allocate(
-            tier0_expert_ids.len() * std::mem::size_of::<f32>(),
+            tier0_scale_count * std::mem::size_of::<f32>(),
             "K2 global scales",
         )?;
         let tier1_global_scale = allocate(
-            tier1_expert_ids.len() * std::mem::size_of::<f32>(),
+            tier1_scale_count * std::mem::size_of::<f32>(),
             "K3 global scales",
         )?;
         let gate_suh = allocate(hidden_rotation_bytes, "gate SUH rotations")?;
@@ -5280,26 +5329,36 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
         let intermediate_rotations =
             allocate(intermediate_rotation_bytes, "intermediate rotations")?;
         let down_svh = allocate(hidden_rotation_bytes, "down SVH rotations")?;
+        let trellis_lut = allocate(SQG_XOR_CHEB_T12_LUT_BYTES, "SQG-XOR-Cheb T12 LUT")?;
         let global_to_combined = allocate(
             DS4_FLASH_ROUTED_EXPERTS * std::mem::size_of::<i32>(),
             "global-to-combined map",
         )?;
         let descriptor_map = allocate(
-            DS4_FLASH_ROUTED_EXPERTS * std::mem::size_of::<i32>(),
+            3 * total_slots * std::mem::size_of::<i32>(),
             "tier descriptor map",
         )?;
 
-        let mut global_map = vec![-1_i32; DS4_FLASH_ROUTED_EXPERTS];
-        for (local, &global) in tier0_expert_ids.iter().enumerate() {
-            global_map[global] = local as i32;
+        // Projection tiering cannot remap one route to one tier. Keep routes
+        // in their 256-expert global namespace and let each descriptor row
+        // select its own tier and tier-local packed plane.
+        let global_map = (0..DS4_FLASH_ROUTED_EXPERTS as i32).collect::<Vec<_>>();
+        let mut descriptors = vec![-1_i32; 3 * total_slots];
+        for (row, (tier0, tier1)) in [
+            (&tier0_gate_expert_ids, &tier1_gate_expert_ids),
+            (&tier0_up_expert_ids, &tier1_up_expert_ids),
+            (&tier0_down_expert_ids, &tier1_down_expert_ids),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for (local, &global) in tier0.iter().enumerate() {
+                descriptors[row * total_slots + global] = local as i32;
+            }
+            for (local, &global) in tier1.iter().enumerate() {
+                descriptors[row * total_slots + global] = ((1 << 8) | local) as i32;
+            }
         }
-        for (local, &global) in tier1_expert_ids.iter().enumerate() {
-            global_map[global] = (tier0_expert_ids.len() + local) as i32;
-        }
-        let descriptors = (0..tier0_expert_ids.len())
-            .map(|value| value as i32)
-            .chain((0..tier1_expert_ids.len()).map(|value| ((1 << 8) | value) as i32))
-            .collect::<Vec<_>>();
         let encode_i32 = |values: &[i32]| {
             values
                 .iter()
@@ -5312,14 +5371,21 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
                 .collect::<Vec<_>>()
         };
         library.copy_h2d(dummy_scale.buffer(), &[0_u8; 16])?;
-        library.copy_h2d(tier0_global_scale.buffer(), &ones(tier0_expert_ids.len()))?;
-        library.copy_h2d(tier1_global_scale.buffer(), &ones(tier1_expert_ids.len()))?;
+        library.copy_h2d(trellis_lut.buffer(), sqg_xor_cheb_t12_lut_bytes())?;
+        library.copy_h2d(tier0_global_scale.buffer(), &ones(tier0_scale_count))?;
+        library.copy_h2d(tier1_global_scale.buffer(), &ones(tier1_scale_count))?;
         library.copy_h2d(global_to_combined.buffer(), &encode_i32(&global_map))?;
         library.copy_h2d(descriptor_map.buffer(), &encode_i32(&descriptors))?;
         Ok(Self {
             layer_id,
-            tier0_expert_ids,
-            tier1_expert_ids,
+            tier0_gate_expert_ids,
+            tier1_gate_expert_ids,
+            tier0_up_expert_ids,
+            tier1_up_expert_ids,
+            tier0_down_expert_ids,
+            tier1_down_expert_ids,
+            tier0_slots,
+            tier1_slots,
             tier0_w13_trellis,
             tier0_w2_trellis,
             tier1_w13_trellis,
@@ -5331,38 +5397,35 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
             up_suh,
             intermediate_rotations,
             down_svh,
+            trellis_lut,
             global_to_combined,
             descriptor_map,
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn store_tier_direct(
+    fn store_layer_experts_direct(
         &self,
         catalog: &TensorCatalog,
-        expert_ids: &[usize],
-        bits: usize,
-        combined_base: usize,
-        w13: Ds4rtDeviceBuffer,
-        w2: Ds4rtDeviceBuffer,
         shard: ExpertIntermediateShard,
         library: Arc<NativeLibrary>,
         workspace: &mut RouteCudaWorkspace,
         cuda_stream: *mut c_void,
     ) -> Result<u64> {
-        let trellis = DS4_FLASH_HIDDEN_SIZE * DS4_FLASH_LOCAL_INTERMEDIATE_SIZE * bits / 8;
+        let trellis_bytes =
+            |bits: usize| DS4_FLASH_HIDDEN_SIZE * DS4_FLASH_LOCAL_INTERMEDIATE_SIZE * bits / 8;
+        let max_trellis = trellis_bytes(3);
         let hidden_rotation = DS4_FLASH_HIDDEN_SIZE * std::mem::size_of::<u16>();
         let local_rotation = DS4_FLASH_LOCAL_INTERMEDIATE_SIZE * std::mem::size_of::<u16>();
         let offsets = [
             0,
-            trellis,
-            2 * trellis,
-            3 * trellis,
-            3 * trellis + hidden_rotation,
-            3 * trellis + 2 * hidden_rotation,
-            3 * trellis + 2 * hidden_rotation + local_rotation,
-            3 * trellis + 2 * hidden_rotation + 2 * local_rotation,
-            3 * trellis + 2 * hidden_rotation + 3 * local_rotation,
+            max_trellis,
+            2 * max_trellis,
+            3 * max_trellis,
+            3 * max_trellis + hidden_rotation,
+            3 * max_trellis + 2 * hidden_rotation,
+            3 * max_trellis + 2 * hidden_rotation + local_rotation,
+            3 * max_trellis + 2 * hidden_rotation + 2 * local_rotation,
+            3 * max_trellis + 2 * hidden_rotation + 3 * local_rotation,
         ];
         let expert_bytes = offsets[8] + hidden_rotation;
         let chunk_experts = ((32 * 1024 * 1024) / expert_bytes).clamp(1, 16);
@@ -5375,6 +5438,7 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
         let snapshot = Path::new(&catalog.snapshot_path);
         let mut files = HashMap::<PathBuf, Arc<File>>::new();
         let mut source_bytes = 0_u64;
+        let expert_ids = (0..catalog.facts.routed_experts).collect::<Vec<_>>();
         for expert_chunk in expert_ids.chunks(chunk_experts) {
             let staging_buffer;
             {
@@ -5386,17 +5450,14 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
                 let mut requests = Vec::with_capacity(expert_chunk.len() * 520);
                 for (chunk_index, &expert_id) in expert_chunk.iter().enumerate() {
                     let expert = exl3_expert(catalog, self.layer_id, expert_id)?;
-                    anyhow::ensure!(
-                        exl3_expert_trellis_bits(catalog, self.layer_id, expert_id)? == bits,
-                        "mixed EXL3 tier changed while loading layer {} expert {expert_id}",
-                        self.layer_id
-                    );
                     let base = chunk_index * expert_bytes;
                     for (projection, offset) in [
                         (expert.gate, offsets[0]),
                         (expert.up, offsets[1]),
                         (expert.down, offsets[2]),
                     ] {
+                        let bits = exl3_projection_trellis_bits(projection)?;
+                        let trellis = trellis_bytes(bits);
                         queue_exl3_trellis_tp4(
                             snapshot,
                             projection,
@@ -5452,55 +5513,97 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
                     for projection in [expert.gate, expert.up, expert.down] {
                         validate_exl3_mcg_marker(snapshot, projection, &mut files)?;
                     }
-                    source_bytes += expert_bytes as u64 + 3 * std::mem::size_of::<u32>() as u64;
+                    source_bytes += [expert.gate, expert.up, expert.down]
+                        .into_iter()
+                        .map(exl3_projection_trellis_bits)
+                        .collect::<Result<Vec<_>>>()?
+                        .into_iter()
+                        .map(trellis_bytes)
+                        .sum::<usize>() as u64
+                        + (2 * hidden_rotation + 3 * local_rotation + hidden_rotation) as u64
+                        + 3 * std::mem::size_of::<u32>() as u64;
                 }
                 execute_exl3_read_requests(&requests)?;
                 staging_buffer = staging.buffer();
             }
             for (chunk_index, &expert_id) in expert_chunk.iter().enumerate() {
-                let local_id = expert_ids
-                    .binary_search(&expert_id)
-                    .map_err(|_| anyhow::anyhow!("mixed EXL3 expert ordering changed"))?;
-                let combined_id = combined_base + local_id;
+                let expert = exl3_expert(catalog, self.layer_id, expert_id)?;
                 let host_base = chunk_index * expert_bytes;
-                let intermediate_base = combined_id * 3 * local_rotation;
-                let copies = [
-                    (
-                        offsets[0],
+                let intermediate_base = expert_id * 3 * local_rotation;
+                let mut copies = Vec::with_capacity(9);
+                for (projection_index, (projection, source_offset)) in [
+                    (expert.gate, offsets[0]),
+                    (expert.up, offsets[1]),
+                    (expert.down, offsets[2]),
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    let bits = exl3_projection_trellis_bits(projection)?;
+                    let trellis = trellis_bytes(bits);
+                    let (members, buffer, plane_base, label) = match (bits, projection_index) {
+                        (2, 0) => (
+                            &self.tier0_gate_expert_ids,
+                            self.tier0_w13_trellis.buffer(),
+                            0,
+                            "mixed K2 W13 gate",
+                        ),
+                        (3, 0) => (
+                            &self.tier1_gate_expert_ids,
+                            self.tier1_w13_trellis.buffer(),
+                            0,
+                            "mixed K3 W13 gate",
+                        ),
+                        (2, 1) => (
+                            &self.tier0_up_expert_ids,
+                            self.tier0_w13_trellis.buffer(),
+                            self.tier0_gate_expert_ids.len(),
+                            "mixed K2 W13 up",
+                        ),
+                        (3, 1) => (
+                            &self.tier1_up_expert_ids,
+                            self.tier1_w13_trellis.buffer(),
+                            self.tier1_gate_expert_ids.len(),
+                            "mixed K3 W13 up",
+                        ),
+                        (2, 2) => (
+                            &self.tier0_down_expert_ids,
+                            self.tier0_w2_trellis.buffer(),
+                            0,
+                            "mixed K2 W2 down",
+                        ),
+                        (3, 2) => (
+                            &self.tier1_down_expert_ids,
+                            self.tier1_w2_trellis.buffer(),
+                            0,
+                            "mixed K3 W2 down",
+                        ),
+                        _ => anyhow::bail!("unsupported mixed EXL3 projection tier K{bits}"),
+                    };
+                    let local_id = members.binary_search(&expert_id).map_err(|_| {
+                        anyhow::anyhow!(
+                            "mixed EXL3 layer {} projection membership changed for expert {expert_id}",
+                            self.layer_id
+                        )
+                    })?;
+                    copies.push((
+                        source_offset,
                         trellis,
                         device_buffer_byte_view(
-                            w13,
-                            local_id * trellis,
+                            buffer,
+                            (plane_base + local_id) * trellis,
                             trellis,
-                            "mixed K W13 gate",
+                            label,
                         )?,
-                    ),
-                    (
-                        offsets[1],
-                        trellis,
-                        device_buffer_byte_view(
-                            w13,
-                            (expert_ids.len() + local_id) * trellis,
-                            trellis,
-                            "mixed K W13 up",
-                        )?,
-                    ),
-                    (
-                        offsets[2],
-                        trellis,
-                        device_buffer_byte_view(
-                            w2,
-                            local_id * trellis,
-                            trellis,
-                            "mixed K W2 down",
-                        )?,
-                    ),
+                    ));
+                }
+                copies.extend([
                     (
                         offsets[3],
                         hidden_rotation,
                         device_buffer_byte_view(
                             self.gate_suh.buffer(),
-                            combined_id * hidden_rotation,
+                            expert_id * hidden_rotation,
                             hidden_rotation,
                             "mixed gate SUH",
                         )?,
@@ -5510,7 +5613,7 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
                         hidden_rotation,
                         device_buffer_byte_view(
                             self.up_suh.buffer(),
-                            combined_id * hidden_rotation,
+                            expert_id * hidden_rotation,
                             hidden_rotation,
                             "mixed up SUH",
                         )?,
@@ -5550,12 +5653,12 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
                         hidden_rotation,
                         device_buffer_byte_view(
                             self.down_svh.buffer(),
-                            combined_id * hidden_rotation,
+                            expert_id * hidden_rotation,
                             hidden_rotation,
                             "mixed down SVH",
                         )?,
                     ),
-                ];
+                ]);
                 for (source_offset, bytes, destination) in copies {
                     let source = host_buffer_byte_view(
                         staging_buffer,
@@ -5580,41 +5683,6 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
         Ok(source_bytes)
     }
 
-    fn store_layer_experts_direct(
-        &self,
-        catalog: &TensorCatalog,
-        shard: ExpertIntermediateShard,
-        library: Arc<NativeLibrary>,
-        workspace: &mut RouteCudaWorkspace,
-        cuda_stream: *mut c_void,
-    ) -> Result<u64> {
-        let k2 = self.store_tier_direct(
-            catalog,
-            &self.tier0_expert_ids,
-            2,
-            0,
-            self.tier0_w13_trellis.buffer(),
-            self.tier0_w2_trellis.buffer(),
-            shard,
-            Arc::clone(&library),
-            workspace,
-            cuda_stream,
-        )?;
-        let k3 = self.store_tier_direct(
-            catalog,
-            &self.tier1_expert_ids,
-            3,
-            self.tier0_expert_ids.len(),
-            self.tier1_w13_trellis.buffer(),
-            self.tier1_w2_trellis.buffer(),
-            shard,
-            library,
-            workspace,
-            cuda_stream,
-        )?;
-        Ok(k2 + k3)
-    }
-
     fn resident_weight_bytes(&self) -> u64 {
         (self.tier0_w13_trellis.capacity_bytes()
             + self.tier0_w2_trellis.capacity_bytes()
@@ -5630,8 +5698,48 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
             + self.up_suh.capacity_bytes()
             + self.intermediate_rotations.capacity_bytes()
             + self.down_svh.capacity_bytes()
+            + self.trellis_lut.capacity_bytes()
             + self.global_to_combined.capacity_bytes()
             + self.descriptor_map.capacity_bytes()) as u64
+    }
+
+    fn launch_counts(&self) -> [usize; 8] {
+        [
+            self.tier0_slots,
+            self.tier1_slots,
+            self.tier0_gate_expert_ids.len(),
+            self.tier1_gate_expert_ids.len(),
+            self.tier0_up_expert_ids.len(),
+            self.tier1_up_expert_ids.len(),
+            self.tier0_down_expert_ids.len(),
+            self.tier1_down_expert_ids.len(),
+        ]
+    }
+
+    unsafe fn launch_mixed(
+        &self,
+        library: &NativeLibrary,
+        buffers: &Ds4rtDs4FlashSparkExl3MixedMoeBuffers,
+        rows: usize,
+        cuda_stream: *mut c_void,
+    ) -> Result<()> {
+        let [tier0_slots, tier1_slots, tier0_gate, tier1_gate, tier0_up, tier1_up, tier0_down, tier1_down] =
+            self.launch_counts();
+        unsafe {
+            library.cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
+                buffers,
+                tier0_slots,
+                tier1_slots,
+                tier0_gate,
+                tier1_gate,
+                tier0_up,
+                tier1_up,
+                tier0_down,
+                tier1_down,
+                rows,
+                cuda_stream,
+            )
+        }
     }
 
     fn aot_buffers(
@@ -5656,6 +5764,7 @@ impl RouteCudaDs4FlashExl3MixedLayerExpertSlab {
             up_suh: self.up_suh.buffer(),
             intermediate_rotations: self.intermediate_rotations.buffer(),
             down_svh: self.down_svh.buffer(),
+            trellis_lut: self.trellis_lut.buffer(),
             global_to_combined: self.global_to_combined.buffer(),
             descriptor_map: self.descriptor_map.buffer(),
             topk_ids,
@@ -7056,15 +7165,7 @@ pub(in crate::commands::real_full) fn ds4_flash_spark_decode_m1_preloaded_device
     unsafe {
         if let Some(slab) = mixed_slab {
             let native_buffers = slab.decode_m1_aot_buffers(buffers);
-            cuda_cache
-                .library
-                .cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
-                    &native_buffers,
-                    slab.tier0_expert_ids.len(),
-                    slab.tier1_expert_ids.len(),
-                    1,
-                    cuda_stream,
-                )
+            slab.launch_mixed(&cuda_cache.library, &native_buffers, 1, cuda_stream)
                 .with_context(|| {
                     format!(
                         "launching native Flash mixed EXL3 layer {layer_id} caller-owned M1 TP4 rank partial"
@@ -7376,14 +7477,7 @@ pub(in crate::commands::real_full) fn ds4_flash_spark_prefill_topk6_preloaded_de
     unsafe {
         if let Some(slab) = mixed_slab {
             let native_buffers = slab.prefill_aot_buffers(buffers);
-            library
-                .cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
-                    &native_buffers,
-                    slab.tier0_expert_ids.len(),
-                    slab.tier1_expert_ids.len(),
-                    rows,
-                    cuda_stream,
-                )
+            slab.launch_mixed(&library, &native_buffers, rows, cuda_stream)
                 .with_context(|| {
                     format!(
                         "launching native Flash mixed EXL3 layer {layer_id} caller-owned {rows}-row TP4 rank partial"
@@ -8258,14 +8352,7 @@ fn execute_native_flash_route_cached_inner(
         }
         if rows == 1 {
             if let (Some(slab), Some(buffers)) = (mixed_slab.as_ref(), mixed_buffers.as_ref()) {
-                library
-                    .cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
-                        buffers,
-                        slab.tier0_expert_ids.len(),
-                        slab.tier1_expert_ids.len(),
-                        rows,
-                        cuda_stream,
-                    )
+                slab.launch_mixed(&library, buffers, rows, cuda_stream)
                     .context("launching native Flash mixed EXL3 K2/K3 M1 TP4 expert partial")?;
             } else if let Some(buffers) = exl3_buffers.as_ref() {
                 let profile = exl3_profile.expect("EXL3 slab has a checked profile");
@@ -8297,14 +8384,7 @@ fn execute_native_flash_route_cached_inner(
             }
         } else {
             if let (Some(slab), Some(buffers)) = (mixed_slab.as_ref(), mixed_buffers.as_ref()) {
-                library
-                    .cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
-                        buffers,
-                        slab.tier0_expert_ids.len(),
-                        slab.tier1_expert_ids.len(),
-                        rows,
-                        cuda_stream,
-                    )
+                slab.launch_mixed(&library, buffers, rows, cuda_stream)
                     .context(
                         "launching native Flash mixed EXL3 K2/K3 prefill TP4 expert partials",
                     )?;
@@ -17651,10 +17731,22 @@ fn preload_exl3_mixed_flash_projection_cuda_cache_local_tp4(
 ) -> Result<RouteCudaProjectionPreload> {
     let mut preload = RouteCudaProjectionPreload::default();
     for &layer_id in layers {
-        let tier_bits = (0..catalog.facts.routed_experts)
-            .map(|expert_id| exl3_expert_trellis_bits(catalog, layer_id, expert_id))
+        let projection_bits = (0..catalog.facts.routed_experts)
+            .map(|expert_id| {
+                let expert = exl3_expert(catalog, layer_id, expert_id)?;
+                Ok([
+                    exl3_projection_trellis_bits(expert.gate)?,
+                    exl3_projection_trellis_bits(expert.up)?,
+                    exl3_projection_trellis_bits(expert.down)?,
+                ])
+            })
             .collect::<Result<Vec<_>>>()?;
-        if tier_bits.iter().all(|bits| *bits == tier_bits[0]) {
+        let first_bits = projection_bits[0][0];
+        if projection_bits
+            .iter()
+            .flatten()
+            .all(|bits| *bits == first_bits)
+        {
             let expert_ids = (0..catalog.facts.routed_experts).collect::<Vec<_>>();
             let uniform = preload_exl3_flash_projection_cuda_cache_local_tp4(
                 catalog,
@@ -17669,7 +17761,7 @@ fn preload_exl3_mixed_flash_projection_cuda_cache_local_tp4(
             preload.weight_scale_bytes += uniform.weight_scale_bytes;
             eprintln!(
                 "ds4_flash_exl3_mixed_cuda_layer_preload layer_id={layer_id} uniform_k={} experts={} tp_rank={} one_grid=false",
-                tier_bits[0],
+                first_bits,
                 expert_ids.len(),
                 shard.rank,
             );
@@ -17705,9 +17797,12 @@ fn preload_exl3_mixed_flash_projection_cuda_cache_local_tp4(
         cuda_cache.projection_uploads += projection_groups;
         let source_gbps = source_bytes as f64 / (load_ms * 1.0e6).max(1.0);
         eprintln!(
-            "ds4_flash_exl3_mixed_cuda_layer_preload layer_id={layer_id} k2_experts={} k3_experts={} tp_rank={} source_bytes={source_bytes} source_gbps={source_gbps:.3} allocation_ms={allocation_ms:.3} load_ms={load_ms:.3} one_grid=true",
-            slab.tier0_expert_ids.len(),
-            slab.tier1_expert_ids.len(),
+            "ds4_flash_exl3_mixed_cuda_layer_preload layer_id={layer_id} k2_slots={} k3_slots={} gate_k3={} up_k3={} down_k3={} tp_rank={} source_bytes={source_bytes} source_gbps={source_gbps:.3} allocation_ms={allocation_ms:.3} load_ms={load_ms:.3} one_grid=true projection_mixed=true",
+            slab.tier0_slots,
+            slab.tier1_slots,
+            slab.tier1_gate_expert_ids.len(),
+            slab.tier1_up_expert_ids.len(),
+            slab.tier1_down_expert_ids.len(),
             shard.rank,
         );
     }

@@ -125,7 +125,7 @@ def make_cache(
     )
     refs = root / "refs"
     refs.mkdir()
-    (refs / "main").write_text(revision + "\n", encoding="utf-8")
+    (refs / "main").write_text(revision, encoding="utf-8")
     return root, revision
 
 
@@ -225,7 +225,7 @@ def test_remote_verifier_hashes_before_atomically_publishing_ref(tmp_path: Path)
     assert report["revision"] == revision
     assert report["verified_blobs"] == 2
     assert report["qualification_reports"] == 0
-    assert (root / "refs" / "main").read_text(encoding="utf-8") == revision + "\n"
+    assert (root / "refs" / "main").read_text(encoding="utf-8") == revision
 
 
 def test_remote_verifier_hashes_gptqmodel_qualification_before_ref(
@@ -246,7 +246,7 @@ def test_remote_verifier_hashes_gptqmodel_qualification_before_ref(
 
     report = json.loads(result.stdout)
     assert report["qualification_reports"] == 2
-    assert ref.read_text(encoding="utf-8") == revision + "\n"
+    assert ref.read_text(encoding="utf-8") == revision
 
 
 def test_remote_verifier_rejects_tampered_qualification_before_ref(

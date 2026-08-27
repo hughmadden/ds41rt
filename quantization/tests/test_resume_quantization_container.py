@@ -182,6 +182,21 @@ def test_exact_resume_clones_command_and_hides_environment(tmp_path: Path) -> No
     assert spec.plan_sha256
 
 
+def test_local_resume_preserves_private_ipc(tmp_path: Path) -> None:
+    metadata, plan_sha256 = fixture(tmp_path)
+    metadata["HostConfig"]["IpcMode"] = "private"
+
+    spec = MODULE.build_resume_spec(
+        metadata,
+        source_container="source",
+        target_container="source-resume",
+        expected_plan_sha256=plan_sha256,
+        live_gpus=GPUS,
+    )
+
+    assert spec.ipc_mode == "private"
+
+
 def test_exact_resume_preserves_nonroot_memory_and_runtime_limits(
     tmp_path: Path,
 ) -> None:
@@ -321,6 +336,125 @@ def test_resume_chain_normalizes_existing_resume_suffix(
     assert "--resume" not in spec.command
     assert "--execution-upgrade" not in spec.command
     assert spec.resume_arguments == ("--execution-upgrade", "--resume")
+
+
+def test_upgrade_normalizes_read_only_legacy_quantizer_path(tmp_path: Path) -> None:
+    metadata, plan_sha256 = fixture(tmp_path)
+    legacy_root = tmp_path / "legacy-source"
+    legacy_quantizer = legacy_root / "quantization" / "quantize_flash_gptqmodel.py"
+    legacy_quantizer.parent.mkdir(parents=True)
+    legacy_quantizer.write_text("# immutable legacy source\n", encoding="utf-8")
+    metadata["Config"]["Cmd"][1] = "/legacy/quantization/quantize_flash_gptqmodel.py"
+    metadata["HostConfig"]["Binds"].append(f"{legacy_root}:/legacy:ro")
+
+    spec = MODULE.build_resume_spec(
+        metadata,
+        source_container="source",
+        target_container="source-resume",
+        expected_plan_sha256=plan_sha256,
+        live_gpus=GPUS,
+        upgrade_image_id=UPGRADE_IMAGE,
+    )
+
+    assert spec.command[1] == MODULE.QUANTIZER
+    assert spec.resume_arguments == ("--execution-upgrade", "--resume")
+
+
+def test_upgrade_inherits_dependency_contract_from_target_image(
+    tmp_path: Path,
+) -> None:
+    metadata, plan_sha256 = fixture(tmp_path)
+    metadata["Config"]["Env"].extend(
+        [
+            "DS4RT_QUANT_REQUIREMENTS_SHA256=" + "c" * 64,
+            "DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256=" + "d" * 64,
+        ]
+    )
+
+    spec = MODULE.build_resume_spec(
+        metadata,
+        source_container="source",
+        target_container="source-resume",
+        expected_plan_sha256=plan_sha256,
+        live_gpus=GPUS,
+        upgrade_image_id=UPGRADE_IMAGE,
+    )
+
+    assert not any(
+        record.startswith("DS4RT_QUANT_REQUIREMENTS_SHA256=")
+        or record.startswith("DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256=")
+        for record in spec.environment
+    )
+
+    started = copy.deepcopy(metadata)
+    started["Image"] = UPGRADE_IMAGE
+    started["Config"]["Cmd"] = [*spec.command, *spec.resume_arguments]
+    started["Config"]["Env"] = [
+        *spec.environment,
+        "DS4RT_QUANT_REQUIREMENTS_SHA256=" + "e" * 64,
+        "DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256=" + "f" * 64,
+    ]
+    MODULE.validate_started_container(spec, started)
+
+    started["Config"]["Env"].append("UNEXPECTED_EXECUTION_OVERRIDE=1")
+    with pytest.raises(MODULE.ResumeError, match="reconstructed exact launch"):
+        MODULE.validate_started_container(spec, started)
+
+
+def test_plain_resume_rejects_legacy_quantizer_path(tmp_path: Path) -> None:
+    metadata, plan_sha256 = fixture(tmp_path)
+    metadata["Config"]["Cmd"][1] = "/legacy/quantization/quantize_flash_gptqmodel.py"
+
+    with pytest.raises(MODULE.ResumeError, match="unfinished production"):
+        MODULE.build_resume_spec(
+            metadata,
+            source_container="source",
+            target_container="source-resume",
+            expected_plan_sha256=plan_sha256,
+            live_gpus=GPUS,
+        )
+
+
+def test_upgrade_hardens_legacy_missing_image_digest_requirement(
+    tmp_path: Path,
+) -> None:
+    metadata, plan_sha256 = fixture(tmp_path)
+    metadata["Config"]["Env"] = [
+        record
+        for record in metadata["Config"]["Env"]
+        if not record.startswith("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=")
+    ]
+
+    spec = MODULE.build_resume_spec(
+        metadata,
+        source_container="source",
+        target_container="source-resume",
+        expected_plan_sha256=plan_sha256,
+        live_gpus=GPUS,
+        upgrade_image_id=UPGRADE_IMAGE,
+    )
+
+    assert "DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=1" in spec.environment
+
+
+def test_plain_resume_rejects_missing_image_digest_requirement(
+    tmp_path: Path,
+) -> None:
+    metadata, plan_sha256 = fixture(tmp_path)
+    metadata["Config"]["Env"] = [
+        record
+        for record in metadata["Config"]["Env"]
+        if not record.startswith("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=")
+    ]
+
+    with pytest.raises(MODULE.ResumeError, match="qualified image/GPU role"):
+        MODULE.build_resume_spec(
+            metadata,
+            source_container="source",
+            target_container="source-resume",
+            expected_plan_sha256=plan_sha256,
+            live_gpus=GPUS,
+        )
 
 
 def test_private_environment_file_has_mode_0600(tmp_path: Path) -> None:

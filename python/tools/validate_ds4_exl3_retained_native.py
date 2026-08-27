@@ -137,14 +137,38 @@ def retained_native_plan(native_snapshot: Path, config: dict):
     quant = config.get("quantization_config")
     gptqmodel_native = is_gptqmodel_native_exl3(quant)
     bits = int(quant["bits"]) if gptqmodel_native else 2
-    return build_artifact_plan(
-        native_snapshot,
-        expert_tensor_layout=(
+    plan_kwargs = {
+        "expert_tensor_layout": (
             EXPERT_TENSOR_LAYOUT_GPTQMODEL
             if gptqmodel_native
             else EXPERT_TENSOR_LAYOUT_CHECKPOINT_NATIVE
         ),
-        exl3_bits=bits,
+        "exl3_bits": bits,
+    }
+    if gptqmodel_native:
+        storage = quant.get("tensor_storage")
+        if isinstance(storage, dict) and storage:
+            projection_bits = {}
+            for module, entry in storage.items():
+                physical_bits = (
+                    entry.get("bits_per_weight")
+                    if isinstance(entry, dict)
+                    else None
+                )
+                if (
+                    not isinstance(module, str)
+                    or not module
+                    or type(physical_bits) is not int
+                    or physical_bits not in {2, 3}
+                ):
+                    raise ValueError(
+                        "GPTQModel tensor_storage has an invalid projection tier"
+                    )
+                projection_bits[module] = physical_bits
+            plan_kwargs["exl3_projection_bits"] = projection_bits
+    return build_artifact_plan(
+        native_snapshot,
+        **plan_kwargs,
     )
 
 

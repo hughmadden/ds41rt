@@ -161,7 +161,51 @@ def test_checkpoint_recipe_accepts_exact_compact_public_gptqmodel_config(
         == generation.GPTQMODEL_RECIPE_K3
     )
 
-    external = json.loads((checkpoint / "quantize_config.json").read_text())
+    declaration["bits"] = 2.0
+    declaration["meta"] = {
+        "ds4rt_inline_mixed": {
+            "schema": "gptqmodel.exl3-inline-mixed",
+            "schema_version": 1,
+            "namespace": "base",
+            "base_bits": 2,
+            "upgrade_bits": 3,
+            "extra_bits": {"numerator": 1, "denominator": 10},
+            "target_bpw": "21/10",
+            "projection_ratio": {"w1": 3, "w3": 5, "w2": 8},
+            "score_kind": (
+                "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1"
+            ),
+        }
+    }
+    (checkpoint / "config.json").write_text(
+        json.dumps({"quantization_config": declaration}), encoding="utf-8"
+    )
+    (checkpoint / "quantize_config.json").write_text(
+        json.dumps({**declaration, "tensor_storage": {"projection": {}}}),
+        encoding="utf-8",
+    )
+    assert (
+        checkpoint_quantization_recipe(checkpoint)
+        == generation.GPTQMODEL_RECIPE_MIXED_K2_K3
+    )
+
+    declaration["meta"]["ds4rt_inline_mixed"]["target_bpw"] = "22/10"
+    (checkpoint / "config.json").write_text(
+        json.dumps({"quantization_config": declaration}), encoding="utf-8"
+    )
+    (checkpoint / "quantize_config.json").write_text(
+        json.dumps({**declaration, "tensor_storage": {"projection": {}}}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="target disagrees"):
+        checkpoint_quantization_recipe(checkpoint)
+
+    declaration.pop("meta")
+    declaration["bits"] = 3.0
+    (checkpoint / "config.json").write_text(
+        json.dumps({"quantization_config": declaration}), encoding="utf-8"
+    )
+    external = {**declaration, "tensor_storage": {"projection": {}}}
     external["bits"] = 2.0
     (checkpoint / "quantize_config.json").write_text(
         json.dumps(external), encoding="utf-8"

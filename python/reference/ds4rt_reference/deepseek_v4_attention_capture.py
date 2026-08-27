@@ -223,28 +223,29 @@ def qualify_deepseek_v4_compressed_mla_contract(**kwargs: Any) -> bool:
     contract = plan_deepseek_v4_compressed_mla(**kwargs)
     import torch
     from b12x.attention._shared.mla.compressed_reference import (
-        COMPRESSED_MLA_C4_PAGE_SIZE,
-        COMPRESSED_MLA_C128_PAGE_SIZE,
-        COMPRESSED_MLA_DSV4_PAGE_SIZE,
-        compressed_mla_page_nbytes,
+        COMPRESSED_SPARSE_MLA_C4_PAGE_SIZE,
+        COMPRESSED_SPARSE_MLA_C128_PAGE_SIZE,
+        COMPRESSED_SPARSE_MLA_DSV4_PAGE_SIZE,
+        compressed_sparse_mla_page_nbytes,
     )
-    from b12x.attention.compressed_mla import (
+    from b12x.attention.compressed_sparse_mla import (
         Caps,
         plan,
         split_chunks_for_contract,
     )
 
     if (
-        COMPRESSED_MLA_DSV4_PAGE_SIZE != DS4_SOURCE_PAGE_TOKENS
-        or COMPRESSED_MLA_C4_PAGE_SIZE != DS4_C4_PAGE_TOKENS
-        or COMPRESSED_MLA_C128_PAGE_SIZE != DS4_C128_PAGE_TOKENS
+        COMPRESSED_SPARSE_MLA_DSV4_PAGE_SIZE != DS4_SOURCE_PAGE_TOKENS
+        or COMPRESSED_SPARSE_MLA_C4_PAGE_SIZE != DS4_C4_PAGE_TOKENS
+        or COMPRESSED_SPARSE_MLA_C128_PAGE_SIZE != DS4_C128_PAGE_TOKENS
     ):
         raise RuntimeError("pinned SparkInfer DSV4 compressed-page ABI drifted")
     if contract.cache_format == "fp8" and (
-        compressed_mla_page_nbytes(DS4_SOURCE_PAGE_TOKENS)
+        compressed_sparse_mla_page_nbytes(DS4_SOURCE_PAGE_TOKENS)
         != contract.main_page_bytes
-        or compressed_mla_page_nbytes(DS4_C4_PAGE_TOKENS) != DS4_C4_PAGE_BYTES
-        or compressed_mla_page_nbytes(DS4_C128_PAGE_TOKENS)
+        or compressed_sparse_mla_page_nbytes(DS4_C4_PAGE_TOKENS)
+        != DS4_C4_PAGE_BYTES
+        or compressed_sparse_mla_page_nbytes(DS4_C128_PAGE_TOKENS)
         != DS4_C128_PAGE_BYTES
     ):
         raise RuntimeError("pinned SparkInfer DSV4 FP8 page ABI drifted")
@@ -306,7 +307,7 @@ def _run_deepseek_v4_compressed_mla(
 ) -> None:
     import torch
     from b12x_mla_capture import _bf16_tensor, _f32_tensor, _i32_tensor, _u8_tensor
-    from b12x.attention.compressed_mla import Caps, plan, run
+    from b12x.attention.compressed_sparse_mla import Caps, plan, run
 
     use_sink = bool(kwargs.get("use_sink", True))
     contract = plan_deepseek_v4_compressed_mla(

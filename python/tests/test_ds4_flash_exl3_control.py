@@ -59,21 +59,16 @@ def test_control_config_requires_matching_exl3_codebook_and_deepseek_v4(
             "quant_method": "exl3",
             "version": "1.3.0",
             "bits": 2.04,
-            "codebook": "mul1",
+            "codebook": "mcg",
         },
     }
     (tmp_path / "config.json").write_text(json.dumps(raw), encoding="utf-8")
     _, quant = read_control_config(tmp_path, config)
     assert quant["bits"] == 2.04
 
-    raw["quantization_config"]["codebook"] = "mcg"
-    (tmp_path / "config.json").write_text(json.dumps(raw), encoding="utf-8")
-    _, quant = read_control_config(tmp_path, config)
-    assert quant["codebook"] == "mcg"
-
     raw["quantization_config"]["codebook"] = "unknown"
     (tmp_path / "config.json").write_text(json.dumps(raw), encoding="utf-8")
-    with pytest.raises(ValueError, match="mcg or mul1"):
+    with pytest.raises(ValueError, match="mcg codebook"):
         read_control_config(tmp_path, config)
 
 
@@ -96,7 +91,7 @@ def test_control_layout_detects_unsharded_and_strict_tp4(tmp_path: Path) -> None
     )
     unsharded = resolve_control_layout(
         tmp_path,
-        {"codebook": "mul1"},
+        {"codebook": "mcg"},
         layer_id=0,
         intermediate_size=2048,
         expert_count=256,

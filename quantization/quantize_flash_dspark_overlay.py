@@ -1829,10 +1829,24 @@ def execute(
         selection,
     )
     memory_safety = _effective_memory_safety(plan, execution_upgrade)
+    capture_checkpoint_interval = int(
+        plan.get(
+            "capture_batch_checkpoint_interval",
+            base.DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL,
+        )
+    )
+    if execution_upgrade is not None:
+        capture_checkpoint_interval = int(
+            execution_upgrade.get("change_contract", {}).get(
+                "capture_batch_checkpoint_interval",
+                capture_checkpoint_interval,
+            )
+        )
     with base.capture_frontier_scope(
         run_state / MTP_CAPTURE_FRONTIER_DIRNAME
     ), base.capture_batch_spool_scope(
-        run_state / base.CAPTURE_BATCH_SPOOL_DIRNAME
+        run_state / base.CAPTURE_BATCH_SPOOL_DIRNAME,
+        checkpoint_interval=capture_checkpoint_interval,
     ), base.memory_safety_scope(memory_safety):
         model.quantize(replay, batch_size=1, calibration_sort=None)
     publish_overlay(plan, len(replay), selection)

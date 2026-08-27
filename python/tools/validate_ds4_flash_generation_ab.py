@@ -28,8 +28,10 @@ from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
     PLAN_FILE as GPTQMODEL_PLAN_FILE,
     RECIPE as GPTQMODEL_RECIPE,
     RECIPE_K3 as GPTQMODEL_RECIPE_K3,
+    RECIPE_MIXED_K2_K3 as GPTQMODEL_RECIPE_MIXED_K2_K3,
     RUN_FILE as GPTQMODEL_RUN_FILE,
     is_gptqmodel_native_exl3,
+    validate_inline_mixed_policy,
     validate_gptqmodel_native_exl3,
     validate_gptqmodel_publication,
 )
@@ -51,7 +53,9 @@ EXL3_V4_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
 EXL3_K3_V4_RECIPE = "deepseek_v4_exl3_trellis_3bpw_v4_flash_natural_route"
 EXL3_RECIPE = EXL3_V4_RECIPE
 HISTORICAL_EXL3_RECIPES = frozenset((EXL3_V2_RECIPE, EXL3_V3_RECIPE))
-GPTQMODEL_RECIPES = frozenset((GPTQMODEL_RECIPE, GPTQMODEL_RECIPE_K3))
+GPTQMODEL_RECIPES = frozenset(
+    (GPTQMODEL_RECIPE, GPTQMODEL_RECIPE_K3, GPTQMODEL_RECIPE_MIXED_K2_K3)
+)
 PRODUCTION_EXL3_RECIPES = frozenset((EXL3_V4_RECIPE, EXL3_K3_V4_RECIPE))
 STAGED_EXL3_REQUIRED_FILES = frozenset(
     (
@@ -389,6 +393,35 @@ def checkpoint_quantization_recipe(
         return NATIVE_RECIPE
     if isinstance(method, str) and method.lower() == "exl3":
         if is_gptqmodel_native_exl3(quantization):
+            inline_mixed = quantization.get("meta", {}).get("ds4rt_inline_mixed")
+            if inline_mixed is not None:
+                validate_inline_mixed_policy(inline_mixed)
+                if quantization.get("bits") not in (2, 2.0):
+                    raise ValueError(
+                        "inline mixed GPTQModel EXL3 must keep public bits at K2"
+                    )
+                provenance = quantization["meta"].get("ds4rt_error_ledger")
+                family = (
+                    provenance.get("family_join")
+                    if isinstance(provenance, dict)
+                    else None
+                )
+                family_mixed = (
+                    family.get("inline_mixed") if isinstance(family, dict) else None
+                )
+                if (
+                    not isinstance(family_mixed, dict)
+                    or family_mixed.get("base") != inline_mixed
+                ):
+                    raise ValueError(
+                        "inline mixed GPTQModel EXL3 metadata is not provenance-bound"
+                    )
+                validate_inline_mixed_policy(family_mixed["base"])
+                if "mtp" in family_mixed:
+                    validate_inline_mixed_policy(
+                        family_mixed["mtp"], namespace="mtp"
+                    )
+                return GPTQMODEL_RECIPE_MIXED_K2_K3
             validate_gptqmodel_native_exl3(
                 quantization,
                 model_config=config,
@@ -444,6 +477,17 @@ def checkpoint_quantization_recipe(
                     raise ValueError(
                         "public GPTQModel EXL3 config is not the routed K2/K3 MCG contract"
                     )
+                meta = external.get("meta")
+                inline_mixed = (
+                    meta.get("ds4rt_inline_mixed") if isinstance(meta, dict) else None
+                )
+                if inline_mixed is not None:
+                    if int(bits) != 2:
+                        raise ValueError(
+                            "inline mixed GPTQModel EXL3 must keep public bits at K2"
+                        )
+                    validate_inline_mixed_policy(inline_mixed)
+                    return GPTQMODEL_RECIPE_MIXED_K2_K3
                 return GPTQMODEL_RECIPE if int(bits) == 2 else GPTQMODEL_RECIPE_K3
         ds4rt = quantization.get("ds4rt")
         recipe = ds4rt.get("recipe") if isinstance(ds4rt, dict) else None

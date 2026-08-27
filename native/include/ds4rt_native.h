@@ -222,6 +222,7 @@ typedef struct ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t {
   ds4rt_device_buffer_t up_suh;
   ds4rt_device_buffer_t intermediate_rotations;
   ds4rt_device_buffer_t down_svh;
+  ds4rt_device_buffer_t trellis_lut;
   ds4rt_device_buffer_t global_to_combined;
   ds4rt_device_buffer_t descriptor_map;
   ds4rt_device_buffer_t topk_ids;
@@ -861,7 +862,11 @@ ds4rt_status_t ds4rt_cuda_ds4_flash_spark_exl3_k3_prefill_topk6_async(
     void* cuda_stream);
 ds4rt_status_t ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
     const ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t* buffers,
-    size_t tier0_experts, size_t tier1_experts, size_t rows,
+    size_t tier0_slots, size_t tier1_slots,
+    size_t tier0_gate_experts, size_t tier1_gate_experts,
+    size_t tier0_up_experts, size_t tier1_up_experts,
+    size_t tier0_down_experts, size_t tier1_down_experts,
+    size_t rows,
     void* cuda_stream);
 ds4rt_status_t ds4rt_cuda_ds4_pro_spark_aot_available(int* out_available);
 ds4rt_status_t ds4rt_cuda_ds4_pro_spark_aot_init(void);

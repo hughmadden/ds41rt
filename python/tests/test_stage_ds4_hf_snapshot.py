@@ -16,18 +16,28 @@ if str(TOOLS) not in sys.path:
 from stage_ds4_hf_snapshot import (  # noqa: E402
     GPTQMODEL_PRODUCTION_SAMPLING_POLICY,
     gptqmodel_publication_identity,
+    ledger_projection_storage_contract,
     model_cache_dir,
     quality_snapshot_identity,
     stage_snapshot,
     validate_error_ledger,
+    validate_gptqmodel_retained_native_report,
 )
 from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+    GPTQMODEL_SOURCE_INLINE_MIXED,
     GPTQMODEL_SOURCE_SERIALIZED_TRELLIS,
+    GPTQMODEL_SOURCE_TERMINAL_FINALIZE,
+    GPTQMODEL_SOURCE_UPSTREAM_REFRESH,
     GPTQMODEL_SOURCE_WITH_ROUTE_RECOVERY,
     PLAN_SCHEMA,
+    PREVIOUS_PLAN_SCHEMA,
     _expected_source_geometry,
+    _expected_projection_owners,
+    _expected_projection_encoded_bytes,
     _validate_canonical_assembly,
+    _validate_canonical_tensor_storage,
     _validate_composite_canonical_assembly,
+    _validate_error_ledger,
     _valid_recovery_sample_accounting,
     validate_gptqmodel_native_exl3,
 )
@@ -43,6 +53,73 @@ from validate_ds4_flash_generation_ab import (  # noqa: E402
 RECIPE = "deepseek_v4_exl3_trellis_2bpw_v2"
 V3_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v3_flash_activation_pilot"
 V4_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
+
+
+def test_projection_owners_follow_coordinator_only_topology() -> None:
+    digest = "a" * 64
+    image = "sha256:" + "b" * 64
+    family = {
+        "gptqmodel": GPTQMODEL_SOURCE_INLINE_MIXED,
+        "image_digest": image,
+        "preflight_sha256": digest,
+    }
+    provenance = {
+        "run": {
+            "mtp_execution_mode": "integrated",
+            "coordinator": {
+                "image_digest": image,
+                "sha256": digest,
+                "gptqmodel": {
+                    "revision": GPTQMODEL_SOURCE_INLINE_MIXED["revision"],
+                    "source_tree_sha256": GPTQMODEL_SOURCE_INLINE_MIXED[
+                        "source_tree_sha256"
+                    ],
+                },
+                "gpus": [
+                    {
+                        "index": index,
+                        "uuid": f"GPU-{index}",
+                        "compute_capability": [12, 0],
+                        "total_memory_bytes": 96 * 1024**3,
+                    }
+                    for index in (0, 1)
+                ],
+            },
+        }
+    }
+
+    assert _expected_projection_owners(provenance, family) == {
+        "coordinator:cuda:0",
+        "coordinator:cuda:1",
+    }
+
+
+def test_projection_encoded_bytes_follow_physical_mixed_tiers() -> None:
+    hidden_size = 4096
+    intermediate_size = 2048
+    quant = {
+        "bits": 2,
+        "tensor_storage": {
+            "expert.0.gate_proj": {"bits_per_weight": 2},
+            "expert.0.up_proj": {"bits_per_weight": 3},
+        },
+    }
+    k2_bytes = (
+        (hidden_size // 16) * (intermediate_size // 16) * 32 * 2
+        + (hidden_size + intermediate_size) * 2
+        + 4
+    )
+    k3_bytes = (
+        (hidden_size // 16) * (intermediate_size // 16) * 32 * 3
+        + (hidden_size + intermediate_size) * 2
+        + 4
+    )
+
+    assert _expected_projection_encoded_bytes(
+        quant,
+        hidden_size=hidden_size,
+        intermediate_size=intermediate_size,
+    ) == k2_bytes + k3_bytes
 
 
 def write_json(path: Path, value: object) -> None:
@@ -196,9 +273,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     }
     projection = bind_record(
         {
-            "schema": (
-                "ds4rt-exl3-canonical-hybrid-composite-projection-assembly-v1"
-            ),
+            "schema": ("ds4rt-exl3-canonical-hybrid-composite-projection-assembly-v1"),
             "base_plan_sha256": base_plan_sha256,
             "mtp_plan_sha256": mtp_plan_sha256,
             "sources": source_reports,
@@ -267,9 +342,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     )
     quant_report = bind_record(
         {
-            "schema": (
-                "ds4rt-exl3-canonical-composite-quant-config-assembly-v1"
-            ),
+            "schema": ("ds4rt-exl3-canonical-composite-quant-config-assembly-v1"),
             "base_plan_sha256": base_plan_sha256,
             "mtp_plan_sha256": mtp_plan_sha256,
             "canonical_module_count": projections_per_block * 2,
@@ -699,8 +772,7 @@ def gptqmodel_tensor_storage(geometry: dict) -> dict:
     hidden_size = geometry["hidden_size"]
     intermediate_size = geometry["moe_intermediate_size"]
     blocks = [
-        f"model.layers.{layer}"
-        for layer in range(geometry["num_hidden_layers"])
+        f"model.layers.{layer}" for layer in range(geometry["num_hidden_layers"])
     ] + [
         f"mtp.{layer}"
         for layer in range(len(geometry.get("dspark_target_layer_ids", [])))
@@ -737,6 +809,298 @@ def gptqmodel_tensor_storage(geometry: dict) -> dict:
                     "mcg_multiplier": 0xCBAC1FED,
                 }
     return storage
+
+
+def inline_mixed_policy(namespace: str, numerator: int, denominator: int) -> dict:
+    return {
+        "schema": "gptqmodel.exl3-inline-mixed",
+        "schema_version": 1,
+        "namespace": namespace,
+        "base_bits": 2,
+        "upgrade_bits": 3,
+        "extra_bits": {"numerator": numerator, "denominator": denominator},
+        "target_bpw": f"{2 * denominator + numerator}/{denominator}",
+        "projection_ratio": {"w1": 3, "w3": 5, "w2": 8},
+        "score_kind": (
+            "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1"
+        ),
+    }
+
+
+def mixed_quantization_fixture() -> tuple[dict, dict, dict]:
+    geometry = {
+        "num_hidden_layers": 2,
+        "n_routed_experts": 16,
+        "hidden_size": 128,
+        "moe_intermediate_size": 64,
+        "dspark_target_layer_ids": [1],
+        "num_hash_layers": 1,
+        "num_experts_per_tok": 6,
+        "hc_mult": 4,
+        "num_nextn_predict_layers": 1,
+    }
+    policies = {
+        "base": inline_mixed_policy("base", 1, 10),
+        "mtp": inline_mixed_policy("mtp", 1, 5),
+    }
+    family = {
+        "bits": 2,
+        "codebook": "mcg",
+        "inline_mixed": policies,
+        "gptqmodel": GPTQMODEL_SOURCE_INLINE_MIXED,
+        "source": {"geometry": geometry},
+        "mtp_anchor_selection": {
+            "contract": "ds4rt-mtp-anchor-stratified-v1",
+            "count": 16,
+            "seed": 20260809,
+        },
+        "mtp_replay_batching": {
+            "contract": "ds4rt-mtp-source-sequence-anchor-batches-v1",
+            "source_sequence_anchor_cap": None,
+            "proposal_rows_per_anchor": 5,
+        },
+    }
+    provenance = {
+        "family_join": family,
+        "run": {"mtp_execution_mode": "integrated"},
+    }
+    storage = gptqmodel_tensor_storage(geometry)
+    # Exact half-up/largest-remainder quotas are base=(2,3,5), spread
+    # (1,1,2)/(1,2,3), and MTP=(2,3,5) for w1/w3/w2.
+    quotas = {
+        ("base", 0): {"w1": 1, "w3": 1, "w2": 2},
+        ("base", 1): {"w1": 1, "w3": 2, "w2": 3},
+        ("mtp", 0): {"w1": 2, "w3": 3, "w2": 5},
+    }
+    projection_names = {
+        "gate_proj": "w1",
+        "up_proj": "w3",
+        "down_proj": "w2",
+    }
+    for (namespace, layer), layer_quotas in quotas.items():
+        block = f"model.layers.{layer}" if namespace == "base" else f"mtp.{layer}"
+        for expert in range(geometry["n_routed_experts"]):
+            for module_projection, projection in projection_names.items():
+                if expert >= layer_quotas[projection]:
+                    continue
+                module = f"{block}.mlp.experts.{expert}.{module_projection}"
+                entry = storage[module]
+                entry["bits_per_weight"] = 3
+                entry["stored_tensors"][f"{module}.trellis"]["shape"][-1] = 48
+    quant = {
+        "bits": 2,
+        "tensor_storage": storage,
+        "meta": {
+            "fallback": None,
+            "ds4rt_inline_mixed": policies["base"],
+            "ds4rt_error_ledger": provenance,
+        },
+    }
+    return geometry, quant, family
+
+
+def write_mixed_test_ledger(
+    root: Path,
+    geometry: dict,
+    quant: dict,
+    family: dict,
+) -> None:
+    records = []
+    projection_names = {
+        "gate_proj": "w1",
+        "down_proj": "w2",
+        "up_proj": "w3",
+    }
+    for namespace, layer_count in (
+        ("base", geometry["num_hidden_layers"]),
+        ("mtp", len(geometry["dspark_target_layer_ids"])),
+    ):
+        for layer in range(layer_count):
+            block = f"model.layers.{layer}" if namespace == "base" else f"mtp.{layer}"
+            for expert in range(geometry["n_routed_experts"]):
+                route = {
+                    "schema": "ds4rt.exl3-natural-route",
+                    "schema_version": 1,
+                    "block_namespace": namespace,
+                    "logical_layer": layer,
+                    "expert": expert,
+                    "expert_route_count": 1024,
+                }
+                family_bits = {}
+                for module_projection, projection in projection_names.items():
+                    module = f"{block}.mlp.experts.{expert}.{module_projection}"
+                    bits = quant["tensor_storage"][module]["bits_per_weight"]
+                    family_bits[projection] = bits
+                    records.append(
+                        bind_ledger_record(
+                            {
+                                "schema": "ds4rt.exl3-error-ledger",
+                                "schema_version": 1,
+                                "record_kind": "projection",
+                                "module": module,
+                                "processor_layer_index": layer,
+                                "block_namespace": namespace,
+                                "logical_layer": layer,
+                                "expert": expert,
+                                "projection": projection,
+                                "bits": bits,
+                                "codebook": "mcg",
+                                "sample_count": 1024,
+                                "duration_seconds": 1.0,
+                                "encoded_bytes": 128,
+                                "devices": ["cuda:0"],
+                                "provenance": {"family_join": family},
+                                "route_evidence": route,
+                                "quantizer_metrics": {
+                                    "schema": "gptqmodel.exl3-trellis-error",
+                                    "schema_version": 1,
+                                    "quantizer_path": "hessian_ldlq",
+                                    "hessian_sample_count": 1024,
+                                    "hessian_metric_status": "ok",
+                                    "hessian_regularization_sigma": 0.025,
+                                    "hessian_numerical_contract": (
+                                        "signed-block-hadamard-congruence-fp64-v1"
+                                    ),
+                                    "hessian_transform_compute_dtype": "torch.float64",
+                                    "hessian_storage_dtype": "torch.float32",
+                                    "hessian_regularization_placement": (
+                                        "before-fp64-congruence"
+                                    ),
+                                    "hessian_regularization_diagonal_addend": 0.1,
+                                    "hessian_symmetry_restoration": (
+                                        "mean-with-transpose-fp64"
+                                    ),
+                                    "hessian_symmetry_correction_max_abs": 0.0,
+                                },
+                            }
+                        )
+                    )
+                records.append(
+                    bind_ledger_record(
+                        {
+                            "schema": "ds4rt.exl3-error-ledger",
+                            "schema_version": 1,
+                            "record_kind": "expert_family",
+                            "block_namespace": namespace,
+                            "logical_layer": layer,
+                            "expert": expert,
+                            "bits": min(family_bits.values()),
+                            "projection_bits": family_bits,
+                            "mixed_bits": len(set(family_bits.values())) > 1,
+                            "codebook": "mcg",
+                            "projections": ["w1", "w2", "w3"],
+                            "provenance": {"family_join": family},
+                            "route_evidence": route,
+                            "aggregate_metrics": {"hessian_metric_status": "ok"},
+                        }
+                    )
+                )
+    payload = b"".join(canonical_json(record) + b"\n" for record in records)
+    (root / "ds4rt-exl3-error-ledger.jsonl").write_bytes(payload)
+    projection_count = (
+        (geometry["num_hidden_layers"] + len(geometry["dspark_target_layer_ids"]))
+        * geometry["n_routed_experts"]
+        * 3
+    )
+    family_count = projection_count // 3
+    write_json(
+        root / "ds4rt-exl3-error-ledger.manifest.json",
+        {
+            "schema": "ds4rt.exl3-error-ledger",
+            "schema_version": 1,
+            "ledger": "ds4rt-exl3-error-ledger.jsonl",
+            "ledger_sha256": hashlib.sha256(payload).hexdigest(),
+            "projection_records": projection_count,
+            "complete_family_records": family_count,
+            "total_records": len(records),
+        },
+    )
+
+
+def test_inline_mixed_tensor_storage_and_ledger_bind_exact_layer_quotas(
+    tmp_path: Path,
+) -> None:
+    geometry, quant, family = mixed_quantization_fixture()
+    bits = _validate_canonical_tensor_storage(quant, geometry)
+    assert sum(value == 3 for value in bits.values()) == 20
+
+    write_mixed_test_ledger(tmp_path, geometry, quant, family)
+    _validate_error_ledger(tmp_path, geometry, quant, family)
+
+    upgraded = next(
+        module
+        for module, entry in quant["tensor_storage"].items()
+        if entry["bits_per_weight"] == 3
+    )
+    entry = quant["tensor_storage"][upgraded]
+    entry["bits_per_weight"] = 2
+    entry["stored_tensors"][f"{upgraded}.trellis"]["shape"][-1] = 32
+    with pytest.raises(ValueError, match="tier allocation differs"):
+        _validate_canonical_tensor_storage(quant, geometry)
+
+
+def test_stage_ledger_uses_inline_mixed_physical_projection_tiers() -> None:
+    geometry, quant, _ = mixed_quantization_fixture()
+    expected = {
+        ("base", 0, expert, projection)
+        for expert in range(geometry["n_routed_experts"])
+        for projection in ("w1", "w2", "w3")
+    }
+
+    contract = ledger_projection_storage_contract(
+        quant,
+        expected,
+        default_bits=2,
+    )
+
+    assert any(bits == 3 for _, bits in contract.values())
+    for identity, (module, bits) in contract.items():
+        assert module is not None
+        assert quant["tensor_storage"][module]["bits_per_weight"] == bits
+        assert identity[-1] in {"w1", "w2", "w3"}
+
+
+def test_v7_integrated_mixed_writer_is_canonical_without_legacy_assembly(
+    tmp_path: Path,
+) -> None:
+    geometry, quant, family = mixed_quantization_fixture()
+    provenance = quant["meta"]["ds4rt_error_ledger"]
+    plan_policies = {
+        namespace: {**policy, "tier_plan_root": f"/run/{namespace}"}
+        for namespace, policy in family["inline_mixed"].items()
+    }
+    plan = {
+        "schema": PLAN_SCHEMA,
+        "recipe": V4_RECIPE,
+        "source": family["source"],
+        "ledger_provenance": provenance,
+        "mtp_execution_mode": "integrated",
+        "mtp_anchor_selection": family["mtp_anchor_selection"],
+        "mtp_replay_batching": family["mtp_replay_batching"],
+        "inline_mixed": plan_policies,
+    }
+    artifact = {"files": {}}
+
+    assert (
+        _validate_canonical_assembly(
+            tmp_path,
+            geometry,
+            quant,
+            plan,
+            artifact,
+        )
+        is None
+    )
+
+    plan["schema"] = PREVIOUS_PLAN_SCHEMA
+    with pytest.raises(ValueError, match="raw GPTQModel export"):
+        _validate_canonical_assembly(
+            tmp_path,
+            geometry,
+            quant,
+            plan,
+            artifact,
+        )
 
 
 def make_gptqmodel_artifact(root: Path) -> Path:
@@ -867,11 +1231,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
     }
     source_plan = bind_record(source_plan_body, "plan_sha256")
     source_artifact_sha256 = "a" * 64
-    projection_count = (
-        geometry["num_hidden_layers"]
-        * geometry["n_routed_experts"]
-        * 3
-    )
+    projection_count = geometry["num_hidden_layers"] * geometry["n_routed_experts"] * 3
     projection_bytes = (
         (geometry["hidden_size"] // 16)
         * (geometry["moe_intermediate_size"] // 16)
@@ -929,9 +1289,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
             "projection_count": projection_count,
             "expert_family_count": projection_count // 3,
             "reports": block_reports,
-            "reports_sha256": hashlib.sha256(
-                canonical_json(block_reports)
-            ).hexdigest(),
+            "reports_sha256": hashlib.sha256(canonical_json(block_reports)).hexdigest(),
         },
         "report_sha256",
     )
@@ -942,9 +1300,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
             "raw_module_count": projection_count,
             "canonical_module_count": projection_count,
             "added_mtp_module_count": 0,
-            "added_mtp_modules_sha256": hashlib.sha256(
-                canonical_json([])
-            ).hexdigest(),
+            "added_mtp_modules_sha256": hashlib.sha256(canonical_json([])).hexdigest(),
             "raw_quant_config_sha256": quant_config_sha256,
             "canonical_quant_config_sha256": quant_config_sha256,
         },
@@ -1018,9 +1374,7 @@ def make_gptqmodel_qualification(
     report_root: Path,
 ) -> tuple[Path, Path]:
     report_root.mkdir()
-    retained = json.loads(
-        (artifact / "ds4rt-exl3-retained-native.json").read_text()
-    )
+    retained = json.loads((artifact / "ds4rt-exl3-retained-native.json").read_text())
     retained.update(
         {
             "recipe": V4_RECIPE,
@@ -1079,6 +1433,38 @@ def make_gptqmodel_qualification(
     return retained_path, quality_path
 
 
+def test_gptqmodel_retained_native_accepts_mixed_tp4_layout(
+    tmp_path: Path,
+) -> None:
+    artifact = make_gptqmodel_artifact(tmp_path / "artifact")
+    retained_path, _quality_path = make_gptqmodel_qualification(
+        artifact,
+        tmp_path / "qualification",
+    )
+    report = json.loads(retained_path.read_text(encoding="utf-8"))
+    report["strict_tp4_source_layout"] = {
+        "world_size": 4,
+        "blocks": 1,
+        "experts_per_block": 6,
+        "experts_checked": 6,
+        "local_intermediate_size": 512,
+        "mixed_projection_tiers": True,
+        "tier_counts": {"2": 16, "3": 2},
+        "rank_source_bytes_by_block": [640],
+        "rank_source_bytes_by_expert_sha256": "7" * 64,
+        "rank_source_bytes_per_expert_summary": {
+            "min": 100,
+            "mean": 640 / 6,
+            "max": 120,
+        },
+        "rank_source_bytes_total": [640, 640, 640, 640],
+        "equal_rank_source_bytes": True,
+    }
+    config = json.loads((artifact / "config.json").read_text(encoding="utf-8"))
+
+    validate_gptqmodel_retained_native_report(report, config, artifact)
+
+
 def rebind_gptqmodel_publication(root: Path, plan: dict) -> None:
     write_json(root / "ds4rt-gptqmodel-plan.json", plan)
     excluded = {"ds4rt-gptqmodel-artifact.json", "ds4rt-gptqmodel-run.json"}
@@ -1127,7 +1513,7 @@ def test_hardlink_stage_is_resolver_compatible_and_content_addressed(
 
     model_root = model_cache_dir(hf_home.resolve(), "tpurtell/flash-exl3")
     revision = result["revision"]
-    assert (model_root / "refs/main").read_text(encoding="utf-8") == f"{revision}\n"
+    assert (model_root / "refs/main").read_text(encoding="utf-8") == revision
     staged = model_root / "snapshots" / revision
     shard_link = staged / "model-00001-of-00001.safetensors"
     assert shard_link.is_symlink()
@@ -1138,6 +1524,19 @@ def test_hardlink_stage_is_resolver_compatible_and_content_addressed(
     assert shard_blob.stat().st_ino == (artifact / shard_link.name).stat().st_ino
     assert not (staged / ".ds4rt-exl3-debug").exists()
     assert (model_root / "ds4rt-manifests" / f"{revision}.json").is_file()
+
+
+def test_existing_legacy_newline_ref_is_canonicalized(tmp_path: Path) -> None:
+    artifact = make_artifact(tmp_path / "artifact")
+    hf_home = tmp_path / "hf"
+    result = stage_snapshot(artifact, "tpurtell/flash-exl3", hf_home)
+    ref = model_cache_dir(hf_home.resolve(), "tpurtell/flash-exl3") / "refs/main"
+    ref.write_text(f"{result['revision']}\n", encoding="utf-8")
+
+    repeated = stage_snapshot(artifact, "tpurtell/flash-exl3", hf_home)
+
+    assert repeated["revision"] == result["revision"]
+    assert ref.read_bytes() == str(result["revision"]).encode()
 
 
 def test_gptqmodel_route_recovery_source_requires_its_recovery_contract(
@@ -1217,6 +1616,61 @@ def test_gptqmodel_serialized_trellis_accepts_bound_two_rtx_topology(
         validate_gptqmodel_native_exl3(quant)
 
 
+@pytest.mark.parametrize(
+    "gptqmodel_source",
+    (
+        GPTQMODEL_SOURCE_INLINE_MIXED,
+        GPTQMODEL_SOURCE_UPSTREAM_REFRESH,
+        GPTQMODEL_SOURCE_TERMINAL_FINALIZE,
+    ),
+    ids=("initial-inline-mixed", "upstream-refresh", "terminal-finalize"),
+)
+def test_gptqmodel_inline_mixed_source_accepts_integrated_two_rtx_topology(
+    tmp_path: Path,
+    gptqmodel_source: dict[str, object],
+) -> None:
+    artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
+    config = json.loads((artifact / "config.json").read_text())
+    quant = config["quantization_config"]
+    provenance = quant["meta"]["ds4rt_error_ledger"]
+    family = provenance["family_join"]
+    policy = inline_mixed_policy("base", 1, 10)
+    family["gptqmodel"] = gptqmodel_source
+    family["zero_route_recovery_contract"] = "ds4rt.exl3-zero-route-recovery"
+    family["inline_mixed"] = {"base": policy}
+    family.pop("execution_topology")
+    family["image_digest"] = "sha256:" + "2" * 64
+    family["preflight_sha256"] = "1" * 64
+    quant["bits"] = 2
+    quant["meta"]["ds4rt_inline_mixed"] = policy
+    provenance["run"] = {
+        "mtp_execution_mode": "integrated",
+        "coordinator": {
+            "image_digest": family["image_digest"],
+            "sha256": family["preflight_sha256"],
+            "gptqmodel": {
+                "revision": gptqmodel_source["revision"],
+                "source_tree_sha256": gptqmodel_source["source_tree_sha256"],
+            },
+            "gpus": [
+                {
+                    "index": index,
+                    "uuid": f"GPU-{index}",
+                    "compute_capability": [12, 0],
+                    "total_memory_bytes": 96 * 1024**3,
+                }
+                for index in (0, 1)
+            ],
+        },
+    }
+
+    assert validate_gptqmodel_native_exl3(quant) == family
+
+    quant["bits"] = 2.0
+    with pytest.raises(ValueError, match="public bits at integer K2"):
+        validate_gptqmodel_native_exl3(quant)
+
+
 def test_v6_publication_geometry_includes_pro_router_and_mtp_fields() -> None:
     config = {
         "num_hidden_layers": 61,
@@ -1258,9 +1712,12 @@ def test_gptqmodel_native_publication_stages_without_rewriting_metadata(
     )
     snapshot = Path(result["snapshot"])
     assert (snapshot / "config.json").read_bytes() == original_config
-    assert json.loads((snapshot / "config.json").read_text())["quantization_config"][
-        "method"
-    ] == "exl3"
+    assert (
+        json.loads((snapshot / "config.json").read_text())["quantization_config"][
+            "method"
+        ]
+        == "exl3"
+    )
     runtime = read_exl3_expert_config(snapshot)
     assert runtime.hidden_size == 4096
     assert runtime.intermediate_size == 2048
@@ -1273,8 +1730,12 @@ def test_gptqmodel_native_publication_stages_without_rewriting_metadata(
         / "ds4rt-qualifications"
         / result["revision"]
     )
-    assert (staged_qualification / "retained-native.json").read_bytes() == retained.read_bytes()
-    assert (staged_qualification / "expert-quality.json").read_bytes() == quality.read_bytes()
+    assert (
+        staged_qualification / "retained-native.json"
+    ).read_bytes() == retained.read_bytes()
+    assert (
+        staged_qualification / "expert-quality.json"
+    ).read_bytes() == quality.read_bytes()
     assert len(result["qualification"]) == 2
     sync_contract = load_staged_cache(
         tmp_path / "hf-gptqmodel",
@@ -1406,9 +1867,7 @@ def test_runtime_rejects_rebound_incomplete_block_audit_set(tmp_path: Path) -> N
     assembly = json.loads(assembly_path.read_text())
     block_audits = assembly["block_audit_set"]
     block_audit_body = {
-        key: value
-        for key, value in block_audits.items()
-        if key != "report_sha256"
+        key: value for key, value in block_audits.items() if key != "report_sha256"
     }
     block_audit_body["block_count"] = 2
     assembly_body = {
@@ -1421,12 +1880,8 @@ def test_runtime_rejects_rebound_incomplete_block_audit_set(tmp_path: Path) -> N
     rebound_assembly = bind_record(assembly_body, "report_sha256")
     write_json(assembly_path, rebound_assembly)
 
-    plan = json.loads(
-        (artifact_root / "ds4rt-gptqmodel-plan.json").read_text()
-    )
-    plan["canonical_assembly"]["report_sha256"] = rebound_assembly[
-        "report_sha256"
-    ]
+    plan = json.loads((artifact_root / "ds4rt-gptqmodel-plan.json").read_text())
+    plan["canonical_assembly"]["report_sha256"] = rebound_assembly["report_sha256"]
     config = json.loads((artifact_root / "config.json").read_text())
     publication = json.loads(
         (artifact_root / "ds4rt-gptqmodel-artifact.json").read_text()
@@ -1602,6 +2057,9 @@ def test_gptqmodel_native_ledger_accepts_uniform_k3_records(tmp_path: Path) -> N
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
     config = json.loads((artifact / "config.json").read_text())
     config["quantization_config"]["bits"] = 3.0
+    for module, entry in config["quantization_config"]["tensor_storage"].items():
+        entry["bits_per_weight"] = 3
+        entry["stored_tensors"][f"{module}.trellis"]["shape"][-1] = 48
     family_join = config["quantization_config"]["meta"]["ds4rt_error_ledger"][
         "family_join"
     ]
@@ -1823,7 +2281,7 @@ def test_stage_refuses_ref_movement_without_explicit_update(tmp_path: Path) -> N
     )
     assert second_result["revision"] != first_result["revision"]
     model_root = model_cache_dir(hf_home.resolve(), "tpurtell/flash-exl3")
-    assert (model_root / "refs/main").read_text(encoding="utf-8").strip() == str(
+    assert (model_root / "refs/main").read_text(encoding="utf-8") == str(
         second_result["revision"]
     )
     assert (model_root / "snapshots" / str(first_result["revision"])).is_dir()

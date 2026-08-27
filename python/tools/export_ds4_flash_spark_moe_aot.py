@@ -18,12 +18,26 @@ from pathlib import Path
 
 TP_WORLD_SIZE = 4
 PREFILL_REGIMES = (2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048)
+# Adaptive dSpark can jointly issue up to twelve target rows. Mixed-rate
+# Trellis is sensitive enough to M padding that the ordinary power-of-two
+# prefill ladder leaves useful decode throughput behind, so keep exact AOT
+# specializations for every graph-reachable decode width.
+FLASH_MIXED_EXACT_DECODE_REGIMES = tuple(range(1, 13))
+FLASH_MIXED_REGIMES = (
+    *FLASH_MIXED_EXACT_DECODE_REGIMES,
+    *(rows for rows in PREFILL_REGIMES if rows > 12),
+)
 PREFILL_ROUTE_BLOCK_SIZE = 32
 FLASH_DIRECT_M4_CAPACITY = 4
 FLASH_DIRECT_M4_MIN_ACTIVE = 2
 FLASH_DIRECT_M4_BLOCK_SIZE = 16
 FLASH_DIRECT_M6_CAPACITY = 8
 FLASH_DIRECT_M6_BLOCK_SIZE = 16
+# Mixed K2/K3 has to use an FC1 K128 tile once routes are packed.  That
+# geometry is disproportionately expensive at the graph-reachable dSpark
+# verification widths, while direct route slots remain small (at most 72).
+# Keep those exact M1--M12 shapes on the narrower qualified K64 geometry.
+FLASH_MIXED_DIRECT_CAPACITY = 12
 EXL3_TIERS = (2, 3)
 DEFAULT_EXL3_BITS = 2
 EXL3_CODEBOOK = "mcg"
@@ -263,7 +277,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
         "activation=silu",
         f"swiglu_limit={profile.swiglu_limit}",
         f"native_fp4={int(profile.native_fp4)}",
-        "exl3_weight_layout=trellis3_t256",
+        "exl3_weight_layout=trellis_t256",
         "exl3_trellis_bits=" + ",".join(str(bits) for bits in EXL3_TIERS),
         "exl3_codebook=mcg",
         "exl3_compute=fp16_full_rotation_bf16_input_f32_partial",
@@ -404,9 +418,9 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
             sms=target_sms,
             max_shared_mem=max_shared_mem,
             swiglu_limit=profile.swiglu_limit,
-            weight_layout="trellis3_t256",
+            weight_layout="trellis_t256",
             scale_format="e4m3_k32",
-            w13_layout="trellis3_t256_proj",
+            w13_layout="trellis_t256_proj",
             trellis_bits=bits,
             # Checkpoints are exllamav3_trellis_mcg.  Never inherit the
             # compiler default: b12x 1.1 changed it to SQG-XOR-Cheb T12.
@@ -499,14 +513,17 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
 
     if profile.variant == "flash":
         # Mixed K2/K3 artifacts keep a single cooperative FC1/activation/FC2
-        # grid. Expert counts are runtime scalars, so the same binary covers
-        # the balanced 230/26 and 231/25 layer partitions.
-        for rows in (1, *PREFILL_REGIMES):
-            # Decode widths through the maximum dSpark joint issue (M6 in an
-            # M8 capacity kernel) use direct combined route ids. This preserves
-            # the one-grid tier dispatcher while avoiding generic block-32
-            # route packing and restoring the qualified 128-thread Flash tile.
-            direct_topk = rows <= FLASH_DIRECT_M6_CAPACITY
+        # grid. Compile for the largest projection-slot namespace used by the
+        # integrated dSpark 2.2 policy (228 K2 + 48 K3 slots); runtime scalars
+        # cover the 2.1 base-layer variants as well. Routing remains the real
+        # 256-expert namespace even though padded projection slots can sum to
+        # more than 256.
+        for rows in FLASH_MIXED_REGIMES:
+            # Every adaptive dSpark decode width uses direct combined route
+            # ids.  At M10/M12 this avoids the mixed packed kernel's mandatory
+            # FC1 K128 tile and preserves the K64 decode geometry; wider
+            # prefill shapes retain the ordinary packed representation.
+            direct_topk = rows <= FLASH_MIXED_DIRECT_CAPACITY
             block_size = (
                 select_route_block_size_m(
                     rows, profile.top_k, profile.num_experts
@@ -534,8 +551,8 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
                 size_m=rows,
                 hidden_size=profile.hidden_size,
                 intermediate_size=profile.local_intermediate_size,
-                tier0_num_experts=230,
-                tier1_num_experts=26,
+                tier0_num_experts=228,
+                tier1_num_experts=48,
                 top_k=profile.top_k,
                 max_m_blocks=max_m_blocks,
                 sms=target_sms,
@@ -550,6 +567,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
                 moe_block_size=block_size,
                 rotation_input_dtype="bf16",
                 direct_topk_routes=direct_topk,
+                route_num_experts=profile.num_experts,
             )
             label = f"mixed_k2_k3_m{rows}"
             export_name = f"{prefix}_tp4_exl3_{label}"

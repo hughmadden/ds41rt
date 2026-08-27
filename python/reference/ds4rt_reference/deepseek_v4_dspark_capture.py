@@ -2806,7 +2806,7 @@ def _qualify_target_main_kv_producer(contract: DeepseekV4DsparkContract) -> None
 
 def _qualify_dspark_decode_attention(contract: DeepseekV4DsparkContract) -> None:
     import torch
-    from b12x.attention import compressed_mla
+    from b12x.attention import compressed_sparse_mla as compressed_mla
 
     required_surface = {"Caps", "Plan", "Binding", "plan", "bind", "run"}
     if not required_surface.issubset(compressed_mla.META.entry_points):

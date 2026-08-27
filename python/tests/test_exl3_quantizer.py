@@ -41,6 +41,7 @@ from ds4rt_runtime.exl3_quantizer import (
     plan_summary,
     quantization_progress,
     simulated_hidden_states,
+    strict_tp4_source_layout,
     validate_projection_quantization_diagnostic,
     verify_retained_native_tensors,
 )
@@ -143,11 +144,7 @@ def make_activation_corpus(
             if routed
             else {}
         ),
-        "prompts": [
-            {
-                "capture_files": [capture_record]
-            }
-        ],
+        "prompts": [{"capture_files": [capture_record]}],
     }
     manifest_path = root / "manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -293,7 +290,9 @@ def make_native_snapshot(tmp_path: Path) -> Path:
     shard_name = "model.safetensors"
     save_file(tensors, snapshot / shard_name)
     index = {
-        "metadata": {"total_size": sum(t.numel() * t.element_size() for t in tensors.values())},
+        "metadata": {
+            "total_size": sum(t.numel() * t.element_size() for t in tensors.values())
+        },
         "weight_map": {name: shard_name for name in tensors},
     }
     (snapshot / "model.safetensors.index.json").write_text(
@@ -302,8 +301,12 @@ def make_native_snapshot(tmp_path: Path) -> Path:
     return snapshot
 
 
-def test_flash_plan_replaces_only_routed_experts_with_k2_trellis(tmp_path: Path) -> None:
-    plan = build_artifact_plan(make_native_snapshot(tmp_path), max_shard_bytes=32 * 1024)
+def test_flash_plan_replaces_only_routed_experts_with_k2_trellis(
+    tmp_path: Path,
+) -> None:
+    plan = build_artifact_plan(
+        make_native_snapshot(tmp_path), max_shard_bytes=32 * 1024
+    )
     names = {tensor.name for tensor in plan.tensors}
     assert "norm.weight" in names
     assert "layers.0.ffn.experts.0.w1.weight" not in names
@@ -324,7 +327,9 @@ def test_flash_plan_replaces_only_routed_experts_with_k2_trellis(tmp_path: Path)
     assert summary["routed_expert_exl3_bytes"] == plan.trellis_bytes
 
 
-def test_gptqmodel_hybrid_plan_keeps_native_coordinator_namespace(tmp_path: Path) -> None:
+def test_gptqmodel_hybrid_plan_keeps_native_coordinator_namespace(
+    tmp_path: Path,
+) -> None:
     plan = build_artifact_plan(
         make_native_snapshot(tmp_path),
         max_shard_bytes=32 * 1024,
@@ -359,6 +364,48 @@ def test_gptqmodel_hybrid_plan_supports_k3_geometry(tmp_path: Path) -> None:
     assert plan_summary(plan)["trellis_bits"] == 3
     storage = gptqmodel_tensor_storage_for_plan(plan)
     assert storage["model.layers.0.mlp.experts.0.gate_proj"]["bits_per_weight"] == 3
+
+
+def test_gptqmodel_hybrid_plan_supports_per_projection_k2_k3_geometry(
+    tmp_path: Path,
+) -> None:
+    upgraded = "model.layers.0.mlp.experts.0.gate_proj"
+    plan = build_artifact_plan(
+        make_native_snapshot(tmp_path),
+        max_shard_bytes=32 * 1024,
+        expert_tensor_layout=EXPERT_TENSOR_LAYOUT_GPTQMODEL,
+        exl3_bits=2,
+        exl3_projection_bits={upgraded: 3},
+    )
+
+    storage = gptqmodel_tensor_storage_for_plan(plan)
+    assert storage[upgraded]["bits_per_weight"] == 3
+    assert storage["model.layers.0.mlp.experts.0.up_proj"]["bits_per_weight"] == 2
+    gate = next(
+        tensor
+        for tensor in plan.generated_tensors
+        if tensor.name == f"{upgraded}.trellis"
+    )
+    assert gate.shape == (8, 32, 48)
+    layout = strict_tp4_source_layout(plan)
+    assert layout["mixed_projection_tiers"] is True
+    assert layout["tier_counts"] == {"2": 2, "3": 1}
+    assert len(layout["rank_source_bytes_by_block"]) == 1
+    assert (
+        layout["rank_source_bytes_total"]
+        == [layout["rank_source_bytes_by_block"][0]] * 4
+    )
+
+
+def test_gptqmodel_hybrid_plan_rejects_unknown_projection_tier(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="unexpected modules"):
+        build_artifact_plan(
+            make_native_snapshot(tmp_path),
+            expert_tensor_layout=EXPERT_TENSOR_LAYOUT_GPTQMODEL,
+            exl3_projection_bits={"model.layers.99.mlp.experts.0.gate_proj": 3},
+        )
 
 
 def test_hybrid_plan_rejects_unknown_expert_namespace(tmp_path: Path) -> None:
@@ -442,9 +489,7 @@ def test_streaming_writer_rejects_incomplete_gptqmodel_storage(tmp_path: Path) -
         expert_tensor_layout=EXPERT_TENSOR_LAYOUT_GPTQMODEL,
     )
     qconfig = gptqmodel_quant_config_for_plan(plan)
-    qconfig["tensor_storage"].pop(
-        "model.layers.0.mlp.experts.0.gate_proj"
-    )
+    qconfig["tensor_storage"].pop("model.layers.0.mlp.experts.0.gate_proj")
     with pytest.raises(ValueError, match="differs from the artifact plan"):
         SafetensorsArtifactWriter(
             plan,
@@ -504,7 +549,9 @@ def test_streaming_writer_publishes_standard_hybrid_hf_snapshot(tmp_path: Path) 
     assert "layers.0.ffn.experts.0.w1.trellis" in index
     assert "layers.0.ffn.experts.0.w1.weight" not in index
     with safe_open(output / index["norm.weight"], framework="pt") as shard:
-        assert torch.equal(shard.get_tensor("norm.weight"), torch.ones(128, dtype=torch.float16))
+        assert torch.equal(
+            shard.get_tensor("norm.weight"), torch.ones(128, dtype=torch.float16)
+        )
     trellis_name = "layers.0.ffn.experts.0.w1.trellis"
     with safe_open(output / index[trellis_name], framework="pt") as shard:
         assert tuple(shard.get_tensor(trellis_name).shape) == (8, 32, 32)
@@ -519,9 +566,10 @@ def test_streaming_writer_publishes_standard_hybrid_hf_snapshot(tmp_path: Path) 
     assert integrity["generated_exl3_metadata_verified"] is True
     assert integrity["generated_exl3_mcg_tensor_count"] == 3
     assert integrity["generated_exl3_mcg_markers_verified"] is True
-    assert integrity["strict_tp4_source_layout"]["rank_source_bytes_per_block"] == [
-        13_836
-    ] * 4
+    assert (
+        integrity["strict_tp4_source_layout"]["rank_source_bytes_per_block"]
+        == [13_836] * 4
+    )
     assert integrity["tensors"][0]["name"] == "norm.weight"
 
 
@@ -706,9 +754,12 @@ def test_routed_activation_corpus_loads_joint_router_plane_and_verifies_it(
 ) -> None:
     snapshot = make_native_snapshot(tmp_path)
     plan = build_artifact_plan(snapshot, max_shard_bytes=32 * 1024)
-    expected = torch.arange(
-        MIN_NATURAL_ROUTES_PER_EXPERT * 128, dtype=torch.float32
-    ).reshape(MIN_NATURAL_ROUTES_PER_EXPERT, 128) / 17
+    expected = (
+        torch.arange(MIN_NATURAL_ROUTES_PER_EXPERT * 128, dtype=torch.float32).reshape(
+            MIN_NATURAL_ROUTES_PER_EXPERT, 128
+        )
+        / 17
+    )
     root = make_activation_corpus(
         tmp_path, snapshot=snapshot, samples=expected, routed=True
     )
@@ -768,7 +819,9 @@ def test_routed_activation_corpus_rejects_undercovered_manifest(tmp_path: Path) 
         load_activation_corpus(root, snapshot=snapshot, shape=plan.shape)
 
 
-def test_routed_activation_corpus_accepts_explicit_heldout_floor(tmp_path: Path) -> None:
+def test_routed_activation_corpus_accepts_explicit_heldout_floor(
+    tmp_path: Path,
+) -> None:
     snapshot = make_native_snapshot(tmp_path)
     plan = build_artifact_plan(snapshot, max_shard_bytes=32 * 1024)
     samples = torch.ones((16, 128))

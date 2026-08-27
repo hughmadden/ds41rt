@@ -5,6 +5,7 @@ import importlib.util
 import json
 import math
 from pathlib import Path
+import shutil
 import sys
 from types import SimpleNamespace
 
@@ -43,6 +44,37 @@ from gptqmodel.utils.exl3_projection_checkpoint import (  # noqa: E402
     build_projection_request,
     canonical_json_bytes,
 )
+from gptqmodel.utils.exl3_inline_mixed import (  # noqa: E402
+    INLINE_MIXED_META_KEY,
+    InlineMixedTierPlanStore,
+    build_layer_tier_plan,
+    inline_mixed_policy,
+)
+
+
+def test_canonical_raw_config_completion_preserves_quant_and_source_extensions():
+    raw = {
+        "model_type": "deepseek_v4",
+        "quantization_config": {"bits": 2, "format": "exl3"},
+    }
+    source = {
+        "model_type": "deepseek_v4",
+        "num_hash_layers": 3,
+        "quantization_config": {"quant_method": "fp8"},
+        "attn_implementation": "flash_attention_2",
+    }
+
+    completed = CANONICAL._source_complete_raw_config(raw, source)
+
+    assert completed == {
+        "model_type": "deepseek_v4",
+        "num_hash_layers": 3,
+        "quantization_config": {"bits": 2, "format": "exl3"},
+    }
+    assert raw == {
+        "model_type": "deepseek_v4",
+        "quantization_config": {"bits": 2, "format": "exl3"},
+    }
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -90,9 +122,7 @@ def _metrics(value: float, *, sample_count: int = 4) -> dict[str, object]:
         "hessian_metric_status": "ok",
         "hessian_regularization_sigma": 0.025,
         "hessian_sample_count": sample_count,
-        "hessian_numerical_contract": (
-            "signed-block-hadamard-congruence-fp64-v1"
-        ),
+        "hessian_numerical_contract": ("signed-block-hadamard-congruence-fp64-v1"),
         "hessian_transform_compute_dtype": "torch.float64",
         "hessian_storage_dtype": "torch.float32",
         "hessian_regularization_placement": "before-fp64-congruence",
@@ -122,9 +152,7 @@ def _metrics(value: float, *, sample_count: int = 4) -> dict[str, object]:
     }
 
 
-def _projection_tensors(
-    projection: str, *, bits: int = 2
-) -> dict[str, torch.Tensor]:
+def _projection_tensors(projection: str, *, bits: int = 2) -> dict[str, torch.Tensor]:
     if projection in {"w1", "w3"}:
         trellis_shape = (2, 1, bits * 16)
         suh = torch.ones(32, dtype=torch.float16)
@@ -172,10 +200,20 @@ def _make_run_state(
             "hessian_symmetry": "mean-with-transpose-fp64",
         },
     }
+    mtp_anchor_selection = {
+        "contract": "ds4rt-mtp-anchor-stratified-v1",
+        "count": 8,
+        "seed": 20260809,
+    }
+    mtp_replay_batching = {
+        "contract": "ds4rt-mtp-source-sequence-anchor-batches-v1",
+        "proposal_rows_per_anchor": 5,
+        "source_sequence_anchor_cap": None,
+    }
+    family_join["mtp_anchor_selection"] = mtp_anchor_selection
+    family_join["mtp_replay_batching"] = mtp_replay_batching
     if recover_expert is not None:
-        family_join["zero_route_recovery_contract"] = (
-            "ds4rt.exl3-zero-route-recovery"
-        )
+        family_join["zero_route_recovery_contract"] = "ds4rt.exl3-zero-route-recovery"
     plan = {
         "schema": (
             "ds4rt-deepseek-v4-dspark-overlay-plan-v2"
@@ -200,8 +238,17 @@ def _make_run_state(
             "scheduler": "dynamic-pipelined-slot-projection-v2",
             "assignment_store": str(assignment_root),
         },
+        "mtp_execution_mode": "integrated",
+        "mtp_anchor_selection": mtp_anchor_selection,
+        "mtp_replay_batching": mtp_replay_batching,
         "exl3": {"bits": bits, "codebook": "mcg"},
-        "ledger_provenance": {"family_join": family_join},
+        "ledger_provenance": {
+            "family_join": family_join,
+            "run": {
+                "mtp_anchor_selection": mtp_anchor_selection,
+                "mtp_replay_batching": mtp_replay_batching,
+            },
+        },
     }
     if overlay:
         plan["scope"] = "mtp-routed-experts-only"
@@ -308,9 +355,7 @@ def _make_run_state(
                         else None
                     ),
                     "authorization": {
-                        "schema": (
-                            "ds4rt.exl3-zero-route-recovery-authorization"
-                        ),
+                        "schema": ("ds4rt.exl3-zero-route-recovery-authorization"),
                         "schema_version": 1,
                         "kind": "immutable-family-join",
                         "recovery_contract": MODULE.ZERO_ROUTE_RECOVERY_SCHEMA,
@@ -327,9 +372,7 @@ def _make_run_state(
                     },
                 }
             for projection, projection_name in projection_names.items():
-                module = (
-                    f"{block_prefix}.mlp.experts.{expert}.{projection_name}"
-                )
+                module = f"{block_prefix}.mlp.experts.{expert}.{projection_name}"
                 if module == omit:
                     continue
                 tensors = _projection_tensors(projection, bits=bits)
@@ -429,6 +472,203 @@ def _make_run_state(
     return run_state
 
 
+def _make_inline_mixed_run_state(
+    tmp_path: Path,
+    *,
+    include_mtp: bool = True,
+) -> Path:
+    """Rewrite the small uniform fixture as an authenticated K2/K3 run."""
+
+    run_state = _make_run_state(tmp_path, include_mtp=include_mtp)
+    plan_path = run_state / "ds4rt-gptqmodel-plan.json"
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    checkpoint_root = run_state / "projection-checkpoints"
+    old_store = EXL3ProjectionCheckpointStore(checkpoint_root)
+    old_entries = []
+    for request, _result in old_store.inspect_committed_manifests():
+        loaded = old_store.load(request)
+        assert loaded is not None
+        tensors, result = loaded
+        old_entries.append((request, tensors, result))
+
+    shutil.rmtree(checkpoint_root)
+    (run_state / ".ds4rt-exl3-error-journal.jsonl").unlink()
+    candidate_journal = run_state / ".ds4rt-exl3-error-journal.jsonl.k2-candidates"
+    tier_root = run_state / "inline-mixed-tier-plans"
+    namespaces = ["base", *(["mtp"] if include_mtp else [])]
+    policies = {
+        namespace: {
+            "schema": "gptqmodel.exl3-inline-mixed",
+            "schema_version": 1,
+            "namespace": namespace,
+            "base_bits": 2,
+            "upgrade_bits": 3,
+            "extra_bits": {"numerator": 1, "denominator": 2},
+            "target_bpw": "5/2",
+            "projection_ratio": {"w1": 1, "w3": 1, "w2": 1},
+            "score_kind": (
+                "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1"
+            ),
+            "tier_plan_root": str(tier_root),
+        }
+        for namespace in namespaces
+    }
+    family_join = plan["ledger_provenance"]["family_join"]
+    family_join["inline_mixed"] = {
+        namespace: {
+            key: value for key, value in policy.items() if key != "tier_plan_root"
+        }
+        for namespace, policy in policies.items()
+    }
+    plan["inline_mixed"] = policies
+    body = {key: value for key, value in plan.items() if key != "plan_sha256"}
+    plan = {
+        **body,
+        "plan_sha256": hashlib.sha256(canonical_json_bytes(body)).hexdigest(),
+    }
+    _write_json(plan_path, plan)
+
+    store = EXL3ProjectionCheckpointStore(checkpoint_root)
+    candidates: dict[tuple[str, int], list[dict[str, object]]] = {}
+    candidate_state: dict[str, tuple[dict, dict, dict, dict]] = {}
+    for old_request, tensors, old_result in old_entries:
+        module = old_request["module"]
+        identity = MODULE.routed_expert_identity(module)
+        assert identity is not None
+        namespace = identity["block_namespace"]
+        policy = inline_mixed_policy({INLINE_MIXED_META_KEY: policies[namespace]})
+        assert policy is not None
+        inline = {
+            "base_bits": 2,
+            "upgrade_bits": 3,
+            "policy_sha256": policy.policy_sha256,
+            "role": "candidate_k2",
+        }
+        quantizer_contract = {
+            **old_request["quantizer_contract"],
+            "bits": 2,
+            "inline_mixed": inline,
+        }
+        old_ledger = old_result["ledger_record"]
+        provenance = {
+            "family_join": family_join,
+            "execution": old_ledger["provenance"]["execution"],
+        }
+        ledger = build_projection_record(
+            module_full_name=module,
+            layer_index=identity["logical_layer"],
+            bits=2,
+            codebook="mcg",
+            sample_count=old_ledger["sample_count"],
+            duration_seconds=old_result["duration_seconds"],
+            encoded_bytes=sum(
+                tensor.numel() * tensor.element_size() for tensor in tensors.values()
+            ),
+            device_names=old_result["device_names"],
+            quantizer_metrics=old_result["quantizer_metrics"],
+            provenance=provenance,
+            route_evidence=old_request["route_evidence"],
+            zero_route_recovery=old_request.get("zero_route_recovery"),
+        )
+        request = build_projection_request(
+            module_full_name=module,
+            layer_index=identity["logical_layer"],
+            input_weight=torch.ones(16, 32),
+            hessian=torch.eye(32),
+            sample_count=old_ledger["sample_count"],
+            quantizer_contract=quantizer_contract,
+            family_join=family_join,
+            route_evidence=old_request["route_evidence"],
+            zero_route_recovery=old_request.get("zero_route_recovery"),
+        )
+        result = {
+            **old_result,
+            "ledger_record": ledger,
+            "quantizer_metrics": ledger["quantizer_metrics"],
+            "proxy_error": ledger["quantizer_metrics"]["reported_metric_value"],
+        }
+        store.commit(request, tensors, result)
+        append_exl3_error_journal(candidate_journal, ledger)
+        candidates.setdefault((namespace, identity["logical_layer"]), []).append(ledger)
+        candidate_state[module] = (request, result, identity, quantizer_contract)
+
+    selected_by_module: dict[str, dict[str, object]] = {}
+    for (namespace, logical_layer), records in candidates.items():
+        policy = inline_mixed_policy({INLINE_MIXED_META_KEY: policies[namespace]})
+        assert policy is not None
+        tier_plan = build_layer_tier_plan(
+            policy=policy,
+            layer_index=logical_layer,
+            layer_count=1,
+            candidate_records=records,
+        )
+        InlineMixedTierPlanStore(policy).commit(tier_plan)
+        selected_by_module.update(
+            {entry["module"]: tier_plan for entry in tier_plan["selected"]}
+        )
+
+    journal = run_state / ".ds4rt-exl3-error-journal.jsonl"
+    for module, (
+        candidate_request,
+        candidate_result,
+        identity,
+        candidate_contract,
+    ) in candidate_state.items():
+        tier_plan = selected_by_module.get(module)
+        if tier_plan is None:
+            append_exl3_error_journal(journal, candidate_result["ledger_record"])
+            continue
+        projection = identity["projection"]
+        tensors = _projection_tensors(projection, bits=3)
+        metrics = candidate_result["quantizer_metrics"]
+        provenance = candidate_result["ledger_record"]["provenance"]
+        ledger = build_projection_record(
+            module_full_name=module,
+            layer_index=identity["logical_layer"],
+            bits=3,
+            codebook="mcg",
+            sample_count=candidate_result["ledger_record"]["sample_count"],
+            duration_seconds=1.1,
+            encoded_bytes=sum(
+                tensor.numel() * tensor.element_size() for tensor in tensors.values()
+            ),
+            device_names=candidate_result["device_names"],
+            quantizer_metrics=metrics,
+            provenance=provenance,
+            route_evidence=candidate_request["route_evidence"],
+            zero_route_recovery=candidate_request.get("zero_route_recovery"),
+        )
+        selected_inline = {
+            **candidate_contract["inline_mixed"],
+            "role": "selected_k3",
+            "candidate_request_sha256": candidate_request["request_sha256"],
+            "tier_plan_sha256": tier_plan["tier_plan_sha256"],
+        }
+        request = build_projection_request(
+            module_full_name=module,
+            layer_index=identity["logical_layer"],
+            input_weight=torch.ones(16, 32),
+            hessian=torch.eye(32),
+            sample_count=ledger["sample_count"],
+            quantizer_contract={
+                **candidate_contract,
+                "bits": 3,
+                "inline_mixed": selected_inline,
+            },
+            family_join=family_join,
+            route_evidence=candidate_request["route_evidence"],
+            zero_route_recovery=candidate_request.get("zero_route_recovery"),
+        )
+        result = {
+            **candidate_result,
+            "duration_seconds": 1.1,
+            "ledger_record": ledger,
+        }
+        store.commit(request, tensors, result)
+        append_exl3_error_journal(journal, ledger)
+    return run_state
+
+
 def test_audit_complete_projection_block(tmp_path: Path) -> None:
     run_state = _make_run_state(tmp_path)
 
@@ -467,6 +707,39 @@ def test_audit_complete_k3_dspark_overlay_block(tmp_path: Path) -> None:
     assert report["projection_count"] == 6
     assert report["encoded_bytes"] == 6 * 292
     with pytest.raises(MODULE.AuditError, match="contain only MTP"):
+        MODULE.audit_block(
+            run_state,
+            block_namespace="base",
+            logical_layer=0,
+        )
+
+
+def test_audit_selects_authenticated_inline_mixed_k2_k3_tiers(
+    tmp_path: Path,
+) -> None:
+    run_state = _make_inline_mixed_run_state(tmp_path)
+
+    report = MODULE.audit_block(
+        run_state,
+        block_namespace="base",
+        logical_layer=0,
+    )
+
+    mixed = report["geometry"]["inline_mixed"]
+    assert mixed["tier_counts"] == {"2": 3, "3": 3}
+    assert mixed["quotas"] == {"w1": 1, "w3": 1, "w2": 1}
+    assert report["projection_count"] == 6
+    assert report["encoded_bytes"] == 3 * 228 + 3 * 292
+
+
+def test_audit_rejects_drifted_inline_mixed_tier_plan(tmp_path: Path) -> None:
+    run_state = _make_inline_mixed_run_state(tmp_path)
+    tier_path = run_state / "inline-mixed-tier-plans/base/layer-000000.json"
+    tier = json.loads(tier_path.read_text(encoding="utf-8"))
+    tier["selected"][0]["score"] += 1.0
+    _write_json(tier_path, tier)
+
+    with pytest.raises(MODULE.AuditError, match="immutable contract"):
         MODULE.audit_block(
             run_state,
             block_namespace="base",
@@ -581,19 +854,15 @@ def test_tp4_residency_matches_runtime_plane_and_rotation_order() -> None:
     assert {rank["resident_metadata_bytes"] for rank in report["ranks"]} == {612}
     assert {rank["resident_bytes"] for rank in report["ranks"]} == {1_380}
     for component in ("w13_trellis", "w2_trellis", "intermediate_rotations"):
-        assert len(
-            {
-                rank["components"][component]["sha256"]
-                for rank in report["ranks"]
-            }
-        ) == 4
+        assert (
+            len({rank["components"][component]["sha256"] for rank in report["ranks"]})
+            == 4
+        )
     for component in ("gate_suh", "up_suh", "down_svh"):
-        assert len(
-            {
-                rank["components"][component]["sha256"]
-                for rank in report["ranks"]
-            }
-        ) == 1
+        assert (
+            len({rank["components"][component]["sha256"] for rank in report["ranks"]})
+            == 1
+        )
     assert report["runtime_generated"]["bytes"] == 36
     assert len(report["report_sha256"]) == 64
 
@@ -638,9 +907,15 @@ def _canonical_generated_tensors(run_state: Path) -> tuple[OutputTensor, ...]:
         torch.float16: "F16",
         torch.int32: "I32",
     }
+    projection_bits, _tiers = CANONICAL._projection_bits_from_tier_plans(
+        plan,
+        run_state,
+    )
     generated = []
     for module, identity in CANONICAL._expected_modules(plan).items():
-        for suffix, tensor in _projection_tensors(identity["projection"]).items():
+        for suffix, tensor in _projection_tensors(
+            identity["projection"], bits=projection_bits[module]
+        ).items():
             generated.append(
                 OutputTensor(
                     name=f"{module}.{suffix}",
@@ -669,8 +944,7 @@ def _write_complete_block_audits(run_state: Path, report_dir: Path) -> Path:
                 logical_layer=logical_layer,
             )
             _write_json(
-                report_dir
-                / f"{namespace}-layer-{logical_layer}-projection-audit.json",
+                report_dir / f"{namespace}-layer-{logical_layer}-projection-audit.json",
                 report,
             )
     return report_dir
@@ -699,10 +973,30 @@ def test_canonical_block_audit_set_binds_complete_base_and_mtp_reports(
         "base-layer-0-projection-audit.json",
         "mtp-layer-0-projection-audit.json",
     ]
-    assert report["reports_sha256"] == hashlib.sha256(
-        canonical_json_bytes(report["reports"])
-    ).hexdigest()
+    assert (
+        report["reports_sha256"]
+        == hashlib.sha256(canonical_json_bytes(report["reports"])).hexdigest()
+    )
     assert len(report["report_sha256"]) == 64
+
+
+def test_canonical_block_audit_set_binds_inline_mixed_tier_plans(
+    tmp_path: Path,
+) -> None:
+    run_state = _make_inline_mixed_run_state(tmp_path)
+    report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
+    plan = json.loads(
+        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+    )
+
+    report = CANONICAL.validate_block_audit_set(
+        report_dir,
+        plan,
+        run_state=run_state,
+    )
+
+    assert report["block_count"] == 2
+    assert report["projection_count"] == 12
 
 
 def test_canonical_block_audit_set_accepts_mtp_identity_recovery(
@@ -801,9 +1095,7 @@ def test_composite_block_audits_join_base_and_replacement_mtp_plans(
     mtp_run = _make_run_state(tmp_path / "mtp", overlay=True)
     mtp_plan_path = mtp_run / "ds4rt-gptqmodel-plan.json"
     mtp_plan = json.loads(mtp_plan_path.read_text(encoding="utf-8"))
-    mtp_body = {
-        key: value for key, value in mtp_plan.items() if key != "plan_sha256"
-    }
+    mtp_body = {key: value for key, value in mtp_plan.items() if key != "plan_sha256"}
     mtp_body["target_parent"] = {"plan_sha256": base_plan["plan_sha256"]}
     mtp_plan = {
         **mtp_body,
@@ -929,6 +1221,44 @@ def test_canonical_assembly_streams_complete_base_and_mtp_run(
     assert len(report["report_sha256"]) == 64
 
 
+def test_canonical_assembly_streams_authoritative_inline_mixed_tiers(
+    tmp_path: Path,
+) -> None:
+    run_state = _make_inline_mixed_run_state(tmp_path)
+    plan = json.loads(
+        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+    )
+    generated = _canonical_generated_tensors(run_state)
+    written: dict[str, torch.Tensor] = {}
+
+    report = CANONICAL.assemble_projection_checkpoints(
+        run_state,
+        generated_tensors=generated,
+        write_generated_tensor=lambda name, value: written.setdefault(
+            name, value.clone()
+        ),
+        expected_plan_sha256=plan["plan_sha256"],
+    )
+
+    assert report["projection_count"] == 12
+    assert report["encoded_bytes"] == 2 * (3 * 228 + 3 * 292)
+    base_report = MODULE.audit_block(
+        run_state,
+        block_namespace="base",
+        logical_layer=0,
+    )
+    selected_count = base_report["geometry"]["inline_mixed"]["tier_counts"]["3"]
+    assert selected_count == 3
+    assert (
+        sum(
+            tensor.shape[-1] == 48
+            for name, tensor in written.items()
+            if name.startswith("model.layers.0") and name.endswith(".trellis")
+        )
+        == selected_count
+    )
+
+
 def test_composite_projection_assembly_ignores_parent_mtp_and_uses_overlay(
     tmp_path: Path,
 ) -> None:
@@ -941,9 +1271,7 @@ def test_composite_projection_assembly_ignores_parent_mtp_and_uses_overlay(
     mtp_run = _make_run_state(tmp_path / "mtp", overlay=True)
     mtp_plan_path = mtp_run / "ds4rt-gptqmodel-plan.json"
     mtp_plan = json.loads(mtp_plan_path.read_text(encoding="utf-8"))
-    mtp_body = {
-        key: value for key, value in mtp_plan.items() if key != "plan_sha256"
-    }
+    mtp_body = {key: value for key, value in mtp_plan.items() if key != "plan_sha256"}
     mtp_body["target_parent"] = {"plan_sha256": base_plan["plan_sha256"]}
     mtp_plan = {
         **mtp_body,
@@ -1012,12 +1340,14 @@ def test_canonical_quant_config_closes_exact_base_only_mtp_overlay(
     assert report["raw_module_count"] == len(base_storage)
     assert report["canonical_module_count"] == len(storage)
     assert report["added_mtp_module_count"] == len(added)
-    assert report["added_mtp_modules_sha256"] == hashlib.sha256(
-        canonical_json_bytes(added)
-    ).hexdigest()
-    assert report["raw_quant_config_sha256"] == hashlib.sha256(
-        canonical_json_bytes(raw)
-    ).hexdigest()
+    assert (
+        report["added_mtp_modules_sha256"]
+        == hashlib.sha256(canonical_json_bytes(added)).hexdigest()
+    )
+    assert (
+        report["raw_quant_config_sha256"]
+        == hashlib.sha256(canonical_json_bytes(raw)).hexdigest()
+    )
     assert len(report["report_sha256"]) == 64
 
 
@@ -1033,9 +1363,10 @@ def test_canonical_quant_config_accepts_already_complete_storage(
     assert report["raw_module_count"] == len(storage)
     assert report["canonical_module_count"] == len(storage)
     assert report["added_mtp_module_count"] == 0
-    assert report["added_mtp_modules_sha256"] == hashlib.sha256(
-        canonical_json_bytes([])
-    ).hexdigest()
+    assert (
+        report["added_mtp_modules_sha256"]
+        == hashlib.sha256(canonical_json_bytes([])).hexdigest()
+    )
 
 
 def test_composite_quant_config_binds_distinct_base_and_mtp_provenance(
@@ -1047,9 +1378,7 @@ def test_composite_quant_config_binds_distinct_base_and_mtp_provenance(
     mtp_run = _make_run_state(tmp_path / "mtp", overlay=True)
     base_plan_path = base_run / "ds4rt-gptqmodel-plan.json"
     base_plan = json.loads(base_plan_path.read_text(encoding="utf-8"))
-    base_body = {
-        key: value for key, value in base_plan.items() if key != "plan_sha256"
-    }
+    base_body = {key: value for key, value in base_plan.items() if key != "plan_sha256"}
     base_body["ledger_provenance"]["run"] = {"source": "base"}
     base_plan = {
         **base_body,
@@ -1058,9 +1387,7 @@ def test_composite_quant_config_binds_distinct_base_and_mtp_provenance(
     _write_json(base_plan_path, base_plan)
     mtp_plan_path = mtp_run / "ds4rt-gptqmodel-plan.json"
     mtp_plan = json.loads(mtp_plan_path.read_text(encoding="utf-8"))
-    mtp_body = {
-        key: value for key, value in mtp_plan.items() if key != "plan_sha256"
-    }
+    mtp_body = {key: value for key, value in mtp_plan.items() if key != "plan_sha256"}
     mtp_body["ledger_provenance"]["run"] = {"source": "mtp"}
     mtp_body["target_parent"] = {"plan_sha256": base_plan["plan_sha256"]}
     mtp_plan = {
@@ -1080,15 +1407,15 @@ def test_composite_quant_config_binds_distinct_base_and_mtp_provenance(
     provenance = quant["meta"]["ds4rt_error_ledger"]
     assert quant["tensor_storage"] == storage
     assert quant["module_include"] == [CANONICAL.launcher.BASE_EXPERT_PATTERN]
-    assert provenance["family_join"] == base_plan["ledger_provenance"][
-        "family_join"
-    ]
-    assert provenance["projection_sources"]["base"]["plan_sha256"] == base_plan[
-        "plan_sha256"
-    ]
-    assert provenance["projection_sources"]["mtp"]["plan_sha256"] == mtp_plan[
-        "plan_sha256"
-    ]
+    assert provenance["family_join"] == base_plan["ledger_provenance"]["family_join"]
+    assert (
+        provenance["projection_sources"]["base"]["plan_sha256"]
+        == base_plan["plan_sha256"]
+    )
+    assert (
+        provenance["projection_sources"]["mtp"]["plan_sha256"]
+        == mtp_plan["plan_sha256"]
+    )
     assert report["schema"] == CANONICAL.COMPOSITE_QUANT_CONFIG_ASSEMBLY_SCHEMA
     assert report["canonical_module_count"] == len(storage)
 

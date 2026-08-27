@@ -15,9 +15,17 @@ and four NVIDIA DGX Spark expert workers. The coordinator owns attention,
 cache, scheduling, sampling, and the OpenAI-compatible API. The Sparks hold
 and execute tensor-parallel slices of every routed MoE expert.
 
-The release serves the calibrated 2-bpw EXL3 checkpoint
+The v2 runtime serves the calibrated 2-bpw EXL3 checkpoint
 [`wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1`](https://huggingface.co/wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1).
 Model weights are not included in the repository or containers.
+
+## What's new in v2
+
+This minor engine release adds direct serving support for qualified
+projection-mixed K2/K3 EXL3 artifacts, makes inline mixed quantization and its
+resumable source-native publication flow portable, and refreshes the pinned
+GPTQModel and SparkInfer/B12x implementations. The default Pro checkpoint above
+is unchanged.
 
 ## Why
 
@@ -43,12 +51,12 @@ drafter uses the same expert path.
 The stable ownership, transport, cache, and profile contracts are described in
 [`architecture.md`](architecture.md).
 
-## Quick deploy with the v1 images
+## Quick deploy with the v2 images
 
-The checked-in configuration points at immutable `v1` images:
+The checked-in configuration points at immutable `v2` images:
 
-- `ghcr.io/tpurtell/ds4rt-coordinator:v1` (`linux/amd64`, CUDA `sm_120`)
-- `ghcr.io/tpurtell/ds4rt-spark-expert:v1` (`linux/arm64`, CUDA `sm_121`)
+- `ghcr.io/tpurtell/ds4rt-coordinator:v2` (`linux/amd64`, CUDA `sm_120`)
+- `ghcr.io/tpurtell/ds4rt-spark-expert:v2` (`linux/arm64`, CUDA `sm_121`)
 
 Clone the complete source graph:
 
@@ -80,9 +88,9 @@ done
 Pull the role-specific images on their native hosts:
 
 ```bash
-docker pull ghcr.io/tpurtell/ds4rt-coordinator:v1
+docker pull ghcr.io/tpurtell/ds4rt-coordinator:v2
 for host in ostrich dodo emu kiwi; do
-  ssh "$host" docker pull ghcr.io/tpurtell/ds4rt-spark-expert:v1
+  ssh "$host" docker pull ghcr.io/tpurtell/ds4rt-spark-expert:v2
 done
 ```
 
@@ -145,9 +153,10 @@ and at least 60 GiB of free build space are required. See
 
 ## Performance
 
-These measurements use the public Pro K2 artifact, the `balanced` FP8-KV
-profile, adaptive dSpark, temperature zero, thinking disabled, one RTX PRO
-6000 Blackwell coordinator, and four DGX Spark TP4 workers on the dedicated
+This is the unchanged v1 measurement record; v2 does not republish benchmark
+claims. These measurements use the public Pro K2 artifact, the `balanced`
+FP8-KV profile, adaptive dSpark, temperature zero, thinking disabled, one RTX
+PRO 6000 Blackwell coordinator, and four DGX Spark TP4 workers on the dedicated
 400-Gb/s fabric. Rates are end-to-end unless stated otherwise.
 
 | Release gate | Result |
@@ -211,7 +220,7 @@ The full measurement contract and machine-readable summary are in
 
 ## Scope
 
-DS4RT v1 is a hardware-specific engine, not a general-purpose serving
+DS4RT v2 is a hardware-specific engine, not a general-purpose serving
 framework. Its release topology is exactly one x86_64 `sm_120` coordinator and
 four ARM64 `sm_121` expert workers. Adapting GPU generations, worker count,
 transport, or model family is engineering work, not a configuration switch.

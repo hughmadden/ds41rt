@@ -16,7 +16,7 @@
 - Every Spark owns one quarter of every routed expert's intermediate
   dimension. All ranks receive the same top-6 routes; DS4RT is not expert
   parallel.
-- The v1 model is the pinned public Pro EXL3 K2 artifact in `ds4rt.config`.
+- The release model is the pinned public Pro EXL3 K2 artifact in `ds4rt.config`.
   Pro never falls back to native experts or an unqualified quantization recipe.
 - Release serving uses host networking, Protocol V2, native verbs transport,
   GPU-resident experts, and startup-captured graph shapes.
@@ -223,10 +223,10 @@ an actual five-host run before publication:
 scripts/api-smoke.sh \
   "http://127.0.0.1:8000" \
   "wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1"
-./push-containers.sh v1
+./push-containers.sh v2
 ```
 
-`push-containers.sh` publishes both `v1` and `latest`. The OCI source label in
+`push-containers.sh` publishes both `v2` and `latest`. The OCI source label in
 `docker/Dockerfile.release` records this repository on both GHCR packages.
 After a package's first publication, connect it to this repository and set its
 visibility to public in GitHub's package settings. Do not retag mismatched

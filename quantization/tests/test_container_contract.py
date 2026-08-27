@@ -62,10 +62,10 @@ def test_entrypoint_always_runs_preflight_before_command() -> None:
 def test_bake_targets_pin_identical_source_and_dependency_locks() -> None:
     revision = GPTQMODEL_LOCK["revision"]
     amd64_requirements = (
-        "eccdca51d6c821202e0a1cc4c966129c2daf1959e501616758aaf716f6db6777"
+        "0dd72f6171711269548da684cd1f4fda37d0da2948f371129f52fcae0bdac140"
     )
     arm64_requirements = (
-        "312f140ef27d7d2444bec82bdeaeb5e8e8d2b5410bb3f69d101277ce6bbcacf9"
+        "196cfaf026ef3f7d9b81d65aaeb00a871ad69793381a40ce0d1b3decbcc31d7b"
     )
     build_requirements = (
         "9f21166fd088fd5eee2e9560c5d97b14201e0fde30d7ee27a43a56c24e104fd1"

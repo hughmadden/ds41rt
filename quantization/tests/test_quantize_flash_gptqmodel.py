@@ -93,6 +93,23 @@ def test_capture_frontier_scope_spans_work_and_restores_environment(
     assert MODULE.os.environ[variable] == "conflicting-frontier"
 
 
+def test_capture_batch_scope_binds_checkpoint_cadence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_variable = "GPTQMODEL_EXL3_CAPTURE_BATCH_SPOOL"
+    interval_variable = "GPTQMODEL_EXL3_CAPTURE_BATCH_CHECKPOINT_INTERVAL"
+    root = tmp_path / "capture-batches"
+    monkeypatch.delenv(root_variable, raising=False)
+    monkeypatch.delenv(interval_variable, raising=False)
+
+    with MODULE.capture_batch_spool_scope(root, checkpoint_interval=64):
+        assert MODULE.os.environ[root_variable] == str(root)
+        assert MODULE.os.environ[interval_variable] == "64"
+    assert root_variable not in MODULE.os.environ
+    assert interval_variable not in MODULE.os.environ
+
+
 def test_lazy_direct_state_preflight_restores_constructor_buffers() -> None:
     report = MODULE.preflight_lazy_nonpersistent_buffers(
         _FakeLazyDeepSeekModel(),
@@ -225,6 +242,13 @@ def test_plan_binds_source_corpus_environment_and_joint_mtp(tmp_path: Path) -> N
 
     assert first == second
     assert first["schema"] == MODULE.PLAN_SCHEMA
+    assert (
+        first["capture_batch_checkpoint_interval"]
+        == MODULE.DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL
+    )
+    assert first["ledger_provenance"]["run"][
+        "capture_batch_checkpoint_interval"
+    ] == MODULE.DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL
     assert first["mtp_execution_mode"] == MODULE.MTP_EXECUTION_INTEGRATED
     assert first["source"]["revision"] == "a" * 40
     assert first["source"]["total_shard_bytes"] == 6
@@ -296,6 +320,46 @@ def test_plan_binds_source_corpus_environment_and_joint_mtp(tmp_path: Path) -> N
     assert not args.output.exists()
 
 
+def test_plan_binds_exact_inline_base_and_mtp_targets(tmp_path: Path) -> None:
+    args = fixture(tmp_path)
+    args.base_target_bpw = "2.1"
+    args.mtp_target_bpw = "11/5"
+    args.mixed_projection_ratio = (3, 5, 8)
+
+    plan, _texts = MODULE.build_plan(args)
+
+    assert plan["exl3"]["bits"] == 2
+    assert plan["inline_mixed"]["base"]["extra_bits"] == {
+        "numerator": 1,
+        "denominator": 10,
+    }
+    assert plan["inline_mixed"]["base"]["target_bpw"] == "21/10"
+    assert plan["inline_mixed"]["mtp"]["extra_bits"] == {
+        "numerator": 1,
+        "denominator": 5,
+    }
+    assert plan["inline_mixed"]["mtp"]["target_bpw"] == "11/5"
+    assert plan["inline_mixed"]["mtp"]["projection_ratio"] == {
+        "w1": 3,
+        "w3": 5,
+        "w2": 8,
+    }
+    assert plan["mtp_anchor_selection"] == {
+        "contract": "ds4rt-mtp-anchor-stratified-v1",
+        "count": 327_680,
+        "seed": 20_260_809,
+    }
+    assert plan["mtp_replay_batching"] == {
+        "contract": "ds4rt-mtp-source-sequence-anchor-batches-v1",
+        "source_sequence_anchor_cap": None,
+        "proposal_rows_per_anchor": 5,
+    }
+    assert plan["ledger_provenance"]["family_join"]["inline_mixed"][
+        "base"
+    ].get("tier_plan_root") is None
+    MODULE._validate_plan(plan)
+
+
 def test_plan_supports_local_k3_on_one_visible_coordinator_gpu(
     tmp_path: Path,
 ) -> None:
@@ -315,6 +379,26 @@ def test_plan_supports_local_k3_on_one_visible_coordinator_gpu(
         {"index": 0, "uuid": "GPU-physical-one"}
     ]
     assert plan["remote_workers"] is None
+
+
+def test_quantize_config_metadata_drops_local_tier_plan_root() -> None:
+    class Config:
+        meta = {
+            "ds4rt_inline_mixed": {
+                "target_bpw": "21/10",
+                "tier_plan_root": "/private/coordinator/frontier",
+            },
+            "provenance": {"corpus": "next-v1"},
+        }
+
+    config = Config()
+    MODULE._make_quantize_config_metadata_portable(config)
+
+    assert config.meta == {
+        "ds4rt_inline_mixed": {"target_bpw": "21/10"},
+        "provenance": {"corpus": "next-v1"},
+    }
+    assert Config.meta["ds4rt_inline_mixed"]["tier_plan_root"].startswith("/")
 
 
 def test_external_overlay_mode_is_bound_and_has_a_durable_handoff(
@@ -361,15 +445,15 @@ def test_external_overlay_mode_is_bound_and_has_a_durable_handoff(
         MODULE.validate_base_prefix_completion(plan)
 
 
-def test_new_plans_default_to_sampled_overlay_handoff(tmp_path: Path) -> None:
+def test_new_plans_default_to_integrated_mtp(tmp_path: Path) -> None:
     args = fixture(tmp_path)
     del args.mtp_execution_mode
 
     plan, _ = MODULE.build_plan(args)
 
-    assert plan["mtp_execution_mode"] == MODULE.MTP_EXECUTION_EXTERNAL_OVERLAY
+    assert plan["mtp_execution_mode"] == MODULE.MTP_EXECUTION_INTEGRATED
     assert plan["ledger_provenance"]["run"]["mtp_execution_mode"] == (
-        MODULE.MTP_EXECUTION_EXTERNAL_OVERLAY
+        MODULE.MTP_EXECUTION_INTEGRATED
     )
 
 
@@ -647,6 +731,9 @@ def test_execution_upgrade_preserves_parent_plan_and_is_stable(
     assert first["change_contract"]["concurrent_rng"] == (
         "projection-local-generator-v1"
     )
+    assert first["change_contract"][
+        "capture_batch_checkpoint_interval"
+    ] == MODULE.DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL
     run_state = Path(parent["run_state_dir"])
     assert json.loads(
         (run_state / MODULE.EXECUTION_UPGRADE_FILENAME).read_text()
@@ -923,13 +1010,13 @@ def test_plan_rejects_nested_work_paths(tmp_path: Path) -> None:
         MODULE.build_plan(args)
 
 
-def test_run_resume_requires_exact_plan_and_discards_only_partial_export(
+def test_run_resume_requires_exact_plan_and_preserves_partial_export(
     tmp_path: Path,
 ) -> None:
     args = fixture(tmp_path)
     plan, _ = MODULE.build_plan(args)
     run_state = Path(plan["run_state_dir"])
-    stage = run_state / MODULE.EXPORT_STAGE_DIRNAME
+    stage = MODULE._export_stage_path(plan)
 
     assert MODULE.prepare_run(plan, resume=False) is False
     assert not args.output.exists()
@@ -947,7 +1034,7 @@ def test_run_resume_requires_exact_plan_and_discards_only_partial_export(
     (stage / "partial.safetensors").write_bytes(b"partial")
 
     assert MODULE.prepare_run(plan, resume=True) is False
-    assert not stage.exists()
+    assert (stage / "partial.safetensors").read_bytes() == b"partial"
     assert checkpoint.read_bytes() == b"packed"
     assert journal.read_bytes() == b'{"durable":true}\n'
 
@@ -986,6 +1073,31 @@ def test_run_resume_fails_closed_on_unexpected_state(tmp_path: Path) -> None:
     assert (run_state / "unowned.txt").read_text(encoding="utf-8") == "do not delete"
 
 
+def test_run_resume_accepts_owned_inline_mixed_state(tmp_path: Path) -> None:
+    args = fixture(tmp_path)
+    args.base_target_bpw = 2.1
+    args.mtp_target_bpw = 2.2
+    args.mixed_projection_ratio = (3, 5, 8)
+    plan, _ = MODULE.build_plan(args)
+    MODULE.prepare_run(plan, resume=False)
+    run_state = Path(plan["run_state_dir"])
+    (run_state / MODULE.INLINE_MIXED_CANDIDATE_JOURNAL_FILENAME).touch()
+    (run_state / MODULE.INLINE_MIXED_TIER_PLAN_DIRNAME).mkdir()
+
+    assert MODULE.prepare_run(plan, resume=True) is False
+
+
+def test_nonmixed_run_rejects_inline_mixed_state(tmp_path: Path) -> None:
+    args = fixture(tmp_path)
+    plan, _ = MODULE.build_plan(args)
+    MODULE.prepare_run(plan, resume=False)
+    run_state = Path(plan["run_state_dir"])
+    (run_state / MODULE.INLINE_MIXED_CANDIDATE_JOURNAL_FILENAME).touch()
+
+    with pytest.raises(MODULE.LaunchError, match="unexpected entries"):
+        MODULE.prepare_run(plan, resume=True)
+
+
 def test_run_resume_accepts_owned_integrated_mtp_activation_state(
     tmp_path: Path,
 ) -> None:
@@ -1006,7 +1118,7 @@ def test_run_resume_refuses_symlinked_partial_export(tmp_path: Path) -> None:
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "keep").write_bytes(b"user")
-    (run_state / MODULE.EXPORT_STAGE_DIRNAME).symlink_to(outside, target_is_directory=True)
+    MODULE._export_stage_path(plan).symlink_to(outside, target_is_directory=True)
 
     with pytest.raises(MODULE.LaunchError, match="not a regular directory"):
         MODULE.prepare_run(plan, resume=True)
@@ -1018,7 +1130,9 @@ def test_export_is_hashed_and_atomically_published(tmp_path: Path) -> None:
     plan, _ = MODULE.build_plan(args)
     MODULE.prepare_run(plan, resume=False)
     run_state = Path(plan["run_state_dir"])
-    stage = run_state / MODULE.EXPORT_STAGE_DIRNAME
+    stage = MODULE._export_stage_path(plan)
+    assert stage.parent == args.output.parent
+    assert stage.parent != run_state
     stage.mkdir()
     (stage / "model.safetensors").write_bytes(b"quantized")
     nested = stage / "tokenizer"

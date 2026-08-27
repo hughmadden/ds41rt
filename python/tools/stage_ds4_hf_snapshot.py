@@ -44,9 +44,7 @@ EXL3_RECIPES = frozenset(
 DEBUG_DIRECTORY = ".ds4rt-exl3-debug"
 QUALITY_REPORT_SCHEMA = "ds4rt-exl3-checkpoint-quality-v1"
 QUALITY_GPU_SCHEMA = "ds4rt-quality-physical-gpu-v1"
-GPTQMODEL_PRODUCTION_SAMPLING_POLICY = (
-    "natural-target-stratified-mtp-rms-isotropic"
-)
+GPTQMODEL_PRODUCTION_SAMPLING_POLICY = "natural-target-stratified-mtp-rms-isotropic"
 DEVELOPMENT_QUALIFICATION_STATUS = "development-unqualified"
 DEVELOPMENT_BLOCKERS = (
     "complete token-aware all-layer quality evidence is absent",
@@ -86,9 +84,7 @@ GPU_UUID_RE = re.compile(
     r"GPU-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\Z"
 )
-PCI_BUS_ID_RE = re.compile(
-    r"[0-9A-Fa-f]{8}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\.[0-7]\Z"
-)
+PCI_BUS_ID_RE = re.compile(r"[0-9A-Fa-f]{8}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\.[0-7]\Z")
 COMPUTE_CAPABILITY_RE = re.compile(r"[0-9]+\.[0-9]+\Z")
 
 
@@ -489,6 +485,14 @@ def validate_error_ledger(
         for family in expected_families
         for projection in ("w1", "w2", "w3")
     }
+    projection_storage = ledger_projection_storage_contract(
+        quant,
+        expected_projections,
+        default_bits=expected_bits,
+    )
+    mixed_projection_storage = any(
+        bits != expected_bits for _, bits in projection_storage.values()
+    )
 
     actual_projections: set[tuple[Any, ...]] = set()
     projections_by_family: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
@@ -527,8 +531,13 @@ def validate_error_ledger(
             if isinstance(metrics, dict)
             else None
         )
+        expected_module, projection_bits = projection_storage[identity]
         if (
-            record.get("bits") != expected_bits
+            record.get("bits") != projection_bits
+            or (
+                expected_module is not None
+                and record.get("module") != expected_module
+            )
             or record.get("codebook") != "mcg"
             or not isinstance(record.get("sample_count"), int)
             or record["sample_count"] <= 0
@@ -544,16 +553,14 @@ def validate_error_ledger(
             or metrics.get("hessian_sample_count") != record["sample_count"]
             or (
                 record_family_join is not None
-                and record["provenance"].get("family_join")
-                != record_family_join
+                and record["provenance"].get("family_join") != record_family_join
             )
             or (
                 record_family_join is not None
                 and (
                     metrics.get("hessian_numerical_contract")
                     != "signed-block-hadamard-congruence-fp64-v1"
-                    or metrics.get("hessian_transform_compute_dtype")
-                    != "torch.float64"
+                    or metrics.get("hessian_transform_compute_dtype") != "torch.float64"
                     or metrics.get("hessian_storage_dtype") != "torch.float32"
                     or metrics.get("hessian_regularization_placement")
                     != "before-fp64-congruence"
@@ -683,8 +690,7 @@ def validate_error_ledger(
             else expected_family_join
         )
         if (
-            record.get("bits") != expected_bits
-            or record.get("codebook") != "mcg"
+            record.get("codebook") != "mcg"
             or record.get("projections") != ["w1", "w2", "w3"]
             or not isinstance(record.get("aggregate_metrics"), dict)
             or (
@@ -693,8 +699,7 @@ def validate_error_ledger(
             )
             or (
                 record_family_join is not None
-                and record["provenance"].get("family_join")
-                != record_family_join
+                and record["provenance"].get("family_join") != record_family_join
             )
         ):
             raise ValueError(
@@ -704,6 +709,32 @@ def validate_error_ledger(
         if len(components) != 3:
             raise ValueError(
                 f"EXL3 error ledger has an incomplete expert family {identity}"
+            )
+        components_by_projection = {
+            component["projection"]: component for component in components
+        }
+        component_bits = {
+            projection: components_by_projection[projection]["bits"]
+            for projection in ("w1", "w2", "w3")
+        }
+        sample_counts = [
+            components_by_projection[projection]["sample_count"]
+            for projection in ("w1", "w2", "w3")
+        ]
+        if (
+            record.get("bits") != min(component_bits.values())
+            or (
+                mixed_projection_storage
+                and (
+                    record.get("projection_bits") != component_bits
+                    or record.get("mixed_bits")
+                    != (len(set(component_bits.values())) > 1)
+                    or record.get("sample_counts") != sample_counts
+                )
+            )
+        ):
+            raise ValueError(
+                f"EXL3 error ledger has malformed expert family {identity}"
             )
         component_route_evidence = [
             component.get("route_evidence") for component in components
@@ -815,6 +846,41 @@ def validate_error_ledger(
         raise ValueError(
             "EXL3 error ledger does not exactly cover every routed projection and expert family"
         )
+
+
+def ledger_projection_storage_contract(
+    quant: dict[str, Any],
+    expected_projections: set[tuple[Any, ...]],
+    *,
+    default_bits: int,
+) -> dict[tuple[Any, ...], tuple[str | None, int]]:
+    """Resolve each ledger projection to its physical GPTQModel tier."""
+
+    storage = quant.get("tensor_storage")
+    if not isinstance(storage, dict):
+        return {
+            identity: (None, default_bits) for identity in expected_projections
+        }
+    projection_names = {"w1": "gate_proj", "w3": "up_proj", "w2": "down_proj"}
+    contract = {}
+    for identity in expected_projections:
+        namespace, layer, expert, projection = identity
+        block = (
+            f"model.layers.{layer}" if namespace == "base" else f"mtp.{layer}"
+        )
+        module = (
+            f"{block}.mlp.experts.{expert}.{projection_names[str(projection)]}"
+        )
+        entry = storage.get(module)
+        physical_bits = (
+            entry.get("bits_per_weight") if isinstance(entry, dict) else None
+        )
+        if type(physical_bits) is not int or physical_bits not in {2, 3}:
+            raise ValueError(
+                f"EXL3 tensor_storage has no physical tier for ledger module {module}"
+            )
+        contract[identity] = (module, physical_bits)
+    return contract
 
 
 def quality_snapshot_identity(snapshot: Path) -> dict[str, Any]:
@@ -992,8 +1058,7 @@ def validate_quality_report(
         or (
             has_dspark_thresholds
             and (
-                threshold_values["min_dspark_quant_cosine"]
-                < MIN_DSPARK_QUANT_COSINE
+                threshold_values["min_dspark_quant_cosine"] < MIN_DSPARK_QUANT_COSINE
                 or threshold_values["max_dspark_quant_relative_l2"]
                 > MAX_DSPARK_QUANT_RELATIVE_L2
             )
@@ -1076,9 +1141,7 @@ def validate_quality_report(
         expert_ids,
         thresholds,
     )
-    gptqmodel_native = is_gptqmodel_native_exl3(
-        config.get("quantization_config")
-    )
+    gptqmodel_native = is_gptqmodel_native_exl3(config.get("quantization_config"))
     execution_gpu_sha256 = None
     if gptqmodel_native:
         family = validate_gptqmodel_native_exl3(
@@ -1142,8 +1205,7 @@ def validate_quality_report(
             else threshold_values["max_quant_relative_l2"]
         )
         if (
-            finite_number(quant.get("cosine"), "quantized cosine")
-            < quant_cosine_floor
+            finite_number(quant.get("cosine"), "quantized cosine") < quant_cosine_floor
             or finite_number(quant.get("relative_l2"), "quantized relative L2")
             > quant_relative_l2_ceiling
             or finite_number(tp.get("cosine"), "TP4 cosine")
@@ -1189,8 +1251,7 @@ def validate_quality_report(
                 else "uncaptured_mtp_rms_isotropic"
             )
             if (
-                layer.get("sampling_policy")
-                != GPTQMODEL_PRODUCTION_SAMPLING_POLICY
+                layer.get("sampling_policy") != GPTQMODEL_PRODUCTION_SAMPLING_POLICY
                 or layer.get("sampling_mode") != expected_sampling_mode
                 or not isinstance(evidence, dict)
                 or evidence.get("input_mode") != expected_input_mode
@@ -1208,7 +1269,9 @@ def validate_quality_report(
                 if (
                     not isinstance(sampled, list)
                     or [record.get("expert_id") for record in sampled] != expert_ids
-                    or any(record.get("rows") != quality.get("rows") for record in sampled)
+                    or any(
+                        record.get("rows") != quality.get("rows") for record in sampled
+                    )
                 ):
                     raise ValueError(
                         "GPTQModel target quality layer lacks natural per-expert rows"
@@ -1252,7 +1315,10 @@ def validate_development_quality_report(
         or not isinstance(hidden_layers, int)
         or hidden_layers <= 0
         or not isinstance(dspark_targets, list)
-        or any(isinstance(layer_id, bool) or not isinstance(layer_id, int) for layer_id in layer_ids)
+        or any(
+            isinstance(layer_id, bool) or not isinstance(layer_id, int)
+            for layer_id in layer_ids
+        )
         or len(set(layer_ids)) != len(layer_ids)
         or any(
             layer_id < 0 or layer_id >= hidden_layers + len(dspark_targets)
@@ -1285,7 +1351,9 @@ def validate_development_quality_report(
     for layer in layers:
         quant = layer.get("native_to_exl3") if isinstance(layer, dict) else None
         tp = layer.get("exl3_tp4_to_unsharded") if isinstance(layer, dict) else None
-        rank_bytes = layer.get("tp4_rank_source_bytes") if isinstance(layer, dict) else None
+        rank_bytes = (
+            layer.get("tp4_rank_source_bytes") if isinstance(layer, dict) else None
+        )
         if (
             not isinstance(quant, dict)
             or not isinstance(tp, dict)
@@ -1327,10 +1395,7 @@ def gptqmodel_publication_identity(snapshot: Path) -> dict[str, Any]:
     )
     return {
         "path": str(snapshot),
-        "metadata_sha256": {
-            name: hash_file(snapshot / name)
-            for name in names
-        },
+        "metadata_sha256": {name: hash_file(snapshot / name) for name in names},
     }
 
 
@@ -1372,10 +1437,11 @@ def validate_gptqmodel_retained_native_report(
     tensors = report.get("tensors")
     if not isinstance(tensors, list) or not tensors:
         raise ValueError("GPTQModel retained-native report has no tensor records")
-    names = [record.get("name") if isinstance(record, dict) else None for record in tensors]
+    names = [
+        record.get("name") if isinstance(record, dict) else None for record in tensors
+    ]
     bytes_by_tensor = [
-        record.get("bytes") if isinstance(record, dict) else None
-        for record in tensors
+        record.get("bytes") if isinstance(record, dict) else None for record in tensors
     ]
     digest_pattern = re.compile(r"[0-9a-f]{64}\Z")
     if (
@@ -1414,35 +1480,85 @@ def validate_gptqmodel_retained_native_report(
         raise ValueError("GPTQModel retained-native generated tensor proof is invalid")
 
     layout = report.get("strict_tp4_source_layout")
-    per_expert = layout.get("rank_source_bytes_per_expert") if isinstance(layout, dict) else None
-    per_block = layout.get("rank_source_bytes_per_block") if isinstance(layout, dict) else None
+    per_expert = (
+        layout.get("rank_source_bytes_per_expert") if isinstance(layout, dict) else None
+    )
+    per_block = (
+        layout.get("rank_source_bytes_per_block") if isinstance(layout, dict) else None
+    )
     total = layout.get("rank_source_bytes_total") if isinstance(layout, dict) else None
-    if (
+    common_layout_invalid = (
         not isinstance(layout, dict)
         or layout.get("world_size") != 4
         or layout.get("blocks") != blocks
         or layout.get("experts_per_block") != expert_count
         or layout.get("experts_checked") != blocks * expert_count
         or layout.get("equal_rank_source_bytes") is not True
-        or not isinstance(per_expert, list)
-        or len(per_expert) != 4
-        or any(
-            isinstance(size, bool) or not isinstance(size, int) or size <= 0
-            for size in per_expert
+    )
+    if isinstance(layout, dict) and layout.get("mixed_projection_tiers") is True:
+        by_block = layout.get("rank_source_bytes_by_block")
+        tier_counts = layout.get("tier_counts")
+        summary = layout.get("rank_source_bytes_per_expert_summary")
+        mixed_invalid = (
+            not isinstance(by_block, list)
+            or len(by_block) != blocks
+            or any(
+                isinstance(size, bool) or not isinstance(size, int) or size <= 0
+                for size in by_block
+            )
+            or not isinstance(total, list)
+            or len(total) != 4
+            or len(set(total)) != 1
+            or total[0] != sum(by_block)
+            or not isinstance(tier_counts, dict)
+            or set(tier_counts) != {"2", "3"}
+            or any(
+                isinstance(count, bool) or not isinstance(count, int) or count <= 0
+                for count in tier_counts.values()
+            )
+            or sum(tier_counts.values()) != blocks * expert_count * 3
+            or not isinstance(summary, dict)
+            or any(
+                isinstance(summary.get(field), bool)
+                or not isinstance(summary.get(field), (int, float))
+                or not math.isfinite(summary[field])
+                or summary[field] <= 0
+                for field in ("min", "mean", "max")
+            )
+            or not summary["min"] <= summary["mean"] <= summary["max"]
+            or digest_pattern.fullmatch(
+                str(layout.get("rank_source_bytes_by_expert_sha256", ""))
+            )
+            is None
         )
-        or len(set(per_expert)) != 1
-        or per_block != [size * expert_count for size in per_expert]
-        or total != [size * blocks for size in per_block]
-    ):
+        layout_invalid = common_layout_invalid or mixed_invalid
+    else:
+        uniform_invalid = (
+            not isinstance(per_expert, list)
+            or len(per_expert) != 4
+            or any(
+                isinstance(size, bool) or not isinstance(size, int) or size <= 0
+                for size in per_expert
+            )
+            or len(set(per_expert)) != 1
+            or per_block != [size * expert_count for size in per_expert]
+            or total != [size * blocks for size in per_block]
+        )
+        layout_invalid = common_layout_invalid or uniform_invalid
+    if layout_invalid:
         raise ValueError(
             "GPTQModel retained-native report does not prove strict TP4 residency"
         )
 
 
-def read_external_qualification_report(path: Path, snapshot: Path, label: str) -> dict[str, Any]:
+def read_external_qualification_report(
+    path: Path, snapshot: Path, label: str
+) -> dict[str, Any]:
     resolved = path.expanduser().resolve(strict=True)
     if resolved == snapshot or snapshot in resolved.parents:
-        raise ValueError(f"{label} must remain outside the immutable GPTQModel artifact")
+        raise ValueError(
+            f"{label} must remain outside the immutable GPTQModel artifact"
+        )
     if not resolved.is_file() or resolved.is_symlink():
         raise ValueError(f"{label} must be a regular file: {resolved}")
     return read_json_object(resolved)
@@ -1458,7 +1574,9 @@ def qualification_report_record(
     try:
         observed = json.loads(payload)
     except (UnicodeError, json.JSONDecodeError) as error:
-        raise ValueError(f"qualification report changed while reading: {resolved}") from error
+        raise ValueError(
+            f"qualification report changed while reading: {resolved}"
+        ) from error
     if observed != report:
         raise ValueError(f"qualification report changed while reading: {resolved}")
     contract = report.get("validation_contract")
@@ -1469,9 +1587,7 @@ def qualification_report_record(
         size=len(payload),
         sha256=hashlib.sha256(payload).hexdigest(),
         schema=str(report.get("schema", "")),
-        contract_sha256=(
-            str(contract_sha256) if contract_sha256 is not None else None
-        ),
+        contract_sha256=(str(contract_sha256) if contract_sha256 is not None else None),
     )
 
 
@@ -1603,7 +1719,9 @@ def validate_indexed_artifact_files(
 def validate_complete_artifact(snapshot: Path) -> list[tuple[Path, PurePosixPath]]:
     config_path = snapshot / "config.json"
     if not config_path.is_file() or config_path.is_symlink():
-        raise ValueError(f"complete EXL3 artifact is missing regular file {config_path}")
+        raise ValueError(
+            f"complete EXL3 artifact is missing regular file {config_path}"
+        )
     config = read_json_object(config_path)
     quant = config.get("quantization_config")
     if is_gptqmodel_native_exl3(quant):
@@ -1649,8 +1767,7 @@ def validate_complete_artifact(snapshot: Path) -> list[tuple[Path, PurePosixPath
             if isinstance(projection_sources, dict)
             and set(projection_sources) == {"base", "mtp"}
             and all(
-                isinstance(source, dict)
-                and isinstance(source.get("family_join"), dict)
+                isinstance(source, dict) and isinstance(source.get("family_join"), dict)
                 for source in projection_sources.values()
             )
             else None
@@ -1982,15 +2099,15 @@ def write_atomic(path: Path, payload: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def install_qualification_report(report: QualificationReport, destination: Path) -> None:
+def install_qualification_report(
+    report: QualificationReport, destination: Path
+) -> None:
     payload = report.source.read_bytes()
     if (
         len(payload) != report.size
         or hashlib.sha256(payload).hexdigest() != report.sha256
     ):
-        raise ValueError(
-            f"qualification report changed while staging: {report.source}"
-        )
+        raise ValueError(f"qualification report changed while staging: {report.source}")
     if destination.exists():
         if (
             not destination.is_file()
@@ -2047,7 +2164,9 @@ def stage_snapshot(
                 snapshot / "README.md",
             )
         ]
-        files = [hash_artifact_file(source, relative) for source, relative in discovered]
+        files = [
+            hash_artifact_file(source, relative) for source, relative in discovered
+        ]
         qualification_reports: tuple[QualificationReport, ...] = ()
         development_reports: tuple[QualificationReport, ...] = ()
         gptqmodel_native = False
@@ -2116,7 +2235,9 @@ def stage_snapshot(
 
     if not standard_publication:
         discovered = validate_complete_artifact(snapshot)
-        files = [hash_artifact_file(source, relative) for source, relative in discovered]
+        files = [
+            hash_artifact_file(source, relative) for source, relative in discovered
+        ]
     if not standard_publication and gptqmodel_native:
         publication = read_json_object(snapshot / GPTQMODEL_ARTIFACT_FILE)
         published_files = publication.get("files")
@@ -2147,13 +2268,9 @@ def stage_snapshot(
     manifest_bytes, entries = canonical_manifest(files)
     revision = hashlib.sha256(manifest_bytes).hexdigest()
     qualification_entries = [
-        report.manifest_entry()
-        for report in qualification_reports
+        report.manifest_entry() for report in qualification_reports
     ]
-    development_entries = [
-        report.manifest_entry()
-        for report in development_reports
-    ]
+    development_entries = [report.manifest_entry() for report in development_reports]
 
     refs = model_root / "refs"
     blobs = model_root / "blobs"
@@ -2233,8 +2350,9 @@ def stage_snapshot(
             (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode(),
         )
 
-    if previous_revision != revision:
-        write_atomic(ref_path, f"{revision}\n".encode())
+    canonical_ref = revision.encode()
+    if previous_revision != revision or ref_path.read_bytes() != canonical_ref:
+        write_atomic(ref_path, canonical_ref)
 
     return {
         "schema": MANIFEST_SCHEMA,
@@ -2246,7 +2364,9 @@ def stage_snapshot(
         "snapshot": str(snapshot_path),
         "manifest": str(metadata_path),
         "qualification": qualification_entries,
-        "qualification_status": metadata.get("qualification_status", "production-qualified"),
+        "qualification_status": metadata.get(
+            "qualification_status", "production-qualified"
+        ),
         "development_blockers": metadata.get("development_blockers", []),
         "development_evidence": development_entries,
         "previous_revision": previous_revision,

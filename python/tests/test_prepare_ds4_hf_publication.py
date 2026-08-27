@@ -156,11 +156,101 @@ def test_prepare_publication_compacts_exact_embedded_storage_map(tmp_path: Path)
     assert "tensor_storage" not in published["quantization_config"]
     assert "ds4rt_error_ledger" not in published["quantization_config"]["meta"]
     assert "ds4rt_error_ledger" not in published_external["meta"]
+    assert published["quantization_config"]["bits"] == 2
+    assert isinstance(published["quantization_config"]["bits"], int)
+    assert published_external["bits"] == 2
+    assert isinstance(published_external["bits"], int)
     assert published["quantization_config"] == {
         key: value
         for key, value in published_external.items()
         if key != "tensor_storage"
     }
+
+
+def test_prepare_publication_preserves_portable_inline_mixed_policy(tmp_path: Path) -> None:
+    snapshot = make_snapshot(tmp_path / "snapshot")
+    config = json.loads((snapshot / "config.json").read_text(encoding="utf-8"))
+    external = json.loads((snapshot / "quantize_config.json").read_text(encoding="utf-8"))
+    policy = {
+        "schema": "gptqmodel.exl3-inline-mixed",
+        "schema_version": 1,
+        "namespace": "base",
+        "base_bits": 2,
+        "upgrade_bits": 3,
+        "extra_bits": {"numerator": 1, "denominator": 10},
+        "target_bpw": "21/10",
+        "projection_ratio": {"w1": 3, "w3": 5, "w2": 8},
+        "score_kind": "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1",
+        "tier_plan_root": "/private/resume/frontier",
+    }
+    mtp_policy = {
+        **policy,
+        "namespace": "mtp",
+        "extra_bits": {"numerator": 1, "denominator": 5},
+        "target_bpw": "11/5",
+    }
+    config["quantization_config"]["meta"]["ds4rt_inline_mixed"] = policy
+    external["meta"]["ds4rt_inline_mixed"] = policy
+    namespace_provenance = {"base": policy, "mtp": mtp_policy}
+    config["quantization_config"]["meta"]["ds4rt_error_ledger"] = {
+        "family_join": {"inline_mixed": namespace_provenance}
+    }
+    external["meta"]["ds4rt_error_ledger"] = {
+        "family_join": {"inline_mixed": namespace_provenance}
+    }
+    write_json(snapshot / "config.json", config)
+    write_json(snapshot / "quantize_config.json", external)
+
+    output = tmp_path / "public"
+    prepare_publication(snapshot, make_readme(tmp_path / "README.md"), output)
+
+    published = json.loads((output / "config.json").read_text(encoding="utf-8"))
+    published_policy = published["quantization_config"]["meta"][
+        "ds4rt_inline_mixed"
+    ]
+    assert published_policy["target_bpw"] == "21/10"
+    assert published_policy["projection_ratio"] == {"w1": 3, "w3": 5, "w2": 8}
+    assert "tier_plan_root" not in published_policy
+    published_namespaces = published["quantization_config"]["meta"][
+        "ds4rt_inline_mixed_namespaces"
+    ]
+    assert published_namespaces["base"] == published_policy
+    assert published_namespaces["mtp"]["target_bpw"] == "11/5"
+    assert "tier_plan_root" not in published_namespaces["mtp"]
+
+
+def test_prepare_publication_rejects_invalid_inline_mixed_policy(tmp_path: Path) -> None:
+    snapshot = make_snapshot(tmp_path / "snapshot")
+    config = json.loads((snapshot / "config.json").read_text(encoding="utf-8"))
+    external = json.loads((snapshot / "quantize_config.json").read_text(encoding="utf-8"))
+    config["quantization_config"]["meta"]["ds4rt_inline_mixed"] = "K2.1"
+    external["meta"]["ds4rt_inline_mixed"] = "K2.1"
+    write_json(snapshot / "config.json", config)
+    write_json(snapshot / "quantize_config.json", external)
+
+    with pytest.raises(ValueError, match="metadata is not an object"):
+        prepare_publication(
+            snapshot,
+            make_readme(tmp_path / "README.md"),
+            tmp_path / "public",
+        )
+
+
+def test_prepare_publication_rejects_fractional_top_level_bits(tmp_path: Path) -> None:
+    snapshot = make_snapshot(tmp_path / "snapshot")
+    config = json.loads((snapshot / "config.json").read_text(encoding="utf-8"))
+    external = json.loads((snapshot / "quantize_config.json").read_text(encoding="utf-8"))
+    config["quantization_config"]["bits"] = 2.1
+    external["bits"] = 2.1
+    write_json(snapshot / "config.json", config)
+    write_json(snapshot / "quantize_config.json", external)
+
+    with pytest.raises(ValueError, match="integer K2 or K3 base tier"):
+        prepare_publication(
+            snapshot,
+            make_readme(tmp_path / "README.md"),
+            tmp_path / "public",
+        )
 
 
 def test_prepare_publication_rejects_mismatched_embedded_storage_map(

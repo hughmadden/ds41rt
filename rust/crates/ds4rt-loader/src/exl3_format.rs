@@ -21,6 +21,9 @@ pub const DEEPSEEK_V4_EXL3_TRELLIS_BITS: usize = 2;
 pub const DEEPSEEK_V4_EXL3_CODEBOOK: &str = "mcg";
 pub const DEEPSEEK_V4_EXL3_TENSOR_FORMAT: &str = "exllamav3_trellis_mcg";
 pub const DEEPSEEK_V4_EXL3_SOURCE_FORMAT: &str = "fp4_e8m0_k32";
+pub const GPTQMODEL_EXL3_INLINE_MIXED_SCHEMA: &str = "gptqmodel.exl3-inline-mixed";
+pub const GPTQMODEL_EXL3_INLINE_MIXED_SCORE: &str =
+    "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1";
 /// Resident SQG-XOR-Cheb T12 decode table required by the b12x trellis ABI.
 /// The table is generated once per model block and is not checkpoint payload.
 pub const DEEPSEEK_V4_EXL3_T12_LUT_BYTES: usize = 1 << 12;
@@ -224,14 +227,111 @@ fn validate_gptqmodel_serving_quantization_config(value: &Value) -> Result<Exl3R
         .and_then(Value::as_f64)
         .filter(|bits| bits.is_finite() && *bits >= 2.0 && *bits <= 3.0)
         .context("GPTQModel EXL3 requires K2, K3, or a declared mixed K2/K3 payload")?;
-    let mixed_plan = value.pointer("/meta/ds4rt_expert_bit_plan").filter(|plan| {
+    let legacy_mixed_plan = value.pointer("/meta/ds4rt_expert_bit_plan").filter(|plan| {
         plan.get("recipe").and_then(Value::as_str) == Some(DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1)
             && plan.get("schema").and_then(Value::as_str) == Some("ds4rt.exl3-mixed-k2-k3-v1")
     });
+    let inline_mixed = value.pointer("/meta/ds4rt_inline_mixed");
+    if let Some(plan) = inline_mixed {
+        anyhow::ensure!(
+            plan.get("tier_plan_root").is_none(),
+            "GPTQModel inline mixed EXL3 publication metadata contains a private tier-plan path"
+        );
+        anyhow::ensure!(
+            plan.as_object().is_some_and(|fields| {
+                fields.len() == 9
+                    && [
+                        "schema",
+                        "schema_version",
+                        "namespace",
+                        "base_bits",
+                        "upgrade_bits",
+                        "extra_bits",
+                        "target_bpw",
+                        "projection_ratio",
+                        "score_kind",
+                    ]
+                    .into_iter()
+                    .all(|name| fields.contains_key(name))
+            }),
+            "GPTQModel inline mixed EXL3 metadata has unexpected fields"
+        );
+        anyhow::ensure!(
+            plan.get("schema").and_then(Value::as_str) == Some(GPTQMODEL_EXL3_INLINE_MIXED_SCHEMA)
+                && plan.get("schema_version").and_then(Value::as_u64) == Some(1)
+                && plan.get("namespace").and_then(Value::as_str) == Some("base")
+                && plan.get("base_bits").and_then(Value::as_u64) == Some(2)
+                && plan.get("upgrade_bits").and_then(Value::as_u64) == Some(3)
+                && plan.get("score_kind").and_then(Value::as_str)
+                    == Some(GPTQMODEL_EXL3_INLINE_MIXED_SCORE),
+            "GPTQModel inline mixed EXL3 metadata has an unsupported schema or tier pair"
+        );
+        let extra = plan
+            .get("extra_bits")
+            .and_then(Value::as_object)
+            .context("GPTQModel inline mixed EXL3 metadata has no exact bitrate")?;
+        anyhow::ensure!(
+            extra.len() == 2
+                && extra.contains_key("numerator")
+                && extra.contains_key("denominator"),
+            "GPTQModel inline mixed EXL3 metadata has unexpected exact-bitrate fields"
+        );
+        let numerator = extra
+            .get("numerator")
+            .and_then(Value::as_u64)
+            .filter(|value| *value > 0)
+            .context("GPTQModel inline mixed EXL3 metadata has an invalid exact numerator")?;
+        let denominator = extra
+            .get("denominator")
+            .and_then(Value::as_u64)
+            .filter(|value| *value > numerator)
+            .context("GPTQModel inline mixed EXL3 metadata has an invalid exact denominator")?;
+        let mut gcd_left = numerator;
+        let mut gcd_right = denominator;
+        while gcd_right != 0 {
+            let remainder = gcd_left % gcd_right;
+            gcd_left = gcd_right;
+            gcd_right = remainder;
+        }
+        anyhow::ensure!(
+            gcd_left == 1,
+            "GPTQModel inline mixed EXL3 bitrate is not reduced"
+        );
+        let target = plan
+            .get("target_bpw")
+            .and_then(Value::as_str)
+            .context("GPTQModel inline mixed EXL3 metadata has no exact target")?;
+        let expected_numerator = 2_u64
+            .checked_mul(denominator)
+            .and_then(|value| value.checked_add(numerator))
+            .context("GPTQModel inline mixed EXL3 target overflows")?;
+        anyhow::ensure!(
+            target == format!("{expected_numerator}/{denominator}"),
+            "GPTQModel inline mixed EXL3 target disagrees with its exact bitrate"
+        );
+        anyhow::ensure!(
+            plan.get("projection_ratio")
+                .and_then(Value::as_object)
+                .is_some_and(|ratio| {
+                    ratio.len() == 3
+                        && ["w1", "w3", "w2"].into_iter().all(|name| {
+                            ratio
+                                .get(name)
+                                .and_then(Value::as_u64)
+                                .is_some_and(|v| v > 0)
+                        })
+                }),
+            "GPTQModel inline mixed EXL3 metadata has an invalid w1:w3:w2 ratio"
+        );
+    }
     let integer_bits = bits.fract() == 0.0 && matches!(bits as usize, 2 | 3);
     anyhow::ensure!(
-        integer_bits || (bits > 2.0 && bits < 3.0 && mixed_plan.is_some()),
+        integer_bits || (bits > 2.0 && bits < 3.0 && legacy_mixed_plan.is_some()),
         "fractional EXL3 bits require a bound DS4RT K2/K3 expert plan"
+    );
+    anyhow::ensure!(
+        inline_mixed.is_none() || bits == 2.0,
+        "GPTQModel inline mixed EXL3 keeps standard quantization_config.bits at integer K2"
     );
     anyhow::ensure!(
         value.get("codebook").and_then(Value::as_str) == Some(DEEPSEEK_V4_EXL3_CODEBOOK)
@@ -249,7 +349,7 @@ fn validate_gptqmodel_serving_quantization_config(value: &Value) -> Result<Exl3R
     );
 
     Ok(Exl3RecipeContract {
-        recipe: if !integer_bits {
+        recipe: if inline_mixed.is_some() || !integer_bits {
             DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1
         } else if bits as usize == 2 {
             DEEPSEEK_V4_EXL3_RECIPE_V4
@@ -463,34 +563,37 @@ pub fn exl3_expert_trellis_bits(
     expert_id: usize,
 ) -> Result<usize> {
     let expert = exl3_expert(catalog, layer_id, expert_id)?;
-    let logical_values = expert
-        .gate
+    let bits = exl3_projection_trellis_bits(expert.gate)?;
+    for projection in [expert.up, expert.down] {
+        let projection_bits = exl3_projection_trellis_bits(projection)?;
+        anyhow::ensure!(
+            projection_bits == bits,
+            "EXL3 expert layer {layer_id} expert {expert_id} mixes projection tiers"
+        );
+    }
+    Ok(bits)
+}
+
+pub fn exl3_projection_trellis_bits(projection: Exl3Projection<'_>) -> Result<usize> {
+    let logical_values = projection
         .input_features
-        .checked_mul(expert.gate.output_features)
-        .context("EXL3 logical expert size overflow")?;
-    let stored_bits = usize::try_from(expert.gate.trellis.byte_length)
+        .checked_mul(projection.output_features)
+        .context("EXL3 logical projection size overflow")?;
+    let stored_bits = usize::try_from(projection.trellis.byte_length)
         .context("EXL3 trellis byte length exceeds usize")?
         .checked_mul(8)
         .context("EXL3 trellis bit length overflow")?;
     anyhow::ensure!(
         stored_bits % logical_values == 0,
-        "EXL3 expert layer {layer_id} expert {expert_id} has a fractional trellis tier"
+        "EXL3 {:?} projection has a fractional trellis tier",
+        projection.kind
     );
     let bits = stored_bits / logical_values;
     anyhow::ensure!(
         matches!(bits, 2 | 3),
-        "EXL3 expert layer {layer_id} expert {expert_id} has unsupported K{bits}"
+        "EXL3 {:?} projection has unsupported K{bits}",
+        projection.kind
     );
-    for projection in [expert.up, expert.down] {
-        let values = projection
-            .input_features
-            .checked_mul(projection.output_features)
-            .context("EXL3 projection size overflow")?;
-        anyhow::ensure!(
-            usize::try_from(projection.trellis.byte_length)? * 8 == values * bits,
-            "EXL3 expert layer {layer_id} expert {expert_id} mixes projection tiers"
-        );
-    }
     Ok(bits)
 }
 
@@ -865,6 +968,48 @@ mod tests {
             exl3_recipe_from_quantization_config(Some(&mixed)).unwrap(),
             Some(DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1)
         );
+        let mut inline_mixed = valid_gptqmodel_quantization_config();
+        inline_mixed["meta"] = serde_json::json!({
+            "ds4rt_inline_mixed": {
+                "schema": GPTQMODEL_EXL3_INLINE_MIXED_SCHEMA,
+                "schema_version": 1,
+                "namespace": "base",
+                "base_bits": 2,
+                "upgrade_bits": 3,
+                "extra_bits": {"numerator": 1, "denominator": 10},
+                "target_bpw": "21/10",
+                "projection_ratio": {"w1": 3, "w3": 5, "w2": 8},
+                "score_kind": GPTQMODEL_EXL3_INLINE_MIXED_SCORE
+            }
+        });
+        assert_eq!(
+            exl3_recipe_from_quantization_config(Some(&inline_mixed)).unwrap(),
+            Some(DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1)
+        );
+        let mut leaked_path = inline_mixed.clone();
+        leaked_path["meta"]["ds4rt_inline_mixed"]["tier_plan_root"] =
+            serde_json::json!("/private/frontier");
+        assert!(exl3_recipe_from_quantization_config(Some(&leaked_path))
+            .unwrap_err()
+            .to_string()
+            .contains("private tier-plan path"));
+        let mut mismatched_target = inline_mixed.clone();
+        mismatched_target["meta"]["ds4rt_inline_mixed"]["target_bpw"] = serde_json::json!("22/10");
+        assert!(
+            exl3_recipe_from_quantization_config(Some(&mismatched_target))
+                .unwrap_err()
+                .to_string()
+                .contains("target disagrees")
+        );
+        let mut noncanonical_bitrate = inline_mixed.clone();
+        noncanonical_bitrate["meta"]["ds4rt_inline_mixed"]["extra_bits"] =
+            serde_json::json!({"numerator": 2, "denominator": 20});
+        assert!(
+            exl3_recipe_from_quantization_config(Some(&noncanonical_bitrate))
+                .unwrap_err()
+                .to_string()
+                .contains("not reduced")
+        );
         for (pointer, value, expected) in [
             (
                 "/bits",
@@ -1009,6 +1154,29 @@ mod tests {
             assert_eq!(expert.sparkinfer_w13()[0].kind, Exl3ProjectionKind::Gate);
             assert_eq!(expert.down.input_features, intermediate);
         }
+    }
+
+    #[test]
+    fn projection_mixed_expert_reports_each_integer_tier() {
+        let mut catalog = test_catalog(4096, 2048, ModelVariant::Flash);
+        catalog.facts.quantization_recipe = DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1.to_owned();
+        let up = catalog
+            .tensors
+            .iter_mut()
+            .find(|tensor| tensor.name == "layers.0.ffn.experts.0.w3.trellis")
+            .unwrap();
+        up.shape[2] = 48;
+        up.byte_length = up.byte_length * 3 / 2;
+
+        let expert = exl3_expert(&catalog, 0, 0).unwrap();
+        assert_eq!(exl3_projection_trellis_bits(expert.gate).unwrap(), 2);
+        assert_eq!(exl3_projection_trellis_bits(expert.up).unwrap(), 3);
+        assert_eq!(exl3_projection_trellis_bits(expert.down).unwrap(), 2);
+        assert!(exl3_expert_trellis_bits(&catalog, 0, 0)
+            .unwrap_err()
+            .to_string()
+            .contains("mixes projection tiers"));
+        validate_exl3_expert_catalog(&catalog).unwrap();
     }
 
     #[test]

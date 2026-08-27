@@ -30,7 +30,7 @@ ROLE_CONTRACTS = {
     "expert": ("linux/arm64", "121"),
 }
 PACKAGE_VERSIONS = {
-    "gptqmodel": "7.3.4",
+    "gptqmodel": "7.3.5",
     "torch": "2.13.0+cu130",
     "torchvision": "0.28.0+cu130",
 }

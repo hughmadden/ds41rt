@@ -36,8 +36,16 @@
 #include "ds4_flash_tp4_exl3_k3_prefill_m8_topk6.h"
 #include "ds4_flash_tp4_exl3_mixed_k2_k3_m1.h"
 #include "ds4_flash_tp4_exl3_mixed_k2_k3_m2.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m3.h"
 #include "ds4_flash_tp4_exl3_mixed_k2_k3_m4.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m5.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m6.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m7.h"
 #include "ds4_flash_tp4_exl3_mixed_k2_k3_m8.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m9.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m10.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m11.h"
+#include "ds4_flash_tp4_exl3_mixed_k2_k3_m12.h"
 #include "ds4_flash_tp4_exl3_mixed_k2_k3_m16.h"
 #include "ds4_flash_tp4_exl3_mixed_k2_k3_m32.h"
 #include "ds4_flash_tp4_exl3_mixed_k2_k3_m64.h"
@@ -59,6 +67,7 @@
 #include "ds4_flash_tp4_w4a16_prefill_m64_topk6.h"
 #include "ds4_flash_tp4_w4a16_prefill_m8_topk6.h"
 
+#include <algorithm>
 #include <mutex>
 #include <cuda_bf16.h>
 
@@ -200,8 +209,16 @@ DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(2048)
       flash_exl3_mixed_m##M##_module;
 DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(1)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(2)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(3)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(4)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(5)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(6)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(7)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(8)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(9)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(10)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(11)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(12)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(16)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(32)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(64)
@@ -329,8 +346,16 @@ void initialize_flash_module_on_current_device() {
                           flash_exl3_mixed_m##M##_module)
   DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(1);
   DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(2);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(3);
   DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(4);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(5);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(6);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(7);
   DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(8);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(9);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(10);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(11);
+  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(12);
   DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(16);
   DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(32);
   DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(64);
@@ -753,6 +778,8 @@ using FlashPrefillLaunchFn = int (*)(
     return cute_dsl_ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_wrapper(      \
         &flash_prefill_m##M##_module, buffers->input.ptr, buffers->input.ptr,    \
         buffers->input.ptr, buffers->w13_weight.ptr, buffers->w2_weight.ptr,     \
+        static_cast<int64_t>(buffers->w13_weight.bytes / sizeof(int32_t)),       \
+        static_cast<int64_t>(buffers->w2_weight.bytes / sizeof(int32_t)),        \
         &fc1, &activated, &routed_output, buffers->w13_scale.ptr,                \
         buffers->w2_scale.ptr, buffers->w13_global_scale.ptr,                    \
         buffers->w2_global_scale.ptr, &routes, &block_experts, &route_count,     \
@@ -843,7 +870,10 @@ int launch_flash_exl3_decode(
   return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_wrapper(
       &flash_exl3_decode_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
-      buffers->w2_trellis.ptr, &fc1, &activated, &routed_output,
+      buffers->w2_trellis.ptr,
+      static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),
+      static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)), &fc1,
+      &activated, &routed_output,
       buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,
       buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,
       &block_experts, &route_count, &activation_amax, 0,
@@ -881,7 +911,10 @@ int launch_flash_exl3_decode_m8_direct_m6(
   return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_wrapper(
       &flash_exl3_decode_m8_direct_m6_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
-      buffers->w2_trellis.ptr, &fc1, &activated, &routed_output,
+      buffers->w2_trellis.ptr,
+      static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),
+      static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)), &fc1,
+      &activated, &routed_output,
       buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,
       buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,
       &block_experts, &route_count, &activation_amax, 0,
@@ -920,7 +953,10 @@ int launch_flash_exl3_decode_m4_direct_m4(
   return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_wrapper(
       &flash_exl3_decode_m4_direct_m4_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
-      buffers->w2_trellis.ptr, &fc1, &activated, &routed_output,
+      buffers->w2_trellis.ptr,
+      static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),
+      static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)), &fc1,
+      &activated, &routed_output,
       buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,
       buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,
       &block_experts, &route_count, &activation_amax, 0,
@@ -964,7 +1000,10 @@ using FlashExl3PrefillLaunchFn = int (*)(
     return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_wrapper(   \
         &flash_exl3_prefill_m##M##_module, buffers->rotation_gate.ptr,           \
         buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,  \
-        buffers->w2_trellis.ptr, &fc1, &activated, &routed_output,               \
+        buffers->w2_trellis.ptr,                                                 \
+        static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),       \
+        static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)),        \
+        &fc1, &activated, &routed_output,                                         \
         buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,                      \
         buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,           \
         &block_experts, &route_count, &activation_amax, 0,                       \
@@ -1044,7 +1083,10 @@ int launch_flash_exl3_k3_decode(
   return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_wrapper(
       &flash_exl3_k3_decode_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
-      buffers->w2_trellis.ptr, &fc1, &activated, &routed_output,
+      buffers->w2_trellis.ptr,
+      static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),
+      static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)), &fc1,
+      &activated, &routed_output,
       buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,
       buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,
       &block_experts, &route_count, &activation_amax, 0,
@@ -1083,7 +1125,10 @@ int launch_flash_exl3_k3_decode(
     return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_wrapper(            \
         &flash_exl3_k3_##LABEL##_module, buffers->rotation_gate.ptr,           \
         buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,\
-        buffers->w2_trellis.ptr, &fc1, &activated, &routed_output,             \
+        buffers->w2_trellis.ptr,                                               \
+        static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),     \
+        static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)),      \
+        &fc1, &activated, &routed_output,                                       \
         buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,                    \
         buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,         \
         &block_experts, &route_count, &activation_amax, 0,                     \
@@ -1127,7 +1172,10 @@ DS4RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(DECODE_M8_DIRECT_M6,
     return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_wrapper( \
         &flash_exl3_k3_prefill_m##M##_module, buffers->rotation_gate.ptr,      \
         buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,\
-        buffers->w2_trellis.ptr, &fc1, &activated, &routed_output,             \
+        buffers->w2_trellis.ptr,                                               \
+        static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),     \
+        static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)),      \
+        &fc1, &activated, &routed_output,                                       \
         buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,                    \
         buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,         \
         &block_experts, &route_count, &activation_amax, 0,                     \
@@ -1184,7 +1232,11 @@ __global__ void map_flash_mixed_topk6_kernel(
 #define DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(M)                              \
   int launch_flash_exl3_mixed_m##M(                                         \
       const ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *buffers,        \
-      int32_t tier0_experts, int32_t tier1_experts, int32_t active_m,        \
+      int32_t tier0_slots, int32_t tier1_slots,                              \
+      int32_t tier0_gate_experts, int32_t tier1_gate_experts,                \
+      int32_t tier0_up_experts, int32_t tier1_up_experts,                    \
+      int32_t tier0_down_experts, int32_t tier1_down_experts,                \
+      int32_t active_m,                                                       \
       cudaStream_t stream) {                                                 \
     ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_rotation_gate_t      \
         rotation_gate{buffers->rotation_gate.ptr};                           \
@@ -1222,13 +1274,24 @@ __global__ void map_flash_mixed_topk6_kernel(
         &block_experts, &route_count, buffers->descriptor_map.ptr,            \
         buffers->topk_weights.ptr, &fc1_scratch, &fc2_scratch, &workspace,   \
         buffers->intermediate_rotations.ptr, buffers->gate_suh.ptr,           \
-        buffers->up_suh.ptr, tier0_experts, tier1_experts, active_m,         \
-        DS4RT_DS4_FLASH_EXL3_MIXED_K2_K3_M##M##_GRID_X, stream);             \
+        buffers->up_suh.ptr, buffers->trellis_lut.ptr, tier0_slots,          \
+        tier1_slots, tier0_down_experts, tier1_down_experts, active_m,       \
+        DS4RT_DS4_FLASH_EXL3_MIXED_K2_K3_M##M##_GRID_X, stream,              \
+        tier0_gate_experts, tier1_gate_experts, tier0_up_experts,            \
+        tier1_up_experts);                                                    \
   }
 DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(1)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(2)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(3)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(4)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(5)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(6)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(7)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(8)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(9)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(10)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(11)
+DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(12)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(16)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(32)
 DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(64)
@@ -1241,14 +1304,23 @@ DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(2048)
 
 using FlashExl3MixedLaunchFn = int (*)(
     const ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *, int32_t, int32_t,
-    int32_t, cudaStream_t);
+    int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
+    cudaStream_t);
 
 FlashExl3MixedLaunchFn flash_exl3_mixed_launcher(size_t capacity_rows) {
   switch (capacity_rows) {
   case 1: return &launch_flash_exl3_mixed_m1;
   case 2: return &launch_flash_exl3_mixed_m2;
+  case 3: return &launch_flash_exl3_mixed_m3;
   case 4: return &launch_flash_exl3_mixed_m4;
+  case 5: return &launch_flash_exl3_mixed_m5;
+  case 6: return &launch_flash_exl3_mixed_m6;
+  case 7: return &launch_flash_exl3_mixed_m7;
   case 8: return &launch_flash_exl3_mixed_m8;
+  case 9: return &launch_flash_exl3_mixed_m9;
+  case 10: return &launch_flash_exl3_mixed_m10;
+  case 11: return &launch_flash_exl3_mixed_m11;
+  case 12: return &launch_flash_exl3_mixed_m12;
   case 16: return &launch_flash_exl3_mixed_m16;
   case 32: return &launch_flash_exl3_mixed_m32;
   case 64: return &launch_flash_exl3_mixed_m64;
@@ -1388,6 +1460,8 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async(
       cute_dsl_ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_wrapper(
           &flash_decode_module, buffers->input.ptr, buffers->input.ptr,
           buffers->input.ptr, buffers->w13_weight.ptr, buffers->w2_weight.ptr,
+          static_cast<int64_t>(buffers->w13_weight.bytes / sizeof(int32_t)),
+          static_cast<int64_t>(buffers->w2_weight.bytes / sizeof(int32_t)),
           &fc1, &activated, &output, buffers->w13_scale.ptr,
           buffers->w2_scale.ptr, buffers->w13_global_scale.ptr,
           buffers->w2_global_scale.ptr, &routes, &block_experts, &route_count,
@@ -1725,16 +1799,29 @@ ds4rt_cuda_ds4_flash_spark_exl3_k3_prefill_topk6_async(
 extern "C" ds4rt_status_t
 ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
     const ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *buffers,
-    size_t tier0_experts, size_t tier1_experts, size_t rows,
+    size_t tier0_slots, size_t tier1_slots,
+    size_t tier0_gate_experts, size_t tier1_gate_experts,
+    size_t tier0_up_experts, size_t tier1_up_experts,
+    size_t tier0_down_experts, size_t tier1_down_experts, size_t rows,
     void *cuda_stream) {
-  if (buffers == nullptr || tier0_experts == 0 || tier1_experts == 0 ||
-      tier0_experts + tier1_experts != kExperts || rows == 0 ||
-      rows > kPrefillMaxRows) {
+  const size_t total_slots = tier0_slots + tier1_slots;
+  if (buffers == nullptr || tier0_slots == 0 || tier1_slots == 0 ||
+      tier0_slots > kExperts || tier1_slots > kExperts ||
+      total_slots < kExperts ||
+      tier0_gate_experts == 0 || tier1_gate_experts == 0 ||
+      tier0_up_experts == 0 || tier1_up_experts == 0 ||
+      tier0_down_experts == 0 || tier1_down_experts == 0 ||
+      tier0_gate_experts + tier1_gate_experts != kExperts ||
+      tier0_up_experts + tier1_up_experts != kExperts ||
+      tier0_down_experts + tier1_down_experts != kExperts ||
+      tier0_slots != std::max(tier0_gate_experts, tier0_up_experts) ||
+      tier1_slots != std::max(tier1_gate_experts, tier1_up_experts) ||
+      rows == 0 || rows > kPrefillMaxRows) {
     ds4rt_set_last_error_message(
-        "DeepSeek-V4-Flash mixed K2/K3 launch received invalid tiers or rows");
+        "DeepSeek-V4-Flash mixed K2/K3 launch received invalid projection tiers or rows");
     return DS4RT_STATUS_INVALID_ARGUMENT;
   }
-  size_t capacity_rows = 1;
+  size_t capacity_rows = rows <= 12 ? rows : 16;
   while (capacity_rows < rows) capacity_rows *= 2;
   const bool decode = capacity_rows == 1;
   const size_t packed_route_elements =
@@ -1746,9 +1833,9 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
   const size_t fc2_scratch_elements =
       decode ? kFc2ScratchElements : kPrefillScratchElements;
   const size_t tier0_projection =
-      tier0_experts * kHidden * kIntermediate * kExl3K2Bits / 8;
+      kHidden * kIntermediate * kExl3K2Bits / 8;
   const size_t tier1_projection =
-      tier1_experts * kHidden * kIntermediate * kExl3K3Bits / 8;
+      kHidden * kIntermediate * kExl3K3Bits / 8;
   const size_t routed_rows = capacity_rows * kTopK;
 #define DS4RT_REQUIRE_MIXED_BYTES(FIELD, REQUIRED)                            \
   do {                                                                       \
@@ -1760,23 +1847,37 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
   } while (false)
   DS4RT_REQUIRE_MIXED_BYTES(input,
                             capacity_rows * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(tier0_w13_trellis, 2 * tier0_projection);
-  DS4RT_REQUIRE_MIXED_BYTES(tier0_w2_trellis, tier0_projection);
-  DS4RT_REQUIRE_MIXED_BYTES(tier1_w13_trellis, 2 * tier1_projection);
-  DS4RT_REQUIRE_MIXED_BYTES(tier1_w2_trellis, tier1_projection);
+  DS4RT_REQUIRE_MIXED_BYTES(
+      tier0_w13_trellis,
+      (tier0_gate_experts + tier0_up_experts) * tier0_projection);
+  DS4RT_REQUIRE_MIXED_BYTES(tier0_w2_trellis,
+                            tier0_down_experts * tier0_projection);
+  DS4RT_REQUIRE_MIXED_BYTES(
+      tier1_w13_trellis,
+      (tier1_gate_experts + tier1_up_experts) * tier1_projection);
+  DS4RT_REQUIRE_MIXED_BYTES(tier1_w2_trellis,
+                            tier1_down_experts * tier1_projection);
   DS4RT_REQUIRE_MIXED_BYTES(dummy_scale, 16);
   DS4RT_REQUIRE_MIXED_BYTES(tier0_global_scale,
-                            tier0_experts * sizeof(float));
+                            std::max(tier0_slots, tier0_down_experts) *
+                                sizeof(float));
   DS4RT_REQUIRE_MIXED_BYTES(tier1_global_scale,
-                            tier1_experts * sizeof(float));
-  DS4RT_REQUIRE_MIXED_BYTES(gate_suh, kExl3HiddenRotationBytes);
-  DS4RT_REQUIRE_MIXED_BYTES(up_suh, kExl3HiddenRotationBytes);
+                            std::max(tier1_slots, tier1_down_experts) *
+                                sizeof(float));
+  DS4RT_REQUIRE_MIXED_BYTES(gate_suh,
+                            total_slots * kHidden * sizeof(uint16_t));
+  DS4RT_REQUIRE_MIXED_BYTES(up_suh,
+                            total_slots * kHidden * sizeof(uint16_t));
   DS4RT_REQUIRE_MIXED_BYTES(intermediate_rotations,
-                            kExl3IntermediateRotationBytes);
-  DS4RT_REQUIRE_MIXED_BYTES(down_svh, kExl3HiddenRotationBytes);
+                            total_slots * 3 * kIntermediate *
+                                sizeof(uint16_t));
+  DS4RT_REQUIRE_MIXED_BYTES(down_svh,
+                            total_slots * kHidden * sizeof(uint16_t));
+  DS4RT_REQUIRE_MIXED_BYTES(trellis_lut, kExl3TrellisLutBytes);
   DS4RT_REQUIRE_MIXED_BYTES(global_to_combined,
                             kExperts * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(descriptor_map, kExperts * sizeof(int32_t));
+  DS4RT_REQUIRE_MIXED_BYTES(descriptor_map,
+                            3 * total_slots * sizeof(int32_t));
   DS4RT_REQUIRE_MIXED_BYTES(topk_ids, routed_rows * sizeof(int32_t));
   DS4RT_REQUIRE_MIXED_BYTES(mapped_topk_ids,
                             routed_rows * sizeof(int32_t));
@@ -1831,7 +1932,7 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
       static_cast<int32_t *>(buffers->mapped_topk_ids.ptr), live_routes);
   cudaError_t error = cudaGetLastError();
   if (error != cudaSuccess) return status_from_cuda(error);
-  const bool direct_topk = capacity_rows <= 8;
+  const bool direct_topk = capacity_rows <= 12;
   if (!direct_topk) {
     const ds4rt_ds4_flash_route_pack_buffers_t route_buffers{
         buffers->mapped_topk_ids,
@@ -1848,8 +1949,14 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
   error = cudaMemsetAsync(buffers->workspace.ptr, 0,
                           kExl3WorkspaceElements * sizeof(int32_t), stream);
   if (error != cudaSuccess) return status_from_cuda(error);
-  if (launcher(buffers, static_cast<int32_t>(tier0_experts),
-               static_cast<int32_t>(tier1_experts),
+  if (launcher(buffers, static_cast<int32_t>(tier0_slots),
+               static_cast<int32_t>(tier1_slots),
+               static_cast<int32_t>(tier0_gate_experts),
+               static_cast<int32_t>(tier1_gate_experts),
+               static_cast<int32_t>(tier0_up_experts),
+               static_cast<int32_t>(tier1_up_experts),
+               static_cast<int32_t>(tier0_down_experts),
+               static_cast<int32_t>(tier1_down_experts),
                static_cast<int32_t>(rows), stream) != 0) {
     ds4rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 mixed K2/K3 EXL3 launch failed");

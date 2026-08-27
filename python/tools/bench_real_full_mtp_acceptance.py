@@ -11,6 +11,7 @@ import statistics
 import urllib.request
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from deepseek_v4_benchmark import DEFAULT_FLASH_MODEL_ID
@@ -137,6 +138,11 @@ def parse_args() -> argparse.Namespace:
         help="Run the complete selected corpus this many times.",
     )
     parser.add_argument("--timeout", type=float, default=300.0)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write the complete JSONL capture while retaining stdout output.",
+    )
     return parser.parse_args()
 
 
@@ -283,6 +289,18 @@ def main() -> None:
     else:
         selected = list(CASES)
         selected_suite = "all"
+    output_stream = None
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        output_stream = args.output.open("w", encoding="utf-8")
+
+    def emit(value: dict[str, Any]) -> None:
+        rendered = json.dumps(value, ensure_ascii=False)
+        print(rendered, flush=True)
+        if output_stream is not None:
+            output_stream.write(rendered + "\n")
+            output_stream.flush()
+
     summaries = []
     repeat_summaries = []
     for repeat_index in range(args.repeats):
@@ -308,7 +326,7 @@ def main() -> None:
                 )
             repeat_cases.append(summary)
             summaries.append(summary)
-            print(json.dumps(summary, ensure_ascii=False), flush=True)
+            emit(summary)
 
         repeat_timed_tokens = sum(
             summary["completion_tokens"] - 1 for summary in repeat_cases
@@ -467,7 +485,9 @@ def main() -> None:
             and summary["reference_completion_tokens_match"]
             for summary in summaries
         )
-    print(json.dumps({"aggregate": aggregate}, ensure_ascii=False))
+    emit({"aggregate": aggregate})
+    if output_stream is not None:
+        output_stream.close()
 
 
 if __name__ == "__main__":

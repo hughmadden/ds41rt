@@ -31,10 +31,35 @@ ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 USER_RE = re.compile(r"[1-9][0-9]*:[1-9][0-9]*\Z")
 CONTAINER_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 PLAN_FILENAME = "ds4rt-gptqmodel-plan.json"
+EXECUTION_UPGRADE_FILENAME = "ds4rt-execution-upgrade.json"
+EXECUTION_UPGRADE_HISTORY_DIRNAME = "execution-upgrade-history"
+EXECUTION_UPGRADE_SCHEMA = "ds4rt-deepseek-v4-execution-upgrade-v1"
+IMAGE_OWNED_UPGRADE_ENV = frozenset(
+    {
+        "DS4RT_QUANT_BASE_IMAGE",
+        "DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256",
+        "DS4RT_QUANT_CUDA_ARCH",
+        "DS4RT_QUANT_MIN_GPUS",
+        "DS4RT_QUANT_PYTHON_VERSION",
+        "DS4RT_QUANT_REQUIREMENTS_LOCK",
+        "DS4RT_QUANT_REQUIREMENTS_SHA256",
+        "DS4RT_QUANT_ROLE",
+        "DS4RT_QUANT_TARGET_PLATFORM",
+    }
+)
 PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v5"
-CURRENT_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
-SUPPORTED_PLAN_SCHEMAS = frozenset((PLAN_SCHEMA, CURRENT_PLAN_SCHEMA))
+PREVIOUS_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
+CURRENT_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v7"
+SUPPORTED_PLAN_SCHEMAS = frozenset(
+    (PLAN_SCHEMA, PREVIOUS_PLAN_SCHEMA, CURRENT_PLAN_SCHEMA)
+)
+STRICT_STORAGE_PLAN_SCHEMAS = frozenset(
+    (PREVIOUS_PLAN_SCHEMA, CURRENT_PLAN_SCHEMA)
+)
 QUANTIZER = "/opt/ds4rt/quantization/quantize_flash_gptqmodel.py"
+LEGACY_QUANTIZER_SUFFIX = PurePosixPath(
+    "quantization/quantize_flash_gptqmodel.py"
+)
 ENTRYPOINT = [
     "/usr/bin/tini",
     "--",
@@ -264,6 +289,30 @@ def map_container_path(raw_path: str, binds: Sequence[Bind]) -> Path:
     return bind.source.joinpath(*relative.parts)
 
 
+def backing_bind(raw_path: str, binds: Sequence[Bind]) -> Bind:
+    path = PurePosixPath(raw_path)
+    if not path.is_absolute() or ".." in path.parts:
+        raise ResumeError(f"container path is not canonical: {raw_path!r}")
+    candidates = [
+        bind
+        for bind in binds
+        if path == bind.destination or path.is_relative_to(bind.destination)
+    ]
+    if not candidates:
+        raise ResumeError(f"container path is not backed by a host bind: {raw_path}")
+    return max(candidates, key=lambda item: len(item.destination.parts))
+
+
+def is_legacy_quantizer_path(raw_path: str) -> bool:
+    path = PurePosixPath(raw_path)
+    return (
+        path.is_absolute()
+        and ".." not in path.parts
+        and path.parts[-len(LEGACY_QUANTIZER_SUFFIX.parts) :]
+        == LEGACY_QUANTIZER_SUFFIX.parts
+    )
+
+
 def option_value(command: Sequence[str], option: str) -> str:
     indices = [index for index, value in enumerate(command) if value == option]
     if len(indices) != 1 or indices[0] + 1 >= len(command):
@@ -324,6 +373,70 @@ def validate_plan(path: Path, expected_sha256: str) -> dict[str, Any]:
             "saved quantization plan does not match --expected-plan-sha256"
         )
     return plan
+
+
+def validate_execution_upgrade_chain(
+    run_state: Path,
+    plan_sha256: str,
+) -> tuple[dict[str, Any], ...]:
+    latest_path = run_state / EXECUTION_UPGRADE_FILENAME
+    if not latest_path.is_file() or latest_path.is_symlink():
+        raise ResumeError("chained resume lacks a regular execution-upgrade record")
+    latest = read_json_object(latest_path, "execution upgrade")
+    history_root = run_state / EXECUTION_UPGRADE_HISTORY_DIRNAME
+    history: dict[str, dict[str, Any]] = {}
+    if history_root.exists():
+        if not history_root.is_dir() or history_root.is_symlink():
+            raise ResumeError("execution-upgrade history is not a regular directory")
+        for path in history_root.iterdir():
+            match = re.fullmatch(r"([0-9a-f]{64})\.json", path.name)
+            if match is None or not path.is_file() or path.is_symlink():
+                raise ResumeError("execution-upgrade history contains an unsafe entry")
+            history[match.group(1)] = read_json_object(
+                path, "archived execution upgrade"
+            )
+
+    def validate(record: dict[str, Any], expected_digest: str | None) -> str:
+        digest = record.get("upgrade_sha256")
+        body = {
+            key: value for key, value in record.items() if key != "upgrade_sha256"
+        }
+        if (
+            record.get("schema") != EXECUTION_UPGRADE_SCHEMA
+            or record.get("parent_plan_sha256") != plan_sha256
+            or not isinstance(digest, str)
+            or SHA256_RE.fullmatch(digest) is None
+            or hashlib.sha256(canonical_json(body)).hexdigest() != digest
+            or (expected_digest is not None and digest != expected_digest)
+        ):
+            raise ResumeError("execution-upgrade history is invalid")
+        return digest
+
+    validate(latest, None)
+    chain = [latest]
+    links = [
+        latest.get(field)
+        for field in ("previous_upgrade_sha256", "previous_failed_upgrade_sha256")
+        if latest.get(field) is not None
+    ]
+    visited: set[str] = set()
+    while links:
+        if len(links) != 1 or links[0] in visited or links[0] not in history:
+            raise ResumeError("execution-upgrade history chain is incomplete")
+        digest = links[0]
+        visited.add(digest)
+        record = history[digest]
+        validate(record, digest)
+        chain.append(record)
+        links = [
+            record.get(field)
+            for field in (
+                "previous_upgrade_sha256",
+                "previous_failed_upgrade_sha256",
+            )
+            if record.get(field) is not None
+        ]
+    return tuple(chain)
 
 
 def expected_gpus_from_plan(plan: dict[str, Any]) -> tuple[tuple[int, str], ...]:
@@ -495,9 +608,13 @@ def build_resume_spec(
     ):
         raise ResumeError("source container does not bind a content-addressed image")
     environment, environment_map = parse_environment(config.get("Env"))
+    require_image_digest = environment_map.get(
+        "DS4RT_QUANT_REQUIRE_IMAGE_DIGEST"
+    )
     if (
         environment_map.get("DS4RT_QUANT_IMAGE_DIGEST") != parent_image_id
-        or environment_map.get("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST") != "1"
+        or require_image_digest not in {None, "1"}
+        or (require_image_digest is None and upgrade_image_id is None)
         or environment_map.get("DS4RT_QUANT_ROLE") != "coordinator"
         or environment_map.get("DS4RT_QUANT_TARGET_PLATFORM") != "linux/amd64"
         or environment_map.get("DS4RT_QUANT_CUDA_ARCH") != "120"
@@ -505,14 +622,27 @@ def build_resume_spec(
         raise ResumeError("source environment does not bind the qualified image/GPU role")
 
     raw_command = config.get("Cmd")
+    legacy_quantizer = (
+        isinstance(raw_command, list)
+        and len(raw_command) >= 2
+        and isinstance(raw_command[1], str)
+        and raw_command[1] != QUANTIZER
+        and is_legacy_quantizer_path(raw_command[1])
+    )
     if (
         not isinstance(raw_command, list)
         or len(raw_command) < 3
         or any(not isinstance(value, str) for value in raw_command)
-        or raw_command[:2] != ["python", QUANTIZER]
+        or raw_command[0] != "python"
+        or (raw_command[1] != QUANTIZER and not legacy_quantizer)
+        or (legacy_quantizer and upgrade_image_id is None)
         or "--plan-only" in raw_command
     ):
         raise ResumeError("source command is not an unfinished production quantization")
+    source_is_upgrade_resume = raw_command[-2:] == [
+        "--execution-upgrade",
+        "--resume",
+    ]
     command_values = list(raw_command)
     if command_values[-2:] == ["--execution-upgrade", "--resume"]:
         command_values = command_values[:-2]
@@ -520,14 +650,26 @@ def build_resume_spec(
         command_values = command_values[:-1]
     if "--resume" in command_values or "--execution-upgrade" in command_values:
         raise ResumeError("source command has a noncanonical resume suffix")
-    command = tuple(command_values)
-
     raw_binds = host.get("Binds")
     if not isinstance(raw_binds, list) or not raw_binds:
         raise ResumeError("source container has no host bind mounts")
     binds = tuple(parse_bind(raw) for raw in raw_binds)
     if len({bind.destination for bind in binds}) != len(binds):
         raise ResumeError("source container repeats a bind destination")
+    if legacy_quantizer:
+        legacy_path = command_values[1]
+        legacy_bind = backing_bind(legacy_path, binds)
+        host_quantizer = map_container_path(legacy_path, binds)
+        if (
+            legacy_bind.options != "ro"
+            or not host_quantizer.is_file()
+            or host_quantizer.is_symlink()
+        ):
+            raise ResumeError(
+                "legacy source quantizer is not a regular read-only bind"
+            )
+        command_values[1] = QUANTIZER
+    command = tuple(command_values)
 
     output = option_value(command, "--output")
     command_preflight = option_value(command, "--preflight-report")
@@ -548,7 +690,7 @@ def build_resume_spec(
     command_active_source = optional_option_value(
         command, "--active-layer-source-dir"
     ) or os.fspath(run_state_container / "active-layer-source")
-    split_paths_differ = plan.get("schema") == CURRENT_PLAN_SCHEMA and (
+    split_paths_differ = plan.get("schema") in STRICT_STORAGE_PLAN_SCHEMAS and (
         plan.get("projection_checkpoint_dir") != command_checkpoint
         or plan.get("active_layer_source_dir") != command_active_source
         or plan.get("projection_checkpoint", {}).get("root") != command_checkpoint
@@ -570,7 +712,7 @@ def build_resume_spec(
         (offload, "offload directory"),
         (prefix_store, "MTP prefix store"),
     ]
-    if plan.get("schema") == CURRENT_PLAN_SCHEMA:
+    if plan.get("schema") in STRICT_STORAGE_PLAN_SCHEMAS:
         required_paths.extend(
             (
                 (command_checkpoint, "projection checkpoint store"),
@@ -592,9 +734,6 @@ def build_resume_spec(
         raise ResumeError("source environment GPU count differs from the saved plan")
     if (
         not isinstance(plan_preflight, dict)
-        or plan_preflight.get("path") != command_preflight
-        or plan_preflight.get("sha256") != sha256_file(original_preflight_path)
-        or plan_preflight.get("image_digest") != parent_image_id
         or original_preflight.get("status") != "qualified"
         or original_preflight.get("role") != "coordinator"
         or original_preflight.get("image_digest") != parent_image_id
@@ -606,6 +745,30 @@ def build_resume_spec(
         != expected_gpus
     ):
         raise ResumeError("original coordinator preflight differs from the saved plan")
+    plan_preflight_is_current = (
+        plan_preflight.get("path") == command_preflight
+        and plan_preflight.get("sha256") == sha256_file(original_preflight_path)
+        and plan_preflight.get("image_digest") == parent_image_id
+    )
+    if not plan_preflight_is_current:
+        if not source_is_upgrade_resume:
+            raise ResumeError(
+                "source preflight differs from the parent plan without an upgrade chain"
+            )
+        upgrades = validate_execution_upgrade_chain(
+            host_run_state, expected_plan_sha256
+        )
+        current_execution = {
+            key: original_preflight.get(key)
+            for key in ("image_digest", "gptqmodel", "python", "torch", "gpus")
+        }
+        if not any(
+            upgrade.get("upgraded_execution") == current_execution
+            for upgrade in upgrades
+        ):
+            raise ResumeError(
+                "source preflight differs from the latest execution upgrade"
+            )
     validate_live_gpus(live_gpus, expected_gpus, gpu_device_ids)
 
     network_mode = host.get("NetworkMode")
@@ -624,7 +787,7 @@ def build_resume_spec(
         or working_dir != "/workspace"
         or not isinstance(user, str)
         or (user and USER_RE.fullmatch(user) is None)
-        or ipc_mode != "host"
+        or ipc_mode not in {"host", "private"}
         or isinstance(shm_size, bool)
         or not isinstance(shm_size, int)
         or shm_size <= 0
@@ -677,11 +840,24 @@ def build_resume_spec(
             )
         image_id = upgrade_image_id
         environment = tuple(
+            record
+            for record in environment
+            if record.split("=", 1)[0] not in IMAGE_OWNED_UPGRADE_ENV
+        )
+        environment = tuple(
             f"DS4RT_QUANT_IMAGE_DIGEST={image_id}"
             if record.startswith("DS4RT_QUANT_IMAGE_DIGEST=")
             else record
             for record in environment
         )
+        if not any(
+            record.startswith("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=")
+            for record in environment
+        ):
+            environment = (
+                *environment,
+                "DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=1",
+            )
         command_values = list(command)
         preflight_index = command_values.index("--preflight-report") + 1
         command_values[preflight_index] = preflight_report
@@ -836,13 +1012,21 @@ def validate_started_container(spec: ResumeSpec, metadata: dict[str, Any]) -> No
         raise ResumeError("started resume container metadata is incomplete")
     _, expected_environment = parse_environment(list(spec.environment))
     _, actual_environment = parse_environment(config.get("Env"))
+    environment_matches = (
+        all(
+            actual_environment.get(key) == value
+            for key, value in expected_environment.items()
+        )
+        and set(actual_environment).difference(expected_environment)
+        <= IMAGE_OWNED_UPGRADE_ENV
+    )
     expected_binds = [bind.raw for bind in spec.binds]
     actual_binds = host.get("Binds")
     if (
         metadata.get("Image") != spec.image_id
         or config.get("Entrypoint") != ENTRYPOINT
         or config.get("Cmd") != [*spec.command, *spec.resume_arguments]
-        or actual_environment != expected_environment
+        or not environment_matches
         or config.get("WorkingDir") != spec.working_dir
         or config.get("User") != spec.user
         # Docker may canonicalize bind order when it materializes a container.

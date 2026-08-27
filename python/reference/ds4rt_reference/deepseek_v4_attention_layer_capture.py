@@ -906,7 +906,7 @@ def bind_deepseek_v4_sliding_attention_layer(
     """
 
     import torch
-    from b12x.attention import compressed_mla, dsv4_producer
+    from b12x.attention import compressed_sparse_mla as compressed_mla, dsv4_producer
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -1079,7 +1079,7 @@ def run_deepseek_v4_sliding_attention_layer(
 ) -> tuple[Any, Any, Any, Any]:
     """Run a bound C0 half-layer and return residual, post, comb, normalized y."""
 
-    from b12x.attention import compressed_mla, dsv4_producer
+    from b12x.attention import compressed_sparse_mla as compressed_mla, dsv4_producer
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -1159,7 +1159,7 @@ def deepseek_v4_c4_selector_scratch_nbytes(
 
     import math
     import torch
-    from b12x.attention import nsa_indexer
+    from b12x.attention import dsa_indexer
 
     normalized_mode = str(mode).strip().lower()
     if normalized_mode not in {"decode", "prefill"}:
@@ -1178,10 +1178,10 @@ def deepseek_v4_c4_selector_scratch_nbytes(
         swa_width=DS4_SWA_TOKENS,
     )
     plan = _cached_target_capture_plan(
-        nsa_indexer.plan,
-        nsa_indexer.Caps(
+        dsa_indexer.plan,
+        dsa_indexer.Caps(
             device=torch.device("cuda:0"),
-            source_layout=nsa_indexer.SOURCE_LAYOUT_PAGED,
+            source_layout=dsa_indexer.SOURCE_LAYOUT_PAGED,
             num_q_heads=DS4_INDEX_HEADS,
             max_q_rows=max_rows,
             max_page_table_width=contract.max_page_table_width,
@@ -2620,7 +2620,11 @@ def bind_deepseek_v4_c128_decode_attention_layer(
     """Bind the sequence-unique C128 decode chain into one lane arena."""
 
     import torch
-    from b12x.attention import compressed_mla, dsv4_compressor, dsv4_producer
+    from b12x.attention import (
+        compressed_sparse_mla as compressed_mla,
+        dsv4_compressor,
+        dsv4_producer,
+    )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -2826,7 +2830,11 @@ def run_deepseek_v4_c128_decode_attention_layer(
 ) -> tuple[Any, Any, Any, Any]:
     """Run C128 decode and return residual, post, comb, normalized y."""
 
-    from b12x.attention import compressed_mla, dsv4_compressor, dsv4_producer
+    from b12x.attention import (
+        compressed_sparse_mla as compressed_mla,
+        dsv4_compressor,
+        dsv4_producer,
+    )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -2919,7 +2927,11 @@ def bind_deepseek_v4_c128_prefill_attention_layer(
     """
 
     import torch
-    from b12x.attention import compressed_mla, dsv4_compressor, dsv4_producer
+    from b12x.attention import (
+        compressed_sparse_mla as compressed_mla,
+        dsv4_compressor,
+        dsv4_producer,
+    )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -3129,7 +3141,11 @@ def run_deepseek_v4_c128_prefill_attention_layer(
 ) -> tuple[Any, Any, Any, Any]:
     """Run initial C128 prefill and return residual, post, comb, normalized y."""
 
-    from b12x.attention import compressed_mla, dsv4_compressor, dsv4_producer
+    from b12x.attention import (
+        compressed_sparse_mla as compressed_mla,
+        dsv4_compressor,
+        dsv4_producer,
+    )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -3219,7 +3235,11 @@ def bind_deepseek_v4_c128_continuation_attention_layer(
     """Bind one ordered C128 continuation chunk into the fixed lane arena."""
 
     import torch
-    from b12x.attention import compressed_mla, dsv4_compressor, dsv4_producer
+    from b12x.attention import (
+        compressed_sparse_mla as compressed_mla,
+        dsv4_compressor,
+        dsv4_producer,
+    )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -3431,7 +3451,11 @@ def run_deepseek_v4_c128_continuation_attention_layer(
 ) -> tuple[Any, Any, Any, Any]:
     """Run ordered C128 continuation and return its next FFN input."""
 
-    from b12x.attention import compressed_mla, dsv4_compressor, dsv4_producer
+    from b12x.attention import (
+        compressed_sparse_mla as compressed_mla,
+        dsv4_compressor,
+        dsv4_producer,
+    )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
 
@@ -3525,10 +3549,10 @@ def bind_deepseek_v4_c4_prefill_attention_layer(
 
     import torch
     from b12x.attention import (
-        compressed_mla,
+        compressed_sparse_mla as compressed_mla,
         dsv4_compressor,
         dsv4_producer,
-        nsa_indexer,
+        dsa_indexer,
     )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
@@ -3642,10 +3666,10 @@ def bind_deepseek_v4_c4_prefill_attention_layer(
     )
 
     selector_plan = _cached_target_capture_plan(
-        nsa_indexer.plan,
-        nsa_indexer.Caps(
+        dsa_indexer.plan,
+        dsa_indexer.Caps(
             device=hidden_states.device,
-            source_layout=nsa_indexer.SOURCE_LAYOUT_PAGED,
+            source_layout=dsa_indexer.SOURCE_LAYOUT_PAGED,
             num_q_heads=DS4_INDEX_HEADS,
             max_q_rows=contract.max_rows,
             max_page_table_width=contract.max_page_table_width,
@@ -3798,10 +3822,10 @@ def run_deepseek_v4_c4_prefill_attention_layer(
     """Run initial C4 prefill and return residual, post, comb, normalized y."""
 
     from b12x.attention import (
-        compressed_mla,
+        compressed_sparse_mla as compressed_mla,
         dsv4_compressor,
         dsv4_producer,
-        nsa_indexer,
+        dsa_indexer,
     )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
@@ -3811,7 +3835,7 @@ def run_deepseek_v4_c4_prefill_attention_layer(
     dsv4_producer.run(binding=binding.producer_binding)
     dsv4_compressor.run_prefill(binding=binding.compressor_binding)
     dsv4_producer.run_indexer(binding=binding.indexer_producer_binding)
-    nsa_indexer.index_topk_fp8(
+    dsa_indexer.index_topk_fp8(
         q_fp8=binding.arena_binding.index_query,
         weights=binding.arena_binding.index_head_weights,
         index_k_cache=binding.index_cache,
@@ -3906,10 +3930,10 @@ def bind_deepseek_v4_c4_continuation_attention_layer(
 
     import torch
     from b12x.attention import (
-        compressed_mla,
+        compressed_sparse_mla as compressed_mla,
         dsv4_compressor,
         dsv4_producer,
-        nsa_indexer,
+        dsa_indexer,
     )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
@@ -4025,10 +4049,10 @@ def bind_deepseek_v4_c4_continuation_attention_layer(
     )
 
     selector_plan = _cached_target_capture_plan(
-        nsa_indexer.plan,
-        nsa_indexer.Caps(
+        dsa_indexer.plan,
+        dsa_indexer.Caps(
             device=hidden_states.device,
-            source_layout=nsa_indexer.SOURCE_LAYOUT_PAGED,
+            source_layout=dsa_indexer.SOURCE_LAYOUT_PAGED,
             num_q_heads=DS4_INDEX_HEADS,
             max_q_rows=contract.max_rows,
             max_page_table_width=contract.max_page_table_width,
@@ -4177,10 +4201,10 @@ def run_deepseek_v4_c4_continuation_attention_layer(
     """Run ordered C4 continuation and return its next FFN input."""
 
     from b12x.attention import (
-        compressed_mla,
+        compressed_sparse_mla as compressed_mla,
         dsv4_compressor,
         dsv4_producer,
-        nsa_indexer,
+        dsa_indexer,
     )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
@@ -4190,7 +4214,7 @@ def run_deepseek_v4_c4_continuation_attention_layer(
     dsv4_producer.run(binding=binding.producer_binding)
     dsv4_compressor.run_continuation(binding=binding.compressor_binding)
     dsv4_producer.run_indexer(binding=binding.indexer_producer_binding)
-    nsa_indexer.index_topk_fp8(
+    dsa_indexer.index_topk_fp8(
         q_fp8=binding.arena_binding.index_query,
         weights=binding.arena_binding.index_head_weights,
         index_k_cache=binding.index_cache,
@@ -4278,10 +4302,10 @@ def bind_deepseek_v4_c4_decode_attention_layer(
 
     import torch
     from b12x.attention import (
-        compressed_mla,
+        compressed_sparse_mla as compressed_mla,
         dsv4_compressor,
         dsv4_producer,
-        nsa_indexer,
+        dsa_indexer,
     )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
@@ -4391,10 +4415,10 @@ def bind_deepseek_v4_c4_decode_attention_layer(
     )
 
     selector_plan = _cached_target_capture_plan(
-        nsa_indexer.plan,
-        nsa_indexer.Caps(
+        dsa_indexer.plan,
+        dsa_indexer.Caps(
             device=hidden_states.device,
-            source_layout=nsa_indexer.SOURCE_LAYOUT_PAGED,
+            source_layout=dsa_indexer.SOURCE_LAYOUT_PAGED,
             num_q_heads=DS4_INDEX_HEADS,
             max_q_rows=contract.max_rows,
             max_page_table_width=contract.max_page_table_width,
@@ -4541,10 +4565,10 @@ def run_deepseek_v4_c4_decode_attention_layer(
     """Run C4 decode and return residual, post, comb, normalized y."""
 
     from b12x.attention import (
-        compressed_mla,
+        compressed_sparse_mla as compressed_mla,
         dsv4_compressor,
         dsv4_producer,
-        nsa_indexer,
+        dsa_indexer,
     )
     from b12x.gemm import wo_projection
     from b12x.norm import mhc
@@ -4554,7 +4578,7 @@ def run_deepseek_v4_c4_decode_attention_layer(
     dsv4_producer.run(binding=binding.producer_binding)
     dsv4_compressor.run_decode(binding=binding.compressor_binding)
     dsv4_producer.run_indexer(binding=binding.indexer_producer_binding)
-    nsa_indexer.index_topk_fp8(
+    dsa_indexer.index_topk_fp8(
         q_fp8=binding.arena_binding.index_query,
         weights=binding.arena_binding.index_head_weights,
         index_k_cache=binding.index_cache,

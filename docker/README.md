@@ -5,8 +5,8 @@ host architectures and CUDA targets:
 
 | Image | Platform | CUDA target | Purpose |
 | --- | --- | --- | --- |
-| `ghcr.io/tpurtell/ds4rt-coordinator:v1` | `linux/amd64` | `sm_120` | API, scheduler, attention, cache, sampling |
-| `ghcr.io/tpurtell/ds4rt-spark-expert:v1` | `linux/arm64` | `sm_121` | TP4 routed-expert worker |
+| `ghcr.io/tpurtell/ds4rt-coordinator:v2` | `linux/amd64` | `sm_120` | API, scheduler, attention, cache, sampling |
+| `ghcr.io/tpurtell/ds4rt-spark-expert:v2` | `linux/arm64` | `sm_121` | TP4 routed-expert worker |
 
 Weights are mounted read-only from the host Hugging Face cache. They are never
 embedded in an image and the release image runs offline.
@@ -40,16 +40,16 @@ modules required at startup, pinned SparkInfer source, XGrammar/SparkInfer
 license and provenance records, and the runtime entrypoint. Development
 toolchains and quantization utilities are not part of the serving contract.
 
-## Publish v1
+## Publish v2
 
 After a clean build and five-host runtime qualification:
 
 ```bash
-./push-containers.sh v1
+./push-containers.sh v2
 ```
 
 The script verifies that the local coordinator and first-Spark expert images
-carry the same engine revision, pushes `v1`, and updates `latest` for both
+carry the same engine revision, pushes `v2`, and updates `latest` for both
 packages. It never builds an image; publication therefore cannot bypass the
 normal build and runtime gates.
 
@@ -58,11 +58,11 @@ The publisher needs `write:packages`. The images carry
 `org.opencontainers.image.source=https://github.com/tpurtell/ds4rt-pro-rtx-4spark`,
 which records the intended source association. After the first push, use each
 package's settings to connect this repository and set visibility to public,
-then verify both `v1` manifests from a Docker client with no registry login.
+then verify both `v2` manifests from a Docker client with no registry login.
 
 ## Quantization images
 
 `Dockerfile.quantization` and the `quant-coordinator`/`quant-expert` bake
 targets preserve the reproducible conversion environment used to create the
-published checkpoint. They are developer tools, not required for v1 serving.
+published checkpoint. They are developer tools, not required for v2 serving.
 The public quick-deploy path starts from the already quantized Pro artifact.

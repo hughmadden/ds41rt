@@ -20,15 +20,13 @@ import re
 import shutil
 import struct
 import time
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Mapping
 
 EXL3_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v2"
 EXL3_FORCED_ACTIVATION_RECIPE = (
     "deepseek_v4_exl3_trellis_2bpw_v3_flash_activation_pilot"
 )
-EXL3_ACTIVATION_RECIPE = (
-    "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
-)
+EXL3_ACTIVATION_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
 EXL3_SCHEMA = "ds4rt.exl3.expert-trellis"
 EXL3_SCHEMA_VERSION = 1
 EXL3_BITS = 2
@@ -254,10 +252,14 @@ def read_native_model_config(snapshot: str | Path) -> tuple[dict[str, Any], Mode
     snapshot = Path(snapshot).resolve()
     raw = json.loads((snapshot / "config.json").read_text(encoding="utf-8"))
     if raw.get("model_type") != "deepseek_v4":
-        raise ValueError(f"expected model_type=deepseek_v4, got {raw.get('model_type')!r}")
+        raise ValueError(
+            f"expected model_type=deepseek_v4, got {raw.get('model_type')!r}"
+        )
     quant = raw.get("quantization_config") or {}
     if str(quant.get("quant_method", "")).lower() != "fp8":
-        raise ValueError("EXL3 conversion requires the native FP4/FP8 source checkpoint")
+        raise ValueError(
+            "EXL3 conversion requires the native FP4/FP8 source checkpoint"
+        )
     if raw.get("expert_dtype") != "fp4":
         raise ValueError(f"expected expert_dtype=fp4, got {raw.get('expert_dtype')!r}")
     hidden = int(raw["hidden_size"])
@@ -580,7 +582,9 @@ def load_activation_corpus(
     captures: list[list[ActivationCapture]] = [[] for _ in range(layer_count)]
     seen_paths: set[Path] = set()
     for prompt_index, prompt in enumerate(prompt_records):
-        if not isinstance(prompt, dict) or not isinstance(prompt.get("capture_files"), list):
+        if not isinstance(prompt, dict) or not isinstance(
+            prompt.get("capture_files"), list
+        ):
             raise ValueError(f"activation prompt {prompt_index} has invalid captures")
         for raw_capture in prompt["capture_files"]:
             if not isinstance(raw_capture, dict):
@@ -592,12 +596,16 @@ def load_activation_corpus(
                 raise ValueError("activation capture has no path")
             relative = Path(raw_path)
             if relative.is_absolute():
-                raise ValueError("activation capture paths must be relative to the manifest")
+                raise ValueError(
+                    "activation capture paths must be relative to the manifest"
+                )
             path = (root / relative).resolve(strict=True)
             try:
                 path.relative_to(root)
             except ValueError as error:
-                raise ValueError(f"activation capture escapes its manifest root: {path}") from error
+                raise ValueError(
+                    f"activation capture escapes its manifest root: {path}"
+                ) from error
             if path in seen_paths:
                 raise ValueError(f"duplicate activation capture path: {relative}")
             seen_paths.add(path)
@@ -625,10 +633,14 @@ def load_activation_corpus(
             if route_aware:
                 raw_route_path = raw_capture.get("route_path")
                 if not isinstance(raw_route_path, str) or not raw_route_path:
-                    raise ValueError(f"routed activation capture has no route path: {relative}")
+                    raise ValueError(
+                        f"routed activation capture has no route path: {relative}"
+                    )
                 route_relative = Path(raw_route_path)
                 if route_relative.is_absolute():
-                    raise ValueError("activation route paths must be relative to the manifest")
+                    raise ValueError(
+                        "activation route paths must be relative to the manifest"
+                    )
                 route_path = (root / route_relative).resolve(strict=True)
                 try:
                     route_path.relative_to(root)
@@ -637,7 +649,9 @@ def load_activation_corpus(
                         f"activation route capture escapes its manifest root: {route_path}"
                     ) from error
                 if route_path in seen_paths:
-                    raise ValueError(f"duplicate activation route path: {route_relative}")
+                    raise ValueError(
+                        f"duplicate activation route path: {route_relative}"
+                    )
                 seen_paths.add(route_path)
                 route_nbytes = int(raw_capture.get("route_bytes", 0))
                 route_digest = raw_capture.get("route_sha256")
@@ -675,9 +689,13 @@ def load_activation_corpus(
                     routes_per_row=routes_per_row,
                 )
             )
-    missing_layers = [layer for layer, layer_captures in enumerate(captures) if not layer_captures]
+    missing_layers = [
+        layer for layer, layer_captures in enumerate(captures) if not layer_captures
+    ]
     if missing_layers:
-        raise ValueError(f"activation corpus has no captures for layers {missing_layers}")
+        raise ValueError(
+            f"activation corpus has no captures for layers {missing_layers}"
+        )
     return ActivationCorpus(
         root=root,
         manifest_path=manifest_path,
@@ -724,7 +742,9 @@ def load_activation_layer_samples(
         samples[offset : offset + capture.rows].copy_(values)
         offset += capture.rows
     if offset != total_rows:
-        raise AssertionError(f"activation row accounting changed: {offset} != {total_rows}")
+        raise AssertionError(
+            f"activation row accounting changed: {offset} != {total_rows}"
+        )
     return samples
 
 
@@ -754,8 +774,13 @@ def load_routed_activation_layer(
             raise ValueError(f"routed activation capture is incomplete: {capture.path}")
         payload = capture.route_path.read_bytes()
         if len(payload) != capture.route_nbytes:
-            raise ValueError(f"activation route capture was truncated: {capture.route_path}")
-        if verify_sha256 and hashlib.sha256(payload).hexdigest() != capture.route_sha256:
+            raise ValueError(
+                f"activation route capture was truncated: {capture.route_path}"
+            )
+        if (
+            verify_sha256
+            and hashlib.sha256(payload).hexdigest() != capture.route_sha256
+        ):
             raise ValueError(
                 f"activation route capture SHA-256 changed: {capture.route_path}"
             )
@@ -796,7 +821,9 @@ def load_routed_activation_layer(
         gate_weights[offset:end].copy_(capture_weights)
         offset = end
     if offset != total_rows:
-        raise AssertionError(f"activation route row accounting changed: {offset} != {total_rows}")
+        raise AssertionError(
+            f"activation route row accounting changed: {offset} != {total_rows}"
+        )
     route_counts = torch.bincount(
         expert_ids.reshape(-1), minlength=corpus.routed_experts
     )
@@ -928,7 +955,7 @@ def _read_safetensors_header(path: Path) -> dict[str, SourceTensor]:
         if expected <= 0 or end - start != expected:
             raise ValueError(
                 f"unsupported or inconsistent tensor {name} in {path}: "
-                f"dtype={dtype} shape={shape} bytes={end-start}"
+                f"dtype={dtype} shape={shape} bytes={end - start}"
             )
         result[name] = SourceTensor(
             name=name,
@@ -957,7 +984,9 @@ def _read_indexed_tensors(snapshot: Path, index_path: Path) -> dict[str, SourceT
         try:
             tensor = by_file[file_name][name]
         except KeyError as exc:
-            raise ValueError(f"index points to missing tensor {name} in {file_name}") from exc
+            raise ValueError(
+                f"index points to missing tensor {name} in {file_name}"
+            ) from exc
         result[name] = tensor
     return result
 
@@ -998,7 +1027,9 @@ def _generated_projection_tensors(
             name=f"{base}.{suffix}",
             dtype=dtype,
             shape=shape,
-            nbytes=math.prod(shape) * DTYPE_BYTES[dtype] if shape else DTYPE_BYTES[dtype],
+            nbytes=math.prod(shape) * DTYPE_BYTES[dtype]
+            if shape
+            else DTYPE_BYTES[dtype],
             source=None,
         )
         for suffix, dtype, shape in specs
@@ -1011,6 +1042,7 @@ def build_artifact_plan(
     max_shard_bytes: int = 8 * 1024**3,
     expert_tensor_layout: str = EXPERT_TENSOR_LAYOUT_CHECKPOINT_NATIVE,
     exl3_bits: int = EXL3_BITS,
+    exl3_projection_bits: Mapping[str, int] | None = None,
 ) -> ArtifactPlan:
     if max_shard_bytes <= 0:
         raise ValueError("max_shard_bytes must be positive")
@@ -1020,6 +1052,16 @@ def build_artifact_plan(
         )
     if isinstance(exl3_bits, bool) or exl3_bits not in {2, 3}:
         raise ValueError("EXL3 artifact tier must be integer K2 or K3")
+    projection_bits = dict(exl3_projection_bits or {})
+    if any(
+        not isinstance(name, str)
+        or not name
+        or isinstance(bits, bool)
+        or bits not in {2, 3}
+        for name, bits in projection_bits.items()
+    ):
+        raise ValueError("EXL3 per-projection tiers must be integer K2 or K3")
+    unused_projection_bits = set(projection_bits)
     raw_config, shape = read_native_model_config(snapshot)
     source_index = read_source_index(snapshot)
     tensors = [
@@ -1063,9 +1105,15 @@ def build_artifact_plan(
                         output_base,
                         input_size,
                         output_size,
-                        bits=exl3_bits,
+                        bits=projection_bits.get(output_base, exl3_bits),
                     )
                 )
+                unused_projection_bits.discard(output_base)
+    if unused_projection_bits:
+        raise ValueError(
+            "EXL3 per-projection tier map contains unexpected modules: "
+            f"{sorted(unused_projection_bits)[:8]}"
+        )
     if native_expert_names != expected_native_names:
         missing = sorted(expected_native_names - native_expert_names)[:8]
         unexpected = sorted(native_expert_names - expected_native_names)[:8]
@@ -1127,22 +1175,110 @@ def strict_tp4_source_layout(plan: ArtifactPlan) -> dict[str, Any]:
             f"EXL3 intermediate size {intermediate} must be divisible by {alignment}"
         )
     local_intermediate = intermediate // EXPERT_TP_WORLD_SIZE
-    projection_trellis_bytes = hidden * local_intermediate * plan.exl3_bits // 8
-    per_expert = (
-        3 * projection_trellis_bytes
-        + (3 * hidden + 3 * local_intermediate) * DTYPE_BYTES["F16"]
-        + 3 * DTYPE_BYTES["I32"]
-    )
-    per_block = per_expert * shape.experts
-    total = per_block * shape.total_layers
+    tier_counts: dict[int, int] = {}
+    for tensor in plan.generated_tensors:
+        if not tensor.name.endswith(".trellis"):
+            continue
+        bits = tensor.shape[-1] // 16 if len(tensor.shape) == 3 else 0
+        if bits not in {2, 3}:
+            raise ValueError("EXL3 trellis has an invalid integer tier")
+        tier_counts[bits] = tier_counts.get(bits, 0) + 1
+    if len(tier_counts) == 1:
+        bits = next(iter(tier_counts))
+        projection_trellis_bytes = hidden * local_intermediate * bits // 8
+        per_expert = (
+            3 * projection_trellis_bytes
+            + (3 * hidden + 3 * local_intermediate) * DTYPE_BYTES["F16"]
+            + 3 * DTYPE_BYTES["I32"]
+        )
+        per_block = per_expert * shape.experts
+        total = per_block * shape.total_layers
+        return {
+            "world_size": EXPERT_TP_WORLD_SIZE,
+            "blocks": shape.total_layers,
+            "experts_per_block": shape.experts,
+            "experts_checked": shape.total_layers * shape.experts,
+            "local_intermediate_size": local_intermediate,
+            "rank_source_bytes_per_expert": [per_expert] * EXPERT_TP_WORLD_SIZE,
+            "rank_source_bytes_per_block": [per_block] * EXPERT_TP_WORLD_SIZE,
+            "rank_source_bytes_total": [total] * EXPERT_TP_WORLD_SIZE,
+            "equal_rank_source_bytes": True,
+        }
+
+    by_projection: dict[str, dict[str, OutputTensor]] = {}
+    for tensor in plan.generated_tensors:
+        base, separator, suffix = tensor.name.rpartition(".")
+        if not separator:
+            raise ValueError("mixed EXL3 tensor has no projection identity")
+        by_projection.setdefault(base, {})[suffix] = tensor
+    expert_bytes: dict[tuple[str, int, int], int] = {}
+    for base, tensors in by_projection.items():
+        match = re.fullmatch(
+            r"(?:(model\.layers|layers)|(mtp))\.(\d+)\.(?:mlp|ffn)\.experts\.(\d+)\.(?:gate_proj|up_proj|down_proj|w[123])",
+            base,
+        )
+        if match is None or set(tensors) != {"trellis", "suh", "svh", "mcg"}:
+            raise ValueError(f"mixed EXL3 projection identity is invalid: {base}")
+        namespace = "mtp" if match.group(2) else "base"
+        layer = int(match.group(3))
+        expert = int(match.group(4))
+        local_bytes = 0
+        for suffix, tensor in tensors.items():
+            if suffix == "trellis":
+                if tensor.nbytes % EXPERT_TP_WORLD_SIZE:
+                    raise ValueError(
+                        "mixed EXL3 trellis cannot be partitioned over TP4"
+                    )
+                local_bytes += tensor.nbytes // EXPERT_TP_WORLD_SIZE
+            elif suffix == "mcg" or tensor.shape == (hidden,):
+                local_bytes += tensor.nbytes
+            elif tensor.shape == (intermediate,):
+                if tensor.nbytes % EXPERT_TP_WORLD_SIZE:
+                    raise ValueError(
+                        "mixed EXL3 rotations cannot be partitioned over TP4"
+                    )
+                local_bytes += tensor.nbytes // EXPERT_TP_WORLD_SIZE
+            else:
+                raise ValueError(f"mixed EXL3 rotation geometry is invalid: {base}")
+        key = (namespace, layer, expert)
+        expert_bytes[key] = expert_bytes.get(key, 0) + local_bytes
+    if len(expert_bytes) != shape.total_layers * shape.experts or any(
+        value <= 0 for value in expert_bytes.values()
+    ):
+        raise ValueError("mixed EXL3 TP4 expert accounting is incomplete")
+    block_order = [
+        *(("base", layer) for layer in range(shape.hidden_layers)),
+        *(("mtp", layer) for layer in range(shape.dspark_layers)),
+    ]
+    block_bytes = [
+        sum(expert_bytes[(namespace, layer, expert)] for expert in range(shape.experts))
+        for namespace, layer in block_order
+    ]
+    expert_values = list(expert_bytes.values())
+    total = sum(block_bytes)
+    expert_digest = hashlib.sha256(
+        json.dumps(
+            sorted((*key, value) for key, value in expert_bytes.items()),
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     return {
         "world_size": EXPERT_TP_WORLD_SIZE,
         "blocks": shape.total_layers,
         "experts_per_block": shape.experts,
         "experts_checked": shape.total_layers * shape.experts,
         "local_intermediate_size": local_intermediate,
-        "rank_source_bytes_per_expert": [per_expert] * EXPERT_TP_WORLD_SIZE,
-        "rank_source_bytes_per_block": [per_block] * EXPERT_TP_WORLD_SIZE,
+        "mixed_projection_tiers": True,
+        "tier_counts": {
+            str(bits): count for bits, count in sorted(tier_counts.items())
+        },
+        "rank_source_bytes_by_block": block_bytes,
+        "rank_source_bytes_by_expert_sha256": expert_digest,
+        "rank_source_bytes_per_expert_summary": {
+            "min": min(expert_values),
+            "mean": sum(expert_values) / len(expert_values),
+            "max": max(expert_values),
+        },
         "rank_source_bytes_total": [total] * EXPERT_TP_WORLD_SIZE,
         "equal_rank_source_bytes": True,
     }
@@ -1215,7 +1351,9 @@ def verify_retained_native_tensors(
                     actual.source_offset,
                 )
                 if len(payload) != DTYPE_BYTES["I32"]:
-                    raise IOError(f"short read while checking EXL3 marker {tensor.name}")
+                    raise IOError(
+                        f"short read while checking EXL3 marker {tensor.name}"
+                    )
                 if struct.unpack("<I", payload)[0] != MCG_MARKER:
                     raise ValueError(f"EXL3 tensor {tensor.name} has a non-MCG marker")
             markers_verified = True
@@ -1242,9 +1380,13 @@ def verify_retained_native_tensors(
                 expected = os.pread(source_fd, count, source_offset)
                 observed = os.pread(artifact_fd, count, artifact_offset)
                 if len(expected) != count or len(observed) != count:
-                    raise IOError(f"short read while checking retained tensor {tensor.name}")
+                    raise IOError(
+                        f"short read while checking retained tensor {tensor.name}"
+                    )
                 if observed != expected:
-                    raise ValueError(f"retained native tensor bytes changed for {tensor.name}")
+                    raise ValueError(
+                        f"retained native tensor bytes changed for {tensor.name}"
+                    )
                 digest.update(observed)
                 remaining -= count
                 source_offset += count
@@ -1307,8 +1449,8 @@ def gptqmodel_tensor_storage_for_plan(
         raise ValueError(
             "GPTQModel tensor_storage requires the GPTQModel expert layout"
         )
-    bits = getattr(plan, "exl3_bits", EXL3_BITS)
-    if isinstance(bits, bool) or bits not in {2, 3}:
+    base_bits = getattr(plan, "exl3_bits", EXL3_BITS)
+    if isinstance(base_bits, bool) or base_bits not in {2, 3}:
         raise ValueError("GPTQModel tensor_storage has an invalid EXL3 tier")
     expected_by_base: dict[str, dict[str, OutputTensor]] = {}
     for tensor in plan.generated_tensors:
@@ -1321,6 +1463,14 @@ def gptqmodel_tensor_storage_for_plan(
     for base, expected in expected_by_base.items():
         if set(expected) != {"trellis", "suh", "svh", "mcg"}:
             raise ValueError(f"planned EXL3 projection is incomplete for {base}")
+        trellis = expected["trellis"]
+        bits = (
+            trellis.shape[-1] // 16
+            if len(trellis.shape) == 3 and trellis.shape[-1] % 16 == 0
+            else None
+        )
+        if bits not in {2, 3}:
+            raise ValueError(f"planned EXL3 projection has an invalid tier for {base}")
         storage[base] = {
             "stored_tensors": {
                 f"{base}.{suffix}": {
@@ -1377,7 +1527,9 @@ class SafetensorsArtifactWriter:
         if self.preserve_quant_config:
             self._validate_preserved_quant_config()
         self.state_path = self.output / ".ds4rt-exl3-state.json"
-        self.partial_report_path = self.output / "ds4rt-exl3-calibration.json.incomplete"
+        self.partial_report_path = (
+            self.output / "ds4rt-exl3-calibration.json.incomplete"
+        )
         self.locations: dict[str, OutputLocation] = {}
         self.dirty_shards: set[str] = set()
         self.generated_by_name = {
@@ -1408,7 +1560,10 @@ class SafetensorsArtifactWriter:
         for source in self.plan.snapshot.iterdir():
             if not source.is_file():
                 continue
-            if source.name == "config.json" or source.name == "model.safetensors.index.json":
+            if (
+                source.name == "config.json"
+                or source.name == "model.safetensors.index.json"
+            ):
                 continue
             if source.suffix == ".safetensors":
                 continue
@@ -1538,7 +1693,10 @@ class SafetensorsArtifactWriter:
         weight_map = {
             name: location.file_name for name, location in self.locations.items()
         }
-        index = {"metadata": {"total_size": self.plan.total_size}, "weight_map": weight_map}
+        index = {
+            "metadata": {"total_size": self.plan.total_size},
+            "weight_map": weight_map,
+        }
         (self.output / "model.safetensors.index.json.incomplete").write_text(
             json.dumps(index, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -1594,7 +1752,10 @@ class SafetensorsArtifactWriter:
             "F16": torch.float16,
             "I32": torch.int32,
         }
-        if actual.dtype != dtype_map[expected.dtype] or tuple(actual.shape) != expected.shape:
+        if (
+            actual.dtype != dtype_map[expected.dtype]
+            or tuple(actual.shape) != expected.shape
+        ):
             raise ValueError(
                 f"generated tensor {name} is {actual.dtype} {tuple(actual.shape)}, "
                 f"expected {expected.dtype} {expected.shape}"
@@ -1605,7 +1766,9 @@ class SafetensorsArtifactWriter:
             raise ValueError(f"generated tensor {name} byte count changed")
         destination_fd = os.open(self.output / location.file_name, os.O_WRONLY)
         try:
-            if os.pwrite(destination_fd, payload, location.absolute_offset) != len(payload):
+            if os.pwrite(destination_fd, payload, location.absolute_offset) != len(
+                payload
+            ):
                 raise IOError(f"short write for generated tensor {name}")
         finally:
             os.close(destination_fd)
@@ -1661,7 +1824,9 @@ class SafetensorsArtifactWriter:
     ) -> None:
         missing = {tensor.name for tensor in self.plan.tensors} - self.completed
         if missing:
-            raise ValueError(f"cannot publish incomplete EXL3 artifact; missing {len(missing)} tensors")
+            raise ValueError(
+                f"cannot publish incomplete EXL3 artifact; missing {len(missing)} tensors"
+            )
         self.checkpoint()
         retained_integrity = verify_retained_native_tensors(
             self.plan,
@@ -1754,8 +1919,24 @@ def dequantize_native_fp4_projection(packed: Any, scales: Any) -> Any:
     codes[:, 0::2] = packed_u8 & 0x0F
     codes[:, 1::2] = (packed_u8 >> 4) & 0x0F
     codebook = torch.tensor(
-        [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0,
-         0.0, -0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -6.0],
+        [
+            0.0,
+            0.5,
+            1.0,
+            1.5,
+            2.0,
+            3.0,
+            4.0,
+            6.0,
+            0.0,
+            -0.5,
+            -1.0,
+            -1.5,
+            -2.0,
+            -3.0,
+            -4.0,
+            -6.0,
+        ],
         dtype=torch.float32,
         device=packed.device,
     )
@@ -1986,7 +2167,6 @@ def blended_forced_down_hessian(
 ) -> dict[str, Any]:
     """Shrink one forced expert covariance toward the equal-expert pool."""
 
-    torch = _torch()
     if activations.ndim != 2 or activations.shape[0] <= 0:
         raise ValueError("forced down activations must be a non-empty matrix")
     if (
@@ -2159,7 +2339,9 @@ def qualify_multigpu_batch_equivalence(
         len(shape) != 2 or shape[0] <= 0 or shape[1] <= 0
         for shape in production_projection_shapes
     ):
-        raise ValueError("production projection qualification shapes must be positive rank-2")
+        raise ValueError(
+            "production projection qualification shapes must be positive rank-2"
+        )
 
     primary = torch.device("cuda:0")
     generator = torch.Generator(device=primary).manual_seed(seed)
@@ -2465,7 +2647,9 @@ def build_forced_down_pooled_covariance(
         torch.cuda.empty_cache()
     pooled_sum.div_(plan.shape.experts * rows_per_expert)
     if not bool(torch.isfinite(pooled_sum).all().item()):
-        raise ValueError(f"forced down pooled covariance is non-finite at layer {layer_id}")
+        raise ValueError(
+            f"forced down pooled covariance is non-finite at layer {layer_id}"
+        )
     return pooled_sum
 
 
@@ -2679,9 +2863,7 @@ def run_layerwise_quantization(
                             "forced_down_total_rows": (
                                 forced_down_rows_per_expert * plan.shape.experts
                             ),
-                            "forced_down_expert_weight": (
-                                forced_down_expert_weight
-                            ),
+                            "forced_down_expert_weight": (forced_down_expert_weight),
                         }
                     ),
                 }
@@ -2694,7 +2876,9 @@ def run_layerwise_quantization(
             layer_report["expert_natural_route_rows"] = []
         for expert_start in range(0, plan.shape.experts, batch_experts):
             expert_ids = tuple(
-                range(expert_start, min(plan.shape.experts, expert_start + batch_experts))
+                range(
+                    expert_start, min(plan.shape.experts, expert_start + batch_experts)
+                )
             )
             group_bases = [
                 expert_projection_base(plan.shape, layer_id, expert_id, stem)
@@ -2725,7 +2909,9 @@ def run_layerwise_quantization(
                 gate_weights.append(gate)
                 up_weights.append(up)
                 down_weights.append(down)
-            fc1_weights = [value for pair in zip(gate_weights, up_weights) for value in pair]
+            fc1_weights = [
+                value for pair in zip(gate_weights, up_weights) for value in pair
+            ]
             fc1_bases = [
                 expert_projection_base(plan.shape, layer_id, expert_id, stem)
                 for expert_id in expert_ids
@@ -2749,14 +2935,10 @@ def run_layerwise_quantization(
                         ),
                         device=device,
                     )
-                    for expert_id, (samples, gates) in zip(
-                        expert_ids, routed_inputs
-                    )
+                    for expert_id, (samples, gates) in zip(expert_ids, routed_inputs)
                 ]
                 fc1_hessians = [
-                    hessian
-                    for hessian in expert_input_hessians
-                    for _ in ("w1", "w3")
+                    hessian for hessian in expert_input_hessians for _ in ("w1", "w3")
                 ]
                 layer_report["expert_natural_route_rows"].extend(
                     {
@@ -2766,9 +2948,7 @@ def run_layerwise_quantization(
                         "gate_mean": float(gates.mean().item()),
                         "gate_max": float(gates.max().item()),
                     }
-                    for expert_id, (samples, gates) in zip(
-                        expert_ids, routed_inputs
-                    )
+                    for expert_id, (samples, gates) in zip(expert_ids, routed_inputs)
                 )
             else:
                 assert shared_h is not None

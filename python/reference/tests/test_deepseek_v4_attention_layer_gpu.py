@@ -21,11 +21,11 @@ from ds4rt_reference.deepseek_v4_attention_layer_capture import (
     run_deepseek_v4_c128_prefill_attention_layer,
     run_deepseek_v4_sliding_attention_layer,
 )
-from b12x.attention import dsv4_compressor, dsv4_producer, nsa_indexer
+from b12x.attention import dsa_indexer, dsv4_compressor, dsv4_producer
 from b12x.attention._shared.mla.compressed_reference import (
-    pack_compressed_mla_kv_cache_reference,
+    pack_compressed_sparse_mla_kv_cache_reference as pack_compressed_mla_kv_cache_reference,
 )
-from b12x.attention.nsa_indexer.reference import pack_index_k_cache_reference
+from b12x.attention.dsa_indexer.reference import pack_index_k_cache_reference
 from b12x.gemm import wo_projection
 
 pytestmark = pytest.mark.skipif(
@@ -896,10 +896,10 @@ def test_flash_m1_c4_decode_replays_learned_selection_on_gpu0(
                 torch.randn((64, hidden), device=device, dtype=torch.bfloat16) / 64
             ).contiguous(),
         )
-        selector_plan = nsa_indexer.plan(
-            nsa_indexer.Caps(
+        selector_plan = dsa_indexer.plan(
+            dsa_indexer.Caps(
                 device=device,
-                source_layout=nsa_indexer.SOURCE_LAYOUT_PAGED,
+                source_layout=dsa_indexer.SOURCE_LAYOUT_PAGED,
                 num_q_heads=64,
                 max_q_rows=tokens,
                 max_page_table_width=pages,
@@ -1182,10 +1182,10 @@ def test_flash_m512_c4_initial_prefill_replays_causal_selection_on_gpu0(
                 torch.randn((64, hidden), device=device, dtype=torch.bfloat16) / 64
             ).contiguous(),
         )
-        selector_plan = nsa_indexer.plan(
-            nsa_indexer.Caps(
+        selector_plan = dsa_indexer.plan(
+            dsa_indexer.Caps(
                 device=device,
-                source_layout=nsa_indexer.SOURCE_LAYOUT_PAGED,
+                source_layout=dsa_indexer.SOURCE_LAYOUT_PAGED,
                 num_q_heads=64,
                 max_q_rows=tokens,
                 max_page_table_width=pages,
@@ -1479,10 +1479,10 @@ def test_flash_m8_c4_continuation_replays_shared_selection_on_gpu0(
                 torch.randn((64, hidden), device=device, dtype=torch.bfloat16) / 64
             ).contiguous(),
         )
-        selector_plan = nsa_indexer.plan(
-            nsa_indexer.Caps(
+        selector_plan = dsa_indexer.plan(
+            dsa_indexer.Caps(
                 device=device,
-                source_layout=nsa_indexer.SOURCE_LAYOUT_PAGED,
+                source_layout=dsa_indexer.SOURCE_LAYOUT_PAGED,
                 num_q_heads=64,
                 max_q_rows=tokens,
                 max_page_table_width=pages,

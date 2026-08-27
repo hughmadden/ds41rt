@@ -2,7 +2,7 @@
 
 DS4RT is an attention–FFN-disaggregated DeepSeek V4 Pro engine for one RTX PRO
 6000 Blackwell coordinator and four DGX Spark workers. This document defines
-the stable v1 ownership and execution contract. Model dimensions are validated
+the stable v2 ownership and execution contract. Model dimensions are validated
 from the selected snapshot rather than inferred from these prose values.
 
 ## Topology and ownership

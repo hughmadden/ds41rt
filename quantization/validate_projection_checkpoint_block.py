@@ -36,7 +36,14 @@ from gptqmodel.utils.exl3_error_ledger import (
 from gptqmodel.utils.exl3_projection_checkpoint import (
     CHECKPOINT_CONTRACT,
     EXL3ProjectionCheckpointStore,
-    canonical_json_bytes,
+)
+from gptqmodel.utils.exl3_inline_mixed import (
+    INLINE_MIXED_META_KEY,
+    INLINE_MIXED_SCHEMA,
+    INLINE_MIXED_SCHEMA_VERSION,
+    PROJECTION_ORDER,
+    inline_mixed_policy,
+    projection_score,
 )
 
 import quantize_flash_gptqmodel as launcher
@@ -160,7 +167,9 @@ def _load_journal(path: Path) -> dict[str, tuple[dict[str, Any], str]]:
         )
         module = bound.get("module")
         if not isinstance(module, str) or not module or module in records:
-            raise AuditError("projection journal contains a missing or duplicate module")
+            raise AuditError(
+                "projection journal contains a missing or duplicate module"
+            )
         records[module] = (
             {key: value for key, value in bound.items() if key != "record_sha256"},
             digest,
@@ -184,6 +193,357 @@ def _expected_modules(
         for expert in range(expert_count)
         for projection, projection_name in PROJECTION_NAMES.items()
     }
+
+
+def _portable_inline_policy(policy: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in policy.items() if key != "tier_plan_root"}
+
+
+def _resolve_planned_path(
+    path: Path,
+    *,
+    plan: dict[str, Any],
+    run_state: Path,
+) -> Path:
+    """Resolve a run-state child across a host/container mount alias."""
+
+    planned_run_state = Path(plan["run_state_dir"])
+    try:
+        relative = path.relative_to(planned_run_state)
+    except ValueError:
+        return path.resolve()
+    return (run_state / relative).resolve()
+
+
+def _inline_mixed_block_contract(
+    *,
+    plan: dict[str, Any],
+    run_state: Path,
+    namespace: str,
+    logical_layer: int,
+    expected: dict[str, tuple[int, str]] | dict[str, dict[str, Any]],
+    family_join: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Authenticate one immutable tier plan and return its exact module tiers."""
+
+    policies = plan.get("inline_mixed", {})
+    if not isinstance(policies, dict):
+        raise AuditError("quantization plan inline-mixed policies are invalid")
+    raw = policies.get(namespace)
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise AuditError("quantization plan inline-mixed policy is invalid")
+    portable = _portable_inline_policy(raw)
+    joined = family_join.get("inline_mixed")
+    if not isinstance(joined, dict) or joined.get(namespace) != portable:
+        raise AuditError("inline-mixed policy differs from family provenance")
+    try:
+        policy = inline_mixed_policy({INLINE_MIXED_META_KEY: raw})
+    except (TypeError, ValueError) as error:
+        raise AuditError("inline-mixed policy contract is invalid") from error
+    if policy is None or policy.namespace != namespace:
+        raise AuditError("inline-mixed policy namespace is invalid")
+    base_bits = plan.get("exl3", {}).get("bits")
+    if policy.base_bits != base_bits or policy.upgrade_bits != base_bits + 1:
+        raise AuditError("inline-mixed policy differs from the base EXL3 tier")
+
+    geometry = plan["source"]["geometry"]
+    layer_count = (
+        geometry["num_hidden_layers"]
+        if namespace == "base"
+        else len(geometry["dspark_target_layer_ids"])
+    )
+    expert_count = geometry["n_routed_experts"]
+    tier_root = _resolve_planned_path(
+        policy.tier_plan_root,
+        plan=plan,
+        run_state=run_state,
+    )
+    tier_path = tier_root / namespace / f"layer-{logical_layer:06d}.json"
+    tier_plan = _read_object(tier_path, "inline-mixed tier plan")
+    body = {key: value for key, value in tier_plan.items() if key != "tier_plan_sha256"}
+    digest = tier_plan.get("tier_plan_sha256")
+    expected_tier_keys = {
+        *policy.policy_body,
+        "policy_sha256",
+        "layer_index",
+        "layer_count",
+        "experts_per_layer",
+        "quotas",
+        "selected",
+        "tier_plan_sha256",
+    }
+    try:
+        quotas = policy.layer_quotas(
+            layer_index=logical_layer,
+            layer_count=layer_count,
+            experts_per_layer=expert_count,
+        )
+    except ValueError as error:
+        raise AuditError("inline-mixed tier quotas are invalid") from error
+    if (
+        set(tier_plan) != expected_tier_keys
+        or tier_plan.get("schema") != INLINE_MIXED_SCHEMA
+        or tier_plan.get("schema_version") != INLINE_MIXED_SCHEMA_VERSION
+        or tier_plan.get("namespace") != namespace
+        or tier_plan.get("layer_index") != logical_layer
+        or tier_plan.get("layer_count") != layer_count
+        or tier_plan.get("experts_per_layer") != expert_count
+        or tier_plan.get("policy_sha256") != policy.policy_sha256
+        or tier_plan.get("quotas") != quotas
+        or not isinstance(digest, str)
+        or digest != _sha256(_canonical(body))
+        or any(tier_plan.get(key) != value for key, value in policy.policy_body.items())
+    ):
+        raise AuditError("inline-mixed tier plan failed its immutable contract")
+
+    selected_raw = tier_plan.get("selected")
+    if not isinstance(selected_raw, list) or len(selected_raw) != sum(quotas.values()):
+        raise AuditError("inline-mixed tier plan has an invalid selection count")
+    selected: dict[str, dict[str, Any]] = {}
+    observed_quotas = {projection: 0 for projection in PROJECTION_ORDER}
+    for entry in selected_raw:
+        if not isinstance(entry, dict) or set(entry) != {
+            "module",
+            "expert",
+            "projection",
+            "score",
+            "candidate_record_sha256",
+        }:
+            raise AuditError("inline-mixed tier plan selection is malformed")
+        module = entry.get("module")
+        identity = expected.get(module) if isinstance(module, str) else None
+        if isinstance(identity, tuple):
+            expert, projection = identity
+        elif isinstance(identity, dict):
+            expert, projection = identity.get("expert"), identity.get("projection")
+        else:
+            raise AuditError("inline-mixed tier plan selected an unexpected module")
+        score = entry.get("score")
+        candidate_digest = entry.get("candidate_record_sha256")
+        if (
+            entry.get("expert") != expert
+            or entry.get("projection") != projection
+            or projection not in observed_quotas
+            or isinstance(score, bool)
+            or not isinstance(score, (int, float))
+            or not math.isfinite(float(score))
+            or float(score) < 0
+            or not isinstance(candidate_digest, str)
+            or launcher.SHA256_RE.fullmatch(candidate_digest) is None
+            or module in selected
+        ):
+            raise AuditError("inline-mixed tier plan selection identity is invalid")
+        observed_quotas[projection] += 1
+        selected[module] = entry
+    if observed_quotas != quotas:
+        raise AuditError("inline-mixed tier plan does not close projection quotas")
+
+    bits_by_module = {
+        module: policy.upgrade_bits if module in selected else policy.base_bits
+        for module in expected
+    }
+    return {
+        "policy": portable,
+        "policy_sha256": policy.policy_sha256,
+        "tier_plan_sha256": digest,
+        "tier_plan": tier_plan,
+        "quotas": quotas,
+        "selected": selected,
+        "bits_by_module": bits_by_module,
+        "base_bits": policy.base_bits,
+        "upgrade_bits": policy.upgrade_bits,
+    }
+
+
+def _checkpoint_manifest_selection(
+    checkpoint_root: Path,
+    *,
+    plan: dict[str, Any],
+    run_state: Path,
+    expected: dict[str, tuple[int, str]] | dict[str, dict[str, Any]],
+    family_join: dict[str, Any],
+    ignore_unexpected: bool,
+    allow_missing: bool = False,
+) -> tuple[
+    dict[str, tuple[dict[str, Any], dict[str, Any]]],
+    dict[str, tuple[tuple[dict[str, Any], dict[str, Any]], ...]],
+    dict[tuple[str, int], dict[str, Any] | None],
+]:
+    """Select authoritative manifests while retaining all authenticated tiers."""
+
+    blocks: dict[tuple[str, int], dict[str, Any]] = {}
+    for module, raw_identity in expected.items():
+        if isinstance(raw_identity, tuple):
+            identity = routed_expert_identity(module)
+        else:
+            identity = raw_identity
+        if not isinstance(identity, dict):
+            raise AuditError(f"projection identity differs for {module}")
+        key = (identity["block_namespace"], identity["logical_layer"])
+        blocks.setdefault(key, {})[module] = raw_identity
+    tier_contracts = {
+        key: _inline_mixed_block_contract(
+            plan=plan,
+            run_state=run_state,
+            namespace=key[0],
+            logical_layer=key[1],
+            expected=block_expected,
+            family_join=family_join,
+        )
+        for key, block_expected in blocks.items()
+    }
+
+    store = EXL3ProjectionCheckpointStore(checkpoint_root)
+    manifests: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+    for manifest_path in sorted(checkpoint_root.rglob("*.json")):
+        if manifest_path.name.startswith("."):
+            continue
+        manifest = _read_object(manifest_path, "projection checkpoint manifest")
+        request = manifest.get("request")
+        module = request.get("module") if isinstance(request, dict) else None
+        if module not in expected:
+            if ignore_unexpected:
+                continue
+            raise AuditError(
+                f"projection checkpoint contains an unexpected module: {module!r}"
+            )
+        request_digest = request.get("request_sha256")
+        if not isinstance(request_digest, str):
+            raise AuditError(
+                f"projection checkpoint has no request digest for {module}"
+            )
+        try:
+            expected_manifest, _expected_tensor = store._paths(request_digest)
+        except ValueError as error:
+            raise AuditError(
+                f"projection checkpoint request is invalid for {module}"
+            ) from error
+        if expected_manifest != manifest_path:
+            raise AuditError("projection checkpoint manifest path differs from request")
+        manifests.setdefault(module, []).append((request, manifest))
+
+    selected: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+    retained: dict[str, tuple[tuple[dict[str, Any], dict[str, Any]], ...]] = {}
+    for module, raw_identity in expected.items():
+        identity = (
+            routed_expert_identity(module)
+            if isinstance(raw_identity, tuple)
+            else raw_identity
+        )
+        key = (identity["block_namespace"], identity["logical_layer"])
+        tier = tier_contracts[key]
+        entries = manifests.get(module, [])
+        by_role: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+        for request, manifest in entries:
+            contract = request.get("quantizer_contract")
+            inline = (
+                contract.get("inline_mixed") if isinstance(contract, dict) else None
+            )
+            try:
+                _module, role = store._module_request_key(request)
+            except ValueError as error:
+                raise AuditError(
+                    f"projection checkpoint tier role is invalid for {module}"
+                ) from error
+            if role in by_role:
+                raise AuditError(f"duplicate projection checkpoint tier for {module}")
+            if tier is None:
+                if role != "uniform" or inline is not None:
+                    raise AuditError(
+                        f"uniform projection has an inline-mixed checkpoint for {module}"
+                    )
+            else:
+                expected_static = {
+                    "base_bits": tier["base_bits"],
+                    "upgrade_bits": tier["upgrade_bits"],
+                    "policy_sha256": tier["policy_sha256"],
+                    "role": role,
+                }
+                if (
+                    not isinstance(inline, dict)
+                    or any(
+                        inline.get(key) != value
+                        for key, value in expected_static.items()
+                    )
+                    or (role == "candidate_k2" and inline != expected_static)
+                ):
+                    raise AuditError(
+                        f"inline-mixed checkpoint policy differs for {module}"
+                    )
+            by_role[role] = (request, manifest)
+
+        if tier is None:
+            if not by_role and allow_missing:
+                continue
+            if set(by_role) != {"uniform"}:
+                raise AuditError(f"projection checkpoint is missing for {module}")
+            selected[module] = by_role["uniform"]
+        else:
+            upgraded = module in tier["selected"]
+            expected_roles = {"candidate_k2"}
+            if upgraded:
+                expected_roles.add("selected_k3")
+            if set(by_role) != expected_roles:
+                if allow_missing and set(by_role) < expected_roles:
+                    retained[module] = tuple(entries)
+                    continue
+                raise AuditError(
+                    f"inline-mixed checkpoint tiers differ for {module}: "
+                    f"actual={sorted(by_role)} expected={sorted(expected_roles)}"
+                )
+            candidate_request = by_role["candidate_k2"][0]
+            if upgraded:
+                selected_request = by_role["selected_k3"][0]
+                inline = selected_request["quantizer_contract"]["inline_mixed"]
+                expected_inline = {
+                    "base_bits": tier["base_bits"],
+                    "upgrade_bits": tier["upgrade_bits"],
+                    "policy_sha256": tier["policy_sha256"],
+                    "role": "selected_k3",
+                    "candidate_request_sha256": candidate_request["request_sha256"],
+                    "tier_plan_sha256": tier["tier_plan_sha256"],
+                }
+                if inline != expected_inline:
+                    raise AuditError(
+                        f"inline-mixed selected checkpoint binding differs for {module}"
+                    )
+                selected[module] = by_role["selected_k3"]
+            else:
+                selected[module] = by_role["candidate_k2"]
+        retained[module] = tuple(entries)
+    return selected, retained, tier_contracts
+
+
+def _block_report_geometry(
+    *,
+    hidden_size: int,
+    intermediate_size: int,
+    expert_count: int,
+    bits: int,
+    tier: dict[str, Any] | None,
+) -> dict[str, Any]:
+    geometry: dict[str, Any] = {
+        "hidden_size": hidden_size,
+        "moe_intermediate_size": intermediate_size,
+        "n_routed_experts": expert_count,
+        "bits": bits,
+        "codebook": "mcg",
+    }
+    if tier is not None:
+        selected_count = len(tier["selected"])
+        geometry["inline_mixed"] = {
+            "policy": tier["policy"],
+            "policy_sha256": tier["policy_sha256"],
+            "tier_plan_sha256": tier["tier_plan_sha256"],
+            "quotas": tier["quotas"],
+            "tier_counts": {
+                str(tier["base_bits"]): expert_count * 3 - selected_count,
+                str(tier["upgrade_bits"]): selected_count,
+            },
+        }
+    return geometry
 
 
 def _expected_tensor_contract(
@@ -242,9 +602,10 @@ def _validate_tensors(
                 f"expected {dtype}/{shape}"
             )
         encoded_bytes += tensor.numel() * tensor.element_size()
-    if not torch.isfinite(tensors["suh"]).all() or not torch.isfinite(
-        tensors["svh"]
-    ).all():
+    if (
+        not torch.isfinite(tensors["suh"]).all()
+        or not torch.isfinite(tensors["svh"]).all()
+    ):
         raise AuditError("projection rotations contain NaN or Inf")
     if int(tensors["mcg"].item()) & 0xFFFFFFFF != MCG_MARKER:
         raise AuditError("projection MCG marker does not match the DS4RT codebook")
@@ -369,7 +730,9 @@ def _projection_error_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _route_summary(families: list[dict[str, Any]]) -> dict[str, Any]:
-    counts = [int(family["route_evidence"]["expert_route_count"]) for family in families]
+    counts = [
+        int(family["route_evidence"]["expert_route_count"]) for family in families
+    ]
     summary = {
         "experts": len(counts),
         "zero_count": sum(count == 0 for count in counts),
@@ -382,11 +745,7 @@ def _route_summary(families: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     if recovered:
         router_augmented = [
-            int(
-                family["zero_route_recovery"][
-                    "router_augmented_sample_count"
-                ]
-            )
+            int(family["zero_route_recovery"]["router_augmented_sample_count"])
             for family in recovered
         ]
         identity = [
@@ -465,7 +824,9 @@ def _tp4_residency_summary(
     for module, (expert, projection) in expected.items():
         item = selected.get(module)
         if item is None or (expert, projection) in by_identity:
-            raise AuditError("TP4 residency projection identity is incomplete or repeated")
+            raise AuditError(
+                "TP4 residency projection identity is incomplete or repeated"
+            )
         by_identity[(expert, projection)] = item[0]
 
     local_intermediate = intermediate_size // TP4_WORLD_SIZE
@@ -572,9 +933,7 @@ def _tp4_residency_summary(
                 torch.cat(
                     [
                         tensors["svh"][
-                            rank
-                            * local_intermediate : (rank + 1)
-                            * local_intermediate
+                            rank * local_intermediate : (rank + 1) * local_intermediate
                         ]
                         for rank in range(TP4_WORLD_SIZE)
                     ]
@@ -600,9 +959,7 @@ def _tp4_residency_summary(
             torch.cat(
                 [
                     down["suh"][
-                        rank
-                        * local_intermediate : (rank + 1)
-                        * local_intermediate
+                        rank * local_intermediate : (rank + 1) * local_intermediate
                     ]
                     for rank in range(TP4_WORLD_SIZE)
                 ]
@@ -612,8 +969,7 @@ def _tp4_residency_summary(
             raise AuditError("TP4 FC2 trellis/rotation partition is not lossless")
 
     identity_expert_map = b"".join(
-        value.to_bytes(4, "little", signed=True)
-        for value in range(expert_count + 1)
+        value.to_bytes(4, "little", signed=True) for value in range(expert_count + 1)
     )
     dummy_scale = bytes(16)
     global_scale = struct.pack("<f", 1.0) * expert_count
@@ -622,20 +978,15 @@ def _tp4_residency_summary(
         "identity_expert_map_sha256": _sha256(identity_expert_map),
         "dummy_scale_sha256": _sha256(dummy_scale),
         "global_scale_sha256": _sha256(global_scale),
-        "combined_sha256": _sha256(
-            identity_expert_map + dummy_scale + global_scale
-        ),
+        "combined_sha256": _sha256(identity_expert_map + dummy_scale + global_scale),
     }
-    checkpoint_sizes = {
-        report["checkpoint_payload_bytes"] for report in rank_reports
-    }
+    checkpoint_sizes = {report["checkpoint_payload_bytes"] for report in rank_reports}
     if len(checkpoint_sizes) != 1:
         raise AuditError("TP4 ranks do not have equal resident payload bytes")
     for rank_report in rank_reports:
         components = rank_report["components"]
         rank_report["resident_weight_bytes"] = (
-            components["w13_trellis"]["bytes"]
-            + components["w2_trellis"]["bytes"]
+            components["w13_trellis"]["bytes"] + components["w2_trellis"]["bytes"]
         )
         rank_report["resident_metadata_bytes"] = (
             rank_report["checkpoint_payload_bytes"]
@@ -643,8 +994,7 @@ def _tp4_residency_summary(
             + runtime_generated["bytes"]
         )
         rank_report["resident_bytes"] = (
-            rank_report["checkpoint_payload_bytes"]
-            + runtime_generated["bytes"]
+            rank_report["checkpoint_payload_bytes"] + runtime_generated["bytes"]
         )
     report = {
         "schema": TP4_RESIDENCY_SCHEMA,
@@ -725,6 +1075,10 @@ def audit_block(
     if isinstance(bits, bool) or not isinstance(bits, int) or bits not in {2, 3, 4}:
         raise AuditError("quantization plan has an invalid integer EXL3 tier")
 
+    family_join = plan.get("ledger_provenance", {}).get("family_join")
+    if not isinstance(family_join, dict):
+        raise AuditError("quantization plan has no family-join provenance")
+
     checkpoint_contract = plan.get("projection_checkpoint")
     checkpoint_root = Path(
         checkpoint_contract.get("root", "")
@@ -744,24 +1098,120 @@ def audit_block(
         logical_layer=logical_layer,
         expert_count=values["expert_count"],
     )
-    journal = _load_journal(run_state / launcher.ERROR_JOURNAL_FILENAME)
     store = EXL3ProjectionCheckpointStore(checkpoint_root)
-    selected: dict[str, tuple[dict[str, torch.Tensor], dict[str, Any], dict[str, Any]]] = {}
-    for manifest_path in sorted(checkpoint_root.rglob("*.json")):
-        if manifest_path.name.startswith("."):
-            continue
-        manifest = _read_object(manifest_path, "projection checkpoint manifest")
-        request = manifest.get("request")
-        module = request.get("module") if isinstance(request, dict) else None
-        if module not in expected:
-            continue
-        if module in selected:
-            raise AuditError(f"duplicate projection checkpoint for {module}")
-        loaded = store.load(request)
+    selected_manifests, retained_manifests, tier_contracts = (
+        _checkpoint_manifest_selection(
+            checkpoint_root,
+            plan=plan,
+            run_state=run_state,
+            expected=expected,
+            family_join=family_join,
+            ignore_unexpected=True,
+            allow_missing=True,
+        )
+    )
+    journal = _load_journal(run_state / launcher.ERROR_JOURNAL_FILENAME)
+    block_key = (block_namespace, logical_layer)
+    block_tier = tier_contracts[block_key]
+    candidate_journal = (
+        _load_journal(run_state / launcher.INLINE_MIXED_CANDIDATE_JOURNAL_FILENAME)
+        if block_tier is not None
+        else None
+    )
+    loaded_by_request: dict[str, tuple[dict[str, torch.Tensor], dict[str, Any]]] = {}
+
+    def load_entry(
+        entry: tuple[dict[str, Any], dict[str, Any]],
+    ) -> tuple[dict[str, torch.Tensor], dict[str, Any]]:
+        request, _manifest = entry
+        digest = request["request_sha256"]
+        loaded = loaded_by_request.get(digest)
         if loaded is None:
-            raise AuditError(f"projection checkpoint disappeared for {module}")
-        tensors, result = loaded
-        selected[module] = (tensors, result, manifest)
+            loaded = store.load(request)
+            if loaded is None:
+                raise AuditError(
+                    f"projection checkpoint disappeared for {request.get('module')}"
+                )
+            loaded_by_request[digest] = loaded
+        return loaded
+
+    selected: dict[
+        str,
+        tuple[dict[str, torch.Tensor], dict[str, Any], dict[str, Any]],
+    ] = {}
+    for module, entry in selected_manifests.items():
+        tensors, result = load_entry(entry)
+        selected[module] = (tensors, result, entry[1])
+
+    if block_tier is not None:
+        assert candidate_journal is not None
+        for module, entries in retained_manifests.items():
+            candidate_entries = [
+                entry
+                for entry in entries
+                if entry[0]
+                .get("quantizer_contract", {})
+                .get("inline_mixed", {})
+                .get("role")
+                == "candidate_k2"
+            ]
+            if len(candidate_entries) != 1:
+                raise AuditError(f"inline-mixed K2 candidate differs for {module}")
+            candidate_request, _candidate_manifest = candidate_entries[0]
+            _candidate_tensors, candidate_result = load_entry(candidate_entries[0])
+            candidate_ledger = candidate_result.get("ledger_record")
+            candidate_bound = candidate_journal.get(module)
+            if (
+                not isinstance(candidate_ledger, dict)
+                or candidate_ledger.get("bits") != block_tier["base_bits"]
+                or candidate_ledger.get("module") != module
+                or candidate_ledger.get("provenance", {}).get("family_join")
+                != family_join
+                or candidate_bound is None
+                or candidate_bound[0] != candidate_ledger
+            ):
+                raise AuditError(
+                    f"inline-mixed K2 candidate evidence differs for {module}"
+                )
+            selected_entry = block_tier["selected"].get(module)
+            if selected_entry is not None and module in selected_manifests:
+                try:
+                    score = projection_score(candidate_ledger)
+                except ValueError as error:
+                    raise AuditError(
+                        f"inline-mixed K2 candidate score differs for {module}"
+                    ) from error
+                candidate_digest = _sha256(_canonical(candidate_ledger))
+                chosen_request = selected_manifests[module][0]
+                candidate_body = {
+                    key: value
+                    for key, value in candidate_request.items()
+                    if key not in {"request_sha256", "quantizer_contract"}
+                }
+                chosen_body = {
+                    key: value
+                    for key, value in chosen_request.items()
+                    if key not in {"request_sha256", "quantizer_contract"}
+                }
+                candidate_contract = {
+                    key: value
+                    for key, value in candidate_request["quantizer_contract"].items()
+                    if key not in {"bits", "inline_mixed"}
+                }
+                chosen_contract = {
+                    key: value
+                    for key, value in chosen_request["quantizer_contract"].items()
+                    if key not in {"bits", "inline_mixed"}
+                }
+                if (
+                    selected_entry["candidate_record_sha256"] != candidate_digest
+                    or selected_entry["score"] != score
+                    or candidate_body != chosen_body
+                    or candidate_contract != chosen_contract
+                ):
+                    raise AuditError(
+                        f"inline-mixed K3 selection differs from its K2 candidate for {module}"
+                    )
 
     missing = sorted(set(expected) - set(selected))
     if require_complete and missing:
@@ -780,9 +1230,6 @@ def audit_block(
     journal_digests: list[tuple[str, str]] = []
     ownership: dict[str, int] = {}
     encoded_bytes = 0
-    family_join = plan.get("ledger_provenance", {}).get("family_join")
-    if not isinstance(family_join, dict):
-        raise AuditError("quantization plan has no family-join provenance")
     expected_recovery_authorization = _expected_recovery_authorization(
         family_join,
     )
@@ -791,6 +1238,9 @@ def audit_block(
         tensors, result, manifest = selected[module]
         expert, projection = expected[module]
         request = manifest["request"]
+        expected_bits = (
+            block_tier["bits_by_module"][module] if block_tier is not None else bits
+        )
         identity = routed_expert_identity(module)
         expected_identity = {
             "block_namespace": block_namespace,
@@ -805,7 +1255,7 @@ def audit_block(
         quantizer_contract = request.get("quantizer_contract")
         if (
             not isinstance(quantizer_contract, dict)
-            or quantizer_contract.get("bits") != bits
+            or quantizer_contract.get("bits") != expected_bits
             or quantizer_contract.get("codebook") != "mcg"
             or quantizer_contract.get("apply_out_scales") is not None
             or quantizer_contract.get("sigma_reg") != launcher.EXL3_SIGMA_REG
@@ -824,7 +1274,7 @@ def audit_block(
             projection=projection,
             hidden_size=values["hidden_size"],
             intermediate_size=values["intermediate_size"],
-            bits=bits,
+            bits=expected_bits,
         )
         encoded_bytes += projection_bytes
 
@@ -838,7 +1288,9 @@ def audit_block(
                 result.get("proxy_error", math.nan),
             )
         ):
-            raise AuditError(f"projection checkpoint has non-finite results for {module}")
+            raise AuditError(
+                f"projection checkpoint has non-finite results for {module}"
+            )
         metrics = ledger.get("quantizer_metrics")
         if (
             ledger.get("schema") != LEDGER_SCHEMA
@@ -846,17 +1298,15 @@ def audit_block(
             or ledger.get("record_kind") != "projection"
             or ledger.get("module") != module
             or any(ledger.get(key) != value for key, value in expected_identity.items())
-            or ledger.get("bits") != bits
+            or ledger.get("bits") != expected_bits
             or ledger.get("codebook") != "mcg"
             or ledger.get("encoded_bytes") != projection_bytes
             or ledger.get("sample_count") != request.get("sample_count")
             or ledger.get("route_evidence") != request.get("route_evidence")
-            or ledger.get("zero_route_recovery")
-            != request.get("zero_route_recovery")
+            or ledger.get("zero_route_recovery") != request.get("zero_route_recovery")
             or not isinstance(metrics, dict)
             or metrics.get("hessian_metric_status") != "ok"
-            or metrics.get("hessian_regularization_sigma")
-            != launcher.EXL3_SIGMA_REG
+            or metrics.get("hessian_regularization_sigma") != launcher.EXL3_SIGMA_REG
             or metrics.get("hessian_numerical_contract")
             != launcher.EXL3_HESSIAN_NUMERICAL_CONTRACT
             or metrics.get("hessian_transform_compute_dtype") != "torch.float64"
@@ -933,13 +1383,13 @@ def audit_block(
         "run_state": os.fspath(run_state),
         "block_namespace": block_namespace,
         "logical_layer": logical_layer,
-        "geometry": {
-            "hidden_size": values["hidden_size"],
-            "moe_intermediate_size": values["intermediate_size"],
-            "n_routed_experts": values["expert_count"],
-            "bits": bits,
-            "codebook": "mcg",
-        },
+        "geometry": _block_report_geometry(
+            hidden_size=values["hidden_size"],
+            intermediate_size=values["intermediate_size"],
+            expert_count=values["expert_count"],
+            bits=bits,
+            tier=block_tier,
+        ),
         "projection_count": len(projection_records),
         "expected_projection_count": len(expected),
         "complete_expert_families": complete_experts,

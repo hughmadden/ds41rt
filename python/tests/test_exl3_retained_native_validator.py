@@ -149,10 +149,18 @@ def test_retained_native_plan_uses_the_published_expert_namespace(
     captured = {}
     expected = object()
 
-    def build(snapshot: Path, *, expert_tensor_layout: str, exl3_bits: int):
+    def build(
+        snapshot: Path,
+        *,
+        expert_tensor_layout: str,
+        exl3_bits: int,
+        exl3_projection_bits: dict[str, int] | None = None,
+    ):
         captured["snapshot"] = snapshot
         captured["layout"] = expert_tensor_layout
         captured["bits"] = exl3_bits
+        if exl3_projection_bits is not None:
+            captured["projection_bits"] = exl3_projection_bits
         return expected
 
     monkeypatch.setattr(validator, "build_artifact_plan", build)
@@ -168,4 +176,38 @@ def test_retained_native_plan_uses_the_published_expert_namespace(
         "snapshot": native,
         "layout": expected_layout,
         "bits": expected_bits,
+    }
+
+
+def test_retained_native_plan_preserves_mixed_physical_projection_tiers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    def build(snapshot: Path, **kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(validator, "build_artifact_plan", build)
+    storage = {
+        "model.layers.0.mlp.experts.0.gate_proj": {"bits_per_weight": 2},
+        "model.layers.0.mlp.experts.0.up_proj": {"bits_per_weight": 3},
+    }
+
+    validator.retained_native_plan(
+        tmp_path / "native",
+        {
+            "quantization_config": {
+                "quant_method": "exl3",
+                "bits": 2,
+                "meta": {"ds4rt_error_ledger": {}},
+                "tensor_storage": storage,
+            }
+        },
+    )
+
+    assert captured["exl3_bits"] == 2
+    assert captured["exl3_projection_bits"] == {
+        module: entry["bits_per_weight"] for module, entry in storage.items()
     }

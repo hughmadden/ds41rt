@@ -46,25 +46,19 @@ import quantize_flash_dspark_overlay as dspark_overlay
 import validate_projection_checkpoint_block as block_audit
 
 
-PROJECTION_ASSEMBLY_SCHEMA = (
-    "ds4rt-exl3-canonical-hybrid-projection-assembly-v1"
-)
+PROJECTION_ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-hybrid-projection-assembly-v1"
 COMPOSITE_PROJECTION_ASSEMBLY_SCHEMA = (
     "ds4rt-exl3-canonical-hybrid-composite-projection-assembly-v1"
 )
 ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-hybrid-assembly-v1"
 ASSEMBLY_FILENAME = "ds4rt-exl3-canonical-assembly.json"
-QUANT_CONFIG_ASSEMBLY_SCHEMA = (
-    "ds4rt-exl3-canonical-quant-config-assembly-v1"
-)
+QUANT_CONFIG_ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-quant-config-assembly-v1"
 COMPOSITE_ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-hybrid-assembly-v2"
 COMPOSITE_QUANT_CONFIG_ASSEMBLY_SCHEMA = (
     "ds4rt-exl3-canonical-composite-quant-config-assembly-v1"
 )
 BLOCK_AUDIT_SET_SCHEMA = "ds4rt-exl3-independent-block-audit-set-v1"
-COMPOSITE_BLOCK_AUDIT_SET_SCHEMA = (
-    "ds4rt-exl3-independent-composite-block-audit-set-v1"
-)
+COMPOSITE_BLOCK_AUDIT_SET_SCHEMA = "ds4rt-exl3-independent-composite-block-audit-set-v1"
 PROJECTION_SUFFIXES = ("trellis", "suh", "svh", "mcg")
 PROJECTION_NAMES = {
     "w1": "gate_proj",
@@ -99,6 +93,29 @@ def _portable_source_identity(source: dict[str, Any]) -> dict[str, Any]:
     """Remove only the bind-mount spelling from a snapshot identity."""
 
     return {key: value for key, value in source.items() if key != "path"}
+
+
+def _source_complete_raw_config(
+    raw_config: dict[str, Any],
+    source_config: dict[str, Any],
+) -> dict[str, Any]:
+    """Restore source-only config extensions for raw-envelope validation.
+
+    Older GPTQModel terminal exports serialized the registered Transformers
+    config class and could therefore omit extension fields unknown to that
+    class. The raw artifact remains byte-for-byte authenticated; this merged
+    in-memory view supplies only missing fields from its independently bound
+    source snapshot. Canonical output is assembled from that native source
+    config below rather than from the raw writer's model config.
+    """
+
+    if not isinstance(raw_config, dict) or not isinstance(source_config, dict):
+        raise AssemblyError("model config must be a JSON object")
+    completed = deepcopy(raw_config)
+    for key, value in source_config.items():
+        if key not in {"attn_implementation", "_attn_implementation"}:
+            completed.setdefault(key, deepcopy(value))
+    return completed
 
 
 def _validate_planned_run_state_paths(plan: dict[str, Any]) -> None:
@@ -165,9 +182,7 @@ def _validate_source_plan(plan: dict[str, Any]) -> set[str]:
             return {"base", "mtp"}
         if schema == dspark_overlay.PLAN_SCHEMA:
             digest = plan.get("plan_sha256")
-            body = {
-                key: value for key, value in plan.items() if key != "plan_sha256"
-            }
+            body = {key: value for key, value in plan.items() if key != "plan_sha256"}
             if (
                 not isinstance(digest, str)
                 or launcher.SHA256_RE.fullmatch(digest) is None
@@ -211,9 +226,7 @@ def _expected_modules(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
             )
             for expert in range(expert_count):
                 for projection, projection_name in PROJECTION_NAMES.items():
-                    module = (
-                        f"{block}.mlp.experts.{expert}.{projection_name}"
-                    )
+                    module = f"{block}.mlp.experts.{expert}.{projection_name}"
                     expected[module] = {
                         "block_namespace": namespace,
                         "logical_layer": logical_layer,
@@ -221,6 +234,49 @@ def _expected_modules(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
                         "projection": projection,
                     }
     return expected
+
+
+def _projection_bits_from_tier_plans(
+    plan: dict[str, Any],
+    run_state: Path,
+) -> tuple[dict[str, int], dict[tuple[str, int], dict[str, Any] | None]]:
+    """Derive every canonical projection shape from signed per-layer plans."""
+
+    expected = _expected_modules(plan)
+    family_join = plan.get("ledger_provenance", {}).get("family_join")
+    bits = plan.get("exl3", {}).get("bits")
+    if (
+        not isinstance(family_join, dict)
+        or isinstance(bits, bool)
+        or not isinstance(bits, int)
+        or bits not in {2, 3}
+    ):
+        raise AssemblyError("quantization plan has invalid tier provenance")
+    grouped: dict[tuple[str, int], dict[str, dict[str, Any]]] = {}
+    for module, identity in expected.items():
+        key = (identity["block_namespace"], identity["logical_layer"])
+        grouped.setdefault(key, {})[module] = identity
+    tiers: dict[tuple[str, int], dict[str, Any] | None] = {}
+    projection_bits: dict[str, int] = {}
+    try:
+        for key, block_expected in grouped.items():
+            tier = block_audit._inline_mixed_block_contract(
+                plan=plan,
+                run_state=run_state,
+                namespace=key[0],
+                logical_layer=key[1],
+                expected=block_expected,
+                family_join=family_join,
+            )
+            tiers[key] = tier
+            projection_bits.update(
+                tier["bits_by_module"]
+                if tier is not None
+                else {module: bits for module in block_expected}
+            )
+    except block_audit.AuditError as error:
+        raise AssemblyError(str(error)) from error
+    return projection_bits, tiers
 
 
 def _planned_generated_names(
@@ -241,7 +297,9 @@ def _load_checkpoint_manifest_index(
     if allowed is None:
         allowed = set(expected)
     if not set(expected) <= allowed:
-        raise AssemblyError("expected projection modules exceed the allowed source scope")
+        raise AssemblyError(
+            "expected projection modules exceed the allowed source scope"
+        )
     selected = {}
     for manifest_path in sorted(checkpoint_root.rglob("*.json")):
         if manifest_path.name.startswith("."):
@@ -302,9 +360,13 @@ def _validate_projection(
     family_join: dict[str, Any],
     hidden_size: int,
     intermediate_size: int,
+    expected_bits: int,
 ) -> tuple[int, str, str, str, str]:
-    bits = plan.get("exl3", {}).get("bits")
-    if isinstance(bits, bool) or not isinstance(bits, int) or bits not in {2, 3}:
+    if (
+        isinstance(expected_bits, bool)
+        or not isinstance(expected_bits, int)
+        or expected_bits not in {2, 3}
+    ):
         raise AssemblyError("projection source has an invalid EXL3 tier")
     if routed_expert_identity(module) != identity:
         raise AssemblyError(f"projection identity differs for {module}")
@@ -312,7 +374,7 @@ def _validate_projection(
     if (
         request.get("family_join") != family_join
         or not isinstance(quantizer_contract, dict)
-        or quantizer_contract.get("bits") != bits
+        or quantizer_contract.get("bits") != expected_bits
         or quantizer_contract.get("codebook") != "mcg"
         or quantizer_contract.get("apply_out_scales") is not None
         or quantizer_contract.get("sigma_reg") != launcher.EXL3_SIGMA_REG
@@ -331,7 +393,7 @@ def _validate_projection(
         projection=identity["projection"],
         hidden_size=hidden_size,
         intermediate_size=intermediate_size,
-        bits=bits,
+        bits=expected_bits,
     )
     ledger = result.get("ledger_record")
     metrics = ledger.get("quantizer_metrics") if isinstance(ledger, dict) else None
@@ -339,21 +401,19 @@ def _validate_projection(
         not isinstance(ledger, dict)
         or ledger.get("module") != module
         or any(ledger.get(key) != value for key, value in identity.items())
-        or ledger.get("bits") != bits
+        or ledger.get("bits") != expected_bits
         or ledger.get("codebook") != "mcg"
         or ledger.get("encoded_bytes") != encoded_bytes
         or ledger.get("sample_count") != request.get("sample_count")
         or ledger.get("route_evidence") != request.get("route_evidence")
         or not isinstance(metrics, dict)
         or metrics.get("hessian_metric_status") != "ok"
-        or metrics.get("hessian_regularization_sigma")
-        != launcher.EXL3_SIGMA_REG
+        or metrics.get("hessian_regularization_sigma") != launcher.EXL3_SIGMA_REG
         or metrics.get("hessian_numerical_contract")
         != launcher.EXL3_HESSIAN_NUMERICAL_CONTRACT
         or metrics.get("hessian_transform_compute_dtype") != "torch.float64"
         or metrics.get("hessian_storage_dtype") != "torch.float32"
-        or metrics.get("hessian_regularization_placement")
-        != "before-fp64-congruence"
+        or metrics.get("hessian_regularization_placement") != "before-fp64-congruence"
         or metrics.get("hessian_symmetry_restoration")
         != launcher.EXL3_HESSIAN_SYMMETRY_CONTRACT
         or result.get("quantizer_metrics") != metrics
@@ -366,7 +426,11 @@ def _validate_projection(
         "proxy_error",
     ):
         value = result.get(field)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
             raise AssemblyError(f"projection result has invalid {field} for {module}")
 
     journal_record = journal.get(module)
@@ -414,10 +478,7 @@ def assemble_projection_checkpoints(
     except launcher.LaunchError as error:
         raise AssemblyError(str(error)) from error
     _validate_planned_run_state_paths(plan)
-    if (
-        expected_plan_sha256 is not None
-        and plan["plan_sha256"] != expected_plan_sha256
-    ):
+    if expected_plan_sha256 is not None and plan["plan_sha256"] != expected_plan_sha256:
         raise AssemblyError("run-state plan differs from the raw artifact plan")
 
     expected = _expected_modules(plan)
@@ -443,18 +504,26 @@ def assemble_projection_checkpoints(
         or checkpoint_root.is_symlink()
     ):
         raise AssemblyError("projection checkpoint root differs from the plan")
-    selected = _load_checkpoint_manifest_index(checkpoint_root, expected)
-    journal = block_audit._load_journal(
-        run_state / launcher.ERROR_JOURNAL_FILENAME
-    )
+    family_join = plan.get("ledger_provenance", {}).get("family_join")
+    if not isinstance(family_join, dict):
+        raise AssemblyError("quantization plan has no family-join provenance")
+    try:
+        selected, retained, tier_contracts = block_audit._checkpoint_manifest_selection(
+            checkpoint_root,
+            plan=plan,
+            run_state=run_state,
+            expected=expected,
+            family_join=family_join,
+            ignore_unexpected=False,
+        )
+    except block_audit.AuditError as error:
+        raise AssemblyError(str(error)) from error
+    journal = block_audit._load_journal(run_state / launcher.ERROR_JOURNAL_FILENAME)
     if set(journal) != set(expected):
         raise AssemblyError("projection journal does not exactly cover the run")
 
     remote = plan.get("remote_workers")
     assignment_root = run_state / launcher.REMOTE_ASSIGNMENT_DIRNAME
-    family_join = plan.get("ledger_provenance", {}).get("family_join")
-    if not isinstance(family_join, dict):
-        raise AssemblyError("quantization plan has no family-join provenance")
     geometry = plan["source"]["geometry"]
     bits = plan.get("exl3", {}).get("bits")
     if isinstance(bits, bool) or not isinstance(bits, int) or bits not in {2, 3}:
@@ -464,25 +533,27 @@ def assemble_projection_checkpoints(
 
     store = EXL3ProjectionCheckpointStore(checkpoint_root)
     expected_checkpoint_files = set()
-    for request, _manifest in selected.values():
-        manifest_path, tensor_path = store._paths(request["request_sha256"])
-        expected_checkpoint_files.update(
-            {
-                manifest_path.relative_to(checkpoint_root).as_posix(),
-                tensor_path.relative_to(checkpoint_root).as_posix(),
-            }
+    for entries in retained.values():
+        for request, _manifest in entries:
+            manifest_path, tensor_path = store._paths(request["request_sha256"])
+            expected_checkpoint_files.update(
+                {
+                    manifest_path.relative_to(checkpoint_root).as_posix(),
+                    tensor_path.relative_to(checkpoint_root).as_posix(),
+                }
+            )
+    if (
+        _regular_tree_files(
+            checkpoint_root,
+            "projection checkpoint store",
         )
-    if _regular_tree_files(
-        checkpoint_root,
-        "projection checkpoint store",
-    ) != expected_checkpoint_files:
+        != expected_checkpoint_files
+    ):
         raise AssemblyError(
             "projection checkpoint store contains orphaned or unexpected files"
         )
     expected_assignment_files = {
-        (
-            f"{digest[:2]}/{digest[2:4]}/{digest}.json"
-        )
+        (f"{digest[:2]}/{digest[2:4]}/{digest}.json")
         for module in expected
         for digest in (hashlib.sha256(module.encode("utf-8")).hexdigest(),)
     }
@@ -524,6 +595,8 @@ def assemble_projection_checkpoints(
             current_family_records = []
         current_family = family_identity
         request, manifest = selected[module]
+        tier = tier_contracts[(identity["block_namespace"], identity["logical_layer"])]
+        expected_bits = tier["bits_by_module"][module] if tier is not None else bits
         loaded = store.load(request)
         if loaded is None:
             raise AssemblyError(f"projection checkpoint disappeared for {module}")
@@ -547,6 +620,7 @@ def assemble_projection_checkpoints(
             family_join=family_join,
             hidden_size=hidden_size,
             intermediate_size=intermediate_size,
+            expected_bits=expected_bits,
         )
         for suffix in PROJECTION_SUFFIXES:
             write_generated_tensor(f"{module}.{suffix}", tensors[suffix])
@@ -631,7 +705,9 @@ def _assemble_projection_source(
         canonical_expected.get(module) != identity
         for module, identity in expected.items()
     ):
-        raise AssemblyError("projection source geometry differs from the canonical model")
+        raise AssemblyError(
+            "projection source geometry differs from the canonical model"
+        )
 
     checkpoint_root = _resolve_checkpoint_root(plan, run_state)
     checkpoint_contract = plan.get("projection_checkpoint")
@@ -643,49 +719,49 @@ def _assemble_projection_source(
         or checkpoint_root.is_symlink()
     ):
         raise AssemblyError("projection checkpoint root differs from the source plan")
-    selected = _load_checkpoint_manifest_index(
-        checkpoint_root,
-        expected,
-        allowed=set(source_expected_all),
-    )
+    family_join = plan.get("ledger_provenance", {}).get("family_join")
+    if not isinstance(family_join, dict):
+        raise AssemblyError("quantization plan has no family-join provenance")
+    try:
+        selected_all, retained_all, tier_contracts = (
+            block_audit._checkpoint_manifest_selection(
+                checkpoint_root,
+                plan=plan,
+                run_state=run_state,
+                expected=source_expected_all,
+                family_join=family_join,
+                ignore_unexpected=False,
+            )
+        )
+    except block_audit.AuditError as error:
+        raise AssemblyError(str(error)) from error
+    selected = {module: selected_all[module] for module in expected}
     store = EXL3ProjectionCheckpointStore(checkpoint_root)
     all_checkpoint_files: set[str] = set()
-    checkpoint_modules: set[str] = set()
-    for manifest_path in sorted(checkpoint_root.rglob("*.json")):
-        if manifest_path.name.startswith("."):
-            continue
-        manifest = block_audit._read_object(
-            manifest_path,
-            "projection checkpoint manifest",
-        )
-        request = manifest.get("request")
-        module = request.get("module") if isinstance(request, dict) else None
-        if module not in source_expected_all or module in checkpoint_modules:
-            raise AssemblyError(
-                f"projection checkpoint source contains invalid module {module!r}"
+    for entries in retained_all.values():
+        for request, _manifest in entries:
+            expected_manifest, expected_tensor = store._paths(request["request_sha256"])
+            all_checkpoint_files.update(
+                {
+                    expected_manifest.relative_to(checkpoint_root).as_posix(),
+                    expected_tensor.relative_to(checkpoint_root).as_posix(),
+                }
             )
-        checkpoint_modules.add(module)
-        expected_manifest, expected_tensor = store._paths(request["request_sha256"])
-        if expected_manifest != manifest_path:
-            raise AssemblyError("projection checkpoint manifest path differs from request")
-        all_checkpoint_files.update(
-            {
-                expected_manifest.relative_to(checkpoint_root).as_posix(),
-                expected_tensor.relative_to(checkpoint_root).as_posix(),
-            }
+    if (
+        _regular_tree_files(
+            checkpoint_root,
+            "projection checkpoint store",
         )
-    if _regular_tree_files(
-        checkpoint_root,
-        "projection checkpoint store",
-    ) != all_checkpoint_files:
+        != all_checkpoint_files
+    ):
         raise AssemblyError(
             "projection checkpoint store contains orphaned or unexpected files"
         )
 
-    journal = block_audit._load_journal(
-        run_state / launcher.ERROR_JOURNAL_FILENAME
-    )
-    if not set(expected) <= set(journal) or not set(journal) <= set(source_expected_all):
+    journal = block_audit._load_journal(run_state / launcher.ERROR_JOURNAL_FILENAME)
+    if not set(expected) <= set(journal) or not set(journal) <= set(
+        source_expected_all
+    ):
         raise AssemblyError("projection journal differs from the selected source scope")
     remote = plan.get("remote_workers")
     assignment_root = run_state / launcher.REMOTE_ASSIGNMENT_DIRNAME
@@ -694,27 +770,27 @@ def _assemble_projection_source(
         if assignment_root.exists()
         else set()
     )
-    assignment_path = lambda module: (
-        f"{(digest := hashlib.sha256(module.encode('utf-8')).hexdigest())[:2]}/"
-        f"{digest[2:4]}/{digest}.json"
-    )
+
+    def assignment_path(module: str) -> str:
+        digest = hashlib.sha256(module.encode("utf-8")).hexdigest()
+        return f"{digest[:2]}/{digest[2:4]}/{digest}.json"
+
     expected_assignments = {assignment_path(module) for module in expected}
-    allowed_assignments = {
-        assignment_path(module) for module in source_expected_all
-    }
+    allowed_assignments = {assignment_path(module) for module in source_expected_all}
     if (
         isinstance(remote, dict)
         and (
             not expected_assignments <= actual_assignments
             or not actual_assignments <= allowed_assignments
         )
-        or remote is None and actual_assignments
+        or remote is None
+        and actual_assignments
     ):
         raise AssemblyError("dynamic assignments differ from the selected source scope")
-    family_join = plan.get("ledger_provenance", {}).get("family_join")
-    if not isinstance(family_join, dict):
-        raise AssemblyError("quantization plan has no family-join provenance")
     geometry = plan["source"]["geometry"]
+    bits = plan.get("exl3", {}).get("bits")
+    if isinstance(bits, bool) or not isinstance(bits, int) or bits not in {2, 3}:
+        raise AssemblyError("projection source has an invalid EXL3 tier")
     hidden_size = geometry["hidden_size"]
     intermediate_size = geometry["moe_intermediate_size"]
 
@@ -744,6 +820,8 @@ def _assemble_projection_source(
             current_records = []
         current_family = family
         request, manifest = selected[module]
+        tier = tier_contracts[(identity["block_namespace"], identity["logical_layer"])]
+        expected_bits = tier["bits_by_module"][module] if tier is not None else bits
         loaded = store.load(request)
         if loaded is None:
             raise AssemblyError(f"projection checkpoint disappeared for {module}")
@@ -767,6 +845,7 @@ def _assemble_projection_source(
             family_join=family_join,
             hidden_size=hidden_size,
             intermediate_size=intermediate_size,
+            expected_bits=expected_bits,
         )
         for suffix in PROJECTION_SUFFIXES:
             write_generated_tensor(f"{module}.{suffix}", tensors[suffix])
@@ -808,7 +887,11 @@ def _assemble_projection_source(
         "encoded_bytes": encoded_bytes,
         "ownership": dict(sorted(ownership.items())),
         "excluded_known_state": {
-            "checkpoint_count": len(checkpoint_modules - set(expected)),
+            "checkpoint_count": sum(
+                len(entries)
+                for module, entries in retained_all.items()
+                if module not in expected
+            ),
             "journal_count": len(set(journal) - set(expected)),
             "assignment_count": len(actual_assignments - expected_assignments),
         },
@@ -868,7 +951,9 @@ def assemble_composite_projection_checkpoints(
     }
     planned_generated = _planned_generated_names(generated_tensors)
     if planned_generated != expected_generated:
-        raise AssemblyError("canonical generated tensor set differs from composite sources")
+        raise AssemblyError(
+            "canonical generated tensor set differs from composite sources"
+        )
 
     base_report, base_records = _assemble_projection_source(
         base_path,
@@ -915,8 +1000,7 @@ def assemble_composite_projection_checkpoints(
             "projection_records_sha256": _sha256(
                 _canonical(
                     [
-                        record.get("record_sha256")
-                        or _sha256(_canonical(record))
+                        record.get("record_sha256") or _sha256(_canonical(record))
                         for record in records
                     ]
                 )
@@ -940,6 +1024,7 @@ def validate_block_audit_set(
     plan: dict[str, Any],
     *,
     namespaces: set[str] | None = None,
+    run_state: str | Path | None = None,
 ) -> dict[str, Any]:
     """Bind every independent complete-block report before canonical assembly."""
 
@@ -962,12 +1047,16 @@ def validate_block_audit_set(
     hidden_size = geometry["hidden_size"]
     intermediate_size = geometry["moe_intermediate_size"]
     projections_per_block = expert_count * 3
-    projection_bytes = (
-        (hidden_size // 16) * (intermediate_size // 16) * 32 * bits
-        + (hidden_size + intermediate_size) * 2
-        + 4
+    materialized_run_state = (
+        Path(plan["run_state_dir"] if run_state is None else run_state)
+        .expanduser()
+        .resolve(strict=True)
     )
-    encoded_bytes_per_block = projections_per_block * projection_bytes
+    projection_bits, tier_contracts = _projection_bits_from_tier_plans(
+        plan,
+        materialized_run_state,
+    )
+    expected_modules = _expected_modules(plan)
     expected_blocks = [
         (namespace, logical_layer)
         for namespace, count in (("base", base_blocks), ("mtp", mtp_blocks))
@@ -976,9 +1065,7 @@ def validate_block_audit_set(
     ]
     reports = []
     for ordinal, (namespace, logical_layer) in enumerate(expected_blocks, 1):
-        filename = (
-            f"{namespace}-layer-{logical_layer}-projection-audit.json"
-        )
+        filename = f"{namespace}-layer-{logical_layer}-projection-audit.json"
         path = report_dir / filename
         if not path.is_file() or path.is_symlink():
             raise AssemblyError(
@@ -1091,13 +1178,11 @@ def validate_block_audit_set(
                     and isinstance(identity_effective_count, int)
                     and not isinstance(identity_effective_count, bool)
                     and (
-                        (
-                            identity_expert_count == 0
-                            and identity_effective_count == 0
-                        )
+                        (identity_expert_count == 0 and identity_effective_count == 0)
                         or (
                             identity_expert_count > 0
-                            and identity_expert_count <= identity_effective_count
+                            and identity_expert_count
+                            <= identity_effective_count
                             <= identity_expert_count
                             * block_audit.ZERO_ROUTE_RECOVERY_TARGET_SAMPLE_COUNT
                         )
@@ -1109,26 +1194,44 @@ def validate_block_audit_set(
                 )
             )
         )
+        tier = tier_contracts[(namespace, logical_layer)]
+        expected_geometry = block_audit._block_report_geometry(
+            hidden_size=hidden_size,
+            intermediate_size=intermediate_size,
+            expert_count=expert_count,
+            bits=bits,
+            tier=tier,
+        )
+        block_modules = {
+            module: identity
+            for module, identity in expected_modules.items()
+            if identity["block_namespace"] == namespace
+            and identity["logical_layer"] == logical_layer
+        }
+        expected_encoded_bytes = sum(
+            (
+                (hidden_size // 16)
+                * (intermediate_size // 16)
+                * 32
+                * projection_bits[module]
+                + (hidden_size + intermediate_size) * 2
+                + 4
+            )
+            for module in block_modules
+        )
         if (
             report.get("schema") != block_audit.AUDIT_SCHEMA
             or report.get("status") != "complete"
             or report.get("plan_sha256") != plan["plan_sha256"]
             or report.get("block_namespace") != namespace
             or report.get("logical_layer") != logical_layer
-            or report_geometry
-            != {
-                "hidden_size": hidden_size,
-                "moe_intermediate_size": intermediate_size,
-                "n_routed_experts": expert_count,
-                "bits": bits,
-                "codebook": "mcg",
-            }
+            or report_geometry != expected_geometry
             or report.get("projection_count") != projections_per_block
             or report.get("expected_projection_count") != projections_per_block
             or report.get("missing_projection_count") != 0
             or report.get("first_missing_projection") is not None
             or report.get("complete_expert_families") != expert_count
-            or report.get("encoded_bytes") != encoded_bytes_per_block
+            or report.get("encoded_bytes") != expected_encoded_bytes
             or not isinstance(content, dict)
             or any(
                 launcher.SHA256_RE.fullmatch(content.get(field, "")) is None
@@ -1199,14 +1302,13 @@ def validate_composite_block_audit_set(
 ) -> dict[str, Any]:
     """Bind the completed parent base and replacement MTP audit sets."""
 
-    if _portable_source_identity(base_plan.get("source", {})) != _portable_source_identity(
-        mtp_plan.get("source", {})
-    ):
+    if _portable_source_identity(
+        base_plan.get("source", {})
+    ) != _portable_source_identity(mtp_plan.get("source", {})):
         raise AssemblyError("base and MTP audit plans describe different source models")
     parent = mtp_plan.get("target_parent")
-    if (
-        not isinstance(parent, dict)
-        or parent.get("plan_sha256") != base_plan.get("plan_sha256")
+    if not isinstance(parent, dict) or parent.get("plan_sha256") != base_plan.get(
+        "plan_sha256"
     ):
         raise AssemblyError("MTP audit plan is not bound to the base parent plan")
     base = validate_block_audit_set(
@@ -1255,6 +1357,16 @@ def canonical_quant_config(
     raw_storage = raw_quant_config.get("tensor_storage")
     if not isinstance(raw_storage, dict):
         raise AssemblyError("raw GPTQModel quantization config has no tensor_storage")
+    base_bits = getattr(plan, "exl3_bits", 2)
+    if (
+        isinstance(base_bits, bool)
+        or not isinstance(base_bits, int)
+        or base_bits not in {2, 3}
+        or raw_quant_config.get("bits") != base_bits
+    ):
+        raise AssemblyError(
+            "raw GPTQModel top-level bits must identify the integer base tier"
+        )
     expected = gptqmodel_tensor_storage_for_plan(plan)
     base_names = {name for name in expected if name.startswith("model.layers.")}
     mtp_names = set(expected) - base_names
@@ -1273,8 +1385,11 @@ def canonical_quant_config(
             )
     added = sorted(set(expected) - raw_names)
     if added and set(added) != mtp_names:
-        raise AssemblyError("canonical tensor_storage may add only the complete MTP overlay")
+        raise AssemblyError(
+            "canonical tensor_storage may add only the complete MTP overlay"
+        )
     canonical = deepcopy(raw_quant_config)
+    canonical["bits"] = base_bits
     canonical["tensor_storage"] = expected
     report = _bound_report(
         {
@@ -1294,14 +1409,13 @@ def composite_ledger_provenance(
     base_plan: dict[str, Any],
     mtp_plan: dict[str, Any],
 ) -> dict[str, Any]:
-    if _portable_source_identity(base_plan.get("source", {})) != _portable_source_identity(
-        mtp_plan.get("source", {})
-    ):
+    if _portable_source_identity(
+        base_plan.get("source", {})
+    ) != _portable_source_identity(mtp_plan.get("source", {})):
         raise AssemblyError("composite ledger plans describe different source models")
     parent = mtp_plan.get("target_parent")
-    if (
-        not isinstance(parent, dict)
-        or parent.get("plan_sha256") != base_plan.get("plan_sha256")
+    if not isinstance(parent, dict) or parent.get("plan_sha256") != base_plan.get(
+        "plan_sha256"
     ):
         raise AssemblyError("composite MTP ledger is not bound to the base plan")
     base_provenance = base_plan.get("ledger_provenance")
@@ -1356,7 +1470,7 @@ def canonical_composite_quant_config(
         "method": "exl3",
         "format": "exl3",
         "checkpoint_format": "exl3",
-        "bits": float(bits),
+        "bits": bits,
         "codebook": "mcg",
         "out_scales": "auto",
         "group_size": -1,
@@ -1429,9 +1543,7 @@ def _canonical_publication_plan(
     assembly: dict[str, Any],
 ) -> dict[str, Any]:
     body = {
-        key: deepcopy(value)
-        for key, value in raw_plan.items()
-        if key != "plan_sha256"
+        key: deepcopy(value) for key, value in raw_plan.items() if key != "plan_sha256"
     }
     body["output"] = os.fspath(output)
     body["canonical_assembly"] = {
@@ -1439,9 +1551,7 @@ def _canonical_publication_plan(
         "filename": ASSEMBLY_FILENAME,
         "report_sha256": assembly["report_sha256"],
         "source_plan_sha256": raw_plan["plan_sha256"],
-        "source_artifact_manifest_sha256": assembly[
-            "source_artifact_manifest_sha256"
-        ],
+        "source_artifact_manifest_sha256": assembly["source_artifact_manifest_sha256"],
     }
     return launcher._bound_record(body, "plan_sha256")
 
@@ -1458,9 +1568,7 @@ def _validate_finished_assembly_for_resume(
 ) -> None:
     """Bind a post-writer/pre-rename resume to the same immutable inputs."""
 
-    body = {
-        key: value for key, value in assembly.items() if key != "report_sha256"
-    }
+    body = {key: value for key, value in assembly.items() if key != "report_sha256"}
     projection = assembly.get("projection_assembly")
     if (
         assembly.get("report_sha256") != _sha256(_canonical(body))
@@ -1512,9 +1620,7 @@ def _canonical_composite_publication_plan(
     ledger_provenance: dict[str, Any],
 ) -> dict[str, Any]:
     body = {
-        key: deepcopy(value)
-        for key, value in base_plan.items()
-        if key != "plan_sha256"
+        key: deepcopy(value) for key, value in base_plan.items() if key != "plan_sha256"
     }
     sources = assembly["projection_sources"]
     body["output"] = os.fspath(output)
@@ -1539,9 +1645,7 @@ def _validate_finished_composite_assembly_for_resume(
     quant_config_assembly: dict[str, Any],
     recipe: str,
 ) -> None:
-    body = {
-        key: value for key, value in assembly.items() if key != "report_sha256"
-    }
+    body = {key: value for key, value in assembly.items() if key != "report_sha256"}
     projection = assembly.get("projection_assembly")
     if (
         assembly.get("report_sha256") != _sha256(_canonical(body))
@@ -1555,8 +1659,7 @@ def _validate_finished_composite_assembly_for_resume(
         or not isinstance(projection, dict)
         or projection.get("base_plan_sha256")
         != projection_sources["base"]["plan_sha256"]
-        or projection.get("mtp_plan_sha256")
-        != projection_sources["mtp"]["plan_sha256"]
+        or projection.get("mtp_plan_sha256") != projection_sources["mtp"]["plan_sha256"]
     ):
         raise AssemblyError(
             "finished composite work directory is bound to different inputs"
@@ -1583,10 +1686,15 @@ def canonicalize_composite(
     work_dir = work_dir.expanduser().resolve()
     if output.exists() or output.is_symlink():
         raise AssemblyError(f"canonical output already exists: {output}")
-    if work_dir == output or base_run_state in {output, work_dir} or mtp_overlay in {
-        output,
-        work_dir,
-    }:
+    if (
+        work_dir == output
+        or base_run_state in {output, work_dir}
+        or mtp_overlay
+        in {
+            output,
+            work_dir,
+        }
+    ):
         raise AssemblyError("composite inputs, work, and output paths must be distinct")
     for readonly in (base_run_state, mtp_overlay, source_snapshot):
         for writable in (output, work_dir):
@@ -1615,12 +1723,11 @@ def canonicalize_composite(
         materialized_source = launcher.snapshot_identity(source_snapshot)
     except launcher.LaunchError as error:
         raise AssemblyError(str(error)) from error
-    if (
-        _portable_source_identity(base_plan.get("source", {}))
-        != _portable_source_identity(materialized_source)
-        or _portable_source_identity(mtp_plan.get("source", {}))
-        != _portable_source_identity(materialized_source)
-    ):
+    if _portable_source_identity(
+        base_plan.get("source", {})
+    ) != _portable_source_identity(materialized_source) or _portable_source_identity(
+        mtp_plan.get("source", {})
+    ) != _portable_source_identity(materialized_source):
         raise AssemblyError("composite plans are bound to another source snapshot")
     projection_sources = _composite_projection_sources(
         base_plan=base_plan,
@@ -1691,14 +1798,12 @@ def canonicalize_composite(
         quant_config_filename="quantize_config.json",
     )
     writer.copy_native_tensors()
-    projection_assembly, projection_records = (
-        assemble_composite_projection_checkpoints(
-            base_run_state=base_run_state,
-            mtp_run_state=mtp_overlay,
-            generated_tensors=artifact_plan.generated_tensors,
-            write_generated_tensor=writer.write_generated_tensor,
-            checkpoint=writer.checkpoint,
-        )
+    projection_assembly, projection_records = assemble_composite_projection_checkpoints(
+        base_run_state=base_run_state,
+        mtp_run_state=mtp_overlay,
+        generated_tensors=artifact_plan.generated_tensors,
+        write_generated_tensor=writer.write_generated_tensor,
+        checkpoint=writer.checkpoint,
     )
     assembly = _bound_report(
         {
@@ -1720,8 +1825,7 @@ def canonicalize_composite(
         if (
             not isinstance(manifest, dict)
             or manifest.get("projection_records") != len(projection_records)
-            or manifest.get("complete_family_records")
-            != len(projection_records) // 3
+            or manifest.get("complete_family_records") != len(projection_records) // 3
         ):
             raise AssemblyError("composite EXL3 error ledger did not close")
         ledger_root = Path(ledger_directory)
@@ -1784,7 +1888,14 @@ def canonicalize(
 
     raw_plan = _read_json(raw_artifact / launcher.PLAN_FILENAME)
     _validate_planned_run_state_paths(raw_plan)
-    block_audit_set = validate_block_audit_set(block_audit_dir, raw_plan)
+    if run_state is None:
+        run_state = Path(raw_plan["run_state_dir"])
+    run_state = run_state.expanduser().resolve(strict=True)
+    block_audit_set = validate_block_audit_set(
+        block_audit_dir,
+        raw_plan,
+        run_state=run_state,
+    )
     launcher.validate_published_artifact(
         raw_artifact,
         raw_plan,
@@ -1793,38 +1904,35 @@ def canonicalize(
         # roughly 84 GB raw artifact twice.
         verify_file_hashes=False,
     )
-    raw_config = _read_json(raw_artifact / "config.json")
-    validate_gptqmodel_publication(
-        raw_artifact,
-        raw_config,
-        verify_all_hashes=True,
-        require_canonical=False,
-    )
     try:
         materialized_source = launcher.snapshot_identity(source_snapshot)
     except launcher.LaunchError as error:
         raise AssemblyError(str(error)) from error
     planned_source = raw_plan.get("source")
-    if (
-        not isinstance(planned_source, dict)
-        or _portable_source_identity(planned_source)
-        != _portable_source_identity(materialized_source)
-    ):
+    if not isinstance(planned_source, dict) or _portable_source_identity(
+        planned_source
+    ) != _portable_source_identity(materialized_source):
         raise AssemblyError("raw artifact plan is bound to another source snapshot")
-    raw_run = _read_json(raw_artifact / launcher.RUN_FILENAME)
-    raw_manifest = _read_json(
-        raw_artifact / launcher.ARTIFACT_MANIFEST_FILENAME
+    raw_config = _read_json(raw_artifact / "config.json")
+    native_config = _read_json(source_snapshot / "config.json")
+    validate_gptqmodel_publication(
+        raw_artifact,
+        _source_complete_raw_config(raw_config, native_config),
+        verify_all_hashes=True,
+        require_canonical=False,
     )
-    if run_state is None:
-        run_state = Path(raw_plan["run_state_dir"])
-    run_state = run_state.expanduser().resolve(strict=True)
-
+    raw_run = _read_json(raw_artifact / launcher.RUN_FILENAME)
+    raw_manifest = _read_json(raw_artifact / launcher.ARTIFACT_MANIFEST_FILENAME)
+    projection_bits, _tier_contracts = _projection_bits_from_tier_plans(
+        raw_plan,
+        run_state,
+    )
     plan = build_artifact_plan(
         source_snapshot,
         expert_tensor_layout=EXPERT_TENSOR_LAYOUT_GPTQMODEL,
         exl3_bits=raw_plan["exl3"]["bits"],
+        exl3_projection_bits=projection_bits,
     )
-    native_config = _read_json(source_snapshot / "config.json")
     raw_quant_config = deepcopy(raw_config.get("quantization_config"))
     if not isinstance(raw_quant_config, dict):
         raise AssemblyError("raw artifact has no GPTQModel quantization config")
@@ -1891,9 +1999,7 @@ def canonicalize(
             "materialized_raw_artifact": os.fspath(raw_artifact),
             "source_plan_sha256": raw_plan["plan_sha256"],
             "source_run_sha256": raw_run["run_sha256"],
-            "source_artifact_manifest_sha256": raw_manifest[
-                "manifest_sha256"
-            ],
+            "source_artifact_manifest_sha256": raw_manifest["manifest_sha256"],
             "source_snapshot": _portable_source_identity(materialized_source),
             "block_audit_set": block_audit_set,
             "quant_config_assembly": quant_config_assembly,

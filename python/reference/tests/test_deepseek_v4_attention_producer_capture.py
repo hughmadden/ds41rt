@@ -74,7 +74,7 @@ def test_flash_indexer_plan_reuses_qrank_and_selects_physical_c4_slots() -> None
     assert contract.consumes_shared_q_rank
     assert contract.output_physical_slots
     assert contract.selection_scratch_planned_by_owner
-    assert contract.selector_owner == "sparkinfer.attention.nsa_indexer"
+    assert contract.selector_owner == "b12x.attention.dsa_indexer"
     assert contract.supports_initial_prefill
     assert contract.supports_ordered_continuation
     assert not contract.serving_allocates

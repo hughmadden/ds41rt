@@ -102,6 +102,7 @@ class Exl3ExpertTpLayer:
     weight_plan: Any
     source_bytes: int
     load_seconds: float
+    projection_mixed: bool = False
 
     @property
     def local_experts(self) -> int:
@@ -111,21 +112,39 @@ class Exl3ExpertTpLayer:
     def local_intermediate_size(self) -> int:
         return self.tp_slice.size
 
-    def plan_tp(self, *, max_tokens: int):
+    def plan_tp(self, *, max_tokens: int, route_ids_dtype=None):
         """Allocate fixed launch scratch before graph capture."""
 
         torch = _torch()
         from b12x.moe import fused_moe
 
+        mixed_plan_hints = {}
+        if self.projection_mixed and route_ids_dtype is not None:
+            prepared = self.experts.representation_for("w4a16")
+            mixed_plan_hints = {
+                "mixed_trellis_route_id_dtypes": (route_ids_dtype,),
+                "mixed_trellis_broadcast_suh": (
+                    int(prepared.rotations.gate_suh.shape[0]) == 1,
+                ),
+                "mixed_trellis_broadcast_svh": (
+                    int(prepared.rotations.down_svh.shape[0]) == 1,
+                ),
+            }
+
         plan = fused_moe.plan(
             fused_moe.Caps(
                 max_tokens=max_tokens,
                 num_topk=self.config.top_k,
-                route_num_experts=self.config.global_experts,
+                route_num_experts=(
+                    self.local_experts
+                    if self.projection_mixed
+                    else self.config.global_experts
+                ),
                 device=self.route_expert_map.device,
                 weight_plan=self.weight_plan,
                 quant_mode="w4a16",
                 swiglu_limit=self.config.swiglu_limit,
+                **mixed_plan_hints,
             )
         )
         spec = plan.scratch_specs()[0]
@@ -149,7 +168,10 @@ class Exl3ExpertTpLayer:
         from b12x.moe import fused_moe
 
         if plan is None or scratch is None:
-            plan, scratch = self.plan_tp(max_tokens=int(hidden_states.shape[0]))
+            plan, scratch = self.plan_tp(
+                max_tokens=int(hidden_states.shape[0]),
+                route_ids_dtype=topk_ids.dtype,
+            )
         if output is None:
             # Full EXL3 rotations accumulate the route sum in FP32.  Transport
             # policy decides whether that rank partial is encoded as BF16 or
@@ -159,6 +181,27 @@ class Exl3ExpertTpLayer:
                 dtype=torch.float32,
                 device=hidden_states.device,
             )
+        route_expert_map = self.route_expert_map
+        if self.projection_mixed:
+            # Production owns all 256 replicated experts and therefore takes
+            # this identity fast path.  Small validation oracles load only six
+            # experts, so remap their global route IDs before entering the
+            # projection-mixed kernel, whose descriptor table is layer-local.
+            identity = (
+                self.local_experts == self.config.global_experts
+                and self.global_expert_ids
+                == tuple(range(self.config.global_experts))
+            )
+            if identity:
+                route_expert_map = None
+            else:
+                local_ids = route_expert_map.index_select(
+                    0, topk_ids.reshape(-1).to(torch.int64)
+                ).view_as(topk_ids)
+                if torch.any(local_ids < 0).item():
+                    raise ValueError("routes reference an expert absent from this layer")
+                topk_ids = local_ids.to(dtype=topk_ids.dtype)
+                route_expert_map = None
         binding = fused_moe.bind(
             plan,
             scratch=scratch,
@@ -166,7 +209,7 @@ class Exl3ExpertTpLayer:
             experts=self.experts,
             topk_weights=topk_weights,
             topk_ids=topk_ids,
-            route_expert_map=self.route_expert_map,
+            route_expert_map=route_expert_map,
             output=output,
             input_scales_static=True,
             fast_math=fast_math,
@@ -181,6 +224,7 @@ class ValidatedExl3ExpertSnapshot:
     path: Path
     config: NativeExpertConfig
     bits: int
+    projection_bits: dict[str, int] | None = None
 
 
 def validate_exl3_expert_snapshot(
@@ -204,6 +248,10 @@ def validate_exl3_expert_snapshot(
         return ValidatedExl3ExpertSnapshot(
             path=snapshot,
             bits=int(quant["bits"]),
+            projection_bits={
+                str(module): int(entry["bits_per_weight"])
+                for module, entry in quant["tensor_storage"].items()
+            },
             config=_native_expert_config_from_raw(
                 raw,
                 expert_tensor_layout=GPTQMODEL_EXPERT_LAYOUT,
@@ -492,17 +540,77 @@ def _load_exl3_expert_layer(
     h = config.hidden_size
     n = config.intermediate_size
     local_n = tp_slice.size
-    streams = 16 * bits
-    w13 = torch.empty(
-        (2, local_e, h // 16, local_n // 16, streams),
-        dtype=torch.int16,
-        device=resolved_device,
-    )
-    w2 = torch.empty(
-        (local_e, local_n // 16, h // 16, streams),
-        dtype=torch.int16,
-        device=resolved_device,
-    )
+    from b12x.moe.fused_moe.trellis import ProjectionTrellisTierWeights
+
+    tier_bits = (bits, bits + 1)
+    projection_bits: dict[tuple[int, str], int] = {}
+    for local_id, global_id in enumerate(expert_ids):
+        names = checkpoint_tensor_names(config, layer_id, global_id)
+        for projection in ("gate", "up", "down"):
+            module = names[f"{projection}_trellis"].removesuffix(".trellis")
+            projection_bits[(local_id, projection)] = (
+                bits
+                if validated.projection_bits is None
+                else validated.projection_bits[module]
+            )
+    unexpected_bits = sorted(set(projection_bits.values()) - set(tier_bits))
+    if unexpected_bits:
+        raise ValueError(
+            f"EXL3 projection tiers {unexpected_bits} are outside planned {tier_bits}"
+        )
+
+    native_tiers = []
+    trellis_destinations: dict[tuple[int, str], tuple[Any, Any]] = {}
+    for tier in tier_bits:
+        gate_ids = tuple(
+            local_id
+            for local_id in range(local_e)
+            if projection_bits[(local_id, "gate")] == tier
+        )
+        up_ids = tuple(
+            local_id
+            for local_id in range(local_e)
+            if projection_bits[(local_id, "up")] == tier
+        )
+        down_ids = tuple(
+            local_id
+            for local_id in range(local_e)
+            if projection_bits[(local_id, "down")] == tier
+        )
+        fc1_slots = len(gate_ids) + len(up_ids)
+        if fc1_slots:
+            w13 = torch.empty(
+                (fc1_slots, h // 16, local_n // 16, 16 * tier),
+                dtype=torch.int16,
+                device=resolved_device,
+            )
+        else:
+            w13 = torch.empty(
+                (1, h // 16, local_n // 16, 16 * tier),
+                dtype=torch.int16,
+                device=resolved_device,
+            )
+        w2 = torch.empty(
+            (max(len(down_ids), 1), local_n // 16, h // 16, 16 * tier),
+            dtype=torch.int16,
+            device=resolved_device,
+        )
+        for slot, local_id in enumerate(gate_ids):
+            trellis_destinations[(local_id, "gate")] = (w13, slot)
+        for offset, local_id in enumerate(up_ids, start=len(gate_ids)):
+            trellis_destinations[(local_id, "up")] = (w13, offset)
+        for slot, local_id in enumerate(down_ids):
+            trellis_destinations[(local_id, "down")] = (w2, slot)
+        native_tiers.append(
+            ProjectionTrellisTierWeights(
+                bits=tier,
+                w13=w13,
+                w2=w2,
+                gate_experts=gate_ids,
+                up_experts=up_ids,
+                down_experts=down_ids,
+            )
+        )
     gate_suh = torch.empty((local_e, h), dtype=torch.float16, device=resolved_device)
     up_suh = torch.empty_like(gate_suh)
     intermediate_rotations = torch.empty(
@@ -525,10 +633,12 @@ def _load_exl3_expert_layer(
         # passed through the ModelOpt row-rotation repacker.
         for projection, plane, rotation_slot in EXL3_W13_PROJECTION_LAYOUT:
             input_size, output_size = h, n
+            destination, location = trellis_destinations[(local_id, projection)]
+            projection_streams = 16 * projection_bits[(local_id, projection)]
             destinations[names[f"{projection}_trellis"]] = (
-                w13,
-                (plane, local_id),
-                (h // 16, n // 16, streams),
+                destination,
+                location,
+                (h // 16, n // 16, projection_streams),
                 (slice(None), slice(tile_start, tile_stop), slice(None)),
                 torch.int16,
             )
@@ -553,10 +663,12 @@ def _load_exl3_expert_layer(
                 None,
                 torch.int32,
             )
+        down_destination, down_location = trellis_destinations[(local_id, "down")]
+        down_streams = 16 * projection_bits[(local_id, "down")]
         destinations[names["down_trellis"]] = (
-            w2,
-            local_id,
-            (n // 16, h // 16, streams),
+            down_destination,
+            down_location,
+            (n // 16, h // 16, down_streams),
             (slice(tile_start, tile_stop), slice(None), slice(None)),
             torch.int16,
         )
@@ -620,21 +732,10 @@ def _load_exl3_expert_layer(
         raise ValueError("EXL3 routed expert tensors contain a non-MCG marker")
     load_seconds = time.perf_counter() - load_started
 
-    if (h, local_n) == (4096, 512):
-        # Qualified on the exact Flash TP4 K2 geometry: the 128-thread tile is
-        # bitwise-identical and faster for both M1 and M2048-capacity launches.
-        tile_config = (64, 128, 64, 128)
-    else:
-        fc1_tile_n = 128 if h == 128 else (256 if local_n % 256 == 0 else 128)
-        fc2_tile_n = 256 if h % 256 == 0 else 128
-        # Retain the established 256-thread geometry for Pro and use the
-        # 128-wide qualification geometry for tiny fixtures.
-        tile_config = (
-            16_384 // fc1_tile_n,
-            fc1_tile_n,
-            16_384 // fc2_tile_n,
-            fc2_tile_n,
-        )
+    # Direct GPTQModel artifacts contain one adjacent K pair.  The generic
+    # routed planner uses its capture-safe K128/N128 geometry; DS4RT serving's
+    # AOT decode path retains the independently tuned direct K64/N128 variant.
+    tile_config = (128, 128, 128, 128)
     weight_plan = fused_moe.plan_weights(
         quant_modes=quant_mode,
         source_format=SPARKINFER_SOURCE_FORMAT,
@@ -646,17 +747,17 @@ def _load_exl3_expert_layer(
         w13_layout="w13",
         trellis_bits=bits,
         trellis_tile_config=tile_config,
+        trellis_codebook="mcg",
+        trellis_rate_granularity="per_expert_projection",
     )
     experts = fused_moe.prepare_weights(
         plan=weight_plan,
         params_dtype=torch.bfloat16,
-        w1_fp4=w13,
-        w2_fp4=w2,
+        projection_tiers=tuple(native_tiers),
         gate_suh=gate_suh,
         up_suh=up_suh,
         intermediate_rotations=intermediate_rotations,
         down_svh=down_svh,
-        trellis_mcg=MCG_MARKER,
     )
     route_expert_map = torch.full(
         (config.global_experts,), -1, dtype=torch.int32, device=resolved_device
@@ -674,6 +775,7 @@ def _load_exl3_expert_layer(
         weight_plan=weight_plan,
         source_bytes=source_bytes,
         load_seconds=load_seconds,
+        projection_mixed=True,
     )
 
 

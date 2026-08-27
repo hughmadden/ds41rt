@@ -640,6 +640,8 @@ int launch_decode(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
   return cute_dsl_ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_wrapper(
       &pro_decode_module, buffers->rotation_gate.ptr, buffers->rotation_up.ptr,
       buffers->input.ptr, buffers->w13_trellis.ptr, buffers->w2_trellis.ptr,
+      static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),
+      static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)),
       &fc1, &activated, &routed_output, buffers->dummy_scale.ptr,
       buffers->dummy_scale.ptr, buffers->global_scale.ptr,
       buffers->global_scale.ptr, &routes, &block_experts, &route_count,
@@ -681,8 +683,11 @@ using ProPrefillLaunchFn = int (*)(
     return cute_dsl_ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_wrapper(      \
         &pro_prefill_m##M##_module, buffers->rotation_gate.ptr,                  \
         buffers->rotation_up.ptr, buffers->input.ptr,                            \
-        buffers->w13_trellis.ptr, buffers->w2_trellis.ptr, &fc1, &activated,     \
-        &routed_output, buffers->dummy_scale.ptr, buffers->dummy_scale.ptr,      \
+        buffers->w13_trellis.ptr, buffers->w2_trellis.ptr,                      \
+        static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),       \
+        static_cast<int64_t>(buffers->w2_trellis.bytes / sizeof(int32_t)),        \
+        &fc1, &activated, &routed_output, buffers->dummy_scale.ptr,              \
+        buffers->dummy_scale.ptr,                                                \
         buffers->global_scale.ptr, buffers->global_scale.ptr, &routes,           \
         &block_experts, &route_count, &activation_amax, 0,                       \
         buffers->topk_weights.ptr, &fc1_scratch, &fc2_scratch, &workspace,       \

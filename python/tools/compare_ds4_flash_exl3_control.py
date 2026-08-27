@@ -106,8 +106,8 @@ def read_control_config(
     quant = raw.get("quantization_config") or {}
     if quant.get("quant_method") != "exl3":
         raise ValueError("external control is not an EXL3 checkpoint")
-    if quant.get("codebook") not in {"mcg", "mul1"}:
-        raise ValueError("external control must use the EXL3 mcg or mul1 codebook")
+    if quant.get("codebook") != "mcg":
+        raise ValueError("external control must use the EXL3 mcg codebook")
     if not isinstance(quant.get("bits"), (int, float)) or float(quant["bits"]) <= 0:
         raise ValueError("external control has no positive EXL3 bits setting")
     return raw, quant
@@ -306,7 +306,6 @@ def _control_linear(
         svh=tensors["svh"],
         trellis=trellis,
         mcg=tensors.get("mcg"),
-        mul1=tensors.get("mul1"),
         out_dtype=torch.float16,
         key=prefix,
     )

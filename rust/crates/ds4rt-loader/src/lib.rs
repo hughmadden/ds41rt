@@ -22,15 +22,15 @@ pub use dspark_format::{
     NativeDeepseekV4DsparkCatalogSummary, NativeDeepseekV4DsparkTensorSpec,
 };
 pub use exl3_format::{
-    exl3_expert, exl3_expert_trellis_bits, exl3_trellis_bits_for_recipe,
-    is_deepseek_v4_exl3_recipe, is_deepseek_v4_mixed_exl3_recipe, validate_exl3_expert_catalog,
-    Exl3CatalogSummary, Exl3Expert, Exl3Projection, Exl3ProjectionKind, Exl3Tp4ResidentGeometry,
-    DEEPSEEK_V4_EXL3_CODEBOOK, DEEPSEEK_V4_EXL3_RECIPE, DEEPSEEK_V4_EXL3_RECIPE_K3_V4,
-    DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1, DEEPSEEK_V4_EXL3_RECIPE_V2, DEEPSEEK_V4_EXL3_RECIPE_V3,
-    DEEPSEEK_V4_EXL3_RECIPE_V4, DEEPSEEK_V4_EXL3_SCHEMA, DEEPSEEK_V4_EXL3_SCHEMA_VERSION,
-    DEEPSEEK_V4_EXL3_SOURCE_FORMAT, DEEPSEEK_V4_EXL3_T12_LUT_BYTES, DEEPSEEK_V4_EXL3_TENSOR_FORMAT,
-    DEEPSEEK_V4_EXL3_TRELLIS_BITS, EXLLAMAV3_REPOSITORY, EXLLAMAV3_REVISION,
-    EXLLAMAV3_SOURCE_TREE_SHA256,
+    exl3_expert, exl3_expert_trellis_bits, exl3_projection_trellis_bits,
+    exl3_trellis_bits_for_recipe, is_deepseek_v4_exl3_recipe, is_deepseek_v4_mixed_exl3_recipe,
+    validate_exl3_expert_catalog, Exl3CatalogSummary, Exl3Expert, Exl3Projection,
+    Exl3ProjectionKind, Exl3Tp4ResidentGeometry, DEEPSEEK_V4_EXL3_CODEBOOK,
+    DEEPSEEK_V4_EXL3_RECIPE, DEEPSEEK_V4_EXL3_RECIPE_K3_V4, DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1,
+    DEEPSEEK_V4_EXL3_RECIPE_V2, DEEPSEEK_V4_EXL3_RECIPE_V3, DEEPSEEK_V4_EXL3_RECIPE_V4,
+    DEEPSEEK_V4_EXL3_SCHEMA, DEEPSEEK_V4_EXL3_SCHEMA_VERSION, DEEPSEEK_V4_EXL3_SOURCE_FORMAT,
+    DEEPSEEK_V4_EXL3_T12_LUT_BYTES, DEEPSEEK_V4_EXL3_TENSOR_FORMAT, DEEPSEEK_V4_EXL3_TRELLIS_BITS,
+    EXLLAMAV3_REPOSITORY, EXLLAMAV3_REVISION, EXLLAMAV3_SOURCE_TREE_SHA256,
 };
 pub use expert_format::{
     native_fp4_expert, validate_native_fp4_expert_catalog, NativeFp4CatalogSummary,

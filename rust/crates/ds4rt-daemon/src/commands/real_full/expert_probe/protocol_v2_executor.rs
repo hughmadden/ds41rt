@@ -5,8 +5,9 @@ use ds4rt_core::{
 };
 use ds4rt_ffi::Ds4rtDeviceBuffer;
 use ds4rt_loader::{
-    exl3_expert_trellis_bits, is_deepseek_v4_exl3_recipe, is_deepseek_v4_mixed_exl3_recipe,
-    native_fp4_expert, Exl3Tp4ResidentGeometry, DEEPSEEK_V4_EXL3_RECIPE,
+    exl3_expert, exl3_projection_trellis_bits, is_deepseek_v4_exl3_recipe,
+    is_deepseek_v4_mixed_exl3_recipe, native_fp4_expert, Exl3Tp4ResidentGeometry,
+    DEEPSEEK_V4_EXL3_RECIPE, DEEPSEEK_V4_EXL3_T12_LUT_BYTES,
 };
 use ds4rt_transport::{
     protocol_v2_verbs_host_execution_lanes, ExpertProtocolV2DeviceResponseRef,
@@ -3001,54 +3002,87 @@ fn native_flash_resident_preload_plan(
         let hidden = u64::try_from(catalog.facts.hidden_size)?;
         let local_intermediate = u64::try_from(catalog.facts.moe_intermediate_size / shard.count)?;
         for layer_id in 0..layers {
-            let first_bits = exl3_expert_trellis_bits(catalog, layer_id, 0)?;
+            let mut counts = [[0_usize; 2]; 3];
+            let mut first_bits = None;
             let mut uniform_layer = true;
             for expert_id in 0..experts_per_layer {
-                let expert_bits = exl3_expert_trellis_bits(catalog, layer_id, expert_id)?;
-                uniform_layer &= expert_bits == first_bits;
-                let bits = u64::try_from(expert_bits)?;
-                let projection_bytes = hidden
-                    .checked_mul(local_intermediate)
-                    .and_then(|values| values.checked_mul(bits))
-                    .and_then(|bits| bits.checked_div(8))
-                    .context("mixed EXL3 TP4 projection byte count overflow")?;
-                let expert_bytes = projection_bytes
-                    .checked_mul(3)
-                    .context("mixed EXL3 TP4 expert byte count overflow")?;
-                plan.weight_bytes = plan
-                    .weight_bytes
-                    .checked_add(expert_bytes)
-                    .context("mixed EXL3 TP4 resident weight byte count overflow")?;
+                let expert = exl3_expert(catalog, layer_id, expert_id)?;
+                for (projection_index, projection) in [expert.gate, expert.up, expert.down]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let bits = exl3_projection_trellis_bits(projection)?;
+                    anyhow::ensure!(matches!(bits, 2 | 3), "unsupported mixed EXL3 tier K{bits}");
+                    first_bits.get_or_insert(bits);
+                    uniform_layer &= first_bits == Some(bits);
+                    counts[projection_index][bits - 2] += 1;
+                    let projection_bytes = hidden
+                        .checked_mul(local_intermediate)
+                        .and_then(|values| values.checked_mul(u64::try_from(bits).ok()?))
+                        .and_then(|bits| bits.checked_div(8))
+                        .context("mixed EXL3 TP4 projection byte count overflow")?;
+                    plan.weight_bytes = plan
+                        .weight_bytes
+                        .checked_add(projection_bytes)
+                        .context("mixed EXL3 TP4 resident weight byte count overflow")?;
+                }
             }
             let layer_scalar_metadata_bytes = if uniform_layer {
                 Exl3Tp4ResidentGeometry::from_model_facts_with_trellis_bits(
                     &catalog.facts,
-                    first_bits,
+                    first_bits.context("mixed EXL3 layer has no projection tier")?,
                 )?
                 .scalar_metadata_bytes
             } else {
+                let tier0_slots = counts[0][0].max(counts[1][0]);
+                let tier1_slots = counts[0][1].max(counts[1][1]);
+                let total_slots = tier0_slots + tier1_slots;
+                anyhow::ensure!(
+                    total_slots >= experts_per_layer,
+                    "mixed EXL3 projection slots do not cover the route namespace"
+                );
+                let rotations = u64::try_from(total_slots)?
+                    .checked_mul(3)
+                    .and_then(|values| values.checked_mul(hidden + local_intermediate))
+                    .and_then(|values| values.checked_mul(std::mem::size_of::<u16>() as u64))
+                    .context("mixed EXL3 projection rotation byte count overflow")?;
+                plan.weight_scale_bytes = plan
+                    .weight_scale_bytes
+                    .checked_add(rotations)
+                    .context("mixed EXL3 resident rotation byte count overflow")?;
+                let scale_entries = tier0_slots.max(counts[2][0]) + tier1_slots.max(counts[2][1]);
+                let scale_bytes = (scale_entries as u64)
+                    .checked_mul(std::mem::size_of::<f32>() as u64)
+                    .context("mixed EXL3 per-layer metadata byte count overflow")?;
                 16_u64
-                    .checked_add(
-                        (experts_per_layer as u64)
-                            .checked_mul(3 * std::mem::size_of::<f32>() as u64)
-                            .context("mixed EXL3 per-layer metadata byte count overflow")?,
-                    )
+                    .checked_add(DEEPSEEK_V4_EXL3_T12_LUT_BYTES as u64)
+                    .and_then(|bytes| bytes.checked_add(scale_bytes))
+                    .and_then(|bytes| {
+                        bytes.checked_add(
+                            experts_per_layer as u64 * std::mem::size_of::<i32>() as u64,
+                        )
+                    })
+                    .and_then(|bytes| {
+                        bytes
+                            .checked_add(3 * total_slots as u64 * std::mem::size_of::<i32>() as u64)
+                    })
                     .context("mixed EXL3 per-layer metadata byte count overflow")?
             };
+            if uniform_layer {
+                let geometry = Exl3Tp4ResidentGeometry::from_model_facts_with_trellis_bits(
+                    &catalog.facts,
+                    first_bits.context("mixed EXL3 layer has no projection tier")?,
+                )?;
+                plan.weight_scale_bytes = plan
+                    .weight_scale_bytes
+                    .checked_add(geometry.resident_rotation_bytes())
+                    .context("mixed EXL3 resident rotation byte count overflow")?;
+            }
             plan.scalar_metadata_bytes = plan
                 .scalar_metadata_bytes
                 .checked_add(layer_scalar_metadata_bytes)
                 .context("mixed EXL3 resident metadata byte count overflow")?;
         }
-        let rotation_width = hidden
-            .checked_add(local_intermediate)
-            .context("mixed EXL3 TP4 rotation width overflow")?;
-        let expert_count_u64 = u64::try_from(expert_count)?;
-        plan.weight_scale_bytes = expert_count_u64
-            .checked_mul(3)
-            .and_then(|values| values.checked_mul(rotation_width))
-            .and_then(|values| values.checked_mul(std::mem::size_of::<u16>() as u64))
-            .context("mixed EXL3 TP4 rotation byte count overflow")?;
     } else if is_deepseek_v4_exl3_recipe(&catalog.facts.quantization_recipe) {
         let geometry = Exl3Tp4ResidentGeometry::from_model_facts(&catalog.facts)?;
         plan.weight_bytes = (layers as u64)
@@ -4560,10 +4594,14 @@ mod tests {
     }
 
     fn exl3_flash_plan_catalog() -> TensorCatalog {
+        exl3_flash_plan_catalog_with_experts(2)
+    }
+
+    fn exl3_flash_plan_catalog_with_experts(routed_experts: usize) -> TensorCatalog {
         let mut facts = ModelFacts::default();
         facts.num_hidden_layers = 1;
         facts.dspark_target_layer_ids.clear();
-        facts.routed_experts = 2;
+        facts.routed_experts = routed_experts;
         facts.top_k = 2;
         facts.hidden_size = 4_096;
         facts.moe_intermediate_size = 2_048;
@@ -4743,8 +4781,35 @@ mod tests {
             assert_eq!(plan.projection_groups, 6);
             assert_eq!(plan.weight_bytes, 3_932_160);
             assert_eq!(plan.weight_scale_bytes, 55_296);
-            assert_eq!(plan.scalar_metadata_bytes, 40);
+            assert_eq!(plan.scalar_metadata_bytes, 4_152);
         }
+    }
+
+    #[test]
+    fn projection_mixed_resident_plan_accounts_padded_fc1_slots() {
+        let mut catalog = exl3_flash_plan_catalog_with_experts(4);
+        catalog.facts.quantization_recipe = DEEPSEEK_V4_EXL3_RECIPE_MIXED_K2_K3_V1.to_owned();
+        for tensor in &mut catalog.tensors {
+            let expert = tensor.expert_id.unwrap() as usize;
+            let k3 = (tensor.name.contains(".w1.") && expert == 3)
+                || (tensor.name.contains(".w3.") && expert >= 1)
+                || (tensor.name.contains(".w2.") && expert >= 2);
+            if k3 && tensor.name.ends_with(".trellis") {
+                tensor.byte_length = tensor.byte_length * 3 / 2;
+                tensor.shape[2] = 48;
+            }
+        }
+
+        let plan = native_flash_resident_preload_plan(
+            &catalog,
+            Some(ExpertIntermediateShard::new(4, 0).unwrap()),
+        )
+        .unwrap();
+        assert_eq!(plan.experts, 4);
+        assert_eq!(plan.projection_groups, 12);
+        assert_eq!(plan.weight_bytes, 7_864_320);
+        assert_eq!(plan.weight_scale_bytes, 165_888);
+        assert_eq!(plan.scalar_metadata_bytes, 4_224);
     }
 
     #[test]

@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+from fractions import Fraction
 from pathlib import Path, PurePosixPath
 import re
 from typing import Any
@@ -13,9 +14,18 @@ from typing import Any
 
 RECIPE = "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
 RECIPE_K3 = "deepseek_v4_exl3_trellis_3bpw_v4_flash_natural_route"
-PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
+RECIPE_MIXED_K2_K3 = "deepseek_v4_exl3_trellis_mixed_k2_k3_v1"
+INLINE_MIXED_SCHEMA = "gptqmodel.exl3-inline-mixed"
+INLINE_MIXED_SCORE = (
+    "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1"
+)
+PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v7"
+PREVIOUS_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
 LEGACY_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v5"
-SUPPORTED_PLAN_SCHEMAS = frozenset((LEGACY_PLAN_SCHEMA, PLAN_SCHEMA))
+SUPPORTED_PLAN_SCHEMAS = frozenset(
+    (LEGACY_PLAN_SCHEMA, PREVIOUS_PLAN_SCHEMA, PLAN_SCHEMA)
+)
+EXTENDED_GEOMETRY_PLAN_SCHEMAS = frozenset((PREVIOUS_PLAN_SCHEMA, PLAN_SCHEMA))
 RUN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-run-v5"
 ARTIFACT_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-artifact-v1"
 PLAN_FILE = "ds4rt-gptqmodel-plan.json"
@@ -79,6 +89,74 @@ GPTQMODEL_SOURCE_SERIALIZED_TRELLIS = {
         "05a8d9fda891206fc5b2fd83c68d14101c26101d0d94848fdcaf038e6a8888c0"
     ),
 }
+GPTQMODEL_SOURCE_INLINE_MIXED = {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/GPTQModel.git",
+    "revision": "bb369dc7adf83e680609f3db523d275f5eda532d",
+    "source_tree_sha256": (
+        "1119c6ef22221c4ae781ec0b73ef99d803ecdc8a76252901eafabfbfe56e174f"
+    ),
+}
+GPTQMODEL_SOURCE_GROUPED_CAPTURE = {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/GPTQModel.git",
+    "revision": "d0a80e0d5b62c79aca967d7f9456007e19af8484",
+    "source_tree_sha256": (
+        "bb2f88145d7bd4ef686c2165af1b556ed0b33d4656555c08cf40409efd45bb14"
+    ),
+}
+GPTQMODEL_SOURCE_UPSTREAM_REFRESH = {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/GPTQModel.git",
+    "revision": "547e3cefee14a8035e46d108cd0dd96cad6b2354",
+    "source_tree_sha256": (
+        "ca69291e7c4e4a6e47b10195842d96ea95ddc9628fe318274227a15df1b03878"
+    ),
+}
+GPTQMODEL_SOURCE_TERMINAL_FINALIZE = {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/GPTQModel.git",
+    "revision": "e9d0596c63bef1b6f7f5f73f463318fdfdc80041",
+    "source_tree_sha256": (
+        "6a6684aedc3a3400bed6cbc526fa09957dfd7071df9844b4c508fc50cb36aba2"
+    ),
+}
+GPTQMODEL_SOURCE_CHECKPOINT_TREE_RESTORE = {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/GPTQModel.git",
+    "revision": "0848f984a7af3ddeb5f4966db0ada939a098c4dc",
+    "source_tree_sha256": (
+        "8b25c6853ec65a5222dffa55a0e2419e97f38208c697ef4e12bf75517a299fcc"
+    ),
+}
+GPTQMODEL_SOURCE_RESUMABLE_CONFIG_SAVE = {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/GPTQModel.git",
+    "revision": "e5b4c9c0d68f31d90e0768c056bbaf8d287c1415",
+    "source_tree_sha256": (
+        "19774c44871ebe0857cb291a28c3dbc1b049089ae0a9d6da457eb83320e71af2"
+    ),
+}
+GPTQMODEL_SOURCE_CONFIG_EXTENSION_SAVE = {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/GPTQModel.git",
+    "revision": "5624c3d716b63218d18fd662eb4326f14f4beff0",
+    "source_tree_sha256": (
+        "85b4b9fef1dbee2ecfed6677b7d6984c138dcbe87479ea0c591251c841643d76"
+    ),
+}
+GPTQMODEL_RECOVERY_SOURCES = (
+    GPTQMODEL_SOURCE_WITH_ROUTE_RECOVERY,
+    GPTQMODEL_SOURCE_SAMPLED_PIPELINE,
+    GPTQMODEL_SOURCE_SERIALIZED_TRELLIS,
+    GPTQMODEL_SOURCE_INLINE_MIXED,
+    GPTQMODEL_SOURCE_GROUPED_CAPTURE,
+    GPTQMODEL_SOURCE_UPSTREAM_REFRESH,
+    GPTQMODEL_SOURCE_TERMINAL_FINALIZE,
+    GPTQMODEL_SOURCE_CHECKPOINT_TREE_RESTORE,
+    GPTQMODEL_SOURCE_RESUMABLE_CONFIG_SAVE,
+    GPTQMODEL_SOURCE_CONFIG_EXTENSION_SAVE,
+)
 OPERATOR_CONTRACT = "ds4rt-deepseek-v4-target-plus-joint-mtp-v1"
 REMOTE_CONTRACT = "ds4rt.exl3-remote-worker-v1"
 REMOTE_SCHEDULER = "dynamic-pipelined-slot-projection-v2"
@@ -124,11 +202,7 @@ def _expected_plan_exl3(family: dict[str, Any]) -> dict[str, Any]:
         "hessian_numerical": HESSIAN_NUMERICS["hessian_numerical"],
         "hessian_symmetry": HESSIAN_NUMERICS["hessian_symmetry"],
     }
-    if family.get("gptqmodel") in (
-        GPTQMODEL_SOURCE_WITH_ROUTE_RECOVERY,
-        GPTQMODEL_SOURCE_SAMPLED_PIPELINE,
-        GPTQMODEL_SOURCE_SERIALIZED_TRELLIS,
-    ):
+    if family.get("gptqmodel") in GPTQMODEL_RECOVERY_SOURCES:
         expected["zero_route_recovery"] = ZERO_ROUTE_RECOVERY_CONFIG
     return expected
 
@@ -139,6 +213,227 @@ def _recipe_for_bits(bits: int) -> str:
     if bits == 3:
         return RECIPE_K3
     raise ValueError(f"unsupported EXL3 integer tier K{bits}")
+
+
+def validate_inline_mixed_policy(
+    value: Any,
+    *,
+    namespace: str = "base",
+    require_portable: bool = True,
+) -> dict[str, Any]:
+    """Validate the portable exact-rational K2/K3 projection policy."""
+
+    if not isinstance(value, dict):
+        raise ValueError("GPTQModel inline mixed EXL3 metadata is not an object")
+    expected_fields = {
+        "schema",
+        "schema_version",
+        "namespace",
+        "base_bits",
+        "upgrade_bits",
+        "extra_bits",
+        "target_bpw",
+        "projection_ratio",
+        "score_kind",
+    }
+    fields = set(value)
+    allowed_fields = expected_fields | {"tier_plan_root"}
+    if require_portable and "tier_plan_root" in fields:
+        raise ValueError(
+            "GPTQModel inline mixed EXL3 publication metadata contains a private tier-plan path"
+        )
+    if fields != expected_fields and not (
+        not require_portable and fields == allowed_fields
+    ):
+        raise ValueError("GPTQModel inline mixed EXL3 metadata has unexpected fields")
+    if (
+        value.get("schema") != INLINE_MIXED_SCHEMA
+        or value.get("namespace") != namespace
+        or value.get("score_kind") != INLINE_MIXED_SCORE
+        or any(
+            isinstance(value.get(field), bool)
+            or not isinstance(value.get(field), int)
+            or value[field] != expected
+            for field, expected in (
+                ("schema_version", 1),
+                ("base_bits", 2),
+                ("upgrade_bits", 3),
+            )
+        )
+    ):
+        raise ValueError(
+            "GPTQModel inline mixed EXL3 metadata has an unsupported schema or tier pair"
+        )
+    if not require_portable and "tier_plan_root" in value and (
+        not isinstance(value["tier_plan_root"], str) or not value["tier_plan_root"]
+    ):
+        raise ValueError("GPTQModel inline mixed EXL3 tier-plan path is invalid")
+
+    extra = value.get("extra_bits")
+    if not isinstance(extra, dict) or set(extra) != {"numerator", "denominator"}:
+        raise ValueError("GPTQModel inline mixed EXL3 metadata has no exact bitrate")
+    numerator = extra.get("numerator")
+    denominator = extra.get("denominator")
+    if (
+        isinstance(numerator, bool)
+        or not isinstance(numerator, int)
+        or numerator <= 0
+        or isinstance(denominator, bool)
+        or not isinstance(denominator, int)
+        or denominator <= numerator
+    ):
+        raise ValueError(
+            "GPTQModel inline mixed EXL3 metadata has an invalid exact bitrate"
+        )
+    fraction = Fraction(numerator, denominator)
+    if (fraction.numerator, fraction.denominator) != (numerator, denominator):
+        raise ValueError("GPTQModel inline mixed EXL3 bitrate is not reduced")
+    target = value.get("target_bpw")
+    try:
+        target_fraction = Fraction(target) if isinstance(target, str) else None
+    except (ValueError, ZeroDivisionError) as error:
+        raise ValueError(
+            "GPTQModel inline mixed EXL3 target is not an exact rational"
+        ) from error
+    expected_target = 2 + fraction
+    if (
+        target_fraction != expected_target
+        or target != f"{expected_target.numerator}/{expected_target.denominator}"
+    ):
+        raise ValueError(
+            "GPTQModel inline mixed EXL3 target disagrees with its exact bitrate"
+        )
+
+    ratio = value.get("projection_ratio")
+    if (
+        not isinstance(ratio, dict)
+        or set(ratio) != {"w1", "w3", "w2"}
+        or any(
+            isinstance(ratio[name], bool)
+            or not isinstance(ratio[name], int)
+            or ratio[name] <= 0
+            for name in ("w1", "w3", "w2")
+        )
+    ):
+        raise ValueError(
+            "GPTQModel inline mixed EXL3 metadata has an invalid w1:w3:w2 ratio"
+        )
+    return value
+
+
+PROJECTION_ORDER = ("w1", "w3", "w2")
+
+
+def _portable_inline_mixed_policy(value: Any, *, namespace: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError("GPTQModel inline mixed EXL3 policy is not an object")
+    portable = {key: item for key, item in value.items() if key != "tier_plan_root"}
+    validate_inline_mixed_policy(portable, namespace=namespace)
+    return portable
+
+
+def _inline_mixed_policies(
+    family_join: dict[str, Any],
+    quant: dict[str, Any] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Return exact portable base/MTP policies bound by config provenance."""
+
+    raw = family_join.get("inline_mixed")
+    meta = quant.get("meta") if isinstance(quant, dict) else None
+    compatibility = meta.get("ds4rt_inline_mixed") if isinstance(meta, dict) else None
+    published_namespaces = (
+        meta.get("ds4rt_inline_mixed_namespaces")
+        if isinstance(meta, dict)
+        else None
+    )
+    if raw is None:
+        if compatibility is not None or published_namespaces is not None:
+            raise ValueError(
+                "GPTQModel inline mixed EXL3 metadata lacks family provenance"
+            )
+        return {}
+    if (
+        not isinstance(raw, dict)
+        or not raw
+        or "base" not in raw
+        or not set(raw).issubset({"base", "mtp"})
+    ):
+        raise ValueError("GPTQModel inline mixed EXL3 namespaces are invalid")
+    policies = {
+        namespace: _portable_inline_mixed_policy(policy, namespace=namespace)
+        for namespace, policy in raw.items()
+    }
+    if quant is not None:
+        if compatibility != policies["base"]:
+            raise ValueError(
+                "GPTQModel inline mixed EXL3 base metadata differs from provenance"
+            )
+        if published_namespaces is not None and published_namespaces != policies:
+            raise ValueError(
+                "GPTQModel inline mixed EXL3 namespace metadata differs from provenance"
+            )
+    return policies
+
+
+def _namespace_upgrade_quotas(
+    policy: dict[str, Any],
+    *,
+    layer_count: int,
+    experts_per_layer: int,
+) -> dict[str, int]:
+    """Mirror GPTQModel's exact half-up/largest-remainder tier allocation."""
+
+    extra = policy["extra_bits"]
+    fraction = Fraction(extra["numerator"], extra["denominator"])
+    candidate_count = layer_count * experts_per_layer * len(PROJECTION_ORDER)
+    ideal_upgrades = candidate_count * fraction
+    total_upgrades = (
+        2 * ideal_upgrades.numerator + ideal_upgrades.denominator
+    ) // (2 * ideal_upgrades.denominator)
+    ratio = policy["projection_ratio"]
+    ratio_sum = sum(ratio[projection] for projection in PROJECTION_ORDER)
+    ideals = {
+        projection: Fraction(total_upgrades * ratio[projection], ratio_sum)
+        for projection in PROJECTION_ORDER
+    }
+    quotas = {
+        projection: ideal.numerator // ideal.denominator
+        for projection, ideal in ideals.items()
+    }
+    remainder = total_upgrades - sum(quotas.values())
+    ranked = sorted(
+        PROJECTION_ORDER,
+        key=lambda projection: (
+            -(ideals[projection] - quotas[projection]),
+            PROJECTION_ORDER.index(projection),
+        ),
+    )
+    for projection in ranked[:remainder]:
+        quotas[projection] += 1
+    if any(quota > layer_count * experts_per_layer for quota in quotas.values()):
+        raise ValueError("GPTQModel inline mixed EXL3 quota exceeds its projection class")
+    return quotas
+
+
+def _layer_upgrade_quotas(
+    policy: dict[str, Any],
+    *,
+    layer_index: int,
+    layer_count: int,
+    experts_per_layer: int,
+) -> dict[str, int]:
+    totals = _namespace_upgrade_quotas(
+        policy,
+        layer_count=layer_count,
+        experts_per_layer=experts_per_layer,
+    )
+    return {
+        projection: (
+            ((layer_index + 1) * total) // layer_count
+            - (layer_index * total) // layer_count
+        )
+        for projection, total in totals.items()
+    }
 
 
 def canonical_json_bytes(value: Any) -> bytes:
@@ -188,9 +483,20 @@ def _valid_coordinator_only_topology(
     provenance: dict[str, Any],
     family: dict[str, Any],
 ) -> bool:
-    """Validate the two-RTX v6 execution envelope used for Pro quantization."""
+    """Validate the exact two-RTX envelope used by serialized EXL3 runs."""
 
-    if family.get("gptqmodel") != GPTQMODEL_SOURCE_SERIALIZED_TRELLIS:
+    source = family.get("gptqmodel")
+    execution_mode = {
+        canonical_json_bytes(GPTQMODEL_SOURCE_SERIALIZED_TRELLIS): "external-overlay",
+        canonical_json_bytes(GPTQMODEL_SOURCE_INLINE_MIXED): "integrated",
+        canonical_json_bytes(GPTQMODEL_SOURCE_GROUPED_CAPTURE): "integrated",
+        canonical_json_bytes(GPTQMODEL_SOURCE_UPSTREAM_REFRESH): "integrated",
+        canonical_json_bytes(GPTQMODEL_SOURCE_TERMINAL_FINALIZE): "integrated",
+        canonical_json_bytes(GPTQMODEL_SOURCE_CHECKPOINT_TREE_RESTORE): "integrated",
+        canonical_json_bytes(GPTQMODEL_SOURCE_RESUMABLE_CONFIG_SAVE): "integrated",
+        canonical_json_bytes(GPTQMODEL_SOURCE_CONFIG_EXTENSION_SAVE): "integrated",
+    }.get(canonical_json_bytes(source) if isinstance(source, dict) else b"")
+    if execution_mode is None:
         return False
     run = provenance.get("run")
     coordinator = run.get("coordinator") if isinstance(run, dict) else None
@@ -201,7 +507,7 @@ def _valid_coordinator_only_topology(
     family_source = family["gptqmodel"]
     return (
         isinstance(run, dict)
-        and run.get("mtp_execution_mode") == "external-overlay"
+        and run.get("mtp_execution_mode") == execution_mode
         and "remote_workers" not in run
         and isinstance(coordinator, dict)
         and coordinator.get("image_digest") == family.get("image_digest")
@@ -235,12 +541,65 @@ def _valid_coordinator_only_topology(
     )
 
 
+def _expected_projection_owners(
+    provenance: dict[str, Any],
+    family: dict[str, Any],
+) -> set[str]:
+    """Derive canonical projection owners from the authenticated topology."""
+
+    if _valid_coordinator_only_topology(provenance, family):
+        gpus = provenance["run"]["coordinator"]["gpus"]
+        return {f"coordinator:cuda:{gpu['index']}" for gpu in gpus}
+    topology = family.get("execution_topology")
+    if not isinstance(topology, dict):
+        return set()
+    slots = topology.get("coordinator_slots")
+    workers = topology.get("workers")
+    if not isinstance(slots, list) or not isinstance(workers, list):
+        return set()
+    return {
+        *(f"coordinator:{slot['device']}" for slot in slots if isinstance(slot, dict)),
+        *(
+            f"remote_worker:{worker['name']}"
+            for worker in workers
+            if isinstance(worker, dict)
+        ),
+    }
+
+
+def _expected_projection_encoded_bytes(
+    quant: dict[str, Any],
+    *,
+    hidden_size: int,
+    intermediate_size: int,
+) -> int | None:
+    """Sum packed projection bytes from each module's physical EXL3 tier."""
+
+    storage = quant.get("tensor_storage")
+    if not isinstance(storage, dict) or not storage:
+        return None
+    total = 0
+    for record in storage.values():
+        bits = record.get("bits_per_weight") if isinstance(record, dict) else None
+        if type(bits) is not int or bits not in {2, 3}:
+            return None
+        total += (
+            (hidden_size // 16)
+            * (intermediate_size // 16)
+            * 32
+            * bits
+            + (hidden_size + intermediate_size) * 2
+            + 4
+        )
+    return total
+
+
 def validate_gptqmodel_native_exl3(
     quant: Any,
     *,
     model_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Validate and return the family-join provenance for one uniform K2/K3 run."""
+    """Validate and return the family provenance for uniform or inline-mixed EXL3."""
 
     if not isinstance(quant, dict):
         raise ValueError("GPTQModel EXL3 quantization configuration is not an object")
@@ -275,17 +634,17 @@ def validate_gptqmodel_native_exl3(
     ):
         raise ValueError("GPTQModel EXL3 has no complete error-ledger provenance")
     family = provenance["family_join"]
+    mixed_policies = _inline_mixed_policies(family, quant)
+    if mixed_policies and type(bits_value) is not int:
+        raise ValueError(
+            "GPTQModel inline mixed EXL3 must keep public bits at integer K2"
+        )
     family_source = family.get("gptqmodel")
     recovery_contract = family.get("zero_route_recovery_contract")
     qualified_source = (
         family_source == GPTQMODEL_SOURCE and recovery_contract is None
     ) or (
-        family_source
-        in (
-            GPTQMODEL_SOURCE_WITH_ROUTE_RECOVERY,
-            GPTQMODEL_SOURCE_SAMPLED_PIPELINE,
-            GPTQMODEL_SOURCE_SERIALIZED_TRELLIS,
-        )
+        family_source in GPTQMODEL_RECOVERY_SOURCES
         and recovery_contract == ZERO_ROUTE_RECOVERY_CONFIG["contract"]
     )
     if (
@@ -324,9 +683,9 @@ def validate_gptqmodel_native_exl3(
     ):
         raise ValueError("GPTQModel EXL3 source-checkpoint provenance is invalid")
     if model_config is not None:
-        supported_geometries = (
-            _expected_source_geometry(model_config, LEGACY_PLAN_SCHEMA),
-            _expected_source_geometry(model_config, PLAN_SCHEMA),
+        supported_geometries = tuple(
+            _expected_source_geometry(model_config, schema)
+            for schema in SUPPORTED_PLAN_SCHEMAS
         )
         if not any(geometry == expected for expected in supported_geometries):
             raise ValueError("GPTQModel EXL3 source geometry differs from config.json")
@@ -418,29 +777,57 @@ def _finite_number(value: Any, *, positive: bool = False) -> bool:
 def _validate_canonical_tensor_storage(
     quant: dict[str, Any],
     model_config: dict[str, Any],
-) -> None:
+) -> dict[tuple[str, int, int, str], int]:
     hidden_size = model_config["hidden_size"]
     intermediate_size = model_config["moe_intermediate_size"]
     layer_count = model_config["num_hidden_layers"]
     expert_count = model_config["n_routed_experts"]
     dspark_targets = model_config["dspark_target_layer_ids"]
-    bits = int(quant["bits"])
+    base_bits = int(quant["bits"])
     storage = quant["tensor_storage"]
-    expected: dict[str, dict[str, Any]] = {}
+    provenance = quant.get("meta", {}).get("ds4rt_error_ledger")
+    family_join = (
+        provenance.get("family_join") if isinstance(provenance, dict) else None
+    )
+    if not isinstance(family_join, dict):
+        raise ValueError("canonical GPTQModel EXL3 tensor_storage has no provenance")
+    policies = _inline_mixed_policies(family_join, quant)
+    layer_counts = {"base": layer_count, "mtp": len(dspark_targets)}
+    if any(layer_counts[namespace] <= 0 for namespace in policies):
+        raise ValueError("GPTQModel inline mixed EXL3 policy has an empty namespace")
+
+    expected_module_count = (layer_count + len(dspark_targets)) * expert_count * 3
+    if len(storage) != expected_module_count:
+        raise ValueError("canonical GPTQModel EXL3 tensor_storage coverage is incomplete")
+
+    bits_by_projection: dict[tuple[str, int, int, str], int] = {}
+    observed_upgrades: dict[tuple[str, int, str], int] = {}
     for namespace, layers in (
-        ("base", range(layer_count)),
-        ("mtp", range(len(dspark_targets))),
+        ("base", range(layer_counts["base"])),
+        ("mtp", range(layer_counts["mtp"])),
     ):
         for layer in layers:
             block = f"model.layers.{layer}" if namespace == "base" else f"mtp.{layer}"
             for expert in range(expert_count):
-                for projection, (input_size, output_size) in {
-                    "gate_proj": (hidden_size, intermediate_size),
-                    "up_proj": (hidden_size, intermediate_size),
-                    "down_proj": (intermediate_size, hidden_size),
+                for projection, (logical_projection, input_size, output_size) in {
+                    "gate_proj": ("w1", hidden_size, intermediate_size),
+                    "up_proj": ("w3", hidden_size, intermediate_size),
+                    "down_proj": ("w2", intermediate_size, hidden_size),
                 }.items():
                     module = f"{block}.mlp.experts.{expert}.{projection}"
-                    expected[module] = {
+                    entry = storage.get(module)
+                    bits = entry.get("bits_per_weight") if isinstance(entry, dict) else None
+                    policy = policies.get(namespace)
+                    allowed_bits = (
+                        {policy["base_bits"], policy["upgrade_bits"]}
+                        if policy is not None
+                        else {base_bits}
+                    )
+                    if type(bits) is not int or bits not in allowed_bits:
+                        raise ValueError(
+                            f"canonical GPTQModel EXL3 tensor_storage has invalid tier for {module}"
+                        )
+                    expected = {
                         "stored_tensors": {
                             f"{module}.trellis": {
                                 "shape": [
@@ -467,10 +854,101 @@ def _validate_canonical_tensor_storage(
                         "bits_per_weight": bits,
                         "mcg_multiplier": MCG_MULTIPLIER,
                     }
-    if storage != expected:
-        raise ValueError(
-            "canonical GPTQModel EXL3 tensor_storage differs from its uniform tier"
+                    if entry != expected:
+                        raise ValueError(
+                            f"canonical GPTQModel EXL3 tensor_storage is invalid for {module}"
+                        )
+                    identity = (namespace, layer, expert, logical_projection)
+                    bits_by_projection[identity] = bits
+                    if policy is not None and bits == policy["upgrade_bits"]:
+                        key = (namespace, layer, logical_projection)
+                        observed_upgrades[key] = observed_upgrades.get(key, 0) + 1
+
+    for namespace, policy in policies.items():
+        layers = layer_counts[namespace]
+        for layer in range(layers):
+            expected = _layer_upgrade_quotas(
+                policy,
+                layer_index=layer,
+                layer_count=layers,
+                experts_per_layer=expert_count,
+            )
+            for projection in PROJECTION_ORDER:
+                observed = observed_upgrades.get((namespace, layer, projection), 0)
+                if observed != expected[projection]:
+                    raise ValueError(
+                        "canonical GPTQModel inline mixed EXL3 tier allocation "
+                        f"differs for {namespace} layer {layer} {projection}: "
+                        f"expected {expected[projection]}, observed {observed}"
+                    )
+    return bits_by_projection
+
+
+def _validate_integrated_direct_canonical_assembly(
+    snapshot: Path,
+    model_config: dict[str, Any],
+    quant: dict[str, Any],
+    plan: dict[str, Any],
+    artifact: dict[str, Any],
+) -> None:
+    """Validate the v7 writer that saves base and MTP in one native pass."""
+
+    provenance = quant.get("meta", {}).get("ds4rt_error_ledger")
+    family_join = (
+        provenance.get("family_join") if isinstance(provenance, dict) else None
+    )
+    if not isinstance(family_join, dict):
+        raise ValueError("integrated GPTQModel EXL3 artifact has no family provenance")
+    policies = _inline_mixed_policies(family_join, quant)
+    required_namespaces = {"base"}
+    if model_config.get("dspark_target_layer_ids"):
+        required_namespaces.add("mtp")
+    planned_policies = plan.get("inline_mixed")
+    if (
+        plan.get("schema") != PLAN_SCHEMA
+        or plan.get("mtp_execution_mode") != "integrated"
+        or set(policies) != required_namespaces
+        or not isinstance(planned_policies, dict)
+        or set(planned_policies) != required_namespaces
+        or family_join.get("gptqmodel")
+        not in (
+            GPTQMODEL_SOURCE_INLINE_MIXED,
+            GPTQMODEL_SOURCE_GROUPED_CAPTURE,
+            GPTQMODEL_SOURCE_UPSTREAM_REFRESH,
+            GPTQMODEL_SOURCE_TERMINAL_FINALIZE,
+            GPTQMODEL_SOURCE_CHECKPOINT_TREE_RESTORE,
+            GPTQMODEL_SOURCE_RESUMABLE_CONFIG_SAVE,
         )
+        or plan.get("ledger_provenance") != provenance
+        or plan.get("source") != family_join.get("source")
+        or plan.get("mtp_anchor_selection")
+        != family_join.get("mtp_anchor_selection")
+        or plan.get("mtp_replay_batching") != family_join.get("mtp_replay_batching")
+    ):
+        raise ValueError("integrated GPTQModel EXL3 canonical contract is inconsistent")
+    for namespace in required_namespaces:
+        validate_inline_mixed_policy(
+            planned_policies[namespace],
+            namespace=namespace,
+            require_portable=False,
+        )
+        if (
+            _portable_inline_mixed_policy(
+                planned_policies[namespace], namespace=namespace
+            )
+            != policies[namespace]
+        ):
+            raise ValueError(
+                f"integrated GPTQModel EXL3 {namespace} tier policy differs"
+            )
+    records = artifact.get("files")
+    if (
+        not isinstance(records, dict)
+        or CANONICAL_ASSEMBLY_FILE in records
+        or (snapshot / CANONICAL_ASSEMBLY_FILE).exists()
+    ):
+        raise ValueError("integrated GPTQModel EXL3 artifact has stale assembly state")
+    _validate_canonical_tensor_storage(quant, model_config)
 
 
 def _validate_canonical_assembly(
@@ -484,6 +962,15 @@ def _validate_canonical_assembly(
     recipe = _recipe_for_bits(bits)
     declaration = plan.get("canonical_assembly")
     if not isinstance(declaration, dict):
+        if plan.get("schema") == PLAN_SCHEMA:
+            _validate_integrated_direct_canonical_assembly(
+                snapshot,
+                model_config,
+                quant,
+                plan,
+                artifact,
+            )
+            return None
         raise ValueError(
             "raw GPTQModel export is not a canonical source-native hybrid artifact"
         )
@@ -670,28 +1157,28 @@ def _validate_canonical_assembly(
         != sha256_bytes(canonical_json_bytes(quant))
     ):
         raise ValueError("canonical GPTQModel quantization-config assembly is invalid")
-    projection_bytes = (
-        (hidden_size // 16) * (intermediate_size // 16) * 32 * bits
-        + (hidden_size + intermediate_size) * 2
-        + 4
+    expected_encoded_bytes = _expected_projection_encoded_bytes(
+        quant,
+        hidden_size=hidden_size,
+        intermediate_size=intermediate_size,
     )
     ownership = projection.get("ownership")
     content = projection.get("content")
+    provenance = quant["meta"]["ds4rt_error_ledger"]
+    expected_owners = _expected_projection_owners(
+        provenance,
+        provenance["family_join"],
+    )
     if (
         projection.get("projection_count") != projection_count
         or projection.get("expert_family_count") != family_count
         or projection.get("generated_tensor_count") != projection_count * 4
-        or projection.get("encoded_bytes") != projection_count * projection_bytes
+        or len(quant["tensor_storage"]) != projection_count
+        or expected_encoded_bytes is None
+        or projection.get("encoded_bytes") != expected_encoded_bytes
         or not isinstance(ownership, dict)
-        or set(ownership)
-        != {
-            "coordinator:cuda:0",
-            "coordinator:cuda:1",
-            "remote_worker:dodo",
-            "remote_worker:emu",
-            "remote_worker:kiwi",
-            "remote_worker:ostrich",
-        }
+        or not expected_owners
+        or set(ownership) != expected_owners
         or any(
             isinstance(value, bool) or not isinstance(value, int) or value <= 0
             for value in ownership.values()
@@ -1034,6 +1521,7 @@ def _valid_recovery_sample_accounting(
 def _validate_error_ledger(
     snapshot: Path,
     model_config: dict[str, Any],
+    quant: dict[str, Any],
     family_join: dict[str, Any],
     namespace_family_joins: dict[str, dict[str, Any]] | None = None,
 ) -> None:
@@ -1052,6 +1540,8 @@ def _validate_error_ledger(
     bits = family_join.get("bits")
     if isinstance(bits, bool) or bits not in {2, 3}:
         raise ValueError("GPTQModel EXL3 error ledger has an invalid uniform tier")
+    mixed_policies = _inline_mixed_policies(family_join, quant)
+    bits_by_projection = _validate_canonical_tensor_storage(quant, model_config)
     records: list[dict[str, Any]] = []
     try:
         for line_number, line in enumerate(ledger_payload.splitlines(), 1):
@@ -1118,6 +1608,7 @@ def _validate_error_ledger(
     projections: set[tuple[Any, ...]] = set()
     families: set[tuple[Any, ...]] = set()
     projection_routes: dict[tuple[Any, ...], list[Any]] = {}
+    projection_bits: dict[tuple[Any, ...], dict[str, int]] = {}
     projection_count = 0
     family_count = 0
     for record in records:
@@ -1139,6 +1630,7 @@ def _validate_error_ledger(
             raise ValueError("GPTQModel EXL3 ledger provenance differs from config")
         if record["record_kind"] == "projection":
             projection_identity = (*identity, record.get("projection"))
+            expected_bits = bits_by_projection.get(projection_identity)
             metrics = record.get("quantizer_metrics")
             route = record.get("route_evidence")
             sample_count = record.get("sample_count")
@@ -1155,7 +1647,8 @@ def _validate_error_ledger(
             if (
                 projection_identity not in expected_projections
                 or projection_identity in projections
-                or record.get("bits") != bits
+                or expected_bits is None
+                or record.get("bits") != expected_bits
                 or record.get("codebook") != "mcg"
                 or isinstance(sample_count, bool)
                 or not isinstance(sample_count, int)
@@ -1200,13 +1693,39 @@ def _validate_error_ledger(
                 )
             projections.add(projection_identity)
             projection_routes.setdefault(identity, []).append(route)
+            projection_bits.setdefault(identity, {})[record["projection"]] = int(
+                record["bits"]
+            )
             projection_count += 1
         else:
             aggregate = record.get("aggregate_metrics")
+            expected_projection_bits = projection_bits.get(identity)
+            mixed_tier_fields_valid = (
+                isinstance(expected_projection_bits, dict)
+                and set(expected_projection_bits) == {"w1", "w2", "w3"}
+                and record.get("bits") == min(expected_projection_bits.values())
+                and (
+                    not mixed_policies
+                    or (
+                        record.get("projection_bits") == expected_projection_bits
+                        and record.get("mixed_bits")
+                        is (len(set(expected_projection_bits.values())) > 1)
+                    )
+                )
+                and (
+                    record.get("projection_bits") is None
+                    or record.get("projection_bits") == expected_projection_bits
+                )
+                and (
+                    record.get("mixed_bits") is None
+                    or record.get("mixed_bits")
+                    is (len(set(expected_projection_bits.values())) > 1)
+                )
+            )
             if (
                 identity not in expected_families
                 or identity in families
-                or record.get("bits") != bits
+                or not mixed_tier_fields_valid
                 or record.get("codebook") != "mcg"
                 or record.get("projections") != ["w1", "w2", "w3"]
                 or not isinstance(aggregate, dict)
@@ -1252,7 +1771,7 @@ def _expected_source_geometry(
             "dspark_target_layer_ids",
         )
     }
-    if plan_schema == PLAN_SCHEMA:
+    if plan_schema in EXTENDED_GEOMETRY_PLAN_SCHEMAS:
         geometry.update(
             {
                 "mtp_block_count": len(model_config.get("dspark_target_layer_ids", [])),
@@ -1375,6 +1894,7 @@ def validate_gptqmodel_publication(
     _validate_error_ledger(
         snapshot,
         model_config,
+        quant,
         family,
         namespace_family_joins=namespace_family_joins,
     )
@@ -1389,8 +1909,11 @@ __all__ = [
     "LEDGER_MANIFEST_FILE",
     "PLAN_FILE",
     "RECIPE",
+    "RECIPE_K3",
+    "RECIPE_MIXED_K2_K3",
     "RUN_FILE",
     "is_gptqmodel_native_exl3",
+    "validate_inline_mixed_policy",
     "validate_gptqmodel_native_exl3",
     "validate_gptqmodel_publication",
 ]

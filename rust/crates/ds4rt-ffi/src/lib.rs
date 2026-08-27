@@ -244,6 +244,7 @@ pub struct Ds4rtDs4FlashSparkExl3MixedMoeBuffers {
     pub up_suh: Ds4rtDeviceBuffer,
     pub intermediate_rotations: Ds4rtDeviceBuffer,
     pub down_svh: Ds4rtDeviceBuffer,
+    pub trellis_lut: Ds4rtDeviceBuffer,
     pub global_to_combined: Ds4rtDeviceBuffer,
     pub descriptor_map: Ds4rtDeviceBuffer,
     pub topk_ids: Ds4rtDeviceBuffer,
@@ -1369,8 +1370,14 @@ type CudaDs4FlashSparkExl3K3DecodeM1AsyncFn = CudaDs4FlashSparkExl3K2DecodeM1Asy
 type CudaDs4FlashSparkExl3K3PrefillTopk6AsyncFn = CudaDs4FlashSparkExl3K2PrefillTopk6AsyncFn;
 type CudaDs4FlashSparkExl3MixedK2K3AsyncFn = unsafe extern "C" fn(
     buffers: *const Ds4rtDs4FlashSparkExl3MixedMoeBuffers,
-    tier0_experts: usize,
-    tier1_experts: usize,
+    tier0_slots: usize,
+    tier1_slots: usize,
+    tier0_gate_experts: usize,
+    tier1_gate_experts: usize,
+    tier0_up_experts: usize,
+    tier1_up_experts: usize,
+    tier0_down_experts: usize,
+    tier1_down_experts: usize,
     rows: usize,
     cuda_stream: *mut c_void,
 ) -> Ds4rtStatus;
@@ -6767,8 +6774,14 @@ impl NativeLibrary {
     pub unsafe fn cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
         &self,
         buffers: &Ds4rtDs4FlashSparkExl3MixedMoeBuffers,
-        tier0_experts: usize,
-        tier1_experts: usize,
+        tier0_slots: usize,
+        tier1_slots: usize,
+        tier0_gate_experts: usize,
+        tier1_gate_experts: usize,
+        tier0_up_experts: usize,
+        tier1_up_experts: usize,
+        tier0_down_experts: usize,
+        tier1_down_experts: usize,
         rows: usize,
         cuda_stream: *mut c_void,
     ) -> Result<()> {
@@ -6776,7 +6789,21 @@ impl NativeLibrary {
             self.lib
                 .get(b"ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async")?
         };
-        let status = unsafe { kernel_fn(buffers, tier0_experts, tier1_experts, rows, cuda_stream) };
+        let status = unsafe {
+            kernel_fn(
+                buffers,
+                tier0_slots,
+                tier1_slots,
+                tier0_gate_experts,
+                tier1_gate_experts,
+                tier0_up_experts,
+                tier1_up_experts,
+                tier0_down_experts,
+                tier1_down_experts,
+                rows,
+                cuda_stream,
+            )
+        };
         self.status_to_result("ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async", status)
     }
 
