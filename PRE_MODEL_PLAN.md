@@ -138,3 +138,12 @@ Owned-attention progress: the complete query/KV-to-output wave and fused private
 Removed balanced/long/accuracy presets, PROFILE configuration, profile selection and expert-environment propagation. Launch settings resolve through `serve_settings.py` / `resolve_serve_settings.py`; alternate configuration files use `--config`. Release, WIP and direct real-full serving now require FP8 target KV. BF16 transactional mirrors and dSpark FP8-quantized/dequantized BF16 windows retain their reference contracts. b12x device performance policies and timing instrumentation are separate from serving presets. Existing legacy model sizing/defaults still need the V4.1 serving migration; this does not qualify full-model serving.
 
 Validation: 63 targeted Python/launcher checks passed; shell syntax and build/run help checks passed; the daemon test binary compiled and its FP8-only serving entry test passed. Nine resolver tests also passed after the final naming cleanup. No real-model launch or container rebuild was performed for this change.
+
+### Committed dSpark main context (2026-09-11)
+
+- [x] Compose shared main projection/norm and three independent KV projection/norm/RoPE paths into one owned captured producer.
+- [x] Validate all stage leases, logical request identities and row mappings before committing FP8-style KV to the shared rings.
+- [x] Qualify six capacities through 4096 with changed-input graph replay and ring wraparound on both RTX GPUs using synthetic weights.
+- [ ] Connect decoder tap gathering and native frequencies to the producer and compose the complete three-stage draft/verification lifecycle.
+
+Evidence and remaining limits are recorded in `docs/ds41-main-context-qualification.md` and its JSON companion.

@@ -91,3 +91,6 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-attention-wave/`, `rust/target/debug/ds41-attention-wave-fixture`, `/tmp/ds41-v41-aot/attention-wave-ops-rtx*.json` and `attention-wave-*.log` under `/tmp/ds41-v41-fp8-aot/`, including the initial live-row/capacity admission failure; retain production owners, fused KV kernels, the reusable primitive qualifier and committed evidence.
 
 - Profile-removal editing helpers `/tmp/remove-serve-profiles.py`, `/tmp/fix-kv-entry.py` and `/tmp/ds41-no-profiles-{tests,rust}.log` are disposable after review. No model data was loaded for this change.
+
+- `/tmp/ds41-main-context/` contains disposable sparse synthetic checkpoint shards, copied Rust fixture modules, generators and expected BF16 outputs; remove it and `rust/target/debug/ds41-main-context-fixture` during Goal 2 cleanup.
+- `/tmp/ds41-main-context-*.log` records producer compilation and both RTX qualification runs and can be removed after review of the checked-in qualification artifacts.

@@ -1,0 +1,218 @@
+{
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "b12x_revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_dspark_cache.rs": "fbca35f1691bc74b6e40d5700b50e333549638bbfeef8eef5712455b281f92cc",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "b706eb9300906eb34936e2bdd2f3489d4cd998497021c25f90d96314657bc194",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/main_context.rs": "b7eab2d072b92229c561166e8c292bf442eba8863c25234289c3e187a2b67b32",
+    "/tmp/ds41-main-context/src/main.rs": "540250927288d603389f782a200574bd3eea7a55e103ec30eb1e897013bcf630",
+    "/tmp/ds41-main-context/generate.py": "57a54f7082cce22b654f4e71601fc74971b4b2b9a1411585d76a5596d172fb44",
+    "/tmp/ds41-main-context/setup.py": "710a6450fcca09bec5ce5de7083ed6d8009fc73568fe7657827806470c0d78db",
+    "/tmp/ds41-main-context-final-build.log": "6c48ef657939595524d25499f14645ce72c44726a02091dca684ee7a59e13e21",
+    "/tmp/ds41-main-context-fixture-final-build.log": "c42234de6efe776692b0ea76d2be2892621a9570c5965849db9e9eba537c26d3",
+    "/tmp/ds41-main-context-rtx0-final.log": "403145f877949d50a23e12067c55523e4c69a731fec87305e01c79adc79695d0",
+    "/tmp/ds41-main-context-rtx1-final.log": "403145f877949d50a23e12067c55523e4c69a731fec87305e01c79adc79695d0"
+  },
+  "gpus": {
+    "rtx0": [
+      {
+        "capacity": 1,
+        "rows": 1,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 286992
+      },
+      {
+        "capacity": 1,
+        "rows": 1,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 286992
+      },
+      {
+        "capacity": 16,
+        "rows": 13,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 2044944
+      },
+      {
+        "capacity": 16,
+        "rows": 13,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 2044944
+      },
+      {
+        "capacity": 80,
+        "rows": 73,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 9724944
+      },
+      {
+        "capacity": 80,
+        "rows": 73,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 9724944
+      },
+      {
+        "capacity": 256,
+        "rows": 255,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 30965776
+      },
+      {
+        "capacity": 256,
+        "rows": 255,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 30965776
+      },
+      {
+        "capacity": 1024,
+        "rows": 1001,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 123863056
+      },
+      {
+        "capacity": 1024,
+        "rows": 1001,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 123863056
+      },
+      {
+        "capacity": 4096,
+        "rows": 4095,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 495452176
+      },
+      {
+        "capacity": 4096,
+        "rows": 4095,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 495452176
+      }
+    ],
+    "rtx1": [
+      {
+        "capacity": 1,
+        "rows": 1,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 286992
+      },
+      {
+        "capacity": 1,
+        "rows": 1,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 286992
+      },
+      {
+        "capacity": 16,
+        "rows": 13,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 2044944
+      },
+      {
+        "capacity": 16,
+        "rows": 13,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 2044944
+      },
+      {
+        "capacity": 80,
+        "rows": 73,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 9724944
+      },
+      {
+        "capacity": 80,
+        "rows": 73,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 9724944
+      },
+      {
+        "capacity": 256,
+        "rows": 255,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 30965776
+      },
+      {
+        "capacity": 256,
+        "rows": 255,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 30965776
+      },
+      {
+        "capacity": 1024,
+        "rows": 1001,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 123863056
+      },
+      {
+        "capacity": 1024,
+        "rows": 1001,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 123863056
+      },
+      {
+        "capacity": 4096,
+        "rows": 4095,
+        "case": 0,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 495452176
+      },
+      {
+        "capacity": 4096,
+        "rows": 4095,
+        "case": 1,
+        "max_abs": 0,
+        "changed": 0,
+        "device_bytes": 495452176
+      }
+    ]
+  },
+  "additional_device_bytes_per_wave80": 5118988,
+  "partial_two_wave_device_bytes80": 8853572464,
+  "real_checkpoint_loaded": false,
+  "gpu_fault_injection": false
+}

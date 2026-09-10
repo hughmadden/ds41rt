@@ -1,0 +1,278 @@
+//! Shared main-hidden projection and three independent committed-KV producers.
+use super::{DsparkProjection, DsparkWeights, ProjectionKind};
+use crate::v41_dspark_cache::{DsparkWindow, WindowChunk};
+use crate::v41_memory::{DeviceAllocation, LoadStream};
+use anyhow::{ensure, Context, Result};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps};
+use std::ffi::c_void;
+
+pub(crate) struct DsparkMainContext<'weights, 'library> {
+    stream: LoadStream<'library>,
+    main: DsparkProjection<'weights, 'library>,
+    kv: [DsparkProjection<'weights, 'library>; 3],
+    ops: V41AttentionOps<'library>,
+    main_norm: Ds41rtDeviceBuffer,
+    kv_norm: [Ds41rtDeviceBuffer; 3],
+    normalized: DeviceAllocation<'library>,
+    frequencies: DeviceAllocation<'library>,
+    rotated: [DeviceAllocation<'library>; 3],
+    capacity: u32,
+    graph: Option<(*mut c_void, u32)>,
+    ready: Option<u32>,
+}
+impl<'library> DsparkWeights<'library> {
+    pub fn main_context(
+        &self,
+        capacity: u32,
+        budget: usize,
+    ) -> Result<DsparkMainContext<'_, 'library>> {
+        let library = self.experts[0].buffers[0].library;
+        ensure!(
+            DsparkMainContext::device_bytes(library, capacity)? <= budget,
+            "dSpark main context exceeds budget"
+        );
+        let projection = |kind| {
+            self.projection(
+                kind,
+                capacity,
+                DsparkProjection::device_bytes(library, kind, capacity)?,
+            )
+        };
+        Ok(DsparkMainContext {
+            stream: LoadStream {
+                library,
+                raw: library.cuda_stream_create()?,
+            },
+            main: projection(ProjectionKind::Main)?,
+            kv: [
+                projection(ProjectionKind::Kv(0))?,
+                projection(ProjectionKind::Kv(1))?,
+                projection(ProjectionKind::Kv(2))?,
+            ],
+            ops: library.v41_attention_ops()?,
+            main_norm: self.tensor("mtp.0.main_norm.weight")?,
+            kv_norm: [
+                self.tensor("mtp.0.attn.kv_norm.weight")?,
+                self.tensor("mtp.1.attn.kv_norm.weight")?,
+                self.tensor("mtp.2.attn.kv_norm.weight")?,
+            ],
+            normalized: DeviceAllocation::new(library, capacity as usize * 10240)?,
+            frequencies: DeviceAllocation::new(library, capacity as usize * 256)?,
+            rotated: [
+                DeviceAllocation::new(library, capacity as usize * 1024)?,
+                DeviceAllocation::new(library, capacity as usize * 1024)?,
+                DeviceAllocation::new(library, capacity as usize * 1024)?,
+            ],
+            capacity,
+            graph: None,
+            ready: None,
+        })
+    }
+}
+impl DsparkMainContext<'_, '_> {
+    /// Extra storage beyond the main projection already in the wave plan;
+    /// committed and private-draft KV use separate projection workspaces.
+    pub fn additional_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
+        ensure!(
+            [1, 16, 80, 256, 1024, 4096].contains(&capacity),
+            "invalid main context capacity"
+        );
+        Ok(capacity as usize * (10240 + 256 + 3 * 1024)
+            + 3 * DsparkProjection::device_bytes(library, ProjectionKind::Kv(0), capacity)?)
+    }
+    pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
+        Self::additional_bytes(library, capacity)?
+            .checked_add(DsparkProjection::device_bytes(
+                library,
+                ProjectionKind::Main,
+                capacity,
+            )?)
+            .context("main context storage overflow")
+    }
+    /// BF16 [capacity,15360], concatenated taps in checkpoint target-layer order.
+    pub fn input(&self) -> Ds41rtDeviceBuffer {
+        self.main.input()
+    }
+    /// FP32 [capacity,32,2] complex frequencies at committed main positions.
+    pub fn frequencies(&self) -> Ds41rtDeviceBuffer {
+        self.frequencies.buffer
+    }
+    fn prepare(&mut self, rows: u32) -> Result<()> {
+        self.ready = None;
+        ensure!(
+            rows > 0 && rows <= self.capacity,
+            "invalid main context rows"
+        );
+        Ok(())
+    }
+    fn synchronize(&self) -> Result<()> {
+        unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
+    }
+    unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
+        let stream = self.stream.raw;
+        unsafe {
+            self.main
+                .enqueue(self.main.input(), self.main.output_storage(), rows, stream)?;
+            self.ops.norm(
+                self.main.output_storage(),
+                self.main_norm,
+                None,
+                self.normalized.buffer,
+                rows,
+                5120,
+                stream,
+            )?;
+            for stage in 0..3 {
+                self.kv[stage].enqueue(
+                    self.normalized.buffer,
+                    self.kv[stage].output_storage(),
+                    rows,
+                    stream,
+                )?;
+                // Window writes perform the final official K32 quant/dequant
+                // while scattering; do not quantize twice in this producer.
+                self.ops.norm(
+                    self.kv[stage].output_storage(),
+                    self.kv_norm[stage],
+                    Some(self.frequencies.buffer),
+                    self.rotated[stage].buffer,
+                    rows,
+                    512,
+                    stream,
+                )?;
+            }
+        }
+        Ok(())
+    }
+    /// # Safety
+    /// Inputs and frequencies must be initialized, finite and on this device;
+    /// serialize writes and all borrowed outputs through completion/replay.
+    pub unsafe fn execute(&mut self, rows: u32) -> Result<()> {
+        self.prepare(rows)?;
+        let launched = unsafe { self.enqueue(rows) };
+        let drained = self.synchronize();
+        launched.and(drained)?;
+        self.ready = Some(rows);
+        Ok(())
+    }
+    /// # Safety
+    /// Same initialized-input and exclusive-use contract as execute.
+    pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
+        self.prepare(rows)?;
+        ensure!(self.graph.is_none(), "main context already captured");
+        unsafe {
+            self.execute(rows)?;
+        }
+        self.ready = None;
+        unsafe {
+            self.stream
+                .library
+                .cuda_graph_begin_capture(self.stream.raw)?;
+        }
+        let launched = unsafe { self.enqueue(rows) };
+        let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+        match (launched, captured) {
+            (Ok(()), Ok(graph)) => self.graph = Some((graph, rows)),
+            (Err(error), Ok(graph)) => {
+                unsafe {
+                    self.stream.library.cuda_graph_exec_destroy(graph)?;
+                }
+                return Err(error);
+            }
+            (Err(error), Err(_)) | (Ok(()), Err(error)) => return Err(error),
+        }
+        Ok(())
+    }
+    /// # Safety
+    /// Same initialized-input and exclusive-use contract as execute.
+    pub unsafe fn replay(&mut self, rows: u32) -> Result<()> {
+        self.prepare(rows)?;
+        let (graph, captured) = self.graph.context("main context not captured")?;
+        ensure!(rows == captured, "main context replay rows differ");
+        let launched = unsafe {
+            self.stream
+                .library
+                .cuda_graph_launch(graph, self.stream.raw)
+        };
+        let drained = self.synchronize();
+        launched.and(drained)?;
+        self.ready = Some(rows);
+        Ok(())
+    }
+    /// Normalized main hidden, shared by all three stages.
+    pub fn output(&self) -> Result<Ds41rtDeviceBuffer> {
+        let rows = self.ready.context("main context is incomplete")?;
+        let mut output = self.normalized.buffer;
+        output.bytes = rows as usize * 10240;
+        Ok(output)
+    }
+    /// Commit the same produced rows to each independently leased stage ring.
+    /// Prevalidate all stages; invalidate every participating lease if a GPU
+    /// failure leaves a partially updated multi-stage commit. Consumes readiness.
+    /// # Safety
+    /// Chunks describe accepted main tokens only, with correct positions and
+    /// row mappings; windows are on this device with no outstanding consumers.
+    pub unsafe fn commit(
+        &mut self,
+        windows: &mut [&mut DsparkWindow<'_>; 3],
+        chunks: [&[WindowChunk]; 3],
+    ) -> Result<()> {
+        let rows = self.ready.take().context("main context is incomplete")?;
+        for stage in 0..3 {
+            windows[stage].validate_write(chunks[stage], rows)?;
+        }
+        // Corresponding stage leases can differ, but positions and row mappings
+        // must describe the same batch before any device memory is changed.
+        for stage in 1..3 {
+            ensure!(
+                chunks[stage].len() == chunks[0].len(),
+                "main context stage batch differs"
+            );
+            for (a, b) in chunks[0].iter().zip(chunks[stage]) {
+                ensure!(
+                    windows[0].request_id(a.lease)? == windows[stage].request_id(b.lease)?,
+                    "main context stage request differs"
+                );
+                ensure!(
+                    a.position == b.position
+                        && a.source_row == b.source_row
+                        && a.tokens == b.tokens,
+                    "main context stage row mapping differs"
+                );
+            }
+        }
+        let result = (|| -> Result<()> {
+            for stage in 0..3 {
+                self.stream.library.copy_d2d(
+                    windows[stage].source(),
+                    self.rotated[stage].buffer,
+                    rows as usize * 1024,
+                )?;
+                unsafe {
+                    windows[stage].write(chunks[stage])?;
+                }
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            for stage in 0..3 {
+                for chunk in chunks[stage] {
+                    let _ = windows[stage].release(chunk.lease);
+                }
+            }
+        }
+        result
+    }
+}
+impl Drop for DsparkMainContext<'_, '_> {
+    fn drop(&mut self) {
+        if let Err(error) = self.synchronize() {
+            tracing::error!(%error,"draining dSpark main context");
+        }
+        if let Some((graph, _)) = self.graph.take() {
+            if let Err(error) = unsafe { self.stream.library.cuda_graph_exec_destroy(graph) } {
+                tracing::error!(%error,"destroying dSpark main context graph");
+            }
+        }
+    }
+}

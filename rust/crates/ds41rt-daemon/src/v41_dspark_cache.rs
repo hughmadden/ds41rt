@@ -163,6 +163,11 @@ impl<'a> DsparkWindow<'a> {
         );
         Ok(lease.slot)
     }
+    /// Stable logical request identity after owner/generation validation.
+    pub fn request_id(&self, lease: WindowLease) -> Result<u64> {
+        let slot = self.validate(lease)?;
+        self.slots[slot].request.context("dSpark cache request missing")
+    }
     pub fn release(&mut self, lease: WindowLease) -> Result<()> {
         let slot = self.validate(lease)?;
         self.slots[slot].request = None;
@@ -173,11 +178,10 @@ impl<'a> DsparkWindow<'a> {
     pub fn source(&self) -> Ds41rtDeviceBuffer {
         self.source.buffer
     }
-    /// # Safety
-    /// Source rows must be initialized finite KV with producer writes completed;
-    /// serialize source use and every consumer of a borrowed ring view. Chunks
-    /// contain only committed main-model positions, never unaccepted draft KV.
-    pub unsafe fn write(&mut self, chunks: &[WindowChunk]) -> Result<()> {
+    fn prepare_write(&self, chunks: &[WindowChunk], source_rows: u32)
+        -> Result<([V41KvWrite; 16], [bool; 16], [Option<u64>; 16])>
+    {
+        ensure!(source_rows > 0 && source_rows <= self.source_rows, "invalid produced cache rows");
         ensure!(
             !chunks.is_empty() && chunks.len() <= self.slot_count,
             "invalid cache chunk count"
@@ -191,8 +195,8 @@ impl<'a> DsparkWindow<'a> {
             seen[slot] = true;
             ensure!(
                 chunk.tokens > 0
-                    && chunk.source_row < self.source_rows
-                    && chunk.tokens <= self.source_rows - chunk.source_row,
+                    && chunk.source_row < source_rows
+                    && chunk.tokens <= source_rows - chunk.source_row,
                 "invalid cache source span"
             );
             let end = chunk
@@ -219,6 +223,18 @@ impl<'a> DsparkWindow<'a> {
             };
             ends[slot] = Some(end);
         }
+        Ok((descriptors, seen, ends))
+    }
+    /// Prevalidate an entire producer batch without changing cache state.
+    pub fn validate_write(&self, chunks: &[WindowChunk], source_rows: u32) -> Result<()> {
+        self.prepare_write(chunks, source_rows).map(|_| ())
+    }
+    /// # Safety
+    /// Source rows must be initialized finite KV with producer writes completed;
+    /// serialize source use and every consumer of a borrowed ring view. Chunks
+    /// contain only committed main-model positions, never unaccepted draft KV.
+    pub unsafe fn write(&mut self, chunks: &[WindowChunk]) -> Result<()> {
+        let (descriptors, seen, ends) = self.prepare_write(chunks, self.source_rows)?;
         let bytes = unsafe { std::slice::from_raw_parts(descriptors.as_ptr().cast::<u8>(), 384) };
         self.staging.bytes_mut().copy_from_slice(bytes);
         let launched = (|| unsafe {

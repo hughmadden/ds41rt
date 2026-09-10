@@ -1,4 +1,6 @@
 //! RTX-only ownership for every native dSpark tensor and independent stage experts.
+mod main_context;
+pub(crate) use main_context::DsparkMainContext;
 mod attention_wave;
 pub(crate) use attention_wave::DsparkAttentionWave;
 mod attention_output;
@@ -35,6 +37,7 @@ pub(crate) struct DsparkBudget {
     pub projection_packed_scale_bytes: usize,
     pub grouped_output_resident_bytes: usize,
     pub projection_bytes_per_wave: usize,
+    pub main_context_additional_bytes_per_wave: usize,
     pub attention_output_additional_bytes_per_wave: usize,
     pub attention_wave_additional_bytes_per_wave: usize,
     pub shared_execution_bytes_per_wave: usize,
@@ -64,7 +67,8 @@ impl DsparkBudget {
         ensure!((1..=2).contains(&waves), "dSpark needs one or two waves");
         let execution = self
             .execution_bytes_per_wave
-            .checked_add(self.shared_execution_bytes_per_wave)
+            .checked_add(self.main_context_additional_bytes_per_wave)
+            .and_then(|bytes| bytes.checked_add(self.shared_execution_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.projection_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.attention_output_additional_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.attention_wave_additional_bytes_per_wave))
@@ -134,6 +138,7 @@ impl<'library> DsparkWeights<'library> {
             projection_packed_scale_bytes: projection::packed_bytes(library)?,
             grouped_output_resident_bytes: 3 * 67108864,
             projection_bytes_per_wave: projection::wave_bytes(library, capacity)?,
+            main_context_additional_bytes_per_wave: DsparkMainContext::additional_bytes(library, capacity)?,
             attention_output_additional_bytes_per_wave: DsparkAttentionOutput::additional_bytes(capacity)? * 3,
             attention_wave_additional_bytes_per_wave: DsparkAttentionWave::additional_bytes(capacity)? * 3,
             shared_execution_bytes_per_wave: DsparkSharedFfn::device_bytes(library, capacity)? * 3,
