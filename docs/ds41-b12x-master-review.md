@@ -1,0 +1,22 @@
+# b12x master migration and reuse review
+
+The runtime now follows the fork's `master` branch, pinned at `aeb1d8c18e99809797c76af6fbfaca1273c36ff6`. The merge retains all seven V4.1 commits from `main` and the newer master work without rewriting either branch. `.gitmodules` records `branch = master`; release builds still require the exact gitlink and source digest rather than a floating branch.
+
+Four merge conflicts were resolved by retaining master's runtime-count split reducer and planner tile parameter while preserving V4.1 two/four-split FP32 reduction, K32 weight scales and deterministic expert accumulation. Existing Trellis validation remains intact. Qualification passed 267 GEMM/activation-floor/planner cases on RTX0, 15 expert/TP4 cases on RTX1 and the same 15 cases on ostrich's GB10. A fresh native expert/FP8 AOT build passed, followed by all eight projection geometries at six capacities and shared-FFN regressions on both RTX GPUs. Detailed results and limitations are in `ds41-b12x-master-qualification.json`; this is not renewed four-physical-Spark or performance evidence.
+
+The following source review determines what to reuse next, rather than assuming operators with similar names implement V4.1.
+
+| Master component | Useful contribution | V4.1 decision and remaining qualification |
+| --- | --- | --- |
+| `b12x/policy/`, component `_policy.py`, RTX/GB10 profiles | Plan-time device matching, validated overrides, stable capacity-based configuration and provenance | Retain master planning when exporting kernels; do not enable A16 activation promotion where the official V4.1 path requires K32 FP8 quantization. |
+| `attention/compressed_sparse_mla` and `_shared/mla/compressed_api.py` | 512-wide heads, sink support, dual sliding/indexed caches, planned split/extend infrastructure and newer wide vision-prefill handling | Highest-priority attention reuse candidate for backbone work; its `compressed_dsv4` byte-record/FP8 cache contract needs an explicit V4.1 adaptation and comparison of chunkwise probability rounding before use. |
+| `attention/dense_mla/_scratch.py` | Mature planned dense MLA execution | Current accepted geometries are (576,512) and (1088,1024), so it is not a direct replacement for dSpark's (512,512) BF16 ring/draft path. |
+| `norm/mhc` | Configurable RMS epsilon and newer prefill geometry, including TF32 paths | Reuse candidates for the expensive coefficient projection; qualify against FP32 reference tolerance and preserve V4.1's shifted incoming pre-mix in orchestration. |
+| `norm/hyperconnection` | Planned combine/norm primitives and live-prefix output views | Useful implementation patterns, but do not substitute these equations for the full V4.1 Sinkhorn/mHC contract. |
+| `loader/_checkpoint.py`, `_direct.c`, `_storage.c` | Bounded parallel O_DIRECT reads and CPU-addressable CUDA storage on GB10 | Evaluate for resident Spark expert-weight loading; retain mmap and request-driven prefetch for engram tables as required, and retain Rust ownership/provenance when adapting the C interfaces. |
+| `sequence/ple` | Request-slot state, accepted-token metadata and rollback-aware sequence processing patterns | Reuse lifecycle ideas where useful; its zero-centered Gemma normalization and PLE convolution are different from official V4.1 engram equations. |
+| `sequence/mtp_feedback/reference.py` | Planned embedding/state fusion implementation | Not dSpark: it applies zero-centered Gemma RMSNorm and two projection paths, whereas dSpark uses its own tapped-main projection, three expert stages and sequential Markov head. |
+| `gemm/bf16_vocab_projection` | Device-specific BF16 vocabulary projection planning | Current public execution does not provide the FP32-logit contract required by our terminal path; evaluate an explicit FP32-output adaptation before replacing the owned projection. |
+| `attention/qsa` and KDA/GDN operators | Qwen-specific compressed/indexed attention and recurrent state handling | Not direct substitutes for V4.1 CSA2 or encoder/decoder execution; avoid importing those model assumptions. |
+
+Immediate follow-up remains the owned V4.1 attention wave already in progress, followed by a scoped adaptation assessment of compressed sparse MLA for backbone attention and mHC prefill kernels before writing equivalent kernels again. Every adoption still needs numerical, changed-input graph and fixed-capacity checks for the actual V4.1 contract.

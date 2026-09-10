@@ -1,0 +1,2019 @@
+{
+  "revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "branch": "master",
+  "source_tree_sha256": "ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f",
+  "merge_parents": [
+    "4a30e982849b4aa2e98de1fde41a9f63a3537cf9",
+    "3ed9f9a67c45cf47f419ac948780a1c5875eb009"
+  ],
+  "tests": {
+    "rtx0": {
+      "passed": 267,
+      "log_sha256": "be9d95c55974dce3dbbb981440c0446d2e2f829169101219009d82031069d326",
+      "summary": "267 passed, 270 warnings in 9.36s"
+    },
+    "rtx1": {
+      "passed": 15,
+      "log_sha256": "e8324ac407867c67544b13e43e1d52536291ded23d48a0389c44c05240c07852",
+      "summary": "15 passed in 17.53s"
+    },
+    "spark": {
+      "passed": 15,
+      "log_sha256": "216ce42ec24b490c27dc63ef17a16eb18ed2311769e88338ffd77b57a37b93b6",
+      "summary": "15 passed in 23.25s"
+    }
+  },
+  "native_projection_results": [
+    {
+      "scope": "Synthetic native FP8 projections and shared FFN; excludes Rust-owned composition and serving",
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "reference_hashes": {
+        "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455"
+      },
+      "device": 0,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "device_uuid": "fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+      "native_library_sha256": "5a1f8f5765e5e141c768ff48a05b155205e7a4b8eebd9721396e9a30f22d97b4",
+      "qualifier_sha256": "b459b7420f9acd2e6f428b17dabb1e0503274bf1bac1742ce834222697ffd120",
+      "results": [
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 5
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 12
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 95
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 89
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 469
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 512
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1530
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1491
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6160
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6302
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 24588
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 24523
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.000244140625,
+            "different_bf16_elements": 1
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 7
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 5
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 34
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 37
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 106
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 113
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 427
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 437
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1745
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1735
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 5
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 5
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 32
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 24
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 114
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 113
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 412
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 368
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1875
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1809
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 2
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 5
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 71
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 48
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 266
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 243
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 922
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 840
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 3369
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 3481
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 13509
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 13623
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 4.76837158203125e-07,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 4
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 24
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 24
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 54
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 62
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 227
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 223
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 959
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 986
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 1.4901161193847656e-08,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 3.814697265625e-06,
+            "different_bf16_elements": 1
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 17
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 9
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 110
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 114
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 369
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 355
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1488
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1554
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 5531
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 5687
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 3
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 11
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 8
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 34
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 30
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 96
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 91
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 420
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 386
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 2
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 21
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 29
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 137
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 129
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 364
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 415
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1641
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1752
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6633
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6696
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "shared_ffn_rows": 1,
+          "composed": {
+            "gate": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0
+            },
+            "up": {
+              "max_abs_error": 5.960464477539063e-08,
+              "different_bf16_elements": 1
+            },
+            "intermediate": {
+              "max_abs_error": 1.1175870895385742e-08,
+              "different_bf16_elements": 1,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0
+            },
+            "end_to_end_max_abs_error": 0.0,
+            "end_to_end_rms_error": 0.0,
+            "reference_rms": 1.169215440750122,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 1,
+            "different_down_input_fp8_elements": 0
+          },
+          "changed_graph": {
+            "gate": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0
+            },
+            "up": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0
+            },
+            "intermediate": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 9.5367431640625e-07,
+              "different_bf16_elements": 1
+            },
+            "end_to_end_max_abs_error": 9.5367431640625e-07,
+            "end_to_end_rms_error": 1.332800358966324e-08,
+            "reference_rms": 1.3524094820022583,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 0,
+            "different_down_input_fp8_elements": 0
+          },
+          "activation_extremes_bitwise": true
+        },
+        {
+          "shared_ffn_rows": 16,
+          "composed": {
+            "gate": {
+              "max_abs_error": 0.001953125,
+              "different_bf16_elements": 9
+            },
+            "up": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 4
+            },
+            "intermediate": {
+              "max_abs_error": 0.001953125,
+              "different_bf16_elements": 12,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 17
+            },
+            "end_to_end_max_abs_error": 0.0078125,
+            "end_to_end_rms_error": 4.7836481826379895e-05,
+            "reference_rms": 1.2624346017837524,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 12,
+            "different_down_input_fp8_elements": 1
+          },
+          "changed_graph": {
+            "gate": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 3
+            },
+            "up": {
+              "max_abs_error": 1.9073486328125e-06,
+              "different_bf16_elements": 2
+            },
+            "intermediate": {
+              "max_abs_error": 7.62939453125e-06,
+              "different_bf16_elements": 3,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 18
+            },
+            "end_to_end_max_abs_error": 0.0078125,
+            "end_to_end_rms_error": 3.2008643756853417e-05,
+            "reference_rms": 1.255379319190979,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 3,
+            "different_down_input_fp8_elements": 0
+          },
+          "activation_extremes_bitwise": true
+        },
+        {
+          "shared_ffn_rows": 80,
+          "composed": {
+            "gate": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 35
+            },
+            "up": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 48
+            },
+            "intermediate": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 76,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 101
+            },
+            "end_to_end_max_abs_error": 0.03125,
+            "end_to_end_rms_error": 0.000633294228464365,
+            "reference_rms": 1.2486121654510498,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 76,
+            "different_down_input_fp8_elements": 3
+          },
+          "changed_graph": {
+            "gate": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 36
+            },
+            "up": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 24
+            },
+            "intermediate": {
+              "max_abs_error": 0.00390625,
+              "different_bf16_elements": 50,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.03125,
+              "different_bf16_elements": 101
+            },
+            "end_to_end_max_abs_error": 0.03125,
+            "end_to_end_rms_error": 8.907140727387741e-05,
+            "reference_rms": 1.2404972314834595,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 50,
+            "different_down_input_fp8_elements": 1
+          },
+          "activation_extremes_bitwise": true
+        }
+      ]
+    },
+    {
+      "scope": "Synthetic native FP8 projections and shared FFN; excludes Rust-owned composition and serving",
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "reference_hashes": {
+        "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455"
+      },
+      "device": 1,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "device_uuid": "95f8f212-9131-df99-fd53-7535965197d7",
+      "native_library_sha256": "5a1f8f5765e5e141c768ff48a05b155205e7a4b8eebd9721396e9a30f22d97b4",
+      "qualifier_sha256": "b459b7420f9acd2e6f428b17dabb1e0503274bf1bac1742ce834222697ffd120",
+      "results": [
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 6
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 91
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 85
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 466
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 507
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1450
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1488
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6073
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6326
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 6144,
+          "n": 25600,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 24591
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 24536
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 14
+          },
+          "changed_graph": {
+            "max_abs_error": 6.103515625e-05,
+            "different_bf16_elements": 7
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 31
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 27
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 103
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 105
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 431
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 436
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 2304,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1855
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1805
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 5
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 5
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 33
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 32
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 121
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 101
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 402
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 438
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 2304,
+          "n": 5120,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1751
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1763
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 1.52587890625e-05,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 49
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 53
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 253
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 272
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 870
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 802
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 3531
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 3400
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 15360,
+          "n": 5120,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 13686
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 13657
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 1.9073486328125e-06,
+            "different_bf16_elements": 1
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 5
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 10
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 26
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 21
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 51
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 71
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 221
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 228
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 1280,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 970
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 970
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 5
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 2
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 24
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 28
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 103
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 120
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 380
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 329
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1518
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1445
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 1280,
+          "n": 32768,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 5676
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 5539
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 2
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.000244140625,
+            "different_bf16_elements": 7
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 8
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 21
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 19
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 81
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 103
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 5120,
+          "n": 512,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 393
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 422
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 1,
+          "rows": 1,
+          "projection": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 16,
+          "rows": 16,
+          "projection": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 20
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 31
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 80,
+          "rows": 80,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 128
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 113
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 256,
+          "rows": 255,
+          "projection": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 419
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 418
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 1024,
+          "rows": 1023,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1695
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1644
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "k": 8192,
+          "n": 5120,
+          "capacity": 4096,
+          "rows": 4095,
+          "projection": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6647
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 6824
+          },
+          "quantization_and_scale_packing_exact": true,
+          "zero_input_exact": true,
+          "tiny_input_quantization_exact": true
+        },
+        {
+          "shared_ffn_rows": 1,
+          "composed": {
+            "gate": {
+              "max_abs_error": 0.00048828125,
+              "different_bf16_elements": 1
+            },
+            "up": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0
+            },
+            "intermediate": {
+              "max_abs_error": 0.0001220703125,
+              "different_bf16_elements": 1,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0
+            },
+            "end_to_end_max_abs_error": 0.015625,
+            "end_to_end_rms_error": 0.0004506506666075438,
+            "reference_rms": 1.1175693273544312,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 1,
+            "different_down_input_fp8_elements": 1
+          },
+          "changed_graph": {
+            "gate": {
+              "max_abs_error": 0.0,
+              "different_bf16_elements": 0
+            },
+            "up": {
+              "max_abs_error": 1.52587890625e-05,
+              "different_bf16_elements": 1
+            },
+            "intermediate": {
+              "max_abs_error": 1.52587890625e-05,
+              "different_bf16_elements": 1,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 7.62939453125e-06,
+              "different_bf16_elements": 1
+            },
+            "end_to_end_max_abs_error": 7.62939453125e-06,
+            "end_to_end_rms_error": 1.0662402871730592e-07,
+            "reference_rms": 1.0959306955337524,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 1,
+            "different_down_input_fp8_elements": 0
+          },
+          "activation_extremes_bitwise": true
+        },
+        {
+          "shared_ffn_rows": 16,
+          "composed": {
+            "gate": {
+              "max_abs_error": 0.00390625,
+              "different_bf16_elements": 7
+            },
+            "up": {
+              "max_abs_error": 0.00390625,
+              "different_bf16_elements": 7
+            },
+            "intermediate": {
+              "max_abs_error": 0.00390625,
+              "different_bf16_elements": 14,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 12
+            },
+            "end_to_end_max_abs_error": 0.0078125,
+            "end_to_end_rms_error": 3.3779469958972186e-05,
+            "reference_rms": 1.249414324760437,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 14,
+            "different_down_input_fp8_elements": 0
+          },
+          "changed_graph": {
+            "gate": {
+              "max_abs_error": 0.00390625,
+              "different_bf16_elements": 7
+            },
+            "up": {
+              "max_abs_error": 0.001953125,
+              "different_bf16_elements": 4
+            },
+            "intermediate": {
+              "max_abs_error": 0.0009765625,
+              "different_bf16_elements": 11,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 20
+            },
+            "end_to_end_max_abs_error": 0.015625,
+            "end_to_end_rms_error": 0.00016447568486910313,
+            "reference_rms": 1.2567808628082275,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 11,
+            "different_down_input_fp8_elements": 1
+          },
+          "activation_extremes_bitwise": true
+        },
+        {
+          "shared_ffn_rows": 80,
+          "composed": {
+            "gate": {
+              "max_abs_error": 0.00390625,
+              "different_bf16_elements": 35
+            },
+            "up": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 31
+            },
+            "intermediate": {
+              "max_abs_error": 0.00390625,
+              "different_bf16_elements": 63,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 107
+            },
+            "end_to_end_max_abs_error": 0.015625,
+            "end_to_end_rms_error": 5.894793866900727e-05,
+            "reference_rms": 1.256734013557434,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 63,
+            "different_down_input_fp8_elements": 2
+          },
+          "changed_graph": {
+            "gate": {
+              "max_abs_error": 0.0078125,
+              "different_bf16_elements": 31
+            },
+            "up": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 36
+            },
+            "intermediate": {
+              "max_abs_error": 0.03125,
+              "different_bf16_elements": 60,
+              "nonlinear_propagation_bound_passed": true
+            },
+            "down_same_input": {
+              "max_abs_error": 0.015625,
+              "different_bf16_elements": 90
+            },
+            "end_to_end_max_abs_error": 0.03125,
+            "end_to_end_rms_error": 0.0002591555821709335,
+            "reference_rms": 1.2577300071716309,
+            "quantization_propagation_bound_passed": true,
+            "different_intermediate_bf16_elements": 60,
+            "different_down_input_fp8_elements": 7
+          },
+          "activation_extremes_bitwise": true
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "No full-model or performance qualification",
+    "Existing four-physical-Spark TP4 evidence predates this dependency revision; new Spark tests execute TP4 shards on one GB10",
+    "Native rebuild includes in-progress uncommitted attention-wave integration; the regression qualifier exercises FP8 projections and shared FFN only"
+  ]
+}
