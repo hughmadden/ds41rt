@@ -129,7 +129,16 @@ impl<'a> ExpertWeights<'a> {
             library,
             raw: library.cuda_stream_create()?,
         };
+        // Keep at most four future experts advised while current staging and
+        // GPU packing run; no unrelated layers or host-mapped engram data.
+        const PREFETCH_EXPERTS: usize = 4;
+        for expert in 0..PREFETCH_EXPERTS.min(experts) {
+            catalog.expert_staging(layer.expert(expert))?.prefetch()?;
+        }
         for expert in 0..experts {
+            if expert + PREFETCH_EXPERTS < experts {
+                catalog.expert_staging(layer.expert(expert + PREFETCH_EXPERTS))?.prefetch()?;
+            }
             let plan = catalog.expert_staging(layer.expert(expert))?;
             plan.read_into(host.bytes_mut(), &mut read_scratch)?;
             unsafe {

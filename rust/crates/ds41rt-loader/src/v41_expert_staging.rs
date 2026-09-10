@@ -140,6 +140,41 @@ impl V41ExpertStaging<'_> {
         &self.names
     }
 
+    /// Advise only this expert's physical read ranges, without mapping or loading
+    /// unrelated experts/engram tables; callers bound the lookahead window.
+    pub fn prefetch(&self) -> Result<()> {
+        use std::os::fd::AsRawFd;
+        for (name, range) in self.names.iter().zip(&self.ranges) {
+            let tensor = self.catalog.tensor(name)?;
+            let mut offset = tensor.metadata.byte_offset;
+            let bytes = match tensor.placement {
+                crate::V41TensorPlacement::BackboneExpertTp4 { axis: 0, .. } => {
+                    offset = offset
+                        .checked_add((range.len() as u64) * self.rank.unwrap() as u64)
+                        .context("expert prefetch offset overflow")?;
+                    range.len() as u64
+                }
+                // Strided W2 column slices touch the complete source row span.
+                _ => tensor.metadata.byte_length,
+            };
+            let file = std::fs::File::open(self.catalog.snapshot().join(&tensor.shard))?;
+            let status = unsafe {
+                libc::posix_fadvise(
+                    file.as_raw_fd(),
+                    i64::try_from(offset)?,
+                    i64::try_from(bytes)?,
+                    libc::POSIX_FADV_WILLNEED,
+                )
+            };
+            ensure!(
+                status == 0,
+                "expert prefetch failed: {}",
+                std::io::Error::from_raw_os_error(status)
+            );
+        }
+        Ok(())
+    }
+
     /// Read all six native tensors; only a successful return permits packing.
     /// On an I/O failure staging may contain partial data and must not be consumed.
     /// Checkpoint files must remain unchanged after catalog validation.

@@ -672,6 +672,7 @@ mod expert_staging_tests {
                 .is_err());
             assert!(plan.read_into(&mut staging, &mut scratch[..1151]).is_err());
             assert!(staging.iter().all(|&byte| byte == 205));
+            plan.prefetch().unwrap();
             plan.read_into(&mut staging, &mut scratch).unwrap();
             for (slot, range) in plan.tensor_ranges().iter().enumerate() {
                 assert_eq!(range.start % 16, 0);
@@ -701,6 +702,7 @@ mod expert_staging_tests {
         assert_eq!(plan.minimum_read_scratch_bytes(), 0);
         assert_eq!(plan.intermediate_size(), 2304);
         let mut staging = vec![0; plan.staging_bytes()];
+        plan.prefetch().unwrap();
         plan.read_into(&mut staging, &mut []).unwrap();
         for (range, expected) in plan.tensor_ranges().iter().zip(&payloads) {
             assert_eq!(&staging[range.clone()], expected.as_slice());

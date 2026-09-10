@@ -23,6 +23,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Confirm checkpoint headers and required configuration, tokenizer and vision assets agree across all five hosts and record any differences from the reference lock.
 - [ ] Validate checkpoint payload representations through selected real-weight component execution before full-model loading.
 - [ ] Read and stage only each node's required tensors or TP slices with explicit native packed-storage and workspace budgets.
+- [x] Add bounded expert read-ahead and verify real TP staging bytes with a reusable cold/warm I/O probe on ostrich and the coordinator.
 - [ ] Measure useful weight bytes, physical read bytes and load time separately and optimize loading when it falls behind measured Spark NVMe throughput near 5 GB/s.
 - [ ] Measure graph setup separately from weight loading and prune graph work if additional startup exceeds 75 seconds.
 - [ ] Qualify build, WIP, run, restart, stop, source-manifest generation, artifact export and deployment across all five hosts.
@@ -72,3 +73,5 @@ The next dSpark dependency is target-layer tap gathering followed by complete st
 Fleet checkpoint evidence is recorded in `docs/ds41-checkpoint-inventory.json` and `docs/ds41-checkpoint-inventory.md`; all weights still require execution qualification, and payload hashes were not scanned.
 
 The tap gather and composed main-context evidence is in `docs/ds41-dspark-taps-qualification.md`; production target-layer call sites remain unwired.
+
+Checkpoint-backed staging and the remaining read-amplification bottleneck are recorded in `docs/ds41-expert-load-probe.md`; these host reads do not establish real-weight GPU numerical or startup qualification.
