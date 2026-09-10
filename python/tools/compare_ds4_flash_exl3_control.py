@@ -19,20 +19,20 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from ds4rt_runtime.exl3_quantizer import (  # noqa: E402
+from ds41rt_runtime.exl3_quantizer import (  # noqa: E402
     deterministic_expert_row_indices,
     load_activation_corpus,
     load_activation_layer_samples,
     read_native_model_config,
 )
-from ds4rt_runtime.native_experts import (  # noqa: E402
+from ds41rt_runtime.native_experts import (  # noqa: E402
     NativeExpertConfig,
     load_native_expert_reference_layer,
     read_native_expert_config,
 )
 
 
-REPORT_SCHEMA = "ds4rt-external-exl3-control-quality-v1"
+REPORT_SCHEMA = "ds41rt-external-exl3-control-quality-v1"
 PROJECTIONS = ("w1", "w3", "w2")
 
 

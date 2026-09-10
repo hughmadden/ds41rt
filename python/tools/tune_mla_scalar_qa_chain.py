@@ -18,7 +18,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error(error, len(error))
+    lib.ds41rt_last_error(error, len(error))
     raise RuntimeError(f"{action} failed with status {status}: {error.value.decode()}")
 
 
@@ -90,9 +90,9 @@ def main() -> None:
     device = torch.device("cuda", torch.cuda.current_device())
     properties = torch.cuda.get_device_properties(device)
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    lib.ds4rt_last_error.restype = ctypes.c_int
-    rmsnorm = lib.ds4rt_cuda_rmsnorm_bf16_async
+    lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    lib.ds41rt_last_error.restype = ctypes.c_int
+    rmsnorm = lib.ds41rt_cuda_rmsnorm_bf16_async
     rmsnorm.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -103,7 +103,7 @@ def main() -> None:
         ctypes.c_void_p,
     )
     rmsnorm.restype = ctypes.c_int
-    linear = lib.ds4rt_cuda_linear_bf16_cublas_async
+    linear = lib.ds41rt_cuda_linear_bf16_cublas_async
     linear.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -115,7 +115,7 @@ def main() -> None:
         ctypes.c_void_p,
     )
     linear.restype = ctypes.c_int
-    candidate = lib.ds4rt_cuda_mla_scalar_qa_batched_norm_candidate_async
+    candidate = lib.ds41rt_cuda_mla_scalar_qa_batched_norm_candidate_async
     candidate.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,

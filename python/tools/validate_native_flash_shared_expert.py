@@ -55,37 +55,37 @@ def tensor_buffer(tensor) -> DeviceBuffer:
 
 def configure_native(path: Path):
     library = ctypes.CDLL(str(path.resolve()))
-    library.ds4rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async.argtypes = (
+    library.ds41rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async.argtypes = (
         DeviceBuffer,
         DeviceBuffer,
         ctypes.c_size_t,
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    library.ds4rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async.restype = (
+    library.ds41rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async.restype = (
         ctypes.c_int
     )
-    library.ds4rt_cuda_ds4_flash_shared_expert_fp8_bf16_async.argtypes = (
+    library.ds41rt_cuda_ds4_flash_shared_expert_fp8_bf16_async.argtypes = (
         ctypes.POINTER(SharedBuffers),
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    library.ds4rt_cuda_ds4_flash_shared_expert_fp8_bf16_async.restype = ctypes.c_int
-    library.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    library.ds4rt_last_error.restype = ctypes.c_int
+    library.ds41rt_cuda_ds4_flash_shared_expert_fp8_bf16_async.restype = ctypes.c_int
+    library.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    library.ds41rt_last_error.restype = ctypes.c_int
     return library
 
 
 def native_error(library) -> str:
     message = ctypes.create_string_buffer(1024)
-    library.ds4rt_last_error(message, len(message))
+    library.ds41rt_last_error(message, len(message))
     return message.value.decode("utf-8", errors="replace")
 
 
 def require_ok(library, status: int, action: str) -> None:
     if status != 0:
         raise RuntimeError(
-            f"{action} failed with ds4rt status {status}: {native_error(library)}"
+            f"{action} failed with ds41rt status {status}: {native_error(library)}"
         )
 
 
@@ -179,7 +179,7 @@ def run(args) -> dict[str, float | int]:
     ):
         require_ok(
             native,
-            native.ds4rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async(
+            native.ds41rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async(
                 tensor_buffer(compact),
                 tensor_buffer(packed),
                 weight.shape[0],
@@ -213,7 +213,7 @@ def run(args) -> dict[str, float | int]:
     )
     require_ok(
         native,
-        native.ds4rt_cuda_ds4_flash_shared_expert_fp8_bf16_async(
+        native.ds41rt_cuda_ds4_flash_shared_expert_fp8_bf16_async(
             ctypes.byref(buffers), args.rows, stream
         ),
         "run shared expert",

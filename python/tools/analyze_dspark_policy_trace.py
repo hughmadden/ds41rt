@@ -21,9 +21,9 @@ from typing import Any, Iterable
 
 
 TRACE_PREFIX = "real_full_dspark_shadow_policy_trace "
-TRACE_SCHEMA = "ds4rt-dspark-shadow-policy-trace-v1"
-NORMALIZED_SCHEMA = "ds4rt-dspark-policy-trace-bank-v1"
-SUMMARY_SCHEMA = "ds4rt-dspark-policy-replay-summary-v1"
+TRACE_SCHEMA = "ds41rt-dspark-shadow-policy-trace-v1"
+NORMALIZED_SCHEMA = "ds41rt-dspark-policy-trace-bank-v1"
+SUMMARY_SCHEMA = "ds41rt-dspark-policy-replay-summary-v1"
 INTERNAL_SEQUENCE_PREFIX = "real-full-startup-"
 CONTEXT_BUCKET_TOKENS = 32 * 1024
 CONTEXT_BUCKET_PRIOR_MS = 2.0

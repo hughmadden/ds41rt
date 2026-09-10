@@ -23,8 +23,8 @@ from collect_ds4_flash_calibration_activations import (
 from collect_expert_route_bank import RouteFragment, read_trace_delta
 
 
-SCHEMA = "ds4rt-flash-natural-route-distribution-v1"
-PROGRESS_SCHEMA = "ds4rt-flash-natural-route-progress-v1"
+SCHEMA = "ds41rt-flash-natural-route-distribution-v1"
+PROGRESS_SCHEMA = "ds41rt-flash-natural-route-progress-v1"
 BASE_LAYERS = 43
 LAYERS = 46
 EXPERTS = 256

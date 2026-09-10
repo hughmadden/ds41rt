@@ -69,15 +69,15 @@ def export_kernels(output_dir: Path) -> None:
         kernel.compiled.export_to_c(
             str(output_dir),
             name,
-            f"ds4rt_b12x_{name}",
+            f"ds41rt_b12x_{name}",
         )
         grid_x = sms * int(kernel.blocks_per_sm)
         macro_label = label.upper()
         config.extend(
             (
-                f"#define DS4RT_B12X_COORDINATOR_{macro_label}_SIZE_N {size_n}",
-                f"#define DS4RT_B12X_COORDINATOR_{macro_label}_SIZE_K {size_k}",
-                f"#define DS4RT_B12X_COORDINATOR_{macro_label}_GRID_X {grid_x}",
+                f"#define DS41RT_B12X_COORDINATOR_{macro_label}_SIZE_N {size_n}",
+                f"#define DS41RT_B12X_COORDINATOR_{macro_label}_SIZE_K {size_k}",
+                f"#define DS41RT_B12X_COORDINATOR_{macro_label}_GRID_X {grid_x}",
                 "",
             )
         )

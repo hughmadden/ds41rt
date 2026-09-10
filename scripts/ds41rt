@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -f /.dockerenv ]]; then
+  export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/tmp/ds41rt-target}"
+fi
+exec "$repo_root/scripts/run-with-python-env.sh" \
+  cargo run --manifest-path "$repo_root/rust/Cargo.toml" -p ds41rt-daemon --bin ds41rt -- "$@"

@@ -177,7 +177,7 @@ def w8a16_group256_gemm(
 
 def configure_native(path: Path):
     native = ctypes.CDLL(str(path.resolve()))
-    quantize = native.ds4rt_cuda_quantize_bf16_w8a16_group256_async
+    quantize = native.ds41rt_cuda_quantize_bf16_w8a16_group256_async
     quantize.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -188,7 +188,7 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     quantize.restype = ctypes.c_int
-    dequantize = native.ds4rt_cuda_dequantize_w8a16_group256_bf16_async
+    dequantize = native.ds41rt_cuda_dequantize_w8a16_group256_bf16_async
     dequantize.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -220,7 +220,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        default=Path("native/build-w8a16/libds4rt_native.so"),
+        default=Path("native/build-w8a16/libds41rt_native.so"),
     )
     parser.add_argument(
         "--tensor", choices=tuple(PROJECTION_TENSORS), default="o"

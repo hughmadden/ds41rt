@@ -85,7 +85,7 @@ def test_active_python_does_not_import_retired_sparkinfer_package() -> None:
 
 def test_embedded_python_bridge_requires_b12x_namespace() -> None:
     bridge = (
-        ROOT / "rust/crates/ds4rt-daemon/src/python_graph_capture.rs"
+        ROOT / "rust/crates/ds41rt-daemon/src/python_graph_capture.rs"
     ).read_text(encoding="utf-8")
     modules = bridge.split(
         "const COORDINATOR_PYTHON_CAPTURE_MODULES", maxsplit=1
@@ -142,7 +142,7 @@ def test_standalone_tools_bootstrap_pinned_source_before_b12x_imports() -> None:
             )
 
     assert not violations, (
-        "standalone tools must verify and prepend DS4RT's pinned b12x/SparkInfer "
+        "standalone tools must verify and prepend DS41RT's pinned b12x/SparkInfer "
         "tree before importing it:\n" + "\n".join(violations)
     )
 
@@ -226,7 +226,7 @@ def test_slotted_builds_link_the_native_deepseek_aot_module() -> None:
         "scripts/build-wip-artifacts.sh",
     ):
         text = (ROOT / relative).read_text(encoding="utf-8")
-        assert "-DDS4RT_ENABLE_DS4_FLASH_AOT=ON" in text, (
+        assert "-DDS41RT_ENABLE_DS4_FLASH_AOT=ON" in text, (
             f"{relative} must link the native Flash/Pro expert and shared-expert "
             "AOT module into slotted artifacts"
         )
@@ -351,30 +351,30 @@ def test_live_launchers_override_stale_cmake_sparkinfer_cache_entries() -> None:
     justfile = (ROOT / "justfile").read_text(encoding="utf-8")
 
     assert (
-        '-DDS4RT_SPARKINFER_SOURCE_DIR="$repo_root/third_party/sparkinfer"'
+        '-DDS41RT_SPARKINFER_SOURCE_DIR="$repo_root/third_party/sparkinfer"'
         in coordinator
     )
     assert (
-        '-DDS4RT_SPARKINFER_LOCK_FILE="$repo_root/third_party/sparkinfer.lock.json"'
+        '-DDS41RT_SPARKINFER_LOCK_FILE="$repo_root/third_party/sparkinfer.lock.json"'
         in coordinator
     )
-    assert '-DDS4RT_ENABLE_DS4_FLASH_AOT="$ds4_flash_spark_aot"' in coordinator
-    assert '"-DDS4RT_NCCL_INCLUDE_DIR=$host_nccl_include_dir"' in coordinator
-    assert '"-DDS4RT_NCCL_LIBRARY=$host_nccl_library"' in coordinator
+    assert '-DDS41RT_ENABLE_DS4_FLASH_AOT="$ds4_flash_spark_aot"' in coordinator
+    assert '"-DDS41RT_NCCL_INCLUDE_DIR=$host_nccl_include_dir"' in coordinator
+    assert '"-DDS41RT_NCCL_LIBRARY=$host_nccl_library"' in coordinator
     assert '-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc' in coordinator
     assert "native CMake cache lost requested CUDA/RDMA/NCCL options" in coordinator
-    assert "DS4RT_ENABLE_CUDA:BOOL=ON" in coordinator
-    assert 'DS4RT_ENABLE_RDMA:BOOL=$native_rdma' in coordinator
-    assert "DS4RT_ENABLE_NCCL:BOOL=ON" in coordinator
-    assert "-DDS4RT_SPARKINFER_SOURCE_DIR=" in spark
-    assert "-DDS4RT_SPARKINFER_LOCK_FILE=" in spark
+    assert "DS41RT_ENABLE_CUDA:BOOL=ON" in coordinator
+    assert 'DS41RT_ENABLE_RDMA:BOOL=$native_rdma' in coordinator
+    assert "DS41RT_ENABLE_NCCL:BOOL=ON" in coordinator
+    assert "-DDS41RT_SPARKINFER_SOURCE_DIR=" in spark
+    assert "-DDS41RT_SPARKINFER_LOCK_FILE=" in spark
     coordinator_recipe = justfile.split(
         "build-native-coordinator-test:", maxsplit=1
     )[1].split("\n\n", maxsplit=1)[0]
-    assert "-U DS4RT_ENABLE_B12X_AOT" in coordinator_recipe
-    assert "-U DS4RT_ENABLE_B12X_COORDINATOR_AOT" in coordinator_recipe
-    assert "-DDS4RT_SPARKINFER_SOURCE_DIR=" in coordinator_recipe
-    assert "-DDS4RT_SPARKINFER_LOCK_FILE=" in coordinator_recipe
+    assert "-U DS41RT_ENABLE_B12X_AOT" in coordinator_recipe
+    assert "-U DS41RT_ENABLE_B12X_COORDINATOR_AOT" in coordinator_recipe
+    assert "-DDS41RT_SPARKINFER_SOURCE_DIR=" in coordinator_recipe
+    assert "-DDS41RT_SPARKINFER_LOCK_FILE=" in coordinator_recipe
 
 
 def test_launchers_use_only_the_packed_spark_moe_layout() -> None:
@@ -383,20 +383,20 @@ def test_launchers_use_only_the_packed_spark_moe_layout() -> None:
     )
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
 
-    assert 'docker_args+=(-e DS4RT_SERVE_PROFILE="$serve_profile")' in phase0
+    assert 'docker_args+=(-e DS41RT_SERVE_PROFILE="$serve_profile")' in phase0
     assert "serve_profile=${serve_profile:-unset}" in phase0
     assert 'serve_profile="${67:-}"' in phase0
-    assert "DS4RT_SPARK_MOE_MODE" not in phase0
-    assert "DS4RT_SPARKINFER_SOURCE_W4A16" not in phase0
-    assert "DS4RT_SPARKINFER_HYBRID_W4A4_W4A16" not in phase0
+    assert "DS41RT_SPARK_MOE_MODE" not in phase0
+    assert "DS41RT_SPARKINFER_SOURCE_W4A16" not in phase0
+    assert "DS41RT_SPARKINFER_HYBRID_W4A4_W4A16" not in phase0
     assert "SPARK_MOE_MODE" not in release
-    assert "export DS4RT_SPARK_PREBUILT=1" in release
-    assert "export DS4RT_SPARK_SKIP_STAGE=1" in release
+    assert "export DS41RT_SPARK_PREBUILT=1" in release
+    assert "export DS41RT_SPARK_SKIP_STAGE=1" in release
 
     env = os.environ.copy()
-    env["DS4RT_SPARK_PREBUILT"] = "1"
-    env["DS4RT_SPARK_MOE_MODE"] = "hybrid-w4a4-w4a16"
-    env["DS4RT_SERVE_PROFILE"] = "balanced"
+    env["DS41RT_SPARK_PREBUILT"] = "1"
+    env["DS41RT_SPARK_MOE_MODE"] = "hybrid-w4a4-w4a16"
+    env["DS41RT_SERVE_PROFILE"] = "balanced"
     result = subprocess.run(
         [ROOT / "scripts" / "start-spark-experts-tcp.sh", "--dry-run"],
         check=False,
@@ -407,8 +407,8 @@ def test_launchers_use_only_the_packed_spark_moe_layout() -> None:
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    assert "DS4RT_SPARK_MOE_MODE" not in result.stdout
-    assert "DS4RT_SERVE_PROFILE=balanced" in result.stdout
+    assert "DS41RT_SPARK_MOE_MODE" not in result.stdout
+    assert "DS41RT_SERVE_PROFILE=balanced" in result.stdout
 
 
 def test_phase0_image_only_staging_does_not_remove_live_experts() -> None:
@@ -429,20 +429,20 @@ def test_spark_launcher_defaults_to_runtime_tp4_placement() -> None:
     )
 
     assert (
-        'use_diagnostic_placement="${DS4RT_SPARK_USE_DIAGNOSTIC_PLACEMENT:-0}"'
+        'use_diagnostic_placement="${DS41RT_SPARK_USE_DIAGNOSTIC_PLACEMENT:-0}"'
         in phase0
     )
     assert 'if [ "$use_diagnostic_placement" = "1" ]; then' in phase0
     assert 'catalog=""' in phase0
-    assert 'ds4_flash_spark_aot="$DS4RT_DS4_FLASH_SPARK_AOT"' in phase0
+    assert 'ds4_flash_spark_aot="$DS41RT_DS4_FLASH_SPARK_AOT"' in phase0
     assert 'ds4_flash_spark_aot="${72:-1}"' in phase0
-    assert "DS4RT_SPARK_TRANSFORMER_TP" not in phase0
-    assert "DS4RT_SPARK_LAYER_BLOCK" not in phase0
-    assert '-DDS4RT_ENABLE_DS4_FLASH_AOT="$ds4_flash_aot"' in phase0
+    assert "DS41RT_SPARK_TRANSFORMER_TP" not in phase0
+    assert "DS41RT_SPARK_LAYER_BLOCK" not in phase0
+    assert '-DDS41RT_ENABLE_DS4_FLASH_AOT="$ds4_flash_aot"' in phase0
     real_source_launch = phase0.split(
-        'if [ "$DS4RT_BENCH_MODE" = "real" ]; then', maxsplit=1
+        'if [ "$DS41RT_BENCH_MODE" = "real" ]; then', maxsplit=1
     )[1].split("\nfi\n", maxsplit=1)[0]
-    assert '--model-id "$DS4RT_MODEL_ID"' in real_source_launch
+    assert '--model-id "$DS41RT_MODEL_ID"' in real_source_launch
     startup_loop = phase0.rsplit(
         'for host_index in "${!hosts[@]}"; do', maxsplit=1
     )[1].split("\ndone", maxsplit=1)[0]
@@ -506,13 +506,13 @@ def test_release_build_overrides_the_base_image_version_label() -> None:
         encoding="utf-8"
     )
 
-    assert 'ARG DS4RT_RELEASE_VERSION=unknown' in dockerfile
-    assert 'LABEL org.opencontainers.image.version=${DS4RT_RELEASE_VERSION}' in dockerfile
+    assert 'ARG DS41RT_RELEASE_VERSION=unknown' in dockerfile
+    assert 'LABEL org.opencontainers.image.version=${DS41RT_RELEASE_VERSION}' in dockerfile
     assert 'spark_release_version="${SPARK_EXPERT_DOCKER_INFERENCE##*:}"' in build
     assert '[[ "$spark_release_version" == "$release_version" ]]' in build
     assert 'release_version="$6"' in build
     assert 'source_manifest_sha256="${7-}"' in build
-    assert build.count('--build-arg DS4RT_RELEASE_VERSION="$release_version"') == 2
+    assert build.count('--build-arg DS41RT_RELEASE_VERSION="$release_version"') == 2
     assert build.count('org.opencontainers.image.version') == 2
     remote_revision_label = next(
         line
@@ -539,7 +539,7 @@ def test_packed_expert_warmups_use_bf16_wire() -> None:
             "\n}\n", 1
         )[0]
 
-        assert "DS4RT_SPARK_MOE_MODE" not in warmup
+        assert "DS41RT_SPARK_MOE_MODE" not in warmup
         assert "--nvfp4-fp8-roundtrip" not in warmup
         assert 'if [ "$warmup_layer_id" != "78" ]; then' not in warmup
         assert 'local wire_contract="bf16-in/bf16-out"' in warmup
@@ -612,15 +612,15 @@ def test_deepseek_full_launchers_do_not_supply_ep_loadplans() -> None:
 
 def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> None:
     coordinator = (
-        ROOT / "rust" / "crates" / "ds4rt-daemon" / "src" / "commands" / "coordinator.rs"
+        ROOT / "rust" / "crates" / "ds41rt-daemon" / "src" / "commands" / "coordinator.rs"
     ).read_text(encoding="utf-8")
-    assert '"cuda-reference" => ds4rt_api::ApiBackend::RealDs4Full' not in coordinator
+    assert '"cuda-reference" => ds41rt_api::ApiBackend::RealDs4Full' not in coordinator
 
     entry = (
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-daemon"
+        / "ds41rt-daemon"
         / "src"
         / "commands"
         / "real_full"
@@ -643,7 +643,7 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-daemon"
+        / "ds41rt-daemon"
         / "src"
         / "commands"
         / "real_full"
@@ -661,7 +661,7 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-daemon"
+        / "ds41rt-daemon"
         / "src"
         / "commands"
         / "real_full"
@@ -708,20 +708,20 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         "sparse_tcp_dispatch_worker: Option<Arc<RealFullSchedulerSparseTcpDispatchWorker>>"
         not in entry
     )
-    assert "DS4RT_REAL_FULL_SERVE_FAST_TOKEN" not in entry
+    assert "DS41RT_REAL_FULL_SERVE_FAST_TOKEN" not in entry
     assert "serve-fast-token-embedding-lm-head" not in entry
     assert "fast_embedding_lm_head_token_info" not in entry
 
     serving_launcher = (ROOT / "scripts" / "real-full-tcp-serve.sh").read_text(
         encoding="utf-8"
     )
-    assert "DS4RT_REAL_FULL_SERVE_FAST_TOKEN" not in serving_launcher
+    assert "DS41RT_REAL_FULL_SERVE_FAST_TOKEN" not in serving_launcher
 
     api_backend = (
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-api"
+        / "ds41rt-api"
         / "src"
         / "backends"
         / "real_full.rs"
@@ -735,7 +735,7 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-daemon"
+        / "ds41rt-daemon"
         / "src"
         / "commands"
         / "real_full"
@@ -752,7 +752,7 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-daemon"
+        / "ds41rt-daemon"
         / "src"
         / "commands"
         / "real_full"
@@ -771,7 +771,7 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-daemon"
+        / "ds41rt-daemon"
         / "src"
         / "commands"
         / "real_full"
@@ -784,7 +784,7 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         ROOT
         / "python"
         / "reference"
-        / "ds4rt_reference"
+        / "ds41rt_reference"
         / "b12x_mla_capture.py"
     ).read_text(encoding="utf-8")
     assert "prepare_b12x_glm_dsa_indexer_prefill" not in mla_capture
@@ -792,10 +792,10 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
     assert "_B12X_GLM_DSA_INDEXER_STATES" not in mla_capture
 
     retired_native_dsa = (
-        ROOT / "rust" / "crates" / "ds4rt-ffi" / "src" / "lib.rs",
-        ROOT / "native" / "include" / "ds4rt_native.h",
+        ROOT / "rust" / "crates" / "ds41rt-ffi" / "src" / "lib.rs",
+        ROOT / "native" / "include" / "ds41rt_native.h",
         ROOT / "native" / "cuda" / "kernels" / "mla_indexing.cu",
-        ROOT / "native" / "src" / "ds4rt_native.cc",
+        ROOT / "native" / "src" / "ds41rt_native.cc",
     )
     assert not (ROOT / "native" / "cuda" / "kernels" / "dsa_indexer.cu").exists()
     for path in retired_native_dsa:
@@ -811,14 +811,14 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
             assert retired_symbol not in source
 
     ffi_source = retired_native_dsa[0].read_text(encoding="utf-8")
-    assert "DS4RT_CUDA_GENERIC_KV_PAGE_SIZE" in ffi_source
+    assert "DS41RT_CUDA_GENERIC_KV_PAGE_SIZE" in ffi_source
     assert "cuda_generic_kv_page_table_expand_indices_async" in ffi_source
 
     kv_snapshot = (
         ROOT
         / "rust"
         / "crates"
-        / "ds4rt-daemon"
+        / "ds41rt-daemon"
         / "src"
         / "commands"
         / "real_full"
@@ -826,7 +826,7 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
         / "execution"
         / "snapshot.rs"
     ).read_text(encoding="utf-8")
-    assert 'REAL_FULL_KV_SNAPSHOT_FORMAT: &str = "ds4rt-kv-v3"' in kv_snapshot
+    assert 'REAL_FULL_KV_SNAPSHOT_FORMAT: &str = "ds41rt-kv-v3"' in kv_snapshot
     assert "dsa_index_file" not in kv_snapshot
 
     launcher = (ROOT / "scripts" / "real-full-tcp-serve.sh").read_text(
@@ -834,6 +834,6 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
     )
     assert 'case "$kv_cache_dtype" in' in launcher
     assert (
-        "DS4RT_REAL_FULL_SERVE_KV_CACHE_DTYPE must be bf16, fp8, or nvfp4"
+        "DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE must be bf16, fp8, or nvfp4"
         in launcher
     )

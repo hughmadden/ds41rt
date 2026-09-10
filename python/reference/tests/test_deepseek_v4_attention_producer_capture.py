@@ -1,6 +1,6 @@
 import pytest
 
-from ds4rt_reference.deepseek_v4_attention_producer_capture import (
+from ds41rt_reference.deepseek_v4_attention_producer_capture import (
     DS4_INDEX_PAGE_BYTES,
     DS4_MAIN_PAGE_BYTES,
     plan_deepseek_v4_attention_indexer,
@@ -127,7 +127,7 @@ def test_indexer_required_buffers_keep_cache_selection_and_arenas_caller_owned()
 def test_contract_matches_pinned_sparkinfer_plan(
     variant: str, cache_format: str
 ) -> None:
-    from ds4rt_reference.deepseek_v4_attention_producer_capture import (
+    from ds41rt_reference.deepseek_v4_attention_producer_capture import (
         qualify_deepseek_v4_attention_producer_contract,
     )
 
@@ -140,7 +140,7 @@ def test_contract_matches_pinned_sparkinfer_plan(
 def test_indexer_contract_matches_pinned_sparkinfer_producer_and_selector(
     variant: str,
 ) -> None:
-    from ds4rt_reference.deepseek_v4_attention_producer_capture import (
+    from ds41rt_reference.deepseek_v4_attention_producer_capture import (
         qualify_deepseek_v4_attention_indexer_contract,
     )
 

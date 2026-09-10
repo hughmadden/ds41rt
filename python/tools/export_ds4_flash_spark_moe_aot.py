@@ -81,7 +81,7 @@ class KernelProfile:
 
     @property
     def macro_prefix(self) -> str:
-        return f"DS4RT_DS4_{self.variant.upper()}"
+        return f"DS41RT_DS4_{self.variant.upper()}"
 
     @property
     def local_intermediate_size(self) -> int:
@@ -331,7 +331,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
         fused.compiled.export_to_c(
             str(output_dir),
             export_name,
-            f"ds4rt_{export_name}",
+            f"ds41rt_{export_name}",
         )
         if grid_x is None:
             grid_x = _w4a16_fused_persistent_grid_x(
@@ -438,7 +438,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
         fused.compiled.export_to_c(
             str(output_dir),
             export_name,
-            f"ds4rt_{export_name}",
+            f"ds41rt_{export_name}",
         )
         grid_x = _w4a16_fused_persistent_grid_x(
             fused=fused,
@@ -574,7 +574,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
             mixed.compiled.export_to_c(
                 str(output_dir),
                 export_name,
-                f"ds4rt_{export_name}",
+                f"ds41rt_{export_name}",
             )
             macro = label.upper()
             grid_x = mixed.blocks_per_sm * target_sms
@@ -621,7 +621,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
     topk_sum.compiled.export_to_c(
         str(output_dir),
         f"{prefix}_tp4_exl3_k2_topk{profile.top_k}_sum",
-        f"ds4rt_{prefix}_tp4_exl3_k2_topk{profile.top_k}_sum",
+        f"ds41rt_{prefix}_tp4_exl3_k2_topk{profile.top_k}_sum",
     )
     metadata_lines.append(
         f"exl3_topk{profile.top_k}_sum="
@@ -646,7 +646,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
         kernel.export_to_c(
             str(output_dir),
             export_name,
-            f"ds4rt_{export_name}",
+            f"ds41rt_{export_name}",
         )
         metadata_lines.append(
             f"{label}=m:{rows},n:{size_n},k:{size_k},activation_scale:k128"
@@ -672,7 +672,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
             kernel.export_to_c(
                 str(output_dir),
                 export_name,
-                f"ds4rt_{export_name}",
+                f"ds41rt_{export_name}",
             )
             metadata_lines.append(
                 f"{label}=m:runtime<=2048,k:{size_k},activation_scale:k128"
@@ -703,7 +703,7 @@ def export_kernels(output_dir: Path, target_sms: int, profile: KernelProfile) ->
             kernel.export_to_c(
                 str(output_dir),
                 export_name,
-                f"ds4rt_{export_name}",
+                f"ds41rt_{export_name}",
             )
             metadata_lines.append(
                 f"{label}=m:runtime<=2048,n:{size_n},k:{size_k},"

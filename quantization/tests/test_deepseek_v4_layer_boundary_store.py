@@ -86,7 +86,7 @@ def _projection_entries(
                 scale_search_mse=scale_search_mse
             )
             ledger_record = {
-                "schema": "ds4rt.exl3-error-ledger",
+                "schema": "ds41rt.exl3-error-ledger",
                 "schema_version": 1,
                 "record_kind": "projection",
                 "module": module,
@@ -136,7 +136,7 @@ def _mtp_projection_entry(
     store = EXL3ProjectionCheckpointStore(checkpoint_root)
     module = f"mtp.{block_index}.mlp.experts.{expert}.{projection}"
     route_evidence = {
-        "schema": "ds4rt.exl3-natural-route",
+        "schema": "ds41rt.exl3-natural-route",
         "schema_version": 1,
         "block_namespace": "mtp",
         "logical_layer": block_index,
@@ -154,7 +154,7 @@ def _mtp_projection_entry(
     )
     quantizer_metrics = _quantizer_metrics()
     ledger_record = {
-        "schema": "ds4rt.exl3-error-ledger",
+        "schema": "ds41rt.exl3-error-ledger",
         "schema_version": 1,
         "record_kind": "projection",
         "module": module,
@@ -477,7 +477,7 @@ def test_discovery_uses_selected_k3_and_audits_superseded_k2(
     )
     metrics = _quantizer_metrics()
     candidate_ledger = {
-        "schema": "ds4rt.exl3-error-ledger",
+        "schema": "ds41rt.exl3-error-ledger",
         "schema_version": 1,
         "record_kind": "projection",
         "module": module,

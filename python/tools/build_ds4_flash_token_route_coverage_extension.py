@@ -250,7 +250,7 @@ def build_retry_alignment_extension(
         for record in extension_records
     )
     manifest = {
-        "schema": "ds4rt-flash-natural-route-token-alignment-retry-v1",
+        "schema": "ds41rt-flash-natural-route-token-alignment-retry-v1",
         "base_corpus": str(corpus_path.resolve()),
         "base_corpus_sha256": sha256_bytes(corpus_payload),
         "progress": str(progress_path.resolve()),
@@ -656,7 +656,7 @@ def build_token_coverage_extension(
         for token_sequence in sorted(tried_token_sequences)
     )
     manifest = {
-        "schema": "ds4rt-flash-natural-token-route-coverage-extension-v1",
+        "schema": "ds41rt-flash-natural-token-route-coverage-extension-v1",
         "base_corpus": str(corpus_path.resolve()),
         "base_corpus_sha256": sha256_bytes(corpus_payload),
         "progress": str(progress_path.resolve()),

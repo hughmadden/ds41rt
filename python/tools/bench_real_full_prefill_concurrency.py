@@ -435,7 +435,7 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     manifest = {
         "record": "manifest",
-        "schema": "ds4rt-prefill-concurrency-v3",
+        "schema": "ds41rt-prefill-concurrency-v3",
         "commit": git_commit(root),
         "model": args.model,
         "prompt_protocol": "deepseek-v4-nonthinking-v1",

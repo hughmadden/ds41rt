@@ -24,7 +24,7 @@ def test_cli_binds_staged_identity_to_requested_model_and_revision(
         validator,
         "validate_staged_exl3_checkpoint",
         lambda checkpoint, **_kwargs: {
-            "schema": "ds4rt-hf-staged-snapshot-v1",
+            "schema": "ds41rt-hf-staged-snapshot-v1",
             "model_id": "tpurtell/flash-k2",
             "revision": revision,
             "checkpoint": str(checkpoint),
@@ -65,7 +65,7 @@ def test_cli_requires_explicit_development_override(
         calls.append(allow_development_unqualified)
         assert audit_publication
         return {
-            "schema": "ds4rt-hf-staged-snapshot-v1",
+            "schema": "ds41rt-hf-staged-snapshot-v1",
             "model_id": "tpurtell/flash-k2-dev",
             "revision": revision,
             "checkpoint": str(checkpoint),
@@ -108,7 +108,7 @@ def test_cli_rejects_requested_identity_mismatch(
 ) -> None:
     revision = "a" * 64
     identity = {
-        "schema": "ds4rt-hf-staged-snapshot-v1",
+        "schema": "ds41rt-hf-staged-snapshot-v1",
         "model_id": "tpurtell/flash-k2",
         "revision": revision,
     }
@@ -146,7 +146,7 @@ def test_cli_startup_contract_uses_public_serving_validator(
     def validate(checkpoint: Path, model_id: str, selected: str) -> dict[str, str]:
         calls.append((checkpoint, model_id, selected))
         return {
-            "schema": "ds4rt-public-exl3-serving-snapshot-v1",
+            "schema": "ds41rt-public-exl3-serving-snapshot-v1",
             "model_id": "tpurtell/flash-k2",
             "revision": revision,
         }

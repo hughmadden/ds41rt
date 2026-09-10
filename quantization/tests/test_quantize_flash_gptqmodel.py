@@ -205,7 +205,7 @@ def fixture(tmp_path: Path) -> argparse.Namespace:
             "cuda_arch": "120",
             "image_digest": "sha256:" + "d" * 64,
             "gptqmodel": {
-                "source": "/opt/ds4rt/third_party/gptqmodel",
+                "source": "/opt/ds41rt/third_party/gptqmodel",
                 "revision": lock["revision"],
                 "source_tree_sha256": lock["source_tree_sha256"],
             },
@@ -297,12 +297,12 @@ def test_plan_binds_source_corpus_environment_and_joint_mtp(tmp_path: Path) -> N
     assert first["projection_checkpoint"] == {
         "contract": MODULE.PROJECTION_CHECKPOINT_CONTRACT,
         "root": str(
-            args.output.with_name(f".{args.output.name}.ds4rt-run")
+            args.output.with_name(f".{args.output.name}.ds41rt-run")
             / MODULE.PROJECTION_CHECKPOINT_DIRNAME
         ),
     }
     assert first["run_state_dir"] == str(
-        args.output.with_name(f".{args.output.name}.ds4rt-run")
+        args.output.with_name(f".{args.output.name}.ds41rt-run")
     )
     assert first["projection_checkpoint_dir"] == first[
         "projection_checkpoint"
@@ -345,12 +345,12 @@ def test_plan_binds_exact_inline_base_and_mtp_targets(tmp_path: Path) -> None:
         "w2": 8,
     }
     assert plan["mtp_anchor_selection"] == {
-        "contract": "ds4rt-mtp-anchor-stratified-v1",
+        "contract": "ds41rt-mtp-anchor-stratified-v1",
         "count": 327_680,
         "seed": 20_260_809,
     }
     assert plan["mtp_replay_batching"] == {
-        "contract": "ds4rt-mtp-source-sequence-anchor-batches-v1",
+        "contract": "ds41rt-mtp-source-sequence-anchor-batches-v1",
         "source_sequence_anchor_cap": None,
         "proposal_rows_per_anchor": 5,
     }
@@ -384,7 +384,7 @@ def test_plan_supports_local_k3_on_one_visible_coordinator_gpu(
 def test_quantize_config_metadata_drops_local_tier_plan_root() -> None:
     class Config:
         meta = {
-            "ds4rt_inline_mixed": {
+            "ds41rt_inline_mixed": {
                 "target_bpw": "21/10",
                 "tier_plan_root": "/private/coordinator/frontier",
             },
@@ -395,10 +395,10 @@ def test_quantize_config_metadata_drops_local_tier_plan_root() -> None:
     MODULE._make_quantize_config_metadata_portable(config)
 
     assert config.meta == {
-        "ds4rt_inline_mixed": {"target_bpw": "21/10"},
+        "ds41rt_inline_mixed": {"target_bpw": "21/10"},
         "provenance": {"corpus": "next-v1"},
     }
-    assert Config.meta["ds4rt_inline_mixed"]["tier_plan_root"].startswith("/")
+    assert Config.meta["ds41rt_inline_mixed"]["tier_plan_root"].startswith("/")
 
 
 def test_external_overlay_mode_is_bound_and_has_a_durable_handoff(
@@ -668,7 +668,7 @@ def test_plan_binds_sorted_spark_workers_and_six_slot_scheduler(
     topology = plan["ledger_provenance"]["family_join"]["execution_topology"]
     assert topology["scheduler"] == "dynamic-pipelined-slot-projection-v2"
     expected_assignment_store = str(
-        args.output.with_name(f".{args.output.name}.ds4rt-run")
+        args.output.with_name(f".{args.output.name}.ds41rt-run")
         / MODULE.REMOTE_ASSIGNMENT_DIRNAME
     )
     assert remote["assignment_store"] == expected_assignment_store
@@ -761,7 +761,7 @@ def test_execution_upgrade_preserves_parent_plan_and_is_stable(
     boundary_root = run_state / MODULE.LAYER_BOUNDARY_DIRNAME
     boundary_root.mkdir()
     boundary_body = {
-        "schema": "ds4rt.deepseek-v4-layer-boundary",
+        "schema": "ds41rt.deepseek-v4-layer-boundary",
         "schema_version": 2,
         "payload_hash_algorithm": "xxh3-128",
         "plan_sha256": parent["plan_sha256"],
@@ -833,7 +833,7 @@ def test_first_execution_upgrade_binds_existing_boundary_and_journal(
     boundary_root = run_state / MODULE.LAYER_BOUNDARY_DIRNAME
     boundary_root.mkdir()
     boundary_body = {
-        "schema": "ds4rt.deepseek-v4-layer-boundary",
+        "schema": "ds41rt.deepseek-v4-layer-boundary",
         "schema_version": 2,
         "payload_hash_algorithm": "xxh3-128",
         "plan_sha256": parent["plan_sha256"],

@@ -17,7 +17,7 @@ REFERENCE_ROOT = Path(__file__).resolve().parents[1] / "reference"
 if str(REFERENCE_ROOT) not in sys.path:
     sys.path.insert(0, str(REFERENCE_ROOT))
 
-from ds4rt_reference.b12x_mla_capture import (  # noqa: E402
+from ds41rt_reference.b12x_mla_capture import (  # noqa: E402
     capture_flashinfer_compressed_mla_decode_chunk,
     capture_flashinfer_packed_fp8_mla_decode,
     prepare_flashinfer_compressed_mla_decode_chunk,
@@ -73,7 +73,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error(error, len(error))
+    lib.ds41rt_last_error(error, len(error))
     raise RuntimeError(
         f"{action} failed with status {status}: {error.value.decode()}"
     )
@@ -732,8 +732,8 @@ def main() -> None:
     device = torch.device("cuda", torch.cuda.current_device())
     properties = torch.cuda.get_device_properties(device)
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    lib.ds4rt_last_error.restype = ctypes.c_int
+    lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    lib.ds41rt_last_error.restype = ctypes.c_int
     pack_args = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -743,20 +743,20 @@ def main() -> None:
         ctypes.c_void_p,
     )
     pack_fp8 = configure(
-        lib, "ds4rt_cuda_mla_kv_pack_fp8_ds_mla_async", pack_args
+        lib, "ds41rt_cuda_mla_kv_pack_fp8_ds_mla_async", pack_args
     )
     pack_nvfp4 = configure(
-        lib, "ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla_async", pack_args
+        lib, "ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla_async", pack_args
     )
     unpack_fp8 = configure(
-        lib, "ds4rt_cuda_mla_kv_unpack_fp8_ds_mla_async", pack_args
+        lib, "ds41rt_cuda_mla_kv_unpack_fp8_ds_mla_async", pack_args
     )
     unpack_nvfp4 = configure(
-        lib, "ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla_async", pack_args
+        lib, "ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla_async", pack_args
     )
     merge = configure(
         lib,
-        "ds4rt_cuda_mla_merge_state_bf16_async",
+        "ds41rt_cuda_mla_merge_state_bf16_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,

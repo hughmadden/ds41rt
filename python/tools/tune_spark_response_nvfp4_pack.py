@@ -35,7 +35,7 @@ def parse_ints(raw: str, label: str) -> tuple[int, ...]:
 
 
 def configure_current(lib: ctypes.CDLL):
-    function = lib.ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async
+    function = lib.ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async
     function.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -51,7 +51,7 @@ def configure_current(lib: ctypes.CDLL):
 
 def configure_policy(lib: ctypes.CDLL):
     function = (
-        lib.ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_policy_candidate_async
+        lib.ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_policy_candidate_async
     )
     function.argtypes = (
         ctypes.c_void_p,
@@ -68,7 +68,7 @@ def configure_policy(lib: ctypes.CDLL):
 
 def configure_candidate(lib: ctypes.CDLL):
     function = (
-        lib.ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async
+        lib.ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async
     )
     function.argtypes = (
         ctypes.c_void_p,
@@ -322,7 +322,7 @@ def main() -> None:
         print(payload, end="")
     finally:
         for graph_exec in graph_execs:
-            native.lib.ds4rt_cuda_graph_exec_destroy(graph_exec)
+            native.lib.ds41rt_cuda_graph_exec_destroy(graph_exec)
         runtime.lib.cudaStreamDestroy(stream)
 
 

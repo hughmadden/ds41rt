@@ -4,7 +4,7 @@
 
 namespace {
 
-bool buffer_has_bytes(ds4rt_device_buffer_t buffer, size_t required) {
+bool buffer_has_bytes(ds41rt_device_buffer_t buffer, size_t required) {
   return buffer.ptr != nullptr && buffer.bytes >= required;
 }
 
@@ -95,8 +95,8 @@ __global__ void pack_ds4_flash_fp8_block_scale_mma_kernel(
   destination[output_index] = source[n_tile * k_tiles + k_tile];
 }
 
-ds4rt_status_t pack_weight_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination,
+ds41rt_status_t pack_weight_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination,
     size_t size_k, size_t source_size_k, size_t source_start_k, size_t size_n,
     size_t row_rotation, void* cuda_stream) {
   if (size_k == 0 || source_size_k == 0 || size_n == 0 || size_k % 16 != 0 ||
@@ -106,13 +106,13 @@ ds4rt_status_t pack_weight_async(
       row_rotation >= size_n ||
       size_n > std::numeric_limits<size_t>::max() / source_size_k ||
       size_n > std::numeric_limits<size_t>::max() / size_k) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t source_bytes = size_n * source_size_k / 2;
   const size_t destination_bytes = size_n * size_k / 2;
   if (!buffer_has_bytes(source, source_bytes) ||
       !buffer_has_bytes(destination, destination_bytes)) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const size_t words = destination_bytes / sizeof(uint32_t);
   constexpr size_t kThreads = 256;
@@ -126,8 +126,8 @@ ds4rt_status_t pack_weight_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-ds4rt_status_t pack_e8m0_scale_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination,
+ds41rt_status_t pack_e8m0_scale_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination,
     size_t size_k, size_t source_size_k, size_t source_start_k, size_t size_n,
     size_t row_rotation, void* cuda_stream) {
   if (size_k == 0 || source_size_k == 0 || size_n == 0 || size_k % 32 != 0 ||
@@ -137,13 +137,13 @@ ds4rt_status_t pack_e8m0_scale_async(
       row_rotation >= size_n ||
       size_n > std::numeric_limits<size_t>::max() / (source_size_k / 32) ||
       size_n > std::numeric_limits<size_t>::max() / (size_k / 32)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t source_bytes = size_n * (source_size_k / 32);
   const size_t destination_bytes = size_n * (size_k / 32);
   if (!buffer_has_bytes(source, source_bytes) ||
       !buffer_has_bytes(destination, destination_bytes)) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   constexpr size_t kThreads = 256;
   const size_t blocks = (destination_bytes + kThreads - 1) / kThreads;
@@ -158,47 +158,47 @@ ds4rt_status_t pack_e8m0_scale_async(
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_w4a16_pack_weight_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination,
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_flash_w4a16_pack_weight_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination,
     size_t size_k, size_t size_n, size_t row_rotation, void* cuda_stream) {
   return pack_weight_async(source, destination, size_k, size_k, 0, size_n,
                            row_rotation, cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_w4a16_pack_weight_strided_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_w4a16_pack_weight_strided_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination,
     size_t size_k, size_t source_size_k, size_t source_start_k, size_t size_n,
     size_t row_rotation, void* cuda_stream) {
   return pack_weight_async(source, destination, size_k, source_size_k,
                            source_start_k, size_n, row_rotation, cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination,
     size_t size_k, size_t size_n, size_t row_rotation, void* cuda_stream) {
   return pack_e8m0_scale_async(source, destination, size_k, size_k, 0, size_n,
                               row_rotation, cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_strided_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_strided_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination,
     size_t size_k, size_t source_size_k, size_t source_start_k, size_t size_n,
     size_t row_rotation, void* cuda_stream) {
   return pack_e8m0_scale_async(source, destination, size_k, source_size_k,
                               source_start_k, size_n, row_rotation, cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination,
     size_t size_n, size_t size_k, void* cuda_stream) {
   if (size_n == 0 || size_k == 0 || size_n % 128 != 0 ||
       size_k % 128 != 0 ||
       size_n > std::numeric_limits<size_t>::max() / size_k) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t n_tiles = size_n / 128;
   const size_t k_tiles = size_k / 128;
@@ -206,12 +206,12 @@ ds4rt_cuda_ds4_flash_fp8_pack_block_scale_mma_async(
   constexpr size_t kScaleAtomBytes = 32 * 4 * 4;
   if (source_bytes >
       std::numeric_limits<size_t>::max() / kScaleAtomBytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t destination_bytes = source_bytes * kScaleAtomBytes;
   if (!buffer_has_bytes(source, source_bytes) ||
       !buffer_has_bytes(destination, destination_bytes)) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   constexpr size_t kThreads = 256;
   const size_t blocks = (destination_bytes + kThreads - 1) / kThreads;

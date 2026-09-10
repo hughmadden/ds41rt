@@ -1,7 +1,7 @@
-# DS4RT developer index
+# DS41RT developer index
 
 > This is a dense orientation and command index for people and coding agents
-> changing DS4RT. Run commands from the repository root, inspect the worktree
+> changing DS41RT. Run commands from the repository root, inspect the worktree
 > before editing, preserve unrelated changes, and use focused gates before
 > consuming the five-machine test cluster.
 
@@ -14,14 +14,14 @@
 - The coordinator owns API, scheduling, residuals, attention, physical KV,
   mHC, routers, shared experts, LM head, sampling, and dSpark control.
 - Every Spark owns one quarter of every routed expert's intermediate
-  dimension. All ranks receive the same top-6 routes; DS4RT is not expert
+  dimension. All ranks receive the same top-6 routes; DS41RT is not expert
   parallel.
-- The release model is the pinned public Pro EXL3 K2 artifact in `ds4rt.config`.
+- The release model is the pinned public Pro EXL3 K2 artifact in `ds41rt.config`.
   Pro never falls back to native experts or an unqualified quantization recipe.
 - Release serving uses host networking, Protocol V2, native verbs transport,
   GPU-resident experts, and startup-captured graph shapes.
-- Generated files belong under ignored `.ds4rt-cache/`, `.ds4rt-release/`,
-  `.ds4rt-release-image/`, `.ds4rt-wip/`, `dist/`, `rust/target/`, or
+- Generated files belong under ignored `.ds41rt-cache/`, `.ds41rt-release/`,
+  `.ds41rt-release-image/`, `.ds41rt-wip/`, `dist/`, `rust/target/`, or
   `native/build*`, not in source control.
 
 Read [`architecture.md`](architecture.md) before changing model ownership,
@@ -31,12 +31,12 @@ routes, caches, transport, graph lifecycles, or admission.
 
 | Path | Responsibility |
 | --- | --- |
-| `rust/crates/ds4rt-daemon` | Binary, role startup, real model execution and scheduling |
-| `rust/crates/ds4rt-api` | OpenAI-compatible routes, request/response semantics |
-| `rust/crates/ds4rt-core` | Model/runtime contracts and shared types |
-| `rust/crates/ds4rt-loader` | Snapshot catalog, classification, load planning |
-| `rust/crates/ds4rt-transport` | Protocol V2 and remote expert transport |
-| `rust/crates/ds4rt-ffi` | Native library loading and FFI boundary |
+| `rust/crates/ds41rt-daemon` | Binary, role startup, real model execution and scheduling |
+| `rust/crates/ds41rt-api` | OpenAI-compatible routes, request/response semantics |
+| `rust/crates/ds41rt-core` | Model/runtime contracts and shared types |
+| `rust/crates/ds41rt-loader` | Snapshot catalog, classification, load planning |
+| `rust/crates/ds41rt-transport` | Protocol V2 and remote expert transport |
+| `rust/crates/ds41rt-ffi` | Native library loading and FFI boundary |
 | `native/` | CUDA/C++ kernels, AOT bindings, RDMA and XGrammar integration |
 | `python/reference/` | Reference operators, capture modules, profile resolver |
 | `python/tools/` | Inspection, validation, benchmarks and release probes |
@@ -54,8 +54,8 @@ routes, caches, transport, graph lifecycles, or admission.
 | `just --list` | List the maintained command surface. |
 | `source .venv/bin/activate` | Enter the optional host Python environment. |
 | `export PATH=/usr/local/cuda/bin:$PATH` | Make the coordinator CUDA toolkit visible. |
-| `export DS4RT_PYTHON="$PWD/.venv/bin/python"` | Select the embedded Python interpreter. |
-| `export PYO3_PYTHON="$DS4RT_PYTHON"` | Bind PyO3 to the same interpreter. |
+| `export DS41RT_PYTHON="$PWD/.venv/bin/python"` | Select the embedded Python interpreter. |
+| `export PYO3_PYTHON="$DS41RT_PYTHON"` | Bind PyO3 to the same interpreter. |
 | `just doctor-host` | Inspect local GPU, CUDA, Docker, RDMA, routes and cache. |
 | `just doctor-hosts` | Run the expert-host doctor over the configured Sparks. |
 | `./run.sh --dry-run` | Validate the complete deployment without mutation. |
@@ -64,11 +64,11 @@ For a direct binary or focused Cargo test, derive the Python library directory
 instead of hard-coding a patch version:
 
 ```bash
-DS4RT_PYTHON_LIBDIR="$(
-  "${DS4RT_PYTHON:-python3}" -c \
+DS41RT_PYTHON_LIBDIR="$(
+  "${DS41RT_PYTHON:-python3}" -c \
     'import sysconfig; print(sysconfig.get_config_var("LIBDIR") or "")'
 )"
-export LD_LIBRARY_PATH="$DS4RT_PYTHON_LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$DS41RT_PYTHON_LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 ```
 
 Do not export `PYTHONHOME`; it breaks embedded interpreter discovery.
@@ -114,7 +114,7 @@ A direct release daemon build is:
 
 ```bash
 PYO3_PYTHON="${PYO3_PYTHON:-$PWD/.venv/bin/python}" \
-  cargo build --manifest-path rust/Cargo.toml -p ds4rt-daemon --release
+  cargo build --manifest-path rust/Cargo.toml -p ds41rt-daemon --release
 ```
 
 ## Test ladder
@@ -137,9 +137,9 @@ When a focused CUDA-backed daemon test needs native symbols, select the current
 library explicitly:
 
 ```bash
-DS4RT_NATIVE_LIB="$PWD/native/build-cuda-rdma-coordinator-aot/libds4rt_native.so" \
+DS41RT_NATIVE_LIB="$PWD/native/build-cuda-rdma-coordinator-aot/libds41rt_native.so" \
   cargo test --manifest-path rust/Cargo.toml \
-  -p ds4rt-daemon TEST_FILTER -- --test-threads=1
+  -p ds41rt-daemon TEST_FILTER -- --test-threads=1
 ```
 
 An FFI symbol failure often means a stale ignored native library was loaded.
@@ -198,8 +198,8 @@ Maintained harnesses include:
   low-entropy repeated-word decode ceiling;
 - `python/tools/bench_real_full_prefill_curve.py` for exact-row fresh prefill;
 - the startup retained-prefix probe, enabled through
-  `DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE=1`, for physical
-  compressor/KV reuse (set `DS4RT_RELEASE_READY_TIMEOUT_SECONDS` high enough
+  `DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE=1`, for physical
+  compressor/KV reuse (set `DS41RT_RELEASE_READY_TIMEOUT_SECONDS` high enough
   for the requested matrix);
 - `python/tools/bench_real_full_concurrency.py` and
   `scripts/bench-real-full-mixed-concurrency.py` for concurrent decode;

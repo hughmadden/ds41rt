@@ -15,11 +15,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Sequence
 
 
-SCHEMA = "ds4rt-deepseek-v4-mtp-prefix-store-v1"
+SCHEMA = "ds41rt-deepseek-v4-mtp-prefix-store-v1"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
-ANCHOR_SELECTION_CONTRACT = "ds4rt-mtp-anchor-stratified-v1"
-FIXED_REPLAY_BATCH_CONTRACT = "ds4rt-mtp-flat-fixed-anchor-batches-v1"
-SEQUENCE_REPLAY_BATCH_CONTRACT = "ds4rt-mtp-source-sequence-anchor-batches-v1"
+ANCHOR_SELECTION_CONTRACT = "ds41rt-mtp-anchor-stratified-v1"
+FIXED_REPLAY_BATCH_CONTRACT = "ds41rt-mtp-flat-fixed-anchor-batches-v1"
+SEQUENCE_REPLAY_BATCH_CONTRACT = "ds41rt-mtp-source-sequence-anchor-batches-v1"
 _UINT64_MASK = (1 << 64) - 1
 
 
@@ -261,7 +261,7 @@ class DeepSeekV4MTPReplayDataset(Sequence[DeepSeekV4MTPStoredReplayBatch]):
             "contract": (
                 ANCHOR_SELECTION_CONTRACT
                 if anchor_sample_count is not None
-                else "ds4rt-mtp-all-eligible-anchors-v1"
+                else "ds41rt-mtp-all-eligible-anchors-v1"
             ),
             "seed": (
                 self.anchor_sample_seed if anchor_sample_count is not None else None

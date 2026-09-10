@@ -1,4 +1,4 @@
-# DS4RT — DeepSeek V4 Pro on one RTX PRO 6000 + four DGX Sparks
+# DS41RT — DeepSeek V4 Pro on one RTX PRO 6000 + four DGX Sparks
 
 ## Up to 68 tok/s decode and 2,039 tok/s prefill
 
@@ -9,7 +9,7 @@ semantic and source-code workloads below, Pro reaches 38.08 tok/s across the
 seven-case blend, 52.50 tok/s on its code slice, and 1,663.5 tok/s at fresh
 32K prefill.
 
-DS4RT is a Rust/CUDA inference engine built specifically for
+DS41RT is a Rust/CUDA inference engine built specifically for
 DeepSeek V4 Pro 0813 on one NVIDIA RTX PRO 6000 Blackwell 96 GB coordinator
 and four NVIDIA DGX Spark expert workers. The coordinator owns attention,
 cache, scheduling, sampling, and the OpenAI-compatible API. The Sparks hold
@@ -30,7 +30,7 @@ is unchanged.
 ## Why
 
 DeepSeek V4 Pro is too large for this five-machine cluster as an ordinary
-replicated or expert-parallel deployment. DS4RT uses attention–FFN
+replicated or expert-parallel deployment. DS41RT uses attention–FFN
 disaggregation and 4-way tensor-parallel routed experts instead: the RTX keeps
 the residual stream and model-specific attention state, while each Spark keeps
 one quarter of every expert's intermediate dimension. That makes the hardware
@@ -38,7 +38,7 @@ layout useful without changing the model's global top-6 routing semantics.
 
 ## Architecture
 
-[![DS4RT system architecture](docs/architecture.svg)](docs/architecture.svg)
+[![DS41RT system architecture](docs/architecture.svg)](docs/architecture.svg)
 
 For each sparse block, the coordinator computes attention, mHC mixing, the
 shared expert, and the global routes. The same hidden rows and top-6 routes go
@@ -46,7 +46,7 @@ to all four Sparks; their four partial hidden-width results are reduced before
 the coordinator advances the residual stream. DeepSeek's three-block dSpark
 drafter uses the same expert path.
 
-[![DS4RT request path](docs/request-path.svg)](docs/request-path.svg)
+[![DS41RT request path](docs/request-path.svg)](docs/request-path.svg)
 
 The stable ownership, transport, cache, and profile contracts are described in
 [`architecture.md`](architecture.md).
@@ -55,18 +55,18 @@ The stable ownership, transport, cache, and profile contracts are described in
 
 The checked-in configuration points at immutable `v2` images:
 
-- `ghcr.io/tpurtell/ds4rt-coordinator:v2` (`linux/amd64`, CUDA `sm_120`)
-- `ghcr.io/tpurtell/ds4rt-spark-expert:v2` (`linux/arm64`, CUDA `sm_121`)
+- `ghcr.io/tpurtell/ds41rt-coordinator:v2` (`linux/amd64`, CUDA `sm_120`)
+- `ghcr.io/tpurtell/ds41rt-spark-expert:v2` (`linux/arm64`, CUDA `sm_121`)
 
 Clone the complete source graph:
 
 ```bash
 git clone --recurse-submodules \
-  https://github.com/tpurtell/ds4rt-pro-rtx-4spark.git
-cd ds4rt-pro-rtx-4spark
+  https://github.com/tpurtell/ds41rt.git
+cd ds41rt
 ```
 
-Edit `ds4rt.config` for the four Spark SSH host names and the dedicated
+Edit `ds41rt.config` for the four Spark SSH host names and the dedicated
 coordinator-to-Spark addresses. The default names (`ostrich`, `dodo`, `emu`,
 and `kiwi`) and `10.55.0.x` addresses are examples from the measured cluster.
 If the coordinator has multiple GPUs, keep `COORDINATOR_GPU=0` and optionally
@@ -88,9 +88,9 @@ done
 Pull the role-specific images on their native hosts:
 
 ```bash
-docker pull ghcr.io/tpurtell/ds4rt-coordinator:v2
+docker pull ghcr.io/tpurtell/ds41rt-coordinator:v2
 for host in ostrich dodo emu kiwi; do
-  ssh "$host" docker pull ghcr.io/tpurtell/ds4rt-spark-expert:v2
+  ssh "$host" docker pull ghcr.io/tpurtell/ds41rt-spark-expert:v2
 done
 ```
 
@@ -101,7 +101,7 @@ Validate the entire deployment without changing it, then launch:
 ./run.sh
 ```
 
-Startup can take about a minute even with local NVMe snapshots because DS4RT
+Startup can take about a minute even with local NVMe snapshots because DS41RT
 loads roughly 438 GB of tensor payload across the workers and prepares the
 production CUDA graph set. `run.sh` returns only after all four experts and the
 API have passed their readiness gates.
@@ -220,11 +220,11 @@ The full measurement contract and machine-readable summary are in
 
 ## Scope
 
-DS4RT v2 is a hardware-specific engine, not a general-purpose serving
+DS41RT v2 is a hardware-specific engine, not a general-purpose serving
 framework. Its release topology is exactly one x86_64 `sm_120` coordinator and
 four ARM64 `sm_121` expert workers. Adapting GPU generations, worker count,
 transport, or model family is engineering work, not a configuration switch.
 
-DS4RT is released under the [MIT License](LICENSE). Redistributed components
+DS41RT is released under the [MIT License](LICENSE). Redistributed components
 retain their own terms; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 and [`third_party/README.md`](third_party/README.md).

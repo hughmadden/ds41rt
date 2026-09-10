@@ -2816,7 +2816,7 @@ def repack_w8_for_mma(weight_k: torch.Tensor) -> torch.Tensor:
 
 def configure_native(path: Path):
     native = ctypes.CDLL(str(path.resolve()))
-    quantize = native.ds4rt_cuda_quantize_bf16_w8a16_group256_async
+    quantize = native.ds41rt_cuda_quantize_bf16_w8a16_group256_async
     quantize.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -2827,7 +2827,7 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     quantize.restype = ctypes.c_int
-    quantize_packed = native.ds4rt_cuda_quantize_bf16_w8a16_group256_packed_async
+    quantize_packed = native.ds41rt_cuda_quantize_bf16_w8a16_group256_packed_async
     quantize_packed.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -2837,7 +2837,7 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     quantize_packed.restype = ctypes.c_int
-    simt = native.ds4rt_cuda_linear_w8a16_group256_m1_simt_async
+    simt = native.ds41rt_cuda_linear_w8a16_group256_m1_simt_async
     simt.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -2849,7 +2849,7 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     simt.restype = ctypes.c_int
-    packed_m1 = native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async
+    packed_m1 = native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async
     packed_m1.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -2860,7 +2860,7 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     packed_m1.restype = ctypes.c_int
-    w8a8 = native.ds4rt_cuda_linear_w8a8_group256_wmma_async
+    w8a8 = native.ds41rt_cuda_linear_w8a8_group256_wmma_async
     w8a8.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -2885,7 +2885,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        default=Path("native/build-cuda-rdma-coordinator-aot/libds4rt_native.so"),
+        default=Path("native/build-cuda-rdma-coordinator-aot/libds41rt_native.so"),
     )
     parser.add_argument(
         "--tensor", choices=tuple(PROJECTION_TENSORS), default="o"
@@ -3234,7 +3234,7 @@ def main() -> None:
             f"w8a16_{args.tensor.replace('-', '_')}_m{args.rows}_"
             f"bm{args.block_m}_n{args.tile_n}_k{args.tile_k}_s{args.stages}"
         )
-        compiled.export_to_c(str(args.export_dir), name, f"ds4rt_{name}")
+        compiled.export_to_c(str(args.export_dir), name, f"ds41rt_{name}")
     compiled(*cute_args)
     torch.cuda.synchronize()
     reference = torch.mm(activations[0], weight.T)

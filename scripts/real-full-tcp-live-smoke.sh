@@ -11,45 +11,45 @@ fi
 
 addr="${ADDR:-127.0.0.1:8000}"
 url="http://${addr}"
-model_id="${DS4RT_MODEL_ID:-wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1}"
+model_id="${DS41RT_MODEL_ID:-wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1}"
 model="${MODEL:-${model_id}-full}"
 max_tokens="${MAX_TOKENS:-1}"
-hosts_csv="${DS4RT_SPARK_HOSTS:-ostrich,dodo,emu,kiwi}"
-expert_port="${DS4RT_SPARK_EXPERT_PORT:-9100}"
-expert_link_suffix="${DS4RT_REAL_FULL_TCP_EXPERT_LINK_SUFFIX:-${DS4RT_SPARK_EXPERT_LINK_SUFFIX:-}}"
-expert_hosts="${DS4RT_REAL_FULL_TCP_EXPERT_HOSTS:-}"
-catalog="${CATALOG:-.ds4rt-cache/model-artifacts/diagnostic/model_catalog.json}"
-coordinator_transport="${DS4RT_REAL_FULL_SMOKE_TRANSPORT:-tcp}"
-if [ -n "${DS4RT_NATIVE_LIB:-}" ]; then
-  native_lib="$DS4RT_NATIVE_LIB"
+hosts_csv="${DS41RT_SPARK_HOSTS:-ostrich,dodo,emu,kiwi}"
+expert_port="${DS41RT_SPARK_EXPERT_PORT:-9100}"
+expert_link_suffix="${DS41RT_REAL_FULL_TCP_EXPERT_LINK_SUFFIX:-${DS41RT_SPARK_EXPERT_LINK_SUFFIX:-}}"
+expert_hosts="${DS41RT_REAL_FULL_TCP_EXPERT_HOSTS:-}"
+catalog="${CATALOG:-.ds41rt-cache/model-artifacts/diagnostic/model_catalog.json}"
+coordinator_transport="${DS41RT_REAL_FULL_SMOKE_TRANSPORT:-tcp}"
+if [ -n "${DS41RT_NATIVE_LIB:-}" ]; then
+  native_lib="$DS41RT_NATIVE_LIB"
 elif [ "$coordinator_transport" = "verbs-host" ]; then
-  native_lib="$repo_root/native/build-cuda-rdma/libds4rt_native.so"
+  native_lib="$repo_root/native/build-cuda-rdma/libds41rt_native.so"
 else
-  native_lib="$repo_root/native/build-cuda/libds4rt_native.so"
+  native_lib="$repo_root/native/build-cuda/libds41rt_native.so"
 fi
 log_dir="${LOG_DIR:-reports/phase0_artifacts/logs}"
 artifact_dir="${ARTIFACT_DIR:-reports/phase0_artifacts/smoke}"
 log_prefix="${LOG_PREFIX:-real-full-tcp-live-smoke}"
-build_daemon="${DS4RT_REAL_FULL_TCP_SMOKE_BUILD_DAEMON:-1}"
-check_experts="${DS4RT_REAL_FULL_TCP_SMOKE_CHECK_EXPERTS:-1}"
-require_cuda="${DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_CUDA:-1}"
-bin="${DS4RT_BIN:-$repo_root/rust/target/debug/ds4rt}"
-warmup_experts="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPERTS:-1}"
-warmup_layer_id="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_LAYER_ID:-${DS4RT_PHASE0_TCP_LAYER_ID:-3}}"
-warmup_iterations="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ITERATIONS:-1}"
-warmup_rows="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ROWS:-1}"
-warmup_timeout_ms="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_TIMEOUT_MS:-120000}"
-warmup_measured_timeout_ms="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_MEASURED_TIMEOUT_MS:-5000}"
-warmup_roundtrip_rows="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUNDTRIP_ROWS:-1}"
-warmup_prefill_roundtrip_rows="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_PREFILL_ROUNDTRIP_ROWS:-16,256,512}"
-warmup_prefill_chain_rows="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_PREFILL_CHAIN_ROWS:-16,256,512}"
-warmup_hidden_dim="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_HIDDEN_DIM:-}"
-warmup_routes_per_row="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUTES_PER_ROW:-}"
-expert_mode="${DS4RT_PHASE0_SPARK_EXPERT_MODE:-real}"
-dry_run="${DS4RT_REAL_FULL_TCP_SMOKE_DRY_RUN:-0}"
-protocol_v2_timeout_ms="${DS4RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS:-120000}"
-intermediate_shards="${DS4RT_EXPERT_INTERMEDIATE_SHARDS:-4}"
-intermediate_reduction="${DS4RT_EXPERT_INTERMEDIATE_REDUCTION:-}"
+build_daemon="${DS41RT_REAL_FULL_TCP_SMOKE_BUILD_DAEMON:-1}"
+check_experts="${DS41RT_REAL_FULL_TCP_SMOKE_CHECK_EXPERTS:-1}"
+require_cuda="${DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_CUDA:-1}"
+bin="${DS41RT_BIN:-$repo_root/rust/target/debug/ds41rt}"
+warmup_experts="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPERTS:-1}"
+warmup_layer_id="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_LAYER_ID:-${DS41RT_PHASE0_TCP_LAYER_ID:-3}}"
+warmup_iterations="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ITERATIONS:-1}"
+warmup_rows="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ROWS:-1}"
+warmup_timeout_ms="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_TIMEOUT_MS:-120000}"
+warmup_measured_timeout_ms="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_MEASURED_TIMEOUT_MS:-5000}"
+warmup_roundtrip_rows="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUNDTRIP_ROWS:-1}"
+warmup_prefill_roundtrip_rows="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_PREFILL_ROUNDTRIP_ROWS:-16,256,512}"
+warmup_prefill_chain_rows="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_PREFILL_CHAIN_ROWS:-16,256,512}"
+warmup_hidden_dim="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_HIDDEN_DIM:-}"
+warmup_routes_per_row="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUTES_PER_ROW:-}"
+expert_mode="${DS41RT_PHASE0_SPARK_EXPERT_MODE:-real}"
+dry_run="${DS41RT_REAL_FULL_TCP_SMOKE_DRY_RUN:-0}"
+protocol_v2_timeout_ms="${DS41RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS:-120000}"
+intermediate_shards="${DS41RT_EXPERT_INTERMEDIATE_SHARDS:-4}"
+intermediate_reduction="${DS41RT_EXPERT_INTERMEDIATE_REDUCTION:-}"
 if [ -z "$intermediate_reduction" ]; then
   if [ "$coordinator_transport" = "verbs-host" ]; then
     intermediate_reduction=spark-rdma
@@ -57,9 +57,9 @@ if [ -z "$intermediate_reduction" ]; then
     intermediate_reduction=coordinator
   fi
 fi
-intermediate_reduction_dtype="${DS4RT_EXPERT_INTERMEDIATE_REDUCTION_DTYPE:-fp8}"
-if [ "${DS4RT_EXPERT_INTERMEDIATE_ROW_SHARDED_REDUCTION+x}" ]; then
-  intermediate_row_sharded_reduction="$DS4RT_EXPERT_INTERMEDIATE_ROW_SHARDED_REDUCTION"
+intermediate_reduction_dtype="${DS41RT_EXPERT_INTERMEDIATE_REDUCTION_DTYPE:-fp8}"
+if [ "${DS41RT_EXPERT_INTERMEDIATE_ROW_SHARDED_REDUCTION+x}" ]; then
+  intermediate_row_sharded_reduction="$DS41RT_EXPERT_INTERMEDIATE_ROW_SHARDED_REDUCTION"
 else
   case "$intermediate_reduction" in
     spark-rdma|spark-rdma-hybrid) intermediate_row_sharded_reduction=1 ;;
@@ -77,15 +77,15 @@ case "$expert_mode" in
     default_require_real_nvfp4=0
     ;;
   *)
-    echo "DS4RT_PHASE0_SPARK_EXPERT_MODE must be real or synthetic, got: ${expert_mode}" >&2
+    echo "DS41RT_PHASE0_SPARK_EXPERT_MODE must be real or synthetic, got: ${expert_mode}" >&2
     exit 2
     ;;
 esac
 
-warmup_expected_executor="${DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPECTED_EXECUTOR:-$default_warmup_expected_executor}"
+warmup_expected_executor="${DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPECTED_EXECUTOR:-$default_warmup_expected_executor}"
 
-export DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY="${DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY:-1}"
-export DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4="${DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4:-$default_require_real_nvfp4}"
+export DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY="${DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY:-1}"
+export DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4="${DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4:-$default_require_real_nvfp4}"
 
 if ! [[ "$max_tokens" =~ ^[0-9]+$ ]] || [ "$max_tokens" -lt 1 ]; then
   echo "MAX_TOKENS must be a positive integer" >&2
@@ -93,63 +93,63 @@ if ! [[ "$max_tokens" =~ ^[0-9]+$ ]] || [ "$max_tokens" -lt 1 ]; then
 fi
 
 if ! [[ "$expert_port" =~ ^[0-9]+$ ]] || [ "$expert_port" -lt 1 ] || [ "$expert_port" -gt 65535 ]; then
-  echo "DS4RT_SPARK_EXPERT_PORT must be an integer in 1..65535" >&2
+  echo "DS41RT_SPARK_EXPERT_PORT must be an integer in 1..65535" >&2
   exit 2
 fi
 case "$warmup_experts" in
   0|1) ;;
   *)
-    echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPERTS must be 0 or 1" >&2
+    echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPERTS must be 0 or 1" >&2
     exit 2
     ;;
 esac
 case "$dry_run" in
   0|1) ;;
   *)
-    echo "DS4RT_REAL_FULL_TCP_SMOKE_DRY_RUN must be 0 or 1" >&2
+    echo "DS41RT_REAL_FULL_TCP_SMOKE_DRY_RUN must be 0 or 1" >&2
     exit 2
     ;;
 esac
 case "$coordinator_transport" in
   tcp|verbs-host) ;;
   *)
-    echo "DS4RT_REAL_FULL_SMOKE_TRANSPORT must be tcp or verbs-host, got: ${coordinator_transport}" >&2
+    echo "DS41RT_REAL_FULL_SMOKE_TRANSPORT must be tcp or verbs-host, got: ${coordinator_transport}" >&2
     exit 2
     ;;
 esac
 if [ "$intermediate_shards" != "4" ]; then
-  echo "strict DS4 smoke requires DS4RT_EXPERT_INTERMEDIATE_SHARDS=4" >&2
+  echo "strict DS4 smoke requires DS41RT_EXPERT_INTERMEDIATE_SHARDS=4" >&2
   exit 2
 fi
-export DS4RT_EXPERT_INTERMEDIATE_SHARDS=4
-export DS4RT_EXPERT_INTERMEDIATE_REDUCTION="$intermediate_reduction"
-export DS4RT_EXPERT_INTERMEDIATE_REDUCTION_DTYPE="$intermediate_reduction_dtype"
-export DS4RT_EXPERT_INTERMEDIATE_ROW_SHARDED_REDUCTION="$intermediate_row_sharded_reduction"
+export DS41RT_EXPERT_INTERMEDIATE_SHARDS=4
+export DS41RT_EXPERT_INTERMEDIATE_REDUCTION="$intermediate_reduction"
+export DS41RT_EXPERT_INTERMEDIATE_REDUCTION_DTYPE="$intermediate_reduction_dtype"
+export DS41RT_EXPERT_INTERMEDIATE_ROW_SHARDED_REDUCTION="$intermediate_row_sharded_reduction"
 if ! [[ "$warmup_layer_id" =~ ^[0-9]+$ ]]; then
-  echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_LAYER_ID must be a non-negative integer" >&2
+  echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_LAYER_ID must be a non-negative integer" >&2
   exit 2
 fi
 if ! [[ "$warmup_iterations" =~ ^[0-9]+$ ]] || [ "$warmup_iterations" -lt 1 ]; then
-  echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ITERATIONS must be a positive integer" >&2
+  echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ITERATIONS must be a positive integer" >&2
   exit 2
 fi
 if ! [[ "$warmup_rows" =~ ^[0-9]+$ ]] || [ "$warmup_rows" -lt 1 ]; then
-  echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ROWS must be a positive integer" >&2
+  echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ROWS must be a positive integer" >&2
   exit 2
 fi
 if ! [[ "$warmup_timeout_ms" =~ ^[0-9]+$ ]] || [ "$warmup_timeout_ms" -lt 1 ]; then
-  echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_TIMEOUT_MS must be a positive integer" >&2
+  echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_TIMEOUT_MS must be a positive integer" >&2
   exit 2
 fi
 if ! [[ "$warmup_measured_timeout_ms" =~ ^[0-9]+$ ]] || [ "$warmup_measured_timeout_ms" -lt 1 ]; then
-  echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_MEASURED_TIMEOUT_MS must be a positive integer" >&2
+  echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_MEASURED_TIMEOUT_MS must be a positive integer" >&2
   exit 2
 fi
 if ! [[ "$protocol_v2_timeout_ms" =~ ^[0-9]+$ ]] || [ "$protocol_v2_timeout_ms" -lt 1 ]; then
-  echo "DS4RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS must be a positive integer" >&2
+  echo "DS41RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS must be a positive integer" >&2
   exit 2
 fi
-export DS4RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS="$protocol_v2_timeout_ms"
+export DS41RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS="$protocol_v2_timeout_ms"
 
 need() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -160,8 +160,8 @@ need() {
 
 add_host_python_libdir() {
   python_libs=()
-  if [ -n "${DS4RT_PYTHON_LIBDIR:-}" ]; then
-    python_libs+=("$DS4RT_PYTHON_LIBDIR")
+  if [ -n "${DS41RT_PYTHON_LIBDIR:-}" ]; then
+    python_libs+=("$DS41RT_PYTHON_LIBDIR")
   fi
   if command -v python3 >/dev/null 2>&1; then
     python_sysconfig_lib="$(python3 - <<'PY' 2>/dev/null || true
@@ -184,7 +184,7 @@ PY
 }
 
 configure_pinned_sparkinfer() {
-  local configured_python="${DS4RT_PYTHON:-${PYO3_PYTHON:-}}"
+  local configured_python="${DS41RT_PYTHON:-${PYO3_PYTHON:-}}"
   if [ -z "$configured_python" ] && [ -x "$repo_root/.venv/bin/python" ]; then
     configured_python="$repo_root/.venv/bin/python"
   fi
@@ -192,11 +192,11 @@ configure_pinned_sparkinfer() {
     configured_python="$(command -v python3 || true)"
   fi
   if [ -z "$configured_python" ] || [ ! -x "$configured_python" ]; then
-    echo "Python interpreter not found; set DS4RT_PYTHON" >&2
+    echo "Python interpreter not found; set DS41RT_PYTHON" >&2
     exit 2
   fi
   configured_python="$(realpath -s "$configured_python")"
-  export DS4RT_PYTHON="$configured_python"
+  export DS41RT_PYTHON="$configured_python"
   export PYO3_PYTHON="${PYO3_PYTHON:-$configured_python}"
 
   local sparkinfer_source="$repo_root/third_party/sparkinfer"
@@ -223,11 +223,11 @@ test -f "$catalog" || {
 warmup_hidden_dim="${warmup_hidden_dim:-$(jq -er '.facts.hidden_size' "$catalog")}"
 warmup_routes_per_row="${warmup_routes_per_row:-$(jq -er '.facts.top_k' "$catalog")}"
 if ! [[ "$warmup_hidden_dim" =~ ^[0-9]+$ ]] || [ "$warmup_hidden_dim" -lt 1 ]; then
-  echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_HIDDEN_DIM must be a positive integer" >&2
+  echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_HIDDEN_DIM must be a positive integer" >&2
   exit 2
 fi
 if ! [[ "$warmup_routes_per_row" =~ ^[0-9]+$ ]] || [ "$warmup_routes_per_row" -lt 1 ]; then
-  echo "DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUTES_PER_ROW must be a positive integer" >&2
+  echo "DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUTES_PER_ROW must be a positive integer" >&2
   exit 2
 fi
 
@@ -236,18 +236,18 @@ if [ "$require_cuda" = "1" ]; then
     cat >&2 <<EOF
 CUDA native library not found: $native_lib
 Build it with:
-  cmake -S native -B native/build-cuda -G Ninja -DDS4RT_ENABLE_CUDA=ON -DDS4RT_ENABLE_RDMA=OFF -DDS4RT_ENABLE_NCCL=ON -DDS4RT_CUDA_ARCHITECTURES=120
+  cmake -S native -B native/build-cuda -G Ninja -DDS41RT_ENABLE_CUDA=ON -DDS41RT_ENABLE_RDMA=OFF -DDS41RT_ENABLE_NCCL=ON -DDS41RT_CUDA_ARCHITECTURES=120
   cmake --build native/build-cuda
 For verbs-host, build the RDMA-enabled native library:
-  cmake -S native -B native/build-cuda-rdma -G Ninja -DDS4RT_ENABLE_CUDA=ON -DDS4RT_ENABLE_RDMA=ON -DDS4RT_ENABLE_NCCL=ON -DDS4RT_CUDA_ARCHITECTURES=120
+  cmake -S native -B native/build-cuda-rdma -G Ninja -DDS41RT_ENABLE_CUDA=ON -DDS41RT_ENABLE_RDMA=ON -DDS41RT_ENABLE_NCCL=ON -DDS41RT_CUDA_ARCHITECTURES=120
   cmake --build native/build-cuda-rdma
-or set DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_CUDA=0 for a diagnostic-only local check.
+or set DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_CUDA=0 for a diagnostic-only local check.
 EOF
     exit 2
   }
-  export DS4RT_REAL_FULL_CUDA_REFERENCE_KERNELS="${DS4RT_REAL_FULL_CUDA_REFERENCE_KERNELS:-1}"
-  export DS4RT_NATIVE_LIB="$native_lib"
-  export DS4RT_B12X="${DS4RT_B12X:-1}"
+  export DS41RT_REAL_FULL_CUDA_REFERENCE_KERNELS="${DS41RT_REAL_FULL_CUDA_REFERENCE_KERNELS:-1}"
+  export DS41RT_NATIVE_LIB="$native_lib"
+  export DS41RT_B12X="${DS41RT_B12X:-1}"
 fi
 add_host_python_libdir
 
@@ -263,25 +263,25 @@ if [ -z "$expert_hosts" ]; then
 fi
 
 if [ -z "$expert_hosts" ]; then
-  echo "no expert targets configured; set DS4RT_SPARK_HOSTS or DS4RT_REAL_FULL_TCP_EXPERT_HOSTS" >&2
+  echo "no expert targets configured; set DS41RT_SPARK_HOSTS or DS41RT_REAL_FULL_TCP_EXPERT_HOSTS" >&2
   exit 2
 fi
 
 if [ "$dry_run" = "1" ]; then
-  printf 'DS4RT_PHASE0_SPARK_EXPERT_MODE=%s\n' "$expert_mode"
-  printf 'DS4RT_REAL_FULL_TCP_EXPERT_HOSTS=%s\n' "$expert_hosts"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPECTED_EXECUTOR=%s\n' "$warmup_expected_executor"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4=%s\n' "$DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY=%s\n' "$DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPERTS=%s\n' "$warmup_experts"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_HIDDEN_DIM=%s\n' "$warmup_hidden_dim"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUTES_PER_ROW=%s\n' "$warmup_routes_per_row"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_BUILD_DAEMON=%s\n' "$build_daemon"
-  printf 'DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_CUDA=%s\n' "$require_cuda"
-  printf 'DS4RT_REAL_FULL_SMOKE_TRANSPORT=%s\n' "$coordinator_transport"
-  printf 'DS4RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS=%s\n' "$DS4RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS"
-  printf 'DS4RT_NATIVE_LIB=%s\n' "${DS4RT_NATIVE_LIB:-$native_lib}"
-  printf 'DS4RT_B12X=%s\n' "${DS4RT_B12X:-}"
+  printf 'DS41RT_PHASE0_SPARK_EXPERT_MODE=%s\n' "$expert_mode"
+  printf 'DS41RT_REAL_FULL_TCP_EXPERT_HOSTS=%s\n' "$expert_hosts"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPECTED_EXECUTOR=%s\n' "$warmup_expected_executor"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4=%s\n' "$DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY=%s\n' "$DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_EXPERTS=%s\n' "$warmup_experts"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_HIDDEN_DIM=%s\n' "$warmup_hidden_dim"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_WARMUP_ROUTES_PER_ROW=%s\n' "$warmup_routes_per_row"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_BUILD_DAEMON=%s\n' "$build_daemon"
+  printf 'DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_CUDA=%s\n' "$require_cuda"
+  printf 'DS41RT_REAL_FULL_SMOKE_TRANSPORT=%s\n' "$coordinator_transport"
+  printf 'DS41RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS=%s\n' "$DS41RT_REAL_FULL_PROTOCOL_V2_TIMEOUT_MS"
+  printf 'DS41RT_NATIVE_LIB=%s\n' "${DS41RT_NATIVE_LIB:-$native_lib}"
+  printf 'DS41RT_B12X=%s\n' "${DS41RT_B12X:-}"
   exit 0
 fi
 
@@ -470,8 +470,8 @@ if [ "$check_experts" = "1" ]; then
 fi
 
 if [ "$build_daemon" = "1" ]; then
-  echo "== building ds4rt daemon ==" >&2
-  cargo build --manifest-path rust/Cargo.toml -p ds4rt-daemon \
+  echo "== building ds41rt daemon ==" >&2
+  cargo build --manifest-path rust/Cargo.toml -p ds41rt-daemon \
     >"${log_dir}/${log_prefix}-build.log" 2>&1
 fi
 
@@ -496,7 +496,7 @@ fi
 
 echo "== running real-full structured TCP smoke ==" >&2
 set +e
-DS4RT_REAL_FULL_SMOKE_TRANSPORT="$coordinator_transport" \
+DS41RT_REAL_FULL_SMOKE_TRANSPORT="$coordinator_transport" \
   scripts/real-full-tcp-smoke.sh "$url" "$model" "$max_tokens" \
   > >(tee "${artifact_dir}/${log_prefix}-response.json") \
   2> >(tee "${artifact_dir}/${log_prefix}-summary.txt" >&2)

@@ -158,7 +158,7 @@ def _fixture(tmp_path: Path) -> argparse.Namespace:
             "tensors": {},
         }
     manifest = {
-        "schema": "ds4rt-deepseek-v4-mtp-prefix-store-v1",
+        "schema": "ds41rt-deepseek-v4-mtp-prefix-store-v1",
         "status": "complete",
         "target_layer_ids": [0, 1, 2],
         "hidden_size": 16,
@@ -294,7 +294,7 @@ def test_overlay_plan_supports_coordinator_only_k3(tmp_path: Path) -> None:
     assert plan["exl3"]["bits"] == 3
     assert plan["remote_workers"] is None
     topology = plan["ledger_provenance"]["family_join"]["execution_topology"]
-    assert topology["contract"] == "ds4rt.exl3-coordinator-only-v1"
+    assert topology["contract"] == "ds41rt.exl3-coordinator-only-v1"
     assert [slot["device"] for slot in topology["coordinator_slots"]] == [
         "cuda:0",
         "cuda:1",

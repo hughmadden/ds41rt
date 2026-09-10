@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ds4rt_reference.quant_ref import (
+from ds41rt_reference.quant_ref import (
     nvfp4_dequantize,
     nvfp4_quantize,
     pack_nibbles,

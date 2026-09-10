@@ -24,10 +24,10 @@ from deepseek_v4_mtp_prefix_store import (
 import quantize_flash_gptqmodel as base
 
 
-PLAN_SCHEMA = "ds4rt-deepseek-v4-dspark-overlay-plan-v2"
-RUN_SCHEMA = "ds4rt-deepseek-v4-dspark-overlay-run-v2"
-OVERLAY_SCHEMA = "ds4rt-exl3-dspark-overlay-v2"
-INDEX_SCHEMA = "ds4rt-exl3-dspark-overlay-checkpoint-index-v1"
+PLAN_SCHEMA = "ds41rt-deepseek-v4-dspark-overlay-plan-v2"
+RUN_SCHEMA = "ds41rt-deepseek-v4-dspark-overlay-run-v2"
+OVERLAY_SCHEMA = "ds41rt-exl3-dspark-overlay-v2"
+INDEX_SCHEMA = "ds41rt-exl3-dspark-overlay-checkpoint-index-v1"
 RECIPE = "deepseek_v4_exl3_dspark_overlay_v2"
 SCOPE = "mtp-routed-experts-only"
 MTP_EXPERT_PATTERN = (
@@ -38,15 +38,15 @@ ACTIVATION_DIRNAME = "mtp-layer-activations"
 MTP_CAPTURE_FRONTIER_DIRNAME = "mtp-capture-frontier"
 REPORT_DIRNAME = "reports"
 EXPORT_STAGE_DIRNAME = "overlay-export-stage"
-INDEX_FILENAME = "ds4rt-dspark-overlay-index.json"
-OVERLAY_FILENAME = "ds4rt-dspark-overlay.json"
-RUN_FILENAME = "ds4rt-dspark-overlay-run.json"
-SELECTION_FILENAME = "ds4rt-mtp-anchor-selection.json"
-EXECUTION_UPGRADE_FILENAME = "ds4rt-dspark-overlay-execution-upgrade.json"
-EXECUTION_UPGRADE_SCHEMA = "ds4rt-dspark-overlay-execution-upgrade-v1"
+INDEX_FILENAME = "ds41rt-dspark-overlay-index.json"
+OVERLAY_FILENAME = "ds41rt-dspark-overlay.json"
+RUN_FILENAME = "ds41rt-dspark-overlay-run.json"
+SELECTION_FILENAME = "ds41rt-mtp-anchor-selection.json"
+EXECUTION_UPGRADE_FILENAME = "ds41rt-dspark-overlay-execution-upgrade.json"
+EXECUTION_UPGRADE_SCHEMA = "ds41rt-dspark-overlay-execution-upgrade-v1"
 EXECUTION_UPGRADE_HISTORY_DIRNAME = base.EXECUTION_UPGRADE_HISTORY_DIRNAME
 MTP_RESUME_CUDA_ALLOCATION_LIMIT_BYTES = 84 * 1024**3
-ZERO_ROUTE_RECOVERY_SCHEMA = "ds4rt.exl3-zero-route-recovery"
+ZERO_ROUTE_RECOVERY_SCHEMA = "ds41rt.exl3-zero-route-recovery"
 ZERO_ROUTE_RECOVERY_TRIGGER = "natural-route-count-below-1024"
 ZERO_ROUTE_RECOVERY_SAMPLE_SOURCE = "same-fixed-calibration-selection"
 ZERO_ROUTE_RECOVERY_CAPTURE_METHOD = (
@@ -62,12 +62,12 @@ ZERO_ROUTE_RECOVERY_IDENTITY_POLICY = (
     "normalized-2i-residual-to-effective-count-1024-v2"
 )
 ZERO_ROUTE_RECOVERY_AUTHORIZATION_SCHEMA = (
-    "ds4rt.exl3-zero-route-recovery-authorization"
+    "ds41rt.exl3-zero-route-recovery-authorization"
 )
 HESSIAN_OWNER_POLICY_CONTRACT = (
-    "ds4rt.exl3-hessian-owner-weighted-round-robin-v1"
+    "ds41rt.exl3-hessian-owner-weighted-round-robin-v1"
 )
-HESSIAN_OWNER_POLICY_META = "ds4rt_hessian_owner_policy"
+HESSIAN_OWNER_POLICY_META = "ds41rt_hessian_owner_policy"
 MTP_REPLAY_CONTRACT = "deepseek-v4-mtp-joint-five-row-v1"
 _COMPLETE_MTP_BOUNDARY = re.compile(r"layer-([0-9]{6})\Z")
 _PARTIAL_MTP_BOUNDARY = re.compile(r"\.layer-([0-9]{6})\.partial\Z")
@@ -443,7 +443,7 @@ def _execution_topology(
 ) -> dict[str, Any]:
     if remote is None:
         return {
-            "contract": "ds4rt.exl3-coordinator-only-v1",
+            "contract": "ds41rt.exl3-coordinator-only-v1",
             "scheduler": "coordinator-only-v1",
             "coordinator": {
                 "preflight_sha256": preflight["sha256"],
@@ -562,7 +562,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     run_state = (
         raw_run_state.expanduser().resolve()
         if raw_run_state is not None
-        else output.with_name(f".{output.name}.ds4rt-run")
+        else output.with_name(f".{output.name}.ds41rt-run")
     )
     raw_checkpoint = getattr(args, "projection_checkpoint_dir", None)
     checkpoint_root = (
@@ -646,7 +646,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         "bits": args.bits,
         "codebook": "mcg",
         "module_include": MTP_EXPERT_PATTERN,
-        "operator_contract": "ds4rt-deepseek-v4-joint-mtp-from-quantized-prefix-v3",
+        "operator_contract": "ds41rt-deepseek-v4-joint-mtp-from-quantized-prefix-v3",
         "anchor_selection": anchor_selection,
         "replay_batching": replay_batching,
         "hessian_owner_policy": hessian_owner_policy,
@@ -981,7 +981,7 @@ def build_execution_upgrade(args: argparse.Namespace) -> tuple[dict[str, Any], d
     run_state = (
         args.run_state_dir.expanduser().resolve()
         if args.run_state_dir is not None
-        else output.with_name(f".{output.name}.ds4rt-run")
+        else output.with_name(f".{output.name}.ds41rt-run")
     )
     _regular_directory(run_state, "overlay run-state")
     saved = base.read_json_object(run_state / base.PLAN_FILENAME)
@@ -1373,7 +1373,7 @@ def _selection_record(plan: dict[str, Any], replay) -> dict[str, Any]:
         raise OverlayError("materialized MTP anchor selection differs from the plan")
     record = _bound(
         {
-            "schema": "ds4rt-mtp-anchor-selection-v1",
+            "schema": "ds41rt-mtp-anchor-selection-v1",
             "plan_sha256": plan["plan_sha256"],
             "prefix_manifest_sha256": plan["prefix"]["manifest_sha256"],
             "anchor_selection": selection,
@@ -1411,7 +1411,7 @@ def _validate_selection_record(
         batching.get("maximum_anchors") if isinstance(batching, dict) else None
     )
     if (
-        record.get("schema") != "ds4rt-mtp-anchor-selection-v1"
+        record.get("schema") != "ds41rt-mtp-anchor-selection-v1"
         or record.get("plan_sha256") != plan["plan_sha256"]
         or record.get("prefix_manifest_sha256")
         != plan["prefix"]["manifest_sha256"]
@@ -1641,7 +1641,7 @@ def validate_overlay(root: Path, plan: dict[str, Any], *, verify_hashes: bool) -
         or run.get("status") != "complete"
         or run.get("plan_sha256") != plan["plan_sha256"]
         or run.get("overlay_sha256") != manifest.get("overlay_sha256")
-        or selection.get("schema") != "ds4rt-mtp-anchor-selection-v1"
+        or selection.get("schema") != "ds41rt-mtp-anchor-selection-v1"
         or selection.get("plan_sha256") != plan["plan_sha256"]
         or selection.get("prefix_manifest_sha256")
         != plan["prefix"]["manifest_sha256"]
@@ -1763,12 +1763,12 @@ def execute(
     # therefore never reuse Hessians or projections from a different subset.
     selection = _write_or_verify_selection(plan, replay)
     qcfg_meta = {
-        "ds4rt_error_ledger": plan["ledger_provenance"],
+        "ds41rt_error_ledger": plan["ledger_provenance"],
         HESSIAN_OWNER_POLICY_META: plan["exl3"]["hessian_owner_policy"],
     }
     recovery_authorization = _recovery_authorization(plan)
     if recovery_authorization is not None:
-        qcfg_meta["ds4rt_zero_route_recovery"] = recovery_authorization
+        qcfg_meta["ds41rt_zero_route_recovery"] = recovery_authorization
     coordinator_devices = [
         f"cuda:{gpu['index']}" for gpu in plan["preflight"]["gpus"]
     ]
@@ -1905,7 +1905,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--remote-token-env",
-        default="DS4RT_EXL3_WORKER_TOKEN",
+        default="DS41RT_EXL3_WORKER_TOKEN",
     )
     parser.add_argument("--remote-timeout-seconds", type=float, default=7200.0)
     parser.add_argument("--remote-max-attempts", type=int, default=2)

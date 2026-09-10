@@ -38,7 +38,7 @@ esac
   exit 2
 }
 [[ -f "$source_dir/rust/Cargo.toml" && -f "$source_dir/native/CMakeLists.txt" ]] || {
-  echo "SOURCE_DIR is not a DS4RT source tree: $source_dir" >&2
+  echo "SOURCE_DIR is not a DS41RT source tree: $source_dir" >&2
   exit 2
 }
 
@@ -53,39 +53,39 @@ fi
 
 mkdir -p "$build_dir" "$output_dir"
 export PYO3_PYTHON=python3
-export PYTHONPATH="$source_dir/third_party/sparkinfer:$source_dir/python/reference/ds4rt_reference:$source_dir/python/reference${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$source_dir/third_party/sparkinfer:$source_dir/python/reference/ds41rt_reference:$source_dir/python/reference${PYTHONPATH:+:$PYTHONPATH}"
 export CARGO_TARGET_DIR="$build_dir/cargo-target"
 
 cargo build \
   --quiet \
   --manifest-path "$source_dir/rust/Cargo.toml" \
-  -p ds4rt-daemon \
+  -p ds41rt-daemon \
   --release
 
 cmake \
   -S "$source_dir/native" \
   -B "$build_dir/native" \
   -G Ninja \
-  -DDS4RT_ENABLE_CUDA=ON \
-  -DDS4RT_ENABLE_RDMA=ON \
-  -DDS4RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
-  -DDS4RT_ENABLE_SPARKINFER_COORDINATOR_AOT="$coordinator_aot" \
-  -DDS4RT_ENABLE_DS4_FLASH_AOT=ON \
-  -DDS4RT_ENABLE_W8A16_AOT="$w8a16_aot" \
-  -DDS4RT_SPARKINFER_SOURCE_DIR="$source_dir/third_party/sparkinfer" \
-  -DDS4RT_SPARKINFER_LOCK_FILE="$source_dir/third_party/sparkinfer.lock.json" \
-  -DDS4RT_ENABLE_NCCL="$nccl" \
-  -DDS4RT_ENABLE_XGRAMMAR="$xgrammar" \
-  -DDS4RT_XGRAMMAR_SOURCE_DIR="$source_dir/third_party/xgrammar" \
-  -DDS4RT_XGRAMMAR_LOCK_FILE="$source_dir/third_party/xgrammar.lock.json" \
+  -DDS41RT_ENABLE_CUDA=ON \
+  -DDS41RT_ENABLE_RDMA=ON \
+  -DDS41RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
+  -DDS41RT_ENABLE_SPARKINFER_COORDINATOR_AOT="$coordinator_aot" \
+  -DDS41RT_ENABLE_DS4_FLASH_AOT=ON \
+  -DDS41RT_ENABLE_W8A16_AOT="$w8a16_aot" \
+  -DDS41RT_SPARKINFER_SOURCE_DIR="$source_dir/third_party/sparkinfer" \
+  -DDS41RT_SPARKINFER_LOCK_FILE="$source_dir/third_party/sparkinfer.lock.json" \
+  -DDS41RT_ENABLE_NCCL="$nccl" \
+  -DDS41RT_ENABLE_XGRAMMAR="$xgrammar" \
+  -DDS41RT_XGRAMMAR_SOURCE_DIR="$source_dir/third_party/xgrammar" \
+  -DDS41RT_XGRAMMAR_LOCK_FILE="$source_dir/third_party/xgrammar.lock.json" \
   -DPython3_EXECUTABLE="$(command -v python3)" \
-  -DDS4RT_CUDA_ARCHITECTURES="$cuda_arch"
+  -DDS41RT_CUDA_ARCHITECTURES="$cuda_arch"
 cmake --build "$build_dir/native"
 
-install -m 0755 "$CARGO_TARGET_DIR/release/ds4rt" "$output_dir/ds4rt"
-install -m 0755 "$build_dir/native/libds4rt_native.so" "$output_dir/libds4rt_native.so"
+install -m 0755 "$CARGO_TARGET_DIR/release/ds41rt" "$output_dir/ds41rt"
+install -m 0755 "$build_dir/native/libds41rt_native.so" "$output_dir/libds41rt_native.so"
 (
   cd "$output_dir"
-  sha256sum ds4rt libds4rt_native.so >ARTIFACT_SHA256SUMS
+  sha256sum ds41rt libds41rt_native.so >ARTIFACT_SHA256SUMS
   sha256sum -c ARTIFACT_SHA256SUMS
 )

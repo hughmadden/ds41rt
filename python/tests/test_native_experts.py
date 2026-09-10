@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from ds4rt_runtime.native_experts import (
+from ds41rt_runtime.native_experts import (
     EXPERT_TP_WORLD_SIZE,
     checkpoint_tensor_names,
     load_native_expert_tp_layer,

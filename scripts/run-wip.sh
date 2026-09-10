@@ -39,7 +39,7 @@ correctness and performance diagnostics without changing Spark TP placement.
 EOF
 }
 
-config="$repo_root/ds4rt.config"
+config="$repo_root/ds41rt.config"
 config_explicit=0
 slot=current
 restart=0
@@ -48,7 +48,7 @@ dspark_off=0
 dspark_shadow_trace=0
 execution_lanes_override=
 allow_development_unqualified_exl3=0
-wip_api_ready_timeout_secs="${DS4RT_WIP_API_READY_TIMEOUT_SECS:-900}"
+wip_api_ready_timeout_secs="${DS41RT_WIP_API_READY_TIMEOUT_SECS:-900}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --wip)
@@ -108,7 +108,7 @@ if [[ -n "$execution_lanes_override" ]] &&
   release_die "--execution-lanes must be an integer in 1..8"
 fi
 [[ "$wip_api_ready_timeout_secs" =~ ^[1-9][0-9]*$ ]] ||
-  release_die "DS4RT_WIP_API_READY_TIMEOUT_SECS must be a positive integer"
+  release_die "DS41RT_WIP_API_READY_TIMEOUT_SECS must be a positive integer"
 
 release_need docker
 release_need ssh
@@ -120,8 +120,8 @@ release_need sha256sum
 release_need python3
 docker info >/dev/null 2>&1 || release_die "local Docker daemon is unavailable"
 
-coordinator_container=ds4rt-coordinator-wip
-spark_container=ds4rt-spark-expert-wip
+coordinator_container=ds41rt-coordinator-wip
+spark_container=ds41rt-spark-expert-wip
 docker container inspect "$coordinator_container" >/dev/null 2>&1 ||
   release_die "persistent coordinator WIP container is missing; run ./wip.sh --slot '$slot'"
 [[ "$(docker inspect -f '{{.State.Running}}' "$coordinator_container")" == true ]] ||
@@ -130,13 +130,13 @@ docker container inspect "$coordinator_container" >/dev/null 2>&1 ||
 # Bootstrap topology from the operator configuration, then prefer the exact
 # configuration frozen with the slot unless the caller selected one explicitly.
 release_load_config "$config"
-state_dir="$repo_root/.ds4rt-wip/run"
+state_dir="$repo_root/.ds41rt-wip/run"
 mkdir -p "$state_dir"
 if ((config_explicit == 0)); then
   slot_config="$state_dir/${slot}.config"
   docker exec "$coordinator_container" \
-    cat "/wip/slots/$slot/coordinator/workspace/ds4rt.config" >"$slot_config" ||
-    release_die "coordinator WIP slot is missing its frozen ds4rt.config: $slot"
+    cat "/wip/slots/$slot/coordinator/workspace/ds41rt.config" >"$slot_config" ||
+    release_die "coordinator WIP slot is missing its frozen ds41rt.config: $slot"
   config="$slot_config"
   release_load_config "$config"
 fi
@@ -170,14 +170,14 @@ image_id="$3"
 root="/wip/slots/$slot/$role"
 test -s "$root/META.json"
 test -s "$root/FINGERPRINT"
-test -x "$root/workspace/.ds4rt-wip/ds4rt"
-test -s "$root/workspace/.ds4rt-wip/libds4rt_native.so"
+test -x "$root/workspace/.ds41rt-wip/ds41rt"
+test -s "$root/workspace/.ds41rt-wip/libds41rt_native.so"
 actual_fingerprint="$(sha256sum "$root/META.json" | awk '{print $1}')"
 test "$actual_fingerprint" = "$(<"$root/FINGERPRINT")"
 python3 "$root/workspace/scripts/verify-release-source-manifest.py" \
   --source "$root/workspace" --manifest "$root/SOURCE_SHA256SUMS" >&2
 (
-  cd "$root/workspace/.ds4rt-wip"
+  cd "$root/workspace/.ds41rt-wip"
   sha256sum -c ARTIFACT_SHA256SUMS >&2
 )
 python3 - "$root/META.json" "$image_id" "$root" <<'PY'
@@ -191,7 +191,7 @@ meta = json.loads(pathlib.Path(meta_path).read_text())
 assert meta["schema"] == 1
 assert meta["base_image_id"] == image_id, (meta["base_image_id"], image_id)
 source_sum = hashlib.sha256(pathlib.Path(root, "SOURCE_SHA256SUMS").read_bytes()).hexdigest()
-artifact_sum = hashlib.sha256(pathlib.Path(root, "workspace/.ds4rt-wip/ARTIFACT_SHA256SUMS").read_bytes()).hexdigest()
+artifact_sum = hashlib.sha256(pathlib.Path(root, "workspace/.ds41rt-wip/ARTIFACT_SHA256SUMS").read_bytes()).hexdigest()
 assert meta["source_manifest_sha256"] == source_sum
 assert meta["artifact_manifest_sha256"] == artifact_sum
 PY
@@ -224,14 +224,14 @@ image_id="$2"
 root="/wip/slots/$slot/spark-expert"
 test -s "$root/META.json"
 test -s "$root/FINGERPRINT"
-test -x "$root/workspace/.ds4rt-wip/ds4rt"
-test -s "$root/workspace/.ds4rt-wip/libds4rt_native.so"
+test -x "$root/workspace/.ds41rt-wip/ds41rt"
+test -s "$root/workspace/.ds41rt-wip/libds41rt_native.so"
 actual_fingerprint="$(sha256sum "$root/META.json" | awk '{print $1}')"
 test "$actual_fingerprint" = "$(<"$root/FINGERPRINT")"
 python3 "$root/workspace/scripts/verify-release-source-manifest.py" \
   --source "$root/workspace" --manifest "$root/SOURCE_SHA256SUMS" >&2
 (
-  cd "$root/workspace/.ds4rt-wip"
+  cd "$root/workspace/.ds41rt-wip"
   sha256sum -c ARTIFACT_SHA256SUMS >&2
 )
 python3 - "$root/META.json" "$image_id" "$root" <<'PY'
@@ -245,7 +245,7 @@ meta = json.loads(pathlib.Path(meta_path).read_text())
 assert meta["schema"] == 1
 assert meta["base_image_id"] == image_id, (meta["base_image_id"], image_id)
 source_sum = hashlib.sha256(pathlib.Path(root, "SOURCE_SHA256SUMS").read_bytes()).hexdigest()
-artifact_sum = hashlib.sha256(pathlib.Path(root, "workspace/.ds4rt-wip/ARTIFACT_SHA256SUMS").read_bytes()).hexdigest()
+artifact_sum = hashlib.sha256(pathlib.Path(root, "workspace/.ds41rt-wip/ARTIFACT_SHA256SUMS").read_bytes()).hexdigest()
 assert meta["source_manifest_sha256"] == source_sum
 assert meta["artifact_manifest_sha256"] == artifact_sum
 PY
@@ -355,7 +355,7 @@ profile_args=(
 
 resolved_json="$state_dir/resolved-profile.json"
 docker exec \
-  -e PYTHONPATH="$coordinator_workspace/third_party/sparkinfer:$coordinator_workspace/python/reference/ds4rt_reference:$coordinator_workspace/python/reference:/opt/ds4rt/third_party/sparkinfer" \
+  -e PYTHONPATH="$coordinator_workspace/third_party/sparkinfer:$coordinator_workspace/python/reference/ds41rt_reference:$coordinator_workspace/python/reference:/opt/ds41rt/third_party/sparkinfer" \
   -w "$coordinator_workspace" \
   "$coordinator_container" \
   python3 "$coordinator_workspace/python/tools/resolve_serve_profile.py" \
@@ -367,7 +367,7 @@ resolved_dspark_draft_policy="$(
 [[ "$resolved_dspark_draft_policy" == "$DSPARK_DRAFT_POLICY" ]] ||
   release_die "WIP slot profile resolver draft policy mismatch: requested $DSPARK_DRAFT_POLICY, resolved $resolved_dspark_draft_policy"
 resolved_fixed_drafts="$(
-  jq -r '.environment.DS4RT_REAL_FULL_DSPARK_FIXED_DRAFTS // ""' "$resolved_json"
+  jq -r '.environment.DS41RT_REAL_FULL_DSPARK_FIXED_DRAFTS // ""' "$resolved_json"
 )"
 if [[ "$DSPARK:$DSPARK_DRAFT_POLICY" == on:full ]]; then
   [[ "$resolved_fixed_drafts" == 5 ]] ||
@@ -400,7 +400,7 @@ expert_runtime_fingerprint="$(
     --setting "spark_3=$SPARK_3_HOST,$SPARK_3_LANE_A,$SPARK_3_LANE_B"
 )"
 deployment_fingerprint="$({
-  printf 'ds4rt-wip-deployment-v2\n'
+  printf 'ds41rt-wip-deployment-v2\n'
   jq -S . "$resolved_json"
   printf '%s\n' \
     "$config_sha256" "$coordinator_slot_fingerprint" \
@@ -422,7 +422,7 @@ process_identity_local() {
 inspect_remote_service_state() {
   local host="$1"
   local release_container="${RELEASE_SPARK_CONTAINER_PREFIX}-${host}-${EXPERT_PORT}"
-  local legacy_container="ds4rt-phase0-tcp-expertd-${host}-${EXPERT_PORT}"
+  local legacy_container="ds41rt-phase0-tcp-expertd-${host}-${EXPERT_PORT}"
   ssh -o BatchMode=yes "$host" bash -s -- \
     "$release_container" "$legacy_container" "$spark_container" \
     "$expert_workspace/scripts/wip-process.sh" "$expert_process" <<'REMOTE'
@@ -628,32 +628,32 @@ fi
 
 eval "$(jq -r '.environment | to_entries[] | "\(.key)=\(.value | @sh); export \(.key)"' "$resolved_json")"
 if ((allow_development_unqualified_exl3)); then
-  export DS4RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL=1
+  export DS41RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL=1
 else
-  unset DS4RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL || true
+  unset DS41RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL || true
 fi
-export DS4RT_SPARK_HOSTS="$hosts_csv"
-export DS4RT_REAL_FULL_SERVE_EXPERT_HOSTS="$expert_hosts_csv"
-export DS4RT_SPARK_IMAGE="$SPARK_EXPERT_DOCKER_DEV"
-export DS4RT_SPARK_EXISTING_CONTAINER="$spark_container"
-export DS4RT_SPARK_RUNTIME_CACHE_DIR=/wip/cache
-export DS4RT_SPARK_WORKDIR="$expert_workspace"
-export DS4RT_SPARK_PREBUILT=1
-export DS4RT_MODEL_REVISION="$RELEASE_MODEL_REVISION"
-export DS4RT_SPARK_PREBUILT_BIN="$expert_workspace/.ds4rt-wip/ds4rt"
-export DS4RT_SPARK_PREBUILT_NATIVE_LIB="$expert_workspace/.ds4rt-wip/libds4rt_native.so"
-export DS4RT_SPARK_SKIP_STAGE=1
-export DS4RT_RELEASE_CONFIG_SHA256="$expert_runtime_fingerprint"
-export DS4RT_SPARK_EXPERT_PORT="$EXPERT_PORT"
-export DS4RT_SPARK_EXPERT_TRANSPORT=verbs-host
-export DS4RT_SPARK_KEEP_EXPERTS=1
-export DS4RT_SPARK_EXPERT_REAL_LAYER=all
-export DS4RT_PHASE0_SPARK_SKIP_BENCH=1
-export DS4RT_EXPERT_INTERMEDIATE_RDMA_PEERS="$lane_a_csv"
+export DS41RT_SPARK_HOSTS="$hosts_csv"
+export DS41RT_REAL_FULL_SERVE_EXPERT_HOSTS="$expert_hosts_csv"
+export DS41RT_SPARK_IMAGE="$SPARK_EXPERT_DOCKER_DEV"
+export DS41RT_SPARK_EXISTING_CONTAINER="$spark_container"
+export DS41RT_SPARK_RUNTIME_CACHE_DIR=/wip/cache
+export DS41RT_SPARK_WORKDIR="$expert_workspace"
+export DS41RT_SPARK_PREBUILT=1
+export DS41RT_MODEL_REVISION="$RELEASE_MODEL_REVISION"
+export DS41RT_SPARK_PREBUILT_BIN="$expert_workspace/.ds41rt-wip/ds41rt"
+export DS41RT_SPARK_PREBUILT_NATIVE_LIB="$expert_workspace/.ds41rt-wip/libds41rt_native.so"
+export DS41RT_SPARK_SKIP_STAGE=1
+export DS41RT_RELEASE_CONFIG_SHA256="$expert_runtime_fingerprint"
+export DS41RT_SPARK_EXPERT_PORT="$EXPERT_PORT"
+export DS41RT_SPARK_EXPERT_TRANSPORT=verbs-host
+export DS41RT_SPARK_KEEP_EXPERTS=1
+export DS41RT_SPARK_EXPERT_REAL_LAYER=all
+export DS41RT_PHASE0_SPARK_SKIP_BENCH=1
+export DS41RT_EXPERT_INTERMEDIATE_RDMA_PEERS="$lane_a_csv"
 if [[ -n "$lane_b_csv" ]]; then
-  export DS4RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS="$lane_b_csv"
+  export DS41RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS="$lane_b_csv"
 else
-  unset DS4RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS || true
+  unset DS41RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS || true
 fi
 spark_start_pid=
 if ((reuse_spark_experts)); then
@@ -669,44 +669,44 @@ env_file="$state_dir/coordinator.env"
 jq -r '.environment | to_entries[] | "\(.key)=\(.value)"' "$resolved_json" >"$env_file"
 {
   echo "ADDR=$ADDR"
-  echo "DS4RT_REAL_FULL_SERVE_EXPERT_HOSTS=$expert_hosts_csv"
-  echo "DS4RT_SPARK_HOSTS=$hosts_csv"
-  echo "DS4RT_SPARK_EXPERT_PORT=$EXPERT_PORT"
-  echo "DS4RT_SPARKINFER_EXL3=$SPARKINFER_EXL3"
-  echo "DS4RT_MODEL_REVISION=$RELEASE_MODEL_REVISION"
-  echo "DS4RT_REAL_FULL_SERVE_START_EXPERTS=0"
-  echo "DS4RT_REAL_FULL_SERVE_BUILD_DAEMON=0"
-  echo "DS4RT_REAL_FULL_SERVE_BUILD_NATIVE=0"
-  echo "DS4RT_REAL_FULL_SERVE_REQUIRE_CUDA=1"
-  echo "DS4RT_REAL_FULL_SERVE_EXPERT_WARMUP_STATUS_FILE=/wip/run/expert-warmup.status"
-  echo "DS4RT_BIN=$coordinator_workspace/.ds4rt-wip/ds4rt"
-  echo "DS4RT_NATIVE_LIB=$coordinator_workspace/.ds4rt-wip/libds4rt_native.so"
-  echo "DS4RT_ENGINE_COMMIT=$coordinator_engine_commit"
-  echo "DS4RT_RELEASE_CONFIG_SHA256=$deployment_fingerprint"
-  echo "DS4RT_KERNEL_CACHE_BASE=/wip/cache/kernels"
-  echo "DS4RT_KERNEL_CACHE_ENVIRONMENT_ID=$coordinator_image_id"
-  echo "DS4RT_RUNTIME_CATALOG_CACHE_DIR=/wip/cache/catalogs"
+  echo "DS41RT_REAL_FULL_SERVE_EXPERT_HOSTS=$expert_hosts_csv"
+  echo "DS41RT_SPARK_HOSTS=$hosts_csv"
+  echo "DS41RT_SPARK_EXPERT_PORT=$EXPERT_PORT"
+  echo "DS41RT_SPARKINFER_EXL3=$SPARKINFER_EXL3"
+  echo "DS41RT_MODEL_REVISION=$RELEASE_MODEL_REVISION"
+  echo "DS41RT_REAL_FULL_SERVE_START_EXPERTS=0"
+  echo "DS41RT_REAL_FULL_SERVE_BUILD_DAEMON=0"
+  echo "DS41RT_REAL_FULL_SERVE_BUILD_NATIVE=0"
+  echo "DS41RT_REAL_FULL_SERVE_REQUIRE_CUDA=1"
+  echo "DS41RT_REAL_FULL_SERVE_EXPERT_WARMUP_STATUS_FILE=/wip/run/expert-warmup.status"
+  echo "DS41RT_BIN=$coordinator_workspace/.ds41rt-wip/ds41rt"
+  echo "DS41RT_NATIVE_LIB=$coordinator_workspace/.ds41rt-wip/libds41rt_native.so"
+  echo "DS41RT_ENGINE_COMMIT=$coordinator_engine_commit"
+  echo "DS41RT_RELEASE_CONFIG_SHA256=$deployment_fingerprint"
+  echo "DS41RT_KERNEL_CACHE_BASE=/wip/cache/kernels"
+  echo "DS41RT_KERNEL_CACHE_ENVIRONMENT_ID=$coordinator_image_id"
+  echo "DS41RT_RUNTIME_CATALOG_CACHE_DIR=/wip/cache/catalogs"
   if ((allow_development_unqualified_exl3)); then
-    echo "DS4RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL=1"
+    echo "DS41RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL=1"
   fi
   echo "HF_HOME=$hf_home"
-  echo "PYTHONPATH=$coordinator_workspace/third_party/sparkinfer:$coordinator_workspace/python/reference/ds4rt_reference:$coordinator_workspace/python/reference:/opt/ds4rt/third_party/sparkinfer"
+  echo "PYTHONPATH=$coordinator_workspace/third_party/sparkinfer:$coordinator_workspace/python/reference/ds41rt_reference:$coordinator_workspace/python/reference:/opt/ds41rt/third_party/sparkinfer"
 } >>"$env_file"
 
 if [[ -n "$execution_lanes_override" ]]; then
-  echo "DS4RT_REAL_FULL_MAX_EXECUTION_LANES=$execution_lanes_override" >>"$env_file"
+  echo "DS41RT_REAL_FULL_MAX_EXECUTION_LANES=$execution_lanes_override" >>"$env_file"
 fi
 
 if ((dspark_off)); then
   {
-    echo "DS4RT_REAL_FULL_DSPARK=0"
-    echo "DS4RT_REAL_FULL_DSPARK_SHADOW=0"
+    echo "DS41RT_REAL_FULL_DSPARK=0"
+    echo "DS41RT_REAL_FULL_DSPARK_SHADOW=0"
   } >>"$env_file"
 elif ((dspark_shadow_trace)); then
   {
-    echo "DS4RT_REAL_FULL_DSPARK=0"
-    echo "DS4RT_REAL_FULL_DSPARK_SHADOW=1"
-    echo "DS4RT_REAL_FULL_DSPARK_TRACE=1"
+    echo "DS41RT_REAL_FULL_DSPARK=0"
+    echo "DS41RT_REAL_FULL_DSPARK_SHADOW=1"
+    echo "DS41RT_REAL_FULL_DSPARK_TRACE=1"
   } >>"$env_file"
 fi
 
@@ -714,21 +714,21 @@ fi
 # container otherwise receives only the resolved production environment, which
 # made an A/B graph-identity audit require manually editing its generated env
 # file between restarts.
-if [[ -n "${DS4RT_REAL_FULL_GRAPH_CAPTURE_TRACE:-}" ]]; then
-  echo "DS4RT_REAL_FULL_GRAPH_CAPTURE_TRACE=$DS4RT_REAL_FULL_GRAPH_CAPTURE_TRACE" \
+if [[ -n "${DS41RT_REAL_FULL_GRAPH_CAPTURE_TRACE:-}" ]]; then
+  echo "DS41RT_REAL_FULL_GRAPH_CAPTURE_TRACE=$DS41RT_REAL_FULL_GRAPH_CAPTURE_TRACE" \
     >>"$env_file"
 fi
 
 # Coordinator-only kernel candidates are WIP launch controls. They do not
 # affect Spark identity, and remain absent from production profiles until the
 # corresponding hardware qualification promotes them.
-if [[ -n "${DS4RT_DS4_FLASH_ROUTER_SHORTLIST:-}" ]]; then
-  echo "DS4RT_DS4_FLASH_ROUTER_SHORTLIST=$DS4RT_DS4_FLASH_ROUTER_SHORTLIST" \
+if [[ -n "${DS41RT_DS4_FLASH_ROUTER_SHORTLIST:-}" ]]; then
+  echo "DS41RT_DS4_FLASH_ROUTER_SHORTLIST=$DS41RT_DS4_FLASH_ROUTER_SHORTLIST" \
     >>"$env_file"
 fi
 
-if [[ -n "${DS4RT_REAL_FULL_BF16_HIDDEN_READBACK_OVERLAP:-}" ]]; then
-  echo "DS4RT_REAL_FULL_BF16_HIDDEN_READBACK_OVERLAP=$DS4RT_REAL_FULL_BF16_HIDDEN_READBACK_OVERLAP" \
+if [[ -n "${DS41RT_REAL_FULL_BF16_HIDDEN_READBACK_OVERLAP:-}" ]]; then
+  echo "DS41RT_REAL_FULL_BF16_HIDDEN_READBACK_OVERLAP=$DS41RT_REAL_FULL_BF16_HIDDEN_READBACK_OVERLAP" \
     >>"$env_file"
 fi
 
@@ -740,32 +740,32 @@ for diagnostic_name in \
   B12X_COMPILE_DISK_CACHE \
   B12X_PAGED_INDEX_SUPERTILE_K \
   CUDA_LAUNCH_BLOCKING \
-  DS4RT_REAL_FULL_B12X_PACKED_HIDDEN_EXCHANGE \
-  DS4RT_REAL_FULL_DIAGNOSTIC_LAYER_DUMP_DIR \
-  DS4RT_REAL_FULL_DIAGNOSTIC_LAYER_DUMP_LAYER \
-  DS4RT_REAL_FULL_DSPARK_TRACE \
-  DS4RT_REAL_FULL_DSPARK_CONFIDENCE_POLICY \
-  DS4RT_REAL_FULL_DSPARK_FIXED_DRAFTS \
-  DS4RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_REPEATS \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_PREFIX_ROWS \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_NEW_ROWS \
-  DS4RT_REAL_FULL_REQUEST_TIMING \
-  DS4RT_REAL_FULL_REQUEST_PREFILL_CHUNK_TOKENS \
-  DS4RT_REAL_FULL_SCHEDULER_TIMING \
-  DS4RT_REAL_FULL_SCHEDULER_SUMMARY_TIMING \
-  DS4RT_REAL_FULL_ADMISSION_STAGE_TIMING \
-  DS4RT_REAL_FULL_ATTENTION_CUDA_TIMING \
-  DS4RT_REAL_FULL_ROLLING_SPARSE_PACKS \
-  DS4RT_REAL_FULL_SPARSE_TCP_STAGE_TIMING \
-  DS4RT_REAL_FULL_NVFP4_ROUTE_TIMING \
-  DS4RT_REAL_FULL_NVFP4_ROUTE_CUDA_EVENT_TIMING \
-  DS4RT_REAL_FULL_PROTOCOL_V2_EXECUTOR_TIMING \
-  DS4RT_REAL_FULL_TERMINAL_SAMPLE_VALIDATE \
-  DS4RT_PROTOCOL_V2_TCP_TIMING \
-  DS4RT_PROTOCOL_V2_EXPERT_QUEUE_STATS \
-  DS4RT_PROTOCOL_V2_EXPERT_QUEUE_ROW_ROUTES; do
+  DS41RT_REAL_FULL_B12X_PACKED_HIDDEN_EXCHANGE \
+  DS41RT_REAL_FULL_DIAGNOSTIC_LAYER_DUMP_DIR \
+  DS41RT_REAL_FULL_DIAGNOSTIC_LAYER_DUMP_LAYER \
+  DS41RT_REAL_FULL_DSPARK_TRACE \
+  DS41RT_REAL_FULL_DSPARK_CONFIDENCE_POLICY \
+  DS41RT_REAL_FULL_DSPARK_FIXED_DRAFTS \
+  DS41RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP \
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE \
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_REPEATS \
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_PREFIX_ROWS \
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_NEW_ROWS \
+  DS41RT_REAL_FULL_REQUEST_TIMING \
+  DS41RT_REAL_FULL_REQUEST_PREFILL_CHUNK_TOKENS \
+  DS41RT_REAL_FULL_SCHEDULER_TIMING \
+  DS41RT_REAL_FULL_SCHEDULER_SUMMARY_TIMING \
+  DS41RT_REAL_FULL_ADMISSION_STAGE_TIMING \
+  DS41RT_REAL_FULL_ATTENTION_CUDA_TIMING \
+  DS41RT_REAL_FULL_ROLLING_SPARSE_PACKS \
+  DS41RT_REAL_FULL_SPARSE_TCP_STAGE_TIMING \
+  DS41RT_REAL_FULL_NVFP4_ROUTE_TIMING \
+  DS41RT_REAL_FULL_NVFP4_ROUTE_CUDA_EVENT_TIMING \
+  DS41RT_REAL_FULL_PROTOCOL_V2_EXECUTOR_TIMING \
+  DS41RT_REAL_FULL_TERMINAL_SAMPLE_VALIDATE \
+  DS41RT_PROTOCOL_V2_TCP_TIMING \
+  DS41RT_PROTOCOL_V2_EXPERT_QUEUE_STATS \
+  DS41RT_PROTOCOL_V2_EXPERT_QUEUE_ROW_ROUTES; do
   diagnostic_value="${!diagnostic_name:-}"
   if [[ -n "$diagnostic_value" ]]; then
     printf '%s=%s\n' "$diagnostic_name" "$diagnostic_value" >>"$env_file"
@@ -821,7 +821,7 @@ done
 curl -fsS "http://127.0.0.1:${ADDR##*:}/v1/models" >"$state_dir/models.json"
 release_validate_model_list_file "$state_dir/models.json" "$RELEASE_MODEL_ID"
 report_wip_startup_phase api-ready
-echo "DS4RT WIP server is ready at http://127.0.0.1:${ADDR##*:}/v1/"
+echo "DS41RT WIP server is ready at http://127.0.0.1:${ADDR##*:}/v1/"
 echo "  slot:        $slot"
 echo "  profile:     $PROFILE"
 echo "  model:       $RELEASE_MODEL_ID"

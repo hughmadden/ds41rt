@@ -19,7 +19,7 @@ import plan_expert_reduction_replay as plan  # noqa: E402
 def flash_manifest() -> dict[str, object]:
     return {
         "record": "manifest",
-        "schema": "ds4rt-expert-route-bank-v2",
+        "schema": "ds41rt-expert-route-bank-v2",
         "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
         "hidden_size": 4096,
         "top_k": 6,
@@ -85,7 +85,7 @@ def test_plan_preserves_explicit_deepseek_geometry(tmp_path: Path) -> None:
 
 def test_plan_rejects_legacy_implicit_geometry() -> None:
     legacy = flash_manifest()
-    legacy["schema"] = "ds4rt-expert-route-bank-v1"
+    legacy["schema"] = "ds41rt-expert-route-bank-v1"
     with pytest.raises(ValueError, match="explicit DeepSeek model geometry"):
         plan.geometry_from_manifest(legacy)
 
@@ -136,7 +136,7 @@ def test_reduction_summary_uses_recorded_layer_samples() -> None:
     pairs = analyze.paired_by_m(measurements)
     summary = analyze.summarize(
         {
-            "schema": "ds4rt-expert-reduction-replay-result-v2",
+            "schema": "ds41rt-expert-reduction-replay-result-v2",
             "cohort": "semantic",
             **{
                 key: value
@@ -151,6 +151,6 @@ def test_reduction_summary_uses_recorded_layer_samples() -> None:
     row = summary["rows"][0]
     assert row["coordinator_layer_ms_mean"] == 2.0
     assert row["spark_layer_ms_mean"] == 3.0
-    assert summary["schema"] == "ds4rt-expert-reduction-replay-summary-v2"
+    assert summary["schema"] == "ds41rt-expert-reduction-replay-summary-v2"
     assert summary["hidden_size"] == 4096
     assert summary["routed_layers"] == [0, 1]

@@ -18,7 +18,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error(error, len(error))
+    lib.ds41rt_last_error(error, len(error))
     raise RuntimeError(f"{action} failed with status {status}: {error.value.decode()}")
 
 
@@ -84,11 +84,11 @@ def main() -> None:
     device = torch.device("cuda", torch.cuda.current_device())
     properties = torch.cuda.get_device_properties(device)
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    lib.ds4rt_last_error.restype = ctypes.c_int
+    lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    lib.ds41rt_last_error.restype = ctypes.c_int
     pack = configure(
         lib,
-        "ds4rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_async",
+        "ds41rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -101,12 +101,12 @@ def main() -> None:
     )
     zero = configure(
         lib,
-        "ds4rt_cuda_zero_f32_async",
+        "ds41rt_cuda_zero_f32_async",
         (ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p),
     )
     scatter = configure(
         lib,
-        "ds4rt_cuda_scatter_add_rows_fp8_e4m3_row_scaled_to_f32_async",
+        "ds41rt_cuda_scatter_add_rows_fp8_e4m3_row_scaled_to_f32_async",
         (
             ctypes.c_void_p,
             ctypes.c_size_t,
@@ -119,7 +119,7 @@ def main() -> None:
     )
     residual_add = configure(
         lib,
-        "ds4rt_cuda_residual_add_shared_f32_delta_bf16_async",
+        "ds41rt_cuda_residual_add_shared_f32_delta_bf16_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -131,7 +131,7 @@ def main() -> None:
     )
     candidate = configure(
         lib,
-        "ds4rt_cuda_fp8_decode_combine_residual_async",
+        "ds41rt_cuda_fp8_decode_combine_residual_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,

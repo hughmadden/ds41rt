@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from ds4rt_reference.quant_ref import decode_packed_nvfp4_values, f8e4m3_byte_to_float
+from ds41rt_reference.quant_ref import decode_packed_nvfp4_values, f8e4m3_byte_to_float
 
 
 def _repo_root() -> Path:

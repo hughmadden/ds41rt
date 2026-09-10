@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from ds4rt_reference.deepseek_v4_spark_prefill_capture import (
+from ds41rt_reference.deepseek_v4_spark_prefill_capture import (
     DeepseekV4FlashSparkPrefillBinding,
     bind_deepseek_v4_flash_spark_prefill,
     plan_deepseek_v4_flash_spark_prefill,

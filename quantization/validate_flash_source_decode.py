@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Compare GPTQModel and DS4RT decoding on real DeepSeek-V4-Flash experts.
+"""Compare GPTQModel and DS41RT decoding on real DeepSeek-V4-Flash experts.
 
 This is a bounded source qualification, not a quantization run. It reads one
 expert from representative early/middle/late target layers and all three MTP
 blocks, decodes every w1/w2/w3 projection through the GPTQModel fast and
-Torch-only paths and the independent DS4RT reference, and requires bit-exact
+Torch-only paths and the independent DS41RT reference, and requires bit-exact
 BF16 equality. The report also makes model-traversal coverage explicit: the
 current Transformers DeepSeek-V4 shell ignores ``mtp.*`` even though those
 weights must ultimately be calibrated and quantized for integrated dSpark.
@@ -25,7 +25,7 @@ from types import SimpleNamespace
 from typing import Any
 
 
-SCHEMA = "ds4rt-gptqmodel-flash-source-decode-v1"
+SCHEMA = "ds41rt-gptqmodel-flash-source-decode-v1"
 DEFAULT_CASES = (
     "layers.0:0",
     "layers.21:127",
@@ -162,7 +162,7 @@ def run(
     import torch
     from safetensors import safe_open
 
-    from ds4rt_runtime.exl3_quantizer import dequantize_native_fp4_projection
+    from ds41rt_runtime.exl3_quantizer import dequantize_native_fp4_projection
     from gptqmodel.models.definitions.deepseek_v4 import DeepSeekV4QModel
     from gptqmodel.quantization import dtype as gptq_dtype
     from gptqmodel.utils.structure import LazyTurtle
@@ -242,16 +242,16 @@ def run(
                 axis=None,
                 target_dtype=torch.bfloat16,
             ).contiguous()
-            ds4rt = (
+            ds41rt = (
                 dequantize_native_fp4_projection(packed, scales)
                 .T.to(torch.bfloat16)
                 .contiguous()
             )
-            if not torch.equal(fast, reference) or not torch.equal(fast, ds4rt):
+            if not torch.equal(fast, reference) or not torch.equal(fast, ds41rt):
                 raise ValidationError(
                     f"{base} source decode differs: "
                     f"gptq_reference_max_abs={float((fast.float() - reference.float()).abs().max())} "
-                    f"ds4rt_max_abs={float((fast.float() - ds4rt.float()).abs().max())}"
+                    f"ds41rt_max_abs={float((fast.float() - ds41rt.float()).abs().max())}"
                 )
             if not bool(torch.isfinite(fast).all().item()):
                 raise ValidationError(f"{base} decoded non-finite values")
@@ -287,10 +287,10 @@ def run(
                     "source_scale_sha256": tensor_sha256(scales),
                     "decoded_bf16_sha256": tensor_sha256(fast),
                     "gptq_reference_max_abs": 0.0,
-                    "ds4rt_max_abs": 0.0,
+                    "ds41rt_max_abs": 0.0,
                 }
             )
-            del packed, scales, fast, reference, ds4rt
+            del packed, scales, fast, reference, ds41rt
             gc.collect()
 
     layer_roots = DeepSeekV4QModel.extract_layers_node()

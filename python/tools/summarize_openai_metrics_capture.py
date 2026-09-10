@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and summarize one measured-only DS4RT metrics-proxy capture."""
+"""Validate and summarize one measured-only DS41RT metrics-proxy capture."""
 
 from __future__ import annotations
 
@@ -134,7 +134,7 @@ def summarize(
     if proposed == 0 or cycles == 0:
         raise ValueError("metrics capture did not execute dSpark verification")
     return {
-        "schema": "ds4rt-draft-acceptance-summary-v2",
+        "schema": "ds41rt-draft-acceptance-summary-v2",
         "model": model,
         "runtime_commit": runtime_commit,
         "draft_policy": draft_policy,

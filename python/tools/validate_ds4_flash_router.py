@@ -25,7 +25,7 @@ CAPTURE_RE = re.compile(
     r"rows_(?P<rows>[0-9]+)_expert_input\.bf16$"
 )
 ROUTE_RECORD = struct.Struct("<Hf")
-ROUTE_REPLAY_REPORT_SCHEMA = "ds4rt-flash-route-replay-v1"
+ROUTE_REPLAY_REPORT_SCHEMA = "ds41rt-flash-route-replay-v1"
 ROUTE_REPLAY_REPORT_FILENAME = "route-replay.json"
 
 
@@ -35,7 +35,7 @@ def tensor_pointer(tensor) -> ctypes.c_void_p:
 
 def configure_native(path: Path):
     library = ctypes.CDLL(str(path.resolve()))
-    function = library.ds4rt_cuda_ds4_flash_router_topk_bf16_async
+    function = library.ds41rt_cuda_ds4_flash_router_topk_bf16_async
     function.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -46,13 +46,13 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     function.restype = ctypes.c_int
-    library.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    library.ds4rt_last_error.restype = ctypes.c_int
+    library.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    library.ds41rt_last_error.restype = ctypes.c_int
     return library, function
 
 
 def configure_hybrid_native(library):
-    linear = library.ds4rt_cuda_linear_bf16_f32_cublas_async
+    linear = library.ds41rt_cuda_linear_bf16_f32_cublas_async
     linear.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -63,7 +63,7 @@ def configure_hybrid_native(library):
         ctypes.c_void_p,
     )
     linear.restype = ctypes.c_int
-    refine = library.ds4rt_cuda_ds4_flash_router_refine_topk_bf16_async
+    refine = library.ds41rt_cuda_ds4_flash_router_refine_topk_bf16_async
     refine.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -133,7 +133,7 @@ def invoke_hybrid(
 
 def native_error(library) -> str:
     message = ctypes.create_string_buffer(1024)
-    library.ds4rt_last_error(message, len(message))
+    library.ds41rt_last_error(message, len(message))
     return message.value.decode("utf-8", errors="replace")
 
 

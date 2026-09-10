@@ -39,7 +39,7 @@ def write_json(path: Path, value: object) -> None:
 
 
 def fixture(tmp_path: Path) -> dict:
-    run_state = tmp_path / ".flash.ds4rt-run"
+    run_state = tmp_path / ".flash.ds41rt-run"
     checkpoint_root = tmp_path / "slow-disk" / MODULE.CHECKPOINT_DIRNAME
     checkpoint_root.mkdir(parents=True)
     plan = {

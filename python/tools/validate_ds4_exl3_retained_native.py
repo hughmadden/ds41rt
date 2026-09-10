@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove that every non-routed tensor in a DS4RT EXL3 artifact is byte-identical."""
+"""Prove that every non-routed tensor in a DS41RT EXL3 artifact is byte-identical."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+from ds41rt_runtime.exl3_artifact_contract import (  # noqa: E402
     ARTIFACT_FILE as GPTQMODEL_ARTIFACT_FILE,
     LEDGER_MANIFEST_FILE as GPTQMODEL_LEDGER_MANIFEST_FILE,
     PLAN_FILE as GPTQMODEL_PLAN_FILE,
@@ -24,7 +24,7 @@ from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
     is_gptqmodel_native_exl3,
     validate_gptqmodel_publication,
 )
-from ds4rt_runtime.exl3_quantizer import (  # noqa: E402
+from ds41rt_runtime.exl3_quantizer import (  # noqa: E402
     EXL3_RECIPE,
     EXPERT_TENSOR_LAYOUT_CHECKPOINT_NATIVE,
     EXPERT_TENSOR_LAYOUT_GPTQMODEL,
@@ -127,10 +127,10 @@ def artifact_recipe_and_output(
 
     recipe = EXL3_RECIPE
     if isinstance(quant, dict):
-        ds4rt = quant.get("ds4rt")
-        if isinstance(ds4rt, dict) and isinstance(ds4rt.get("recipe"), str):
-            recipe = ds4rt["recipe"]
-    return recipe, requested_output or snapshot / "ds4rt-exl3-retained-native.json"
+        ds41rt = quant.get("ds41rt")
+        if isinstance(ds41rt, dict) and isinstance(ds41rt.get("recipe"), str):
+            recipe = ds41rt["recipe"]
+    return recipe, requested_output or snapshot / "ds41rt-exl3-retained-native.json"
 
 
 def retained_native_plan(native_snapshot: Path, config: dict):

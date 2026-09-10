@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-runtime_root="${DS4RT_WIP_RUNTIME_ROOT:-/wip/run}"
+runtime_root="${DS41RT_WIP_RUNTIME_ROOT:-/wip/run}"
 mkdir -p "$runtime_root"
 
 valid_name() {

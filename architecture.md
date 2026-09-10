@@ -1,6 +1,6 @@
-# DS4RT architecture
+# DS41RT architecture
 
-DS4RT is an attention–FFN-disaggregated DeepSeek V4 Pro engine for one RTX PRO
+DS41RT is an attention–FFN-disaggregated DeepSeek V4 Pro engine for one RTX PRO
 6000 Blackwell coordinator and four DGX Spark workers. This document defines
 the stable v2 ownership and execution contract. Model dimensions are validated
 from the selected snapshot rather than inferred from these prose values.
@@ -24,7 +24,7 @@ published representation.
 
 ## Routed expert tensor parallelism
 
-DS4RT does not assign whole experts to workers. Every Spark stores one quarter
+DS41RT does not assign whole experts to workers. Every Spark stores one quarter
 of the intermediate dimension of every routed expert. The coordinator computes
 one global route list and sends identical hidden rows and route weights to all
 four ranks. Each rank computes its quarter-intermediate `w1`/`w3` activation
@@ -61,7 +61,7 @@ request performs no graph capture and no Python execution on its timed path.
 ## dSpark
 
 DeepSeek V4 Pro's dSpark head is a three-block semi-autoregressive drafter.
-DS4RT runs its routed experts through the same TP4 boundary as target layers.
+DS41RT runs its routed experts through the same TP4 boundary as target layers.
 The adaptive controller selects a proposal width from one through five using
 checkpoint confidence outputs, then the target verifies the proposal. The
 `-full` API model alias disables drafting without changing the target model.

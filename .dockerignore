@@ -4,9 +4,9 @@
 **/.venv
 .venv-*
 **/.venv-*
-.ds4rt-cache
-.ds4rt-release
-.ds4rt-wip
+.ds41rt-cache
+.ds41rt-release
+.ds41rt-wip
 dist
 rust/target
 **/target

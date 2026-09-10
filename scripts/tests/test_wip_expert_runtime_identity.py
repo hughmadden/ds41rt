@@ -21,7 +21,7 @@ def payload(profile_environment: dict[str, str], ambient: dict[str, str]):
 def test_coordinator_and_shell_environment_do_not_affect_expert_identity() -> None:
     base = payload({}, {})
     candidate = payload(
-        {"DS4RT_COORDINATOR_W8A16_O_PROJ": "1"},
+        {"DS41RT_COORDINATOR_W8A16_O_PROJ": "1"},
         {"OLDPWD": "/somewhere/else", "SSH_CONNECTION": "changed"},
     )
 
@@ -33,8 +33,8 @@ def test_removed_transformer_tp_environment_does_not_affect_expert_identity() ->
     candidate = payload(
         {},
         {
-            "DS4RT_SPARK_TRANSFORMER_TP_RANGE": "0:61",
-            "DS4RT_SPARK_LAYER_BLOCK_RANGE": "0:18",
+            "DS41RT_SPARK_TRANSFORMER_TP_RANGE": "0:61",
+            "DS41RT_SPARK_LAYER_BLOCK_RANGE": "0:18",
         },
     )
 
@@ -42,33 +42,33 @@ def test_removed_transformer_tp_environment_does_not_affect_expert_identity() ->
 
 
 def test_expert_environment_and_profile_precedence_affect_identity() -> None:
-    base = payload({}, {"DS4RT_EXPERT_INTERMEDIATE_SHARDS": "2"})
+    base = payload({}, {"DS41RT_EXPERT_INTERMEDIATE_SHARDS": "2"})
     overridden = payload(
-        {"DS4RT_EXPERT_INTERMEDIATE_SHARDS": "4"},
-        {"DS4RT_EXPERT_INTERMEDIATE_SHARDS": "2"},
+        {"DS41RT_EXPERT_INTERMEDIATE_SHARDS": "4"},
+        {"DS41RT_EXPERT_INTERMEDIATE_SHARDS": "2"},
     )
 
-    assert base["environment"]["DS4RT_EXPERT_INTERMEDIATE_SHARDS"] == "2"
-    assert overridden["environment"]["DS4RT_EXPERT_INTERMEDIATE_SHARDS"] == "4"
+    assert base["environment"]["DS41RT_EXPERT_INTERMEDIATE_SHARDS"] == "2"
+    assert overridden["environment"]["DS41RT_EXPERT_INTERMEDIATE_SHARDS"] == "4"
     assert IDENTITY.canonical_bytes(base) != IDENTITY.canonical_bytes(overridden)
 
 
 def test_model_and_expert_kernel_controls_are_selected() -> None:
     selected = payload(
         {
-            "DS4RT_MODEL_ID": "model-a",
-            "DS4RT_B12X_SPARK_W4A16_SMALL_M_MODE": "wide",
-            "DS4RT_REAL_FULL_NVFP4_ROUTE_CUDA_GRAPHS": "1",
-            "DS4RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES": "4",
+            "DS41RT_MODEL_ID": "model-a",
+            "DS41RT_B12X_SPARK_W4A16_SMALL_M_MODE": "wide",
+            "DS41RT_REAL_FULL_NVFP4_ROUTE_CUDA_GRAPHS": "1",
+            "DS41RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES": "4",
         },
         {},
     )["environment"]
 
     assert set(selected) == {
-        "DS4RT_MODEL_ID",
-        "DS4RT_B12X_SPARK_W4A16_SMALL_M_MODE",
-        "DS4RT_REAL_FULL_NVFP4_ROUTE_CUDA_GRAPHS",
-        "DS4RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES",
+        "DS41RT_MODEL_ID",
+        "DS41RT_B12X_SPARK_W4A16_SMALL_M_MODE",
+        "DS41RT_REAL_FULL_NVFP4_ROUTE_CUDA_GRAPHS",
+        "DS41RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES",
     }
 
 

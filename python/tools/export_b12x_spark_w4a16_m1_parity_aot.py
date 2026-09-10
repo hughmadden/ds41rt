@@ -68,7 +68,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
     # b12x 0.30.2 limits ordered direct-top-k to M<=6 only because its public
     # M=7/8 policy selects the atomic fused-sum TC-decode epilogue. The direct
     # route GEMM itself supports all 64 M=8 route rows. Export that same kernel
-    # with separate route outputs so ds4rt can reduce top-k in fixed order.
+    # with separate route outputs so ds41rt can reduce top-k in fixed order.
     if w4a16_kernel._MAX_DIRECT_TOPK_ROUTE_M < max(ROWS):
         w4a16_kernel._MAX_DIRECT_TOPK_ROUTE_M = max(ROWS)
 
@@ -126,7 +126,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
         fused.compiled.export_to_c(
             str(output_dir),
             name,
-            f"ds4rt_b12x_{name}",
+            f"ds41rt_b12x_{name}",
         )
         grid_x = w4a16_kernel._w4a16_fused_persistent_grid_x(
             fused=fused,
@@ -137,7 +137,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
             direct_topk_routes=True,
             sms=sms,
         )
-        macro = f"DS4RT_B12X_W4A16_M1_PARITY_M{rows}_TOPK8"
+        macro = f"DS41RT_B12X_W4A16_M1_PARITY_M{rows}_TOPK8"
         config_lines.append(f"#define {macro}_GRID_X {grid_x}")
         metadata_lines.append(
             f"m{rows}=grid:{grid_x},block:{block_size},routes:{rows * TOP_K},"
@@ -146,7 +146,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
 
         # Preserve the same block-8 GEMM arithmetic as scalar M=1 while
         # grouping logical routes by expert.  The grouped kernel scatters each
-        # route result back to its original logical route row; ds4rt then folds
+        # route result back to its original logical route row; ds41rt then folds
         # top-k in fixed order.  This isolates route execution order from the
         # numerical contract and recovers weight reuse when several target
         # rows select the same expert.
@@ -177,7 +177,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
         grouped.compiled.export_to_c(
             str(output_dir),
             grouped_name,
-            f"ds4rt_b12x_{grouped_name}",
+            f"ds41rt_b12x_{grouped_name}",
         )
         grouped_grid_x = w4a16_kernel._w4a16_fused_persistent_grid_x(
             fused=grouped,
@@ -189,7 +189,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
             sms=sms,
         )
         grouped_macro = (
-            f"DS4RT_B12X_W4A16_M1_PARITY_GROUPED_M{rows}_TOPK8"
+            f"DS41RT_B12X_W4A16_M1_PARITY_GROUPED_M{rows}_TOPK8"
         )
         config_lines.append(
             f"#define {grouped_macro}_GRID_X {grouped_grid_x}"
@@ -228,7 +228,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
         grouped_wide.compiled.export_to_c(
             str(output_dir),
             grouped_wide_name,
-            f"ds4rt_b12x_{grouped_wide_name}",
+            f"ds41rt_b12x_{grouped_wide_name}",
         )
         grouped_wide_grid_x = w4a16_kernel._w4a16_fused_persistent_grid_x(
             fused=grouped_wide,
@@ -240,7 +240,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
             sms=sms,
         )
         grouped_wide_macro = (
-            f"DS4RT_B12X_W4A16_M1_PARITY_GROUPED_WIDE_M{rows}_TOPK8"
+            f"DS41RT_B12X_W4A16_M1_PARITY_GROUPED_WIDE_M{rows}_TOPK8"
         )
         config_lines.append(
             f"#define {grouped_wide_macro}_GRID_X {grouped_wide_grid_x}"

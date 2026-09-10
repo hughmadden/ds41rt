@@ -23,7 +23,7 @@ from stage_ds4_hf_snapshot import (  # noqa: E402
     validate_error_ledger,
     validate_gptqmodel_retained_native_report,
 )
-from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+from ds41rt_runtime.exl3_artifact_contract import (  # noqa: E402
     GPTQMODEL_SOURCE_INLINE_MIXED,
     GPTQMODEL_SOURCE_SERIALIZED_TRELLIS,
     GPTQMODEL_SOURCE_TERMINAL_FINALIZE,
@@ -41,8 +41,8 @@ from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
     _valid_recovery_sample_accounting,
     validate_gptqmodel_native_exl3,
 )
-from ds4rt_runtime.exl3_experts import read_exl3_expert_config  # noqa: E402
-from ds4rt_runtime.native_experts import GPTQMODEL_EXPERT_LAYOUT  # noqa: E402
+from ds41rt_runtime.exl3_experts import read_exl3_expert_config  # noqa: E402
+from ds41rt_runtime.native_experts import GPTQMODEL_EXPERT_LAYOUT  # noqa: E402
 from sync_ds4_hf_snapshot import load_staged_cache  # noqa: E402
 from validate_ds4_flash_generation_ab import (  # noqa: E402
     checkpoint_quantization_recipe,
@@ -149,7 +149,7 @@ def test_recovery_sample_accounting_accepts_empirical_identity_residual() -> Non
         "expert": 23,
         "provenance": {"family_join": family},
         "zero_route_recovery": {
-            "schema": "ds4rt.exl3-zero-route-recovery",
+            "schema": "ds41rt.exl3-zero-route-recovery",
             "schema_version": 1,
             "trigger": "natural-route-count-below-1024",
             "sample_source": "same-fixed-calibration-selection",
@@ -171,7 +171,7 @@ def test_recovery_sample_accounting_accepts_empirical_identity_residual() -> Non
             "identity_calibration_count": 343,
             "total_sample_count": 1024,
             "authorization": {
-                "schema": "ds4rt.exl3-zero-route-recovery-authorization",
+                "schema": "ds41rt.exl3-zero-route-recovery-authorization",
                 "schema_version": 1,
                 "kind": "immutable-family-join",
                 "family_join_sha256": family_sha256,
@@ -226,7 +226,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     quant = {
         "bits": 2.0,
         "tensor_storage": gptqmodel_tensor_storage(geometry),
-        "meta": {"ds4rt_error_ledger": provenance},
+        "meta": {"ds41rt_error_ledger": provenance},
     }
     projections_per_block = geometry["n_routed_experts"] * 3
     projection_bytes = (
@@ -241,7 +241,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     def source_report(namespace: str, plan_sha256: str) -> dict:
         return bind_record(
             {
-                "schema": "ds4rt-exl3-canonical-hybrid-projection-assembly-v1",
+                "schema": "ds41rt-exl3-canonical-hybrid-projection-assembly-v1",
                 "plan_sha256": plan_sha256,
                 "namespaces": [namespace],
                 "materialized_run_state": f"/materialized/{namespace}",
@@ -273,7 +273,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     }
     projection = bind_record(
         {
-            "schema": ("ds4rt-exl3-canonical-hybrid-composite-projection-assembly-v1"),
+            "schema": ("ds41rt-exl3-canonical-hybrid-composite-projection-assembly-v1"),
             "base_plan_sha256": base_plan_sha256,
             "mtp_plan_sha256": mtp_plan_sha256,
             "sources": source_reports,
@@ -308,7 +308,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
         ]
         return bind_record(
             {
-                "schema": "ds4rt-exl3-independent-block-audit-set-v1",
+                "schema": "ds41rt-exl3-independent-block-audit-set-v1",
                 "plan_sha256": plan_sha256,
                 "base_block_count": 1 if namespace == "base" else 0,
                 "mtp_block_count": 1 if namespace == "mtp" else 0,
@@ -326,7 +326,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     mtp_audits = audit_subset("mtp", mtp_plan_sha256)
     block_audits = bind_record(
         {
-            "schema": "ds4rt-exl3-independent-composite-block-audit-set-v1",
+            "schema": "ds41rt-exl3-independent-composite-block-audit-set-v1",
             "base": base_audits,
             "mtp": mtp_audits,
             "base_plan_sha256": base_plan_sha256,
@@ -342,7 +342,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     )
     quant_report = bind_record(
         {
-            "schema": ("ds4rt-exl3-canonical-composite-quant-config-assembly-v1"),
+            "schema": ("ds41rt-exl3-canonical-composite-quant-config-assembly-v1"),
             "base_plan_sha256": base_plan_sha256,
             "mtp_plan_sha256": mtp_plan_sha256,
             "canonical_module_count": projections_per_block * 2,
@@ -376,7 +376,7 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
     }
     assembly = bind_record(
         {
-            "schema": "ds4rt-exl3-canonical-hybrid-assembly-v2",
+            "schema": "ds41rt-exl3-canonical-hybrid-assembly-v2",
             "recipe": V4_RECIPE,
             "source_snapshot": {"geometry": geometry},
             "projection_sources": projection_sources,
@@ -386,20 +386,20 @@ def test_composite_assembly_binds_base_and_mtp_projection_sources(
         },
         "report_sha256",
     )
-    write_json(snapshot / "ds4rt-exl3-canonical-assembly.json", assembly)
+    write_json(snapshot / "ds41rt-exl3-canonical-assembly.json", assembly)
     declaration = {
-        "schema": "ds4rt-exl3-canonical-hybrid-assembly-v2",
-        "filename": "ds4rt-exl3-canonical-assembly.json",
+        "schema": "ds41rt-exl3-canonical-hybrid-assembly-v2",
+        "filename": "ds41rt-exl3-canonical-assembly.json",
         "report_sha256": assembly["report_sha256"],
         "base_plan_sha256": base_plan_sha256,
         "mtp_plan_sha256": mtp_plan_sha256,
         "mtp_overlay_sha256": overlay_sha256,
     }
     plan = {"source": {"geometry": geometry}, "canonical_assembly": declaration}
-    assembly_payload = (snapshot / "ds4rt-exl3-canonical-assembly.json").read_bytes()
+    assembly_payload = (snapshot / "ds41rt-exl3-canonical-assembly.json").read_bytes()
     artifact = {
         "files": {
-            "ds4rt-exl3-canonical-assembly.json": {
+            "ds41rt-exl3-canonical-assembly.json": {
                 "sha256": hashlib.sha256(assembly_payload).hexdigest()
             }
         }
@@ -424,7 +424,7 @@ def write_error_ledger(
     records = []
     for expert in range(6):
         route_evidence = {
-            "schema": "ds4rt.exl3-natural-route",
+            "schema": "ds41rt.exl3-natural-route",
             "schema_version": 1,
             "block_namespace": "base",
             "logical_layer": 0,
@@ -454,7 +454,7 @@ def write_error_ledger(
             records.append(
                 bind_ledger_record(
                     {
-                        "schema": "ds4rt.exl3-error-ledger",
+                        "schema": "ds41rt.exl3-error-ledger",
                         "schema_version": 1,
                         "record_kind": "projection",
                         "module": f"model.layers.0.mlp.experts.{expert}.{module_projection}",
@@ -516,7 +516,7 @@ def write_error_ledger(
         records.append(
             bind_ledger_record(
                 {
-                    "schema": "ds4rt.exl3-error-ledger",
+                    "schema": "ds41rt.exl3-error-ledger",
                     "schema_version": 1,
                     "record_kind": "expert_family",
                     "block_namespace": "base",
@@ -543,13 +543,13 @@ def write_error_ledger(
             )
         )
     payload = b"".join(canonical_json(record) + b"\n" for record in records)
-    (root / "ds4rt-exl3-error-ledger.jsonl").write_bytes(payload)
+    (root / "ds41rt-exl3-error-ledger.jsonl").write_bytes(payload)
     write_json(
-        root / "ds4rt-exl3-error-ledger.manifest.json",
+        root / "ds41rt-exl3-error-ledger.manifest.json",
         {
-            "schema": "ds4rt.exl3-error-ledger",
+            "schema": "ds41rt.exl3-error-ledger",
             "schema_version": 1,
-            "ledger": "ds4rt-exl3-error-ledger.jsonl",
+            "ledger": "ds41rt-exl3-error-ledger.jsonl",
             "ledger_sha256": hashlib.sha256(payload).hexdigest(),
             "projection_records": 18,
             "complete_family_records": 6,
@@ -565,11 +565,11 @@ def checkpoint_identity(root: Path) -> dict:
             "config.json",
             "model.safetensors.index.json",
             "quantize_config.json",
-            "ds4rt-exl3-calibration.json",
-            "ds4rt-gptqmodel-plan.json",
-            "ds4rt-gptqmodel-run.json",
-            "ds4rt-gptqmodel-artifact.json",
-            "ds4rt-exl3-error-ledger.manifest.json",
+            "ds41rt-exl3-calibration.json",
+            "ds41rt-gptqmodel-plan.json",
+            "ds41rt-gptqmodel-run.json",
+            "ds41rt-gptqmodel-artifact.json",
+            "ds41rt-exl3-error-ledger.manifest.json",
         )
         if (root / name).is_file()
     }
@@ -598,7 +598,7 @@ def make_artifact(
     root.mkdir()
     quantization = {
         "quant_method": "exl3",
-        "ds4rt": {"calibrated": True, "recipe": recipe},
+        "ds41rt": {"calibrated": True, "recipe": recipe},
     }
     write_json(
         root / "config.json",
@@ -620,7 +620,7 @@ def make_artifact(
     }
     if multigpu:
         calibration["multigpu_qualification"] = {
-            "schema": "ds4rt-exl3-multigpu-qualification-v1",
+            "schema": "ds41rt-exl3-multigpu-qualification-v1",
             "status": "bit-exact",
             "devices": [0, 1],
             "device_ratios": None,
@@ -630,18 +630,18 @@ def make_artifact(
             "shape": [128, 256],
         }
         write_json(
-            root / "ds4rt-exl3-multigpu-production.json",
+            root / "ds41rt-exl3-multigpu-production.json",
             {
                 **calibration["multigpu_qualification"],
                 "production_projection_shapes": [[128, 256], [256, 128]],
             },
         )
     write_json(
-        root / "ds4rt-exl3-calibration.json",
+        root / "ds41rt-exl3-calibration.json",
         calibration,
     )
     quality = {
-        "schema": "ds4rt-exl3-checkpoint-quality-v1",
+        "schema": "ds41rt-exl3-checkpoint-quality-v1",
         "expert_ids": [0, 1, 2, 3, 4, 5],
         "rows": 16,
         "seed": 20260805,
@@ -665,11 +665,11 @@ def make_artifact(
             }
         ],
     }
-    write_json(root / "ds4rt-exl3-quality.json", quality)
+    write_json(root / "ds41rt-exl3-quality.json", quality)
     write_json(
-        root / "ds4rt-exl3-retained-native.json",
+        root / "ds41rt-exl3-retained-native.json",
         {
-            "schema": "ds4rt-exl3-retained-native-integrity-v1",
+            "schema": "ds41rt-exl3-retained-native-integrity-v1",
             "recipe": recipe,
             "quantization_scope": "routed_experts_only",
             "retained_tensor_count": 1,
@@ -713,7 +713,7 @@ def make_artifact(
     (root / ".gitattributes").write_text("*.safetensors binary\n", encoding="utf-8")
     if recipe == V4_RECIPE:
         write_error_ledger(root)
-    debug = root / ".ds4rt-exl3-debug"
+    debug = root / ".ds41rt-exl3-debug"
     debug.mkdir()
     (debug / "scratch.bin").write_bytes(b"not staged")
     contract = {
@@ -731,7 +731,7 @@ def make_artifact(
         **contract,
         "sha256": hashlib.sha256(encoded).hexdigest(),
     }
-    write_json(root / "ds4rt-exl3-quality.json", quality)
+    write_json(root / "ds41rt-exl3-quality.json", quality)
     return root
 
 
@@ -745,7 +745,7 @@ def bind_record(record: dict, field: str) -> dict:
 def quality_gpu_identity() -> dict:
     return bind_record(
         {
-            "schema": "ds4rt-quality-physical-gpu-v1",
+            "schema": "ds41rt-quality-physical-gpu-v1",
             "physical_role": "coordinator-gpu0",
             "cuda_visible_devices": "GPU-95f8f212-9131-df99-fd53-7535965197d7",
             "quantization_preflight": {
@@ -850,12 +850,12 @@ def mixed_quantization_fixture() -> tuple[dict, dict, dict]:
         "gptqmodel": GPTQMODEL_SOURCE_INLINE_MIXED,
         "source": {"geometry": geometry},
         "mtp_anchor_selection": {
-            "contract": "ds4rt-mtp-anchor-stratified-v1",
+            "contract": "ds41rt-mtp-anchor-stratified-v1",
             "count": 16,
             "seed": 20260809,
         },
         "mtp_replay_batching": {
-            "contract": "ds4rt-mtp-source-sequence-anchor-batches-v1",
+            "contract": "ds41rt-mtp-source-sequence-anchor-batches-v1",
             "source_sequence_anchor_cap": None,
             "proposal_rows_per_anchor": 5,
         },
@@ -892,8 +892,8 @@ def mixed_quantization_fixture() -> tuple[dict, dict, dict]:
         "tensor_storage": storage,
         "meta": {
             "fallback": None,
-            "ds4rt_inline_mixed": policies["base"],
-            "ds4rt_error_ledger": provenance,
+            "ds41rt_inline_mixed": policies["base"],
+            "ds41rt_error_ledger": provenance,
         },
     }
     return geometry, quant, family
@@ -919,7 +919,7 @@ def write_mixed_test_ledger(
             block = f"model.layers.{layer}" if namespace == "base" else f"mtp.{layer}"
             for expert in range(geometry["n_routed_experts"]):
                 route = {
-                    "schema": "ds4rt.exl3-natural-route",
+                    "schema": "ds41rt.exl3-natural-route",
                     "schema_version": 1,
                     "block_namespace": namespace,
                     "logical_layer": layer,
@@ -934,7 +934,7 @@ def write_mixed_test_ledger(
                     records.append(
                         bind_ledger_record(
                             {
-                                "schema": "ds4rt.exl3-error-ledger",
+                                "schema": "ds41rt.exl3-error-ledger",
                                 "schema_version": 1,
                                 "record_kind": "projection",
                                 "module": module,
@@ -978,7 +978,7 @@ def write_mixed_test_ledger(
                 records.append(
                     bind_ledger_record(
                         {
-                            "schema": "ds4rt.exl3-error-ledger",
+                            "schema": "ds41rt.exl3-error-ledger",
                             "schema_version": 1,
                             "record_kind": "expert_family",
                             "block_namespace": namespace,
@@ -996,7 +996,7 @@ def write_mixed_test_ledger(
                     )
                 )
     payload = b"".join(canonical_json(record) + b"\n" for record in records)
-    (root / "ds4rt-exl3-error-ledger.jsonl").write_bytes(payload)
+    (root / "ds41rt-exl3-error-ledger.jsonl").write_bytes(payload)
     projection_count = (
         (geometry["num_hidden_layers"] + len(geometry["dspark_target_layer_ids"]))
         * geometry["n_routed_experts"]
@@ -1004,11 +1004,11 @@ def write_mixed_test_ledger(
     )
     family_count = projection_count // 3
     write_json(
-        root / "ds4rt-exl3-error-ledger.manifest.json",
+        root / "ds41rt-exl3-error-ledger.manifest.json",
         {
-            "schema": "ds4rt.exl3-error-ledger",
+            "schema": "ds41rt.exl3-error-ledger",
             "schema_version": 1,
-            "ledger": "ds4rt-exl3-error-ledger.jsonl",
+            "ledger": "ds41rt-exl3-error-ledger.jsonl",
             "ledger_sha256": hashlib.sha256(payload).hexdigest(),
             "projection_records": projection_count,
             "complete_family_records": family_count,
@@ -1064,7 +1064,7 @@ def test_v7_integrated_mixed_writer_is_canonical_without_legacy_assembly(
     tmp_path: Path,
 ) -> None:
     geometry, quant, family = mixed_quantization_fixture()
-    provenance = quant["meta"]["ds4rt_error_ledger"]
+    provenance = quant["meta"]["ds41rt_error_ledger"]
     plan_policies = {
         namespace: {**policy, "tier_plan_root": f"/run/{namespace}"}
         for namespace, policy in family["inline_mixed"].items()
@@ -1105,7 +1105,7 @@ def test_v7_integrated_mixed_writer_is_canonical_without_legacy_assembly(
 
 def make_gptqmodel_artifact(root: Path) -> Path:
     root = make_artifact(root, recipe=V4_RECIPE)
-    debug = root / ".ds4rt-exl3-debug"
+    debug = root / ".ds41rt-exl3-debug"
     (debug / "scratch.bin").unlink()
     debug.rmdir()
     digest = "1" * 64
@@ -1133,8 +1133,8 @@ def make_gptqmodel_artifact(root: Path) -> Path:
             "hessian_numerical": "signed-block-hadamard-congruence-fp64-v1",
             "hessian_symmetry": "mean-with-transpose-fp64",
         },
-        "operator_contract": "ds4rt-deepseek-v4-target-plus-joint-mtp-v1",
-        "route_evidence_contract": "ds4rt.exl3-natural-route",
+        "operator_contract": "ds41rt-deepseek-v4-target-plus-joint-mtp-v1",
+        "route_evidence_contract": "ds41rt.exl3-natural-route",
         "gptqmodel": {
             "schema": 1,
             "repository": "https://github.com/tpurtell/GPTQModel.git",
@@ -1156,7 +1156,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
             "geometry": geometry,
         },
         "execution_topology": {
-            "contract": "ds4rt.exl3-remote-worker-v1",
+            "contract": "ds41rt.exl3-remote-worker-v1",
             "scheduler": "dynamic-pipelined-slot-projection-v2",
             "coordinator": {
                 "image_digest": coordinator_image,
@@ -1199,7 +1199,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
         "codebook": "mcg",
         "module_include": [family_join["module_include"]],
         "tensor_storage": gptqmodel_tensor_storage(geometry),
-        "meta": {"fallback": None, "ds4rt_error_ledger": provenance},
+        "meta": {"fallback": None, "ds41rt_error_ledger": provenance},
     }
     config = {
         **geometry,
@@ -1212,7 +1212,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
     write_json(root / "quantize_config.json", quantization)
     write_error_ledger(root, family_join=family_join)
     source_plan_body = {
-        "schema": "ds4rt-deepseek-v4-gptqmodel-plan-v5",
+        "schema": "ds41rt-deepseek-v4-gptqmodel-plan-v5",
         "recipe": V4_RECIPE,
         "source": {"geometry": geometry},
         "exl3": {
@@ -1242,7 +1242,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
     )
     projection_assembly = bind_record(
         {
-            "schema": "ds4rt-exl3-canonical-hybrid-projection-assembly-v1",
+            "schema": "ds41rt-exl3-canonical-hybrid-projection-assembly-v1",
             "plan_sha256": source_plan["plan_sha256"],
             "materialized_run_state": str((root / "run-state").resolve()),
             "planned_run_state": "/artifacts/run-state",
@@ -1280,7 +1280,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
     ]
     block_audit_set = bind_record(
         {
-            "schema": "ds4rt-exl3-independent-block-audit-set-v1",
+            "schema": "ds41rt-exl3-independent-block-audit-set-v1",
             "plan_sha256": source_plan["plan_sha256"],
             "base_block_count": 1,
             "mtp_block_count": 0,
@@ -1296,7 +1296,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
     quant_config_sha256 = hashlib.sha256(canonical_json(quantization)).hexdigest()
     quant_config_assembly = bind_record(
         {
-            "schema": "ds4rt-exl3-canonical-quant-config-assembly-v1",
+            "schema": "ds41rt-exl3-canonical-quant-config-assembly-v1",
             "raw_module_count": projection_count,
             "canonical_module_count": projection_count,
             "added_mtp_module_count": 0,
@@ -1308,7 +1308,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
     )
     assembly = bind_record(
         {
-            "schema": "ds4rt-exl3-canonical-hybrid-assembly-v1",
+            "schema": "ds41rt-exl3-canonical-hybrid-assembly-v1",
             "recipe": V4_RECIPE,
             "materialized_raw_artifact": str((root / "raw").resolve()),
             "source_plan_sha256": source_plan["plan_sha256"],
@@ -1321,20 +1321,20 @@ def make_gptqmodel_artifact(root: Path) -> Path:
         },
         "report_sha256",
     )
-    write_json(root / "ds4rt-exl3-canonical-assembly.json", assembly)
+    write_json(root / "ds41rt-exl3-canonical-assembly.json", assembly)
     plan_body = {
         **source_plan_body,
         "canonical_assembly": {
-            "schema": "ds4rt-exl3-canonical-hybrid-assembly-v1",
-            "filename": "ds4rt-exl3-canonical-assembly.json",
+            "schema": "ds41rt-exl3-canonical-hybrid-assembly-v1",
+            "filename": "ds41rt-exl3-canonical-assembly.json",
             "report_sha256": assembly["report_sha256"],
             "source_plan_sha256": source_plan["plan_sha256"],
             "source_artifact_manifest_sha256": source_artifact_sha256,
         },
     }
     plan = bind_record(plan_body, "plan_sha256")
-    write_json(root / "ds4rt-gptqmodel-plan.json", plan)
-    excluded = {"ds4rt-gptqmodel-artifact.json", "ds4rt-gptqmodel-run.json"}
+    write_json(root / "ds41rt-gptqmodel-plan.json", plan)
+    excluded = {"ds41rt-gptqmodel-artifact.json", "ds41rt-gptqmodel-run.json"}
     files = {}
     for path in sorted(root.iterdir()):
         if path.name in excluded:
@@ -1346,7 +1346,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
         }
     artifact = bind_record(
         {
-            "schema": "ds4rt-deepseek-v4-gptqmodel-artifact-v1",
+            "schema": "ds41rt-deepseek-v4-gptqmodel-artifact-v1",
             "plan_sha256": plan["plan_sha256"],
             "files": files,
             "file_count": len(files),
@@ -1354,10 +1354,10 @@ def make_gptqmodel_artifact(root: Path) -> Path:
         },
         "manifest_sha256",
     )
-    write_json(root / "ds4rt-gptqmodel-artifact.json", artifact)
+    write_json(root / "ds41rt-gptqmodel-artifact.json", artifact)
     run = bind_record(
         {
-            "schema": "ds4rt-deepseek-v4-gptqmodel-run-v5",
+            "schema": "ds41rt-deepseek-v4-gptqmodel-run-v5",
             "status": "complete",
             "plan_sha256": plan["plan_sha256"],
             "artifact_manifest_sha256": artifact["manifest_sha256"],
@@ -1365,7 +1365,7 @@ def make_gptqmodel_artifact(root: Path) -> Path:
         },
         "run_sha256",
     )
-    write_json(root / "ds4rt-gptqmodel-run.json", run)
+    write_json(root / "ds41rt-gptqmodel-run.json", run)
     return root
 
 
@@ -1374,7 +1374,7 @@ def make_gptqmodel_qualification(
     report_root: Path,
 ) -> tuple[Path, Path]:
     report_root.mkdir()
-    retained = json.loads((artifact / "ds4rt-exl3-retained-native.json").read_text())
+    retained = json.loads((artifact / "ds41rt-exl3-retained-native.json").read_text())
     retained.update(
         {
             "recipe": V4_RECIPE,
@@ -1386,7 +1386,7 @@ def make_gptqmodel_qualification(
     retained_path = report_root / "retained-native.json"
     write_json(retained_path, retained)
 
-    quality = json.loads((artifact / "ds4rt-exl3-quality.json").read_text())
+    quality = json.loads((artifact / "ds41rt-exl3-quality.json").read_text())
     digest = "1" * 64
     heldout = {
         "path": str((report_root / "heldout" / "manifest.json").resolve()),
@@ -1466,8 +1466,8 @@ def test_gptqmodel_retained_native_accepts_mixed_tp4_layout(
 
 
 def rebind_gptqmodel_publication(root: Path, plan: dict) -> None:
-    write_json(root / "ds4rt-gptqmodel-plan.json", plan)
-    excluded = {"ds4rt-gptqmodel-artifact.json", "ds4rt-gptqmodel-run.json"}
+    write_json(root / "ds41rt-gptqmodel-plan.json", plan)
+    excluded = {"ds41rt-gptqmodel-artifact.json", "ds41rt-gptqmodel-run.json"}
     files = {}
     for path in sorted(root.iterdir()):
         if path.name in excluded:
@@ -1479,7 +1479,7 @@ def rebind_gptqmodel_publication(root: Path, plan: dict) -> None:
         }
     artifact = bind_record(
         {
-            "schema": "ds4rt-deepseek-v4-gptqmodel-artifact-v1",
+            "schema": "ds41rt-deepseek-v4-gptqmodel-artifact-v1",
             "plan_sha256": plan["plan_sha256"],
             "files": files,
             "file_count": len(files),
@@ -1487,12 +1487,12 @@ def rebind_gptqmodel_publication(root: Path, plan: dict) -> None:
         },
         "manifest_sha256",
     )
-    write_json(root / "ds4rt-gptqmodel-artifact.json", artifact)
+    write_json(root / "ds41rt-gptqmodel-artifact.json", artifact)
     write_json(
-        root / "ds4rt-gptqmodel-run.json",
+        root / "ds41rt-gptqmodel-run.json",
         bind_record(
             {
-                "schema": "ds4rt-deepseek-v4-gptqmodel-run-v5",
+                "schema": "ds41rt-deepseek-v4-gptqmodel-run-v5",
                 "status": "complete",
                 "plan_sha256": plan["plan_sha256"],
                 "artifact_manifest_sha256": artifact["manifest_sha256"],
@@ -1522,8 +1522,8 @@ def test_hardlink_stage_is_resolver_compatible_and_content_addressed(
     shard_blob = shard_link.resolve()
     assert shard_blob.parent == model_root / "blobs"
     assert shard_blob.stat().st_ino == (artifact / shard_link.name).stat().st_ino
-    assert not (staged / ".ds4rt-exl3-debug").exists()
-    assert (model_root / "ds4rt-manifests" / f"{revision}.json").is_file()
+    assert not (staged / ".ds41rt-exl3-debug").exists()
+    assert (model_root / "ds41rt-manifests" / f"{revision}.json").is_file()
 
 
 def test_existing_legacy_newline_ref_is_canonicalized(tmp_path: Path) -> None:
@@ -1545,9 +1545,9 @@ def test_gptqmodel_route_recovery_source_requires_its_recovery_contract(
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
     config = json.loads((artifact / "config.json").read_text())
     quant = config["quantization_config"]
-    family = quant["meta"]["ds4rt_error_ledger"]["family_join"]
+    family = quant["meta"]["ds41rt_error_ledger"]["family_join"]
     family["gptqmodel"] = GPTQMODEL_SOURCE_WITH_ROUTE_RECOVERY
-    family["zero_route_recovery_contract"] = "ds4rt.exl3-zero-route-recovery"
+    family["zero_route_recovery_contract"] = "ds41rt.exl3-zero-route-recovery"
 
     assert validate_gptqmodel_native_exl3(quant) == family
 
@@ -1562,9 +1562,9 @@ def test_gptqmodel_serialized_trellis_source_is_exactly_qualified(
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
     config = json.loads((artifact / "config.json").read_text())
     quant = config["quantization_config"]
-    family = quant["meta"]["ds4rt_error_ledger"]["family_join"]
+    family = quant["meta"]["ds41rt_error_ledger"]["family_join"]
     family["gptqmodel"] = GPTQMODEL_SOURCE_SERIALIZED_TRELLIS
-    family["zero_route_recovery_contract"] = "ds4rt.exl3-zero-route-recovery"
+    family["zero_route_recovery_contract"] = "ds41rt.exl3-zero-route-recovery"
 
     assert validate_gptqmodel_native_exl3(quant) == family
 
@@ -1579,10 +1579,10 @@ def test_gptqmodel_serialized_trellis_accepts_bound_two_rtx_topology(
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
     config = json.loads((artifact / "config.json").read_text())
     quant = config["quantization_config"]
-    provenance = quant["meta"]["ds4rt_error_ledger"]
+    provenance = quant["meta"]["ds41rt_error_ledger"]
     family = provenance["family_join"]
     family["gptqmodel"] = GPTQMODEL_SOURCE_SERIALIZED_TRELLIS
-    family["zero_route_recovery_contract"] = "ds4rt.exl3-zero-route-recovery"
+    family["zero_route_recovery_contract"] = "ds41rt.exl3-zero-route-recovery"
     family.pop("execution_topology")
     family["image_digest"] = "sha256:" + "2" * 64
     family["preflight_sha256"] = "1" * 64
@@ -1632,17 +1632,17 @@ def test_gptqmodel_inline_mixed_source_accepts_integrated_two_rtx_topology(
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
     config = json.loads((artifact / "config.json").read_text())
     quant = config["quantization_config"]
-    provenance = quant["meta"]["ds4rt_error_ledger"]
+    provenance = quant["meta"]["ds41rt_error_ledger"]
     family = provenance["family_join"]
     policy = inline_mixed_policy("base", 1, 10)
     family["gptqmodel"] = gptqmodel_source
-    family["zero_route_recovery_contract"] = "ds4rt.exl3-zero-route-recovery"
+    family["zero_route_recovery_contract"] = "ds41rt.exl3-zero-route-recovery"
     family["inline_mixed"] = {"base": policy}
     family.pop("execution_topology")
     family["image_digest"] = "sha256:" + "2" * 64
     family["preflight_sha256"] = "1" * 64
     quant["bits"] = 2
-    quant["meta"]["ds4rt_inline_mixed"] = policy
+    quant["meta"]["ds41rt_inline_mixed"] = policy
     provenance["run"] = {
         "mtp_execution_mode": "integrated",
         "coordinator": {
@@ -1690,7 +1690,7 @@ def test_v6_publication_geometry_includes_pro_router_and_mtp_fields() -> None:
     }
     assert "mtp_block_count" not in _expected_source_geometry(
         config,
-        "ds4rt-deepseek-v4-gptqmodel-plan-v5",
+        "ds41rt-deepseek-v4-gptqmodel-plan-v5",
     )
 
 
@@ -1727,7 +1727,7 @@ def test_gptqmodel_native_publication_stages_without_rewriting_metadata(
         / "hf-gptqmodel"
         / "hub"
         / "models--tpurtell--flash-gptqmodel-exl3"
-        / "ds4rt-qualifications"
+        / "ds41rt-qualifications"
         / result["revision"]
     )
     assert (
@@ -1837,14 +1837,14 @@ def test_development_unqualified_stage_is_explicit_and_never_promotes_quality(
 
 def test_staging_rejects_raw_gptqmodel_transformed_export(tmp_path: Path) -> None:
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
-    plan = json.loads((artifact / "ds4rt-gptqmodel-plan.json").read_text())
+    plan = json.loads((artifact / "ds41rt-gptqmodel-plan.json").read_text())
     plan_body = {
         key: value
         for key, value in plan.items()
         if key not in {"plan_sha256", "canonical_assembly"}
     }
     raw_plan = bind_record(plan_body, "plan_sha256")
-    (artifact / "ds4rt-exl3-canonical-assembly.json").unlink()
+    (artifact / "ds41rt-exl3-canonical-assembly.json").unlink()
     rebind_gptqmodel_publication(artifact, raw_plan)
     retained, quality = make_gptqmodel_qualification(
         artifact,
@@ -1863,7 +1863,7 @@ def test_staging_rejects_raw_gptqmodel_transformed_export(tmp_path: Path) -> Non
 
 def test_runtime_rejects_rebound_incomplete_block_audit_set(tmp_path: Path) -> None:
     artifact_root = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
-    assembly_path = artifact_root / "ds4rt-exl3-canonical-assembly.json"
+    assembly_path = artifact_root / "ds41rt-exl3-canonical-assembly.json"
     assembly = json.loads(assembly_path.read_text())
     block_audits = assembly["block_audit_set"]
     block_audit_body = {
@@ -1880,11 +1880,11 @@ def test_runtime_rejects_rebound_incomplete_block_audit_set(tmp_path: Path) -> N
     rebound_assembly = bind_record(assembly_body, "report_sha256")
     write_json(assembly_path, rebound_assembly)
 
-    plan = json.loads((artifact_root / "ds4rt-gptqmodel-plan.json").read_text())
+    plan = json.loads((artifact_root / "ds41rt-gptqmodel-plan.json").read_text())
     plan["canonical_assembly"]["report_sha256"] = rebound_assembly["report_sha256"]
     config = json.loads((artifact_root / "config.json").read_text())
     publication = json.loads(
-        (artifact_root / "ds4rt-gptqmodel-artifact.json").read_text()
+        (artifact_root / "ds41rt-gptqmodel-artifact.json").read_text()
     )
 
     with pytest.raises(ValueError, match="block-audit set is invalid"):
@@ -2008,7 +2008,7 @@ def test_gptqmodel_native_publication_rejects_quantizer_provenance_drift(
 ) -> None:
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
     config = json.loads((artifact / "config.json").read_text())
-    config["quantization_config"]["meta"]["ds4rt_error_ledger"]["family_join"][
+    config["quantization_config"]["meta"]["ds41rt_error_ledger"]["family_join"][
         "gptqmodel"
     ]["revision"] = "0" * 40
     write_json(artifact / "config.json", config)
@@ -2029,10 +2029,10 @@ def test_gptqmodel_native_publication_rejects_quantizer_provenance_drift(
 def test_gptqmodel_native_ledger_rejects_fp32_hessian_record(tmp_path: Path) -> None:
     artifact = make_gptqmodel_artifact(tmp_path / "gptqmodel-artifact")
     config = json.loads((artifact / "config.json").read_text())
-    family_join = config["quantization_config"]["meta"]["ds4rt_error_ledger"][
+    family_join = config["quantization_config"]["meta"]["ds41rt_error_ledger"][
         "family_join"
     ]
-    ledger_path = artifact / "ds4rt-exl3-error-ledger.jsonl"
+    ledger_path = artifact / "ds41rt-exl3-error-ledger.jsonl"
     records = [json.loads(line) for line in ledger_path.read_text().splitlines()]
     projection = records[0]
     projection.pop("record_sha256")
@@ -2040,7 +2040,7 @@ def test_gptqmodel_native_ledger_rejects_fp32_hessian_record(tmp_path: Path) -> 
     records[0] = bind_ledger_record(projection)
     payload = b"".join(canonical_json(record) + b"\n" for record in records)
     ledger_path.write_bytes(payload)
-    manifest_path = artifact / "ds4rt-exl3-error-ledger.manifest.json"
+    manifest_path = artifact / "ds41rt-exl3-error-ledger.manifest.json"
     manifest = json.loads(manifest_path.read_text())
     manifest["ledger_sha256"] = hashlib.sha256(payload).hexdigest()
     write_json(manifest_path, manifest)
@@ -2060,14 +2060,14 @@ def test_gptqmodel_native_ledger_accepts_uniform_k3_records(tmp_path: Path) -> N
     for module, entry in config["quantization_config"]["tensor_storage"].items():
         entry["bits_per_weight"] = 3
         entry["stored_tensors"][f"{module}.trellis"]["shape"][-1] = 48
-    family_join = config["quantization_config"]["meta"]["ds4rt_error_ledger"][
+    family_join = config["quantization_config"]["meta"]["ds41rt_error_ledger"][
         "family_join"
     ]
     for value in family_join.values():
         if isinstance(value, dict) and "bits" in value:
             value["bits"] = 3
 
-    ledger_path = artifact / "ds4rt-exl3-error-ledger.jsonl"
+    ledger_path = artifact / "ds41rt-exl3-error-ledger.jsonl"
     records = [json.loads(line) for line in ledger_path.read_text().splitlines()]
     rebound = []
     for record in records:
@@ -2079,7 +2079,7 @@ def test_gptqmodel_native_ledger_accepts_uniform_k3_records(tmp_path: Path) -> N
         rebound.append(bind_ledger_record(record))
     payload = b"".join(canonical_json(record) + b"\n" for record in rebound)
     ledger_path.write_bytes(payload)
-    manifest_path = artifact / "ds4rt-exl3-error-ledger.manifest.json"
+    manifest_path = artifact / "ds41rt-exl3-error-ledger.manifest.json"
     manifest = json.loads(manifest_path.read_text())
     manifest["ledger_sha256"] = hashlib.sha256(payload).hexdigest()
     write_json(manifest_path, manifest)
@@ -2108,22 +2108,22 @@ def test_stage_accepts_checkpoint_bound_activation_recipe(
 
 def test_v4_stage_requires_valid_complete_error_ledger(tmp_path: Path) -> None:
     artifact = make_artifact(tmp_path / "artifact-missing", recipe=V4_RECIPE)
-    (artifact / "ds4rt-exl3-error-ledger.manifest.json").unlink()
+    (artifact / "ds41rt-exl3-error-ledger.manifest.json").unlink()
     with pytest.raises(ValueError, match="missing error ledger"):
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-missing")
 
     artifact = make_artifact(tmp_path / "artifact-corrupt", recipe=V4_RECIPE)
-    ledger = artifact / "ds4rt-exl3-error-ledger.jsonl"
+    ledger = artifact / "ds41rt-exl3-error-ledger.jsonl"
     ledger.write_bytes(ledger.read_bytes() + b"{}\n")
     with pytest.raises(ValueError, match="manifest or payload digest is invalid"):
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-corrupt")
 
     artifact = make_artifact(tmp_path / "artifact-incomplete", recipe=V4_RECIPE)
-    ledger = artifact / "ds4rt-exl3-error-ledger.jsonl"
+    ledger = artifact / "ds41rt-exl3-error-ledger.jsonl"
     records = [json.loads(line) for line in ledger.read_text().splitlines()][1:]
     payload = b"".join(canonical_json(record) + b"\n" for record in records)
     ledger.write_bytes(payload)
-    manifest_path = artifact / "ds4rt-exl3-error-ledger.manifest.json"
+    manifest_path = artifact / "ds41rt-exl3-error-ledger.manifest.json"
     manifest = json.loads(manifest_path.read_text())
     manifest.update(
         ledger_sha256=hashlib.sha256(payload).hexdigest(),
@@ -2138,7 +2138,7 @@ def test_v4_stage_requires_valid_complete_error_ledger(tmp_path: Path) -> None:
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-incomplete")
 
     artifact = make_artifact(tmp_path / "artifact-no-route", recipe=V4_RECIPE)
-    ledger = artifact / "ds4rt-exl3-error-ledger.jsonl"
+    ledger = artifact / "ds41rt-exl3-error-ledger.jsonl"
     records = [json.loads(line) for line in ledger.read_text().splitlines()]
     projection = records[0]
     projection.pop("record_sha256")
@@ -2146,7 +2146,7 @@ def test_v4_stage_requires_valid_complete_error_ledger(tmp_path: Path) -> None:
     records[0] = bind_ledger_record(projection)
     payload = b"".join(canonical_json(record) + b"\n" for record in records)
     ledger.write_bytes(payload)
-    manifest_path = artifact / "ds4rt-exl3-error-ledger.manifest.json"
+    manifest_path = artifact / "ds41rt-exl3-error-ledger.manifest.json"
     manifest = json.loads(manifest_path.read_text())
     manifest["ledger_sha256"] = hashlib.sha256(payload).hexdigest()
     write_json(manifest_path, manifest)
@@ -2156,7 +2156,7 @@ def test_v4_stage_requires_valid_complete_error_ledger(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "unfinished_name",
-    [".ds4rt-exl3-state.json", "config.json.incomplete", "shard.tmp"],
+    [".ds41rt-exl3-state.json", "config.json.incomplete", "shard.tmp"],
 )
 def test_stage_rejects_incomplete_or_temporary_artifact(
     tmp_path: Path, unfinished_name: str
@@ -2170,13 +2170,13 @@ def test_stage_rejects_incomplete_or_temporary_artifact(
 
 def test_stage_requires_all_layer_quality_evidence(tmp_path: Path) -> None:
     artifact = make_artifact(tmp_path / "artifact")
-    (artifact / "ds4rt-exl3-quality.json").unlink()
+    (artifact / "ds41rt-exl3-quality.json").unlink()
     with pytest.raises(ValueError, match="missing regular file"):
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-missing")
 
     artifact = make_artifact(tmp_path / "artifact-partial")
     write_json(
-        artifact / "ds4rt-exl3-calibration.json",
+        artifact / "ds41rt-exl3-calibration.json",
         {"recipe": RECIPE, "layers": [{"layer_id": 0}, {"layer_id": 1}]},
     )
     with pytest.raises(ValueError, match="every target and dSpark block"):
@@ -2190,12 +2190,12 @@ def test_stage_requires_model_bound_multigpu_projection_qualification(
     stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-valid")
 
     artifact = make_artifact(tmp_path / "artifact-missing-multigpu", multigpu=True)
-    (artifact / "ds4rt-exl3-multigpu-production.json").unlink()
+    (artifact / "ds41rt-exl3-multigpu-production.json").unlink()
     with pytest.raises(ValueError, match="missing full-shape qualification"):
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-missing")
 
     artifact = make_artifact(tmp_path / "artifact-wrong-shape", multigpu=True)
-    qualification_path = artifact / "ds4rt-exl3-multigpu-production.json"
+    qualification_path = artifact / "ds41rt-exl3-multigpu-production.json"
     qualification = json.loads(qualification_path.read_text(encoding="utf-8"))
     qualification["production_projection_shapes"][-1] = [128, 256]
     write_json(qualification_path, qualification)
@@ -2205,7 +2205,7 @@ def test_stage_requires_model_bound_multigpu_projection_qualification(
 
 def test_stage_rejects_weak_quality_or_non_tp4_evidence(tmp_path: Path) -> None:
     artifact = make_artifact(tmp_path / "artifact")
-    quality_path = artifact / "ds4rt-exl3-quality.json"
+    quality_path = artifact / "ds41rt-exl3-quality.json"
     quality = json.loads(quality_path.read_text(encoding="utf-8"))
     quality["thresholds"]["min_quant_cosine"] = 0.5
     write_json(quality_path, quality)
@@ -2213,7 +2213,7 @@ def test_stage_rejects_weak_quality_or_non_tp4_evidence(tmp_path: Path) -> None:
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-weak")
 
     artifact = make_artifact(tmp_path / "artifact-nontp4")
-    quality_path = artifact / "ds4rt-exl3-quality.json"
+    quality_path = artifact / "ds41rt-exl3-quality.json"
     quality = json.loads(quality_path.read_text(encoding="utf-8"))
     quality["layers"][0]["tp4_rank_source_bytes"][-1] = 99
     write_json(quality_path, quality)
@@ -2233,7 +2233,7 @@ def test_stage_requires_full_generated_tensor_and_tp4_layout_proof(
     tmp_path: Path,
 ) -> None:
     artifact = make_artifact(tmp_path / "artifact-metadata")
-    integrity_path = artifact / "ds4rt-exl3-retained-native.json"
+    integrity_path = artifact / "ds41rt-exl3-retained-native.json"
     integrity = json.loads(integrity_path.read_text(encoding="utf-8"))
     integrity["generated_exl3_metadata_verified"] = False
     write_json(integrity_path, integrity)
@@ -2241,7 +2241,7 @@ def test_stage_requires_full_generated_tensor_and_tp4_layout_proof(
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-metadata")
 
     artifact = make_artifact(tmp_path / "artifact-layout")
-    integrity_path = artifact / "ds4rt-exl3-retained-native.json"
+    integrity_path = artifact / "ds41rt-exl3-retained-native.json"
     integrity = json.loads(integrity_path.read_text(encoding="utf-8"))
     integrity["strict_tp4_source_layout"]["rank_source_bytes_per_block"][-1] = 99
     write_json(integrity_path, integrity)
@@ -2256,7 +2256,7 @@ def test_stage_rejects_stale_or_rewritten_quality_binding(tmp_path: Path) -> Non
         stage_snapshot(artifact, "tpurtell/flash-exl3", tmp_path / "hf-stale")
 
     artifact = make_artifact(tmp_path / "artifact-rewritten")
-    quality_path = artifact / "ds4rt-exl3-quality.json"
+    quality_path = artifact / "ds41rt-exl3-quality.json"
     quality = json.loads(quality_path.read_text(encoding="utf-8"))
     quality["validation_contract"]["rows"] = 32
     write_json(quality_path, quality)

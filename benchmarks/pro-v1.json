@@ -1,5 +1,5 @@
 {
-  "schema": "ds4rt.public-benchmark.v1",
+  "schema": "ds41rt.public-benchmark.v1",
   "measured_at_utc": "2026-08-21",
   "model": {
     "id": "wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1",

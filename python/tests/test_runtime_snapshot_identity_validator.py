@@ -22,7 +22,7 @@ REVISION = "a" * 64
 
 def runtime_record(**updates: object) -> dict[str, object]:
     record: dict[str, object] = {
-        "schema": "ds4rt-runtime-model-snapshot-v1",
+        "schema": "ds41rt-runtime-model-snapshot-v1",
         "model_id": MODEL_ID,
         "requested_revision": REVISION,
         "selected_revision": REVISION,

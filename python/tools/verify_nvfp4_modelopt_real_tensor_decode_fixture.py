@@ -70,7 +70,7 @@ def build_verification(fixture_path: Path) -> dict[str, Any]:
     fixture = json.loads(fixture_bytes.decode("utf-8"))
     tolerance = float(fixture["tolerance_abs"])
     weight_scale_2 = float(fixture["weight_scale_2"])
-    device = resolve_device(os.environ.get("DS4RT_NVFP4_MODEL_OPT_DEVICE", "auto"))
+    device = resolve_device(os.environ.get("DS41RT_NVFP4_MODEL_OPT_DEVICE", "auto"))
 
     window = dequantize_modelopt(
         packed_bytes_hex=fixture["packed_bytes_hex"],
@@ -117,13 +117,13 @@ def build_verification(fixture_path: Path) -> dict[str, Any]:
 
     return {
         "format_version": 1,
-        "schema": "ds4rt.phase0.nvfp4_modelopt_reference.v1",
+        "schema": "ds41rt.phase0.nvfp4_modelopt_reference.v1",
         "source": "python/tools/verify_nvfp4_modelopt_real_tensor_decode_fixture.py",
         "status": "passed" if comparison_passed else "failed",
         "comparison_executed": True,
         "comparison_passed": comparison_passed,
         "independent_reference": "modelopt.torch.quantization.qtensor.nvfp4_tensor.NVFP4QTensor",
-        "container_image": os.environ.get("DS4RT_NVFP4_MODEL_OPT_IMAGE", "unknown"),
+        "container_image": os.environ.get("DS41RT_NVFP4_MODEL_OPT_IMAGE", "unknown"),
         "device": str(device),
         "cuda_available": torch.cuda.is_available(),
         "cuda_device_name": (
@@ -193,12 +193,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--device",
-        default=os.environ.get("DS4RT_NVFP4_MODEL_OPT_DEVICE", "auto"),
+        default=os.environ.get("DS41RT_NVFP4_MODEL_OPT_DEVICE", "auto"),
         help="torch device for ModelOpt dequantization (default: env or auto)",
     )
     args = parser.parse_args()
 
-    os.environ["DS4RT_NVFP4_MODEL_OPT_DEVICE"] = args.device
+    os.environ["DS41RT_NVFP4_MODEL_OPT_DEVICE"] = args.device
     fixture_path = resolve_repo_path(args.fixture)
     output_path = resolve_repo_path(args.output)
     verification = build_verification(fixture_path)

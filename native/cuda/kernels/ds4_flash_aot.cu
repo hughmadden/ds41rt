@@ -74,32 +74,32 @@
 namespace {
 
 using FlashKernel =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Kernel_Module_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Kernel_Module_t;
 using FlashFc1 =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc1_bf16_flat_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc1_bf16_flat_t;
 using FlashActivated =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_activated_bf16_flat_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_activated_bf16_flat_t;
 using FlashFc2 =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc2_bf16_flat_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc2_bf16_flat_t;
 using FlashRoutes =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_packed_route_indices_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_packed_route_indices_t;
 using FlashBlockExperts =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_block_expert_ids_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_block_expert_ids_t;
 using FlashRouteCount =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_packed_route_count_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_packed_route_count_t;
 using FlashActivationAmax =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_activation_amax_flat_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_activation_amax_flat_t;
 using FlashFc1Scratch =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc1_c_tmp_f32_flat_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc1_c_tmp_f32_flat_t;
 using FlashFc2Scratch =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc2_c_tmp_f32_flat_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_fc2_c_tmp_f32_flat_t;
 using FlashLocks =
-    ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_locks_i32_flat_t;
+    ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_Tensor_locks_i32_flat_t;
 
-constexpr size_t kHidden = DS4RT_DS4_FLASH_HIDDEN_SIZE;
-constexpr size_t kIntermediate = DS4RT_DS4_FLASH_TP_INTERMEDIATE_SIZE;
-constexpr size_t kExperts = DS4RT_DS4_FLASH_NUM_EXPERTS;
-constexpr size_t kTopK = DS4RT_DS4_FLASH_TOP_K;
+constexpr size_t kHidden = DS41RT_DS4_FLASH_HIDDEN_SIZE;
+constexpr size_t kIntermediate = DS41RT_DS4_FLASH_TP_INTERMEDIATE_SIZE;
+constexpr size_t kExperts = DS41RT_DS4_FLASH_NUM_EXPERTS;
+constexpr size_t kTopK = DS41RT_DS4_FLASH_TOP_K;
 constexpr size_t kW13Rows = 2 * kIntermediate;
 constexpr size_t kW13WeightBytes = kExperts * kW13Rows * kHidden / 2;
 constexpr size_t kW2WeightBytes = kExperts * kHidden * kIntermediate / 2;
@@ -110,11 +110,11 @@ constexpr size_t kActivatedElements = kTopK * kIntermediate;
 constexpr size_t kFc1ScratchElements = 98'304;
 constexpr size_t kFc2ScratchElements = 393'216;
 constexpr size_t kLockElements = 48 * 4 + 2;
-constexpr size_t kPrefillMaxRows = DS4RT_DS4_FLASH_PREFILL_MAX_ROWS;
+constexpr size_t kPrefillMaxRows = DS41RT_DS4_FLASH_PREFILL_MAX_ROWS;
 constexpr size_t kPrefillMaxPackedRouteSlots =
-    DS4RT_DS4_FLASH_W4A16_PREFILL_M2048_TOPK6_PACKED_ROUTE_SLOTS;
+    DS41RT_DS4_FLASH_W4A16_PREFILL_M2048_TOPK6_PACKED_ROUTE_SLOTS;
 constexpr size_t kPrefillMaxRouteBlocks =
-    DS4RT_DS4_FLASH_W4A16_PREFILL_M2048_TOPK6_MAX_M_BLOCKS;
+    DS41RT_DS4_FLASH_W4A16_PREFILL_M2048_TOPK6_MAX_M_BLOCKS;
 constexpr size_t kPrefillRouteBlockRows = 32;
 constexpr size_t kPrefillScratchElements = 3'145'728;
 constexpr size_t kExl3K2Bits = 2;
@@ -134,104 +134,104 @@ constexpr size_t kExl3IntermediateRotationBytes =
 constexpr size_t kExl3TrellisLutBytes = 1 << 12;
 constexpr size_t kExl3WorkspaceElements = 48 * 4 + 2;
 constexpr size_t kSharedIntermediate =
-    DS4RT_DS4_FLASH_SHARED_INTERMEDIATE_SIZE;
+    DS41RT_DS4_FLASH_SHARED_INTERMEDIATE_SIZE;
 constexpr size_t kSharedChunkRows = 8;
 constexpr size_t kSharedWeightBytes = kHidden * kSharedIntermediate;
 constexpr size_t kSharedScaleMmaBytes =
     (kHidden / 128) * (kSharedIntermediate / 128) * 512;
 
 FlashKernel flash_decode_module;
-ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Kernel_Module_t
+ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Kernel_Module_t
     flash_exl3_decode_module;
-ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Kernel_Module_t
+ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Kernel_Module_t
     flash_exl3_decode_m4_direct_m4_module;
-ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Kernel_Module_t
+ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Kernel_Module_t
     flash_exl3_decode_m8_direct_m6_module;
-ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Kernel_Module_t
+ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Kernel_Module_t
     flash_exl3_k3_decode_module;
-ds4rt_ds4_flash_tp4_exl3_k3_decode_m4_direct_m4_Kernel_Module_t
+ds41rt_ds4_flash_tp4_exl3_k3_decode_m4_direct_m4_Kernel_Module_t
     flash_exl3_k3_decode_m4_direct_m4_module;
-ds4rt_ds4_flash_tp4_exl3_k3_decode_m8_direct_m6_Kernel_Module_t
+ds41rt_ds4_flash_tp4_exl3_k3_decode_m8_direct_m6_Kernel_Module_t
     flash_exl3_k3_decode_m8_direct_m6_module;
-ds4rt_ds4_flash_tp4_exl3_k2_topk6_sum_Kernel_Module_t
+ds41rt_ds4_flash_tp4_exl3_k2_topk6_sum_Kernel_Module_t
     flash_exl3_topk6_sum_module;
-ds4rt_ds4_flash_shared_up_m1_Kernel_Module_t flash_shared_up_m1_module;
-ds4rt_ds4_flash_shared_up_m8_Kernel_Module_t flash_shared_up_m8_module;
-ds4rt_ds4_flash_shared_down_m1_Kernel_Module_t flash_shared_down_m1_module;
-ds4rt_ds4_flash_shared_down_m8_Kernel_Module_t flash_shared_down_m8_module;
-#define DS4RT_DEFINE_FLASH_PREFILL_MODULE(M)                                   \
-  ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Kernel_Module_t               \
+ds41rt_ds4_flash_shared_up_m1_Kernel_Module_t flash_shared_up_m1_module;
+ds41rt_ds4_flash_shared_up_m8_Kernel_Module_t flash_shared_up_m8_module;
+ds41rt_ds4_flash_shared_down_m1_Kernel_Module_t flash_shared_down_m1_module;
+ds41rt_ds4_flash_shared_down_m8_Kernel_Module_t flash_shared_down_m8_module;
+#define DS41RT_DEFINE_FLASH_PREFILL_MODULE(M)                                   \
+  ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Kernel_Module_t               \
       flash_prefill_m##M##_module;
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(2)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(4)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(8)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(16)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(32)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(64)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(128)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(256)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(512)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(1024)
-DS4RT_DEFINE_FLASH_PREFILL_MODULE(2048)
-#undef DS4RT_DEFINE_FLASH_PREFILL_MODULE
-#define DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(M)                             \
-  ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Kernel_Module_t            \
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(2)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(4)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(8)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(16)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(32)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(64)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(128)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(256)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(512)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(1024)
+DS41RT_DEFINE_FLASH_PREFILL_MODULE(2048)
+#undef DS41RT_DEFINE_FLASH_PREFILL_MODULE
+#define DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(M)                             \
+  ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Kernel_Module_t            \
       flash_exl3_prefill_m##M##_module;
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(2)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(4)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(8)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(16)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(32)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(64)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(128)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(256)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(512)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(1024)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(2048)
-#undef DS4RT_DEFINE_FLASH_EXL3_PREFILL_MODULE
-#define DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(M)                          \
-  ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Kernel_Module_t           \
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(2)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(4)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(8)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(16)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(32)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(64)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(128)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(256)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(512)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(1024)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE(2048)
+#undef DS41RT_DEFINE_FLASH_EXL3_PREFILL_MODULE
+#define DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(M)                          \
+  ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Kernel_Module_t           \
       flash_exl3_k3_prefill_m##M##_module;
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(2)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(4)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(8)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(16)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(32)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(64)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(128)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(256)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(512)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(1024)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(2048)
-#undef DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE
-#define DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(M)                               \
-  ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Kernel_Module_t                \
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(2)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(4)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(8)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(16)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(32)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(64)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(128)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(256)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(512)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(1024)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE(2048)
+#undef DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_MODULE
+#define DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(M)                               \
+  ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Kernel_Module_t                \
       flash_exl3_mixed_m##M##_module;
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(1)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(2)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(3)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(4)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(5)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(6)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(7)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(8)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(9)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(10)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(11)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(12)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(16)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(32)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(64)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(128)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(256)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(512)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(1024)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE(2048)
-#undef DS4RT_DEFINE_FLASH_EXL3_MIXED_MODULE
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(1)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(2)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(3)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(4)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(5)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(6)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(7)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(8)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(9)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(10)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(11)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(12)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(16)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(32)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(64)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(128)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(256)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(512)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(1024)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE(2048)
+#undef DS41RT_DEFINE_FLASH_EXL3_MIXED_MODULE
 std::once_flag flash_module_init_once;
-ds4rt_status_t flash_module_init_status = DS4RT_STATUS_OK;
+ds41rt_status_t flash_module_init_status = DS41RT_STATUS_OK;
 
-bool has_bytes(ds4rt_device_buffer_t buffer, size_t required) {
+bool has_bytes(ds41rt_device_buffer_t buffer, size_t required) {
   return buffer.ptr != nullptr && buffer.bytes >= required;
 }
 
@@ -239,12 +239,12 @@ void initialize_flash_module_on_current_device() {
   int32_t device_id = 0;
   cudaError_t result = cudaGetDevice(&device_id);
   if (result != cudaSuccess) {
-    ds4rt_set_last_error_message(cudaGetErrorString(result));
-    flash_module_init_status = DS4RT_STATUS_INTERNAL_ERROR;
+    ds41rt_set_last_error_message(cudaGetErrorString(result));
+    flash_module_init_status = DS41RT_STATUS_INTERNAL_ERROR;
     return;
   }
 
-#define DS4RT_INIT_FLASH_MODULE(prefix, module_value)                          \
+#define DS41RT_INIT_FLASH_MODULE(prefix, module_value)                          \
   do {                                                                         \
     cudaLibrary_t *library = &(module_value).module;                           \
     result = cudaSuccess;                                                      \
@@ -254,8 +254,8 @@ void initialize_flash_module_on_current_device() {
     } init_args = {&library, &result};                                         \
     _mlir_##prefix##_cuda_init(reinterpret_cast<void **>(&init_args));         \
     if (result != cudaSuccess) {                                               \
-      ds4rt_set_last_error_message(cudaGetErrorString(result));                \
-      flash_module_init_status = DS4RT_STATUS_INTERNAL_ERROR;                  \
+      ds41rt_set_last_error_message(cudaGetErrorString(result));                \
+      flash_module_init_status = DS41RT_STATUS_INTERNAL_ERROR;                  \
       return;                                                                  \
     }                                                                          \
     struct {                                                                   \
@@ -266,153 +266,153 @@ void initialize_flash_module_on_current_device() {
     _mlir_##prefix##_cuda_load_to_device(                                      \
         reinterpret_cast<void **>(&load_args));                                \
     if (result != cudaSuccess) {                                               \
-      ds4rt_set_last_error_message(cudaGetErrorString(result));                \
-      flash_module_init_status = DS4RT_STATUS_INTERNAL_ERROR;                  \
+      ds41rt_set_last_error_message(cudaGetErrorString(result));                \
+      flash_module_init_status = DS41RT_STATUS_INTERNAL_ERROR;                  \
       return;                                                                  \
     }                                                                          \
   } while (false)
 
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum,
                           flash_decode_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k2_decode_m1,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k2_decode_m1,
                           flash_exl3_decode_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4,
                           flash_exl3_decode_m4_direct_m4_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6,
                           flash_exl3_decode_m8_direct_m6_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k3_decode_m1,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k3_decode_m1,
                           flash_exl3_k3_decode_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k3_decode_m4_direct_m4,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k3_decode_m4_direct_m4,
                           flash_exl3_k3_decode_m4_direct_m4_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k3_decode_m8_direct_m6,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k3_decode_m8_direct_m6,
                           flash_exl3_k3_decode_m8_direct_m6_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k2_topk6_sum,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k2_topk6_sum,
                           flash_exl3_topk6_sum_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_shared_up_m1,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_shared_up_m1,
                           flash_shared_up_m1_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_shared_up_m8,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_shared_up_m8,
                           flash_shared_up_m8_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_shared_down_m1,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_shared_down_m1,
                           flash_shared_down_m1_module);
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_shared_down_m8,
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_shared_down_m8,
                           flash_shared_down_m8_module);
-#define DS4RT_INIT_FLASH_PREFILL_MODULE(M)                                     \
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6,      \
+#define DS41RT_INIT_FLASH_PREFILL_MODULE(M)                                     \
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6,      \
                           flash_prefill_m##M##_module)
-  DS4RT_INIT_FLASH_PREFILL_MODULE(2);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(4);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(8);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(16);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(32);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(64);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(128);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(256);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(512);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(1024);
-  DS4RT_INIT_FLASH_PREFILL_MODULE(2048);
-#undef DS4RT_INIT_FLASH_PREFILL_MODULE
-#define DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(M)                               \
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6,   \
+  DS41RT_INIT_FLASH_PREFILL_MODULE(2);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(4);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(8);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(16);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(32);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(64);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(128);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(256);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(512);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(1024);
+  DS41RT_INIT_FLASH_PREFILL_MODULE(2048);
+#undef DS41RT_INIT_FLASH_PREFILL_MODULE
+#define DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(M)                               \
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6,   \
                           flash_exl3_prefill_m##M##_module)
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(2);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(4);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(8);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(16);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(32);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(64);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(128);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(256);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(512);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(1024);
-  DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE(2048);
-#undef DS4RT_INIT_FLASH_EXL3_PREFILL_MODULE
-#define DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(M)                            \
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6,   \
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(2);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(4);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(8);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(16);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(32);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(64);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(128);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(256);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(512);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(1024);
+  DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE(2048);
+#undef DS41RT_INIT_FLASH_EXL3_PREFILL_MODULE
+#define DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(M)                            \
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6,   \
                           flash_exl3_k3_prefill_m##M##_module)
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(2);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(4);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(8);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(16);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(32);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(64);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(128);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(256);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(512);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(1024);
-  DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(2048);
-#undef DS4RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE
-#define DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(M)                                \
-  DS4RT_INIT_FLASH_MODULE(ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M,         \
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(2);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(4);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(8);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(16);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(32);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(64);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(128);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(256);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(512);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(1024);
+  DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE(2048);
+#undef DS41RT_INIT_FLASH_EXL3_K3_PREFILL_MODULE
+#define DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(M)                                \
+  DS41RT_INIT_FLASH_MODULE(ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M,         \
                           flash_exl3_mixed_m##M##_module)
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(1);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(2);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(3);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(4);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(5);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(6);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(7);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(8);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(9);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(10);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(11);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(12);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(16);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(32);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(64);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(128);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(256);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(512);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(1024);
-  DS4RT_INIT_FLASH_EXL3_MIXED_MODULE(2048);
-#undef DS4RT_INIT_FLASH_EXL3_MIXED_MODULE
-#undef DS4RT_INIT_FLASH_MODULE
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(1);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(2);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(3);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(4);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(5);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(6);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(7);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(8);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(9);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(10);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(11);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(12);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(16);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(32);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(64);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(128);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(256);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(512);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(1024);
+  DS41RT_INIT_FLASH_EXL3_MIXED_MODULE(2048);
+#undef DS41RT_INIT_FLASH_EXL3_MIXED_MODULE
+#undef DS41RT_INIT_FLASH_MODULE
 }
 
-bool is_aligned(ds4rt_device_buffer_t buffer, size_t alignment) {
+bool is_aligned(ds41rt_device_buffer_t buffer, size_t alignment) {
   return reinterpret_cast<uintptr_t>(buffer.ptr) % alignment == 0;
 }
 
 bool exl3_buffers_share_device(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers) {
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers) {
   const int device = buffers->input.device_id;
-#define DS4RT_EXL3_SAME_DEVICE(field) buffers->field.device_id == device
+#define DS41RT_EXL3_SAME_DEVICE(field) buffers->field.device_id == device
   const bool same =
-      DS4RT_EXL3_SAME_DEVICE(w13_trellis) &&
-      DS4RT_EXL3_SAME_DEVICE(w2_trellis) &&
-      DS4RT_EXL3_SAME_DEVICE(gate_suh) && DS4RT_EXL3_SAME_DEVICE(up_suh) &&
-      DS4RT_EXL3_SAME_DEVICE(intermediate_rotations) &&
-      DS4RT_EXL3_SAME_DEVICE(down_svh) &&
-      DS4RT_EXL3_SAME_DEVICE(expert_map) &&
-      DS4RT_EXL3_SAME_DEVICE(dummy_scale) &&
-      DS4RT_EXL3_SAME_DEVICE(trellis_lut) &&
-      DS4RT_EXL3_SAME_DEVICE(global_scale) &&
-      DS4RT_EXL3_SAME_DEVICE(topk_ids) &&
-      DS4RT_EXL3_SAME_DEVICE(topk_weights) &&
-      DS4RT_EXL3_SAME_DEVICE(rotation_gate) &&
-      DS4RT_EXL3_SAME_DEVICE(rotation_up) &&
-      DS4RT_EXL3_SAME_DEVICE(fc1_output) &&
-      DS4RT_EXL3_SAME_DEVICE(activated) &&
-      DS4RT_EXL3_SAME_DEVICE(routed_output) &&
-      DS4RT_EXL3_SAME_DEVICE(output_f32) &&
-      DS4RT_EXL3_SAME_DEVICE(output_bf16) &&
-      DS4RT_EXL3_SAME_DEVICE(packed_route_indices) &&
-      DS4RT_EXL3_SAME_DEVICE(block_expert_ids) &&
-      DS4RT_EXL3_SAME_DEVICE(packed_route_count) &&
-      DS4RT_EXL3_SAME_DEVICE(expert_counts) &&
-      DS4RT_EXL3_SAME_DEVICE(expert_offsets) &&
-      DS4RT_EXL3_SAME_DEVICE(fc1_scratch) &&
-      DS4RT_EXL3_SAME_DEVICE(fc2_scratch) &&
-      DS4RT_EXL3_SAME_DEVICE(workspace);
-#undef DS4RT_EXL3_SAME_DEVICE
+      DS41RT_EXL3_SAME_DEVICE(w13_trellis) &&
+      DS41RT_EXL3_SAME_DEVICE(w2_trellis) &&
+      DS41RT_EXL3_SAME_DEVICE(gate_suh) && DS41RT_EXL3_SAME_DEVICE(up_suh) &&
+      DS41RT_EXL3_SAME_DEVICE(intermediate_rotations) &&
+      DS41RT_EXL3_SAME_DEVICE(down_svh) &&
+      DS41RT_EXL3_SAME_DEVICE(expert_map) &&
+      DS41RT_EXL3_SAME_DEVICE(dummy_scale) &&
+      DS41RT_EXL3_SAME_DEVICE(trellis_lut) &&
+      DS41RT_EXL3_SAME_DEVICE(global_scale) &&
+      DS41RT_EXL3_SAME_DEVICE(topk_ids) &&
+      DS41RT_EXL3_SAME_DEVICE(topk_weights) &&
+      DS41RT_EXL3_SAME_DEVICE(rotation_gate) &&
+      DS41RT_EXL3_SAME_DEVICE(rotation_up) &&
+      DS41RT_EXL3_SAME_DEVICE(fc1_output) &&
+      DS41RT_EXL3_SAME_DEVICE(activated) &&
+      DS41RT_EXL3_SAME_DEVICE(routed_output) &&
+      DS41RT_EXL3_SAME_DEVICE(output_f32) &&
+      DS41RT_EXL3_SAME_DEVICE(output_bf16) &&
+      DS41RT_EXL3_SAME_DEVICE(packed_route_indices) &&
+      DS41RT_EXL3_SAME_DEVICE(block_expert_ids) &&
+      DS41RT_EXL3_SAME_DEVICE(packed_route_count) &&
+      DS41RT_EXL3_SAME_DEVICE(expert_counts) &&
+      DS41RT_EXL3_SAME_DEVICE(expert_offsets) &&
+      DS41RT_EXL3_SAME_DEVICE(fc1_scratch) &&
+      DS41RT_EXL3_SAME_DEVICE(fc2_scratch) &&
+      DS41RT_EXL3_SAME_DEVICE(workspace);
+#undef DS41RT_EXL3_SAME_DEVICE
   return same;
 }
 
-ds4rt_status_t validate_exl3_buffers(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+ds41rt_status_t validate_exl3_buffers(
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     size_t capacity_rows, size_t trellis_bits) {
   if (buffers == nullptr || capacity_rows == 0 ||
       capacity_rows > kPrefillMaxRows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t routed_rows = capacity_rows * kTopK;
   const bool decode = capacity_rows == 1;
@@ -467,7 +467,7 @@ ds4rt_status_t validate_exl3_buffers(
       has_bytes(buffers->workspace,
                 kExl3WorkspaceElements * sizeof(int32_t));
   if (!valid) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const bool aligned =
       is_aligned(buffers->input, 16) &&
@@ -496,15 +496,15 @@ ds4rt_status_t validate_exl3_buffers(
       is_aligned(buffers->fc2_scratch, 16) &&
       is_aligned(buffers->workspace, 16);
   if (!aligned || !exl3_buffers_share_device(buffers)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t
-validate_buffers(const ds4rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers) {
+ds41rt_status_t
+validate_buffers(const ds41rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers) {
   if (buffers == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool valid =
       has_bytes(buffers->input, kHidden * sizeof(uint16_t)) &&
@@ -524,15 +524,15 @@ validate_buffers(const ds4rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers) {
       has_bytes(buffers->fc1_scratch, kFc1ScratchElements * sizeof(float)) &&
       has_bytes(buffers->fc2_scratch, kFc2ScratchElements * sizeof(float)) &&
       has_bytes(buffers->locks, kLockElements * sizeof(int32_t));
-  return valid ? DS4RT_STATUS_OK : DS4RT_STATUS_BUFFER_TOO_SMALL;
+  return valid ? DS41RT_STATUS_OK : DS41RT_STATUS_BUFFER_TOO_SMALL;
 }
 
-ds4rt_status_t validate_prefill_buffers(
-    const ds4rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers,
+ds41rt_status_t validate_prefill_buffers(
+    const ds41rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers,
     size_t capacity_rows) {
   if (buffers == nullptr || capacity_rows < 2 ||
       capacity_rows > kPrefillMaxRows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t routed_rows = capacity_rows * kTopK;
   const bool valid =
@@ -561,15 +561,15 @@ ds4rt_status_t validate_prefill_buffers(
       has_bytes(buffers->fc2_scratch,
                 kPrefillScratchElements * sizeof(float)) &&
       has_bytes(buffers->locks, kLockElements * sizeof(int32_t));
-  return valid ? DS4RT_STATUS_OK : DS4RT_STATUS_BUFFER_TOO_SMALL;
+  return valid ? DS41RT_STATUS_OK : DS41RT_STATUS_BUFFER_TOO_SMALL;
 }
 
-ds4rt_status_t validate_route_pack_buffers(
-    const ds4rt_ds4_flash_route_pack_buffers_t *buffers, size_t rows) {
+ds41rt_status_t validate_route_pack_buffers(
+    const ds41rt_ds4_flash_route_pack_buffers_t *buffers, size_t rows) {
   if (buffers == nullptr || rows == 0 || rows > kPrefillMaxRows) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash route pack received invalid buffers or row count");
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t live_routes = rows * kTopK;
   const bool decode = rows == 1;
@@ -587,30 +587,30 @@ ds4rt_status_t validate_route_pack_buffers(
       has_bytes(buffers->expert_counts, kExperts * sizeof(int32_t)) &&
       has_bytes(buffers->expert_offsets, (kExperts + 1) * sizeof(int32_t));
   if (!valid) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash route pack received an undersized buffer");
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const int32_t device_id = buffers->topk_ids.device_id;
-#define DS4RT_REQUIRE_ROUTE_PACK_DEVICE(FIELD)                                \
+#define DS41RT_REQUIRE_ROUTE_PACK_DEVICE(FIELD)                                \
   if (buffers->FIELD.device_id != device_id) {                               \
-    ds4rt_set_last_error_message(                                             \
+    ds41rt_set_last_error_message(                                             \
         "DeepSeek-V4-Flash route pack device mismatch: " #FIELD);           \
-    return DS4RT_STATUS_INVALID_ARGUMENT;                                     \
+    return DS41RT_STATUS_INVALID_ARGUMENT;                                     \
   }
-  DS4RT_REQUIRE_ROUTE_PACK_DEVICE(packed_route_indices);
-  DS4RT_REQUIRE_ROUTE_PACK_DEVICE(block_expert_ids);
-  DS4RT_REQUIRE_ROUTE_PACK_DEVICE(packed_route_count);
-  DS4RT_REQUIRE_ROUTE_PACK_DEVICE(expert_counts);
-  DS4RT_REQUIRE_ROUTE_PACK_DEVICE(expert_offsets);
-#undef DS4RT_REQUIRE_ROUTE_PACK_DEVICE
-  return DS4RT_STATUS_OK;
+  DS41RT_REQUIRE_ROUTE_PACK_DEVICE(packed_route_indices);
+  DS41RT_REQUIRE_ROUTE_PACK_DEVICE(block_expert_ids);
+  DS41RT_REQUIRE_ROUTE_PACK_DEVICE(packed_route_count);
+  DS41RT_REQUIRE_ROUTE_PACK_DEVICE(expert_counts);
+  DS41RT_REQUIRE_ROUTE_PACK_DEVICE(expert_offsets);
+#undef DS41RT_REQUIRE_ROUTE_PACK_DEVICE
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_shared_buffers(
-    const ds4rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows) {
+ds41rt_status_t validate_shared_buffers(
+    const ds41rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows) {
   if (buffers == nullptr || rows == 0 || rows > kPrefillMaxRows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool valid =
       has_bytes(buffers->input, rows * kHidden * sizeof(uint16_t)) &&
@@ -628,7 +628,7 @@ ds4rt_status_t validate_shared_buffers(
                 kSharedChunkRows * kSharedIntermediate * sizeof(uint16_t)) &&
       has_bytes(buffers->output, rows * kHidden * sizeof(uint16_t)) &&
       has_bytes(buffers->alpha, sizeof(float));
-  return valid ? DS4RT_STATUS_OK : DS4RT_STATUS_BUFFER_TOO_SMALL;
+  return valid ? DS41RT_STATUS_OK : DS41RT_STATUS_BUFFER_TOO_SMALL;
 }
 
 __global__ void sum_flash_topk6_bf16_kernel(const uint16_t *routed,
@@ -726,56 +726,56 @@ __global__ void flash_shared_swiglu_kernel(const uint16_t *gate,
   }
   float gate_value = bf16_to_f32(gate[index]);
   float up_value = bf16_to_f32(up[index]);
-  gate_value = fminf(gate_value, DS4RT_DS4_FLASH_SWIGLU_LIMIT);
-  up_value = fminf(fmaxf(up_value, -DS4RT_DS4_FLASH_SWIGLU_LIMIT),
-                   DS4RT_DS4_FLASH_SWIGLU_LIMIT);
+  gate_value = fminf(gate_value, DS41RT_DS4_FLASH_SWIGLU_LIMIT);
+  up_value = fminf(fmaxf(up_value, -DS41RT_DS4_FLASH_SWIGLU_LIMIT),
+                   DS41RT_DS4_FLASH_SWIGLU_LIMIT);
   const float silu = gate_value / (1.0f + expf(-gate_value));
   reinterpret_cast<__nv_bfloat16 *>(activated)[index] =
       __float2bfloat16_rn(silu * up_value);
 }
 
-#define DS4RT_DEFINE_SHARED_LINEAR_LAUNCH(NAME, M)                             \
+#define DS41RT_DEFINE_SHARED_LINEAR_LAUNCH(NAME, M)                             \
   int launch_shared_##NAME##_m##M(                                            \
       void *source, void *weight, void *scale, void *output, void *alpha,      \
       int32_t rows, cudaStream_t stream) {                                     \
-    return cute_dsl_ds4rt_ds4_flash_shared_##NAME##_m##M##_wrapper(            \
+    return cute_dsl_ds41rt_ds4_flash_shared_##NAME##_m##M##_wrapper(            \
         &flash_shared_##NAME##_m##M##_module, source, source, weight, source,  \
         scale, output, alpha, rows, stream);                                   \
   }
-DS4RT_DEFINE_SHARED_LINEAR_LAUNCH(up, 1)
-DS4RT_DEFINE_SHARED_LINEAR_LAUNCH(up, 8)
-DS4RT_DEFINE_SHARED_LINEAR_LAUNCH(down, 1)
-DS4RT_DEFINE_SHARED_LINEAR_LAUNCH(down, 8)
-#undef DS4RT_DEFINE_SHARED_LINEAR_LAUNCH
+DS41RT_DEFINE_SHARED_LINEAR_LAUNCH(up, 1)
+DS41RT_DEFINE_SHARED_LINEAR_LAUNCH(up, 8)
+DS41RT_DEFINE_SHARED_LINEAR_LAUNCH(down, 1)
+DS41RT_DEFINE_SHARED_LINEAR_LAUNCH(down, 8)
+#undef DS41RT_DEFINE_SHARED_LINEAR_LAUNCH
 
 using FlashPrefillLaunchFn = int (*)(
-    const ds4rt_ds4_flash_spark_w4a16_moe_buffers_t *, size_t, cudaStream_t);
+    const ds41rt_ds4_flash_spark_w4a16_moe_buffers_t *, size_t, cudaStream_t);
 
-#define DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(M)                                     \
+#define DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(M)                                     \
   int launch_flash_prefill_m##M(                                                 \
-      const ds4rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers,                  \
+      const ds41rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers,                  \
       size_t active_m, cudaStream_t stream) {                                    \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t fc1{   \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t fc1{   \
         buffers->fc1_output.ptr};                                                \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t  \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t  \
         activated{buffers->activated.ptr};                                       \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t        \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t        \
         routed_output{buffers->routed_output.ptr};                               \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
         routes{buffers->packed_route_indices.ptr};                               \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_block_expert_ids_t     \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_block_expert_ids_t     \
         block_experts{buffers->block_expert_ids.ptr};                            \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_packed_route_count_t   \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_packed_route_count_t   \
         route_count{buffers->packed_route_count.ptr};                            \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
         activation_amax{buffers->w13_global_scale.ptr};                          \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t   \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t   \
         fc1_scratch{buffers->fc1_scratch.ptr};                                   \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t   \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t   \
         fc2_scratch{buffers->fc2_scratch.ptr};                                   \
-    ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_locks_i32_flat_t       \
+    ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_Tensor_locks_i32_flat_t       \
         locks{buffers->locks.ptr};                                               \
-    return cute_dsl_ds4rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_wrapper(      \
+    return cute_dsl_ds41rt_ds4_flash_tp4_w4a16_prefill_m##M##_topk6_wrapper(      \
         &flash_prefill_m##M##_module, buffers->input.ptr, buffers->input.ptr,    \
         buffers->input.ptr, buffers->w13_weight.ptr, buffers->w2_weight.ptr,     \
         static_cast<int64_t>(buffers->w13_weight.bytes / sizeof(int32_t)),       \
@@ -789,20 +789,20 @@ using FlashPrefillLaunchFn = int (*)(
         buffers->packed_route_indices.ptr, buffers->w13_scale.ptr,               \
         buffers->w13_scale.ptr, static_cast<int32_t>(kExperts), 0,               \
         static_cast<int32_t>(active_m),                                          \
-        DS4RT_DS4_FLASH_W4A16_PREFILL_M##M##_TOPK6_GRID_X, stream);              \
+        DS41RT_DS4_FLASH_W4A16_PREFILL_M##M##_TOPK6_GRID_X, stream);              \
   }
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(2)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(4)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(8)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(16)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(32)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(64)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(128)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(256)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(512)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(1024)
-DS4RT_DEFINE_FLASH_PREFILL_LAUNCH(2048)
-#undef DS4RT_DEFINE_FLASH_PREFILL_LAUNCH
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(2)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(4)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(8)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(16)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(32)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(64)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(128)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(256)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(512)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(1024)
+DS41RT_DEFINE_FLASH_PREFILL_LAUNCH(2048)
+#undef DS41RT_DEFINE_FLASH_PREFILL_LAUNCH
 
 FlashPrefillLaunchFn flash_prefill_launcher(size_t capacity_rows) {
   switch (capacity_rows) {
@@ -834,9 +834,9 @@ FlashPrefillLaunchFn flash_prefill_launcher(size_t capacity_rows) {
 }
 
 int launch_flash_exl3_topk6_sum(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     size_t active_m, cudaStream_t stream) {
-  return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_topk6_sum_wrapper(
+  return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k2_topk6_sum_wrapper(
       &flash_exl3_topk6_sum_module, buffers->routed_output.ptr,
       buffers->output_f32.ptr, buffers->topk_weights.ptr,
       buffers->topk_ids.ptr, buffers->expert_map.ptr, buffers->down_svh.ptr,
@@ -845,29 +845,29 @@ int launch_flash_exl3_topk6_sum(
 }
 
 int launch_flash_exl3_decode(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     cudaStream_t stream) {
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc1_bf16_flat_t fc1{
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc1_bf16_flat_t fc1{
       buffers->fc1_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_activated_bf16_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_activated_bf16_flat_t
       activated{buffers->activated.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc2_bf16_flat_t routed_output{
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc2_bf16_flat_t routed_output{
       buffers->routed_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_packed_route_indices_t routes{
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_packed_route_indices_t routes{
       buffers->topk_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_block_expert_ids_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_block_expert_ids_t
       block_experts{buffers->block_expert_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_packed_route_count_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_packed_route_count_t
       route_count{buffers->packed_route_count.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_activation_amax_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_activation_amax_flat_t
       activation_amax{buffers->global_scale.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc1_c_tmp_f32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc1_c_tmp_f32_flat_t
       fc1_scratch{buffers->fc1_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc2_c_tmp_f32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_fc2_c_tmp_f32_flat_t
       fc2_scratch{buffers->fc2_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_locks_i32_flat_t workspace{
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_Tensor_locks_i32_flat_t workspace{
       buffers->workspace.ptr};
-  return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_decode_m1_wrapper(
+  return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k2_decode_m1_wrapper(
       &flash_exl3_decode_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
       buffers->w2_trellis.ptr,
@@ -882,33 +882,33 @@ int launch_flash_exl3_decode(
       buffers->up_suh.ptr, buffers->expert_map.ptr,
       buffers->trellis_lut.ptr, buffers->trellis_lut.ptr,
       static_cast<int32_t>(kExperts), static_cast<int32_t>(kExperts), 1,
-      DS4RT_DS4_FLASH_EXL3_K2_DECODE_M1_GRID_X, stream);
+      DS41RT_DS4_FLASH_EXL3_K2_DECODE_M1_GRID_X, stream);
 }
 
 int launch_flash_exl3_decode_m8_direct_m6(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     size_t active_m, cudaStream_t stream) {
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc1_bf16_flat_t fc1{
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc1_bf16_flat_t fc1{
       buffers->fc1_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_activated_bf16_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_activated_bf16_flat_t
       activated{buffers->activated.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc2_bf16_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc2_bf16_flat_t
       routed_output{buffers->routed_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_packed_route_indices_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_packed_route_indices_t
       routes{buffers->topk_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_block_expert_ids_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_block_expert_ids_t
       block_experts{buffers->block_expert_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_packed_route_count_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_packed_route_count_t
       route_count{buffers->packed_route_count.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_activation_amax_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_activation_amax_flat_t
       activation_amax{buffers->global_scale.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc1_c_tmp_f32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc1_c_tmp_f32_flat_t
       fc1_scratch{buffers->fc1_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc2_c_tmp_f32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_fc2_c_tmp_f32_flat_t
       fc2_scratch{buffers->fc2_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_locks_i32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_Tensor_locks_i32_flat_t
       workspace{buffers->workspace.ptr};
-  return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_wrapper(
+  return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k2_decode_m8_direct_m6_wrapper(
       &flash_exl3_decode_m8_direct_m6_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
       buffers->w2_trellis.ptr,
@@ -924,33 +924,33 @@ int launch_flash_exl3_decode_m8_direct_m6(
       buffers->trellis_lut.ptr, buffers->trellis_lut.ptr,
       static_cast<int32_t>(kExperts), static_cast<int32_t>(kExperts),
       static_cast<int32_t>(active_m),
-      DS4RT_DS4_FLASH_EXL3_K2_DECODE_M8_DIRECT_M6_GRID_X, stream);
+      DS41RT_DS4_FLASH_EXL3_K2_DECODE_M8_DIRECT_M6_GRID_X, stream);
 }
 
 int launch_flash_exl3_decode_m4_direct_m4(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     size_t active_m, cudaStream_t stream) {
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc1_bf16_flat_t fc1{
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc1_bf16_flat_t fc1{
       buffers->fc1_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_activated_bf16_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_activated_bf16_flat_t
       activated{buffers->activated.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc2_bf16_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc2_bf16_flat_t
       routed_output{buffers->routed_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_packed_route_indices_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_packed_route_indices_t
       routes{buffers->topk_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_block_expert_ids_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_block_expert_ids_t
       block_experts{buffers->block_expert_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_packed_route_count_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_packed_route_count_t
       route_count{buffers->packed_route_count.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_activation_amax_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_activation_amax_flat_t
       activation_amax{buffers->global_scale.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc1_c_tmp_f32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc1_c_tmp_f32_flat_t
       fc1_scratch{buffers->fc1_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc2_c_tmp_f32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_fc2_c_tmp_f32_flat_t
       fc2_scratch{buffers->fc2_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_locks_i32_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_Tensor_locks_i32_flat_t
       workspace{buffers->workspace.ptr};
-  return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_wrapper(
+  return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k2_decode_m4_direct_m4_wrapper(
       &flash_exl3_decode_m4_direct_m4_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
       buffers->w2_trellis.ptr,
@@ -966,38 +966,38 @@ int launch_flash_exl3_decode_m4_direct_m4(
       buffers->trellis_lut.ptr, buffers->trellis_lut.ptr,
       static_cast<int32_t>(kExperts), static_cast<int32_t>(kExperts),
       static_cast<int32_t>(active_m),
-      DS4RT_DS4_FLASH_EXL3_K2_DECODE_M4_DIRECT_M4_GRID_X, stream);
+      DS41RT_DS4_FLASH_EXL3_K2_DECODE_M4_DIRECT_M4_GRID_X, stream);
 }
 
 using FlashExl3PrefillLaunchFn = int (*)(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *, size_t,
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *, size_t,
     cudaStream_t);
 
-#define DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(M)                               \
+#define DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(M)                               \
   int launch_flash_exl3_prefill_m##M(                                           \
-      const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,               \
+      const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,               \
       size_t active_m, cudaStream_t stream) {                                    \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t     \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t     \
         fc1{buffers->fc1_output.ptr};                                            \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t \
         activated{buffers->activated.ptr};                                       \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t     \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t     \
         routed_output{buffers->routed_output.ptr};                               \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
         routes{buffers->packed_route_indices.ptr};                               \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_block_expert_ids_t  \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_block_expert_ids_t  \
         block_experts{buffers->block_expert_ids.ptr};                            \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_count_t \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_count_t \
         route_count{buffers->packed_route_count.ptr};                            \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
         activation_amax{buffers->global_scale.ptr};                              \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t \
         fc1_scratch{buffers->fc1_scratch.ptr};                                   \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t \
         fc2_scratch{buffers->fc2_scratch.ptr};                                   \
-    ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_locks_i32_flat_t    \
+    ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_locks_i32_flat_t    \
         workspace{buffers->workspace.ptr};                                       \
-    return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_wrapper(   \
+    return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k2_prefill_m##M##_topk6_wrapper(   \
         &flash_exl3_prefill_m##M##_module, buffers->rotation_gate.ptr,           \
         buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,  \
         buffers->w2_trellis.ptr,                                                 \
@@ -1013,20 +1013,20 @@ using FlashExl3PrefillLaunchFn = int (*)(
         buffers->trellis_lut.ptr, buffers->trellis_lut.ptr,                      \
         static_cast<int32_t>(kExperts), static_cast<int32_t>(kExperts),          \
         static_cast<int32_t>(active_m),                                          \
-        DS4RT_DS4_FLASH_EXL3_K2_PREFILL_M##M##_TOPK6_GRID_X, stream);            \
+        DS41RT_DS4_FLASH_EXL3_K2_PREFILL_M##M##_TOPK6_GRID_X, stream);            \
   }
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(2)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(4)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(8)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(16)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(32)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(64)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(128)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(256)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(512)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(1024)
-DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(2048)
-#undef DS4RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(2)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(4)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(8)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(16)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(32)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(64)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(128)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(256)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(512)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(1024)
+DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH(2048)
+#undef DS41RT_DEFINE_FLASH_EXL3_PREFILL_LAUNCH
 
 FlashExl3PrefillLaunchFn flash_exl3_prefill_launcher(size_t capacity_rows) {
   switch (capacity_rows) {
@@ -1058,29 +1058,29 @@ FlashExl3PrefillLaunchFn flash_exl3_prefill_launcher(size_t capacity_rows) {
 }
 
 int launch_flash_exl3_k3_decode(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     cudaStream_t stream) {
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc1_bf16_flat_t fc1{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc1_bf16_flat_t fc1{
       buffers->fc1_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_activated_bf16_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_activated_bf16_flat_t
       activated{buffers->activated.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc2_bf16_flat_t routed_output{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc2_bf16_flat_t routed_output{
       buffers->routed_output.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_packed_route_indices_t routes{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_packed_route_indices_t routes{
       buffers->topk_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_block_expert_ids_t block_experts{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_block_expert_ids_t block_experts{
       buffers->block_expert_ids.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_packed_route_count_t route_count{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_packed_route_count_t route_count{
       buffers->packed_route_count.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_activation_amax_flat_t
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_activation_amax_flat_t
       activation_amax{buffers->global_scale.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc1_c_tmp_f32_flat_t fc1_scratch{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc1_c_tmp_f32_flat_t fc1_scratch{
       buffers->fc1_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc2_c_tmp_f32_flat_t fc2_scratch{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_fc2_c_tmp_f32_flat_t fc2_scratch{
       buffers->fc2_scratch.ptr};
-  ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_locks_i32_flat_t workspace{
+  ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_Tensor_locks_i32_flat_t workspace{
       buffers->workspace.ptr};
-  return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k3_decode_m1_wrapper(
+  return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k3_decode_m1_wrapper(
       &flash_exl3_k3_decode_module, buffers->rotation_gate.ptr,
       buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,
       buffers->w2_trellis.ptr,
@@ -1095,34 +1095,34 @@ int launch_flash_exl3_k3_decode(
       buffers->up_suh.ptr, buffers->expert_map.ptr, buffers->trellis_lut.ptr,
       buffers->trellis_lut.ptr, static_cast<int32_t>(kExperts),
       static_cast<int32_t>(kExperts), 1,
-      DS4RT_DS4_FLASH_EXL3_K3_DECODE_M1_GRID_X, stream);
+      DS41RT_DS4_FLASH_EXL3_K3_DECODE_M1_GRID_X, stream);
 }
 
-#define DS4RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(CAPACITY, LABEL)              \
+#define DS41RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(CAPACITY, LABEL)              \
   int launch_flash_exl3_k3_##LABEL(                                           \
-      const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,             \
+      const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,             \
       size_t active_m, cudaStream_t stream) {                                  \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc1_bf16_flat_t fc1{         \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc1_bf16_flat_t fc1{         \
         buffers->fc1_output.ptr};                                              \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_activated_bf16_flat_t        \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_activated_bf16_flat_t        \
         activated{buffers->activated.ptr};                                     \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc2_bf16_flat_t              \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc2_bf16_flat_t              \
         routed_output{buffers->routed_output.ptr};                             \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_packed_route_indices_t       \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_packed_route_indices_t       \
         routes{buffers->topk_ids.ptr};                                         \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_block_expert_ids_t           \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_block_expert_ids_t           \
         block_experts{buffers->block_expert_ids.ptr};                          \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_packed_route_count_t         \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_packed_route_count_t         \
         route_count{buffers->packed_route_count.ptr};                          \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_activation_amax_flat_t       \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_activation_amax_flat_t       \
         activation_amax{buffers->global_scale.ptr};                            \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc1_c_tmp_f32_flat_t         \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc1_c_tmp_f32_flat_t         \
         fc1_scratch{buffers->fc1_scratch.ptr};                                 \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc2_c_tmp_f32_flat_t         \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_fc2_c_tmp_f32_flat_t         \
         fc2_scratch{buffers->fc2_scratch.ptr};                                 \
-    ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_locks_i32_flat_t workspace{  \
+    ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_Tensor_locks_i32_flat_t workspace{  \
         buffers->workspace.ptr};                                               \
-    return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k3_##LABEL##_wrapper(            \
+    return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k3_##LABEL##_wrapper(            \
         &flash_exl3_k3_##LABEL##_module, buffers->rotation_gate.ptr,           \
         buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,\
         buffers->w2_trellis.ptr,                                               \
@@ -1137,39 +1137,39 @@ int launch_flash_exl3_k3_decode(
         buffers->up_suh.ptr, buffers->expert_map.ptr, buffers->trellis_lut.ptr,\
         buffers->trellis_lut.ptr, static_cast<int32_t>(kExperts),              \
         static_cast<int32_t>(kExperts), static_cast<int32_t>(active_m),        \
-        DS4RT_DS4_FLASH_EXL3_K3_##CAPACITY##_GRID_X, stream);                  \
+        DS41RT_DS4_FLASH_EXL3_K3_##CAPACITY##_GRID_X, stream);                  \
   }
-DS4RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(DECODE_M4_DIRECT_M4,
+DS41RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(DECODE_M4_DIRECT_M4,
                                          decode_m4_direct_m4)
-DS4RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(DECODE_M8_DIRECT_M6,
+DS41RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(DECODE_M8_DIRECT_M6,
                                          decode_m8_direct_m6)
-#undef DS4RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH
+#undef DS41RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH
 
-#define DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(M)                           \
+#define DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(M)                           \
   int launch_flash_exl3_k3_prefill_m##M(                                      \
-      const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,             \
+      const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,             \
       size_t active_m, cudaStream_t stream) {                                  \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t   \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t   \
         fc1{buffers->fc1_output.ptr};                                          \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t \
         activated{buffers->activated.ptr};                                     \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t   \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t   \
         routed_output{buffers->routed_output.ptr};                             \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
         routes{buffers->packed_route_indices.ptr};                             \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_block_expert_ids_t \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_block_expert_ids_t \
         block_experts{buffers->block_expert_ids.ptr};                          \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_packed_route_count_t \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_packed_route_count_t \
         route_count{buffers->packed_route_count.ptr};                          \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
         activation_amax{buffers->global_scale.ptr};                            \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t \
         fc1_scratch{buffers->fc1_scratch.ptr};                                 \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t \
         fc2_scratch{buffers->fc2_scratch.ptr};                                 \
-    ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_locks_i32_flat_t  \
+    ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_Tensor_locks_i32_flat_t  \
         workspace{buffers->workspace.ptr};                                     \
-    return cute_dsl_ds4rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_wrapper( \
+    return cute_dsl_ds41rt_ds4_flash_tp4_exl3_k3_prefill_m##M##_topk6_wrapper( \
         &flash_exl3_k3_prefill_m##M##_module, buffers->rotation_gate.ptr,      \
         buffers->rotation_up.ptr, buffers->input.ptr, buffers->w13_trellis.ptr,\
         buffers->w2_trellis.ptr,                                               \
@@ -1184,20 +1184,20 @@ DS4RT_DEFINE_FLASH_EXL3_K3_DIRECT_LAUNCH(DECODE_M8_DIRECT_M6,
         buffers->up_suh.ptr, buffers->expert_map.ptr, buffers->trellis_lut.ptr,\
         buffers->trellis_lut.ptr, static_cast<int32_t>(kExperts),              \
         static_cast<int32_t>(kExperts), static_cast<int32_t>(active_m),        \
-        DS4RT_DS4_FLASH_EXL3_K3_PREFILL_M##M##_TOPK6_GRID_X, stream);          \
+        DS41RT_DS4_FLASH_EXL3_K3_PREFILL_M##M##_TOPK6_GRID_X, stream);          \
   }
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(2)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(4)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(8)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(16)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(32)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(64)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(128)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(256)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(512)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(1024)
-DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(2048)
-#undef DS4RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(2)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(4)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(8)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(16)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(32)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(64)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(128)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(256)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(512)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(1024)
+DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH(2048)
+#undef DS41RT_DEFINE_FLASH_EXL3_K3_PREFILL_LAUNCH
 
 FlashExl3PrefillLaunchFn flash_exl3_k3_prefill_launcher(size_t capacity_rows) {
   switch (capacity_rows) {
@@ -1229,40 +1229,40 @@ __global__ void map_flash_mixed_topk6_kernel(
   }
 }
 
-#define DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(M)                              \
+#define DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(M)                              \
   int launch_flash_exl3_mixed_m##M(                                         \
-      const ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *buffers,        \
+      const ds41rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *buffers,        \
       int32_t tier0_slots, int32_t tier1_slots,                              \
       int32_t tier0_gate_experts, int32_t tier1_gate_experts,                \
       int32_t tier0_up_experts, int32_t tier1_up_experts,                    \
       int32_t tier0_down_experts, int32_t tier1_down_experts,                \
       int32_t active_m,                                                       \
       cudaStream_t stream) {                                                 \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_rotation_gate_t      \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_rotation_gate_t      \
         rotation_gate{buffers->rotation_gate.ptr};                           \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_rotation_up_t        \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_rotation_up_t        \
         rotation_up{buffers->rotation_up.ptr};                               \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc1_t fc1{           \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc1_t fc1{           \
         buffers->fc1_output.ptr};                                            \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_activated_t          \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_activated_t          \
         activated{buffers->activated.ptr};                                   \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc2_t fc2{           \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc2_t fc2{           \
         buffers->routed_output.ptr};                                         \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_packed_route_indices_t \
-        routes{DS4RT_DS4_FLASH_EXL3_MIXED_K2_K3_M##M##_DIRECT_TOPK           \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_packed_route_indices_t \
+        routes{DS41RT_DS4_FLASH_EXL3_MIXED_K2_K3_M##M##_DIRECT_TOPK           \
                    ? buffers->mapped_topk_ids.ptr                             \
                    : buffers->packed_route_indices.ptr};                      \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_block_expert_ids_t   \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_block_expert_ids_t   \
         block_experts{buffers->block_expert_ids.ptr};                         \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_packed_route_count_t \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_packed_route_count_t \
         route_count{buffers->packed_route_count.ptr};                         \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc1_scratch_t        \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc1_scratch_t        \
         fc1_scratch{buffers->fc1_scratch.ptr};                                \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc2_scratch_t        \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_fc2_scratch_t        \
         fc2_scratch{buffers->fc2_scratch.ptr};                                \
-    ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_workspace_t          \
+    ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_Tensor_workspace_t          \
         workspace{buffers->workspace.ptr};                                    \
-    return cute_dsl_ds4rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_wrapper(    \
+    return cute_dsl_ds41rt_ds4_flash_tp4_exl3_mixed_k2_k3_m##M##_wrapper(    \
         &flash_exl3_mixed_m##M##_module, buffers->input.ptr, &rotation_gate, \
         &rotation_up, buffers->tier0_w13_trellis.ptr,                         \
         buffers->tier0_w2_trellis.ptr, buffers->dummy_scale.ptr,             \
@@ -1276,34 +1276,34 @@ __global__ void map_flash_mixed_topk6_kernel(
         buffers->intermediate_rotations.ptr, buffers->gate_suh.ptr,           \
         buffers->up_suh.ptr, buffers->trellis_lut.ptr, tier0_slots,          \
         tier1_slots, tier0_down_experts, tier1_down_experts, active_m,       \
-        DS4RT_DS4_FLASH_EXL3_MIXED_K2_K3_M##M##_GRID_X, stream,              \
+        DS41RT_DS4_FLASH_EXL3_MIXED_K2_K3_M##M##_GRID_X, stream,              \
         tier0_gate_experts, tier1_gate_experts, tier0_up_experts,            \
         tier1_up_experts);                                                    \
   }
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(1)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(2)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(3)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(4)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(5)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(6)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(7)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(8)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(9)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(10)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(11)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(12)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(16)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(32)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(64)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(128)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(256)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(512)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(1024)
-DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(2048)
-#undef DS4RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(1)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(2)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(3)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(4)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(5)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(6)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(7)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(8)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(9)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(10)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(11)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(12)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(16)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(32)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(64)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(128)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(256)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(512)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(1024)
+DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH(2048)
+#undef DS41RT_DEFINE_FLASH_EXL3_MIXED_LAUNCH
 
 using FlashExl3MixedLaunchFn = int (*)(
-    const ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *, int32_t, int32_t,
+    const ds41rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *, int32_t, int32_t,
     int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
     cudaStream_t);
 
@@ -1335,31 +1335,31 @@ FlashExl3MixedLaunchFn flash_exl3_mixed_launcher(size_t capacity_rows) {
 
 } // namespace
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_spark_aot_available(int *out_available) {
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_spark_aot_available(int *out_available) {
   if (out_available == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_available = 1;
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_spark_aot_init(void) {
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_flash_spark_aot_init(void) {
   std::call_once(flash_module_init_once,
                  initialize_flash_module_on_current_device);
   return flash_module_init_status;
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_shared_expert_fp8_bf16_async(
-    const ds4rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_shared_expert_fp8_bf16_async(
+    const ds41rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows,
     void *cuda_stream) {
-  const ds4rt_status_t valid = validate_shared_buffers(buffers, rows);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_shared_buffers(buffers, rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
@@ -1395,9 +1395,9 @@ ds4rt_cuda_ds4_flash_shared_expert_fp8_bf16_async(
           static_cast<int32_t>(chunk_rows), stream);
     }
     if (gate_status != 0 || up_status != 0) {
-      ds4rt_set_last_error_message(
+      ds41rt_set_last_error_message(
           "DeepSeek-V4-Flash shared expert up-projection AOT launch failed");
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
     constexpr size_t kThreads = 256;
     const size_t values = chunk_rows * kSharedIntermediate;
@@ -1419,23 +1419,23 @@ ds4rt_cuda_ds4_flash_shared_expert_fp8_bf16_async(
           static_cast<int32_t>(chunk_rows), stream);
     }
     if (down_status != 0) {
-      ds4rt_set_last_error_message(
+      ds41rt_set_last_error_message(
           "DeepSeek-V4-Flash shared expert down-projection AOT launch failed");
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
   }
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async(
-    const ds4rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers,
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async(
+    const ds41rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers,
     void *cuda_stream) {
-  const ds4rt_status_t valid = validate_buffers(buffers);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_buffers(buffers);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
@@ -1457,7 +1457,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async(
   FlashFc2Scratch fc2_scratch{buffers->fc2_scratch.ptr};
   FlashLocks locks{buffers->locks.ptr};
   const int launch_status =
-      cute_dsl_ds4rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_wrapper(
+      cute_dsl_ds41rt_ds4_flash_tp4_w4a16_decode_m1_fused_sum_wrapper(
           &flash_decode_module, buffers->input.ptr, buffers->input.ptr,
           buffers->input.ptr, buffers->w13_weight.ptr, buffers->w2_weight.ptr,
           static_cast<int64_t>(buffers->w13_weight.bytes / sizeof(int32_t)),
@@ -1470,20 +1470,20 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async(
           buffers->w13_global_scale.ptr, buffers->w13_global_scale.ptr,
           buffers->packed_route_indices.ptr, buffers->w13_scale.ptr,
           buffers->w13_scale.ptr, static_cast<int32_t>(kExperts), 0,
-          1, DS4RT_DS4_FLASH_W4A16_DECODE_M1_FUSED_SUM_GRID_X, stream);
+          1, DS41RT_DS4_FLASH_W4A16_DECODE_M1_FUSED_SUM_GRID_X, stream);
   if (launch_status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 W4A16 decode M1 AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_pack_topk6_routes_async(
-    const ds4rt_ds4_flash_route_pack_buffers_t *buffers, size_t rows,
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_flash_pack_topk6_routes_async(
+    const ds41rt_ds4_flash_route_pack_buffers_t *buffers, size_t rows,
     void *cuda_stream) {
-  const ds4rt_status_t valid = validate_route_pack_buffers(buffers, rows);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_route_pack_buffers(buffers, rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
@@ -1523,27 +1523,27 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_pack_topk6_routes_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async(
-    const ds4rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers, size_t rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async(
+    const ds41rt_ds4_flash_spark_w4a16_moe_buffers_t *buffers, size_t rows,
     void *cuda_stream) {
   size_t capacity_rows = 2;
   while (capacity_rows < rows && capacity_rows < kPrefillMaxRows) {
     capacity_rows *= 2;
   }
   if (rows < 2 || rows > capacity_rows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const FlashPrefillLaunchFn launcher = flash_prefill_launcher(capacity_rows);
   if (launcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_prefill_buffers(buffers, capacity_rows);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_prefill_buffers(buffers, capacity_rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
@@ -1555,9 +1555,9 @@ ds4rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async(
   }
   const int launch_status = launcher(buffers, rows, stream);
   if (launch_status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 W4A16 prefill top-k=6 AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   constexpr size_t threads = 256;
   const size_t values = rows * kHidden;
@@ -1569,17 +1569,17 @@ ds4rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_spark_exl3_k2_decode_m1_async(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_spark_exl3_k2_decode_m1_async(
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     void *cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_exl3_buffers(buffers, 1, kExl3K2Bits);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
@@ -1591,54 +1591,54 @@ ds4rt_cuda_ds4_flash_spark_exl3_k2_decode_m1_async(
     return status_from_cuda(error);
   }
   if (launch_flash_exl3_decode(buffers, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K2 decode M1 AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (launch_flash_exl3_topk6_sum(buffers, 1, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K2 decode sum launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return ds4rt_cuda_f32_to_bf16_async(
+  return ds41rt_cuda_f32_to_bf16_async(
       static_cast<const float *>(buffers->output_f32.ptr),
       static_cast<uint16_t *>(buffers->output_bf16.ptr), kHidden,
       cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_spark_exl3_k2_prefill_topk6_async(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers, size_t rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_spark_exl3_k2_prefill_topk6_async(
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers, size_t rows,
     void *cuda_stream) {
   size_t capacity_rows = 2;
   while (capacity_rows < rows && capacity_rows < kPrefillMaxRows) {
     capacity_rows *= 2;
   }
   if (rows < 2 || rows > capacity_rows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool direct_m4 =
-      rows >= DS4RT_DS4_FLASH_EXL3_K2_DIRECT_M4_MIN_ACTIVE && rows <= 4;
+      rows >= DS41RT_DS4_FLASH_EXL3_K2_DIRECT_M4_MIN_ACTIVE && rows <= 4;
   const bool direct_m6 = rows == 6;
   const bool direct = direct_m4 || direct_m6;
   const FlashExl3PrefillLaunchFn launcher = direct
       ? nullptr
       : flash_exl3_prefill_launcher(capacity_rows);
   if (!direct && launcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_exl3_buffers(buffers, capacity_rows, kExl3K2Bits);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
   if (!direct) {
-    const ds4rt_ds4_flash_route_pack_buffers_t route_buffers{
+    const ds41rt_ds4_flash_route_pack_buffers_t route_buffers{
         buffers->topk_ids,
         buffers->packed_route_indices,
         buffers->block_expert_ids,
@@ -1646,9 +1646,9 @@ ds4rt_cuda_ds4_flash_spark_exl3_k2_prefill_topk6_async(
         buffers->expert_counts,
         buffers->expert_offsets,
     };
-    ds4rt_status_t status = ds4rt_cuda_ds4_flash_pack_topk6_routes_async(
+    ds41rt_status_t status = ds41rt_cuda_ds4_flash_pack_topk6_routes_async(
         &route_buffers, rows, cuda_stream);
-    if (status != DS4RT_STATUS_OK) {
+    if (status != DS41RT_STATUS_OK) {
       return status;
     }
   }
@@ -1668,32 +1668,32 @@ ds4rt_cuda_ds4_flash_spark_exl3_k2_prefill_topk6_async(
     launch_status = launcher(buffers, rows, stream);
   }
   if (launch_status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K2 prefill AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (launch_flash_exl3_topk6_sum(buffers, rows, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K2 prefill sum launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return ds4rt_cuda_f32_to_bf16_async(
+  return ds41rt_cuda_f32_to_bf16_async(
       static_cast<const float *>(buffers->output_f32.ptr),
       static_cast<uint16_t *>(buffers->output_bf16.ptr), rows * kHidden,
       cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_spark_exl3_k3_decode_m1_async(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_spark_exl3_k3_decode_m1_async(
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers,
     void *cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_exl3_buffers(buffers, 1, kExl3K3Bits);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1704,52 +1704,52 @@ ds4rt_cuda_ds4_flash_spark_exl3_k3_decode_m1_async(
     return status_from_cuda(error);
   }
   if (launch_flash_exl3_k3_decode(buffers, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K3 decode M1 AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (launch_flash_exl3_topk6_sum(buffers, 1, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K3 decode sum launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return ds4rt_cuda_f32_to_bf16_async(
+  return ds41rt_cuda_f32_to_bf16_async(
       static_cast<const float *>(buffers->output_f32.ptr),
       static_cast<uint16_t *>(buffers->output_bf16.ptr), kHidden,
       cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_spark_exl3_k3_prefill_topk6_async(
-    const ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers, size_t rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_spark_exl3_k3_prefill_topk6_async(
+    const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t *buffers, size_t rows,
     void *cuda_stream) {
   size_t capacity_rows = 2;
   while (capacity_rows < rows && capacity_rows < kPrefillMaxRows) {
     capacity_rows *= 2;
   }
   if (rows < 2 || rows > capacity_rows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool direct_m4 =
-      rows >= DS4RT_DS4_FLASH_EXL3_K2_DIRECT_M4_MIN_ACTIVE && rows <= 4;
+      rows >= DS41RT_DS4_FLASH_EXL3_K2_DIRECT_M4_MIN_ACTIVE && rows <= 4;
   const bool direct_m6 = rows == 6;
   const bool direct = direct_m4 || direct_m6;
   const FlashExl3PrefillLaunchFn launcher =
       direct ? nullptr : flash_exl3_k3_prefill_launcher(capacity_rows);
   if (!direct && launcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_exl3_buffers(buffers, capacity_rows, kExl3K3Bits);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   if (!direct) {
-    const ds4rt_ds4_flash_route_pack_buffers_t route_buffers{
+    const ds41rt_ds4_flash_route_pack_buffers_t route_buffers{
         buffers->topk_ids,
         buffers->packed_route_indices,
         buffers->block_expert_ids,
@@ -1757,9 +1757,9 @@ ds4rt_cuda_ds4_flash_spark_exl3_k3_prefill_topk6_async(
         buffers->expert_counts,
         buffers->expert_offsets,
     };
-    ds4rt_status_t status = ds4rt_cuda_ds4_flash_pack_topk6_routes_async(
+    ds41rt_status_t status = ds41rt_cuda_ds4_flash_pack_topk6_routes_async(
         &route_buffers, rows, cuda_stream);
-    if (status != DS4RT_STATUS_OK) {
+    if (status != DS41RT_STATUS_OK) {
       return status;
     }
   }
@@ -1781,24 +1781,24 @@ ds4rt_cuda_ds4_flash_spark_exl3_k3_prefill_topk6_async(
     launch_status = launcher(buffers, rows, stream);
   }
   if (launch_status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K3 prefill AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (launch_flash_exl3_topk6_sum(buffers, rows, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 EXL3 K3 prefill sum launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return ds4rt_cuda_f32_to_bf16_async(
+  return ds41rt_cuda_f32_to_bf16_async(
       static_cast<const float *>(buffers->output_f32.ptr),
       static_cast<uint16_t *>(buffers->output_bf16.ptr), rows * kHidden,
       cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
-    const ds4rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *buffers,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
+    const ds41rt_ds4_flash_spark_exl3_mixed_moe_buffers_t *buffers,
     size_t tier0_slots, size_t tier1_slots,
     size_t tier0_gate_experts, size_t tier1_gate_experts,
     size_t tier0_up_experts, size_t tier1_up_experts,
@@ -1817,9 +1817,9 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
       tier0_slots != std::max(tier0_gate_experts, tier0_up_experts) ||
       tier1_slots != std::max(tier1_gate_experts, tier1_up_experts) ||
       rows == 0 || rows > kPrefillMaxRows) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash mixed K2/K3 launch received invalid projection tiers or rows");
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t capacity_rows = rows <= 12 ? rows : 16;
   while (capacity_rows < rows) capacity_rows *= 2;
@@ -1837,88 +1837,88 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
   const size_t tier1_projection =
       kHidden * kIntermediate * kExl3K3Bits / 8;
   const size_t routed_rows = capacity_rows * kTopK;
-#define DS4RT_REQUIRE_MIXED_BYTES(FIELD, REQUIRED)                            \
+#define DS41RT_REQUIRE_MIXED_BYTES(FIELD, REQUIRED)                            \
   do {                                                                       \
     if (!has_bytes(buffers->FIELD, (REQUIRED))) {                            \
-      ds4rt_set_last_error_message(                                           \
+      ds41rt_set_last_error_message(                                           \
           "DeepSeek-V4-Flash mixed K2/K3 undersized buffer: " #FIELD);       \
-      return DS4RT_STATUS_BUFFER_TOO_SMALL;                                  \
+      return DS41RT_STATUS_BUFFER_TOO_SMALL;                                  \
     }                                                                        \
   } while (false)
-  DS4RT_REQUIRE_MIXED_BYTES(input,
+  DS41RT_REQUIRE_MIXED_BYTES(input,
                             capacity_rows * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(
+  DS41RT_REQUIRE_MIXED_BYTES(
       tier0_w13_trellis,
       (tier0_gate_experts + tier0_up_experts) * tier0_projection);
-  DS4RT_REQUIRE_MIXED_BYTES(tier0_w2_trellis,
+  DS41RT_REQUIRE_MIXED_BYTES(tier0_w2_trellis,
                             tier0_down_experts * tier0_projection);
-  DS4RT_REQUIRE_MIXED_BYTES(
+  DS41RT_REQUIRE_MIXED_BYTES(
       tier1_w13_trellis,
       (tier1_gate_experts + tier1_up_experts) * tier1_projection);
-  DS4RT_REQUIRE_MIXED_BYTES(tier1_w2_trellis,
+  DS41RT_REQUIRE_MIXED_BYTES(tier1_w2_trellis,
                             tier1_down_experts * tier1_projection);
-  DS4RT_REQUIRE_MIXED_BYTES(dummy_scale, 16);
-  DS4RT_REQUIRE_MIXED_BYTES(tier0_global_scale,
+  DS41RT_REQUIRE_MIXED_BYTES(dummy_scale, 16);
+  DS41RT_REQUIRE_MIXED_BYTES(tier0_global_scale,
                             std::max(tier0_slots, tier0_down_experts) *
                                 sizeof(float));
-  DS4RT_REQUIRE_MIXED_BYTES(tier1_global_scale,
+  DS41RT_REQUIRE_MIXED_BYTES(tier1_global_scale,
                             std::max(tier1_slots, tier1_down_experts) *
                                 sizeof(float));
-  DS4RT_REQUIRE_MIXED_BYTES(gate_suh,
+  DS41RT_REQUIRE_MIXED_BYTES(gate_suh,
                             total_slots * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(up_suh,
+  DS41RT_REQUIRE_MIXED_BYTES(up_suh,
                             total_slots * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(intermediate_rotations,
+  DS41RT_REQUIRE_MIXED_BYTES(intermediate_rotations,
                             total_slots * 3 * kIntermediate *
                                 sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(down_svh,
+  DS41RT_REQUIRE_MIXED_BYTES(down_svh,
                             total_slots * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(trellis_lut, kExl3TrellisLutBytes);
-  DS4RT_REQUIRE_MIXED_BYTES(global_to_combined,
+  DS41RT_REQUIRE_MIXED_BYTES(trellis_lut, kExl3TrellisLutBytes);
+  DS41RT_REQUIRE_MIXED_BYTES(global_to_combined,
                             kExperts * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(descriptor_map,
+  DS41RT_REQUIRE_MIXED_BYTES(descriptor_map,
                             3 * total_slots * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(topk_ids, routed_rows * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(mapped_topk_ids,
+  DS41RT_REQUIRE_MIXED_BYTES(topk_ids, routed_rows * sizeof(int32_t));
+  DS41RT_REQUIRE_MIXED_BYTES(mapped_topk_ids,
                             routed_rows * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(topk_weights, routed_rows * sizeof(float));
-  DS4RT_REQUIRE_MIXED_BYTES(rotation_gate,
+  DS41RT_REQUIRE_MIXED_BYTES(topk_weights, routed_rows * sizeof(float));
+  DS41RT_REQUIRE_MIXED_BYTES(rotation_gate,
                             routed_rows * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(rotation_up,
+  DS41RT_REQUIRE_MIXED_BYTES(rotation_up,
                             routed_rows * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(
+  DS41RT_REQUIRE_MIXED_BYTES(
       fc1_output, routed_rows * 2 * kIntermediate * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(
+  DS41RT_REQUIRE_MIXED_BYTES(
       activated, routed_rows * kIntermediate * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(routed_output,
+  DS41RT_REQUIRE_MIXED_BYTES(routed_output,
                             routed_rows * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(output_f32,
+  DS41RT_REQUIRE_MIXED_BYTES(output_f32,
                             capacity_rows * kHidden * sizeof(float));
-  DS4RT_REQUIRE_MIXED_BYTES(output_bf16,
+  DS41RT_REQUIRE_MIXED_BYTES(output_bf16,
                             capacity_rows * kHidden * sizeof(uint16_t));
-  DS4RT_REQUIRE_MIXED_BYTES(packed_route_indices,
+  DS41RT_REQUIRE_MIXED_BYTES(packed_route_indices,
                             packed_route_elements * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(block_expert_ids,
+  DS41RT_REQUIRE_MIXED_BYTES(block_expert_ids,
                             route_block_elements * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(packed_route_count, sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(expert_counts, kExperts * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(expert_offsets,
+  DS41RT_REQUIRE_MIXED_BYTES(packed_route_count, sizeof(int32_t));
+  DS41RT_REQUIRE_MIXED_BYTES(expert_counts, kExperts * sizeof(int32_t));
+  DS41RT_REQUIRE_MIXED_BYTES(expert_offsets,
                             (kExperts + 1) * sizeof(int32_t));
-  DS4RT_REQUIRE_MIXED_BYTES(fc1_scratch,
+  DS41RT_REQUIRE_MIXED_BYTES(fc1_scratch,
                             fc1_scratch_elements * sizeof(float));
-  DS4RT_REQUIRE_MIXED_BYTES(fc2_scratch,
+  DS41RT_REQUIRE_MIXED_BYTES(fc2_scratch,
                             fc2_scratch_elements * sizeof(float));
-  DS4RT_REQUIRE_MIXED_BYTES(workspace,
+  DS41RT_REQUIRE_MIXED_BYTES(workspace,
                             kExl3WorkspaceElements * sizeof(int32_t));
-#undef DS4RT_REQUIRE_MIXED_BYTES
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_flash_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) return initialized;
+#undef DS41RT_REQUIRE_MIXED_BYTES
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_flash_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) return initialized;
   const FlashExl3MixedLaunchFn launcher =
       flash_exl3_mixed_launcher(capacity_rows);
   if (launcher == nullptr) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash mixed K2/K3 launch has no row-capacity kernel");
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1934,7 +1934,7 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
   if (error != cudaSuccess) return status_from_cuda(error);
   const bool direct_topk = capacity_rows <= 12;
   if (!direct_topk) {
-    const ds4rt_ds4_flash_route_pack_buffers_t route_buffers{
+    const ds41rt_ds4_flash_route_pack_buffers_t route_buffers{
         buffers->mapped_topk_ids,
         buffers->packed_route_indices,
         buffers->block_expert_ids,
@@ -1942,9 +1942,9 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
         buffers->expert_counts,
         buffers->expert_offsets,
     };
-    ds4rt_status_t status = ds4rt_cuda_ds4_flash_pack_topk6_routes_async(
+    ds41rt_status_t status = ds41rt_cuda_ds4_flash_pack_topk6_routes_async(
         &route_buffers, rows, cuda_stream);
-    if (status != DS4RT_STATUS_OK) return status;
+    if (status != DS41RT_STATUS_OK) return status;
   }
   error = cudaMemsetAsync(buffers->workspace.ptr, 0,
                           kExl3WorkspaceElements * sizeof(int32_t), stream);
@@ -1958,11 +1958,11 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
                static_cast<int32_t>(tier0_down_experts),
                static_cast<int32_t>(tier1_down_experts),
                static_cast<int32_t>(rows), stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 mixed K2/K3 EXL3 launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  ds4rt_ds4_flash_spark_exl3_k2_moe_buffers_t sum_buffers{};
+  ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t sum_buffers{};
   sum_buffers.routed_output = buffers->routed_output;
   sum_buffers.output_f32 = buffers->output_f32;
   sum_buffers.topk_weights = buffers->topk_weights;
@@ -1970,11 +1970,11 @@ ds4rt_cuda_ds4_flash_spark_exl3_mixed_k2_k3_async(
   sum_buffers.expert_map = buffers->global_to_combined;
   sum_buffers.down_svh = buffers->down_svh;
   if (launch_flash_exl3_topk6_sum(&sum_buffers, rows, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Flash Spark TP4 mixed K2/K3 EXL3 sum failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return ds4rt_cuda_f32_to_bf16_async(
+  return ds41rt_cuda_f32_to_bf16_async(
       static_cast<const float *>(buffers->output_f32.ptr),
       static_cast<uint16_t *>(buffers->output_bf16.ptr), rows * kHidden,
       cuda_stream);

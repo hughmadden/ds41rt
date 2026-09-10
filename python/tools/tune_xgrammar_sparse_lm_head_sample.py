@@ -31,7 +31,7 @@ from tune_xgrammar_sparse_lm_head import (
 REFERENCE_ROOT = Path(__file__).resolve().parents[1] / "reference"
 sys.path.insert(0, str(REFERENCE_ROOT))
 
-from ds4rt_reference.triton_sampling_capture import (  # noqa: E402
+from ds41rt_reference.triton_sampling_capture import (  # noqa: E402
     _sample_from_candidates,
 )
 
@@ -225,11 +225,11 @@ def main() -> None:
     properties = torch.cuda.get_device_properties(device)
     torch.manual_seed(args.seed)
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    lib.ds4rt_last_error.restype = ctypes.c_int
+    lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    lib.ds41rt_last_error.restype = ctypes.c_int
     native_sampler = configure(
         lib,
-        "ds4rt_cuda_logits_masked_sample_topk_topp_f32_grid_candidate_async",
+        "ds41rt_cuda_logits_masked_sample_topk_topp_f32_grid_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,

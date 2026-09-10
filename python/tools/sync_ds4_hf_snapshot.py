@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify and publish one immutable DS4RT HF snapshot on the Spark ranks."""
+"""Verify and publish one immutable DS41RT HF snapshot on the Spark ranks."""
 
 from __future__ import annotations
 
@@ -16,15 +16,15 @@ import sys
 from typing import Any, Sequence
 
 
-MANIFEST_SCHEMA = "ds4rt-hf-staged-snapshot-v1"
+MANIFEST_SCHEMA = "ds41rt-hf-staged-snapshot-v1"
 MODEL_COMPONENT_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 HOST_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 REVISION_RE = re.compile(r"[0-9a-f]{64}\Z")
 REMOTE_PATH_RE = re.compile(r"/[A-Za-z0-9_./-]+\Z")
 DEFAULT_HOSTS = ("ostrich", "dodo", "emu", "kiwi")
 QUALIFICATION_SCHEMAS = {
-    "retained-native.json": "ds4rt-exl3-retained-native-integrity-v1",
-    "expert-quality.json": "ds4rt-exl3-checkpoint-quality-v1",
+    "retained-native.json": "ds41rt-exl3-retained-native-integrity-v1",
+    "expert-quality.json": "ds41rt-exl3-checkpoint-quality-v1",
 }
 DEVELOPMENT_QUALIFICATION_STATUS = "development-unqualified"
 DEVELOPMENT_BLOCKERS = (
@@ -32,8 +32,8 @@ DEVELOPMENT_BLOCKERS = (
     "natural MTP held-out activation quality evidence is absent",
 )
 DEVELOPMENT_EVIDENCE_SCHEMAS = {
-    "retained-native.json": "ds4rt-exl3-retained-native-integrity-v1",
-    "diagnostic-quality.json": "ds4rt-exl3-checkpoint-quality-v1",
+    "retained-native.json": "ds41rt-exl3-retained-native-integrity-v1",
+    "diagnostic-quality.json": "ds41rt-exl3-checkpoint-quality-v1",
 }
 
 
@@ -52,14 +52,14 @@ from pathlib import Path, PurePosixPath
 import re
 import sys
 
-SCHEMA = "ds4rt-hf-staged-snapshot-v1"
+SCHEMA = "ds41rt-hf-staged-snapshot-v1"
 root = Path(sys.argv[1]).resolve()
 revision = sys.argv[2]
 model_id = sys.argv[3]
 allow_development_unqualified = len(sys.argv) == 5 and sys.argv[4] == "1"
 if re.fullmatch(r"[0-9a-f]{64}", revision) is None:
     raise SystemExit("invalid expected staged revision")
-manifest_path = root / "ds4rt-manifests" / f"{revision}.json"
+manifest_path = root / "ds41rt-manifests" / f"{revision}.json"
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 if (
     manifest.get("schema") != SCHEMA
@@ -128,7 +128,7 @@ quant = config.get("quantization_config")
 gptqmodel_native = (
     isinstance(quant, dict)
     and isinstance(quant.get("meta"), dict)
-    and "ds4rt_error_ledger" in quant["meta"]
+    and "ds41rt_error_ledger" in quant["meta"]
 )
 qualification = manifest.get("qualification")
 qualification_count = 0
@@ -137,11 +137,11 @@ qualification_status = manifest.get("qualification_status")
 if gptqmodel_native:
     if qualification_status is None:
         expected_qualification = {
-            "retained-native.json": "ds4rt-exl3-retained-native-integrity-v1",
-            "expert-quality.json": "ds4rt-exl3-checkpoint-quality-v1",
+            "retained-native.json": "ds41rt-exl3-retained-native-integrity-v1",
+            "expert-quality.json": "ds41rt-exl3-checkpoint-quality-v1",
         }
         evidence = qualification
-        evidence_root_name = "ds4rt-qualifications"
+        evidence_root_name = "ds41rt-qualifications"
         quality_name = "expert-quality.json"
         qualification_status = "production-qualified"
         if manifest.get("development_evidence") not in (None, []):
@@ -158,11 +158,11 @@ if gptqmodel_native:
         ):
             raise SystemExit("remote development qualification state is invalid")
         expected_qualification = {
-            "retained-native.json": "ds4rt-exl3-retained-native-integrity-v1",
-            "diagnostic-quality.json": "ds4rt-exl3-checkpoint-quality-v1",
+            "retained-native.json": "ds41rt-exl3-retained-native-integrity-v1",
+            "diagnostic-quality.json": "ds41rt-exl3-checkpoint-quality-v1",
         }
         evidence = manifest.get("development_evidence")
-        evidence_root_name = "ds4rt-development-evidence"
+        evidence_root_name = "ds41rt-development-evidence"
         quality_name = "diagnostic-quality.json"
     else:
         raise SystemExit("remote GPTQModel qualification status is invalid")
@@ -313,7 +313,7 @@ def is_gptqmodel_native_config(config: dict[str, Any]) -> bool:
     return (
         isinstance(quant, dict)
         and isinstance(quant.get("meta"), dict)
-        and "ds4rt_error_ledger" in quant["meta"]
+        and "ds41rt_error_ledger" in quant["meta"]
     )
 
 
@@ -340,7 +340,7 @@ def validate_staged_qualification(
     qualification_status = manifest.get("qualification_status")
     if qualification_status is None:
         expected_schemas = QUALIFICATION_SCHEMAS
-        evidence_root_name = "ds4rt-qualifications"
+        evidence_root_name = "ds41rt-qualifications"
         quality_name = "expert-quality.json"
         qualification_status = "production-qualified"
         if manifest.get("development_evidence") not in (None, []):
@@ -359,7 +359,7 @@ def validate_staged_qualification(
             raise ValueError("GPTQModel staged development qualification state is invalid")
         entries = manifest.get("development_evidence")
         expected_schemas = DEVELOPMENT_EVIDENCE_SCHEMAS
-        evidence_root_name = "ds4rt-development-evidence"
+        evidence_root_name = "ds41rt-development-evidence"
         quality_name = "diagnostic-quality.json"
     else:
         raise ValueError("GPTQModel staged qualification status is invalid")
@@ -432,7 +432,7 @@ def load_staged_cache(
     revision = ref.read_text(encoding="utf-8").strip()
     if REVISION_RE.fullmatch(revision) is None:
         raise ValueError(f"staged cache has invalid revision {revision!r}")
-    manifest_path = root / "ds4rt-manifests" / f"{revision}.json"
+    manifest_path = root / "ds41rt-manifests" / f"{revision}.json"
     manifest = read_json_object(manifest_path)
     entries = manifest.get("files")
     if (
@@ -650,7 +650,7 @@ def main() -> int:
     print(
         json.dumps(
             {
-                "schema": "ds4rt-hf-spark-sync-v1",
+                "schema": "ds41rt-hf-spark-sync-v1",
                 "model_id": contract.model_id,
                 "revision": contract.revision,
                 "files": contract.files,

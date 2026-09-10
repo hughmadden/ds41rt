@@ -90,9 +90,9 @@ def load_measurements(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]
                 complete = record.get("status") == "complete"
     if manifest is None:
         raise ValueError("result has no manifest")
-    if manifest.get("schema") != "ds4rt-expert-reduction-replay-result-v2":
+    if manifest.get("schema") != "ds41rt-expert-reduction-replay-result-v2":
         raise ValueError(
-            "result must use ds4rt-expert-reduction-replay-result-v2 with "
+            "result must use ds41rt-expert-reduction-replay-result-v2 with "
             "explicit DeepSeek model geometry"
         )
     if not complete:
@@ -247,7 +247,7 @@ def summarize(
             }
         )
     return {
-        "schema": "ds4rt-expert-reduction-replay-summary-v2",
+        "schema": "ds41rt-expert-reduction-replay-summary-v2",
         "input_schema": manifest["schema"],
         **{key: manifest[key] for key in geometry_keys},
         "cohort": manifest["cohort"],

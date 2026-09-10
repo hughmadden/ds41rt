@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Assemble a canonical DS4RT hybrid artifact from GPTQModel checkpoints.
+"""Assemble a canonical DS41RT hybrid artifact from GPTQModel checkpoints.
 
 GPTQModel's model writer serializes the transformed Transformers module tree.
-DS4RT instead needs the original DeepSeek checkpoint representation for every
+DS41RT instead needs the original DeepSeek checkpoint representation for every
 coordinator-owned tensor and GPTQModel's EXL3 representation only for routed
 experts.  This tool performs that bounded, resumable merge without loading a
 full model or trusting the writer's reconstructed dense state.
@@ -22,12 +22,12 @@ import sys
 import tempfile
 from typing import Any, Callable, Iterable
 
-from ds4rt_runtime.exl3_artifact_contract import (
+from ds41rt_runtime.exl3_artifact_contract import (
     LEDGER_FILE,
     LEDGER_MANIFEST_FILE,
     validate_gptqmodel_publication,
 )
-from ds4rt_runtime.exl3_quantizer import (
+from ds41rt_runtime.exl3_quantizer import (
     EXPERT_TENSOR_LAYOUT_GPTQMODEL,
     OutputTensor,
     SafetensorsArtifactWriter,
@@ -46,19 +46,19 @@ import quantize_flash_dspark_overlay as dspark_overlay
 import validate_projection_checkpoint_block as block_audit
 
 
-PROJECTION_ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-hybrid-projection-assembly-v1"
+PROJECTION_ASSEMBLY_SCHEMA = "ds41rt-exl3-canonical-hybrid-projection-assembly-v1"
 COMPOSITE_PROJECTION_ASSEMBLY_SCHEMA = (
-    "ds4rt-exl3-canonical-hybrid-composite-projection-assembly-v1"
+    "ds41rt-exl3-canonical-hybrid-composite-projection-assembly-v1"
 )
-ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-hybrid-assembly-v1"
-ASSEMBLY_FILENAME = "ds4rt-exl3-canonical-assembly.json"
-QUANT_CONFIG_ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-quant-config-assembly-v1"
-COMPOSITE_ASSEMBLY_SCHEMA = "ds4rt-exl3-canonical-hybrid-assembly-v2"
+ASSEMBLY_SCHEMA = "ds41rt-exl3-canonical-hybrid-assembly-v1"
+ASSEMBLY_FILENAME = "ds41rt-exl3-canonical-assembly.json"
+QUANT_CONFIG_ASSEMBLY_SCHEMA = "ds41rt-exl3-canonical-quant-config-assembly-v1"
+COMPOSITE_ASSEMBLY_SCHEMA = "ds41rt-exl3-canonical-hybrid-assembly-v2"
 COMPOSITE_QUANT_CONFIG_ASSEMBLY_SCHEMA = (
-    "ds4rt-exl3-canonical-composite-quant-config-assembly-v1"
+    "ds41rt-exl3-canonical-composite-quant-config-assembly-v1"
 )
-BLOCK_AUDIT_SET_SCHEMA = "ds4rt-exl3-independent-block-audit-set-v1"
-COMPOSITE_BLOCK_AUDIT_SET_SCHEMA = "ds4rt-exl3-independent-composite-block-audit-set-v1"
+BLOCK_AUDIT_SET_SCHEMA = "ds41rt-exl3-independent-block-audit-set-v1"
+COMPOSITE_BLOCK_AUDIT_SET_SCHEMA = "ds41rt-exl3-independent-composite-block-audit-set-v1"
 PROJECTION_SUFFIXES = ("trellis", "suh", "svh", "mcg")
 PROJECTION_NAMES = {
     "w1": "gate_proj",
@@ -1481,7 +1481,7 @@ def canonical_composite_quant_config(
         "tensor_storage": storage,
         "meta": {
             "fallback": None,
-            "ds4rt_error_ledger": provenance,
+            "ds41rt_error_ledger": provenance,
         },
     }
     report = {
@@ -1754,10 +1754,10 @@ def canonicalize_composite(
     )
     native_config["quantization_config"] = quant_config
     artifact_plan = replace(artifact_plan, model_config=native_config)
-    ledger_provenance = quant_config["meta"]["ds4rt_error_ledger"]
+    ledger_provenance = quant_config["meta"]["ds41rt_error_ledger"]
     recipe = base_plan["recipe"]
 
-    state_path = work_dir / ".ds4rt-exl3-state.json"
+    state_path = work_dir / ".ds41rt-exl3-state.json"
     finished_assembly_path = work_dir / ASSEMBLY_FILENAME
     if resume and finished_assembly_path.is_file() and not state_path.exists():
         assembly = _read_json(finished_assembly_path)
@@ -1818,7 +1818,7 @@ def canonicalize_composite(
     )
     launcher.atomic_json(work_dir / ASSEMBLY_FILENAME, assembly)
     with tempfile.TemporaryDirectory(
-        prefix=".ds4rt-composite-ledger-",
+        prefix=".ds41rt-composite-ledger-",
         dir=work_dir.parent,
     ) as ledger_directory:
         manifest = write_exl3_error_ledger(ledger_directory, projection_records)
@@ -1944,7 +1944,7 @@ def canonicalize(
     plan = replace(plan, model_config=native_config)
     recipe = raw_plan["recipe"]
 
-    state_path = work_dir / ".ds4rt-exl3-state.json"
+    state_path = work_dir / ".ds41rt-exl3-state.json"
     finished_assembly_path = work_dir / ASSEMBLY_FILENAME
     if resume and finished_assembly_path.is_file() and not state_path.exists():
         assembly = _read_json(finished_assembly_path)

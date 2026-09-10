@@ -50,9 +50,9 @@ def read_route_bank(path: Path) -> tuple[dict, dict[str, list[tuple[int, ...]]]]
                 outputs[record["case"]].append(tuple(record["physical_ms"]))
     if manifest is None:
         raise ValueError("route bank has no manifest")
-    if manifest.get("schema") != "ds4rt-expert-route-bank-v2":
+    if manifest.get("schema") != "ds41rt-expert-route-bank-v2":
         raise ValueError(
-            "route bank must use ds4rt-expert-route-bank-v2 with explicit "
+            "route bank must use ds41rt-expert-route-bank-v2 with explicit "
             "DeepSeek model geometry"
         )
     if not outputs:
@@ -172,7 +172,7 @@ def main() -> None:
     }
 
     report = {
-        "schema": "ds4rt-expert-reduction-coverage-v2",
+        "schema": "ds41rt-expert-reduction-coverage-v2",
         "route_bank": str(args.route_bank.resolve()),
         "model": manifest["model"],
         "hidden_size": manifest["hidden_size"],

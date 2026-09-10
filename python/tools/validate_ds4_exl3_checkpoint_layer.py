@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _pinned_sparkinfer  # noqa: E402,F401
 
-from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+from ds41rt_runtime.exl3_artifact_contract import (  # noqa: E402
     ARTIFACT_FILE as GPTQMODEL_ARTIFACT_FILE,
     LEDGER_FILE as GPTQMODEL_LEDGER_FILE,
     LEDGER_MANIFEST_FILE as GPTQMODEL_LEDGER_MANIFEST_FILE,
@@ -32,20 +32,20 @@ from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
     is_gptqmodel_native_exl3,
     validate_gptqmodel_native_exl3,
 )
-from ds4rt_runtime.exl3_experts import (  # noqa: E402
+from ds41rt_runtime.exl3_experts import (  # noqa: E402
     ValidatedExl3ExpertSnapshot,
     load_exl3_expert_reference_layer,
     load_exl3_expert_tp_layer,
     validate_exl3_expert_snapshot,
 )
-from ds4rt_runtime.exl3_quantizer import (  # noqa: E402
+from ds41rt_runtime.exl3_quantizer import (  # noqa: E402
     deterministic_expert_row_indices,
     load_activation_corpus,
     load_activation_layer_samples,
     load_routed_activation_layer,
     read_native_model_config,
 )
-from ds4rt_runtime.native_experts import (  # noqa: E402
+from ds41rt_runtime.native_experts import (  # noqa: E402
     load_native_expert_reference_layer,
     read_native_expert_config,
 )
@@ -55,9 +55,9 @@ MIN_QUANT_COSINE = 0.88
 MAX_QUANT_RELATIVE_L2 = 0.50
 MIN_DSPARK_QUANT_COSINE = 0.84
 MAX_DSPARK_QUANT_RELATIVE_L2 = 0.56
-PROGRESS_SCHEMA = "ds4rt-exl3-checkpoint-quality-progress-v1"
+PROGRESS_SCHEMA = "ds41rt-exl3-checkpoint-quality-progress-v1"
 GPTQMODEL_CALIBRATION_FORMAT = "gptqmodel-native-exl3-v4"
-QUALITY_GPU_SCHEMA = "ds4rt-quality-physical-gpu-v1"
+QUALITY_GPU_SCHEMA = "ds41rt-quality-physical-gpu-v1"
 NATURAL_TARGET_SYNTHETIC_MTP = "natural-target-stratified-mtp-rms-isotropic"
 GPU_UUID_RE = re.compile(
     r"GPU-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
@@ -377,7 +377,7 @@ def quality_gpu_identity(
 
 
 def incomplete_report(snapshot: Path) -> dict[str, Any] | None:
-    path = snapshot / "ds4rt-exl3-calibration.json.incomplete"
+    path = snapshot / "ds41rt-exl3-calibration.json.incomplete"
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
 
@@ -456,7 +456,7 @@ def readable_exl3_snapshot(
     allow_incomplete: bool,
 ) -> Iterator[tuple[Path, dict[str, Any]]]:
     snapshot = snapshot.resolve()
-    final_report_path = snapshot / "ds4rt-exl3-calibration.json"
+    final_report_path = snapshot / "ds41rt-exl3-calibration.json"
     config_path = snapshot / "config.json"
     if config_path.is_file():
         model_config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -482,7 +482,7 @@ def readable_exl3_snapshot(
     index = snapshot / "model.safetensors.index.json.incomplete"
     if not config.is_file() or not index.is_file():
         raise ValueError("incomplete EXL3 snapshot is missing staged Hugging Face metadata")
-    with tempfile.TemporaryDirectory(prefix="ds4rt-exl3-validation-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="ds41rt-exl3-validation-") as temporary:
         view = Path(temporary)
         (view / "config.json").symlink_to(config)
         (view / "model.safetensors.index.json").symlink_to(index)
@@ -1526,7 +1526,7 @@ def snapshot_identity(snapshot: Path) -> dict[str, Any]:
         "config.json",
         "model.safetensors.index.json",
         "quantize_config.json",
-        "ds4rt-exl3-calibration.json",
+        "ds41rt-exl3-calibration.json",
         GPTQMODEL_PLAN_FILE,
         GPTQMODEL_RUN_FILE,
         GPTQMODEL_ARTIFACT_FILE,
@@ -1889,7 +1889,7 @@ def main() -> None:
         if validation_contract(args, layer_ids) != contract:
             raise RuntimeError("EXL3 checkpoint changed during all-layer validation")
         report = {
-            "schema": "ds4rt-exl3-checkpoint-quality-v1",
+            "schema": "ds41rt-exl3-checkpoint-quality-v1",
             "native_snapshot": str(args.native_snapshot.resolve()),
             "exl3_snapshot": str(args.exl3_snapshot.resolve()),
             "expert_ids": (

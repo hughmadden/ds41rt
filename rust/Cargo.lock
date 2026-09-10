@@ -462,15 +462,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "ds4rt-api"
+name = "ds41rt-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
  "axum",
- "ds4rt-core",
- "ds4rt-loader",
- "ds4rt-transport",
+ "ds41rt-core",
+ "ds41rt-loader",
+ "ds41rt-transport",
  "futures",
  "serde",
  "serde_json",
@@ -483,7 +483,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ds4rt-core"
+name = "ds41rt-core"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -494,7 +494,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ds4rt-daemon"
+name = "ds41rt-daemon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -502,11 +502,11 @@ dependencies = [
  "bincode",
  "bytes",
  "clap",
- "ds4rt-api",
- "ds4rt-core",
- "ds4rt-ffi",
- "ds4rt-loader",
- "ds4rt-transport",
+ "ds41rt-api",
+ "ds41rt-core",
+ "ds41rt-ffi",
+ "ds41rt-loader",
+ "ds41rt-transport",
  "io-uring",
  "libc",
  "pyo3",
@@ -520,7 +520,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ds4rt-ffi"
+name = "ds41rt-ffi"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -528,11 +528,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "ds4rt-loader"
+name = "ds41rt-loader"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "ds4rt-core",
+ "ds41rt-core",
  "serde",
  "serde_json",
  "sha2",
@@ -542,13 +542,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "ds4rt-transport"
+name = "ds41rt-transport"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
- "ds4rt-core",
- "ds4rt-ffi",
+ "ds41rt-core",
+ "ds41rt-ffi",
  "futures",
  "serde",
  "serde_json",

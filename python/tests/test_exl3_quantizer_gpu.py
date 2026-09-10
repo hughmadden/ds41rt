@@ -8,20 +8,20 @@ import tempfile
 import pytest
 import torch
 
-from ds4rt_runtime.exl3_quantizer import (
+from ds41rt_runtime.exl3_quantizer import (
     SafetensorsArtifactWriter,
     build_artifact_plan,
     run_layerwise_quantization,
 )
-from ds4rt_runtime.exl3_experts import (
+from ds41rt_runtime.exl3_experts import (
     load_exl3_expert_reference_layer,
     load_exl3_expert_tp_layer,
 )
 
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("DS4RT_RUN_GPU_QUALIFICATION") != "1",
-    reason="set DS4RT_RUN_GPU_QUALIFICATION=1 for the pinned EXL3 CUDA gate",
+    os.environ.get("DS41RT_RUN_GPU_QUALIFICATION") != "1",
+    reason="set DS41RT_RUN_GPU_QUALIFICATION=1 for the pinned EXL3 CUDA gate",
 )
 
 
@@ -37,7 +37,7 @@ def test_pinned_exllamav3_calibrated_k2_quantization() -> None:
     original = torch.randn((128, 128), dtype=torch.float32, device=device) * 0.02
     hessian = {
         "H": samples.T @ samples,
-        "first_key": "ds4rt.gpu_qualification.w1",
+        "first_key": "ds41rt.gpu_qualification.w1",
         "count": 512,
         "finalized": False,
         "num_total": samples.numel(),
@@ -109,7 +109,7 @@ def test_layerwise_converter_publishes_tiny_hybrid_snapshot(
 ) -> None:
     output = tiny_exl3_snapshot
     report = __import__("json").loads(
-        (output / "ds4rt-exl3-calibration.json").read_text(encoding="utf-8")
+        (output / "ds41rt-exl3-calibration.json").read_text(encoding="utf-8")
     )
     assert (output / "config.json").is_file()
     assert len(report["layers"]) == 1

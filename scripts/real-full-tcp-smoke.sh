@@ -5,14 +5,14 @@ url="${1:-${URL:-http://127.0.0.1:8000}}"
 model="${2:-${MODEL:-wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1}}"
 max_tokens="${3:-${MAX_TOKENS:-1}}"
 prompt="${PROMPT:-Use real full.}"
-strict="${STRICT:-${DS4RT_REAL_FULL_TCP_SMOKE_STRICT:-0}}"
-prompt_repeat_token="${PROMPT_REPEAT_TOKEN:-${DS4RT_REAL_FULL_TCP_SMOKE_PROMPT_REPEAT_TOKEN:-}}"
-prompt_repeat_count="${PROMPT_REPEAT_COUNT:-${DS4RT_REAL_FULL_TCP_SMOKE_PROMPT_REPEAT_COUNT:-0}}"
-min_prefill_chunks="${MIN_PREFILL_CHUNKS:-${DS4RT_REAL_FULL_TCP_SMOKE_MIN_PREFILL_CHUNKS:-0}}"
-require_runtime_summary="${REQUIRE_RUNTIME_SUMMARY:-${DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY:-0}}"
-require_real_nvfp4="${REQUIRE_REAL_NVFP4:-${DS4RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4:-0}}"
-expert_mode="${DS4RT_PHASE0_SPARK_EXPERT_MODE:-real}"
-expected_transport="${EXPECTED_TRANSPORT:-${DS4RT_REAL_FULL_SMOKE_TRANSPORT:-tcp}}"
+strict="${STRICT:-${DS41RT_REAL_FULL_TCP_SMOKE_STRICT:-0}}"
+prompt_repeat_token="${PROMPT_REPEAT_TOKEN:-${DS41RT_REAL_FULL_TCP_SMOKE_PROMPT_REPEAT_TOKEN:-}}"
+prompt_repeat_count="${PROMPT_REPEAT_COUNT:-${DS41RT_REAL_FULL_TCP_SMOKE_PROMPT_REPEAT_COUNT:-0}}"
+min_prefill_chunks="${MIN_PREFILL_CHUNKS:-${DS41RT_REAL_FULL_TCP_SMOKE_MIN_PREFILL_CHUNKS:-0}}"
+require_runtime_summary="${REQUIRE_RUNTIME_SUMMARY:-${DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_RUNTIME_SUMMARY:-0}}"
+require_real_nvfp4="${REQUIRE_REAL_NVFP4:-${DS41RT_REAL_FULL_TCP_SMOKE_REQUIRE_REAL_NVFP4:-0}}"
+expert_mode="${DS41RT_PHASE0_SPARK_EXPERT_MODE:-real}"
+expected_transport="${EXPECTED_TRANSPORT:-${DS41RT_REAL_FULL_SMOKE_TRANSPORT:-tcp}}"
 
 require_bool_flag() {
   local name="$1"
@@ -43,7 +43,7 @@ require_bool_flag "REQUIRE_REAL_NVFP4" "$require_real_nvfp4"
 case "$expert_mode" in
   real|synthetic) ;;
   *)
-    echo "DS4RT_PHASE0_SPARK_EXPERT_MODE must be real or synthetic, got: ${expert_mode}" >&2
+    echo "DS41RT_PHASE0_SPARK_EXPERT_MODE must be real or synthetic, got: ${expert_mode}" >&2
     exit 2
     ;;
 esac

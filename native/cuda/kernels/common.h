@@ -1,4 +1,4 @@
-#include "ds4rt_native.h"
+#include "ds41rt_native.h"
 
 
 #include <cuda_runtime_api.h>
@@ -8,7 +8,7 @@
 #include <limits>
 #include <vector>
 
-extern "C" void ds4rt_set_last_error_message(const char* message);
+extern "C" void ds41rt_set_last_error_message(const char* message);
 
 namespace {
 
@@ -93,32 +93,32 @@ bool checked_add(size_t lhs, size_t rhs, size_t* out) {
   return true;
 }
 
-ds4rt_status_t status_from_cuda(cudaError_t err) {
+ds41rt_status_t status_from_cuda(cudaError_t err) {
   if (err == cudaSuccess) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
-  ds4rt_set_last_error_message(cudaGetErrorString(err));
-  return DS4RT_STATUS_COPY_FAILED;
+  ds41rt_set_last_error_message(cudaGetErrorString(err));
+  return DS41RT_STATUS_COPY_FAILED;
 }
 
-ds4rt_status_t find_kernel_node_by_index(void* cuda_graph, size_t kernel_node_index,
+ds41rt_status_t find_kernel_node_by_index(void* cuda_graph, size_t kernel_node_index,
                                          cudaGraphNode_t* out_node) {
   if (cuda_graph == nullptr || out_node == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_node = nullptr;
   cudaGraph_t graph = reinterpret_cast<cudaGraph_t>(cuda_graph);
   size_t node_count = 0;
   cudaError_t err = cudaGraphGetNodes(graph, nullptr, &node_count);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   std::vector<cudaGraphNode_t> nodes(node_count);
   if (node_count > 0) {
     size_t copied_nodes = node_count;
     err = cudaGraphGetNodes(graph, nodes.data(), &copied_nodes);
     if (err != cudaSuccess) {
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
     nodes.resize(copied_nodes);
   }
@@ -128,18 +128,18 @@ ds4rt_status_t find_kernel_node_by_index(void* cuda_graph, size_t kernel_node_in
     cudaGraphNodeType type;
     err = cudaGraphNodeGetType(node, &type);
     if (err != cudaSuccess) {
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
     if (type != cudaGraphNodeTypeKernel) {
       continue;
     }
     if (kernel_index == kernel_node_index) {
       *out_node = node;
-      return DS4RT_STATUS_OK;
+      return DS41RT_STATUS_OK;
     }
     ++kernel_index;
   }
-  return DS4RT_STATUS_INVALID_ARGUMENT;
+  return DS41RT_STATUS_INVALID_ARGUMENT;
 }
 
 }  // namespace

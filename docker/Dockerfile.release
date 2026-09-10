@@ -6,9 +6,9 @@ ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV UV_SYSTEM_PYTHON=1
-ENV PATH=/opt/ds4rt/bin:${PATH}
-ENV PYTHONPATH=/opt/ds4rt/third_party/sparkinfer:/opt/ds4rt/python/reference/ds4rt_reference:/opt/ds4rt/python/reference
-ENV DS4RT_NATIVE_LIB=/opt/ds4rt/lib/libds4rt_native.so
+ENV PATH=/opt/ds41rt/bin:${PATH}
+ENV PYTHONPATH=/opt/ds41rt/third_party/sparkinfer:/opt/ds41rt/python/reference/ds41rt_reference:/opt/ds41rt/python/reference
+ENV DS41RT_NATIVE_LIB=/opt/ds41rt/lib/libds41rt_native.so
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -44,88 +44,88 @@ RUN uv pip install --system --break-system-packages --no-cache pytest
 # Keep source/revision metadata after the expensive immutable dependency
 # layers. Rapid SparkInfer iteration should invalidate only the pinned-source
 # and release-material tail of this image.
-ARG DS4RT_ROLE
+ARG DS41RT_ROLE
 ARG CUDA_ARCH
-ARG DS4RT_ENGINE_COMMIT=unknown
-ARG DS4RT_SPARKINFER_COMMIT=unknown
-ARG DS4RT_RELEASE_VERSION=unknown
+ARG DS41RT_ENGINE_COMMIT=unknown
+ARG DS41RT_SPARKINFER_COMMIT=unknown
+ARG DS41RT_RELEASE_VERSION=unknown
 
-ENV DS4RT_ROLE=${DS4RT_ROLE}
-ENV DS4RT_CUDA_ARCH=${CUDA_ARCH}
-ENV DS4RT_ENGINE_COMMIT=${DS4RT_ENGINE_COMMIT}
-ENV DS4RT_SPARKINFER_COMMIT=${DS4RT_SPARKINFER_COMMIT}
-ENV DS4RT_RELEASE_VERSION=${DS4RT_RELEASE_VERSION}
+ENV DS41RT_ROLE=${DS41RT_ROLE}
+ENV DS41RT_CUDA_ARCH=${CUDA_ARCH}
+ENV DS41RT_ENGINE_COMMIT=${DS41RT_ENGINE_COMMIT}
+ENV DS41RT_SPARKINFER_COMMIT=${DS41RT_SPARKINFER_COMMIT}
+ENV DS41RT_RELEASE_VERSION=${DS41RT_RELEASE_VERSION}
 
-LABEL org.opencontainers.image.title="DS4RT inference"
-LABEL org.opencontainers.image.source="https://github.com/tpurtell/ds4rt-pro-rtx-4spark"
+LABEL org.opencontainers.image.title="DS41RT inference"
+LABEL org.opencontainers.image.source="https://github.com/tpurtell/ds41rt"
 LABEL org.opencontainers.image.description="DeepSeek V4 Pro inference for one RTX PRO 6000 and four DGX Spark expert workers"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.revision=${DS4RT_ENGINE_COMMIT}
-LABEL org.opencontainers.image.version=${DS4RT_RELEASE_VERSION}
-LABEL io.ds4rt.role=${DS4RT_ROLE}
-LABEL io.ds4rt.cuda_arch=${CUDA_ARCH}
-LABEL io.ds4rt.sparkinfer.revision=${DS4RT_SPARKINFER_COMMIT}
+LABEL org.opencontainers.image.revision=${DS41RT_ENGINE_COMMIT}
+LABEL org.opencontainers.image.version=${DS41RT_RELEASE_VERSION}
+LABEL io.ds41rt.role=${DS41RT_ROLE}
+LABEL io.ds41rt.cuda_arch=${CUDA_ARCH}
+LABEL io.ds41rt.sparkinfer.revision=${DS41RT_SPARKINFER_COMMIT}
 
-COPY scripts/verify-sparkinfer-source.py /opt/ds4rt/scripts/verify-sparkinfer-source.py
-COPY scripts/sparkinfer-release-provenance.py /opt/ds4rt/scripts/sparkinfer-release-provenance.py
-COPY third_party/sparkinfer.lock.json /opt/ds4rt/third_party/sparkinfer.lock.json
-COPY third_party/sparkinfer /opt/ds4rt/third_party/sparkinfer
+COPY scripts/verify-sparkinfer-source.py /opt/ds41rt/scripts/verify-sparkinfer-source.py
+COPY scripts/sparkinfer-release-provenance.py /opt/ds41rt/scripts/sparkinfer-release-provenance.py
+COPY third_party/sparkinfer.lock.json /opt/ds41rt/third_party/sparkinfer.lock.json
+COPY third_party/sparkinfer /opt/ds41rt/third_party/sparkinfer
 
-RUN python3 /opt/ds4rt/scripts/verify-sparkinfer-source.py \
-      --source /opt/ds4rt/third_party/sparkinfer \
-      --lock /opt/ds4rt/third_party/sparkinfer.lock.json && \
-    locked_revision="$(python3 /opt/ds4rt/scripts/verify-sparkinfer-source.py \
-      --source /opt/ds4rt/third_party/sparkinfer \
-      --lock /opt/ds4rt/third_party/sparkinfer.lock.json \
+RUN python3 /opt/ds41rt/scripts/verify-sparkinfer-source.py \
+      --source /opt/ds41rt/third_party/sparkinfer \
+      --lock /opt/ds41rt/third_party/sparkinfer.lock.json && \
+    locked_revision="$(python3 /opt/ds41rt/scripts/verify-sparkinfer-source.py \
+      --source /opt/ds41rt/third_party/sparkinfer \
+      --lock /opt/ds41rt/third_party/sparkinfer.lock.json \
       --print-revision)" && \
-    [ "${DS4RT_SPARKINFER_COMMIT}" != unknown ] && \
-    [ "${DS4RT_SPARKINFER_COMMIT}" = "$locked_revision" ] && \
+    [ "${DS41RT_SPARKINFER_COMMIT}" != unknown ] && \
+    [ "${DS41RT_SPARKINFER_COMMIT}" = "$locked_revision" ] && \
     uv pip install --system --break-system-packages --no-cache --no-deps \
-      --editable /opt/ds4rt/third_party/sparkinfer && \
+      --editable /opt/ds41rt/third_party/sparkinfer && \
     uv pip check && \
-    python3 -c 'import importlib.metadata, pathlib, b12x; source = pathlib.Path("/opt/ds4rt/third_party/sparkinfer").resolve(); module = pathlib.Path(b12x.__file__).resolve(); assert module.is_relative_to(source), (module, source); print(importlib.metadata.version("b12x"), module)' && \
-    python3 /opt/ds4rt/scripts/verify-sparkinfer-source.py \
-      --source /opt/ds4rt/third_party/sparkinfer \
-      --lock /opt/ds4rt/third_party/sparkinfer.lock.json \
+    python3 -c 'import importlib.metadata, pathlib, b12x; source = pathlib.Path("/opt/ds41rt/third_party/sparkinfer").resolve(); module = pathlib.Path(b12x.__file__).resolve(); assert module.is_relative_to(source), (module, source); print(importlib.metadata.version("b12x"), module)' && \
+    python3 /opt/ds41rt/scripts/verify-sparkinfer-source.py \
+      --source /opt/ds41rt/third_party/sparkinfer \
+      --lock /opt/ds41rt/third_party/sparkinfer.lock.json \
       --require-no-python-cache
 
-COPY .ds4rt-release-image/ds4rt /opt/ds4rt/bin/ds4rt
-COPY .ds4rt-release-image/libds4rt_native.so /opt/ds4rt/lib/libds4rt_native.so
-COPY .ds4rt-release-image/THIRD_PARTY_NOTICES.md /opt/ds4rt/share/THIRD_PARTY_NOTICES.md
-COPY .ds4rt-release-image/SPARKINFER_PROVENANCE.json /opt/ds4rt/share/SPARKINFER_PROVENANCE.json
-COPY .ds4rt-release-image/SPARKINFER_LICENSE /opt/ds4rt/share/SPARKINFER_LICENSE
-COPY .ds4rt-release-image/SPARKINFER_SHA256SUMS /opt/ds4rt/share/SPARKINFER_SHA256SUMS
-COPY .ds4rt-release-image/XGRAMMAR_PROVENANCE.json /opt/ds4rt/share/XGRAMMAR_PROVENANCE.json
-COPY .ds4rt-release-image/XGRAMMAR_LICENSE /opt/ds4rt/share/XGRAMMAR_LICENSE
-COPY .ds4rt-release-image/XGRAMMAR_SHA256SUMS /opt/ds4rt/share/XGRAMMAR_SHA256SUMS
-COPY python /opt/ds4rt/python
-COPY scripts/real-full-tcp-serve.sh /opt/ds4rt/scripts/real-full-tcp-serve.sh
-COPY scripts/kernel-cache-identity.py /opt/ds4rt/scripts/kernel-cache-identity.py
-COPY docker/release-entrypoint.sh /usr/local/bin/ds4rt-release-entrypoint
+COPY .ds41rt-release-image/ds41rt /opt/ds41rt/bin/ds41rt
+COPY .ds41rt-release-image/libds41rt_native.so /opt/ds41rt/lib/libds41rt_native.so
+COPY .ds41rt-release-image/THIRD_PARTY_NOTICES.md /opt/ds41rt/share/THIRD_PARTY_NOTICES.md
+COPY .ds41rt-release-image/SPARKINFER_PROVENANCE.json /opt/ds41rt/share/SPARKINFER_PROVENANCE.json
+COPY .ds41rt-release-image/SPARKINFER_LICENSE /opt/ds41rt/share/SPARKINFER_LICENSE
+COPY .ds41rt-release-image/SPARKINFER_SHA256SUMS /opt/ds41rt/share/SPARKINFER_SHA256SUMS
+COPY .ds41rt-release-image/XGRAMMAR_PROVENANCE.json /opt/ds41rt/share/XGRAMMAR_PROVENANCE.json
+COPY .ds41rt-release-image/XGRAMMAR_LICENSE /opt/ds41rt/share/XGRAMMAR_LICENSE
+COPY .ds41rt-release-image/XGRAMMAR_SHA256SUMS /opt/ds41rt/share/XGRAMMAR_SHA256SUMS
+COPY python /opt/ds41rt/python
+COPY scripts/real-full-tcp-serve.sh /opt/ds41rt/scripts/real-full-tcp-serve.sh
+COPY scripts/kernel-cache-identity.py /opt/ds41rt/scripts/kernel-cache-identity.py
+COPY docker/release-entrypoint.sh /usr/local/bin/ds41rt-release-entrypoint
 
 RUN cmp -s \
-      /opt/ds4rt/third_party/sparkinfer/LICENSE \
-      /opt/ds4rt/share/SPARKINFER_LICENSE && \
-    (cd /opt/ds4rt/share && sha256sum -c SPARKINFER_SHA256SUMS) && \
-    (cd /opt/ds4rt/share && sha256sum -c XGRAMMAR_SHA256SUMS) && \
-    python3 /opt/ds4rt/scripts/sparkinfer-release-provenance.py \
-      --source /opt/ds4rt/third_party/sparkinfer \
-      --lock /opt/ds4rt/third_party/sparkinfer.lock.json \
-      --license /opt/ds4rt/share/SPARKINFER_LICENSE \
-      --notices /opt/ds4rt/share/THIRD_PARTY_NOTICES.md \
-      --verify /opt/ds4rt/share/SPARKINFER_PROVENANCE.json && \
+      /opt/ds41rt/third_party/sparkinfer/LICENSE \
+      /opt/ds41rt/share/SPARKINFER_LICENSE && \
+    (cd /opt/ds41rt/share && sha256sum -c SPARKINFER_SHA256SUMS) && \
+    (cd /opt/ds41rt/share && sha256sum -c XGRAMMAR_SHA256SUMS) && \
+    python3 /opt/ds41rt/scripts/sparkinfer-release-provenance.py \
+      --source /opt/ds41rt/third_party/sparkinfer \
+      --lock /opt/ds41rt/third_party/sparkinfer.lock.json \
+      --license /opt/ds41rt/share/SPARKINFER_LICENSE \
+      --notices /opt/ds41rt/share/THIRD_PARTY_NOTICES.md \
+      --verify /opt/ds41rt/share/SPARKINFER_PROVENANCE.json && \
     install -D -m 0644 \
-      /opt/ds4rt/share/SPARKINFER_LICENSE \
-      /opt/ds4rt/share/licenses/sparkinfer/LICENSE && \
+      /opt/ds41rt/share/SPARKINFER_LICENSE \
+      /opt/ds41rt/share/licenses/sparkinfer/LICENSE && \
     install -D -m 0644 \
-      /opt/ds4rt/share/XGRAMMAR_LICENSE \
-      /opt/ds4rt/share/licenses/xgrammar/LICENSE && \
+      /opt/ds41rt/share/XGRAMMAR_LICENSE \
+      /opt/ds41rt/share/licenses/xgrammar/LICENSE && \
     chmod +x \
-      /opt/ds4rt/bin/ds4rt \
-      /opt/ds4rt/scripts/real-full-tcp-serve.sh \
-      /usr/local/bin/ds4rt-release-entrypoint && \
+      /opt/ds41rt/bin/ds41rt \
+      /opt/ds41rt/scripts/real-full-tcp-serve.sh \
+      /usr/local/bin/ds41rt-release-entrypoint && \
     python3 -c 'import b12x_mla_capture, b12x_spark_capture, triton_kv_pack_capture, triton_mlp_capture, triton_router_capture, triton_sampling_capture'
 
-WORKDIR /opt/ds4rt
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/ds4rt-release-entrypoint"]
-CMD ["ds4rt", "--help"]
+WORKDIR /opt/ds41rt
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/ds41rt-release-entrypoint"]
+CMD ["ds41rt", "--help"]

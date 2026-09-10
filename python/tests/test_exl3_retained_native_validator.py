@@ -24,7 +24,7 @@ def test_legacy_retained_native_report_preserves_declared_recipe(
             {
                 "quantization_config": {
                     "quant_method": "exl3",
-                    "ds4rt": {
+                    "ds41rt": {
                         "recipe": (
                             "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
                         )
@@ -38,7 +38,7 @@ def test_legacy_retained_native_report_preserves_declared_recipe(
     recipe, output = validator.artifact_recipe_and_output(artifact, None)
 
     assert recipe == "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
-    assert output == artifact / "ds4rt-exl3-retained-native.json"
+    assert output == artifact / "ds41rt-exl3-retained-native.json"
 
 
 def test_gptqmodel_retained_native_report_must_remain_external(
@@ -52,7 +52,7 @@ def test_gptqmodel_retained_native_report_must_remain_external(
                 "quantization_config": {
                     "quant_method": "exl3",
                     "bits": 2.0,
-                    "meta": {"ds4rt_error_ledger": {}},
+                    "meta": {"ds41rt_error_ledger": {}},
                 }
             }
         ),
@@ -89,7 +89,7 @@ def test_gptqmodel_k3_retained_native_report_uses_k3_recipe(
                 "quantization_config": {
                     "quant_method": "exl3",
                     "bits": 3.0,
-                    "meta": {"ds4rt_error_ledger": {}},
+                    "meta": {"ds41rt_error_ledger": {}},
                 }
             }
         ),
@@ -115,7 +115,7 @@ def test_gptqmodel_k3_retained_native_report_uses_k3_recipe(
             {
                 "quant_method": "exl3",
                 "bits": 2.0,
-                "meta": {"ds4rt_error_ledger": {}},
+                "meta": {"ds41rt_error_ledger": {}},
             },
             validator.EXPERT_TENSOR_LAYOUT_GPTQMODEL,
             2,
@@ -124,7 +124,7 @@ def test_gptqmodel_k3_retained_native_report_uses_k3_recipe(
             {
                 "quant_method": "exl3",
                 "bits": 3.0,
-                "meta": {"ds4rt_error_ledger": {}},
+                "meta": {"ds41rt_error_ledger": {}},
             },
             validator.EXPERT_TENSOR_LAYOUT_GPTQMODEL,
             3,
@@ -132,7 +132,7 @@ def test_gptqmodel_k3_retained_native_report_uses_k3_recipe(
         (
             {
                 "quant_method": "exl3",
-                "ds4rt": {"recipe": "legacy"},
+                "ds41rt": {"recipe": "legacy"},
             },
             validator.EXPERT_TENSOR_LAYOUT_CHECKPOINT_NATIVE,
             2,
@@ -201,7 +201,7 @@ def test_retained_native_plan_preserves_mixed_physical_projection_tiers(
             "quantization_config": {
                 "quant_method": "exl3",
                 "bits": 2,
-                "meta": {"ds4rt_error_ledger": {}},
+                "meta": {"ds41rt_error_ledger": {}},
                 "tensor_storage": storage,
             }
         },

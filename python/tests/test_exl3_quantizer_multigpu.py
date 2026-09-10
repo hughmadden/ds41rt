@@ -8,15 +8,15 @@ import tempfile
 import pytest
 import torch
 
-from ds4rt_runtime.exl3_quantizer import (
+from ds41rt_runtime.exl3_quantizer import (
     analytic_isotropic_hessian,
     qualify_multigpu_batch_equivalence,
 )
 
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("DS4RT_RUN_MULTI_GPU_QUANTIZATION") != "1",
-    reason="set DS4RT_RUN_MULTI_GPU_QUANTIZATION=1 for the two-GPU EXL3 gate",
+    os.environ.get("DS41RT_RUN_MULTI_GPU_QUANTIZATION") != "1",
+    reason="set DS41RT_RUN_MULTI_GPU_QUANTIZATION=1 for the two-GPU EXL3 gate",
 )
 
 
@@ -36,7 +36,7 @@ def test_pinned_exllamav3_two_gpu_tiles_match_single_gpu_bit_exactly() -> None:
         hessian = analytic_isotropic_hessian(
             features=128,
             equivalent_rows=512,
-            key="ds4rt.multigpu_qualification.w1",
+            key="ds41rt.multigpu_qualification.w1",
             device=primary,
         )
         args = {
@@ -77,7 +77,7 @@ def test_pinned_exllamav3_repeated_batches_fence_two_gpu_tile_streams() -> None:
     import _pinned_exllamav3
 
     with tempfile.TemporaryDirectory() as temporary:
-        debug_dir = Path(temporary) / "new-artifact" / ".ds4rt-exl3-debug"
+        debug_dir = Path(temporary) / "new-artifact" / ".ds41rt-exl3-debug"
         report = qualify_multigpu_batch_equivalence(
             quantize_exl3_batch=_pinned_exllamav3.quantize_exl3_batch,
             quantization_devices=(0, 1),

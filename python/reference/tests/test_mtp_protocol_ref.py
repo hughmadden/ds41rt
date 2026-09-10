@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ds4rt_reference.mtp_protocol_ref import committed_kv_indices, verify_draft_tokens
+from ds41rt_reference.mtp_protocol_ref import committed_kv_indices, verify_draft_tokens
 
 
 def test_verify_draft_tokens_accepts_prefix_until_mismatch():

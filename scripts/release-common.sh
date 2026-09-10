@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-RELEASE_COORDINATOR_CONTAINER_NAME=ds4rt-coordinator
-RELEASE_SPARK_CONTAINER_PREFIX=ds4rt-spark-expert
+RELEASE_COORDINATOR_CONTAINER_NAME=ds41rt-coordinator
+RELEASE_SPARK_CONTAINER_PREFIX=ds41rt-spark-expert
 
 release_die() {
-  echo "ds4rt release: $*" >&2
+  echo "ds41rt release: $*" >&2
   exit 2
 }
 
@@ -81,10 +81,10 @@ release_load_config() {
   SPARKINFER_EXL3=force
   ADDR=0.0.0.0:8000
   EXPERT_PORT=9100
-  COORDINATOR_DOCKER_DEV=ds4rt-coordinator-dev
-  COORDINATOR_DOCKER_INFERENCE=ds4rt-coordinator
-  SPARK_EXPERT_DOCKER_DEV=ds4rt-spark-expert-dev
-  SPARK_EXPERT_DOCKER_INFERENCE=ds4rt-spark-expert
+  COORDINATOR_DOCKER_DEV=ds41rt-coordinator-dev
+  COORDINATOR_DOCKER_INFERENCE=ds41rt-coordinator
+  SPARK_EXPERT_DOCKER_DEV=ds41rt-spark-expert-dev
+  SPARK_EXPERT_DOCKER_INFERENCE=ds41rt-spark-expert
   for release_i in 0 1 2 3; do
     printf -v "SPARK_${release_i}_HOST" '%s' ""
     printf -v "SPARK_${release_i}_LANE_A" '%s' ""
@@ -136,7 +136,7 @@ release_load_config() {
     release_die "SPARKINFER_EXL3=disable requires EXPERT_FORMAT=native"
   [[ "$SPARKINFER_EXL3" != force || "$EXPERT_FORMAT" == exl3 ]] ||
     release_die "SPARKINFER_EXL3=force requires EXPERT_FORMAT=exl3"
-  [[ "$COORDINATOR_GPU" == 0 ]] || release_die "COORDINATOR_GPU must be 0; GPU 1 is outside DS4RT"
+  [[ "$COORDINATOR_GPU" == 0 ]] || release_die "COORDINATOR_GPU must be 0; GPU 1 is outside DS41RT"
   [[ -z "$COORDINATOR_GPU_UUID" || "$COORDINATOR_GPU_UUID" =~ ^GPU-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] ||
     release_die "COORDINATOR_GPU_UUID must be empty or a physical NVIDIA GPU UUID"
   [[ -z "$COORDINATOR_GPU_PCI_BUS_ID" || "$COORDINATOR_GPU_PCI_BUS_ID" =~ ^[0-9A-Fa-f]{8}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\.[0-7]$ ]] ||
@@ -284,8 +284,8 @@ release_stop_host_api() {
   local pid command
   for pid in $pids; do
     command="$(ps -p "$pid" -o args= 2>/dev/null || true)"
-    [[ "$command" == *ds4rt*coordinator* ]] ||
-      release_die "port $port is owned by a non-DS4RT process: pid=$pid $command"
+    [[ "$command" == *ds41rt*coordinator* ]] ||
+      release_die "port $port is owned by a non-DS41RT process: pid=$pid $command"
     echo "  coordinator: stopping host API pid=$pid"
     kill -TERM "$pid"
   done
@@ -332,7 +332,7 @@ release_stop_services() {
   local -a stop_pids=()
   for host in "$SPARK_0_HOST" "$SPARK_1_HOST" "$SPARK_2_HOST" "$SPARK_3_HOST"; do
     release_container="${spark_container_prefix}-${host}-${EXPERT_PORT}"
-    legacy_container="ds4rt-phase0-tcp-expertd-${host}-${EXPERT_PORT}"
+    legacy_container="ds41rt-phase0-tcp-expertd-${host}-${EXPERT_PORT}"
     release_stop_remote_containers \
       "$host" "$release_container" "$legacy_container" &
     stop_hosts+=("$host")
@@ -341,7 +341,7 @@ release_stop_services() {
   local index
   for index in "${!stop_pids[@]}"; do
     if ! wait "${stop_pids[$index]}"; then
-      echo "  ${stop_hosts[$index]}: failed to stop one or more DS4RT containers" >&2
+      echo "  ${stop_hosts[$index]}: failed to stop one or more DS41RT containers" >&2
       failed=1
     fi
   done
@@ -381,8 +381,8 @@ REMOTE
 }
 
 release_stop_wip_containers() {
-  local coordinator_container="${1:-ds4rt-coordinator-wip}"
-  local spark_container="${2:-ds4rt-spark-expert-wip}"
+  local coordinator_container="${1:-ds41rt-coordinator-wip}"
+  local spark_container="${2:-ds41rt-spark-expert-wip}"
   local failed=0
 
   release_stop_persistent_local_container "$coordinator_container" || failed=1
@@ -435,7 +435,7 @@ CONTAINER
 
 release_stop_wip_coordinator() {
   local coordinator_process="${1:-coordinator-${ADDR##*:}}"
-  local coordinator_container=ds4rt-coordinator-wip
+  local coordinator_container=ds41rt-coordinator-wip
 
   if docker container inspect "$coordinator_container" >/dev/null 2>&1 &&
     [[ "$(docker inspect -f '{{.State.Running}}' "$coordinator_container")" == true ]]; then
@@ -448,8 +448,8 @@ release_stop_wip_coordinator() {
 release_stop_wip_services() {
   local coordinator_process="${1:-coordinator-${ADDR##*:}}"
   local expert_process="${2:-expert-$EXPERT_PORT}"
-  local coordinator_container=ds4rt-coordinator-wip
-  local spark_container=ds4rt-spark-expert-wip
+  local coordinator_container=ds41rt-coordinator-wip
+  local spark_container=ds41rt-spark-expert-wip
   local failed=0
 
   release_stop_wip_coordinator "$coordinator_process" || failed=1
@@ -499,4 +499,30 @@ CONTAINER
     fi
   done
   ((failed == 0))
+}
+
+# Build availability is independent of the four-rank runtime topology.
+release_select_build_hosts() {
+  local requested="${1:-}" host configured found prior
+  local -a configured_hosts=("$SPARK_0_HOST" "$SPARK_1_HOST" "$SPARK_2_HOST" "$SPARK_3_HOST")
+  RELEASE_BUILD_HOSTS=()
+  if [[ -z "$requested" ]]; then
+    RELEASE_BUILD_HOSTS=("${configured_hosts[@]}")
+    return 0
+  fi
+  [[ "$requested" != ,* && "$requested" != *, && "$requested" != *,,* ]] ||
+    release_die "--spark-hosts contains an empty host"
+  local -a requested_hosts
+  IFS=, read -r -a requested_hosts <<< "$requested"
+  for host in "${requested_hosts[@]}"; do
+    found=0
+    for configured in "${configured_hosts[@]}"; do
+      [[ "$host" != "$configured" ]] || found=1
+    done
+    ((found)) || release_die "build host is not configured: $host"
+    for prior in "${RELEASE_BUILD_HOSTS[@]}"; do
+      [[ "$host" != "$prior" ]] || release_die "duplicate build host: $host"
+    done
+    RELEASE_BUILD_HOSTS+=("$host")
+  done
 }

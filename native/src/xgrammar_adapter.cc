@@ -1,4 +1,4 @@
-#include "ds4rt_native.h"
+#include "ds41rt_native.h"
 
 #include <dlpack/dlpack.h>
 #include <picojson.h>
@@ -159,7 +159,7 @@ xgrammar::TokenizerInfo LoadTokenizer(
 
 struct CompilerHandle {
   explicit CompilerHandle(xgrammar::TokenizerInfo tokenizer_info)
-      // ds4rt owns a bounded compiled-grammar cache. Keeping XGrammar's
+      // ds41rt owns a bounded compiled-grammar cache. Keeping XGrammar's
       // independent cache enabled would retain evicted client schemas and
       // make unique-schema traffic grow memory without a bound.
       : tokenizer(std::move(tokenizer_info)), compiler(tokenizer, 4, false) {}
@@ -182,15 +182,15 @@ struct MatcherHandle {
 };
 
 template <typename Function>
-ds4rt_status_t Guard(char* error, size_t error_bytes, ds4rt_status_t exception_status,
+ds41rt_status_t Guard(char* error, size_t error_bytes, ds41rt_status_t exception_status,
                      Function&& function) {
   try {
     function();
     CopyError("", error, error_bytes);
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   } catch (const std::invalid_argument& exception) {
     CopyError(exception.what(), error, error_bytes);
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   } catch (const std::exception& exception) {
     CopyError(exception.what(), error, error_bytes);
     return exception_status;
@@ -202,49 +202,49 @@ ds4rt_status_t Guard(char* error, size_t error_bytes, ds4rt_status_t exception_s
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_compiler_create(
+extern "C" ds41rt_status_t ds41rt_xgrammar_compiler_create(
     const char* tokenizer_json_path, size_t vocab_size, const int32_t* stop_token_ids,
     size_t stop_token_count, void** out_compiler, char* error, size_t error_bytes) {
   if (out_compiler == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_compiler = nullptr;
-  return Guard(error, error_bytes, DS4RT_STATUS_INTERNAL_ERROR, [&] {
+  return Guard(error, error_bytes, DS41RT_STATUS_INTERNAL_ERROR, [&] {
     auto compiler = std::make_unique<CompilerHandle>(
         LoadTokenizer(tokenizer_json_path, vocab_size, stop_token_ids, stop_token_count));
     *out_compiler = compiler.release();
   });
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_compiler_destroy(void* compiler) {
+extern "C" ds41rt_status_t ds41rt_xgrammar_compiler_destroy(void* compiler) {
   delete static_cast<CompilerHandle*>(compiler);
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_compile(
-    void* compiler, ds4rt_xgrammar_kind_t kind, const char* grammar_json, int strict,
+extern "C" ds41rt_status_t ds41rt_xgrammar_compile(
+    void* compiler, ds41rt_xgrammar_kind_t kind, const char* grammar_json, int strict,
     void** out_grammar, char* error, size_t error_bytes) {
   if (compiler == nullptr || out_grammar == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_grammar = nullptr;
-  return Guard(error, error_bytes, DS4RT_STATUS_INVALID_ARGUMENT, [&] {
+  return Guard(error, error_bytes, DS41RT_STATUS_INVALID_ARGUMENT, [&] {
     auto* handle = static_cast<CompilerHandle*>(compiler);
     std::lock_guard<std::mutex> lock(handle->mutex);
     xgrammar::CompiledGrammar compiled = [&] {
       switch (kind) {
-        case DS4RT_XGRAMMAR_JSON_OBJECT:
+        case DS41RT_XGRAMMAR_JSON_OBJECT:
           return handle->compiler.CompileJSONSchema(
               R"({"type":"object"})", true, std::nullopt, std::nullopt, true,
               kJsonMaxWhitespaceCount);
-        case DS4RT_XGRAMMAR_JSON_SCHEMA:
+        case DS41RT_XGRAMMAR_JSON_SCHEMA:
           if (grammar_json == nullptr) {
             throw std::invalid_argument("JSON Schema text is null");
           }
           return handle->compiler.CompileJSONSchema(
               grammar_json, true, std::nullopt, std::nullopt, strict != 0,
               kJsonMaxWhitespaceCount);
-        case DS4RT_XGRAMMAR_STRUCTURAL_TAG:
+        case DS41RT_XGRAMMAR_STRUCTURAL_TAG:
           if (grammar_json == nullptr) {
             throw std::invalid_argument("structural-tag JSON text is null");
           }
@@ -256,18 +256,18 @@ extern "C" ds4rt_status_t ds4rt_xgrammar_compile(
   });
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_grammar_destroy(void* grammar) {
+extern "C" ds41rt_status_t ds41rt_xgrammar_grammar_destroy(void* grammar) {
   delete static_cast<GrammarHandle*>(grammar);
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_create(
+extern "C" ds41rt_status_t ds41rt_xgrammar_matcher_create(
     const void* grammar, void** out_matcher, char* error, size_t error_bytes) {
   if (grammar == nullptr || out_matcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_matcher = nullptr;
-  return Guard(error, error_bytes, DS4RT_STATUS_INTERNAL_ERROR, [&] {
+  return Guard(error, error_bytes, DS41RT_STATUS_INTERNAL_ERROR, [&] {
     const auto* handle = static_cast<const GrammarHandle*>(grammar);
     *out_matcher = new MatcherHandle(
         xgrammar::GrammarMatcher(handle->grammar),
@@ -275,32 +275,32 @@ extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_create(
   });
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_fork(
+extern "C" ds41rt_status_t ds41rt_xgrammar_matcher_fork(
     const void* matcher, void** out_matcher, char* error, size_t error_bytes) {
   if (matcher == nullptr || out_matcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_matcher = nullptr;
-  return Guard(error, error_bytes, DS4RT_STATUS_INTERNAL_ERROR, [&] {
+  return Guard(error, error_bytes, DS41RT_STATUS_INTERNAL_ERROR, [&] {
     const auto* handle = static_cast<const MatcherHandle*>(matcher);
     *out_matcher = new MatcherHandle(handle->matcher.Fork(), handle->vocab_size);
   });
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_destroy(void* matcher) {
+extern "C" ds41rt_status_t ds41rt_xgrammar_matcher_destroy(void* matcher) {
   delete static_cast<MatcherHandle*>(matcher);
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_fill_bitmask(
+extern "C" ds41rt_status_t ds41rt_xgrammar_matcher_fill_bitmask(
     void* matcher, uint32_t* bitmask, size_t bitmask_words, int* out_needs_mask,
     char* error, size_t error_bytes) {
   if (matcher == nullptr || bitmask == nullptr || bitmask_words == 0 ||
       out_needs_mask == nullptr ||
       bitmask_words > static_cast<size_t>(std::numeric_limits<int64_t>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return Guard(error, error_bytes, DS4RT_STATUS_INTERNAL_ERROR, [&] {
+  return Guard(error, error_bytes, DS41RT_STATUS_INTERNAL_ERROR, [&] {
     auto* handle = static_cast<MatcherHandle*>(matcher);
     const size_t expected_words =
         static_cast<size_t>(xgrammar::GetBitmaskSize(handle->vocab_size));
@@ -321,24 +321,24 @@ extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_fill_bitmask(
   });
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_accept_token(
+extern "C" ds41rt_status_t ds41rt_xgrammar_matcher_accept_token(
     void* matcher, uint32_t token_id, int* out_accepted, char* error, size_t error_bytes) {
   if (matcher == nullptr || out_accepted == nullptr ||
       token_id > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return Guard(error, error_bytes, DS4RT_STATUS_INTERNAL_ERROR, [&] {
+  return Guard(error, error_bytes, DS41RT_STATUS_INTERNAL_ERROR, [&] {
     auto* handle = static_cast<MatcherHandle*>(matcher);
     *out_accepted = handle->matcher.AcceptToken(static_cast<int32_t>(token_id)) ? 1 : 0;
   });
 }
 
-extern "C" ds4rt_status_t ds4rt_xgrammar_matcher_is_completed(
+extern "C" ds41rt_status_t ds41rt_xgrammar_matcher_is_completed(
     const void* matcher, int* out_completed, char* error, size_t error_bytes) {
   if (matcher == nullptr || out_completed == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return Guard(error, error_bytes, DS4RT_STATUS_INTERNAL_ERROR, [&] {
+  return Guard(error, error_bytes, DS41RT_STATUS_INTERNAL_ERROR, [&] {
     const auto* handle = static_cast<const MatcherHandle*>(matcher);
     *out_completed = handle->matcher.IsCompleted() ? 1 : 0;
   });

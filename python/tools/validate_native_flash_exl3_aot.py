@@ -100,18 +100,18 @@ def tensor_buffer(tensor) -> DeviceBuffer:
 
 def require_ok(status: int, action: str) -> None:
     if status != 0:
-        raise RuntimeError(f"{action} failed with ds4rt status {status}")
+        raise RuntimeError(f"{action} failed with ds41rt status {status}")
 
 
 def configure_native(path: Path, variant: str):
     library = ctypes.CDLL(str(path.resolve()))
-    initialize = getattr(library, f"ds4rt_cuda_ds4_{variant}_spark_aot_init")
+    initialize = getattr(library, f"ds41rt_cuda_ds4_{variant}_spark_aot_init")
     decode = getattr(
-        library, f"ds4rt_cuda_ds4_{variant}_spark_exl3_k2_decode_m1_async"
+        library, f"ds41rt_cuda_ds4_{variant}_spark_exl3_k2_decode_m1_async"
     )
     prefill = getattr(
         library,
-        f"ds4rt_cuda_ds4_{variant}_spark_exl3_k2_prefill_topk6_async",
+        f"ds41rt_cuda_ds4_{variant}_spark_exl3_k2_prefill_topk6_async",
     )
     initialize.restype = ctypes.c_int
     decode.argtypes = (

@@ -26,7 +26,7 @@ class KernelSpec:
 
     @property
     def symbol(self) -> str:
-        return f"ds4rt_w8a16_{self.projection}_m{self.max_rows}"
+        return f"ds41rt_w8a16_{self.projection}_m{self.max_rows}"
 
 
 SPECS = (
@@ -91,7 +91,7 @@ def main() -> None:
     header = [
         "#pragma once",
         "#include <cstddef>",
-        "namespace ds4rt_w8a16_aot {",
+        "namespace ds41rt_w8a16_aot {",
         "struct KernelConfig {",
         "  const unsigned char* cubin;",
         "  std::size_t cubin_size;",
@@ -106,12 +106,12 @@ def main() -> None:
         "};",
         "extern const KernelConfig kernels[];",
         "extern const std::size_t kernel_count;",
-        "}  // namespace ds4rt_w8a16_aot",
+        "}  // namespace ds41rt_w8a16_aot",
         "",
     ]
     source = [
         '#include "w8a16_row_major_aot.h"',
-        "namespace ds4rt_w8a16_aot {",
+        "namespace ds41rt_w8a16_aot {",
     ]
     entries = []
     tensor_cache: dict[tuple[int, int], dict[str, torch.Tensor]] = {}
@@ -162,7 +162,7 @@ def main() -> None:
             ",\n".join(entries),
             "};",
             "const std::size_t kernel_count = sizeof(kernels) / sizeof(kernels[0]);",
-            "}  // namespace ds4rt_w8a16_aot",
+            "}  // namespace ds41rt_w8a16_aot",
             "",
         )
     )

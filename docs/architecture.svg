@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
-  <title id="title">DS4RT system architecture</title>
+  <title id="title">DS41RT system architecture</title>
   <desc id="desc">One RTX PRO 6000 coordinator runs the API, attention, cache, routing, shared experts and sampling. Four DGX Sparks each hold a tensor-parallel quarter of every routed expert and return partial hidden rows.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#091521"/><stop offset="1" stop-color="#13283a"/></linearGradient>
@@ -10,7 +10,7 @@
     <filter id="shadow"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-opacity=".35"/></filter>
   </defs>
   <rect width="1200" height="720" rx="24" fill="url(#bg)"/>
-  <text x="600" y="48" fill="#f5f9fc" font-family="system-ui,sans-serif" font-size="28" font-weight="700" text-anchor="middle">DS4RT — attention–FFN disaggregation for DeepSeek V4 Pro</text>
+  <text x="600" y="48" fill="#f5f9fc" font-family="system-ui,sans-serif" font-size="28" font-weight="700" text-anchor="middle">DS41RT — attention–FFN disaggregation for DeepSeek V4 Pro</text>
   <text x="600" y="78" fill="#9fb8c8" font-family="system-ui,sans-serif" font-size="16" text-anchor="middle">One residual stream • global top-6 routes • four fixed TP expert slices</text>
 
   <g filter="url(#shadow)">

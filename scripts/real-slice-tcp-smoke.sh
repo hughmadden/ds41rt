@@ -6,11 +6,11 @@ cd "$repo_root"
 
 addr="${ADDR:-127.0.0.1:8073}"
 base_port="${BASE_PORT:-9181}"
-catalog="${CATALOG:-.ds4rt-cache/model-artifacts/diagnostic/model_catalog.json}"
+catalog="${CATALOG:-.ds41rt-cache/model-artifacts/diagnostic/model_catalog.json}"
 model="${MODEL:-wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1}"
 log_dir="${LOG_DIR:-reports/phase0_artifacts/logs}"
 log_prefix="${LOG_PREFIX:-real-slice-tcp-smoke-local}"
-bin="${DS4RT_BIN:-$repo_root/rust/target/debug/ds4rt}"
+bin="${DS41RT_BIN:-$repo_root/rust/target/debug/ds41rt}"
 
 if ! [[ "$base_port" =~ ^[0-9]+$ ]] || [ "$base_port" -lt 1 ] || [ "$base_port" -gt 65532 ]; then
   echo "BASE_PORT must be an integer in 1..65532" >&2
@@ -62,8 +62,8 @@ wait_for_health() {
   return 1
 }
 
-echo "building ds4rt daemon" >&2
-cargo build --manifest-path rust/Cargo.toml -p ds4rt-daemon \
+echo "building ds41rt daemon" >&2
+cargo build --manifest-path rust/Cargo.toml -p ds41rt-daemon \
   >"${log_dir}/${log_prefix}-build.log" 2>&1
 
 targets=()
@@ -71,7 +71,7 @@ for idx in "${!owners[@]}"; do
   owner="${owners[$idx]}"
   port=$((base_port + idx))
   targets+=("${owner}=127.0.0.1:${port}")
-  RUST_LOG=ds4rt_transport=info "$bin" expertd \
+  RUST_LOG=ds41rt_transport=info "$bin" expertd \
     --synthetic-weights \
     --transport tcp \
     --listen "127.0.0.1:${port}" \

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-MISSING_IBVERBS_MESSAGE = "DS4RT_ENABLE_RDMA=ON requires libibverbs headers and library"
+MISSING_IBVERBS_MESSAGE = "DS41RT_ENABLE_RDMA=ON requires libibverbs headers and library"
 
 
 def repo_root() -> Path:
@@ -65,8 +65,8 @@ def build_status(args: argparse.Namespace) -> dict[str, Any]:
         str(build_dir),
         "-G",
         args.generator,
-        "-DDS4RT_ENABLE_CUDA=OFF",
-        "-DDS4RT_ENABLE_RDMA=ON",
+        "-DDS41RT_ENABLE_CUDA=OFF",
+        "-DDS41RT_ENABLE_RDMA=ON",
     ]
     steps.append(run_command(configure, root))
     if steps[-1]["returncode"] == 0:
@@ -108,7 +108,7 @@ def build_status(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--build-dir", type=Path, default=Path("/tmp/ds4rt-native-rdma-build"))
+    parser.add_argument("--build-dir", type=Path, default=Path("/tmp/ds41rt-native-rdma-build"))
     parser.add_argument("--generator", default="Ninja")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--clean", action="store_true")

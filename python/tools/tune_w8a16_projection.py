@@ -16,7 +16,7 @@ import torch
 
 
 GROUP_SIZE = 256
-CATALOG_PATH = Path(".ds4rt-cache/model-artifacts/diagnostic/model_catalog.json")
+CATALOG_PATH = Path(".ds41rt-cache/model-artifacts/diagnostic/model_catalog.json")
 DEFAULT_TENSORS = (
     "model.layers.0.self_attn.q_b_proj.weight",
     "model.layers.0.self_attn.o_proj.weight",
@@ -87,7 +87,7 @@ def load_bf16_weight(catalog: dict, name: str) -> torch.Tensor:
 
 def configure_native(path: Path):
     native = ctypes.CDLL(str(path.resolve()))
-    quantize = native.ds4rt_cuda_quantize_bf16_w8a16_group256_async
+    quantize = native.ds41rt_cuda_quantize_bf16_w8a16_group256_async
     quantize.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -98,7 +98,7 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     quantize.restype = ctypes.c_int
-    simt = native.ds4rt_cuda_linear_w8a16_group256_m1_simt_async
+    simt = native.ds41rt_cuda_linear_w8a16_group256_m1_simt_async
     simt.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -403,7 +403,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        default=Path("native/build-w8a16/libds4rt_native.so"),
+        default=Path("native/build-w8a16/libds41rt_native.so"),
     )
     parser.add_argument(
         "--tensor",

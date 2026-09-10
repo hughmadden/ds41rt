@@ -69,7 +69,7 @@ def device_buffer_view(
 
 def configure_native(path: Path) -> ctypes.CDLL:
     native = ctypes.CDLL(str(path.resolve()))
-    native.ds4rt_cuda_quantize_bf16_w8a16_group256_packed_async.argtypes = (
+    native.ds41rt_cuda_quantize_bf16_w8a16_group256_packed_async.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -77,8 +77,8 @@ def configure_native(path: Path) -> ctypes.CDLL:
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    native.ds4rt_cuda_quantize_bf16_w8a16_group256_packed_async.restype = ctypes.c_int
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async.argtypes = (
+    native.ds41rt_cuda_quantize_bf16_w8a16_group256_packed_async.restype = ctypes.c_int
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -87,8 +87,8 @@ def configure_native(path: Path) -> ctypes.CDLL:
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async.restype = ctypes.c_int
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.argtypes = (
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async.restype = ctypes.c_int
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -98,25 +98,25 @@ def configure_native(path: Path) -> ctypes.CDLL:
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.restype = (
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.restype = (
         ctypes.c_int
     )
-    native.ds4rt_cuda_w8a16_packed_o_aot_init.restype = ctypes.c_int
-    native.ds4rt_cuda_w8a16_packed_o_initialize_launch_buffers_async.argtypes = (
+    native.ds41rt_cuda_w8a16_packed_o_aot_init.restype = ctypes.c_int
+    native.ds41rt_cuda_w8a16_packed_o_initialize_launch_buffers_async.argtypes = (
         ctypes.POINTER(CoordinatorBuffers),
         ctypes.c_size_t,
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    native.ds4rt_cuda_w8a16_packed_o_initialize_launch_buffers_async.restype = (
+    native.ds41rt_cuda_w8a16_packed_o_initialize_launch_buffers_async.restype = (
         ctypes.c_int
     )
-    native.ds4rt_cuda_w8a16_packed_o_async.argtypes = (
+    native.ds41rt_cuda_w8a16_packed_o_async.argtypes = (
         ctypes.POINTER(CoordinatorBuffers),
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    native.ds4rt_cuda_w8a16_packed_o_async.restype = ctypes.c_int
+    native.ds41rt_cuda_w8a16_packed_o_async.restype = ctypes.c_int
     return native
 
 
@@ -133,7 +133,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        default=Path("native/build-cuda-rdma-coordinator-aot/libds4rt_native.so"),
+        default=Path("native/build-cuda-rdma-coordinator-aot/libds41rt_native.so"),
     )
     parser.add_argument("--rows", type=int, default=256)
     parser.add_argument(
@@ -164,7 +164,7 @@ def main() -> None:
         (SIZE_K // GROUP_SIZE, SIZE_N), device="cuda", dtype=torch.float32
     )
     check_status(
-        native.ds4rt_cuda_quantize_bf16_w8a16_group256_packed_async(
+        native.ds41rt_cuda_quantize_bf16_w8a16_group256_packed_async(
             weight.data_ptr(),
             packed_weight.data_ptr(),
             scales.data_ptr(),
@@ -201,7 +201,7 @@ def main() -> None:
     if args.rows == 1 and selected_kernel != "aot":
         def launch(_index: int) -> None:
             check_status(
-                native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
+                native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
                     inputs.data_ptr(),
                     packed_weight.data_ptr(),
                     scales.data_ptr(),
@@ -215,7 +215,7 @@ def main() -> None:
     elif selected_kernel == "parity":
         def launch(_index: int) -> None:
             check_status(
-                native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async(
+                native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async(
                     inputs.data_ptr(),
                     packed_weight.data_ptr(),
                     scales.data_ptr(),
@@ -233,7 +233,7 @@ def main() -> None:
         def recurrent_launch(_index: int) -> None:
             for row in range(args.rows):
                 check_status(
-                    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
+                    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
                         inputs[row].data_ptr(),
                         packed_weight.data_ptr(),
                         scales.data_ptr(),
@@ -245,7 +245,7 @@ def main() -> None:
                     "packed W8 recurrent reference launch",
                 )
     else:
-        check_status(native.ds4rt_cuda_w8a16_packed_o_aot_init(), "packed O AOT init")
+        check_status(native.ds41rt_cuda_w8a16_packed_o_aot_init(), "packed O AOT init")
         max_chunk_rows = min(args.rows, 256)
         block_m = bucket_block_m(max_chunk_rows)
         route_slots = (
@@ -290,13 +290,13 @@ def main() -> None:
                     device_buffer(locks),
                 )
                 check_status(
-                    native.ds4rt_cuda_w8a16_packed_o_initialize_launch_buffers_async(
+                    native.ds41rt_cuda_w8a16_packed_o_initialize_launch_buffers_async(
                         ctypes.byref(buffers), chunk_rows, chunk_block_m, stream
                     ),
                     "packed O metadata initialization",
                 )
                 check_status(
-                    native.ds4rt_cuda_w8a16_packed_o_async(
+                    native.ds41rt_cuda_w8a16_packed_o_async(
                         ctypes.byref(buffers), chunk_rows, stream
                     ),
                     "packed O AOT launch",
@@ -309,7 +309,7 @@ def main() -> None:
         def recurrent_launch(_index: int) -> None:
             for row in range(args.rows):
                 check_status(
-                    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
+                    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
                         inputs[row].data_ptr(),
                         packed_weight.data_ptr(),
                         scales.data_ptr(),

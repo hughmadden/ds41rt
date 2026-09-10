@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble one DS4RT model from a completed Flash base and dSpark overlay."""
+"""Assemble one DS41RT model from a completed Flash base and dSpark overlay."""
 
 from __future__ import annotations
 

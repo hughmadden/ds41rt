@@ -315,7 +315,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_grouped_down_accumulate_f32_redu
 
 __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_activation_f32_reduce_kernel(
     const uint16_t* hidden, const uint32_t* row_indices,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, float* activations, size_t rows,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, float* activations, size_t rows,
     size_t routes, size_t hidden_dim, size_t hidden_row_stride, size_t max_intermediate) {
   __shared__ float gate_scratch[kNvfp4RouteReduceBlock];
   __shared__ float up_scratch[kNvfp4RouteReduceBlock];
@@ -326,7 +326,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_activation_f32_reduce_ke
   }
 
   const int tid = threadIdx.x;
-  const ds4rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
+  const ds41rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
   const size_t idx = route_idx * max_intermediate + mid;
   if (mid >= metadata.intermediate) {
     if (tid == 0) {
@@ -383,7 +383,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_activation_f32_reduce_ke
 
 __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_accumulate_f32_reduce_kernel(
     const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, const float* activations,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, const float* activations,
     float* accumulator, size_t rows, size_t routes, size_t max_intermediate,
     size_t output_dim) {
   __shared__ float scratch[kNvfp4RouteReduceBlock];
@@ -394,7 +394,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_accumulate_f32_redu
   }
 
   const int tid = threadIdx.x;
-  const ds4rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
+  const ds41rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
   const size_t dest_row = static_cast<size_t>(row_indices[route_idx]);
   if (dest_row >= rows) {
     return;
@@ -427,7 +427,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_accumulate_f32_redu
 
 __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_accumulate_f32_single_row_kernel(
     const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, const float* activations,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, const float* activations,
     float* accumulator, size_t routes, size_t max_intermediate, size_t output_dim) {
   __shared__ float scratch[kNvfp4RouteReduceBlock];
   const size_t out_col = blockIdx.x;
@@ -441,7 +441,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_accumulate_f32_sing
     if (row_indices[route_idx] != 0) {
       continue;
     }
-    const ds4rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
+    const ds41rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
     const uint8_t* down_weight = reinterpret_cast<const uint8_t*>(metadata.down_weight);
     const uint8_t* down_scale = reinterpret_cast<const uint8_t*>(metadata.down_scale);
     const uint8_t* down_row = down_weight + out_col * metadata.down_weight_row_stride_bytes;
@@ -473,7 +473,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_accumulate_f32_sing
 
 __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_output_bf16_single_row_kernel(
     const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, const float* activations,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, const float* activations,
     uint16_t* out, size_t routes, size_t max_intermediate, size_t output_dim) {
   __shared__ float scratch[kNvfp4RouteReduceBlock];
   const size_t out_col = blockIdx.x;
@@ -487,7 +487,7 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_output_bf16_single_
     if (row_indices[route_idx] != 0) {
       continue;
     }
-    const ds4rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
+    const ds41rt_nvfp4_route_batched_metadata_t metadata = route_metadata[route_idx];
     const uint8_t* down_weight = reinterpret_cast<const uint8_t*>(metadata.down_weight);
     const uint8_t* down_scale = reinterpret_cast<const uint8_t*>(metadata.down_scale);
     const uint8_t* down_row = down_weight + out_col * metadata.down_weight_row_stride_bytes;
@@ -517,86 +517,86 @@ __global__ void nvfp4_silu_gated_mlp_route_bf16_batched_down_output_bf16_single_
   }
 }
 
-ds4rt_status_t validate_mlp_rows_args(const float* x, const float* gate_weight,
+ds41rt_status_t validate_mlp_rows_args(const float* x, const float* gate_weight,
                                       const float* up_weight, const float* down_weight,
                                       const float* out, size_t rows, size_t hidden,
                                       size_t intermediate) {
   if (x == nullptr || gate_weight == nullptr || up_weight == nullptr || down_weight == nullptr ||
       out == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden == 0 || intermediate == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden, &ignored) ||
       !checked_mul(intermediate, hidden, &ignored) ||
       !checked_mul(hidden, intermediate, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mlp_rows_bf16_args(const uint16_t* x, const uint16_t* gate_weight,
+ds41rt_status_t validate_mlp_rows_bf16_args(const uint16_t* x, const uint16_t* gate_weight,
                                            const uint16_t* up_weight,
                                            const uint16_t* down_weight, const uint16_t* out,
                                            size_t rows, size_t hidden, size_t intermediate) {
   if (x == nullptr || gate_weight == nullptr || up_weight == nullptr || down_weight == nullptr ||
       out == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden == 0 || intermediate == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden, &ignored) ||
       !checked_mul(intermediate, hidden, &ignored) ||
       !checked_mul(hidden, intermediate, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mlp_rows_bf16_down_stride_args(
+ds41rt_status_t validate_mlp_rows_bf16_down_stride_args(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, const uint16_t* out, size_t rows, size_t hidden,
     size_t intermediate, size_t down_stride) {
   if (x == nullptr || gate_weight == nullptr || up_weight == nullptr || down_weight == nullptr ||
       out == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden == 0 || intermediate == 0 || down_stride < intermediate) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden, &ignored) ||
       !checked_mul(intermediate, hidden, &ignored) ||
       !checked_mul(hidden, down_stride, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mlp_rows_bf16_down_stride_staged_args(
+ds41rt_status_t validate_mlp_rows_bf16_down_stride_staged_args(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, const float* activation_workspace, const uint16_t* out,
     size_t rows, size_t hidden, size_t intermediate, size_t down_stride) {
   if (activation_workspace == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_mlp_rows_bf16_down_stride_args(
+  const ds41rt_status_t valid = validate_mlp_rows_bf16_down_stride_args(
       x, gate_weight, up_weight, down_weight, out, rows, hidden, intermediate, down_stride);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, intermediate, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_nvfp4_route_bf16_grouped_args(
+ds41rt_status_t validate_nvfp4_route_bf16_grouped_args(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
     const uint8_t* gate_weight, const uint8_t* gate_scale, const uint8_t* up_weight,
     const uint8_t* up_scale, const uint8_t* down_weight, const uint8_t* down_scale,
@@ -607,19 +607,19 @@ ds4rt_status_t validate_nvfp4_route_bf16_grouped_args(
   if (hidden == nullptr || row_indices == nullptr || route_weights == nullptr ||
       gate_weight == nullptr || gate_scale == nullptr || up_weight == nullptr ||
       up_scale == nullptr || down_weight == nullptr || down_scale == nullptr || out == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (routes == 0 || hidden_dim == 0 || hidden_row_stride < hidden_dim || intermediate == 0 ||
       output_dim == 0 || !std::isfinite(gate_scale_2) || !std::isfinite(up_scale_2) ||
       !std::isfinite(down_scale_2)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (hidden_dim > std::numeric_limits<size_t>::max() - 15 ||
       intermediate > std::numeric_limits<size_t>::max() - 15 ||
       !checked_mul(routes, output_dim, &ignored) ||
       output_dim > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t packed_hidden_bytes = (hidden_dim + 1) / 2;
   const size_t hidden_scale_bytes = (hidden_dim + 15) / 16;
@@ -627,18 +627,18 @@ ds4rt_status_t validate_nvfp4_route_bf16_grouped_args(
   const size_t intermediate_scale_bytes = (intermediate + 15) / 16;
   if (down_weight_row_stride_bytes < packed_intermediate_bytes ||
       down_scale_row_stride_bytes < intermediate_scale_bytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (!checked_mul(intermediate, packed_hidden_bytes, &ignored) ||
       !checked_mul(intermediate, hidden_scale_bytes, &ignored) ||
       !checked_mul(output_dim, down_weight_row_stride_bytes, &ignored) ||
       !checked_mul(output_dim, down_scale_row_stride_bytes, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_nvfp4_route_bf16_grouped_accumulate_f32_args(
+ds41rt_status_t validate_nvfp4_route_bf16_grouped_accumulate_f32_args(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
     const uint8_t* gate_weight, const uint8_t* gate_scale, const uint8_t* up_weight,
     const uint8_t* up_scale, const uint8_t* down_weight, const uint8_t* down_scale,
@@ -647,24 +647,24 @@ ds4rt_status_t validate_nvfp4_route_bf16_grouped_accumulate_f32_args(
     size_t down_weight_row_stride_bytes, size_t down_scale_row_stride_bytes,
     float gate_scale_2, float up_scale_2, float down_scale_2) {
   if (accumulator == nullptr || rows == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t grouped_valid = validate_nvfp4_route_bf16_grouped_args(
+  const ds41rt_status_t grouped_valid = validate_nvfp4_route_bf16_grouped_args(
       hidden, row_indices, route_weights, gate_weight, gate_scale, up_weight, up_scale,
       down_weight, down_scale, reinterpret_cast<const uint16_t*>(accumulator), routes,
       hidden_dim, hidden_row_stride, intermediate, output_dim, down_weight_row_stride_bytes,
       down_scale_row_stride_bytes, gate_scale_2, up_scale_2, down_scale_2);
-  if (grouped_valid != DS4RT_STATUS_OK) {
+  if (grouped_valid != DS41RT_STATUS_OK) {
     return grouped_valid;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, output_dim, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_nvfp4_route_bf16_grouped_staged_accumulate_f32_args(
+ds41rt_status_t validate_nvfp4_route_bf16_grouped_staged_accumulate_f32_args(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
     const uint8_t* gate_weight, const uint8_t* gate_scale, const uint8_t* up_weight,
     const uint8_t* up_scale, const uint8_t* down_weight, const uint8_t* down_scale,
@@ -673,35 +673,35 @@ ds4rt_status_t validate_nvfp4_route_bf16_grouped_staged_accumulate_f32_args(
     size_t down_weight_row_stride_bytes, size_t down_scale_row_stride_bytes,
     float gate_scale_2, float up_scale_2, float down_scale_2) {
   if (activation_workspace == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_nvfp4_route_bf16_grouped_accumulate_f32_args(
+  const ds41rt_status_t valid = validate_nvfp4_route_bf16_grouped_accumulate_f32_args(
       hidden, row_indices, route_weights, gate_weight, gate_scale, up_weight, up_scale,
       down_weight, down_scale, accumulator, rows, routes, hidden_dim, hidden_row_stride,
       intermediate, output_dim, down_weight_row_stride_bytes, down_scale_row_stride_bytes,
       gate_scale_2, up_scale_2, down_scale_2);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t ignored = 0;
   if (!checked_mul(routes, intermediate, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_nvfp4_route_bf16_batched_staged_accumulate_f32_args(
+ds41rt_status_t validate_nvfp4_route_bf16_batched_staged_accumulate_f32_args(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
     const float* accumulator, size_t rows, size_t routes, size_t hidden_dim,
     size_t hidden_row_stride, size_t max_intermediate, size_t output_dim) {
   if (hidden == nullptr || row_indices == nullptr || route_weights == nullptr ||
       route_metadata == nullptr || activation_workspace == nullptr || accumulator == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || routes == 0 || hidden_dim == 0 || hidden_row_stride < hidden_dim ||
       max_intermediate == 0 || output_dim == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden_row_stride, &ignored) ||
@@ -710,38 +710,38 @@ ds4rt_status_t validate_nvfp4_route_bf16_batched_staged_accumulate_f32_args(
       routes > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) ||
       max_intermediate > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) ||
       output_dim > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_nvfp4_route_bf16_batched_staged_single_row_bf16_args(
+ds41rt_status_t validate_nvfp4_route_bf16_batched_staged_single_row_bf16_args(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
     const uint16_t* out, size_t rows, size_t routes, size_t hidden_dim,
     size_t hidden_row_stride, size_t max_intermediate, size_t output_dim) {
-  const ds4rt_status_t valid = validate_nvfp4_route_bf16_batched_staged_accumulate_f32_args(
+  const ds41rt_status_t valid = validate_nvfp4_route_bf16_batched_staged_accumulate_f32_args(
       hidden, row_indices, route_weights, route_metadata, activation_workspace,
       reinterpret_cast<const float*>(out), rows, routes, hidden_dim, hidden_row_stride,
       max_intermediate, output_dim);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (rows != 1) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_bf16_graph_mlp_down_stride_buffers(
-    ds4rt_device_buffer_t x, ds4rt_device_buffer_t gate_weight, ds4rt_device_buffer_t up_weight,
-    ds4rt_device_buffer_t down_weight, ds4rt_device_buffer_t out, size_t rows, size_t hidden,
+ds41rt_status_t validate_bf16_graph_mlp_down_stride_buffers(
+    ds41rt_device_buffer_t x, ds41rt_device_buffer_t gate_weight, ds41rt_device_buffer_t up_weight,
+    ds41rt_device_buffer_t down_weight, ds41rt_device_buffer_t out, size_t rows, size_t hidden,
     size_t intermediate, size_t down_stride) {
-  const ds4rt_status_t valid = validate_mlp_rows_bf16_down_stride_args(
+  const ds41rt_status_t valid = validate_mlp_rows_bf16_down_stride_args(
       static_cast<const uint16_t*>(x.ptr), static_cast<const uint16_t*>(gate_weight.ptr),
       static_cast<const uint16_t*>(up_weight.ptr), static_cast<const uint16_t*>(down_weight.ptr),
       static_cast<const uint16_t*>(out.ptr), rows, hidden, intermediate, down_stride);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t row_values = 0;
@@ -750,7 +750,7 @@ ds4rt_status_t validate_bf16_graph_mlp_down_stride_buffers(
   if (!checked_mul(rows, hidden, &row_values) ||
       !checked_mul(intermediate, hidden, &gate_values) ||
       !checked_mul(hidden, down_stride, &down_values)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t row_bytes = 0;
   size_t gate_bytes = 0;
@@ -758,44 +758,44 @@ ds4rt_status_t validate_bf16_graph_mlp_down_stride_buffers(
   if (!checked_mul(row_values, sizeof(uint16_t), &row_bytes) ||
       !checked_mul(gate_values, sizeof(uint16_t), &gate_bytes) ||
       !checked_mul(down_values, sizeof(uint16_t), &down_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (x.bytes < row_bytes || gate_weight.bytes < gate_bytes || up_weight.bytes < gate_bytes ||
       down_weight.bytes < down_bytes || out.bytes < row_bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_silu_gated_mlp_rows_bf16_down_stride_node(
-    void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index, ds4rt_device_buffer_t x,
-    ds4rt_device_buffer_t gate_weight, ds4rt_device_buffer_t up_weight,
-    ds4rt_device_buffer_t down_weight, ds4rt_device_buffer_t out, size_t rows, size_t hidden,
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_silu_gated_mlp_rows_bf16_down_stride_node(
+    void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index, ds41rt_device_buffer_t x,
+    ds41rt_device_buffer_t gate_weight, ds41rt_device_buffer_t up_weight,
+    ds41rt_device_buffer_t down_weight, ds41rt_device_buffer_t out, size_t rows, size_t hidden,
     size_t intermediate, size_t down_stride) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_bf16_graph_mlp_down_stride_buffers(
+  const ds41rt_status_t valid = validate_bf16_graph_mlp_down_stride_buffers(
       x, gate_weight, up_weight, down_weight, out, rows, hidden, intermediate, down_stride);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
   cudaGraphNode_t node = nullptr;
-  const ds4rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
-  if (node_status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
+  if (node_status != DS41RT_STATUS_OK) {
     return node_status;
   }
 
   cudaKernelNodeParams existing = {};
   cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (existing.func != reinterpret_cast<void*>(silu_gated_mlp_rows_bf16_down_stride_kernel)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   const uint16_t* x_ptr = static_cast<const uint16_t*>(x.ptr);
@@ -818,7 +818,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_silu_gated_mlp_rows_bf16_down_
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   cudaKernelNodeParams params = {};
@@ -831,23 +831,23 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_silu_gated_mlp_rows_bf16_down_
 
   err = cudaGraphKernelNodeSetParams(node, &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec), node,
                                          &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_f32(const float* x, const float* gate_weight,
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_f32(const float* x, const float* gate_weight,
                                                         const float* up_weight,
                                                         const float* down_weight, float* out,
                                                         int hidden, int intermediate) {
   if (x == nullptr || gate_weight == nullptr || up_weight == nullptr || down_weight == nullptr ||
       out == nullptr || hidden <= 0 || intermediate <= 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   silu_gated_mlp_f32_kernel<<<1, 1>>>(x, gate_weight, up_weight, down_weight, out, hidden,
                                       intermediate);
@@ -858,13 +858,13 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_f32(const float* x, const fl
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_f32_async(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_f32_async(
     const float* x, const float* gate_weight, const float* up_weight, const float* down_weight,
     float* out, size_t rows, size_t hidden, size_t intermediate, void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_mlp_rows_args(x, gate_weight, up_weight, down_weight, out, rows, hidden,
                              intermediate);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -872,7 +872,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_f32_async(
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int blocks = static_cast<int>(block_count);
   silu_gated_mlp_rows_f32_kernel<<<blocks, threads, 0, stream>>>(
@@ -880,25 +880,25 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_f32_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_f32(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_f32(
     const float* x, const float* gate_weight, const float* up_weight, const float* down_weight,
     float* out, size_t rows, size_t hidden, size_t intermediate) {
-  const ds4rt_status_t status = ds4rt_cuda_silu_gated_mlp_rows_f32_async(
+  const ds41rt_status_t status = ds41rt_cuda_silu_gated_mlp_rows_f32_async(
       x, gate_weight, up_weight, down_weight, out, rows, hidden, intermediate, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_bf16_async(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, uint16_t* out, size_t rows, size_t hidden, size_t intermediate,
     void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_mlp_rows_bf16_args(x, gate_weight, up_weight, down_weight, out, rows, hidden,
                                   intermediate);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -906,7 +906,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_async(
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int blocks = static_cast<int>(block_count);
   silu_gated_mlp_rows_bf16_kernel<<<blocks, threads, 0, stream>>>(
@@ -914,31 +914,31 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_bf16(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, uint16_t* out, size_t rows, size_t hidden, size_t intermediate) {
-  const ds4rt_status_t status = ds4rt_cuda_silu_gated_mlp_rows_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_silu_gated_mlp_rows_bf16_async(
       x, gate_weight, up_weight, down_weight, out, rows, hidden, intermediate, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_mul_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_mul_bf16_async(
     const uint16_t* gate_up, uint16_t* out, size_t rows, size_t intermediate,
     void* cuda_stream) {
   if (gate_up == nullptr || out == nullptr || rows == 0 || intermediate == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t total = rows * intermediate;
   if (rows != 0 && total / rows != intermediate) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   constexpr int threads = 256;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   silu_mul_bf16_kernel<<<static_cast<int>(block_count), threads, 0, stream>>>(
@@ -946,23 +946,23 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_mul_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_quantize_bf16_weight_nvfp4_async(
-    ds4rt_device_buffer_t input, ds4rt_device_buffer_t packed,
-    ds4rt_device_buffer_t scales, size_t rows, size_t cols,
+extern "C" ds41rt_status_t ds41rt_cuda_quantize_bf16_weight_nvfp4_async(
+    ds41rt_device_buffer_t input, ds41rt_device_buffer_t packed,
+    ds41rt_device_buffer_t scales, size_t rows, size_t cols,
     float global_scale, void* cuda_stream) {
   if (rows == 0 || cols == 0 || cols % 16 != 0 ||
       !isfinite(global_scale) || global_scale <= 0.0f ||
       rows > std::numeric_limits<size_t>::max() / cols) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t values = rows * cols;
   if (input.ptr == nullptr || packed.ptr == nullptr || scales.ptr == nullptr ||
       input.bytes < values * sizeof(uint16_t) ||
       packed.bytes < values / 2 || scales.bytes < values / 16) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   if (values / 16 > std::numeric_limits<unsigned int>::max()) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   quantize_bf16_weight_nvfp4_kernel<<<
       static_cast<unsigned int>(values / 16), 16, 0,
@@ -973,13 +973,13 @@ extern "C" ds4rt_status_t ds4rt_cuda_quantize_bf16_weight_nvfp4_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_async(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_bf16_down_stride_async(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, uint16_t* out, size_t rows, size_t hidden, size_t intermediate,
     size_t down_stride, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mlp_rows_bf16_down_stride_args(
+  const ds41rt_status_t valid = validate_mlp_rows_bf16_down_stride_args(
       x, gate_weight, up_weight, down_weight, out, rows, hidden, intermediate, down_stride);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -987,7 +987,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_async(
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int blocks = static_cast<int>(block_count);
   silu_gated_mlp_rows_bf16_down_stride_kernel<<<blocks, threads, 0, stream>>>(
@@ -995,32 +995,32 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_bf16_down_stride(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, uint16_t* out, size_t rows, size_t hidden, size_t intermediate,
     size_t down_stride) {
-  const ds4rt_status_t status = ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_async(
+  const ds41rt_status_t status = ds41rt_cuda_silu_gated_mlp_rows_bf16_down_stride_async(
       x, gate_weight, up_weight, down_weight, out, rows, hidden, intermediate, down_stride,
       nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged_async(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged_async(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, float* activation_workspace, uint16_t* out, size_t rows,
     size_t hidden, size_t intermediate, size_t down_stride, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mlp_rows_bf16_down_stride_staged_args(
+  const ds41rt_status_t valid = validate_mlp_rows_bf16_down_stride_staged_args(
       x, gate_weight, up_weight, down_weight, activation_workspace, out, rows, hidden,
       intermediate, down_stride);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (rows > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) ||
       intermediate > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   const int threads = kNvfp4RouteReduceBlock;
@@ -1028,14 +1028,14 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged
                              static_cast<unsigned int>(rows));
   silu_gated_mlp_rows_bf16_activation_f32_reduce_kernel<<<activation_grid, threads, 0, stream>>>(
       x, gate_weight, up_weight, activation_workspace, rows, hidden, intermediate);
-  ds4rt_status_t status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = status_from_cuda(cudaGetLastError());
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int blocks = static_cast<int>(block_count);
   silu_gated_mlp_rows_bf16_down_from_activation_kernel<<<blocks, threads, 0, stream>>>(
@@ -1043,21 +1043,21 @@ extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged(
+extern "C" ds41rt_status_t ds41rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged(
     const uint16_t* x, const uint16_t* gate_weight, const uint16_t* up_weight,
     const uint16_t* down_weight, float* activation_workspace, uint16_t* out, size_t rows,
     size_t hidden, size_t intermediate, size_t down_stride) {
-  const ds4rt_status_t status = ds4rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged_async(
+  const ds41rt_status_t status = ds41rt_cuda_silu_gated_mlp_rows_bf16_down_stride_staged_async(
       x, gate_weight, up_weight, down_weight, activation_workspace, out, rows, hidden,
       intermediate, down_stride, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32_async(
+extern "C" ds41rt_status_t
+ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32_async(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
     const uint8_t* gate_weight, const uint8_t* gate_scale, const uint8_t* up_weight,
     const uint8_t* up_scale, const uint8_t* down_weight, const uint8_t* down_scale,
@@ -1065,12 +1065,12 @@ ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32_async(
     size_t hidden_dim, size_t hidden_row_stride, size_t intermediate, size_t output_dim,
     size_t down_weight_row_stride_bytes, size_t down_scale_row_stride_bytes,
     float gate_scale_2, float up_scale_2, float down_scale_2, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_nvfp4_route_bf16_grouped_staged_accumulate_f32_args(
+  const ds41rt_status_t valid = validate_nvfp4_route_bf16_grouped_staged_accumulate_f32_args(
       hidden, row_indices, route_weights, gate_weight, gate_scale, up_weight, up_scale,
       down_weight, down_scale, activation_workspace, accumulator, rows, routes, hidden_dim,
       hidden_row_stride, intermediate, output_dim, down_weight_row_stride_bytes,
       down_scale_row_stride_bytes, gate_scale_2, up_scale_2, down_scale_2);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const int threads = kNvfp4RouteReduceBlock;
@@ -1078,12 +1078,12 @@ ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32_async(
   size_t output_total = 0;
   if (!checked_mul(routes, intermediate, &activation_total) ||
       !checked_mul(routes, output_dim, &output_total)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (routes > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) ||
       intermediate > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) ||
       output_dim > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   const dim3 activation_grid(static_cast<unsigned int>(intermediate),
@@ -1105,7 +1105,7 @@ ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32(
+extern "C" ds41rt_status_t ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
     const uint8_t* gate_weight, const uint8_t* gate_scale, const uint8_t* up_weight,
     const uint8_t* up_scale, const uint8_t* down_weight, const uint8_t* down_scale,
@@ -1113,28 +1113,28 @@ extern "C" ds4rt_status_t ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_sta
     size_t hidden_dim, size_t hidden_row_stride, size_t intermediate, size_t output_dim,
     size_t down_weight_row_stride_bytes, size_t down_scale_row_stride_bytes,
     float gate_scale_2, float up_scale_2, float down_scale_2) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32_async(
+  const ds41rt_status_t status =
+      ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32_async(
           hidden, row_indices, route_weights, gate_weight, gate_scale, up_weight, up_scale,
           down_weight, down_scale, activation_workspace, accumulator, rows, routes, hidden_dim,
           hidden_row_stride, intermediate, output_dim, down_weight_row_stride_bytes,
           down_scale_row_stride_bytes, gate_scale_2, up_scale_2, down_scale_2, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32_async(
+extern "C" ds41rt_status_t
+ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32_async(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
     float* accumulator, size_t rows, size_t routes, size_t hidden_dim,
     size_t hidden_row_stride, size_t max_intermediate, size_t output_dim, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_nvfp4_route_bf16_batched_staged_accumulate_f32_args(
+  const ds41rt_status_t valid = validate_nvfp4_route_bf16_batched_staged_accumulate_f32_args(
       hidden, row_indices, route_weights, route_metadata, activation_workspace, accumulator, rows,
       routes, hidden_dim, hidden_row_stride, max_intermediate, output_dim);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const int threads = kNvfp4RouteReduceBlock;
@@ -1166,32 +1166,32 @@ ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32(
+extern "C" ds41rt_status_t
+ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
     float* accumulator, size_t rows, size_t routes, size_t hidden_dim,
     size_t hidden_row_stride, size_t max_intermediate, size_t output_dim) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32_async(
+  const ds41rt_status_t status =
+      ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32_async(
           hidden, row_indices, route_weights, route_metadata, activation_workspace, accumulator,
           rows, routes, hidden_dim, hidden_row_stride, max_intermediate, output_dim, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16_async(
+extern "C" ds41rt_status_t
+ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16_async(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
     uint16_t* out, size_t rows, size_t routes, size_t hidden_dim, size_t hidden_row_stride,
     size_t max_intermediate, size_t output_dim, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_nvfp4_route_bf16_batched_staged_single_row_bf16_args(
+  const ds41rt_status_t valid = validate_nvfp4_route_bf16_batched_staged_single_row_bf16_args(
       hidden, row_indices, route_weights, route_metadata, activation_workspace, out, rows, routes,
       hidden_dim, hidden_row_stride, max_intermediate, output_dim);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const int threads = kNvfp4RouteReduceBlock;
@@ -1214,17 +1214,17 @@ ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16(
+extern "C" ds41rt_status_t
+ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16(
     const uint16_t* hidden, const uint32_t* row_indices, const float* route_weights,
-    const ds4rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
+    const ds41rt_nvfp4_route_batched_metadata_t* route_metadata, float* activation_workspace,
     uint16_t* out, size_t rows, size_t routes, size_t hidden_dim, size_t hidden_row_stride,
     size_t max_intermediate, size_t output_dim) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16_async(
+  const ds41rt_status_t status =
+      ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16_async(
           hidden, row_indices, route_weights, route_metadata, activation_workspace, out, rows,
           routes, hidden_dim, hidden_row_stride, max_intermediate, output_dim, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));

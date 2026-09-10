@@ -34,7 +34,7 @@ class ReleaseProvenanceError(RuntimeError):
 
 def _load_source_verifier() -> ModuleType:
     path = Path(__file__).with_name("verify-sparkinfer-source.py")
-    spec = importlib.util.spec_from_file_location("ds4rt_sparkinfer_verifier", path)
+    spec = importlib.util.spec_from_file_location("ds41rt_sparkinfer_verifier", path)
     if spec is None or spec.loader is None:
         raise ReleaseProvenanceError(f"cannot load SparkInfer verifier: {path}")
     module = importlib.util.module_from_spec(spec)

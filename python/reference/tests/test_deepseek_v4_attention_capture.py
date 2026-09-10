@@ -1,5 +1,5 @@
 import pytest
-from ds4rt_reference.deepseek_v4_attention_capture import (
+from ds41rt_reference.deepseek_v4_attention_capture import (
     DS4_C4_INDEX_TOPK,
     DS4_C4_PAGE_BYTES,
     DS4_C128_PAGE_BYTES,

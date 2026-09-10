@@ -2,7 +2,7 @@
 set -euo pipefail
 
 url="${1:-http://127.0.0.1:8000}"
-model="${2:-ds4rt-synthetic-ds4-layer}"
+model="${2:-ds41rt-synthetic-ds4-layer}"
 prompt_tokens="${3:-16}"
 
 if ! [[ "$prompt_tokens" =~ ^[0-9]+$ ]] || [ "$prompt_tokens" -lt 1 ]; then

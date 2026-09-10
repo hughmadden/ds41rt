@@ -23,8 +23,8 @@ from gptqmodel.models.definitions.deepseek_v4 import DeepSeekV4QModel
 from gptqmodel.quantization import AutoModuleDecoderConfig, EXL3Config
 
 
-SCHEMA = "ds4rt-flash-natural-route-distribution-v1"
-PROGRESS_SCHEMA = "ds4rt-deepseek-v4-base-route-screen-progress-v1"
+SCHEMA = "ds41rt-flash-natural-route-distribution-v1"
+PROGRESS_SCHEMA = "ds41rt-deepseek-v4-base-route-screen-progress-v1"
 
 
 class RouteScreenError(RuntimeError):

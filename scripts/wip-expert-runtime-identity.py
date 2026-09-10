@@ -13,23 +13,23 @@ from pathlib import Path
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 EXACT_EXPERT_ENVIRONMENT_KEYS = {
-    "DS4RT_MODEL_ID",
-    "DS4RT_PROTOCOL_V2_TCP_TIMING",
-    "DS4RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES",
-    "DS4RT_REAL_FULL_CUDA_ROUTE_VALIDATE",
-    "DS4RT_SERVE_PROFILE",
-    "DS4RT_SPARK_BUILD_PROFILE",
-    "DS4RT_SPARK_EXPERT_REAL_LAYER",
-    "DS4RT_SPARK_EXPERT_TRANSPORT",
-    "DS4RT_SPARK_GPU_RUNTIME",
-    "DS4RT_VERBS_APP_IB_PORT_NUM",
+    "DS41RT_MODEL_ID",
+    "DS41RT_PROTOCOL_V2_TCP_TIMING",
+    "DS41RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES",
+    "DS41RT_REAL_FULL_CUDA_ROUTE_VALIDATE",
+    "DS41RT_SERVE_PROFILE",
+    "DS41RT_SPARK_BUILD_PROFILE",
+    "DS41RT_SPARK_EXPERT_REAL_LAYER",
+    "DS41RT_SPARK_EXPERT_TRANSPORT",
+    "DS41RT_SPARK_GPU_RUNTIME",
+    "DS41RT_VERBS_APP_IB_PORT_NUM",
 }
 EXPERT_ENVIRONMENT_PREFIXES = (
-    "DS4RT_B12X_SPARK_",
-    "DS4RT_EXPERT_",
-    "DS4RT_REAL_FULL_NVFP4_ROUTE_",
-    "DS4RT_REAL_FULL_PROTOCOL_V2_",
-    "DS4RT_SPARK_NCCL_",
+    "DS41RT_B12X_SPARK_",
+    "DS41RT_EXPERT_",
+    "DS41RT_REAL_FULL_NVFP4_ROUTE_",
+    "DS41RT_REAL_FULL_PROTOCOL_V2_",
+    "DS41RT_SPARK_NCCL_",
 )
 
 
@@ -77,7 +77,7 @@ def build_payload(
         }
     )
     return {
-        "schema": "ds4rt-wip-expert-runtime-v2",
+        "schema": "ds41rt-wip-expert-runtime-v2",
         "expert_slot_fingerprint": expert_slot_fingerprint,
         "environment": expert_environment,
         "settings": settings,

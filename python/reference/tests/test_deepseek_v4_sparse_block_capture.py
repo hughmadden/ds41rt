@@ -1,6 +1,6 @@
 import pytest
 import torch
-from ds4rt_reference.deepseek_v4_sparse_block_capture import (
+from ds41rt_reference.deepseek_v4_sparse_block_capture import (
     DS4_GLOBAL_TOP_K,
     DeepseekV4SparseBlockBinding,
     bind_deepseek_v4_sparse_block_arena,

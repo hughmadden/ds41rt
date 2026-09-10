@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed environment preflight for DS4RT quantization containers."""
+"""Fail-closed environment preflight for DS41RT quantization containers."""
 
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ def _sha256(path: Path) -> str:
 
 def _cuda_capability(value: str) -> tuple[int, int]:
     if not re.fullmatch(r"[0-9]{2,3}", value):
-        raise PreflightError(f"invalid DS4RT CUDA architecture: {value!r}")
+        raise PreflightError(f"invalid DS41RT CUDA architecture: {value!r}")
     return int(value[:-1]), int(value[-1])
 
 
@@ -252,17 +252,17 @@ def parse_args() -> argparse.Namespace:
         else "requirements.amd64.lock"
     )
     parser = argparse.ArgumentParser()
-    parser.add_argument("--role", default=os.environ.get("DS4RT_QUANT_ROLE"))
+    parser.add_argument("--role", default=os.environ.get("DS41RT_QUANT_ROLE"))
     parser.add_argument(
-        "--target-platform", default=os.environ.get("DS4RT_QUANT_TARGET_PLATFORM")
+        "--target-platform", default=os.environ.get("DS41RT_QUANT_TARGET_PLATFORM")
     )
-    parser.add_argument("--cuda-arch", default=os.environ.get("DS4RT_QUANT_CUDA_ARCH"))
+    parser.add_argument("--cuda-arch", default=os.environ.get("DS41RT_QUANT_CUDA_ARCH"))
     parser.add_argument(
-        "--min-gpus", type=int, default=int(os.environ.get("DS4RT_QUANT_MIN_GPUS", "1"))
+        "--min-gpus", type=int, default=int(os.environ.get("DS41RT_QUANT_MIN_GPUS", "1"))
     )
     parser.add_argument(
         "--python-version",
-        default=os.environ.get("DS4RT_QUANT_PYTHON_VERSION", "3.14.6"),
+        default=os.environ.get("DS41RT_QUANT_PYTHON_VERSION", "3.14.6"),
     )
     parser.add_argument(
         "--source", type=Path, default=root / "third_party" / "gptqmodel"
@@ -282,14 +282,14 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path(
             os.environ.get(
-                "DS4RT_QUANT_REQUIREMENTS_LOCK",
+                "DS41RT_QUANT_REQUIREMENTS_LOCK",
                 root / "quantization" / native_lock_name,
             )
         ),
     )
     parser.add_argument(
         "--requirements-sha256",
-        default=os.environ.get("DS4RT_QUANT_REQUIREMENTS_SHA256"),
+        default=os.environ.get("DS41RT_QUANT_REQUIREMENTS_SHA256"),
     )
     parser.add_argument(
         "--build-requirements-lock",
@@ -298,7 +298,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--build-requirements-sha256",
-        default=os.environ.get("DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256"),
+        default=os.environ.get("DS41RT_QUANT_BUILD_REQUIREMENTS_SHA256"),
     )
     parser.add_argument(
         "--cusparselt-normalizer",
@@ -306,12 +306,12 @@ def parse_args() -> argparse.Namespace:
         default=root / "quantization" / "normalize_nvidia_cusparselt.py",
     )
     parser.add_argument(
-        "--image-digest", default=os.environ.get("DS4RT_QUANT_IMAGE_DIGEST")
+        "--image-digest", default=os.environ.get("DS41RT_QUANT_IMAGE_DIGEST")
     )
     parser.add_argument(
         "--require-image-digest",
         action="store_true",
-        default=os.environ.get("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST") == "1",
+        default=os.environ.get("DS41RT_QUANT_REQUIRE_IMAGE_DIGEST") == "1",
     )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
@@ -359,7 +359,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     requirements_digest = _sha256(args.requirements_lock.resolve())
     if not args.requirements_sha256:
-        raise PreflightError("DS4RT_QUANT_REQUIREMENTS_SHA256 is not set")
+        raise PreflightError("DS41RT_QUANT_REQUIREMENTS_SHA256 is not set")
     if requirements_digest != args.requirements_sha256:
         raise PreflightError(
             "quantization requirements lock digest mismatch: "
@@ -367,7 +367,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
     build_requirements_digest = _sha256(args.build_requirements_lock.resolve())
     if not args.build_requirements_sha256:
-        raise PreflightError("DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256 is not set")
+        raise PreflightError("DS41RT_QUANT_BUILD_REQUIREMENTS_SHA256 is not set")
     if build_requirements_digest != args.build_requirements_sha256:
         raise PreflightError(
             "quantization build requirements lock digest mismatch: "
@@ -435,7 +435,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "role": args.role,
         "target_platform": args.target_platform,
         "machine": machine,
-        "base_image": os.environ.get("DS4RT_QUANT_BASE_IMAGE"),
+        "base_image": os.environ.get("DS41RT_QUANT_BASE_IMAGE"),
         "python": {
             "version": platform.python_version(),
             "executable": sys.executable,

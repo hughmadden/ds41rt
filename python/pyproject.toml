@@ -1,7 +1,7 @@
 [project]
-name = "ds4rt-reference"
+name = "ds41rt-reference"
 version = "0.1.0"
-description = "Reference and oracle utilities for DS4RT phase0"
+description = "Reference and oracle utilities for DS41RT phase0"
 requires-python = ">=3.12"
 dependencies = [
   "pytest>=8",

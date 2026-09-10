@@ -127,7 +127,7 @@ class EXL3WorkerHandler(BaseHTTPRequestHandler):
         )
 
     def _signature_valid(self, payload: bytes) -> bool:
-        claimed = self.headers.get("X-DS4RT-Signature")
+        claimed = self.headers.get("X-DS41RT-Signature")
         expected = hmac.new(self.server.token, payload, hashlib.sha256).hexdigest()
         return isinstance(claimed, str) and hmac.compare_digest(claimed, expected)
 
@@ -140,7 +140,7 @@ class EXL3WorkerHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("X-DS4RT-Signature", signature)
+        self.send_header("X-DS41RT-Signature", signature)
         self.end_headers()
         self.wfile.write(payload)
 
@@ -232,7 +232,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=17841)
     parser.add_argument("--preflight-report", type=Path, required=True)
     parser.add_argument("--checkpoint-root", type=Path, required=True)
-    parser.add_argument("--token-env", default="DS4RT_EXL3_WORKER_TOKEN")
+    parser.add_argument("--token-env", default="DS41RT_EXL3_WORKER_TOKEN")
     parser.add_argument("--max-body-bytes", type=int, default=DEFAULT_MAX_BODY_BYTES)
     args = parser.parse_args()
     if not 0 <= args.port <= 65535 or args.max_body_bytes <= 0:

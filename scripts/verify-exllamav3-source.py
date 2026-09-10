@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the exact exllamav3 source used by DS4RT quantization."""
+"""Verify the exact exllamav3 source used by DS41RT quantization."""
 
 from __future__ import annotations
 

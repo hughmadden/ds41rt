@@ -3,11 +3,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXPECTED_COMMIT="557becfb64c503ae9c04344b0047661f43f44320"
-SOURCE_DIR="${DS4RT_XGRAMMAR_SOURCE_DIR:-$ROOT/third_party/xgrammar}"
-LOCK_FILE="${DS4RT_XGRAMMAR_LOCK_FILE:-$ROOT/third_party/xgrammar.lock.json}"
-BUILD_DIR="${DS4RT_XGRAMMAR_BUILD_DIR:-/tmp/ds4rt-xgrammar-v0.2.3-build}"
-FLASH_SNAPSHOT="${DS4RT_FLASH_SNAPSHOT:-$HOME/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4-Flash-0731/snapshots/9e165c30e2704aec5d9d593cce3eebd58bbef1cb}"
-TOKENIZER="${DS4RT_XGRAMMAR_TOKENIZER:-$FLASH_SNAPSHOT/tokenizer.json}"
+SOURCE_DIR="${DS41RT_XGRAMMAR_SOURCE_DIR:-$ROOT/third_party/xgrammar}"
+LOCK_FILE="${DS41RT_XGRAMMAR_LOCK_FILE:-$ROOT/third_party/xgrammar.lock.json}"
+BUILD_DIR="${DS41RT_XGRAMMAR_BUILD_DIR:-/tmp/ds41rt-xgrammar-v0.2.3-build}"
+FLASH_SNAPSHOT="${DS41RT_FLASH_SNAPSHOT:-$HOME/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4-Flash-0731/snapshots/9e165c30e2704aec5d9d593cce3eebd58bbef1cb}"
+TOKENIZER="${DS41RT_XGRAMMAR_TOKENIZER:-$FLASH_SNAPSHOT/tokenizer.json}"
 FIXTURE="$ROOT/native/tools/fixtures/ds4_required_tool_calls.json"
 BENCH_SOURCE="$ROOT/native/tools/xgrammar_ds4_bench.cc"
 BENCH_BINARY="$BUILD_DIR/xgrammar_ds4_bench"
@@ -24,7 +24,7 @@ printf '%s\n' \
   'set(XGRAMMAR_BUILD_CXX_TESTS OFF)' \
   >"$BUILD_DIR/config.cmake"
 cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release >/dev/null
-cmake --build "$BUILD_DIR" --target xgrammar -j "${DS4RT_BUILD_JOBS:-8}" >/dev/null
+cmake --build "$BUILD_DIR" --target xgrammar -j "${DS41RT_BUILD_JOBS:-8}" >/dev/null
 
 "${CXX:-c++}" \
   -O3 -DNDEBUG -std=c++17 -flto=auto -Wall -Wextra -Werror \

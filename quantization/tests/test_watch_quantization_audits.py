@@ -100,7 +100,7 @@ def test_journal_ready_waits_for_the_regular_file(monkeypatch) -> None:
             "quantizer",
             "test",
             "-f",
-            "/run/state/.ds4rt-exl3-error-journal.jsonl",
+            "/run/state/.ds41rt-exl3-error-journal.jsonl",
         ]
     ]
 

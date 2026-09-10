@@ -93,9 +93,9 @@ def load_snapshot(
 ) -> tuple[list[int], str, dict]:
     metadata_path = root / "metadata.json"
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    if metadata.get("format") != "ds4rt-kv-v3":
+    if metadata.get("format") != "ds41rt-kv-v3":
         raise ValueError(
-            f"{metadata_path} is not a ds4rt-kv-v3 snapshot; "
+            f"{metadata_path} is not a ds41rt-kv-v3 snapshot; "
             "regenerate legacy snapshots with the current runtime"
         )
     producer_profile = metadata.get("producer_profile")
@@ -235,7 +235,7 @@ def concise_record(
         else None
     )
     return {
-        "schema": "ds4rt-real-full-matrix-v3",
+        "schema": "ds41rt-real-full-matrix-v3",
         "timestamp_utc": dt.datetime.now(dt.UTC).isoformat(),
         "commit": commit,
         "model": model,
@@ -370,7 +370,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        help="JSONL destination; defaults under ignored .ds4rt-cache/benchmarks",
+        help="JSONL destination; defaults under ignored .ds41rt-cache/benchmarks",
     )
     parser.add_argument(
         "--instruction",
@@ -421,7 +421,7 @@ def main() -> int:
     output = args.output
     if output is None:
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        output = root / ".ds4rt-cache" / "benchmarks" / f"prefill-matrix-{stamp}.jsonl"
+        output = root / ".ds41rt-cache" / "benchmarks" / f"prefill-matrix-{stamp}.jsonl"
     output = output.resolve()
 
     plans = []

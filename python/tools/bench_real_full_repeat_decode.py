@@ -169,7 +169,7 @@ def main() -> None:
     with args.output.open("x", encoding="utf-8") as destination:
         meta = {
             "record": "meta",
-            "schema": "ds4rt-repeat-decode-v2",
+            "schema": "ds41rt-repeat-decode-v2",
             "commit": git_commit(repo_root()),
             "model": args.model,
             "prompt_protocol": "deepseek-v4-nonthinking-v1",

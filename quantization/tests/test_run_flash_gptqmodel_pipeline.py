@@ -58,7 +58,7 @@ def test_canonical_work_defaults_to_output_sibling(
     args = MODULE.parse_args()
 
     assert args.canonical_work_dir == args.canonical_output.with_name(
-        f".{args.canonical_output.name}.ds4rt-assembly"
+        f".{args.canonical_output.name}.ds41rt-assembly"
     )
 
 

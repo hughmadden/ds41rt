@@ -15,7 +15,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+from ds41rt_runtime.exl3_artifact_contract import (  # noqa: E402
     validate_inline_mixed_policy,
 )
 
@@ -33,7 +33,7 @@ PUBLIC_STATIC_FILES = (
     "tokenizer_config.json",
 )
 UNFINISHED_README_MARKERS = (
-    "DS4RT_PUBLICATION_RESULTS_PENDING",
+    "DS41RT_PUBLICATION_RESULTS_PENDING",
     "TODO_PUBLICATION",
 )
 
@@ -125,14 +125,14 @@ def public_quantization_configs(snapshot: Path) -> tuple[bytes, bytes]:
     # average bitrate remains in the exact-rational inline-mixed metadata.
     public_external["bits"] = int(bits)
     public_meta = dict(public_external.get("meta", {}))
-    private_ledger = public_meta.pop("ds4rt_error_ledger", None)
-    inline_mixed = public_meta.get("ds4rt_inline_mixed")
+    private_ledger = public_meta.pop("ds41rt_error_ledger", None)
+    inline_mixed = public_meta.get("ds41rt_inline_mixed")
     if inline_mixed is not None:
         if isinstance(inline_mixed, dict):
             inline_mixed = dict(inline_mixed)
             inline_mixed.pop("tier_plan_root", None)
         validate_inline_mixed_policy(inline_mixed)
-        public_meta["ds4rt_inline_mixed"] = inline_mixed
+        public_meta["ds41rt_inline_mixed"] = inline_mixed
     family_join = (
         private_ledger.get("family_join")
         if isinstance(private_ledger, dict)
@@ -161,7 +161,7 @@ def public_quantization_configs(snapshot: Path) -> tuple[bytes, bytes]:
         # The compatibility key above continues to describe the target/base
         # experts. This additive map preserves the integrated dSpark bitrate
         # after the private error ledger is removed from the public artifact.
-        public_meta["ds4rt_inline_mixed_namespaces"] = portable_namespaces
+        public_meta["ds41rt_inline_mixed_namespaces"] = portable_namespaces
     public_external["meta"] = public_meta
     public_declaration = dict(public_external)
     public_declaration.pop("tensor_storage")
@@ -262,7 +262,7 @@ def prepare_publication(
     if names != expected_names:
         raise RuntimeError("publication output contains an unexpected file surface")
     return {
-        "schema": "ds4rt-hf-standard-publication-v1",
+        "schema": "ds41rt-hf-standard-publication-v1",
         "snapshot": str(snapshot.expanduser().resolve(strict=True)),
         "output": str(output),
         "link_mode": link_mode,

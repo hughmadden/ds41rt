@@ -64,12 +64,12 @@ def fixture(
     write_json(preflight_path, original_preflight)
 
     output = "/artifacts/flash-k2"
-    run_state = artifacts / ".flash-k2.ds4rt-run"
+    run_state = artifacts / ".flash-k2.ds41rt-run"
     run_state.mkdir()
     plan = {
         "schema": MODULE.PLAN_SCHEMA,
         "output": output,
-        "run_state_dir": "/artifacts/.flash-k2.ds4rt-run",
+        "run_state_dir": "/artifacts/.flash-k2.ds41rt-run",
         "offload_dir": "/run/offload",
         "mtp_prefix_store": "/run/mtp-prefix",
         "preflight": {
@@ -106,13 +106,13 @@ def fixture(
             "Entrypoint": MODULE.ENTRYPOINT,
             "Cmd": command,
             "Env": [
-                f"DS4RT_QUANT_IMAGE_DIGEST={IMAGE}",
-                "DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=1",
-                "DS4RT_QUANT_ROLE=coordinator",
-                "DS4RT_QUANT_TARGET_PLATFORM=linux/amd64",
-                "DS4RT_QUANT_CUDA_ARCH=120",
-                f"DS4RT_QUANT_MIN_GPUS={len(gpus)}",
-                "DS4RT_EXL3_WORKER_TOKEN=do-not-render-this-secret",
+                f"DS41RT_QUANT_IMAGE_DIGEST={IMAGE}",
+                "DS41RT_QUANT_REQUIRE_IMAGE_DIGEST=1",
+                "DS41RT_QUANT_ROLE=coordinator",
+                "DS41RT_QUANT_TARGET_PLATFORM=linux/amd64",
+                "DS41RT_QUANT_CUDA_ARCH=120",
+                f"DS41RT_QUANT_MIN_GPUS={len(gpus)}",
+                "DS41RT_EXL3_WORKER_TOKEN=do-not-render-this-secret",
             ],
             "User": "",
             "WorkingDir": "/workspace",
@@ -170,7 +170,7 @@ def test_exact_resume_clones_command_and_hides_environment(tmp_path: Path) -> No
         spec.preflight_report
     )
     assert (
-        f"DS4RT_QUANT_PREFLIGHT_REPORT={spec.preflight_report}" in spec.environment
+        f"DS41RT_QUANT_PREFLIGHT_REPORT={spec.preflight_report}" in spec.environment
     )
     assert spec.preflight_report == "/preflight/resume-source-resume.json"
     environment_file = tmp_path / "private.env"
@@ -306,10 +306,10 @@ def test_execution_upgrade_uses_new_image_and_fresh_preflight(
         spec.preflight_report
     )
     assert (
-        f"DS4RT_QUANT_PREFLIGHT_REPORT={spec.preflight_report}" in spec.environment
+        f"DS41RT_QUANT_PREFLIGHT_REPORT={spec.preflight_report}" in spec.environment
     )
-    assert f"DS4RT_QUANT_IMAGE_DIGEST={UPGRADE_IMAGE}" in spec.environment
-    assert f"DS4RT_QUANT_IMAGE_DIGEST={IMAGE}" not in spec.environment
+    assert f"DS41RT_QUANT_IMAGE_DIGEST={UPGRADE_IMAGE}" in spec.environment
+    assert f"DS41RT_QUANT_IMAGE_DIGEST={IMAGE}" not in spec.environment
     assert command[-2:] == ["--execution-upgrade", "--resume"]
 
 
@@ -366,8 +366,8 @@ def test_upgrade_inherits_dependency_contract_from_target_image(
     metadata, plan_sha256 = fixture(tmp_path)
     metadata["Config"]["Env"].extend(
         [
-            "DS4RT_QUANT_REQUIREMENTS_SHA256=" + "c" * 64,
-            "DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256=" + "d" * 64,
+            "DS41RT_QUANT_REQUIREMENTS_SHA256=" + "c" * 64,
+            "DS41RT_QUANT_BUILD_REQUIREMENTS_SHA256=" + "d" * 64,
         ]
     )
 
@@ -381,8 +381,8 @@ def test_upgrade_inherits_dependency_contract_from_target_image(
     )
 
     assert not any(
-        record.startswith("DS4RT_QUANT_REQUIREMENTS_SHA256=")
-        or record.startswith("DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256=")
+        record.startswith("DS41RT_QUANT_REQUIREMENTS_SHA256=")
+        or record.startswith("DS41RT_QUANT_BUILD_REQUIREMENTS_SHA256=")
         for record in spec.environment
     )
 
@@ -391,8 +391,8 @@ def test_upgrade_inherits_dependency_contract_from_target_image(
     started["Config"]["Cmd"] = [*spec.command, *spec.resume_arguments]
     started["Config"]["Env"] = [
         *spec.environment,
-        "DS4RT_QUANT_REQUIREMENTS_SHA256=" + "e" * 64,
-        "DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256=" + "f" * 64,
+        "DS41RT_QUANT_REQUIREMENTS_SHA256=" + "e" * 64,
+        "DS41RT_QUANT_BUILD_REQUIREMENTS_SHA256=" + "f" * 64,
     ]
     MODULE.validate_started_container(spec, started)
 
@@ -422,7 +422,7 @@ def test_upgrade_hardens_legacy_missing_image_digest_requirement(
     metadata["Config"]["Env"] = [
         record
         for record in metadata["Config"]["Env"]
-        if not record.startswith("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=")
+        if not record.startswith("DS41RT_QUANT_REQUIRE_IMAGE_DIGEST=")
     ]
 
     spec = MODULE.build_resume_spec(
@@ -434,7 +434,7 @@ def test_upgrade_hardens_legacy_missing_image_digest_requirement(
         upgrade_image_id=UPGRADE_IMAGE,
     )
 
-    assert "DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=1" in spec.environment
+    assert "DS41RT_QUANT_REQUIRE_IMAGE_DIGEST=1" in spec.environment
 
 
 def test_plain_resume_rejects_missing_image_digest_requirement(
@@ -444,7 +444,7 @@ def test_plain_resume_rejects_missing_image_digest_requirement(
     metadata["Config"]["Env"] = [
         record
         for record in metadata["Config"]["Env"]
-        if not record.startswith("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=")
+        if not record.startswith("DS41RT_QUANT_REQUIRE_IMAGE_DIGEST=")
     ]
 
     with pytest.raises(MODULE.ResumeError, match="qualified image/GPU role"):
@@ -495,7 +495,7 @@ def test_secret_is_not_in_environment_validation_error() -> None:
     secret = "never-show-this-value"
     with pytest.raises(MODULE.ResumeError) as captured:
         MODULE.parse_environment(
-            [f"DS4RT_EXL3_WORKER_TOKEN={secret}", "INVALID-NAME=value"]
+            [f"DS41RT_EXL3_WORKER_TOKEN={secret}", "INVALID-NAME=value"]
         )
     assert secret not in str(captured.value)
 
@@ -520,10 +520,10 @@ def test_started_container_must_preserve_exact_environment_and_command(
     token_index = next(
         index
         for index, record in enumerate(started["Config"]["Env"])
-        if record.startswith("DS4RT_EXL3_WORKER_TOKEN=")
+        if record.startswith("DS41RT_EXL3_WORKER_TOKEN=")
     )
     started["Config"]["Env"][token_index] = (
-        "DS4RT_EXL3_WORKER_TOKEN=changed-secret"
+        "DS41RT_EXL3_WORKER_TOKEN=changed-secret"
     )
     with pytest.raises(MODULE.ResumeError, match="reconstructed exact launch") as error:
         MODULE.validate_started_container(spec, started)

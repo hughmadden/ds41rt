@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate exact model-snapshot identity across all five DS4RT daemons."""
+"""Validate exact model-snapshot identity across all five DS41RT daemons."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ import tempfile
 from typing import Any, Sequence
 
 
-RUNTIME_SCHEMA = "ds4rt-runtime-model-snapshot-v1"
-REPORT_SCHEMA = "ds4rt-runtime-model-snapshot-qualification-v1"
+RUNTIME_SCHEMA = "ds41rt-runtime-model-snapshot-v1"
+REPORT_SCHEMA = "ds41rt-runtime-model-snapshot-qualification-v1"
 MARKER = "runtime_model_snapshot "
 REVISION_RE = re.compile(r"[0-9a-f]{64}\Z")
 MODEL_ID_RE = re.compile(

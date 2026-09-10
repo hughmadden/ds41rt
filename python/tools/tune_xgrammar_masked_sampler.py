@@ -19,7 +19,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error(error, len(error))
+    lib.ds41rt_last_error(error, len(error))
     raise RuntimeError(f"{action} failed with status {status}: {error.value.decode()}")
 
 
@@ -394,11 +394,11 @@ def main() -> None:
     device = torch.device("cuda", torch.cuda.current_device())
     properties = torch.cuda.get_device_properties(device)
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    lib.ds4rt_last_error.restype = ctypes.c_int
+    lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    lib.ds41rt_last_error.restype = ctypes.c_int
     serial = configure(
         lib,
-        "ds4rt_cuda_logits_sample_topk_topp_f32_async",
+        "ds41rt_cuda_logits_sample_topk_topp_f32_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -414,7 +414,7 @@ def main() -> None:
     )
     apply_serial = configure(
         lib,
-        "ds4rt_cuda_logits_apply_bitmask_sample_topk_topp_f32_candidate_async",
+        "ds41rt_cuda_logits_apply_bitmask_sample_topk_topp_f32_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -433,7 +433,7 @@ def main() -> None:
     )
     grid_fused = configure(
         lib,
-        "ds4rt_cuda_logits_masked_sample_topk_topp_f32_grid_candidate_async",
+        "ds41rt_cuda_logits_masked_sample_topk_topp_f32_grid_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,

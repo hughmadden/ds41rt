@@ -1,9 +1,9 @@
 #include "common.h"
 
 #if defined(__GNUC__)
-#define DS4RT_MLA_INDEXING_EXPORT __attribute__((visibility("default")))
+#define DS41RT_MLA_INDEXING_EXPORT __attribute__((visibility("default")))
 #else
-#define DS4RT_MLA_INDEXING_EXPORT
+#define DS41RT_MLA_INDEXING_EXPORT
 #endif
 
 namespace {
@@ -110,22 +110,22 @@ __global__ void generic_kv_page_table_expand_indices_kernel(
       page_token);
 }
 
-ds4rt_status_t validate_transpose_rows_heads_bf16_args(
+ds41rt_status_t validate_transpose_rows_heads_bf16_args(
     const uint16_t* input, const uint16_t* output, size_t rows,
     size_t heads, size_t width) {
   if (input == nullptr || output == nullptr || rows == 0 || heads == 0 ||
       width == 0 || width % kBf16ValuesPerVector != 0 ||
       reinterpret_cast<uintptr_t>(input) % alignof(uint4) != 0 ||
       reinterpret_cast<uintptr_t>(output) % alignof(uint4) != 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t values = 0;
   return checked_mul(rows, heads, &values) && checked_mul(values, width, &values)
-             ? DS4RT_STATUS_OK
-             : DS4RT_STATUS_INVALID_ARGUMENT;
+             ? DS41RT_STATUS_OK
+             : DS41RT_STATUS_INVALID_ARGUMENT;
 }
 
-ds4rt_status_t validate_mla_compose_absorbed_query_bf16_args(
+ds41rt_status_t validate_mla_compose_absorbed_query_bf16_args(
     const uint16_t* latent_heads_rows, const uint16_t* rope_rows_heads,
     const uint16_t* output_rows_heads, size_t rows, size_t heads,
     size_t latent_width, size_t rope_width) {
@@ -137,39 +137,39 @@ ds4rt_status_t validate_mla_compose_absorbed_query_bf16_args(
       reinterpret_cast<uintptr_t>(latent_heads_rows) % alignof(uint4) != 0 ||
       reinterpret_cast<uintptr_t>(rope_rows_heads) % alignof(uint4) != 0 ||
       reinterpret_cast<uintptr_t>(output_rows_heads) % alignof(uint4) != 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t values = 0;
   size_t output_width = 0;
   return checked_add(latent_width, rope_width, &output_width) &&
                  checked_mul(rows, heads, &values) &&
                  checked_mul(values, output_width, &values)
-             ? DS4RT_STATUS_OK
-             : DS4RT_STATUS_INVALID_ARGUMENT;
+             ? DS41RT_STATUS_OK
+             : DS41RT_STATUS_INVALID_ARGUMENT;
 }
 
-ds4rt_status_t validate_generic_kv_page_table_init_args(
+ds41rt_status_t validate_generic_kv_page_table_init_args(
     const int32_t* page_table, size_t query_rows, size_t page_table_width) {
   size_t entries = 0;
   if (page_table == nullptr || query_rows == 0 || page_table_width == 0 ||
       page_table_width > static_cast<size_t>(std::numeric_limits<int32_t>::max()) ||
       !checked_mul(query_rows, page_table_width, &entries)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_generic_kv_page_table_base_offset(
+ds41rt_status_t validate_generic_kv_page_table_base_offset(
     size_t page_table_width, size_t base_offset) {
   size_t end = 0;
   if (!checked_add(base_offset, page_table_width, &end) ||
       end > static_cast<size_t>(std::numeric_limits<int32_t>::max()) + 1) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_generic_kv_page_table_expand_indices_args(
+ds41rt_status_t validate_generic_kv_page_table_expand_indices_args(
     const int32_t* output_indices, const uint32_t* physical_pages,
     size_t query_rows, size_t output_width, size_t active_tokens) {
   size_t entries = 0;
@@ -179,25 +179,25 @@ ds4rt_status_t validate_generic_kv_page_table_expand_indices_args(
       !checked_mul(query_rows, output_width, &entries) ||
       active_tokens >
           static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_transpose_rows_heads_bf16_async(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_transpose_rows_heads_bf16_async(
     const uint16_t* input, uint16_t* output, size_t rows, size_t heads,
     size_t width, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_transpose_rows_heads_bf16_args(
+  const ds41rt_status_t valid = validate_transpose_rows_heads_bf16_args(
       input, output, rows, heads, width);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const size_t total_vectors = rows * heads * (width / kBf16ValuesPerVector);
   constexpr int threads = 256;
   const size_t blocks = (total_vectors + threads - 1) / threads;
   if (blocks > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -207,32 +207,32 @@ ds4rt_cuda_transpose_rows_heads_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_transpose_rows_heads_bf16(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_transpose_rows_heads_bf16(
     const uint16_t* input, uint16_t* output, size_t rows, size_t heads,
     size_t width) {
-  const ds4rt_status_t status = ds4rt_cuda_transpose_rows_heads_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_transpose_rows_heads_bf16_async(
       input, output, rows, heads, width, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_transpose_heads_rows_bf16_async(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_transpose_heads_rows_bf16_async(
     const uint16_t* input, uint16_t* output, size_t rows, size_t heads,
     size_t width, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_transpose_rows_heads_bf16_args(
+  const ds41rt_status_t valid = validate_transpose_rows_heads_bf16_args(
       input, output, rows, heads, width);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const size_t total_vectors = rows * heads * (width / kBf16ValuesPerVector);
   constexpr int threads = 256;
   const size_t blocks = (total_vectors + threads - 1) / threads;
   if (blocks > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -242,27 +242,27 @@ ds4rt_cuda_transpose_heads_rows_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_transpose_heads_rows_bf16(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_transpose_heads_rows_bf16(
     const uint16_t* input, uint16_t* output, size_t rows, size_t heads,
     size_t width) {
-  const ds4rt_status_t status = ds4rt_cuda_transpose_heads_rows_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_transpose_heads_rows_bf16_async(
       input, output, rows, heads, width, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_mla_compose_absorbed_query_bf16_async(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_mla_compose_absorbed_query_bf16_async(
     const uint16_t* latent_heads_rows, const uint16_t* rope_rows_heads,
     uint16_t* output_rows_heads, size_t rows, size_t heads,
     size_t latent_width, size_t rope_width, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_compose_absorbed_query_bf16_args(
+  const ds41rt_status_t valid = validate_mla_compose_absorbed_query_bf16_args(
       latent_heads_rows, rope_rows_heads, output_rows_heads, rows, heads,
       latent_width, rope_width);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const size_t output_vectors =
@@ -271,7 +271,7 @@ ds4rt_cuda_mla_compose_absorbed_query_bf16_async(
   constexpr int threads = 256;
   const size_t blocks = (total_vectors + threads - 1) / threads;
   if (blocks > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -284,47 +284,47 @@ ds4rt_cuda_mla_compose_absorbed_query_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_mla_compose_absorbed_query_bf16(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_mla_compose_absorbed_query_bf16(
     const uint16_t* latent_heads_rows, const uint16_t* rope_rows_heads,
     uint16_t* output_rows_heads, size_t rows, size_t heads,
     size_t latent_width, size_t rope_width) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_compose_absorbed_query_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_compose_absorbed_query_bf16_async(
       latent_heads_rows, rope_rows_heads, output_rows_heads, rows, heads,
       latent_width, rope_width, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_init_async(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_init_async(
     int32_t* page_table, size_t query_rows, size_t page_table_width,
     void* cuda_stream) {
-  return ds4rt_cuda_generic_kv_page_table_init_base_async(
+  return ds41rt_cuda_generic_kv_page_table_init_base_async(
       page_table, query_rows, page_table_width, 0, cuda_stream);
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_init_base_async(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_init_base_async(
     int32_t* page_table, size_t query_rows, size_t page_table_width,
     size_t base_offset, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_generic_kv_page_table_init_args(
+  const ds41rt_status_t valid = validate_generic_kv_page_table_init_args(
       page_table, query_rows, page_table_width);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t valid_base =
+  const ds41rt_status_t valid_base =
       validate_generic_kv_page_table_base_offset(page_table_width, base_offset);
-  if (valid_base != DS4RT_STATUS_OK) {
+  if (valid_base != DS41RT_STATUS_OK) {
     return valid_base;
   }
   const size_t entries = query_rows * page_table_width;
   constexpr int threads = 256;
   const size_t blocks = (entries + threads - 1) / threads;
   if (blocks > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -334,46 +334,46 @@ ds4rt_cuda_generic_kv_page_table_init_base_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_init(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_init(
     int32_t* page_table, size_t query_rows, size_t page_table_width) {
-  const ds4rt_status_t status = ds4rt_cuda_generic_kv_page_table_init_async(
+  const ds41rt_status_t status = ds41rt_cuda_generic_kv_page_table_init_async(
       page_table, query_rows, page_table_width, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_init_base(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_init_base(
     int32_t* page_table, size_t query_rows, size_t page_table_width,
     size_t base_offset) {
-  const ds4rt_status_t status = ds4rt_cuda_generic_kv_page_table_init_base_async(
+  const ds41rt_status_t status = ds41rt_cuda_generic_kv_page_table_init_base_async(
       page_table, query_rows, page_table_width, base_offset, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_init_offsets_async(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_init_offsets_async(
     int32_t* page_table, const int32_t* row_offsets, size_t query_rows,
     size_t page_table_width, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_generic_kv_page_table_init_args(
+  const ds41rt_status_t valid = validate_generic_kv_page_table_init_args(
       page_table, query_rows, page_table_width);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (row_offsets == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t entries = query_rows * page_table_width;
   constexpr int threads = 256;
   const size_t blocks = (entries + threads - 1) / threads;
   if (blocks > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -383,36 +383,36 @@ ds4rt_cuda_generic_kv_page_table_init_offsets_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_init_offsets(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_init_offsets(
     int32_t* page_table, const int32_t* row_offsets, size_t query_rows,
     size_t page_table_width) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_generic_kv_page_table_init_offsets_async(
+  const ds41rt_status_t status =
+      ds41rt_cuda_generic_kv_page_table_init_offsets_async(
           page_table, row_offsets, query_rows, page_table_width, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_expand_indices_async(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_expand_indices_async(
     int32_t* output_indices, const uint32_t* physical_pages,
     size_t query_rows, size_t output_width, size_t active_tokens,
     void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_generic_kv_page_table_expand_indices_args(
           output_indices, physical_pages, query_rows, output_width,
           active_tokens);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const size_t entries = query_rows * output_width;
   constexpr int threads = 256;
   const size_t blocks = (entries + threads - 1) / threads;
   if (blocks > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -422,15 +422,15 @@ ds4rt_cuda_generic_kv_page_table_expand_indices_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" DS4RT_MLA_INDEXING_EXPORT ds4rt_status_t
-ds4rt_cuda_generic_kv_page_table_expand_indices(
+extern "C" DS41RT_MLA_INDEXING_EXPORT ds41rt_status_t
+ds41rt_cuda_generic_kv_page_table_expand_indices(
     int32_t* output_indices, const uint32_t* physical_pages,
     size_t query_rows, size_t output_width, size_t active_tokens) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_generic_kv_page_table_expand_indices_async(
+  const ds41rt_status_t status =
+      ds41rt_cuda_generic_kv_page_table_expand_indices_async(
           output_indices, physical_pages, query_rows, output_width,
           active_tokens, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));

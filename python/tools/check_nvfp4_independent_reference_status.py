@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from ds4rt_reference.nvfp4_independent_status import build_independent_reference_status
+from ds41rt_reference.nvfp4_independent_status import build_independent_reference_status
 
 
 def repo_root() -> Path:

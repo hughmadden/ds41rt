@@ -9,26 +9,26 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 Usage: scripts/bench-verbs-app-pair.sh HOST_A HOST_B
 
 Stages this repo on two Spark hosts, ensures the arm64 Spark image is present,
-builds the ARM ds4rt daemon and RDMA-enabled native library remotely, then runs
+builds the ARM ds41rt daemon and RDMA-enabled native library remotely, then runs
 the app-level verbs ProtocolV2 benchmark with HOST_B as server and HOST_A as
 client.
 
 Environment:
-  DS4RT_SPARK_IMAGE                 default: ds4rt-spark-expert-dev
-  DS4RT_SPARK_IMAGE_COPY_METHOD     spark-netcat, ssh-relay, or none; default: spark-netcat
-  DS4RT_SPARK_IMAGE_SEED_HOST       default: first host with DS4RT_SPARK_IMAGE
-  DS4RT_SPARK_IMAGE_LINK_SUFFIX     default: .200gb for spark-netcat data path
-  DS4RT_SPARK_IMAGE_COPY_PORT       default: 29421
-  DS4RT_SPARK_BUILD_IMAGE           set 1 to build remotely when no seed image exists
-  DS4RT_VERBS_APP_WORKDIR           default: $HOME/ds4rt-phase0-verbs-app
-  DS4RT_VERBS_APP_PORT              default: 18615
-  DS4RT_VERBS_APP_DURATION_SECS     default: 2
-  DS4RT_VERBS_APP_PAYLOAD_BYTES     default: Flash 1/2/4/8/16/64/256/512 BF16 rows
-  DS4RT_VERBS_APP_ROUNDTRIP_ITERATIONS optional daemon benchmark override
-  DS4RT_VERBS_APP_CHAIN_ITERATIONS      optional daemon benchmark override
-  DS4RT_VERBS_APP_CHAIN_HOPS            default: Flash model depth, 43
-  DS4RT_VERBS_APP_CONTROL_TIMEOUT_SECS  optional daemon benchmark override
-  DS4RT_VERBS_APP_KEEP_REMOTE       set 1 to keep staged remote workdirs
+  DS41RT_SPARK_IMAGE                 default: ds41rt-spark-expert-dev
+  DS41RT_SPARK_IMAGE_COPY_METHOD     spark-netcat, ssh-relay, or none; default: spark-netcat
+  DS41RT_SPARK_IMAGE_SEED_HOST       default: first host with DS41RT_SPARK_IMAGE
+  DS41RT_SPARK_IMAGE_LINK_SUFFIX     default: .200gb for spark-netcat data path
+  DS41RT_SPARK_IMAGE_COPY_PORT       default: 29421
+  DS41RT_SPARK_BUILD_IMAGE           set 1 to build remotely when no seed image exists
+  DS41RT_VERBS_APP_WORKDIR           default: $HOME/ds41rt-phase0-verbs-app
+  DS41RT_VERBS_APP_PORT              default: 18615
+  DS41RT_VERBS_APP_DURATION_SECS     default: 2
+  DS41RT_VERBS_APP_PAYLOAD_BYTES     default: Flash 1/2/4/8/16/64/256/512 BF16 rows
+  DS41RT_VERBS_APP_ROUNDTRIP_ITERATIONS optional daemon benchmark override
+  DS41RT_VERBS_APP_CHAIN_ITERATIONS      optional daemon benchmark override
+  DS41RT_VERBS_APP_CHAIN_HOPS            default: Flash model depth, 43
+  DS41RT_VERBS_APP_CONTROL_TIMEOUT_SECS  optional daemon benchmark override
+  DS41RT_VERBS_APP_KEEP_REMOTE       set 1 to keep staged remote workdirs
 EOF
   exit 0
 fi
@@ -36,17 +36,17 @@ fi
 host_a="${1:?HOST_A required}"
 host_b="${2:?HOST_B required}"
 
-remote_dir="${DS4RT_VERBS_APP_WORKDIR:-}"
-image="${DS4RT_SPARK_IMAGE:-ds4rt-spark-expert-dev}"
-image_copy_method="${DS4RT_SPARK_IMAGE_COPY_METHOD:-spark-netcat}"
-image_seed_host="${DS4RT_SPARK_IMAGE_SEED_HOST:-}"
-image_link_suffix="${DS4RT_SPARK_IMAGE_LINK_SUFFIX:-.200gb}"
-image_copy_port="${DS4RT_SPARK_IMAGE_COPY_PORT:-29421}"
-build_missing_image="${DS4RT_SPARK_BUILD_IMAGE:-0}"
-port="${DS4RT_VERBS_APP_PORT:-18615}"
-duration="${DS4RT_VERBS_APP_DURATION_SECS:-2}"
-payloads="${DS4RT_VERBS_APP_PAYLOAD_BYTES:-8192,16384,32768,65536,131072,524288,2097152,4194304}"
-keep_remote="${DS4RT_VERBS_APP_KEEP_REMOTE:-0}"
+remote_dir="${DS41RT_VERBS_APP_WORKDIR:-}"
+image="${DS41RT_SPARK_IMAGE:-ds41rt-spark-expert-dev}"
+image_copy_method="${DS41RT_SPARK_IMAGE_COPY_METHOD:-spark-netcat}"
+image_seed_host="${DS41RT_SPARK_IMAGE_SEED_HOST:-}"
+image_link_suffix="${DS41RT_SPARK_IMAGE_LINK_SUFFIX:-.200gb}"
+image_copy_port="${DS41RT_SPARK_IMAGE_COPY_PORT:-29421}"
+build_missing_image="${DS41RT_SPARK_BUILD_IMAGE:-0}"
+port="${DS41RT_VERBS_APP_PORT:-18615}"
+duration="${DS41RT_VERBS_APP_DURATION_SECS:-2}"
+payloads="${DS41RT_VERBS_APP_PAYLOAD_BYTES:-8192,16384,32768,65536,131072,524288,2097152,4194304}"
+keep_remote="${DS41RT_VERBS_APP_KEEP_REMOTE:-0}"
 benchmark_dir="$repo_root/reports/phase0_artifacts/benchmarks"
 log_dir="$repo_root/reports/phase0_artifacts/logs"
 mkdir -p "$benchmark_dir" "$log_dir"
@@ -60,7 +60,7 @@ client_log="$log_dir/bench-verbs-app-${safe_pair}-client.log"
 case "$image_copy_method" in
   spark-netcat|ssh-relay|none) ;;
   *)
-    echo "DS4RT_SPARK_IMAGE_COPY_METHOD must be spark-netcat, ssh-relay, or none, got: $image_copy_method" >&2
+    echo "DS41RT_SPARK_IMAGE_COPY_METHOD must be spark-netcat, ssh-relay, or none, got: $image_copy_method" >&2
     exit 2
     ;;
 esac
@@ -86,7 +86,7 @@ need ssh
 if [ -z "$remote_dir" ]; then
   remote_dir="$(
     ssh -o BatchMode=yes "$host_a" \
-      'printf "%s/ds4rt-phase0-verbs-app" "$HOME"'
+      'printf "%s/ds41rt-phase0-verbs-app" "$HOME"'
   )"
 fi
 
@@ -97,7 +97,7 @@ stage_repo() {
   rsync -az --delete \
     --exclude '.git' \
     --exclude '.venv/' \
-    --exclude '.ds4rt-cache/' \
+    --exclude '.ds41rt-cache/' \
     --exclude '.mypy_cache/' \
     --exclude '.pytest_cache/' \
     --exclude '.ruff_cache/' \
@@ -140,7 +140,7 @@ select_image_seed() {
   local candidate
   if [ -n "$image_seed_host" ]; then
     image_exists "$image_seed_host" || {
-      echo "DS4RT_SPARK_IMAGE_SEED_HOST does not have image '$image': $image_seed_host" >&2
+      echo "DS41RT_SPARK_IMAGE_SEED_HOST does not have image '$image': $image_seed_host" >&2
       return 1
     }
     echo "$image_seed_host"
@@ -173,7 +173,7 @@ copy_image_spark_netcat() {
   local src="$1"
   local dest="$2"
   local dest_link="${dest}${image_link_suffix}"
-  local state_dir="/tmp/ds4rt-image-copy-${USER:-tj}-${dest}-${image_copy_port}"
+  local state_dir="/tmp/ds41rt-image-copy-${USER:-tj}-${dest}-${image_copy_port}"
   echo "== copying $image from $src to $dest over ${dest_link}:${image_copy_port} =="
   ssh -o BatchMode=yes "$dest" bash -s -- "$image_copy_port" "$state_dir" <<'REMOTE'
 set -euo pipefail
@@ -259,7 +259,7 @@ ensure_image() {
   if [ "$image_copy_method" != "none" ]; then
     if [ -z "$image_seed_host" ]; then
       if ! image_seed_host="$(select_image_seed)"; then
-        if [ -n "${DS4RT_SPARK_IMAGE_SEED_HOST:-}" ]; then
+        if [ -n "${DS41RT_SPARK_IMAGE_SEED_HOST:-}" ]; then
           exit 2
         fi
         image_seed_host=""
@@ -275,8 +275,8 @@ ensure_image() {
   if [ "$build_missing_image" != "1" ]; then
     cat >&2 <<EOF
 Spark image '$image' is missing on $host.
-Seed it from another Spark, rerun with DS4RT_SPARK_IMAGE_COPY_METHOD=ssh-relay,
-or explicitly rerun with DS4RT_SPARK_IMAGE_COPY_METHOD=none DS4RT_SPARK_BUILD_IMAGE=1.
+Seed it from another Spark, rerun with DS41RT_SPARK_IMAGE_COPY_METHOD=ssh-relay,
+or explicitly rerun with DS41RT_SPARK_IMAGE_COPY_METHOD=none DS41RT_SPARK_BUILD_IMAGE=1.
 EOF
     exit 2
   fi
@@ -288,7 +288,7 @@ image="$2"
 cd "$remote_dir"
 docker build \
   --platform linux/arm64 \
-  --build-arg DS4RT_ROLE=expert \
+  --build-arg DS41RT_ROLE=expert \
   --build-arg CUDA_ARCH=121 \
   --build-arg TARGET_PLATFORM=linux/arm64 \
   -f docker/Dockerfile.dev \
@@ -301,7 +301,7 @@ REMOTE
 
 build_remote() {
   local host="$1"
-  echo "== building ARM ds4rt and RDMA native library on $host =="
+  echo "== building ARM ds41rt and RDMA native library on $host =="
   ssh -o BatchMode=yes "$host" bash -s -- "$remote_dir" "$image" "$host" <<'REMOTE'
 set -euo pipefail
 remote_dir="$1"
@@ -314,24 +314,24 @@ docker_args=(
   --ipc=host
   --ulimit memlock=-1:-1
   --cap-add IPC_LOCK
-  -v "$remote_dir:/workspace/ds4rt"
+  -v "$remote_dir:/workspace/ds41rt"
   -v "$remote_dir/.cargo-registry:/opt/cargo/registry"
   -v "$remote_dir/.cargo-git:/opt/cargo/git"
-  -w /workspace/ds4rt
+  -w /workspace/ds41rt
 )
 if [ -e /dev/infiniband ]; then
   docker_args+=(--device=/dev/infiniband)
 fi
 docker "${docker_args[@]}" \
-  -e DS4RT_REMOTE_HOST="$host" \
+  -e DS41RT_REMOTE_HOST="$host" \
   "$image" \
   bash -lc '
 set -euo pipefail
-cargo build --manifest-path rust/Cargo.toml -p ds4rt-daemon
+cargo build --manifest-path rust/Cargo.toml -p ds41rt-daemon
 python3 python/tools/check_native_rdma_build.py \
   --clean \
   --build-dir native/build-rdma \
-  --output "reports/phase0_artifacts/benchmarks/native_rdma_build_${DS4RT_REMOTE_HOST}.json" \
+  --output "reports/phase0_artifacts/benchmarks/native_rdma_build_${DS41RT_REMOTE_HOST}.json" \
   --require-pass
 '
 REMOTE
@@ -342,12 +342,12 @@ run_remote_bench() {
   local mode="$2"
   local peer="$3"
   local output="$4"
-  local unset_sentinel="__DS4RT_UNSET__"
-  local roundtrip_iterations="${DS4RT_VERBS_APP_ROUNDTRIP_ITERATIONS:-$unset_sentinel}"
-  local chain_iterations="${DS4RT_VERBS_APP_CHAIN_ITERATIONS:-$unset_sentinel}"
-  local chain_hops="${DS4RT_VERBS_APP_CHAIN_HOPS:-43}"
-  local control_timeout="${DS4RT_VERBS_APP_CONTROL_TIMEOUT_SECS:-$unset_sentinel}"
-  local ib_port="${DS4RT_VERBS_APP_IB_PORT_NUM:-$unset_sentinel}"
+  local unset_sentinel="__DS41RT_UNSET__"
+  local roundtrip_iterations="${DS41RT_VERBS_APP_ROUNDTRIP_ITERATIONS:-$unset_sentinel}"
+  local chain_iterations="${DS41RT_VERBS_APP_CHAIN_ITERATIONS:-$unset_sentinel}"
+  local chain_hops="${DS41RT_VERBS_APP_CHAIN_HOPS:-43}"
+  local control_timeout="${DS41RT_VERBS_APP_CONTROL_TIMEOUT_SECS:-$unset_sentinel}"
+  local ib_port="${DS41RT_VERBS_APP_IB_PORT_NUM:-$unset_sentinel}"
   ssh -o BatchMode=yes "$host" bash -s -- \
     "$remote_dir" "$image" "$mode" "$peer" "$port" "$payloads" "$duration" \
     "$roundtrip_iterations" \
@@ -370,7 +370,7 @@ chain_hops="${3-}"
 control_timeout="${4-}"
 ib_port="${5-}"
 for name in roundtrip_iterations chain_iterations control_timeout ib_port; do
-  if [ "${!name}" = "__DS4RT_UNSET__" ]; then
+  if [ "${!name}" = "__DS41RT_UNSET__" ]; then
     printf -v "$name" ''
   fi
 done
@@ -381,35 +381,35 @@ docker_args=(
   --ipc=host
   --ulimit memlock=-1:-1
   --cap-add IPC_LOCK
-  -v "$remote_dir:/workspace/ds4rt"
+  -v "$remote_dir:/workspace/ds41rt"
   -v "$remote_dir/.cargo-registry:/opt/cargo/registry"
   -v "$remote_dir/.cargo-git:/opt/cargo/git"
-  -w /workspace/ds4rt
+  -w /workspace/ds41rt
 )
 if [ -e /dev/infiniband ]; then
   docker_args+=(--device=/dev/infiniband)
 fi
 docker "${docker_args[@]}" \
-  -e DS4RT_NATIVE_LIB=/workspace/ds4rt/native/build-rdma/libds4rt_native.so \
-  -e DS4RT_VERBS_APP_ROUNDTRIP_ITERATIONS="$roundtrip_iterations" \
-  -e DS4RT_VERBS_APP_CHAIN_ITERATIONS="$chain_iterations" \
-  -e DS4RT_VERBS_APP_CHAIN_HOPS="$chain_hops" \
-  -e DS4RT_VERBS_APP_CONTROL_TIMEOUT_SECS="$control_timeout" \
-  -e DS4RT_VERBS_APP_IB_PORT_NUM="$ib_port" \
-  -e DS4RT_BENCH_MODE="$mode" \
-  -e DS4RT_BENCH_PEER="$peer" \
-  -e DS4RT_BENCH_PORT="$port" \
-  -e DS4RT_BENCH_DURATION="$duration" \
-  -e DS4RT_BENCH_PAYLOADS="$payloads" \
+  -e DS41RT_NATIVE_LIB=/workspace/ds41rt/native/build-rdma/libds41rt_native.so \
+  -e DS41RT_VERBS_APP_ROUNDTRIP_ITERATIONS="$roundtrip_iterations" \
+  -e DS41RT_VERBS_APP_CHAIN_ITERATIONS="$chain_iterations" \
+  -e DS41RT_VERBS_APP_CHAIN_HOPS="$chain_hops" \
+  -e DS41RT_VERBS_APP_CONTROL_TIMEOUT_SECS="$control_timeout" \
+  -e DS41RT_VERBS_APP_IB_PORT_NUM="$ib_port" \
+  -e DS41RT_BENCH_MODE="$mode" \
+  -e DS41RT_BENCH_PEER="$peer" \
+  -e DS41RT_BENCH_PORT="$port" \
+  -e DS41RT_BENCH_DURATION="$duration" \
+  -e DS41RT_BENCH_PAYLOADS="$payloads" \
   "$image" \
   bash -lc '
 set -euo pipefail
-exec rust/target/debug/ds4rt bench-rdma \
-  --mode "$DS4RT_BENCH_MODE" \
-  --peer "$DS4RT_BENCH_PEER" \
-  --port "$DS4RT_BENCH_PORT" \
-  --duration-secs "$DS4RT_BENCH_DURATION" \
-  --payload-bytes "$DS4RT_BENCH_PAYLOADS"
+exec rust/target/debug/ds41rt bench-rdma \
+  --mode "$DS41RT_BENCH_MODE" \
+  --peer "$DS41RT_BENCH_PEER" \
+  --port "$DS41RT_BENCH_PORT" \
+  --duration-secs "$DS41RT_BENCH_DURATION" \
+  --payload-bytes "$DS41RT_BENCH_PAYLOADS"
 '
 REMOTE
 }
@@ -453,7 +453,7 @@ from pathlib import Path
 for path_arg in sys.argv[1:]:
     path = Path(path_arg)
     data = json.loads(path.read_text(encoding="utf-8"))
-    runs = data["ds4rt_app_benchmark"]["app_transport_runs"]
+    runs = data["ds41rt_app_benchmark"]["app_transport_runs"]
     print(f"{path.name}: skipped={data['skipped']} runs={len(runs)} all_ok={all(run['ok'] for run in runs)}")
     for run in runs:
         if run["role"] == "client":

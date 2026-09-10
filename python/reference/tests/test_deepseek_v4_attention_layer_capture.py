@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 import torch
-from ds4rt_reference.deepseek_v4_attention_layer_capture import (
+from ds41rt_reference.deepseek_v4_attention_layer_capture import (
     DS4_LAYER_ARENA_ALIGNMENT,
     bind_deepseek_v4_attention_layer,
     bind_deepseek_v4_sliding_attention_layer,
@@ -440,7 +440,7 @@ def test_c128_decode_execution_lifecycle_is_startup_qualified() -> None:
 
 
 def test_c128_initial_prefill_execution_lifecycle_is_startup_qualified() -> None:
-    from ds4rt_reference.deepseek_v4_attention_layer_capture import (
+    from ds41rt_reference.deepseek_v4_attention_layer_capture import (
         DeepseekV4C128PrefillAttentionLayerBinding,
         bind_deepseek_v4_c128_prefill_attention_layer,
         run_deepseek_v4_c128_prefill_attention_layer,
@@ -469,7 +469,7 @@ def test_c128_initial_prefill_execution_lifecycle_is_startup_qualified() -> None
 
 
 def test_c128_continuation_execution_lifecycle_is_startup_qualified() -> None:
-    from ds4rt_reference.deepseek_v4_attention_layer_capture import (
+    from ds41rt_reference.deepseek_v4_attention_layer_capture import (
         DeepseekV4C128ContinuationAttentionLayerBinding,
         bind_deepseek_v4_c128_continuation_attention_layer,
         run_deepseek_v4_c128_continuation_attention_layer,
@@ -498,7 +498,7 @@ def test_c128_continuation_execution_lifecycle_is_startup_qualified() -> None:
 
 
 def test_c4_initial_prefill_execution_lifecycle_is_startup_qualified() -> None:
-    from ds4rt_reference.deepseek_v4_attention_layer_capture import (
+    from ds41rt_reference.deepseek_v4_attention_layer_capture import (
         DeepseekV4C4PrefillAttentionLayerBinding,
         bind_deepseek_v4_c4_prefill_attention_layer,
         run_deepseek_v4_c4_prefill_attention_layer,
@@ -529,7 +529,7 @@ def test_c4_initial_prefill_execution_lifecycle_is_startup_qualified() -> None:
 
 
 def test_c4_continuation_execution_lifecycle_is_startup_qualified() -> None:
-    from ds4rt_reference.deepseek_v4_attention_layer_capture import (
+    from ds41rt_reference.deepseek_v4_attention_layer_capture import (
         DeepseekV4C4ContinuationAttentionLayerBinding,
         bind_deepseek_v4_c4_continuation_attention_layer,
         run_deepseek_v4_c4_continuation_attention_layer,

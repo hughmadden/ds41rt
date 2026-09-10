@@ -71,8 +71,8 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help=(
             "Coordinator stderr log produced with "
-            "DS4RT_PROTOCOL_V2_EXPERT_QUEUE_STATS=1 and "
-            "DS4RT_PROTOCOL_V2_EXPERT_QUEUE_ROW_ROUTES=1."
+            "DS41RT_PROTOCOL_V2_EXPERT_QUEUE_STATS=1 and "
+            "DS41RT_PROTOCOL_V2_EXPERT_QUEUE_ROW_ROUTES=1."
         ),
     )
     parser.add_argument(
@@ -314,7 +314,7 @@ def main() -> None:
                 output,
                 {
                     "record": "manifest",
-                    "schema": "ds4rt-expert-route-bank-v2",
+                    "schema": "ds41rt-expert-route-bank-v2",
                     "created_unix": time.time(),
                     "model": args.model,
                     "source_trace_log": str(args.trace_log.resolve()),

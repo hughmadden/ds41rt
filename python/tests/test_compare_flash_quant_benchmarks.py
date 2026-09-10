@@ -44,7 +44,7 @@ def benchmark(model: str, ratio: float = 1.0) -> dict:
 
 def draft(model: str, accepted: int = 300) -> dict:
     return {
-        "schema": "ds4rt-draft-acceptance-summary-v2",
+        "schema": "ds41rt-draft-acceptance-summary-v2",
         "model": model,
         "runtime_commit": "a" * 40,
         "draft_policy": "adaptive",

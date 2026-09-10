@@ -1,12 +1,12 @@
-# DS4RT containers
+# DS41RT containers
 
-DS4RT publishes two inference images because the release roles have different
+DS41RT publishes two inference images because the release roles have different
 host architectures and CUDA targets:
 
 | Image | Platform | CUDA target | Purpose |
 | --- | --- | --- | --- |
-| `ghcr.io/tpurtell/ds4rt-coordinator:v2` | `linux/amd64` | `sm_120` | API, scheduler, attention, cache, sampling |
-| `ghcr.io/tpurtell/ds4rt-spark-expert:v2` | `linux/arm64` | `sm_121` | TP4 routed-expert worker |
+| `ghcr.io/tpurtell/ds41rt-coordinator:v2` | `linux/amd64` | `sm_120` | API, scheduler, attention, cache, sampling |
+| `ghcr.io/tpurtell/ds41rt-spark-expert:v2` | `linux/arm64` | `sm_121` | TP4 routed-expert worker |
 
 Weights are mounted read-only from the host Hugging Face cache. They are never
 embedded in an image and the release image runs offline.
@@ -35,7 +35,7 @@ Both images record the same concrete engine revision and SparkInfer revision.
 They also include OCI source, description, and MIT license labels. `run.sh`
 rejects missing or mismatched labels.
 
-Release images contain the `ds4rt` binary, native library, Python capture
+Release images contain the `ds41rt` binary, native library, Python capture
 modules required at startup, pinned SparkInfer source, XGrammar/SparkInfer
 license and provenance records, and the runtime entrypoint. Development
 toolchains and quantization utilities are not part of the serving contract.
@@ -55,7 +55,7 @@ normal build and runtime gates.
 
 Authenticate the local host and the first Spark to GHCR before publishing.
 The publisher needs `write:packages`. The images carry
-`org.opencontainers.image.source=https://github.com/tpurtell/ds4rt-pro-rtx-4spark`,
+`org.opencontainers.image.source=https://github.com/tpurtell/ds41rt`,
 which records the intended source association. After the first push, use each
 package's settings to connect this repository and set visibility to public,
 then verify both `v2` manifests from a Docker client with no registry login.
@@ -66,3 +66,8 @@ then verify both `v2` manifests from a Docker client with no registry login.
 targets preserve the reproducible conversion environment used to create the
 published checkpoint. They are developer tools, not required for v2 serving.
 The public quick-deploy path starts from the already quantized Pro artifact.
+
+For development with only part of the Spark fleet available, use
+`./build.sh --spark-hosts ostrich,dodo`; the first selected host builds the
+ARM image, and only selected hosts are checked and receive it.
+Serving still requires the configured four Spark ranks.

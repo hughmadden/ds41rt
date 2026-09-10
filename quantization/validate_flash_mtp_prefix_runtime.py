@@ -25,7 +25,7 @@ from types import SimpleNamespace
 from typing import Any
 
 
-SCHEMA = "ds4rt-gptqmodel-flash-mtp-prefix-runtime-v1"
+SCHEMA = "ds41rt-gptqmodel-flash-mtp-prefix-runtime-v1"
 INPUT_KIND = "deterministic-runtime-control-not-natural-calibration"
 
 

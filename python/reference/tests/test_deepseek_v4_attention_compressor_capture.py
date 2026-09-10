@@ -1,5 +1,5 @@
 import pytest
-from ds4rt_reference.deepseek_v4_attention_compressor_capture import (
+from ds41rt_reference.deepseek_v4_attention_compressor_capture import (
     DS4_C4_MAIN_PAGE_BYTES,
     DS4_C128_MAIN_PAGE_BYTES,
     DS4_INDEX_PAGE_BYTES,
@@ -180,7 +180,7 @@ def test_continuation_metadata_fails_closed_on_invalid_capacities(
 def test_contract_matches_pinned_sparkinfer_plan(
     variant: str, compress_ratio: int, cache_format: str
 ) -> None:
-    from ds4rt_reference.deepseek_v4_attention_compressor_capture import (
+    from ds41rt_reference.deepseek_v4_attention_compressor_capture import (
         qualify_deepseek_v4_attention_compressor_contract,
     )
 

@@ -22,7 +22,7 @@ from uuid import UUID
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+from ds41rt_runtime.exl3_artifact_contract import (  # noqa: E402
     ARTIFACT_FILE as GPTQMODEL_ARTIFACT_FILE,
     LEDGER_MANIFEST_FILE as GPTQMODEL_LEDGER_MANIFEST_FILE,
     PLAN_FILE as GPTQMODEL_PLAN_FILE,
@@ -37,14 +37,14 @@ from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
 )
 
 
-RUN_SCHEMA = "ds4rt-flash-generation-run-v6"
-REFERENCE_SCHEMA = "ds4rt-flash-generation-reference-v1"
-COMPARISON_SCHEMA = "ds4rt-flash-generation-ab-v6"
-MATRIX_SCHEMA = "ds4rt-flash-generation-matrix-v3"
-ARM_SCHEMA = "ds4rt-flash-generation-arm-v1"
-RUNTIME_GATE = "ds4rt-flash-production-runtime-v5"
-STAGED_ARTIFACT_SCHEMA = "ds4rt-hf-staged-snapshot-v1"
-CHECKPOINT_AUDIT_SCHEMA = "ds4rt-flash-checkpoint-audit-v1"
+RUN_SCHEMA = "ds41rt-flash-generation-run-v6"
+REFERENCE_SCHEMA = "ds41rt-flash-generation-reference-v1"
+COMPARISON_SCHEMA = "ds41rt-flash-generation-ab-v6"
+MATRIX_SCHEMA = "ds41rt-flash-generation-matrix-v3"
+ARM_SCHEMA = "ds41rt-flash-generation-arm-v1"
+RUNTIME_GATE = "ds41rt-flash-production-runtime-v5"
+STAGED_ARTIFACT_SCHEMA = "ds41rt-hf-staged-snapshot-v1"
+CHECKPOINT_AUDIT_SCHEMA = "ds41rt-flash-checkpoint-audit-v1"
 FLASH_LAYER_COUNT = 43
 NATIVE_RECIPE = "deepseek_v4_native_fp4_fp8_mixed_v1"
 EXL3_V2_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v2"
@@ -62,12 +62,12 @@ STAGED_EXL3_REQUIRED_FILES = frozenset(
         "config.json",
         "model.safetensors.index.json",
         "quantization_config.json",
-        "ds4rt-exl3-calibration.json",
-        "ds4rt-exl3-quality.json",
-        "ds4rt-exl3-retained-native.json",
-        "ds4rt-exl3-multigpu-production.json",
-        "ds4rt-exl3-error-ledger.jsonl",
-        "ds4rt-exl3-error-ledger.manifest.json",
+        "ds41rt-exl3-calibration.json",
+        "ds41rt-exl3-quality.json",
+        "ds41rt-exl3-retained-native.json",
+        "ds41rt-exl3-multigpu-production.json",
+        "ds41rt-exl3-error-ledger.jsonl",
+        "ds41rt-exl3-error-ledger.manifest.json",
     )
 )
 STAGED_GPTQMODEL_REQUIRED_FILES = frozenset(
@@ -78,13 +78,13 @@ STAGED_GPTQMODEL_REQUIRED_FILES = frozenset(
         GPTQMODEL_PLAN_FILE,
         GPTQMODEL_RUN_FILE,
         GPTQMODEL_ARTIFACT_FILE,
-        "ds4rt-exl3-error-ledger.jsonl",
+        "ds41rt-exl3-error-ledger.jsonl",
         GPTQMODEL_LEDGER_MANIFEST_FILE,
     )
 )
 GPTQMODEL_QUALIFICATION_SCHEMAS = {
-    "retained-native.json": "ds4rt-exl3-retained-native-integrity-v1",
-    "expert-quality.json": "ds4rt-exl3-checkpoint-quality-v1",
+    "retained-native.json": "ds41rt-exl3-retained-native-integrity-v1",
+    "expert-quality.json": "ds41rt-exl3-checkpoint-quality-v1",
 }
 DEVELOPMENT_QUALIFICATION_STATUS = "development-unqualified"
 DEVELOPMENT_BLOCKERS = (
@@ -92,8 +92,8 @@ DEVELOPMENT_BLOCKERS = (
     "natural MTP held-out activation quality evidence is absent",
 )
 GPTQMODEL_DEVELOPMENT_EVIDENCE_SCHEMAS = {
-    "retained-native.json": "ds4rt-exl3-retained-native-integrity-v1",
-    "diagnostic-quality.json": "ds4rt-exl3-checkpoint-quality-v1",
+    "retained-native.json": "ds41rt-exl3-retained-native-integrity-v1",
+    "diagnostic-quality.json": "ds41rt-exl3-checkpoint-quality-v1",
 }
 GPTQMODEL_IDENTITY_FILES = (
     "config.json",
@@ -105,7 +105,7 @@ GPTQMODEL_IDENTITY_FILES = (
     GPTQMODEL_LEDGER_MANIFEST_FILE,
 )
 GPTQMODEL_QUALITY_IDENTITY_FILES = frozenset(
-    (*GPTQMODEL_IDENTITY_FILES, "ds4rt-exl3-calibration.json")
+    (*GPTQMODEL_IDENTITY_FILES, "ds41rt-exl3-calibration.json")
 )
 DEFAULT_FLASH_API_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731-full"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
@@ -393,14 +393,14 @@ def checkpoint_quantization_recipe(
         return NATIVE_RECIPE
     if isinstance(method, str) and method.lower() == "exl3":
         if is_gptqmodel_native_exl3(quantization):
-            inline_mixed = quantization.get("meta", {}).get("ds4rt_inline_mixed")
+            inline_mixed = quantization.get("meta", {}).get("ds41rt_inline_mixed")
             if inline_mixed is not None:
                 validate_inline_mixed_policy(inline_mixed)
                 if quantization.get("bits") not in (2, 2.0):
                     raise ValueError(
                         "inline mixed GPTQModel EXL3 must keep public bits at K2"
                     )
-                provenance = quantization["meta"].get("ds4rt_error_ledger")
+                provenance = quantization["meta"].get("ds41rt_error_ledger")
                 family = (
                     provenance.get("family_join")
                     if isinstance(provenance, dict)
@@ -479,7 +479,7 @@ def checkpoint_quantization_recipe(
                     )
                 meta = external.get("meta")
                 inline_mixed = (
-                    meta.get("ds4rt_inline_mixed") if isinstance(meta, dict) else None
+                    meta.get("ds41rt_inline_mixed") if isinstance(meta, dict) else None
                 )
                 if inline_mixed is not None:
                     if int(bits) != 2:
@@ -489,18 +489,18 @@ def checkpoint_quantization_recipe(
                     validate_inline_mixed_policy(inline_mixed)
                     return GPTQMODEL_RECIPE_MIXED_K2_K3
                 return GPTQMODEL_RECIPE if int(bits) == 2 else GPTQMODEL_RECIPE_K3
-        ds4rt = quantization.get("ds4rt")
-        recipe = ds4rt.get("recipe") if isinstance(ds4rt, dict) else None
+        ds41rt = quantization.get("ds41rt")
+        recipe = ds41rt.get("recipe") if isinstance(ds41rt, dict) else None
         if recipe in HISTORICAL_EXL3_RECIPES:
             if allow_historical_control:
                 return str(recipe)
             raise ValueError(
-                "checkpoint declares historical non-production DS4RT EXL3 recipe "
+                "checkpoint declares historical non-production DS41RT EXL3 recipe "
                 f"{recipe!r}"
             )
         if recipe not in PRODUCTION_EXL3_RECIPES:
             raise ValueError(
-                f"checkpoint declares unsupported DS4RT EXL3 recipe {recipe!r}"
+                f"checkpoint declares unsupported DS41RT EXL3 recipe {recipe!r}"
             )
         return str(recipe)
     raise ValueError(f"unsupported checkpoint quantization method {method!r}")
@@ -546,7 +546,7 @@ def _validate_staged_gptqmodel_qualification(
     manifest: dict[str, Any],
     *,
     entries_key: str = "qualification",
-    evidence_directory: str = "ds4rt-qualifications",
+    evidence_directory: str = "ds41rt-qualifications",
     expected_schemas: dict[str, str] = GPTQMODEL_QUALIFICATION_SCHEMAS,
 ) -> list[dict[str, Any]]:
     entries = manifest.get(entries_key)
@@ -737,7 +737,7 @@ def validate_staged_exl3_checkpoint(
     if SHA256_RE.fullmatch(revision) is None:
         raise ValueError("staged EXL3 snapshot revision is not a SHA-256")
     model_root = checkpoint.parent.parent
-    manifest_path = model_root / "ds4rt-manifests" / f"{revision}.json"
+    manifest_path = model_root / "ds41rt-manifests" / f"{revision}.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -904,7 +904,7 @@ def validate_staged_exl3_checkpoint(
                 revision,
                 manifest,
                 entries_key="development_evidence",
-                evidence_directory="ds4rt-development-evidence",
+                evidence_directory="ds41rt-development-evidence",
                 expected_schemas=GPTQMODEL_DEVELOPMENT_EVIDENCE_SCHEMAS,
             )
         else:
@@ -948,7 +948,7 @@ def audit_checkpoint(
         allow_historical_control=allow_development_unqualified,
     )
     manifest = (
-        checkpoint.parent.parent / "ds4rt-manifests" / f"{checkpoint.name}.json"
+        checkpoint.parent.parent / "ds41rt-manifests" / f"{checkpoint.name}.json"
     )
     if (
         recipe in PRODUCTION_EXL3_RECIPES or recipe in HISTORICAL_EXL3_RECIPES
@@ -1345,7 +1345,7 @@ def collect_run(
     )
     manifest = (
         checkpoint_path.parent.parent
-        / "ds4rt-manifests"
+        / "ds41rt-manifests"
         / f"{checkpoint_path.name}.json"
     )
     artifact_identity = (

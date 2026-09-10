@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the exact GPTQModel fork source used by DS4RT quantization."""
+"""Verify the exact GPTQModel fork source used by DS41RT quantization."""
 
 from __future__ import annotations
 

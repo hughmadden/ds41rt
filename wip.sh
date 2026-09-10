@@ -23,7 +23,7 @@ creating them again from the configured development images.
 EOF
 }
 
-config="$repo_root/ds4rt.config"
+config="$repo_root/ds41rt.config"
 slot=current
 role=both
 from_slot=
@@ -78,10 +78,10 @@ release_need nvidia-smi
 docker info >/dev/null 2>&1 || release_die "local Docker daemon is unavailable"
 release_resolve_coordinator_gpu_identity
 
-coordinator_container=ds4rt-coordinator-wip
-spark_container=ds4rt-spark-expert-wip
+coordinator_container=ds41rt-coordinator-wip
+spark_container=ds41rt-spark-expert-wip
 seed_host="$SPARK_0_HOST"
-state_dir="$repo_root/.ds4rt-wip"
+state_dir="$repo_root/.ds41rt-wip"
 staging_dir="$state_dir/source-staging"
 hf_home="${HF_HOME:-$HOME/.cache/huggingface}"
 mkdir -p "$state_dir" "$hf_home"
@@ -90,9 +90,9 @@ snapshot_args=(
   -a --delete --delete-excluded
   --exclude .git --exclude '.venv*/' --exclude .mypy_cache/
   --exclude .pytest_cache/ --exclude .ruff_cache/ --exclude __pycache__/
-  --exclude '*.pyc' --exclude '*.pyo' --exclude .ds4rt-cache/
-  --exclude .ds4rt-release/ --exclude .ds4rt-release-image/
-  --exclude .ds4rt-wip/ --exclude dist/ --exclude rust/target/
+  --exclude '*.pyc' --exclude '*.pyo' --exclude .ds41rt-cache/
+  --exclude .ds41rt-release/ --exclude .ds41rt-release-image/
+  --exclude .ds41rt-wip/ --exclude dist/ --exclude rust/target/
   --exclude 'native/build*/'
 )
 
@@ -100,8 +100,8 @@ echo "== freezing current checkout for WIP slot $slot =="
 mkdir -p "$staging_dir"
 rsync "${snapshot_args[@]}" "$repo_root/" "$staging_dir/"
 # The selected complete configuration is part of the slot, even when the
-# caller chose a file other than the repository's default ds4rt.config.
-install -m 0644 "$RELEASE_CONFIG" "$staging_dir/ds4rt.config"
+# caller chose a file other than the repository's default ds41rt.config.
+install -m 0644 "$RELEASE_CONFIG" "$staging_dir/ds41rt.config"
 python3 "$staging_dir/scripts/verify-sparkinfer-source.py" \
   --source "$staging_dir/third_party/sparkinfer" \
   --lock "$staging_dir/third_party/sparkinfer.lock.json"
@@ -300,7 +300,7 @@ if [[ "$role" == coordinator && -n "$from_slot" ]]; then
     echo "== preserving resident Spark experts during coordinator-only build =="
   fi
 elif wip_coordinator_processes_active || wip_expert_processes_active; then
-  release_die "a WIP DS4RT process is active; stop it before synchronizing or building"
+  release_die "a WIP DS41RT process is active; stop it before synchronizing or building"
 fi
 
 if [[ -n "$from_slot" ]]; then
@@ -344,7 +344,7 @@ sync_local_source() {
 
 sync_seed_source() {
   local remote_staging
-  remote_staging="$(ssh -o BatchMode=yes "$seed_host" 'printf "%s/.ds4rt-wip-source-staging" "$HOME"')"
+  remote_staging="$(ssh -o BatchMode=yes "$seed_host" 'printf "%s/.ds41rt-wip-source-staging" "$HOME"')"
   local sync=rsync
   if command -v rdmasync >/dev/null 2>&1 && ssh -o BatchMode=yes "$seed_host" 'command -v rdmasync >/dev/null'; then
     sync=rdmasync
@@ -432,13 +432,13 @@ docker exec -i "$coordinator_container" bash -s -- "$slot" <<'CONTAINER'
 set -euo pipefail
 slot="$1"
 test -s "/wip/slots/$slot/coordinator/FINGERPRINT"
-test -s "/wip/slots/$slot/coordinator/workspace/ds4rt.config"
+test -s "/wip/slots/$slot/coordinator/workspace/ds41rt.config"
 CONTAINER
 ssh -o BatchMode=yes "$seed_host" docker exec -i "$spark_container" bash -s -- "$slot" <<'CONTAINER'
 set -euo pipefail
 slot="$1"
 test -s "/wip/slots/$slot/spark-expert/FINGERPRINT"
-test -s "/wip/slots/$slot/spark-expert/workspace/ds4rt.config"
+test -s "/wip/slots/$slot/spark-expert/workspace/ds41rt.config"
 CONTAINER
 
 distribute_expert_slot() {

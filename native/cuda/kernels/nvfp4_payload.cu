@@ -169,8 +169,8 @@ __global__ void gather_f32_nvfp4_row_payload_grouped_candidate_kernel(
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_quantize_bf16_nvfp4_row_payload_async(
-    ds4rt_device_buffer_t input, ds4rt_device_buffer_t payload, size_t rows, size_t hidden_dim,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_quantize_bf16_nvfp4_row_payload_async(
+    ds41rt_device_buffer_t input, ds41rt_device_buffer_t payload, size_t rows, size_t hidden_dim,
     void* cuda_stream) {
   size_t input_values = 0;
   size_t input_bytes = 0;
@@ -181,11 +181,11 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_quantize_bf16_nvfp4_row_payload_async(
       !checked_mul(input_values, sizeof(uint16_t), &input_bytes) ||
       !checked_add(hidden_dim / 2, hidden_dim / 16, &row_stride_bytes) ||
       !checked_mul(rows, row_stride_bytes, &payload_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (input.ptr == nullptr || input.bytes < input_bytes || payload.ptr == nullptr ||
       payload.bytes < payload_bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const dim3 grid(static_cast<unsigned int>(hidden_dim / 16),
                   static_cast<unsigned int>(rows));
@@ -199,7 +199,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_quantize_bf16_nvfp4_row_payload_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async(
+extern "C" ds41rt_status_t ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async(
     const float* src, const uint32_t* row_indices, uint8_t* dst, size_t rows,
     size_t row_width, size_t dst_row_stride_bytes, void* cuda_stream) {
   size_t logical_row_bytes = 0;
@@ -207,7 +207,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_asyn
       row_width == 0 || row_width % 16 != 0 ||
       !checked_add(row_width / 2, row_width / 16, &logical_row_bytes) ||
       dst_row_stride_bytes < logical_row_bytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const dim3 grid(static_cast<unsigned int>(row_width / 16),
                   static_cast<unsigned int>(rows));
@@ -218,8 +218,8 @@ extern "C" ds4rt_status_t ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_asyn
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async(
+extern "C" ds41rt_status_t
+ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async(
     const float* src, const uint32_t* row_indices, uint8_t* dst, size_t rows,
     size_t row_width, size_t dst_row_stride_bytes, size_t blocks_per_row,
     void* cuda_stream) {
@@ -232,7 +232,7 @@ ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async(
       dst_row_stride_bytes < logical_row_bytes ||
       !checked_mul(rows, blocks_per_row, &grid_blocks) ||
       grid_blocks > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   (void)cudaGetLastError();
   gather_f32_nvfp4_row_payload_grouped_candidate_kernel<<<
@@ -243,12 +243,12 @@ ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_policy_candidate_async(
+extern "C" ds41rt_status_t
+ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_policy_candidate_async(
     const float* src, const uint32_t* row_indices, uint8_t* dst, size_t rows,
     size_t row_width, size_t dst_row_stride_bytes, void* cuda_stream) {
   if (rows <= 4) {
-    return ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async(
+    return ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async(
         src, row_indices, dst, rows, row_width, dst_row_stride_bytes,
         cuda_stream);
   }
@@ -260,17 +260,17 @@ ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_policy_candidate_async(
   } else if (rows > 128) {
     blocks_per_row = 4;
   }
-  return ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async(
+  return ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_grouped_candidate_async(
       src, row_indices, dst, rows, row_width, dst_row_stride_bytes,
       blocks_per_row, cuda_stream);
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3(
+extern "C" ds41rt_status_t ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3(
     const float* src, const uint32_t* row_indices, uint8_t* dst, size_t rows,
     size_t row_width, size_t dst_row_stride_bytes) {
-  const ds4rt_status_t status = ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async(
+  const ds41rt_status_t status = ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_async(
       src, row_indices, dst, rows, row_width, dst_row_stride_bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));

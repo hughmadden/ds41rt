@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Benchmark a CuTe W8A16 GEMM that dequantizes each weight tile in shared memory.
 
-This is the first tensor-core W8A16 prefill prototype.  It consumes DS4RT's
+This is the first tensor-core W8A16 prefill prototype.  It consumes DS41RT's
 single K-major group-256 W8 representation directly and never materializes a
 global BF16 weight matrix.  The compressed weight and its scale are converted
 while staging each CTA tile; BF16 warp MMA then consumes the staged tile.
@@ -42,7 +42,7 @@ def _load_tensorop_base():
         Path(flashinfer.__file__).resolve().parent
         / "data/cutlass/examples/python/CuTeDSL/ampere/tensorop_gemm.py"
     )
-    spec = importlib.util.spec_from_file_location("ds4rt_cute_tensorop_gemm", example)
+    spec = importlib.util.spec_from_file_location("ds41rt_cute_tensorop_gemm", example)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load CuTe tensor-op example from {example}")
     module = importlib.util.module_from_spec(spec)
@@ -481,7 +481,7 @@ class W8A16SharedDequantGemm(TensorOpGemm):
 
 def configure_native(path: Path):
     native = ctypes.CDLL(str(path.resolve()))
-    quantize = native.ds4rt_cuda_quantize_bf16_w8a16_group256_async
+    quantize = native.ds41rt_cuda_quantize_bf16_w8a16_group256_async
     quantize.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -504,7 +504,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        default=Path("native/build-w8a16/libds4rt_native.so"),
+        default=Path("native/build-w8a16/libds41rt_native.so"),
     )
     parser.add_argument("--tensor", choices=("q-b", "o"), default="o")
     parser.add_argument("--rows", type=int, default=256)

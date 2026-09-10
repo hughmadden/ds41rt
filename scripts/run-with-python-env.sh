@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-python="${DS4RT_PYTHON:-}"
+python="${DS41RT_PYTHON:-}"
 if [ -z "$python" ] && [ -x "$repo_root/.venv/bin/python" ]; then
   python="$repo_root/.venv/bin/python"
 fi
@@ -11,7 +11,7 @@ if [ -z "$python" ]; then
   python="$(command -v python3 || true)"
 fi
 if [ -z "$python" ] || [ ! -x "$python" ]; then
-  echo "Python interpreter not found; set DS4RT_PYTHON" >&2
+  echo "Python interpreter not found; set DS41RT_PYTHON" >&2
   exit 2
 fi
 
@@ -32,7 +32,7 @@ python_home="$(sed -n '1p' <<<"$python_config")"
 python_libdir="$(sed -n '2p' <<<"$python_config")"
 python_module_path="$(sed -n '3p' <<<"$python_config")"
 
-export DS4RT_PYTHON="$python"
+export DS41RT_PYTHON="$python"
 export PYO3_PYTHON="${PYO3_PYTHON:-$python}"
 export PYTHONHOME="${PYTHONHOME:-$python_home}"
 export PATH="$(dirname "$python"):$PATH"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve or launch one DS4RT production profile."""
+"""Resolve or launch one DS41RT production profile."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ import os
 from pathlib import Path
 import sys
 
-from ds4rt_reference.serve_profiles import (
+from ds41rt_reference.serve_profiles import (
     resolve_serve_profile,
 )
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(
-        description="Resolve balanced/long/accuracy DS4RT launch settings."
+        description="Resolve balanced/long/accuracy DS41RT launch settings."
     )
     parser.add_argument(
         "--profile",

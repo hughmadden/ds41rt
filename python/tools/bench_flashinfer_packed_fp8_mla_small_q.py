@@ -47,7 +47,7 @@ def load_exact_grouped(path: Path):
     if not path.is_file():
         return None
     library = ctypes.CDLL(str(path.resolve()))
-    function = library.ds4rt_cuda_packed_fp8_mla_exact_grouped_async
+    function = library.ds41rt_cuda_packed_fp8_mla_exact_grouped_async
     function.argtypes = [
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -125,7 +125,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        default=Path("native/build-cuda-rdma-coordinator-aot/libds4rt_native.so"),
+        default=Path("native/build-cuda-rdma-coordinator-aot/libds41rt_native.so"),
     )
     args = parser.parse_args()
     exact_grouped = load_exact_grouped(args.native_library)

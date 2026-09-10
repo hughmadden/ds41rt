@@ -123,7 +123,7 @@ def main() -> None:
     with temporary.open("w", encoding="utf-8") as output:
         manifest = {
             "record": "manifest",
-            "schema": "ds4rt-b12x-w4a16-packed-bucket-sweep-v1",
+            "schema": "ds41rt-b12x-w4a16-packed-bucket-sweep-v1",
             "replay_plan": str(args.replay_plan),
             "rows": rows,
             "chains": len(chains),

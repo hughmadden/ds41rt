@@ -74,7 +74,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error(error, len(error))
+    lib.ds41rt_last_error(error, len(error))
     raise RuntimeError(
         f"{action} failed with status {status}: {error.value.decode()}"
     )
@@ -335,17 +335,17 @@ def main() -> None:
     )
 
     native_lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    native_lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    native_lib.ds4rt_last_error.restype = ctypes.c_int
-    native_lib.ds4rt_cuda_b12x_spark_w4a16_top1_async.argtypes = (
+    native_lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    native_lib.ds41rt_last_error.restype = ctypes.c_int
+    native_lib.ds41rt_cuda_b12x_spark_w4a16_top1_async.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
         ctypes.c_size_t,
         ctypes.c_size_t,
         ctypes.c_uint32,
         ctypes.c_void_p,
     )
-    native_lib.ds4rt_cuda_b12x_spark_w4a16_top1_async.restype = ctypes.c_int
-    native_lib.ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async.argtypes = (
+    native_lib.ds41rt_cuda_b12x_spark_w4a16_top1_async.restype = ctypes.c_int
+    native_lib.ds41rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
         ctypes.c_size_t,
         ctypes.c_size_t,
@@ -353,7 +353,7 @@ def main() -> None:
         ctypes.c_int,
         ctypes.c_void_p,
     )
-    native_lib.ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async.restype = (
+    native_lib.ds41rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async.restype = (
         ctypes.c_int
     )
     native_stream = torch.cuda.Stream()
@@ -361,7 +361,7 @@ def main() -> None:
     def launch_native(expert_id: int) -> None:
         check_status(
             native_lib,
-            native_lib.ds4rt_cuda_b12x_spark_w4a16_top1_async(
+            native_lib.ds41rt_cuda_b12x_spark_w4a16_top1_async(
                 ctypes.byref(native_buffers),
                 rows,
                 capacity_rows,
@@ -417,7 +417,7 @@ def main() -> None:
     def launch_native_grid_candidate(grid: int, expert_id: int) -> None:
         check_status(
             native_lib,
-            native_lib.ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async(
+            native_lib.ds41rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async(
                 ctypes.byref(native_buffers),
                 rows,
                 capacity_rows,

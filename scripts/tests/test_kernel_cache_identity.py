@@ -82,7 +82,7 @@ def test_release_image_packages_cache_identity_helper() -> None:
     dockerfile = (ROOT / "docker" / "Dockerfile.release").read_text(encoding="utf-8")
     assert (
         "COPY scripts/kernel-cache-identity.py "
-        "/opt/ds4rt/scripts/kernel-cache-identity.py"
+        "/opt/ds41rt/scripts/kernel-cache-identity.py"
     ) in dockerfile
 
 

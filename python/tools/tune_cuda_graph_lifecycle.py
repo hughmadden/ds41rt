@@ -260,24 +260,24 @@ class Allocation:
 class NativeLibrary:
     def __init__(self, path: Path) -> None:
         self.lib = ctypes.CDLL(str(path.resolve()))
-        self.lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-        self.lib.ds4rt_last_error.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_b12x_coordinator_aot_init.argtypes = ()
-        self.lib.ds4rt_cuda_b12x_coordinator_aot_init.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.argtypes = (
+        self.lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+        self.lib.ds41rt_last_error.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_b12x_coordinator_aot_init.argtypes = ()
+        self.lib.ds41rt_cuda_b12x_coordinator_aot_init.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.argtypes = (
             ctypes.POINTER(CoordinatorW4A16Buffers),
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.restype = (
+        self.lib.ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.restype = (
             ctypes.c_int
         )
-        self.lib.ds4rt_cuda_b12x_coordinator_w4a16_q_b_m8_async.argtypes = (
+        self.lib.ds41rt_cuda_b12x_coordinator_w4a16_q_b_m8_async.argtypes = (
             ctypes.POINTER(CoordinatorW4A16Buffers),
             ctypes.c_size_t,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_b12x_coordinator_w4a16_q_b_m8_async.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_rmsnorm_bf16_async.argtypes = (
+        self.lib.ds41rt_cuda_b12x_coordinator_w4a16_q_b_m8_async.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_rmsnorm_bf16_async.argtypes = (
             ctypes.c_void_p,
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -286,32 +286,32 @@ class NativeLibrary:
             ctypes.c_float,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_rmsnorm_bf16_async.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_graph_begin_capture.argtypes = (ctypes.c_void_p,)
-        self.lib.ds4rt_cuda_graph_begin_capture.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_graph_end_capture_retained.argtypes = (
+        self.lib.ds41rt_cuda_rmsnorm_bf16_async.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_graph_begin_capture.argtypes = (ctypes.c_void_p,)
+        self.lib.ds41rt_cuda_graph_begin_capture.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_graph_end_capture_retained.argtypes = (
             ctypes.c_void_p,
             ctypes.POINTER(GraphCaptureInfo),
         )
-        self.lib.ds4rt_cuda_graph_end_capture_retained.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_graph_launch.argtypes = (
+        self.lib.ds41rt_cuda_graph_end_capture_retained.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_graph_launch.argtypes = (
             ctypes.c_void_p,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_graph_launch.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_graph_exec_update.argtypes = (
+        self.lib.ds41rt_cuda_graph_launch.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_graph_exec_update.argtypes = (
             ctypes.c_void_p,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_graph_exec_update.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_graph_destroy.argtypes = (ctypes.c_void_p,)
-        self.lib.ds4rt_cuda_graph_destroy.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_graph_exec_destroy.argtypes = (ctypes.c_void_p,)
-        self.lib.ds4rt_cuda_graph_exec_destroy.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_graph_exec_update.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_graph_destroy.argtypes = (ctypes.c_void_p,)
+        self.lib.ds41rt_cuda_graph_destroy.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_graph_exec_destroy.argtypes = (ctypes.c_void_p,)
+        self.lib.ds41rt_cuda_graph_exec_destroy.restype = ctypes.c_int
 
     def error(self) -> str:
         buffer = ctypes.create_string_buffer(1_024)
-        self.lib.ds4rt_last_error(buffer, len(buffer))
+        self.lib.ds41rt_last_error(buffer, len(buffer))
         return buffer.value.decode(errors="replace")
 
     def check(self, status: int, action: str) -> None:
@@ -320,20 +320,20 @@ class NativeLibrary:
 
     def aot_init(self) -> None:
         self.check(
-            self.lib.ds4rt_cuda_b12x_coordinator_aot_init(),
+            self.lib.ds41rt_cuda_b12x_coordinator_aot_init(),
             "initialize coordinator SparkInfer AOT modules",
         )
 
     def begin_capture(self, stream: ctypes.c_void_p) -> None:
         self.check(
-            self.lib.ds4rt_cuda_graph_begin_capture(stream),
+            self.lib.ds41rt_cuda_graph_begin_capture(stream),
             "begin CUDA graph capture",
         )
 
     def end_capture(self, stream: ctypes.c_void_p) -> CapturedGraph:
         info = GraphCaptureInfo()
         self.check(
-            self.lib.ds4rt_cuda_graph_end_capture_retained(stream, ctypes.byref(info)),
+            self.lib.ds41rt_cuda_graph_end_capture_retained(stream, ctypes.byref(info)),
             "end CUDA graph capture",
         )
         if info.graph is None or info.graph_exec is None:
@@ -342,22 +342,22 @@ class NativeLibrary:
 
     def launch(self, graph_exec: ctypes.c_void_p, stream: ctypes.c_void_p) -> None:
         self.check(
-            self.lib.ds4rt_cuda_graph_launch(graph_exec, stream),
+            self.lib.ds41rt_cuda_graph_launch(graph_exec, stream),
             "launch CUDA graph",
         )
 
     def update(self, graph_exec: ctypes.c_void_p, graph: ctypes.c_void_p) -> None:
         self.check(
-            self.lib.ds4rt_cuda_graph_exec_update(graph_exec, graph),
+            self.lib.ds41rt_cuda_graph_exec_update(graph_exec, graph),
             "update CUDA graph exec",
         )
 
     def destroy_graph(self, graph: ctypes.c_void_p) -> None:
-        self.check(self.lib.ds4rt_cuda_graph_destroy(graph), "destroy CUDA graph")
+        self.check(self.lib.ds41rt_cuda_graph_destroy(graph), "destroy CUDA graph")
 
     def destroy_exec(self, graph_exec: ctypes.c_void_p) -> None:
         self.check(
-            self.lib.ds4rt_cuda_graph_exec_destroy(graph_exec),
+            self.lib.ds41rt_cuda_graph_exec_destroy(graph_exec),
             "destroy CUDA graph exec",
         )
 
@@ -426,7 +426,7 @@ class QBFixture:
         one = (ctypes.c_float * 1)(1.0)
         self.runtime.copy_h2d(self.allocations["global_scale"], one)
         native.check(
-            native.lib.ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async(
+            native.lib.ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async(
                 ctypes.byref(self.buffers), stream
             ),
             "initialize coordinator Q-B launch buffers",
@@ -435,7 +435,7 @@ class QBFixture:
 
     def launch(self, native: NativeLibrary, stream: ctypes.c_void_p) -> None:
         native.check(
-            native.lib.ds4rt_cuda_b12x_coordinator_w4a16_q_b_m8_async(
+            native.lib.ds41rt_cuda_b12x_coordinator_w4a16_q_b_m8_async(
                 ctypes.byref(self.buffers), Q_B_ROWS, stream
             ),
             "launch coordinator Q-B M8",
@@ -471,7 +471,7 @@ class RmsFixture:
         rows: int,
     ) -> None:
         native.check(
-            native.lib.ds4rt_cuda_rmsnorm_bf16_async(
+            native.lib.ds41rt_cuda_rmsnorm_bf16_async(
                 self.x.ptr,
                 self.weight.ptr,
                 self.output.ptr,

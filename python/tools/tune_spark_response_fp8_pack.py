@@ -68,14 +68,14 @@ def main() -> None:
     runtime = CudaRuntime()
     native = NativeLibrary(args.native_lib)
     current = configure_pack(
-        native.lib, "ds4rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_async"
+        native.lib, "ds41rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_async"
     )
     candidate = configure_pack(
         native.lib,
-        "ds4rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_register_candidate_async",
+        "ds41rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_register_candidate_async",
     )
-    gather_f32 = configure_gather(native.lib, "ds4rt_cuda_gather_rows_f32_async")
-    f32_to_bf16 = native.lib.ds4rt_cuda_f32_to_bf16_async
+    gather_f32 = configure_gather(native.lib, "ds41rt_cuda_gather_rows_f32_async")
+    f32_to_bf16 = native.lib.ds41rt_cuda_f32_to_bf16_async
     f32_to_bf16.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -84,7 +84,7 @@ def main() -> None:
     )
     f32_to_bf16.restype = ctypes.c_int
     bf16_candidate = configure_gather(
-        native.lib, "ds4rt_cuda_gather_rows_f32_to_bf16_candidate_async"
+        native.lib, "ds41rt_cuda_gather_rows_f32_to_bf16_candidate_async"
     )
     stream = ctypes.c_void_p()
     runtime.check(
@@ -277,10 +277,10 @@ def main() -> None:
             sort_keys=True,
         )
     )
-    native.lib.ds4rt_cuda_graph_exec_destroy(current_graph)
-    native.lib.ds4rt_cuda_graph_exec_destroy(candidate_graph)
-    native.lib.ds4rt_cuda_graph_exec_destroy(current_bf16_graph)
-    native.lib.ds4rt_cuda_graph_exec_destroy(candidate_bf16_graph)
+    native.lib.ds41rt_cuda_graph_exec_destroy(current_graph)
+    native.lib.ds41rt_cuda_graph_exec_destroy(candidate_graph)
+    native.lib.ds41rt_cuda_graph_exec_destroy(current_bf16_graph)
+    native.lib.ds41rt_cuda_graph_exec_destroy(candidate_bf16_graph)
     runtime.lib.cudaStreamDestroy(stream)
 
 

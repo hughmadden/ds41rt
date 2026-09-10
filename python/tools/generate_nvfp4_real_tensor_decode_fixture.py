@@ -9,7 +9,7 @@ import os
 import struct
 from pathlib import Path
 
-from ds4rt_reference.quant_ref import (
+from ds41rt_reference.quant_ref import (
     decode_packed_nvfp4_values,
     unpack_low_first_nibbles_bytes,
 )

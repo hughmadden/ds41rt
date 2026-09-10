@@ -42,7 +42,7 @@ def read_config(snapshot: Path, model_id: str) -> dict[str, Any]:
     expert_dtype = str(config.get("expert_dtype", "unknown")).lower()
     if method == "exl3":
         recipe = str(
-            quant.get("ds4rt", {}).get(
+            quant.get("ds41rt", {}).get(
                 "recipe", "invalid_deepseek_v4_exl3_recipe"
             )
         )

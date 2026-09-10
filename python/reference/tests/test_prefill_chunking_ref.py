@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ds4rt_reference.prefill_ref import (
+from ds41rt_reference.prefill_ref import (
     PrefillRow,
     TinyPrefillWeights,
     mix_prefill_rows,

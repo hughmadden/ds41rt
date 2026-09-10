@@ -16,7 +16,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ds4rt_runtime.native_experts import (
+from ds41rt_runtime.native_experts import (
     EXPERT_TP_WORLD_SIZE,
     NATIVE_SOURCE_FORMAT,
     load_native_expert_reference_layer,

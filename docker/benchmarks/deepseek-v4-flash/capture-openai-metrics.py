@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Transparent OpenAI HTTP proxy that records terminal DS4RT metrics.
+"""Transparent OpenAI HTTP proxy that records terminal DS41RT metrics.
 
 Use this only to capture response counters. Benchmark latency should come from
 a direct server connection so the proxy cannot perturb timing.

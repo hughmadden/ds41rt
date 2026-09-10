@@ -2,7 +2,7 @@
 set -euo pipefail
 
 role="coordinator"
-model_id="${DS4RT_MODEL_ID:-wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1}"
+model_id="${DS41RT_MODEL_ID:-wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -40,7 +40,7 @@ run_optional() {
   echo
 }
 
-echo "# DS4RT doctor"
+echo "# DS41RT doctor"
 echo "role: $role"
 echo "model_id: $model_id"
 echo "hostname: $(hostname 2>/dev/null || true)"

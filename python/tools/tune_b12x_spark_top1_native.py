@@ -153,12 +153,12 @@ class Allocation:
 class NativeLibrary:
     def __init__(self, path: Path) -> None:
         self.lib = ctypes.CDLL(str(path.resolve()))
-        self.lib.ds4rt_last_error.argtypes = (
+        self.lib.ds41rt_last_error.argtypes = (
             ctypes.c_char_p,
             ctypes.c_size_t,
         )
-        self.lib.ds4rt_last_error.restype = ctypes.c_int
-        self.lib.ds4rt_cuda_b12x_w4a16_pack_weight_async.argtypes = (
+        self.lib.ds41rt_last_error.restype = ctypes.c_int
+        self.lib.ds41rt_cuda_b12x_w4a16_pack_weight_async.argtypes = (
             DeviceBuffer,
             DeviceBuffer,
             ctypes.c_size_t,
@@ -166,7 +166,7 @@ class NativeLibrary:
             ctypes.c_size_t,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_b12x_w4a16_pack_scale_async.argtypes = (
+        self.lib.ds41rt_cuda_b12x_w4a16_pack_scale_async.argtypes = (
             DeviceBuffer,
             DeviceBuffer,
             ctypes.c_size_t,
@@ -182,8 +182,8 @@ class NativeLibrary:
             ctypes.c_uint32,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_b12x_spark_w4a16_top1_async.argtypes = top1_args
-        self.lib.ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async.argtypes = (
+        self.lib.ds41rt_cuda_b12x_spark_w4a16_top1_async.argtypes = top1_args
+        self.lib.ds41rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async.argtypes = (
             ctypes.POINTER(SparkW4A16Buffers),
             ctypes.c_size_t,
             ctypes.c_size_t,
@@ -191,25 +191,25 @@ class NativeLibrary:
             ctypes.c_int,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_graph_begin_capture.argtypes = (ctypes.c_void_p,)
-        self.lib.ds4rt_cuda_graph_end_capture.argtypes = (
+        self.lib.ds41rt_cuda_graph_begin_capture.argtypes = (ctypes.c_void_p,)
+        self.lib.ds41rt_cuda_graph_end_capture.argtypes = (
             ctypes.c_void_p,
             ctypes.POINTER(ctypes.c_void_p),
         )
-        self.lib.ds4rt_cuda_graph_launch.argtypes = (
+        self.lib.ds41rt_cuda_graph_launch.argtypes = (
             ctypes.c_void_p,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_graph_exec_destroy.argtypes = (ctypes.c_void_p,)
+        self.lib.ds41rt_cuda_graph_exec_destroy.argtypes = (ctypes.c_void_p,)
         for name in (
-            "ds4rt_cuda_b12x_w4a16_pack_weight_async",
-            "ds4rt_cuda_b12x_w4a16_pack_scale_async",
-            "ds4rt_cuda_b12x_spark_w4a16_top1_async",
-            "ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async",
-            "ds4rt_cuda_graph_begin_capture",
-            "ds4rt_cuda_graph_end_capture",
-            "ds4rt_cuda_graph_launch",
-            "ds4rt_cuda_graph_exec_destroy",
+            "ds41rt_cuda_b12x_w4a16_pack_weight_async",
+            "ds41rt_cuda_b12x_w4a16_pack_scale_async",
+            "ds41rt_cuda_b12x_spark_w4a16_top1_async",
+            "ds41rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async",
+            "ds41rt_cuda_graph_begin_capture",
+            "ds41rt_cuda_graph_end_capture",
+            "ds41rt_cuda_graph_launch",
+            "ds41rt_cuda_graph_exec_destroy",
         ):
             getattr(self.lib, name).restype = ctypes.c_int
 
@@ -217,19 +217,19 @@ class NativeLibrary:
         if status == 0:
             return
         error = ctypes.create_string_buffer(512)
-        self.lib.ds4rt_last_error(error, len(error))
+        self.lib.ds41rt_last_error(error, len(error))
         raise RuntimeError(
             f"{action} failed with status {status}: {error.value.decode()}"
         )
 
     def capture(self, stream: ctypes.c_void_p, operation) -> ctypes.c_void_p:
         self.check(
-            self.lib.ds4rt_cuda_graph_begin_capture(stream), "begin graph capture"
+            self.lib.ds41rt_cuda_graph_begin_capture(stream), "begin graph capture"
         )
         operation()
         graph_exec = ctypes.c_void_p()
         self.check(
-            self.lib.ds4rt_cuda_graph_end_capture(stream, ctypes.byref(graph_exec)),
+            self.lib.ds41rt_cuda_graph_end_capture(stream, ctypes.byref(graph_exec)),
             "end graph capture",
         )
         if graph_exec.value is None:
@@ -278,7 +278,7 @@ def measure(
 ) -> list[float]:
     for iteration in range(warmup):
         native.check(
-            native.lib.ds4rt_cuda_graph_launch(
+            native.lib.ds41rt_cuda_graph_launch(
                 graph_execs[iteration % len(graph_execs)], stream
             ),
             "warmup graph launch",
@@ -294,7 +294,7 @@ def measure(
             runtime.check(runtime.lib.cudaEventRecord(start, stream), "record start")
             for iteration in range(iterations):
                 native.check(
-                    native.lib.ds4rt_cuda_graph_launch(
+                    native.lib.ds41rt_cuda_graph_launch(
                         graph_execs[iteration % len(graph_execs)], stream
                     ),
                     "measured graph launch",
@@ -385,7 +385,7 @@ def main() -> None:
         for expert_id in range(args.weight_sets):
             copy_pack_source(rng.randbytes(w13_weight_bytes))
             native.check(
-                native.lib.ds4rt_cuda_b12x_w4a16_pack_weight_async(
+                native.lib.ds41rt_cuda_b12x_w4a16_pack_weight_async(
                     pack_source.buffer(advertised_bytes=w13_weight_bytes),
                     w13_weight.buffer(
                         offset=expert_id * w13_weight_bytes,
@@ -404,7 +404,7 @@ def main() -> None:
             )
             copy_pack_source(rng.randbytes(w2_weight_bytes))
             native.check(
-                native.lib.ds4rt_cuda_b12x_w4a16_pack_weight_async(
+                native.lib.ds41rt_cuda_b12x_w4a16_pack_weight_async(
                     pack_source.buffer(advertised_bytes=w2_weight_bytes),
                     w2_weight.buffer(
                         offset=expert_id * w2_weight_bytes,
@@ -423,7 +423,7 @@ def main() -> None:
             )
         memset(pack_source, 0x38, w13_scale_bytes)
         native.check(
-            native.lib.ds4rt_cuda_b12x_w4a16_pack_scale_async(
+            native.lib.ds41rt_cuda_b12x_w4a16_pack_scale_async(
                 pack_source.buffer(advertised_bytes=w13_scale_bytes),
                 w13_scale.buffer(advertised_bytes=w13_scale_bytes),
                 HIDDEN,
@@ -436,7 +436,7 @@ def main() -> None:
         )
         memset(pack_source, 0x38, w2_scale_bytes)
         native.check(
-            native.lib.ds4rt_cuda_b12x_w4a16_pack_scale_async(
+            native.lib.ds41rt_cuda_b12x_w4a16_pack_scale_async(
                 pack_source.buffer(advertised_bytes=w2_scale_bytes),
                 w2_scale.buffer(advertised_bytes=w2_scale_bytes),
                 INTERMEDIATE,
@@ -508,7 +508,7 @@ def main() -> None:
 
         def launch_current(expert_id: int) -> None:
             native.check(
-                native.lib.ds4rt_cuda_b12x_spark_w4a16_top1_async(
+                native.lib.ds41rt_cuda_b12x_spark_w4a16_top1_async(
                     ctypes.byref(buffers),
                     args.rows,
                     args.rows,
@@ -520,7 +520,7 @@ def main() -> None:
 
         def launch_candidate(expert_id: int, grid: int) -> None:
             native.check(
-                native.lib.ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async(
+                native.lib.ds41rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async(
                     ctypes.byref(buffers),
                     args.rows,
                     args.rows,
@@ -636,7 +636,7 @@ def main() -> None:
         )
     finally:
         for graph_exec in graph_execs:
-            native.lib.ds4rt_cuda_graph_exec_destroy(graph_exec)
+            native.lib.ds41rt_cuda_graph_exec_destroy(graph_exec)
         runtime.lib.cudaStreamDestroy(stream)
 
 

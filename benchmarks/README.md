@@ -1,4 +1,4 @@
-# DS4RT Pro v1 benchmark record
+# DS41RT Pro v1 benchmark record
 
 The public benchmark summary is intentionally compact: it records the model,
 hardware, runtime policy, request shapes, samples, and correctness gates needed

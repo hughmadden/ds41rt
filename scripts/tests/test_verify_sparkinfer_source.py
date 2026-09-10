@@ -39,7 +39,7 @@ def write_lock(
     path: Path,
     *,
     revision: str = "1" * 40,
-    repository: str = "https://github.com/tpurtell/sparkinfer-ds4rt",
+    repository: str = "https://github.com/tpurtell/sparkinfer-ds41rt",
 ) -> None:
     path.write_text(
         json.dumps(
@@ -195,9 +195,9 @@ def test_git_checkout_requires_locked_revision_cleanliness_and_origin(
     git(
         source,
         "-c",
-        "user.name=DS4RT test",
+        "user.name=DS41RT test",
         "-c",
-        "user.email=ds4rt-test@example.invalid",
+        "user.email=ds41rt-test@example.invalid",
         "commit",
         "-qm",
         "fixture",
@@ -207,7 +207,7 @@ def test_git_checkout_requires_locked_revision_cleanliness_and_origin(
         "remote",
         "add",
         "origin",
-        "git@github.com:tpurtell/sparkinfer-ds4rt.git",
+        "git@github.com:tpurtell/sparkinfer-ds41rt.git",
     )
     revision = git(source, "rev-parse", "HEAD")
     lock = tmp_path / "sparkinfer.lock.json"
@@ -373,8 +373,8 @@ def test_standalone_bootstrap_honors_explicit_verified_source(
     lock = tmp_path / "sparkinfer.lock.json"
     write_lock(source, lock)
     env = os.environ.copy()
-    env["DS4RT_SPARKINFER_SOURCE_DIR"] = os.fspath(source)
-    env["DS4RT_SPARKINFER_LOCK_FILE"] = os.fspath(lock)
+    env["DS41RT_SPARKINFER_SOURCE_DIR"] = os.fspath(source)
+    env["DS41RT_SPARKINFER_LOCK_FILE"] = os.fspath(lock)
     env["PYTHONPATH"] = os.fspath(BOOTSTRAP.parent)
 
     result = subprocess.run(

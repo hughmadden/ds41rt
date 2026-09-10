@@ -2,7 +2,7 @@
 
 ## XGrammar
 
-DS4RT statically links a pinned XGrammar release for JSON Schema and strict
+DS41RT statically links a pinned XGrammar release for JSON Schema and strict
 tool-call constrained decoding: <https://github.com/mlc-ai/xgrammar>. The
 exact revision, nested DLPack revision, and source-tree digest are recorded in
 `third_party/xgrammar.lock.json` and distributed as
@@ -14,7 +14,7 @@ SPDX-License-Identifier: Apache-2.0
 
 XGrammar is distributed under the Apache License, Version 2.0. The complete
 root license text is distributed as `XGRAMMAR_LICENSE` in standalone
-artifacts and as `/opt/ds4rt/share/licenses/xgrammar/LICENSE` in inference
+artifacts and as `/opt/ds41rt/share/licenses/xgrammar/LICENSE` in inference
 images. XGrammar's vendored DLPack headers retain their own Apache-2.0
 copyright and license notices in the pinned source tree.
 
@@ -57,7 +57,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ## SparkInfer
 
-DS4RT builds CuTe kernels from a pinned fork of SparkInfer, formerly `b12x`:
+DS41RT builds CuTe kernels from a pinned fork of SparkInfer, formerly `b12x`:
 <https://github.com/tpurtell/sparkinfer-glmrt>. The pinned fork revision and
 source digest are recorded in `third_party/sparkinfer.lock.json`.
 `SPARKINFER_PROVENANCE.json` carries those exact locked values plus hashes of
@@ -73,12 +73,12 @@ The SparkInfer project is distributed under the Apache License, Version 2.0,
 subject to the per-file notices retained in its source. You may obtain the
 Apache License at <https://www.apache.org/licenses/LICENSE-2.0>. The complete
 root license text is distributed as `SPARKINFER_LICENSE` in standalone
-artifacts and as `/opt/ds4rt/share/licenses/sparkinfer/LICENSE` in inference
+artifacts and as `/opt/ds41rt/share/licenses/sparkinfer/LICENSE` in inference
 images.
 
 ### NVIDIA dense GEMM component in SparkInfer
 
-SparkInfer's `b12x/_lib/dense_gemm.py`, which DS4RT uses to generate
+SparkInfer's `b12x/_lib/dense_gemm.py`, which DS41RT uses to generate
 Spark-side AOT kernels, is adapted from an NVIDIA CUTLASS dense block-scaled
 GEMM example and carries this notice:
 

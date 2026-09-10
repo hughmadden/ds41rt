@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the complete build-relevant inventory of a frozen DS4RT source tree."""
+"""Verify the complete build-relevant inventory of a frozen DS41RT source tree."""
 
 from __future__ import annotations
 
@@ -23,10 +23,10 @@ IGNORED_DIRECTORY_NAMES = frozenset(
         ".pytest_cache",
         ".ruff_cache",
         "__pycache__",
-        ".ds4rt-cache",
-        ".ds4rt-release",
-        ".ds4rt-release-image",
-        ".ds4rt-wip",
+        ".ds41rt-cache",
+        ".ds41rt-release",
+        ".ds41rt-release-image",
+        ".ds41rt-wip",
         "dist",
     }
 )

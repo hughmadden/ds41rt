@@ -247,7 +247,7 @@ def test_quality_gpu_is_bound_to_planned_physical_gpu0(
     snapshot = tmp_path / "artifact"
     snapshot.mkdir()
     uuid = "GPU-95f8f212-9131-df99-fd53-7535965197d7"
-    (snapshot / "ds4rt-gptqmodel-plan.json").write_text(
+    (snapshot / "ds41rt-gptqmodel-plan.json").write_text(
         json.dumps(
             {
                 "preflight": {
@@ -447,7 +447,7 @@ def test_validator_reads_gptqmodel_projection_metrics_without_legacy_report(
         "num_hidden_layers": 1,
         "dspark_target_layer_ids": [],
         "n_routed_experts": 6,
-        "quantization_config": {"meta": {"ds4rt_error_ledger": {}}},
+        "quantization_config": {"meta": {"ds41rt_error_ledger": {}}},
     }
     (tmp_path / "config.json").write_text(json.dumps(config), encoding="utf-8")
     records = []
@@ -466,7 +466,7 @@ def test_validator_reads_gptqmodel_projection_metrics_without_legacy_report(
                     },
                 }
             )
-    (tmp_path / "ds4rt-exl3-error-ledger.jsonl").write_text(
+    (tmp_path / "ds41rt-exl3-error-ledger.jsonl").write_text(
         "".join(json.dumps(record) + "\n" for record in records),
         encoding="utf-8",
     )
@@ -526,7 +526,7 @@ def test_gptqmodel_quality_requires_artifact_bound_disjoint_prompts(
         json.dumps(
             {
                 "quantization_config": {
-                    "meta": {"ds4rt_error_ledger": {}}
+                    "meta": {"ds41rt_error_ledger": {}}
                 }
             }
         ),
@@ -599,7 +599,7 @@ def test_development_diagnostic_allows_only_synthetic_without_heldout(
     artifact = tmp_path / "artifact"
     artifact.mkdir()
     (artifact / "config.json").write_text(
-        json.dumps({"quantization_config": {"meta": {"ds4rt_error_ledger": {}}}}),
+        json.dumps({"quantization_config": {"meta": {"ds41rt_error_ledger": {}}}}),
         encoding="utf-8",
     )
     monkeypatch.setattr(
@@ -628,7 +628,7 @@ def test_incomplete_snapshot_view_requires_checkpointed_layer(tmp_path: Path) ->
         "{}", encoding="utf-8"
     )
     (tmp_path / "model.safetensors").write_bytes(b"test")
-    (tmp_path / "ds4rt-exl3-calibration.json.incomplete").write_text(
+    (tmp_path / "ds41rt-exl3-calibration.json.incomplete").write_text(
         json.dumps({"layers": [{"layer_id": 0, "projections": []}]}),
         encoding="utf-8",
     )

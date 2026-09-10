@@ -427,7 +427,7 @@ def main() -> None:
 
     meta = {
         "record": "meta",
-        "schema": "ds4rt-prefill-curve-v2",
+        "schema": "ds41rt-prefill-curve-v2",
         "commit": git_commit(root),
         "model": args.model,
         "prompt_protocol": "deepseek-v4-nonthinking-v1",

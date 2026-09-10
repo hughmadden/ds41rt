@@ -16,7 +16,7 @@ REFERENCE_ROOT = Path(__file__).resolve().parents[1] / "reference"
 if str(REFERENCE_ROOT) not in sys.path:
     sys.path.insert(0, str(REFERENCE_ROOT))
 
-from ds4rt_reference.b12x_mla_capture import (  # noqa: E402
+from ds41rt_reference.b12x_mla_capture import (  # noqa: E402
     capture_flashinfer_mla_rope_attention,
     prepare_flashinfer_mla_rope_attention,
 )

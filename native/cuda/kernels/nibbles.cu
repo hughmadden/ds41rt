@@ -26,13 +26,13 @@ __global__ void unpack_nibbles_kernel(const uint8_t* packed, uint8_t* codes, siz
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_pack_nibbles(const uint8_t* codes, uint8_t* packed,
+extern "C" ds41rt_status_t ds41rt_cuda_pack_nibbles(const uint8_t* codes, uint8_t* packed,
                                                   size_t count) {
   if (codes == nullptr || packed == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (count == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
   const size_t packed_count = (count + 1) / 2;
   const int threads = 256;
@@ -45,13 +45,13 @@ extern "C" ds4rt_status_t ds4rt_cuda_pack_nibbles(const uint8_t* codes, uint8_t*
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_unpack_nibbles(const uint8_t* packed, uint8_t* codes,
+extern "C" ds41rt_status_t ds41rt_cuda_unpack_nibbles(const uint8_t* packed, uint8_t* codes,
                                                     size_t count) {
   if (packed == nullptr || codes == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (count == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
   const int threads = 256;
   const int blocks = static_cast<int>((count + threads - 1) / threads);

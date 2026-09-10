@@ -111,9 +111,9 @@ def export_kernels(output_dir: Path) -> None:
         compiled.export_to_c(
             str(output_dir),
             spec.name,
-            f"ds4rt_{spec.name}",
+            f"ds41rt_{spec.name}",
         )
-        macro = f"DS4RT_W8A16_PACKED_O_M{spec.max_rows}"
+        macro = f"DS41RT_W8A16_PACKED_O_M{spec.max_rows}"
         config.extend(
             (
                 f"#define {macro}_MAX_ROWS {spec.max_rows}",

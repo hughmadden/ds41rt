@@ -80,29 +80,29 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     for name in (
-        "ds4rt_cuda_ds4_flash_w4a16_pack_weight_async",
-        "ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async",
+        "ds41rt_cuda_ds4_flash_w4a16_pack_weight_async",
+        "ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async",
     ):
         function = getattr(library, name)
         function.argtypes = pack_args
         function.restype = ctypes.c_int
-    library.ds4rt_cuda_ds4_flash_spark_aot_available.argtypes = (
+    library.ds41rt_cuda_ds4_flash_spark_aot_available.argtypes = (
         ctypes.POINTER(ctypes.c_int),
     )
-    library.ds4rt_cuda_ds4_flash_spark_aot_available.restype = ctypes.c_int
-    library.ds4rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async.argtypes = (
+    library.ds41rt_cuda_ds4_flash_spark_aot_available.restype = ctypes.c_int
+    library.ds41rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async.argtypes = (
         ctypes.POINTER(FlashBuffers),
         ctypes.c_void_p,
     )
-    library.ds4rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async.restype = (
+    library.ds41rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async.restype = (
         ctypes.c_int
     )
-    library.ds4rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async.argtypes = (
+    library.ds41rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async.argtypes = (
         ctypes.POINTER(FlashBuffers),
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    library.ds4rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async.restype = (
+    library.ds41rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async.restype = (
         ctypes.c_int
     )
     return library
@@ -110,7 +110,7 @@ def configure_native(path: Path):
 
 def require_ok(status: int, action: str) -> None:
     if status != 0:
-        raise RuntimeError(f"{action} failed with ds4rt status {status}")
+        raise RuntimeError(f"{action} failed with ds41rt status {status}")
 
 
 def prefill_capacity(rows: int) -> int:
@@ -167,7 +167,7 @@ def run(native_path: Path, seed: int, rows: int) -> dict[str, float | int]:
 
     available = ctypes.c_int()
     require_ok(
-        native.ds4rt_cuda_ds4_flash_spark_aot_available(ctypes.byref(available)),
+        native.ds41rt_cuda_ds4_flash_spark_aot_available(ctypes.byref(available)),
         "query Flash AOT availability",
     )
     if available.value != 1:
@@ -248,7 +248,7 @@ def run(native_path: Path, seed: int, rows: int) -> dict[str, float | int]:
     )
     for expert in range(local_experts):
         require_ok(
-            native.ds4rt_cuda_ds4_flash_w4a16_pack_weight_async(
+            native.ds41rt_cuda_ds4_flash_w4a16_pack_weight_async(
                 tensor_buffer(w13_source[expert]),
                 tensor_buffer(w13_weight[expert]),
                 HIDDEN,
@@ -259,7 +259,7 @@ def run(native_path: Path, seed: int, rows: int) -> dict[str, float | int]:
             f"pack expert {expert} FC1",
         )
         require_ok(
-            native.ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
+            native.ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
                 tensor_buffer(w13_scale_source[expert]),
                 tensor_buffer(w13_scale[expert]),
                 HIDDEN,
@@ -270,7 +270,7 @@ def run(native_path: Path, seed: int, rows: int) -> dict[str, float | int]:
             f"pack expert {expert} FC1 scale",
         )
         require_ok(
-            native.ds4rt_cuda_ds4_flash_w4a16_pack_weight_async(
+            native.ds41rt_cuda_ds4_flash_w4a16_pack_weight_async(
                 tensor_buffer(w2_source[expert]),
                 tensor_buffer(w2_weight[expert]),
                 LOCAL_INTERMEDIATE,
@@ -281,7 +281,7 @@ def run(native_path: Path, seed: int, rows: int) -> dict[str, float | int]:
             f"pack expert {expert} FC2",
         )
         require_ok(
-            native.ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
+            native.ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
                 tensor_buffer(w2_scale_source[expert]),
                 tensor_buffer(w2_scale[expert]),
                 LOCAL_INTERMEDIATE,
@@ -407,14 +407,14 @@ def run(native_path: Path, seed: int, rows: int) -> dict[str, float | int]:
     )
     if rows == 1:
         require_ok(
-            native.ds4rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async(
+            native.ds41rt_cuda_ds4_flash_spark_w4a16_decode_m1_bf16_async(
                 ctypes.byref(buffers), stream
             ),
             "launch Flash AOT decode",
         )
     else:
         require_ok(
-            native.ds4rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async(
+            native.ds41rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async(
                 ctypes.byref(buffers), rows, stream
             ),
             "launch Flash AOT prefill",

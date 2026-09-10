@@ -71,9 +71,9 @@ def parse_physical_ms(raw: str) -> list[int]:
 
 
 def geometry_from_manifest(manifest: dict[str, Any]) -> ReplayGeometry:
-    if manifest.get("schema") != "ds4rt-expert-route-bank-v2":
+    if manifest.get("schema") != "ds41rt-expert-route-bank-v2":
         raise ValueError(
-            "route bank must use ds4rt-expert-route-bank-v2 with explicit "
+            "route bank must use ds41rt-expert-route-bank-v2 with explicit "
             "DeepSeek model geometry"
         )
     geometry = ReplayGeometry(
@@ -374,7 +374,7 @@ def main() -> None:
                 output,
                 {
                     "record": "manifest",
-                    "schema": "ds4rt-expert-reduction-replay-plan-v2",
+                    "schema": "ds41rt-expert-reduction-replay-plan-v2",
                     "route_bank_schema": bank_manifest["schema"],
                     "route_bank": str(args.route_bank.resolve()),
                     "model": geometry.model,

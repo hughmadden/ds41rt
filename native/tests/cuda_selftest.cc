@@ -1,4 +1,4 @@
-#include "ds4rt_native.h"
+#include "ds41rt_native.h"
 
 #include <cuda_runtime_api.h>
 
@@ -14,12 +14,12 @@ namespace {
 
 constexpr float kGlm52RoutedScalingFactor = 2.5f;
 
-void require_status(ds4rt_status_t status, const char* action) {
-  if (status == DS4RT_STATUS_OK) {
+void require_status(ds41rt_status_t status, const char* action) {
+  if (status == DS41RT_STATUS_OK) {
     return;
   }
   char error[256] = {};
-  ds4rt_last_error(error, sizeof(error));
+  ds41rt_last_error(error, sizeof(error));
   std::cerr << action << " failed with status " << status << " error=" << error << "\n";
   std::abort();
 }
@@ -625,28 +625,28 @@ CpuSampleRows cpu_lm_head_sample_topk_topp_bf16(const std::vector<uint16_t>& hid
                                      top_p);
 }
 
-ds4rt_device_buffer_t device_buffer(size_t bytes) {
-  ds4rt_device_buffer_t buffer = {};
-  require_status(ds4rt_alloc_device_buffer(bytes, &buffer), "ds4rt_alloc_device_buffer");
+ds41rt_device_buffer_t device_buffer(size_t bytes) {
+  ds41rt_device_buffer_t buffer = {};
+  require_status(ds41rt_alloc_device_buffer(bytes, &buffer), "ds41rt_alloc_device_buffer");
   return buffer;
 }
 
 template <typename T>
-void copy_h2d(ds4rt_device_buffer_t buffer, const std::vector<T>& values) {
-  require_status(ds4rt_copy_h2d(buffer, values.data(), values.size() * sizeof(T)),
-                 "ds4rt_copy_h2d");
+void copy_h2d(ds41rt_device_buffer_t buffer, const std::vector<T>& values) {
+  require_status(ds41rt_copy_h2d(buffer, values.data(), values.size() * sizeof(T)),
+                 "ds41rt_copy_h2d");
 }
 
 template <typename T>
-std::vector<T> copy_d2h(ds4rt_device_buffer_t buffer, size_t count) {
+std::vector<T> copy_d2h(ds41rt_device_buffer_t buffer, size_t count) {
   std::vector<T> values(count);
-  require_status(ds4rt_copy_d2h(values.data(), buffer, values.size() * sizeof(T)),
-                 "ds4rt_copy_d2h");
+  require_status(ds41rt_copy_d2h(values.data(), buffer, values.size() * sizeof(T)),
+                 "ds41rt_copy_d2h");
   return values;
 }
 
-void free_buffer(ds4rt_device_buffer_t* buffer) {
-  require_status(ds4rt_free_device_buffer(buffer), "ds4rt_free_device_buffer");
+void free_buffer(ds41rt_device_buffer_t* buffer) {
+  require_status(ds41rt_free_device_buffer(buffer), "ds41rt_free_device_buffer");
 }
 
 void test_cuda_copy_d2d_2d_async_copies_active_row_prefixes() {
@@ -667,8 +667,8 @@ void test_cuda_copy_d2d_2d_async_copies_active_row_prefixes() {
   copy_h2d(destination_device, initial);
   cudaStream_t stream = nullptr;
   require_cuda(cudaStreamCreate(&stream), "cudaStreamCreate 2D D2D copy");
-  require_status(ds4rt_copy_d2d_2d_async(destination_device, 4, source_device, 5, 3, 3, stream),
-                 "ds4rt_copy_d2d_2d_async");
+  require_status(ds41rt_copy_d2d_2d_async(destination_device, 4, source_device, 5, 3, 3, stream),
+                 "ds41rt_copy_d2d_2d_async");
   require_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize 2D D2D copy");
   assert(copy_d2h<uint8_t>(destination_device, initial.size()) == expected);
   require_cuda(cudaStreamDestroy(stream), "cudaStreamDestroy 2D D2D copy");
@@ -692,8 +692,8 @@ void test_cuda_copy_h2d_2d_async_copies_active_row_prefixes() {
   copy_h2d(destination_device, initial);
   cudaStream_t stream = nullptr;
   require_cuda(cudaStreamCreate(&stream), "cudaStreamCreate 2D H2D copy");
-  require_status(ds4rt_copy_h2d_2d_async(destination_device, 4, source.data(), 5, 3, 3, stream),
-                 "ds4rt_copy_h2d_2d_async");
+  require_status(ds41rt_copy_h2d_2d_async(destination_device, 4, source.data(), 5, 3, 3, stream),
+                 "ds41rt_copy_h2d_2d_async");
   require_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize 2D H2D copy");
   assert(copy_d2h<uint8_t>(destination_device, initial.size()) == expected);
   require_cuda(cudaStreamDestroy(stream), "cudaStreamDestroy 2D H2D copy");
@@ -720,12 +720,12 @@ void test_cuda_mla_merge_state_bf16_matches_weighted_reference() {
   copy_h2d(accumulator_lse_device, accumulator_lse);
   copy_h2d(partial_device, partial);
   copy_h2d(partial_lse_device, partial_lse);
-  require_status(ds4rt_cuda_mla_merge_state_bf16(
+  require_status(ds41rt_cuda_mla_merge_state_bf16(
                      static_cast<uint16_t*>(accumulator_device.ptr),
                      static_cast<float*>(accumulator_lse_device.ptr),
                      static_cast<const uint16_t*>(partial_device.ptr),
                      static_cast<const float*>(partial_lse_device.ptr), heads, rank),
-                 "ds4rt_cuda_mla_merge_state_bf16");
+                 "ds41rt_cuda_mla_merge_state_bf16");
 
   const auto merged = bf16_to_f32_values(
       copy_d2h<uint16_t>(accumulator_device, accumulator.size()));
@@ -744,8 +744,8 @@ void test_cuda_mla_merge_state_bf16_matches_weighted_reference() {
 }
 
 void test_cuda_device_info() {
-  ds4rt_cuda_device_info_t info = {};
-  require_status(ds4rt_cuda_device_info(0, &info), "ds4rt_cuda_device_info");
+  ds41rt_cuda_device_info_t info = {};
+  require_status(ds41rt_cuda_device_info(0, &info), "ds41rt_cuda_device_info");
   assert(info.cuda_available == 1);
   assert(info.compute_capability_major >= 12);
 }
@@ -769,9 +769,9 @@ void test_cuda_rmsnorm_matches_ref() {
   auto dy = device_buffer(x.size() * sizeof(float));
   copy_h2d(dx, x);
   copy_h2d(dw, weight);
-  require_status(ds4rt_cuda_rmsnorm_f32(static_cast<float*>(dx.ptr), static_cast<float*>(dw.ptr),
+  require_status(ds41rt_cuda_rmsnorm_f32(static_cast<float*>(dx.ptr), static_cast<float*>(dw.ptr),
                                        static_cast<float*>(dy.ptr), rows, hidden, eps),
-                 "ds4rt_cuda_rmsnorm_f32");
+                 "ds41rt_cuda_rmsnorm_f32");
   assert_close(copy_d2h<float>(dy, x.size()), cpu_rmsnorm(x, weight, rows, hidden, eps));
   free_buffer(&dx);
   free_buffer(&dw);
@@ -804,10 +804,10 @@ void test_cuda_rmsnorm_bf16_matches_ref() {
   auto dy = device_buffer(x.size() * sizeof(uint16_t));
   copy_h2d(dx, x);
   copy_h2d(dw, weight);
-  require_status(ds4rt_cuda_rmsnorm_bf16(static_cast<uint16_t*>(dx.ptr),
+  require_status(ds41rt_cuda_rmsnorm_bf16(static_cast<uint16_t*>(dx.ptr),
                                         static_cast<uint16_t*>(dw.ptr),
                                         static_cast<uint16_t*>(dy.ptr), rows, hidden, eps),
-                 "ds4rt_cuda_rmsnorm_bf16");
+                 "ds41rt_cuda_rmsnorm_bf16");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dy, x.size())), expected);
   free_buffer(&dx);
   free_buffer(&dw);
@@ -844,11 +844,11 @@ void test_cuda_mlp_matches_ref_small() {
   copy_h2d(dgate, gate_weight);
   copy_h2d(dup, up_weight);
   copy_h2d(ddown, down_weight);
-  require_status(ds4rt_cuda_silu_gated_mlp_f32(
+  require_status(ds41rt_cuda_silu_gated_mlp_f32(
                      static_cast<float*>(dx.ptr), static_cast<float*>(dgate.ptr),
                      static_cast<float*>(dup.ptr), static_cast<float*>(ddown.ptr),
                      static_cast<float*>(dy.ptr), hidden, intermediate),
-                 "ds4rt_cuda_silu_gated_mlp_f32");
+                 "ds41rt_cuda_silu_gated_mlp_f32");
   assert_close(copy_d2h<float>(dy, x.size()),
                cpu_mlp(x, gate_weight, up_weight, down_weight, hidden, intermediate));
   free_buffer(&dx);
@@ -889,11 +889,11 @@ void test_cuda_mlp_rows_matches_ref_small() {
   copy_h2d(dgate, gate_weight);
   copy_h2d(dup, up_weight);
   copy_h2d(ddown, down_weight);
-  require_status(ds4rt_cuda_silu_gated_mlp_rows_f32(
+  require_status(ds41rt_cuda_silu_gated_mlp_rows_f32(
                      static_cast<float*>(dx.ptr), static_cast<float*>(dgate.ptr),
                      static_cast<float*>(dup.ptr), static_cast<float*>(ddown.ptr),
                      static_cast<float*>(dy.ptr), rows, hidden, intermediate),
-                 "ds4rt_cuda_silu_gated_mlp_rows_f32");
+                 "ds41rt_cuda_silu_gated_mlp_rows_f32");
   assert_close(copy_d2h<float>(dy, x.size()),
                cpu_mlp_rows(x, gate_weight, up_weight, down_weight, rows, hidden, intermediate));
   free_buffer(&dx);
@@ -940,12 +940,12 @@ void test_cuda_nvfp4_route_bf16_staged_reduces_wide_dims() {
   std::vector<uint32_t> row_indices = {0};
   std::vector<float> route_weights = {route_weight};
   std::vector<float> accumulator(output_dim, 0.0f);
-  std::vector<ds4rt_nvfp4_route_batched_metadata_t> route_metadata(1);
+  std::vector<ds41rt_nvfp4_route_batched_metadata_t> route_metadata(1);
   auto dhidden = device_buffer(hidden_bf16.size() * sizeof(uint16_t));
   auto drow_indices = device_buffer(row_indices.size() * sizeof(uint32_t));
   auto droute_weights = device_buffer(route_weights.size() * sizeof(float));
   auto droute_metadata = device_buffer(route_metadata.size() *
-                                       sizeof(ds4rt_nvfp4_route_batched_metadata_t));
+                                       sizeof(ds41rt_nvfp4_route_batched_metadata_t));
   auto dgate_weight = device_buffer(gate_weight.size());
   auto dgate_scale = device_buffer(gate_scale.size());
   auto dup_weight = device_buffer(up_weight.size());
@@ -967,7 +967,7 @@ void test_cuda_nvfp4_route_bf16_staged_reduces_wide_dims() {
   copy_h2d(daccumulator, accumulator);
 
   require_status(
-      ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32(
+      ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32(
           static_cast<uint16_t*>(dhidden.ptr), static_cast<uint32_t*>(drow_indices.ptr),
           static_cast<float*>(droute_weights.ptr), static_cast<uint8_t*>(dgate_weight.ptr),
           static_cast<uint8_t*>(dgate_scale.ptr), static_cast<uint8_t*>(dup_weight.ptr),
@@ -976,7 +976,7 @@ void test_cuda_nvfp4_route_bf16_staged_reduces_wide_dims() {
           static_cast<float*>(daccumulator.ptr), 1, row_indices.size(), hidden_dim, hidden_dim,
           intermediate, output_dim, packed_intermediate_bytes, intermediate_scale_bytes, 1.0f,
           1.0f, 1.0f),
-      "ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32 wide");
+      "ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_grouped_staged_accumulate_f32 wide");
   assert_close(copy_d2h<float>(daccumulator, output_dim), expected, 1.0e-3f);
 
   route_metadata[0].gate_weight = reinterpret_cast<uintptr_t>(dgate_weight.ptr);
@@ -994,13 +994,13 @@ void test_cuda_nvfp4_route_bf16_staged_reduces_wide_dims() {
   copy_h2d(droute_metadata, route_metadata);
   copy_h2d(daccumulator, accumulator);
   require_status(
-      ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32(
+      ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32(
           static_cast<uint16_t*>(dhidden.ptr), static_cast<uint32_t*>(drow_indices.ptr),
           static_cast<float*>(droute_weights.ptr),
-          static_cast<ds4rt_nvfp4_route_batched_metadata_t*>(droute_metadata.ptr),
+          static_cast<ds41rt_nvfp4_route_batched_metadata_t*>(droute_metadata.ptr),
           static_cast<float*>(dactivations.ptr), static_cast<float*>(daccumulator.ptr), 1,
           row_indices.size(), hidden_dim, hidden_dim, intermediate, output_dim),
-      "ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32 wide");
+      "ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_accumulate_f32 wide");
   assert_close(copy_d2h<float>(daccumulator, output_dim), expected, 1.0e-3f);
 
   std::vector<float> expected_bf16 = expected;
@@ -1008,13 +1008,13 @@ void test_cuda_nvfp4_route_bf16_staged_reduces_wide_dims() {
     value = bf16_to_f32(f32_to_bf16(value));
   }
   require_status(
-      ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16(
+      ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16(
           static_cast<uint16_t*>(dhidden.ptr), static_cast<uint32_t*>(drow_indices.ptr),
           static_cast<float*>(droute_weights.ptr),
-          static_cast<ds4rt_nvfp4_route_batched_metadata_t*>(droute_metadata.ptr),
+          static_cast<ds41rt_nvfp4_route_batched_metadata_t*>(droute_metadata.ptr),
           static_cast<float*>(dactivations.ptr), static_cast<uint16_t*>(dout_bf16.ptr), 1,
           row_indices.size(), hidden_dim, hidden_dim, intermediate, output_dim),
-      "ds4rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16 wide");
+      "ds41rt_cuda_nvfp4_silu_gated_mlp_route_bf16_batched_staged_single_row_bf16 wide");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dout_bf16, output_dim)), expected_bf16,
                1.0e-3f);
 
@@ -1042,10 +1042,10 @@ void test_cuda_residual_add_matches_ref() {
   auto dout = device_buffer(residual.size() * sizeof(float));
   copy_h2d(dresidual, residual);
   copy_h2d(ddelta, delta);
-  require_status(ds4rt_cuda_residual_add_f32(static_cast<float*>(dresidual.ptr),
+  require_status(ds41rt_cuda_residual_add_f32(static_cast<float*>(dresidual.ptr),
                                             static_cast<float*>(ddelta.ptr),
                                             static_cast<float*>(dout.ptr), residual.size()),
-                 "ds4rt_cuda_residual_add_f32");
+                 "ds41rt_cuda_residual_add_f32");
   assert_close(copy_d2h<float>(dout, residual.size()), cpu_residual_add(residual, delta));
   free_buffer(&dresidual);
   free_buffer(&ddelta);
@@ -1063,10 +1063,10 @@ void test_cuda_residual_add_bf16_matches_ref() {
   auto dout = device_buffer(residual.size() * sizeof(uint16_t));
   copy_h2d(dresidual, residual);
   copy_h2d(ddelta, delta);
-  require_status(ds4rt_cuda_residual_add_bf16(static_cast<uint16_t*>(dresidual.ptr),
+  require_status(ds41rt_cuda_residual_add_bf16(static_cast<uint16_t*>(dresidual.ptr),
                                              static_cast<uint16_t*>(ddelta.ptr),
                                              static_cast<uint16_t*>(dout.ptr), residual.size()),
-                 "ds4rt_cuda_residual_add_bf16");
+                 "ds41rt_cuda_residual_add_bf16");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dout, residual.size())),
                cpu_residual_add_bf16(residual, delta));
   free_buffer(&dresidual);
@@ -1090,10 +1090,10 @@ void test_cuda_residual_add_f32_delta_bf16_matches_ref() {
   auto dout = device_buffer(residual.size() * sizeof(uint16_t));
   copy_h2d(dresidual, residual);
   copy_h2d(ddelta, delta);
-  require_status(ds4rt_cuda_residual_add_f32_delta_bf16(
+  require_status(ds41rt_cuda_residual_add_f32_delta_bf16(
                      static_cast<uint16_t*>(dresidual.ptr), static_cast<float*>(ddelta.ptr),
                      static_cast<uint16_t*>(dout.ptr), residual.size()),
-                 "ds4rt_cuda_residual_add_f32_delta_bf16");
+                 "ds41rt_cuda_residual_add_f32_delta_bf16");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dout, residual.size())), expected);
   free_buffer(&dresidual);
   free_buffer(&ddelta);
@@ -1122,11 +1122,11 @@ void test_cuda_residual_add_shared_f32_delta_bf16_matches_ref() {
   copy_h2d(dresidual, residual);
   copy_h2d(dshared, shared_delta);
   copy_h2d(drouted, routed_delta);
-  require_status(ds4rt_cuda_residual_add_shared_f32_delta_bf16(
+  require_status(ds41rt_cuda_residual_add_shared_f32_delta_bf16(
                      static_cast<uint16_t*>(dresidual.ptr), static_cast<uint16_t*>(dshared.ptr),
                      static_cast<float*>(drouted.ptr), static_cast<uint16_t*>(dout.ptr),
                      residual.size()),
-                 "ds4rt_cuda_residual_add_shared_f32_delta_bf16");
+                 "ds41rt_cuda_residual_add_shared_f32_delta_bf16");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dout, residual.size())), expected);
   free_buffer(&dresidual);
   free_buffer(&dshared);
@@ -1149,13 +1149,13 @@ void test_cuda_accumulate_bf16_to_f32_preserves_launch_order() {
   auto daccumulator = device_buffer(first.size() * sizeof(float));
   copy_h2d(dfirst, first);
   copy_h2d(dsecond, second);
-  require_status(ds4rt_cuda_zero_f32(static_cast<float*>(daccumulator.ptr), first.size()),
+  require_status(ds41rt_cuda_zero_f32(static_cast<float*>(daccumulator.ptr), first.size()),
                  "zero BF16-to-F32 accumulator");
-  require_status(ds4rt_cuda_accumulate_bf16_to_f32(
+  require_status(ds41rt_cuda_accumulate_bf16_to_f32(
                      static_cast<uint16_t*>(dfirst.ptr),
                      static_cast<float*>(daccumulator.ptr), first.size()),
                  "accumulate first BF16 input");
-  require_status(ds4rt_cuda_accumulate_bf16_to_f32(
+  require_status(ds41rt_cuda_accumulate_bf16_to_f32(
                      static_cast<uint16_t*>(dsecond.ptr),
                      static_cast<float*>(daccumulator.ptr), second.size()),
                  "accumulate second BF16 input");
@@ -1195,19 +1195,19 @@ void test_cuda_row_gather_scatter_add_matches_ref() {
   copy_h2d(dscatter_indices, scatter_indices);
   copy_h2d(dscattered, std::vector<float>(source_rows * row_width, 0.0f));
 
-  require_status(ds4rt_cuda_gather_rows_f32(static_cast<float*>(dsrc.ptr),
+  require_status(ds41rt_cuda_gather_rows_f32(static_cast<float*>(dsrc.ptr),
                                            static_cast<uint32_t*>(dgather_indices.ptr),
                                            static_cast<float*>(dgathered.ptr),
                                            gather_indices.size(), row_width),
-                 "ds4rt_cuda_gather_rows_f32");
+                 "ds41rt_cuda_gather_rows_f32");
   assert_close(copy_d2h<float>(dgathered, gather_indices.size() * row_width),
                cpu_gather_rows(src, gather_indices, row_width));
 
-  require_status(ds4rt_cuda_scatter_add_rows_f32(static_cast<float*>(dpartials.ptr),
+  require_status(ds41rt_cuda_scatter_add_rows_f32(static_cast<float*>(dpartials.ptr),
                                                 static_cast<uint32_t*>(dscatter_indices.ptr),
                                                 static_cast<float*>(dscattered.ptr),
                                                 scatter_indices.size(), row_width),
-                 "ds4rt_cuda_scatter_add_rows_f32");
+                 "ds41rt_cuda_scatter_add_rows_f32");
   assert_close(copy_d2h<float>(dscattered, source_rows * row_width),
                cpu_scatter_add_rows(partials, scatter_indices, source_rows, row_width));
 
@@ -1258,18 +1258,18 @@ void test_cuda_row_gather_scatter_add_bf16_matches_ref() {
   copy_h2d(dscatter_indices, scatter_indices);
   copy_h2d(dscattered, std::vector<float>(source_rows * row_width, 0.0f));
 
-  require_status(ds4rt_cuda_gather_rows_bf16(static_cast<uint16_t*>(dsrc.ptr),
+  require_status(ds41rt_cuda_gather_rows_bf16(static_cast<uint16_t*>(dsrc.ptr),
                                             static_cast<uint32_t*>(dgather_indices.ptr),
                                             static_cast<uint16_t*>(dgathered.ptr),
                                             gather_indices.size(), row_width),
-                 "ds4rt_cuda_gather_rows_bf16");
+                 "ds41rt_cuda_gather_rows_bf16");
   assert(copy_d2h<uint16_t>(dgathered, gather_indices.size() * row_width) == expected_gathered);
 
-  require_status(ds4rt_cuda_scatter_add_rows_bf16_to_f32(
+  require_status(ds41rt_cuda_scatter_add_rows_bf16_to_f32(
                      static_cast<uint16_t*>(dpartials.ptr),
                      static_cast<uint32_t*>(dscatter_indices.ptr),
                      static_cast<float*>(dscattered.ptr), scatter_indices.size(), row_width),
-                 "ds4rt_cuda_scatter_add_rows_bf16_to_f32");
+                 "ds41rt_cuda_scatter_add_rows_bf16_to_f32");
   assert_close(copy_d2h<float>(dscattered, source_rows * row_width), expected_scattered);
 
   free_buffer(&dsrc);
@@ -1309,12 +1309,12 @@ void test_cuda_router_topk_matches_ref() {
   copy_h2d(dweight, router_weight);
   copy_h2d(dbias, correction_bias);
 
-  require_status(ds4rt_cuda_router_topk_f32(
+  require_status(ds41rt_cuda_router_topk_f32(
                      static_cast<float*>(dhidden.ptr), static_cast<float*>(dweight.ptr),
                      static_cast<float*>(dbias.ptr), static_cast<uint32_t*>(dindices.ptr),
                      static_cast<float*>(dscores.ptr), static_cast<float*>(dweights.ptr), rows,
                      hidden_dim, experts, top_k),
-                 "ds4rt_cuda_router_topk_f32");
+                 "ds41rt_cuda_router_topk_f32");
   assert(copy_d2h<uint32_t>(dindices, expected.indices.size()) == expected.indices);
   assert_close(copy_d2h<float>(dscores, expected.scores.size()), expected.scores);
   assert_close(copy_d2h<float>(dweights, expected.weights.size()), expected.weights);
@@ -1357,12 +1357,12 @@ void test_cuda_router_topk_bf16_matches_ref() {
   copy_h2d(dweight, router_weight);
   copy_h2d(dbias, correction_bias);
 
-  require_status(ds4rt_cuda_router_topk_bf16(
+  require_status(ds41rt_cuda_router_topk_bf16(
                      static_cast<uint16_t*>(dhidden.ptr), static_cast<uint16_t*>(dweight.ptr),
                      static_cast<float*>(dbias.ptr), static_cast<uint32_t*>(dindices.ptr),
                      static_cast<float*>(dscores.ptr), static_cast<float*>(dweights.ptr), rows,
                      hidden_dim, experts, top_k),
-                 "ds4rt_cuda_router_topk_bf16");
+                 "ds41rt_cuda_router_topk_bf16");
   assert(copy_d2h<uint32_t>(dindices, expected.indices.size()) == expected.indices);
   assert_close(copy_d2h<float>(dscores, expected.scores.size()), expected.scores);
   assert_close(copy_d2h<float>(dweights, expected.weights.size()), expected.weights);
@@ -1399,20 +1399,20 @@ void test_cuda_linear_matches_ref() {
   copy_h2d(dweight, weight);
   copy_h2d(dbias, bias);
 
-  require_status(ds4rt_cuda_linear_f32(static_cast<float*>(dinput.ptr),
+  require_status(ds41rt_cuda_linear_f32(static_cast<float*>(dinput.ptr),
                                       static_cast<float*>(dweight.ptr),
                                       static_cast<float*>(dbias.ptr),
                                       static_cast<float*>(doutput.ptr), rows, input_dim,
                                       output_dim),
-                 "ds4rt_cuda_linear_f32 bias");
+                 "ds41rt_cuda_linear_f32 bias");
   assert_close(copy_d2h<float>(doutput, rows * output_dim),
                cpu_linear(input, weight, bias.data(), rows, input_dim, output_dim));
 
-  require_status(ds4rt_cuda_linear_f32(static_cast<float*>(dinput.ptr),
+  require_status(ds41rt_cuda_linear_f32(static_cast<float*>(dinput.ptr),
                                       static_cast<float*>(dweight.ptr), nullptr,
                                       static_cast<float*>(doutput.ptr), rows, input_dim,
                                       output_dim),
-                 "ds4rt_cuda_linear_f32 no_bias");
+                 "ds41rt_cuda_linear_f32 no_bias");
   assert_close(copy_d2h<float>(doutput, rows * output_dim),
                cpu_linear(input, weight, nullptr, rows, input_dim, output_dim));
 
@@ -1458,20 +1458,20 @@ void test_cuda_linear_bf16_matches_ref() {
   copy_h2d(dweight, weight);
   copy_h2d(dbias, bias);
 
-  require_status(ds4rt_cuda_linear_bf16(static_cast<uint16_t*>(dinput.ptr),
+  require_status(ds41rt_cuda_linear_bf16(static_cast<uint16_t*>(dinput.ptr),
                                        static_cast<uint16_t*>(dweight.ptr),
                                        static_cast<uint16_t*>(dbias.ptr),
                                        static_cast<uint16_t*>(doutput.ptr), rows, input_dim,
                                        output_dim),
-                 "ds4rt_cuda_linear_bf16 bias");
+                 "ds41rt_cuda_linear_bf16 bias");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(doutput, rows * output_dim)),
                expected_bias);
 
-  require_status(ds4rt_cuda_linear_bf16(static_cast<uint16_t*>(dinput.ptr),
+  require_status(ds41rt_cuda_linear_bf16(static_cast<uint16_t*>(dinput.ptr),
                                        static_cast<uint16_t*>(dweight.ptr), nullptr,
                                        static_cast<uint16_t*>(doutput.ptr), rows, input_dim,
                                        output_dim),
-                 "ds4rt_cuda_linear_bf16 no_bias");
+                 "ds41rt_cuda_linear_bf16 no_bias");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(doutput, rows * output_dim)),
                expected_no_bias);
 
@@ -1508,20 +1508,20 @@ void test_cuda_linear_bf16_m1_parity_batched_matches_recurrent_m1() {
     copy_h2d(dweight, weight);
     for (size_t rows = 2; rows <= max_rows; ++rows) {
       require_status(
-          ds4rt_cuda_linear_bf16_m1_parity_batched_cublaslt_async(
+          ds41rt_cuda_linear_bf16_m1_parity_batched_cublaslt_async(
               static_cast<uint16_t*>(dinput.ptr),
               static_cast<uint16_t*>(dweight.ptr),
               static_cast<uint16_t*>(dbatched.ptr), rows, input_dim, output_dim,
               stream),
-          "ds4rt_cuda_linear_bf16_m1_parity_batched_cublaslt_async");
+          "ds41rt_cuda_linear_bf16_m1_parity_batched_cublaslt_async");
       for (size_t row = 0; row < rows; ++row) {
         require_status(
-            ds4rt_cuda_linear_bf16_cublas_async(
+            ds41rt_cuda_linear_bf16_cublas_async(
                 static_cast<uint16_t*>(dinput.ptr) + row * input_dim,
                 static_cast<uint16_t*>(dweight.ptr), nullptr,
                 static_cast<uint16_t*>(drecurrent.ptr) + row * output_dim, 1,
                 input_dim, output_dim, stream),
-            "ds4rt_cuda_linear_bf16_cublas_async parity reference");
+            "ds41rt_cuda_linear_bf16_cublas_async parity reference");
       }
       require_cuda(cudaStreamSynchronize(stream),
                    "cudaStreamSynchronize BF16 M1-parity batch");
@@ -1563,23 +1563,23 @@ void test_cuda_w8a16_parity_batched_matches_recurrent_m1() {
   copy_h2d(dsource_weight, source_weight);
   cudaStream_t stream = nullptr;
   require_cuda(cudaStreamCreate(&stream), "cudaStreamCreate W8A16 parity batch");
-  require_status(ds4rt_cuda_quantize_bf16_w8a16_group256_async(
+  require_status(ds41rt_cuda_quantize_bf16_w8a16_group256_async(
                      static_cast<uint16_t*>(dsource_weight.ptr),
                      static_cast<int8_t*>(dweight.ptr), static_cast<float*>(dscales.ptr),
                      input_dim, output_dim, 0, stream),
-                 "ds4rt_cuda_quantize_bf16_w8a16_group256_async parity batch");
-  require_status(ds4rt_cuda_linear_w8a16_group256_m1_parity_batched_async(
+                 "ds41rt_cuda_quantize_bf16_w8a16_group256_async parity batch");
+  require_status(ds41rt_cuda_linear_w8a16_group256_m1_parity_batched_async(
                      static_cast<uint16_t*>(dinput.ptr), static_cast<int8_t*>(dweight.ptr),
                      static_cast<float*>(dscales.ptr), static_cast<uint16_t*>(dbatched.ptr), rows,
                      input_dim, output_dim, stream),
-                 "ds4rt_cuda_linear_w8a16_group256_m1_parity_batched_async");
+                 "ds41rt_cuda_linear_w8a16_group256_m1_parity_batched_async");
   for (size_t row = 0; row < rows; ++row) {
-    require_status(ds4rt_cuda_linear_w8a16_group256_m1_simt_async(
+    require_status(ds41rt_cuda_linear_w8a16_group256_m1_simt_async(
                        static_cast<uint16_t*>(dinput.ptr) + row * input_dim,
                        static_cast<int8_t*>(dweight.ptr), static_cast<float*>(dscales.ptr),
                        static_cast<uint16_t*>(drecurrent.ptr) + row * output_dim, input_dim,
                        output_dim, 3, stream),
-                   "ds4rt_cuda_linear_w8a16_group256_m1_simt_async parity reference");
+                   "ds41rt_cuda_linear_w8a16_group256_m1_simt_async parity reference");
   }
   require_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize W8A16 parity batch");
   assert(copy_d2h<uint16_t>(dbatched, rows * output_dim) ==
@@ -1621,30 +1621,30 @@ void test_cuda_w8a16_packed_parity_batched_matches_recurrent_m1() {
   cudaStream_t stream = nullptr;
   require_cuda(cudaStreamCreate(&stream),
                "cudaStreamCreate packed W8A16 parity batch");
-  require_status(ds4rt_cuda_quantize_bf16_w8a16_group256_packed_async(
+  require_status(ds41rt_cuda_quantize_bf16_w8a16_group256_packed_async(
                      static_cast<uint16_t*>(dsource_weight.ptr),
                      static_cast<int8_t*>(dweight.ptr),
                      static_cast<float*>(dscales.ptr), input_dim, output_dim,
                      stream),
-                 "ds4rt_cuda_quantize_bf16_w8a16_group256_packed_async parity batch");
+                 "ds41rt_cuda_quantize_bf16_w8a16_group256_packed_async parity batch");
   for (size_t rows = 2; rows <= max_rows; ++rows) {
     require_status(
-        ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async(
+        ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async(
             static_cast<uint16_t*>(dinput.ptr),
             static_cast<int8_t*>(dweight.ptr),
             static_cast<float*>(dscales.ptr),
             static_cast<uint16_t*>(dbatched.ptr), rows, input_dim, output_dim,
             stream),
-        "ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async");
+        "ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async");
     for (size_t row = 0; row < rows; ++row) {
-      require_status(ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
+      require_status(ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
                          static_cast<uint16_t*>(dinput.ptr) + row * input_dim,
                          static_cast<int8_t*>(dweight.ptr),
                          static_cast<float*>(dscales.ptr),
                          static_cast<uint16_t*>(drecurrent.ptr) +
                              row * output_dim,
                          input_dim, output_dim, stream),
-                     "ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async parity reference");
+                     "ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async parity reference");
     }
     require_cuda(cudaStreamSynchronize(stream),
                  "cudaStreamSynchronize packed W8A16 parity batch");
@@ -1703,13 +1703,13 @@ void test_cuda_matmul_bf16_strided_batched_matches_ref() {
   auto doutput = device_buffer(expected.size() * sizeof(uint16_t));
   copy_h2d(dinput, input);
   copy_h2d(dright, right);
-  require_status(ds4rt_cuda_matmul_bf16_strided_batched_cublas_async(
+  require_status(ds41rt_cuda_matmul_bf16_strided_batched_cublas_async(
                      static_cast<uint16_t*>(dinput.ptr),
                      static_cast<uint16_t*>(dright.ptr),
                      static_cast<uint16_t*>(doutput.ptr), batch_count, rows,
                      input_dim, output_dim, rows * input_dim,
                      input_dim * output_dim, rows * output_dim, nullptr),
-                 "ds4rt_cuda_matmul_bf16_strided_batched_cublas_async");
+                 "ds41rt_cuda_matmul_bf16_strided_batched_cublas_async");
   assert_close(
       bf16_to_f32_values(copy_d2h<uint16_t>(doutput, expected.size())), expected);
 
@@ -1757,11 +1757,11 @@ void test_cuda_causal_attention_matches_ref() {
   copy_h2d(dk, k);
   copy_h2d(dv, v);
 
-  require_status(ds4rt_cuda_causal_attention_f32(
+  require_status(ds41rt_cuda_causal_attention_f32(
                      static_cast<float*>(dq.ptr), static_cast<float*>(dk.ptr),
                      static_cast<float*>(dv.ptr), static_cast<float*>(dout.ptr), rows, heads,
                      qk_dim, v_dim, scale),
-                 "ds4rt_cuda_causal_attention_f32");
+                 "ds41rt_cuda_causal_attention_f32");
   assert_close(copy_d2h<float>(dout, rows * heads * v_dim),
                cpu_causal_attention(q, k, v, rows, heads, qk_dim, v_dim, scale));
 
@@ -1816,11 +1816,11 @@ void test_cuda_causal_attention_bf16_matches_ref() {
   copy_h2d(dk, k);
   copy_h2d(dv, v);
 
-  require_status(ds4rt_cuda_causal_attention_bf16(
+  require_status(ds41rt_cuda_causal_attention_bf16(
                      static_cast<uint16_t*>(dq.ptr), static_cast<uint16_t*>(dk.ptr),
                      static_cast<uint16_t*>(dv.ptr), static_cast<uint16_t*>(dout.ptr), rows, heads,
                      qk_dim, v_dim, scale),
-                 "ds4rt_cuda_causal_attention_bf16");
+                 "ds41rt_cuda_causal_attention_bf16");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dout, rows * heads * v_dim)), expected,
                1.0e-5f);
 
@@ -1852,10 +1852,10 @@ void test_cuda_rope_matches_ref() {
   copy_h2d(dinput, input);
   copy_h2d(dpositions, positions);
 
-  require_status(ds4rt_cuda_rope_f32(static_cast<float*>(dinput.ptr),
+  require_status(ds41rt_cuda_rope_f32(static_cast<float*>(dinput.ptr),
                                     static_cast<uint32_t*>(dpositions.ptr),
                                     static_cast<float*>(dout.ptr), rows, heads, rotary_dim, theta),
-                 "ds4rt_cuda_rope_f32");
+                 "ds41rt_cuda_rope_f32");
   assert_close(copy_d2h<float>(dout, input.size()), expected, 1.0e-5f);
 
   free_buffer(&dinput);
@@ -1889,11 +1889,11 @@ void test_cuda_rope_bf16_matches_ref() {
   copy_h2d(dinput, input);
   copy_h2d(dpositions, positions);
 
-  require_status(ds4rt_cuda_rope_bf16(static_cast<uint16_t*>(dinput.ptr),
+  require_status(ds41rt_cuda_rope_bf16(static_cast<uint16_t*>(dinput.ptr),
                                      static_cast<uint32_t*>(dpositions.ptr),
                                      static_cast<uint16_t*>(dout.ptr), rows, heads, rotary_dim,
                                      theta),
-                 "ds4rt_cuda_rope_bf16");
+                 "ds41rt_cuda_rope_bf16");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dout, input.size())), expected, 1.0e-5f);
 
   free_buffer(&dinput);
@@ -1973,12 +1973,12 @@ void test_cuda_mla_rope_attention_bf16_matches_ref() {
   copy_h2d(dk_rope, k_rope);
   copy_h2d(dv, v);
 
-  require_status(ds4rt_cuda_mla_rope_attention_bf16(
+  require_status(ds41rt_cuda_mla_rope_attention_bf16(
                      static_cast<uint16_t*>(dq_nope.ptr), static_cast<uint16_t*>(dq_rope.ptr),
                      static_cast<uint16_t*>(dk_nope.ptr), static_cast<uint16_t*>(dk_rope.ptr),
                      static_cast<uint16_t*>(dv.ptr), static_cast<uint16_t*>(dout.ptr), rows, heads,
                      nope_dim, rope_dim, v_dim, scale),
-                 "ds4rt_cuda_mla_rope_attention_bf16");
+                 "ds41rt_cuda_mla_rope_attention_bf16");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dout, rows * heads * v_dim)), expected,
                1.0e-5f);
 
@@ -2031,13 +2031,13 @@ void test_cuda_mla_rope_attention_bf16_suffix_graph_captures_glm52_shape() {
   require_cuda(cudaStreamCreate(&stream), "cudaStreamCreate suffix MLA graph");
   require_cuda(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal),
                "cudaStreamBeginCapture suffix MLA graph");
-  require_status(ds4rt_cuda_mla_rope_attention_bf16_suffix_async(
+  require_status(ds41rt_cuda_mla_rope_attention_bf16_suffix_async(
                      static_cast<uint16_t*>(dq_nope.ptr), static_cast<uint16_t*>(dq_rope.ptr),
                      static_cast<uint16_t*>(dk_nope.ptr), static_cast<uint16_t*>(dk_rope.ptr),
                      static_cast<uint16_t*>(dv.ptr), static_cast<uint16_t*>(dout.ptr), rows,
                      query_row_offset, query_rows, heads, nope_dim, rope_dim, v_dim, scale,
                      stream),
-                 "capture ds4rt_cuda_mla_rope_attention_bf16_suffix_async");
+                 "capture ds41rt_cuda_mla_rope_attention_bf16_suffix_async");
   require_cuda(cudaStreamEndCapture(stream, &graph), "cudaStreamEndCapture suffix MLA graph");
   require_cuda(cudaGraphInstantiate(&graph_exec, graph, 0), "cudaGraphInstantiate suffix MLA graph");
   require_cuda(cudaGraphLaunch(graph_exec, stream), "cudaGraphLaunch suffix MLA graph");
@@ -2079,11 +2079,11 @@ void test_cuda_embedding_lookup_matches_ref() {
   copy_h2d(dembedding, embedding);
   copy_h2d(dtokens, token_ids);
 
-  require_status(ds4rt_cuda_embedding_lookup_f32(static_cast<float*>(dembedding.ptr),
+  require_status(ds41rt_cuda_embedding_lookup_f32(static_cast<float*>(dembedding.ptr),
                                                 static_cast<uint32_t*>(dtokens.ptr),
                                                 static_cast<float*>(dout.ptr), token_ids.size(),
                                                 vocab, hidden),
-                 "ds4rt_cuda_embedding_lookup_f32");
+                 "ds41rt_cuda_embedding_lookup_f32");
   assert_close(copy_d2h<float>(dout, token_ids.size() * hidden),
                cpu_embedding_lookup(embedding, token_ids, vocab, hidden));
 
@@ -2116,11 +2116,11 @@ void test_cuda_embedding_lookup_bf16_matches_ref() {
   copy_h2d(dembedding, embedding);
   copy_h2d(dtokens, token_ids);
 
-  require_status(ds4rt_cuda_embedding_lookup_bf16(static_cast<uint16_t*>(dembedding.ptr),
+  require_status(ds41rt_cuda_embedding_lookup_bf16(static_cast<uint16_t*>(dembedding.ptr),
                                                  static_cast<uint32_t*>(dtokens.ptr),
                                                  static_cast<uint16_t*>(dout.ptr),
                                                  token_ids.size(), vocab, hidden),
-                 "ds4rt_cuda_embedding_lookup_bf16");
+                 "ds41rt_cuda_embedding_lookup_bf16");
   assert(copy_d2h<uint16_t>(dout, token_ids.size() * hidden) == expected);
 
   free_buffer(&dembedding);
@@ -2143,10 +2143,10 @@ void test_cuda_logits_argmax_matches_ref() {
   auto dscores = device_buffer(rows * sizeof(float));
   copy_h2d(dlogits, logits);
 
-  require_status(ds4rt_cuda_logits_argmax_f32(static_cast<float*>(dlogits.ptr),
+  require_status(ds41rt_cuda_logits_argmax_f32(static_cast<float*>(dlogits.ptr),
                                              static_cast<uint32_t*>(dindices.ptr),
                                              static_cast<float*>(dscores.ptr), rows, vocab),
-                 "ds4rt_cuda_logits_argmax_f32");
+                 "ds41rt_cuda_logits_argmax_f32");
   assert(copy_d2h<uint32_t>(dindices, rows) == expected.indices);
   assert_close(copy_d2h<float>(dscores, rows), expected.scores);
 
@@ -2180,11 +2180,11 @@ void test_cuda_lm_head_argmax_bf16_matches_ref() {
   copy_h2d(dhidden, hidden);
   copy_h2d(dlm_head, lm_head);
 
-  require_status(ds4rt_cuda_lm_head_argmax_bf16(
+  require_status(ds41rt_cuda_lm_head_argmax_bf16(
                      static_cast<uint16_t*>(dhidden.ptr), static_cast<uint16_t*>(dlm_head.ptr),
                      static_cast<uint32_t*>(dindices.ptr), static_cast<float*>(dscores.ptr), rows,
                      hidden_dim, vocab),
-                 "ds4rt_cuda_lm_head_argmax_bf16");
+                 "ds41rt_cuda_lm_head_argmax_bf16");
   assert(copy_d2h<uint32_t>(dindices, rows) == expected.indices);
   assert_close(copy_d2h<float>(dscores, rows), expected.scores);
 
@@ -2225,12 +2225,12 @@ void test_cuda_lm_head_sample_topk_topp_bf16_matches_ref() {
   copy_h2d(dlm_head, lm_head);
   copy_h2d(drandom, random_uniforms);
 
-  require_status(ds4rt_cuda_lm_head_sample_topk_topp_bf16(
+  require_status(ds41rt_cuda_lm_head_sample_topk_topp_bf16(
                      static_cast<uint16_t*>(dhidden.ptr), static_cast<uint16_t*>(dlm_head.ptr),
                      static_cast<float*>(drandom.ptr), static_cast<uint32_t*>(dindices.ptr),
                      static_cast<float*>(dscores.ptr), rows, hidden_dim, vocab, temperature,
                      top_k, top_p),
-                 "ds4rt_cuda_lm_head_sample_topk_topp_bf16");
+                 "ds41rt_cuda_lm_head_sample_topk_topp_bf16");
   assert(copy_d2h<uint32_t>(dindices, rows) == expected.indices);
   assert_close(copy_d2h<float>(dscores, rows), expected.scores);
 
@@ -2263,11 +2263,11 @@ void test_cuda_logits_sample_topk_topp_matches_ref() {
   copy_h2d(dlogits, logits);
   copy_h2d(drandom, random_uniforms);
 
-  require_status(ds4rt_cuda_logits_sample_topk_topp_f32(
+  require_status(ds41rt_cuda_logits_sample_topk_topp_f32(
                      static_cast<float*>(dlogits.ptr), static_cast<float*>(drandom.ptr),
                      static_cast<uint32_t*>(dindices.ptr), static_cast<float*>(dscores.ptr), rows,
                      vocab, temperature, top_k, top_p),
-                 "ds4rt_cuda_logits_sample_topk_topp_f32");
+                 "ds41rt_cuda_logits_sample_topk_topp_f32");
   assert(copy_d2h<uint32_t>(dindices, rows) == expected.indices);
   assert_close(copy_d2h<float>(dscores, rows), expected.scores);
 
@@ -2284,12 +2284,12 @@ void test_nvfp4_pack_unpack_or_skip_with_reason() {
   auto dpacked = device_buffer(packed_count);
   auto dunpacked = device_buffer(codes.size());
   copy_h2d(dcodes, codes);
-  require_status(ds4rt_cuda_pack_nibbles(static_cast<uint8_t*>(dcodes.ptr),
+  require_status(ds41rt_cuda_pack_nibbles(static_cast<uint8_t*>(dcodes.ptr),
                                          static_cast<uint8_t*>(dpacked.ptr), codes.size()),
-                 "ds4rt_cuda_pack_nibbles");
-  require_status(ds4rt_cuda_unpack_nibbles(static_cast<uint8_t*>(dpacked.ptr),
+                 "ds41rt_cuda_pack_nibbles");
+  require_status(ds41rt_cuda_unpack_nibbles(static_cast<uint8_t*>(dpacked.ptr),
                                            static_cast<uint8_t*>(dunpacked.ptr), codes.size()),
-                 "ds4rt_cuda_unpack_nibbles");
+                 "ds41rt_cuda_unpack_nibbles");
   assert(copy_d2h<uint8_t>(dunpacked, codes.size()) == codes);
   free_buffer(&dcodes);
   free_buffer(&dpacked);
@@ -2358,12 +2358,12 @@ void test_cuda_mla_kv_prepare_bf16_matches_normalized_rotated_reference() {
   copy_h2d(dprojected, projected);
   copy_h2d(dpositions, positions);
   copy_h2d(dweight, weight);
-  require_status(ds4rt_cuda_mla_kv_prepare_bf16(
+  require_status(ds41rt_cuda_mla_kv_prepare_bf16(
                      static_cast<uint16_t*>(dprojected.ptr),
                      static_cast<uint32_t*>(dpositions.ptr),
                      static_cast<uint16_t*>(dweight.ptr), static_cast<uint16_t*>(dprepared.ptr),
                      rows, row_stride_bytes, row_stride_bytes, eps, theta),
-                 "ds4rt_cuda_mla_kv_prepare_bf16");
+                 "ds41rt_cuda_mla_kv_prepare_bf16");
   assert_close(
       bf16_to_f32_values(copy_d2h<uint16_t>(dprepared, projected.size())), expected, 2.0e-2f);
   free_buffer(&dprojected);
@@ -2423,12 +2423,12 @@ void test_cuda_mla_compressed_attention_reads_interleaved_cache_formats() {
     auto dout = device_buffer(heads * rank * sizeof(uint16_t));
     copy_h2d(dlatent, latent);
     copy_h2d(drope, rope);
-    require_status(ds4rt_cuda_mla_compressed_attention_bf16(
+    require_status(ds41rt_cuda_mla_compressed_attention_bf16(
                        static_cast<uint16_t*>(dq_absorbed.ptr),
                        static_cast<uint16_t*>(dq_rope.ptr),
                        static_cast<uint16_t*>(dlatent.ptr), static_cast<uint16_t*>(drope.ptr),
                        static_cast<uint16_t*>(dout.ptr), rows, heads, rope_dim, rank, scale),
-                   "ds4rt_cuda_mla_compressed_attention_bf16");
+                   "ds41rt_cuda_mla_compressed_attention_bf16");
     const auto output = copy_d2h<uint16_t>(dout, heads * rank);
     free_buffer(&dlatent);
     free_buffer(&drope);
@@ -2446,12 +2446,12 @@ void test_cuda_mla_compressed_attention_reads_interleaved_cache_formats() {
   auto dbf16 = device_buffer(interleaved_bf16.size());
   auto dbf16_out = device_buffer(heads * rank * sizeof(uint16_t));
   copy_h2d(dbf16, interleaved_bf16);
-  require_status(ds4rt_cuda_mla_compressed_attention_interleaved_bf16(
+  require_status(ds41rt_cuda_mla_compressed_attention_interleaved_bf16(
                      static_cast<uint16_t*>(dq_absorbed.ptr),
                      static_cast<uint16_t*>(dq_rope.ptr), static_cast<uint16_t*>(dbf16.ptr),
                      static_cast<uint16_t*>(dbf16_out.ptr), rows, heads, rope_dim, rank,
                      bf16_stride_bytes, rank * sizeof(uint16_t), scale),
-                 "ds4rt_cuda_mla_compressed_attention_interleaved_bf16");
+                 "ds41rt_cuda_mla_compressed_attention_interleaved_bf16");
   assert(copy_d2h<uint16_t>(dbf16_out, heads * rank) == bf16_reference);
 
   auto dprojected = device_buffer(projected.size() * sizeof(uint16_t));
@@ -2461,22 +2461,22 @@ void test_cuda_mla_compressed_attention_reads_interleaved_cache_formats() {
   auto dfp8 = device_buffer(rows * fp8_stride);
   auto dfp8_unpacked = device_buffer(projected.size() * sizeof(uint16_t));
   auto dfp8_out = device_buffer(heads * rank * sizeof(uint16_t));
-  require_status(ds4rt_cuda_mla_kv_pack_fp8_ds_mla(
+  require_status(ds41rt_cuda_mla_kv_pack_fp8_ds_mla(
                      static_cast<uint16_t*>(dprojected.ptr), static_cast<uint8_t*>(dfp8.ptr),
                      rows, projected_stride_bytes, fp8_stride),
-                 "ds4rt_cuda_mla_kv_pack_fp8_ds_mla");
-  require_status(ds4rt_cuda_mla_kv_unpack_fp8_ds_mla(
+                 "ds41rt_cuda_mla_kv_pack_fp8_ds_mla");
+  require_status(ds41rt_cuda_mla_kv_unpack_fp8_ds_mla(
                      static_cast<uint8_t*>(dfp8.ptr), static_cast<uint16_t*>(dfp8_unpacked.ptr),
                      rows, fp8_stride, projected_stride_bytes),
-                 "ds4rt_cuda_mla_kv_unpack_fp8_ds_mla");
+                 "ds41rt_cuda_mla_kv_unpack_fp8_ds_mla");
   const auto fp8_unpacked = copy_d2h<uint16_t>(dfp8_unpacked, projected.size());
   const auto fp8_reference = run_split(fp8_unpacked);
-  require_status(ds4rt_cuda_mla_compressed_attention_interleaved_fp8(
+  require_status(ds41rt_cuda_mla_compressed_attention_interleaved_fp8(
                      static_cast<uint16_t*>(dq_absorbed.ptr),
                      static_cast<uint16_t*>(dq_rope.ptr), static_cast<uint8_t*>(dfp8.ptr),
                      static_cast<uint16_t*>(dfp8_out.ptr), rows, heads, rope_dim, rank,
                      fp8_stride, scale),
-                 "ds4rt_cuda_mla_compressed_attention_interleaved_fp8");
+                 "ds41rt_cuda_mla_compressed_attention_interleaved_fp8");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dfp8_out, heads * rank)),
                bf16_to_f32_values(fp8_reference), 2.0e-2f);
 
@@ -2486,23 +2486,23 @@ void test_cuda_mla_compressed_attention_reads_interleaved_cache_formats() {
   auto dmxfp4 = device_buffer(rows * mxfp4_stride);
   auto dmxfp4_unpacked = device_buffer(projected.size() * sizeof(uint16_t));
   auto dmxfp4_out = device_buffer(heads * rank * sizeof(uint16_t));
-  require_status(ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla(
+  require_status(ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla(
                      static_cast<uint16_t*>(dprojected.ptr), static_cast<uint8_t*>(dmxfp4.ptr),
                      rows, projected_stride_bytes, mxfp4_stride),
-                 "ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla");
-  require_status(ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla(
+                 "ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla");
+  require_status(ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla(
                      static_cast<uint8_t*>(dmxfp4.ptr),
                      static_cast<uint16_t*>(dmxfp4_unpacked.ptr), rows, mxfp4_stride,
                      projected_stride_bytes),
-                 "ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla");
+                 "ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla");
   const auto mxfp4_unpacked = copy_d2h<uint16_t>(dmxfp4_unpacked, projected.size());
   const auto mxfp4_reference = run_split(mxfp4_unpacked);
-  require_status(ds4rt_cuda_mla_compressed_attention_interleaved_mxfp4(
+  require_status(ds41rt_cuda_mla_compressed_attention_interleaved_mxfp4(
                      static_cast<uint16_t*>(dq_absorbed.ptr),
                      static_cast<uint16_t*>(dq_rope.ptr), static_cast<uint8_t*>(dmxfp4.ptr),
                      static_cast<uint16_t*>(dmxfp4_out.ptr), rows, heads, rope_dim, rank,
                      mxfp4_stride, scale),
-                 "ds4rt_cuda_mla_compressed_attention_interleaved_mxfp4");
+                 "ds41rt_cuda_mla_compressed_attention_interleaved_mxfp4");
   assert_close(bf16_to_f32_values(copy_d2h<uint16_t>(dmxfp4_out, heads * rank)),
                bf16_to_f32_values(mxfp4_reference), 2.0e-2f);
 
@@ -2550,14 +2550,14 @@ void test_cuda_mla_kv_mxfp4_pack_roundtrip_matches_representable_values() {
   auto dpacked = device_buffer(rows * packed_stride_bytes);
   auto dunpacked = device_buffer(projected.size() * sizeof(uint16_t));
   copy_h2d(dprojected, projected);
-  require_status(ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla(
+  require_status(ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla(
                      static_cast<uint16_t*>(dprojected.ptr), static_cast<uint8_t*>(dpacked.ptr),
                      rows, projected_stride_bytes, packed_stride_bytes),
-                 "ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla");
-  require_status(ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla(
+                 "ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla");
+  require_status(ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla(
                      static_cast<uint8_t*>(dpacked.ptr), static_cast<uint16_t*>(dunpacked.ptr),
                      rows, packed_stride_bytes, projected_stride_bytes),
-                 "ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla");
+                 "ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla");
 
   const std::vector<uint8_t> packed = copy_d2h<uint8_t>(dpacked, rows * packed_stride_bytes);
   const std::vector<uint16_t> unpacked = copy_d2h<uint16_t>(dunpacked, projected.size());
@@ -2617,29 +2617,29 @@ void test_cuda_graph_replay_matches_uncaptured() {
   cudaGraph_t graph = nullptr;
   cudaGraphExec_t graph_exec = nullptr;
   require_cuda(cudaStreamCreate(&stream), "cudaStreamCreate");
-  require_status(ds4rt_cuda_rmsnorm_f32_async(static_cast<float*>(dx.ptr),
+  require_status(ds41rt_cuda_rmsnorm_f32_async(static_cast<float*>(dx.ptr),
                                              static_cast<float*>(dw.ptr),
                                              static_cast<float*>(dy_graph.ptr), rows, hidden, eps,
                                              stream),
-                 "warmup ds4rt_cuda_rmsnorm_f32_async");
-  require_status(ds4rt_cuda_residual_add_f32_async(static_cast<float*>(dy_graph.ptr),
+                 "warmup ds41rt_cuda_rmsnorm_f32_async");
+  require_status(ds41rt_cuda_residual_add_f32_async(static_cast<float*>(dy_graph.ptr),
                                                   static_cast<float*>(ddelta.ptr),
                                                   static_cast<float*>(dy_graph.ptr), x0.size(),
                                                   stream),
-                 "warmup ds4rt_cuda_residual_add_f32_async");
+                 "warmup ds41rt_cuda_residual_add_f32_async");
   require_cuda(cudaStreamSynchronize(stream), "warmup cudaStreamSynchronize");
   require_cuda(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
                "cudaStreamBeginCapture");
-  require_status(ds4rt_cuda_rmsnorm_f32_async(static_cast<float*>(dx.ptr),
+  require_status(ds41rt_cuda_rmsnorm_f32_async(static_cast<float*>(dx.ptr),
                                              static_cast<float*>(dw.ptr),
                                              static_cast<float*>(dy_graph.ptr), rows, hidden, eps,
                                              stream),
-                 "capture ds4rt_cuda_rmsnorm_f32_async");
-  require_status(ds4rt_cuda_residual_add_f32_async(static_cast<float*>(dy_graph.ptr),
+                 "capture ds41rt_cuda_rmsnorm_f32_async");
+  require_status(ds41rt_cuda_residual_add_f32_async(static_cast<float*>(dy_graph.ptr),
                                                   static_cast<float*>(ddelta.ptr),
                                                   static_cast<float*>(dy_graph.ptr), x0.size(),
                                                   stream),
-                 "capture ds4rt_cuda_residual_add_f32_async");
+                 "capture ds41rt_cuda_residual_add_f32_async");
   require_cuda(cudaStreamEndCapture(stream, &graph), "cudaStreamEndCapture");
   require_cuda(cudaGraphInstantiate(&graph_exec, graph, 0), "cudaGraphInstantiate");
 
@@ -2653,13 +2653,13 @@ void test_cuda_graph_replay_matches_uncaptured() {
   require_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize x1");
   const auto graph_out = copy_d2h<float>(dy_graph, x1.size());
 
-  require_status(ds4rt_cuda_rmsnorm_f32(static_cast<float*>(dx.ptr), static_cast<float*>(dw.ptr),
+  require_status(ds41rt_cuda_rmsnorm_f32(static_cast<float*>(dx.ptr), static_cast<float*>(dw.ptr),
                                        static_cast<float*>(dy_direct.ptr), rows, hidden, eps),
-                 "direct ds4rt_cuda_rmsnorm_f32");
-  require_status(ds4rt_cuda_residual_add_f32(static_cast<float*>(dy_direct.ptr),
+                 "direct ds41rt_cuda_rmsnorm_f32");
+  require_status(ds41rt_cuda_residual_add_f32(static_cast<float*>(dy_direct.ptr),
                                             static_cast<float*>(ddelta.ptr),
                                             static_cast<float*>(dy_direct.ptr), x1.size()),
-                 "direct ds4rt_cuda_residual_add_f32");
+                 "direct ds41rt_cuda_residual_add_f32");
   assert_close(graph_out, copy_d2h<float>(dy_direct, x1.size()));
 
   require_cuda(cudaGraphExecDestroy(graph_exec), "cudaGraphExecDestroy");
@@ -2697,29 +2697,29 @@ void test_cuda_graph_bf16_replay_matches_uncaptured() {
   cudaGraph_t graph = nullptr;
   cudaGraphExec_t graph_exec = nullptr;
   require_cuda(cudaStreamCreate(&stream), "cudaStreamCreate bf16 graph");
-  require_status(ds4rt_cuda_rmsnorm_bf16_async(static_cast<uint16_t*>(dx.ptr),
+  require_status(ds41rt_cuda_rmsnorm_bf16_async(static_cast<uint16_t*>(dx.ptr),
                                               static_cast<uint16_t*>(dw.ptr),
                                               static_cast<uint16_t*>(dy_graph.ptr), rows, hidden,
                                               eps, stream),
-                 "warmup ds4rt_cuda_rmsnorm_bf16_async");
-  require_status(ds4rt_cuda_residual_add_bf16_async(static_cast<uint16_t*>(dy_graph.ptr),
+                 "warmup ds41rt_cuda_rmsnorm_bf16_async");
+  require_status(ds41rt_cuda_residual_add_bf16_async(static_cast<uint16_t*>(dy_graph.ptr),
                                                    static_cast<uint16_t*>(ddelta.ptr),
                                                    static_cast<uint16_t*>(dy_graph.ptr),
                                                    x0.size(), stream),
-                 "warmup ds4rt_cuda_residual_add_bf16_async");
+                 "warmup ds41rt_cuda_residual_add_bf16_async");
   require_cuda(cudaStreamSynchronize(stream), "warmup bf16 cudaStreamSynchronize");
   require_cuda(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal),
                "cudaStreamBeginCapture bf16");
-  require_status(ds4rt_cuda_rmsnorm_bf16_async(static_cast<uint16_t*>(dx.ptr),
+  require_status(ds41rt_cuda_rmsnorm_bf16_async(static_cast<uint16_t*>(dx.ptr),
                                               static_cast<uint16_t*>(dw.ptr),
                                               static_cast<uint16_t*>(dy_graph.ptr), rows, hidden,
                                               eps, stream),
-                 "capture ds4rt_cuda_rmsnorm_bf16_async");
-  require_status(ds4rt_cuda_residual_add_bf16_async(static_cast<uint16_t*>(dy_graph.ptr),
+                 "capture ds41rt_cuda_rmsnorm_bf16_async");
+  require_status(ds41rt_cuda_residual_add_bf16_async(static_cast<uint16_t*>(dy_graph.ptr),
                                                    static_cast<uint16_t*>(ddelta.ptr),
                                                    static_cast<uint16_t*>(dy_graph.ptr),
                                                    x0.size(), stream),
-                 "capture ds4rt_cuda_residual_add_bf16_async");
+                 "capture ds41rt_cuda_residual_add_bf16_async");
   require_cuda(cudaStreamEndCapture(stream, &graph), "cudaStreamEndCapture bf16");
   require_cuda(cudaGraphInstantiate(&graph_exec, graph, 0), "cudaGraphInstantiate bf16");
 
@@ -2735,14 +2735,14 @@ void test_cuda_graph_bf16_replay_matches_uncaptured() {
   require_cuda(cudaStreamSynchronize(stream), "cudaStreamSynchronize bf16 x1");
   const auto graph_out = bf16_to_f32_values(copy_d2h<uint16_t>(dy_graph, x1.size()));
 
-  require_status(ds4rt_cuda_rmsnorm_bf16(static_cast<uint16_t*>(dx.ptr),
+  require_status(ds41rt_cuda_rmsnorm_bf16(static_cast<uint16_t*>(dx.ptr),
                                         static_cast<uint16_t*>(dw.ptr),
                                         static_cast<uint16_t*>(dy_direct.ptr), rows, hidden, eps),
-                 "direct ds4rt_cuda_rmsnorm_bf16");
-  require_status(ds4rt_cuda_residual_add_bf16(static_cast<uint16_t*>(dy_direct.ptr),
+                 "direct ds41rt_cuda_rmsnorm_bf16");
+  require_status(ds41rt_cuda_residual_add_bf16(static_cast<uint16_t*>(dy_direct.ptr),
                                              static_cast<uint16_t*>(ddelta.ptr),
                                              static_cast<uint16_t*>(dy_direct.ptr), x1.size()),
-                 "direct ds4rt_cuda_residual_add_bf16");
+                 "direct ds41rt_cuda_residual_add_bf16");
   assert_close(graph_out, bf16_to_f32_values(copy_d2h<uint16_t>(dy_direct, x1.size())));
 
   require_cuda(cudaGraphExecDestroy(graph_exec), "cudaGraphExecDestroy bf16");
@@ -2768,10 +2768,10 @@ void test_bf16_weight_nvfp4_quantization_matches_representable_block() {
   auto packed_device = device_buffer(values.size() / 2);
   auto scale_device = device_buffer(values.size() / 16);
   copy_h2d(input_device, input);
-  require_status(ds4rt_cuda_quantize_bf16_weight_nvfp4_async(
+  require_status(ds41rt_cuda_quantize_bf16_weight_nvfp4_async(
                      input_device, packed_device, scale_device, rows, cols,
                      448.0f, nullptr),
-                 "ds4rt_cuda_quantize_bf16_weight_nvfp4_async");
+                 "ds41rt_cuda_quantize_bf16_weight_nvfp4_async");
   require_cuda(cudaStreamSynchronize(nullptr),
                "cudaStreamSynchronize BF16 weight NVFP4 quantization");
   const auto packed = copy_d2h<uint8_t>(packed_device, values.size() / 2);
@@ -2792,9 +2792,9 @@ void test_cuda_generic_kv_page_table_init_base_is_exported_and_correct() {
   constexpr size_t base = 8;
   auto page_table = device_buffer(rows * width * sizeof(int32_t));
   require_status(
-      ds4rt_cuda_generic_kv_page_table_init_base(
+      ds41rt_cuda_generic_kv_page_table_init_base(
           static_cast<int32_t*>(page_table.ptr), rows, width, base),
-      "ds4rt_cuda_generic_kv_page_table_init_base");
+      "ds41rt_cuda_generic_kv_page_table_init_base");
   const auto actual = copy_d2h<int32_t>(page_table, rows * width);
   const std::vector<int32_t> expected = {8, 9, 10, 11, 8, 9, 10, 11};
   assert(actual == expected);
@@ -2848,6 +2848,6 @@ int main() {
   test_cuda_graph_replay_matches_uncaptured();
   test_cuda_graph_bf16_replay_matches_uncaptured();
   test_nvfp4_pack_unpack_or_skip_with_reason();
-  std::cout << "ds4rt_cuda_selftest passed\n";
+  std::cout << "ds41rt_cuda_selftest passed\n";
   return 0;
 }

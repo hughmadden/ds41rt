@@ -5,7 +5,7 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [x] Locate and pin the official configuration, reference implementation, and technical report at revision `df42c109f1defefcbfcedbe7d905718a12266e40`.
 - [ ] Complete the architecture and tensor-layout audit with explicit reference-to-production mappings.
 - [ ] Repair and qualify build, WIP, run, restart, stop, and container export flows without requiring a manually prepared source manifest.
-- [ ] Rename the engine, packages, configuration, container names, and deployment paths from ds4 to ds41.
+- [x] Rename the engine, packages, configuration, container names, and deployment paths from ds4 to ds41.
 - [ ] Remove obsolete model execution paths, alternate weight formats, quantizers, dependencies, optimization notes, and inapplicable benchmarks while preserving serving features.
 - [ ] Implement strict official-checkpoint configuration, tensor inventory, representation validation, and memory-budgeted loading from the alternate Hugging Face cache.
 - [ ] Implement CED encoder/decoder execution with shared KV ownership, chunked prefill, exact replay, and explicitly qualified bounded replay.
@@ -25,3 +25,5 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [ ] Record required temporary fixtures in TO_DELETE_SCAFFOLDING.md and preserve reusable qualification tooling.
 - [ ] Commit and push engine changes and required SparkInfer/b12x changes to their fork main branches with matching dependency pins.
 - [ ] Audit every pre-model requirement and document exact bring-up commands, remaining checkpoint-dependent gates, and hardware evidence for handoff.
+
+Progress evidence: `docs/ds41-build-qualification.md` records the rename and partial-fleet build checks; complete container, GPU, and launch qualification remains open.

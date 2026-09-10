@@ -1,18 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/ds4rt-api",
-  "crates/ds4rt-core",
-  "crates/ds4rt-daemon",
-  "crates/ds4rt-ffi",
-  "crates/ds4rt-loader",
-  "crates/ds4rt-transport",
+  "crates/ds41rt-api",
+  "crates/ds41rt-core",
+  "crates/ds41rt-daemon",
+  "crates/ds41rt-ffi",
+  "crates/ds41rt-loader",
+  "crates/ds41rt-transport",
 ]
 
 [workspace.package]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/tpurtell/ds4rt-pro-rtx-4spark"
+repository = "https://github.com/tpurtell/ds41rt"
 
 [workspace.dependencies]
 anyhow = "1"

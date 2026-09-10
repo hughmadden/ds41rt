@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ds4rt_reference.moe_ref import ExpertWeights, expert_forward, moe_forward
+from ds41rt_reference.moe_ref import ExpertWeights, expert_forward, moe_forward
 
 
 def make_expert(scale: float) -> ExpertWeights:

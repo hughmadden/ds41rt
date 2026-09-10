@@ -159,7 +159,7 @@ def test_released_flash_tokenizer_exact_count_contract_if_available(
     (tmp_path / "metadata.json").write_text(
         json.dumps(
             {
-                "format": "ds4rt-kv-v3",
+                "format": "ds41rt-kv-v3",
                 "producer_profile": {"cache_semantics_revision": 3},
                 "token_count": len(snapshot_ids),
                 "token_ids_file": "token-ids.u32le",

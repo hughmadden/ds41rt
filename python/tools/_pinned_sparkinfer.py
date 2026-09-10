@@ -1,4 +1,4 @@
-"""Make standalone tools use DS4RT's verified SparkInfer source tree."""
+"""Make standalone tools use DS41RT's verified SparkInfer source tree."""
 
 from __future__ import annotations
 
@@ -13,13 +13,13 @@ from types import ModuleType
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(
     os.environ.get(
-        "DS4RT_SPARKINFER_SOURCE_DIR",
+        "DS41RT_SPARKINFER_SOURCE_DIR",
         ROOT / "third_party" / "sparkinfer",
     )
 ).expanduser().resolve()
 LOCK = Path(
     os.environ.get(
-        "DS4RT_SPARKINFER_LOCK_FILE",
+        "DS41RT_SPARKINFER_LOCK_FILE",
         ROOT / "third_party" / "sparkinfer.lock.json",
     )
 ).expanduser().resolve()
@@ -28,7 +28,7 @@ VERIFIER_PATH = ROOT / "scripts" / "verify-sparkinfer-source.py"
 
 def _load_verifier() -> ModuleType:
     spec = importlib.util.spec_from_file_location(
-        "_ds4rt_verify_sparkinfer_source",
+        "_ds41rt_verify_sparkinfer_source",
         VERIFIER_PATH,
     )
     if spec is None or spec.loader is None:

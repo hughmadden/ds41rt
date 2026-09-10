@@ -38,7 +38,7 @@ def check_status(library: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    library.ds4rt_last_error_message(error, len(error))
+    library.ds41rt_last_error_message(error, len(error))
     raise RuntimeError(
         f"{action} failed with status {status}: {error.value.decode()}"
     )
@@ -106,7 +106,7 @@ def main() -> None:
     torch.cuda.init()
     device = torch.device("cuda", torch.cuda.current_device())
     library = ctypes.CDLL(str(args.native_lib.resolve()))
-    sum_bf16 = library.ds4rt_cuda_b12x_spark_sum_topk8_bf16_async
+    sum_bf16 = library.ds41rt_cuda_b12x_spark_sum_topk8_bf16_async
     sum_bf16.argtypes = (
         DeviceBuffer,
         DeviceBuffer,
@@ -114,7 +114,7 @@ def main() -> None:
         ctypes.c_void_p,
     )
     sum_bf16.restype = ctypes.c_int
-    pack_fp8 = library.ds4rt_cuda_bf16_rows_to_fp8_e4m3_row_scaled_async
+    pack_fp8 = library.ds41rt_cuda_bf16_rows_to_fp8_e4m3_row_scaled_async
     pack_fp8.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -124,7 +124,7 @@ def main() -> None:
         ctypes.c_void_p,
     )
     pack_fp8.restype = ctypes.c_int
-    fused = library.ds4rt_cuda_b12x_spark_sum_topk8_bf16_to_fp8_async
+    fused = library.ds41rt_cuda_b12x_spark_sum_topk8_bf16_to_fp8_async
     fused.argtypes = (
         DeviceBuffer,
         DeviceBuffer,

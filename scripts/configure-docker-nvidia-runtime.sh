@@ -6,12 +6,12 @@ usage() {
 Usage: scripts/configure-docker-nvidia-runtime.sh [--verify-only]
 
 Installs and configures the NVIDIA Container Toolkit for Docker on the local
-host, then verifies Docker GPU passthrough with the existing ds4rt coordinator
+host, then verifies Docker GPU passthrough with the existing ds41rt coordinator
 image. Run configuration mode with sudo.
 
 Environment:
-  DS4RT_DOCKER_GPU_VERIFY_IMAGE       default: ds4rt-coordinator-dev
-  DS4RT_NVIDIA_TOOLKIT_SETUP_APT_REPO auto, 0, or 1; default: auto
+  DS41RT_DOCKER_GPU_VERIFY_IMAGE       default: ds41rt-coordinator-dev
+  DS41RT_NVIDIA_TOOLKIT_SETUP_APT_REPO auto, 0, or 1; default: auto
   NVIDIA_CONTAINER_TOOLKIT_VERSION    optional exact package version
 EOF
 }
@@ -33,14 +33,14 @@ case "${1:-}" in
     ;;
 esac
 
-image="${DS4RT_DOCKER_GPU_VERIFY_IMAGE:-ds4rt-coordinator-dev}"
-setup_apt_repo="${DS4RT_NVIDIA_TOOLKIT_SETUP_APT_REPO:-auto}"
+image="${DS41RT_DOCKER_GPU_VERIFY_IMAGE:-ds41rt-coordinator-dev}"
+setup_apt_repo="${DS41RT_NVIDIA_TOOLKIT_SETUP_APT_REPO:-auto}"
 
 case "$setup_apt_repo" in
   auto|0|1)
     ;;
   *)
-    echo "DS4RT_NVIDIA_TOOLKIT_SETUP_APT_REPO must be auto, 0, or 1; got: $setup_apt_repo" >&2
+    echo "DS41RT_NVIDIA_TOOLKIT_SETUP_APT_REPO must be auto, 0, or 1; got: $setup_apt_repo" >&2
     exit 2
     ;;
 esac
@@ -84,7 +84,7 @@ install_toolkit() {
   fi
 
   if ! toolkit_candidate_available; then
-    echo "nvidia-container-toolkit has no apt candidate; set up NVIDIA's apt repo or set DS4RT_NVIDIA_TOOLKIT_SETUP_APT_REPO=1." >&2
+    echo "nvidia-container-toolkit has no apt candidate; set up NVIDIA's apt repo or set DS41RT_NVIDIA_TOOLKIT_SETUP_APT_REPO=1." >&2
     exit 1
   fi
 
@@ -124,7 +124,7 @@ verify_gpu_passthrough() {
   fi
 
   if ! docker image inspect "$image" >/dev/null 2>&1; then
-    echo "Verification image '$image' is not present locally; build it first or set DS4RT_DOCKER_GPU_VERIFY_IMAGE." >&2
+    echo "Verification image '$image' is not present locally; build it first or set DS41RT_DOCKER_GPU_VERIFY_IMAGE." >&2
     exit 1
   fi
 

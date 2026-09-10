@@ -541,131 +541,131 @@ __global__ void mla_kv_finalize_store_candidate_kernel(
   }
 }
 
-ds4rt_status_t validate_kv_cache_write_args(const uint8_t* src, const uint8_t* cache,
+ds41rt_status_t validate_kv_cache_write_args(const uint8_t* src, const uint8_t* cache,
                                             size_t cache_offset_bytes, size_t bytes) {
   if (bytes == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
   if (src == nullptr || cache == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (cache_offset_bytes > std::numeric_limits<size_t>::max() - bytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_graph_kv_cache_write_buffers(ds4rt_device_buffer_t src,
-                                                     ds4rt_device_buffer_t cache,
+ds41rt_status_t validate_graph_kv_cache_write_buffers(ds41rt_device_buffer_t src,
+                                                     ds41rt_device_buffer_t cache,
                                                      size_t cache_offset_bytes, size_t bytes) {
   if (bytes == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_kv_cache_write_args(
+  const ds41rt_status_t valid = validate_kv_cache_write_args(
       static_cast<const uint8_t*>(src.ptr), static_cast<const uint8_t*>(cache.ptr),
       cache_offset_bytes, bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (src.bytes < bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   if (cache_offset_bytes > cache.bytes || bytes > cache.bytes - cache_offset_bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_kv_cache_read_args(const uint8_t* cache, const uint8_t* dst,
+ds41rt_status_t validate_kv_cache_read_args(const uint8_t* cache, const uint8_t* dst,
                                            size_t cache_offset_bytes, size_t bytes) {
   if (bytes == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
   if (cache == nullptr || dst == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (cache_offset_bytes > std::numeric_limits<size_t>::max() - bytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_kv_cache_write_blocks_args(const uint8_t* src, const uint8_t* cache,
+ds41rt_status_t validate_kv_cache_write_blocks_args(const uint8_t* src, const uint8_t* cache,
                                                    const uint64_t* src_offsets,
                                                    const uint64_t* cache_offsets,
                                                    const uint64_t* block_bytes,
                                                    size_t block_count) {
   if (block_count == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
   if (src == nullptr || cache == nullptr || src_offsets == nullptr || cache_offsets == nullptr ||
       block_bytes == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_kv_cache_read_blocks_args(const uint8_t* cache, const uint8_t* dst,
+ds41rt_status_t validate_kv_cache_read_blocks_args(const uint8_t* cache, const uint8_t* dst,
                                                   const uint64_t* cache_offsets,
                                                   const uint64_t* dst_offsets,
                                                   const uint64_t* block_bytes,
                                                   size_t block_count) {
   if (block_count == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
   if (cache == nullptr || dst == nullptr || cache_offsets == nullptr || dst_offsets == nullptr ||
       block_bytes == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mla_kv_cache_unpack_bf16_args(
+ds41rt_status_t validate_mla_kv_cache_unpack_bf16_args(
     const uint8_t* payload, const uint16_t* kv_latent, const uint16_t* k_rope,
     const uint16_t* dsa_key, size_t rows, size_t kv_lora_rank, size_t rope_dim, size_t dsa_dim,
     size_t payload_stride_bytes) {
   if (payload == nullptr || kv_latent == nullptr || k_rope == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (dsa_dim > 0 && dsa_key == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || kv_lora_rank == 0 || rope_dim == 0 || payload_stride_bytes == 0 ||
       payload_stride_bytes % sizeof(uint16_t) != 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t packed_width = 0;
   if (!checked_add(kv_lora_rank, rope_dim, &packed_width) ||
       !checked_add(packed_width, dsa_dim, &packed_width)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t payload_stride_bf16 = payload_stride_bytes / sizeof(uint16_t);
   if (payload_stride_bf16 < packed_width) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, packed_width, &ignored) ||
       !checked_mul(rows, kv_lora_rank, &ignored) || !checked_mul(rows, rope_dim, &ignored) ||
       (dsa_dim > 0 && !checked_mul(rows, dsa_dim, &ignored))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mla_kv_projected_split_bf16_args(
+ds41rt_status_t validate_mla_kv_projected_split_bf16_args(
     const uint16_t* projected, const uint16_t* k_nope, const uint16_t* v, size_t rows,
     size_t heads, size_t nope_dim, size_t v_dim) {
   if (projected == nullptr || k_nope == nullptr || v == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || heads == 0 || nope_dim == 0 || v_dim == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t head_width = 0;
   size_t row_heads = 0;
@@ -673,12 +673,12 @@ ds4rt_status_t validate_mla_kv_projected_split_bf16_args(
   if (!checked_add(nope_dim, v_dim, &head_width) || !checked_mul(rows, heads, &row_heads) ||
       !checked_mul(row_heads, head_width, &ignored) ||
       !checked_mul(row_heads, nope_dim, &ignored) || !checked_mul(row_heads, v_dim, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mla_kv_prepare_bf16_args(
+ds41rt_status_t validate_mla_kv_prepare_bf16_args(
     const uint16_t* projected, const uint32_t* positions, const uint16_t* norm_weight,
     const uint16_t* prepared, size_t rows, size_t projected_stride_bytes,
     size_t prepared_stride_bytes, float eps, float theta) {
@@ -689,41 +689,41 @@ ds4rt_status_t validate_mla_kv_prepare_bf16_args(
       prepared_stride_bytes < minimum_stride_bytes || projected_stride_bytes % sizeof(uint16_t) != 0 ||
       prepared_stride_bytes % sizeof(uint16_t) != 0 || !std::isfinite(eps) || eps <= 0.0f ||
       !std::isfinite(theta) || theta <= 0.0f) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, projected_stride_bytes, &ignored) ||
       !checked_mul(rows, prepared_stride_bytes, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mla_kv_pack_fp8_ds_mla_args(const uint16_t* projected,
+ds41rt_status_t validate_mla_kv_pack_fp8_ds_mla_args(const uint16_t* projected,
                                                     const uint8_t* packed, size_t rows,
                                                     size_t projected_stride_bytes,
                                                     size_t packed_stride_bytes) {
   if (projected == nullptr || packed == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || projected_stride_bytes == 0 || packed_stride_bytes == 0 ||
       projected_stride_bytes % sizeof(uint16_t) != 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t projected_stride_bf16 = projected_stride_bytes / sizeof(uint16_t);
   if (projected_stride_bf16 < kMlaFp8DsProjectedValues ||
       packed_stride_bytes < kMlaFp8DsPackedBytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, projected_stride_bytes, &ignored) ||
       !checked_mul(rows, packed_stride_bytes, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mla_kv_unpack_fp8_ds_mla_args(const uint8_t* packed,
+ds41rt_status_t validate_mla_kv_unpack_fp8_ds_mla_args(const uint8_t* packed,
                                                       const uint16_t* projected, size_t rows,
                                                       size_t packed_stride_bytes,
                                                       size_t projected_stride_bytes) {
@@ -731,31 +731,31 @@ ds4rt_status_t validate_mla_kv_unpack_fp8_ds_mla_args(const uint8_t* packed,
                                              packed_stride_bytes);
 }
 
-ds4rt_status_t validate_mla_kv_pack_mxfp4_ds_mla_args(const uint16_t* projected,
+ds41rt_status_t validate_mla_kv_pack_mxfp4_ds_mla_args(const uint16_t* projected,
                                                       const uint8_t* packed, size_t rows,
                                                       size_t projected_stride_bytes,
                                                       size_t packed_stride_bytes) {
   if (projected == nullptr || packed == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || projected_stride_bytes == 0 || packed_stride_bytes == 0 ||
       projected_stride_bytes % sizeof(uint16_t) != 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t projected_stride_bf16 = projected_stride_bytes / sizeof(uint16_t);
   if (projected_stride_bf16 < kMlaMxfp4DsProjectedValues ||
       packed_stride_bytes < kMlaMxfp4DsPackedBytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, projected_stride_bytes, &ignored) ||
       !checked_mul(rows, packed_stride_bytes, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_mla_kv_unpack_mxfp4_ds_mla_args(const uint8_t* packed,
+ds41rt_status_t validate_mla_kv_unpack_mxfp4_ds_mla_args(const uint8_t* packed,
                                                         const uint16_t* projected, size_t rows,
                                                         size_t packed_stride_bytes,
                                                         size_t projected_stride_bytes) {
@@ -763,7 +763,7 @@ ds4rt_status_t validate_mla_kv_unpack_mxfp4_ds_mla_args(const uint8_t* packed,
                                                packed_stride_bytes);
 }
 
-ds4rt_status_t validate_mla_kv_finalize_store_candidate_args(
+ds41rt_status_t validate_mla_kv_finalize_store_candidate_args(
     const uint16_t* projected, const float* rope_factors,
     const uint16_t* norm_weight,
     const uint8_t* cache_rows, const uint16_t* attention_ready,
@@ -777,7 +777,7 @@ ds4rt_status_t validate_mla_kv_finalize_store_candidate_args(
       rows == 0 || projected_stride_bytes < kv_bytes ||
       projected_stride_bytes % sizeof(uint16_t) != 0 ||
       !std::isfinite(eps) || eps <= 0.0f) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t main_bytes = 0;
   switch (cache_format) {
@@ -791,14 +791,14 @@ ds4rt_status_t validate_mla_kv_finalize_store_candidate_args(
       main_bytes = kMlaMxfp4DsPackedBytes;
       break;
     default:
-      return DS4RT_STATUS_INVALID_ARGUMENT;
+      return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t dsa_bytes = 0;
   size_t required_cache_bytes = 0;
   if (!checked_mul(dsa_values, sizeof(uint16_t), &dsa_bytes) ||
       !checked_add(main_bytes, dsa_bytes, &required_cache_bytes) ||
       cache_stride_bytes < required_cache_bytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if ((attention_ready != nullptr &&
        (attention_stride_bytes < kv_bytes ||
@@ -806,7 +806,7 @@ ds4rt_status_t validate_mla_kv_finalize_store_candidate_args(
       (dsa_values > 0 &&
        (dsa_normalized == nullptr || dsa_stride_bytes < dsa_bytes ||
         dsa_stride_bytes % sizeof(uint16_t) != 0))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, projected_stride_bytes, &ignored) ||
@@ -814,39 +814,39 @@ ds4rt_status_t validate_mla_kv_finalize_store_candidate_args(
       (attention_ready != nullptr &&
        !checked_mul(rows, attention_stride_bytes, &ignored)) ||
       (dsa_values > 0 && !checked_mul(rows, dsa_stride_bytes, &ignored))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_kv_cache_write_bytes_node(
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_kv_cache_write_bytes_node(
     void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index,
-    ds4rt_device_buffer_t src, ds4rt_device_buffer_t cache, size_t cache_offset_bytes,
+    ds41rt_device_buffer_t src, ds41rt_device_buffer_t cache, size_t cache_offset_bytes,
     size_t bytes) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_graph_kv_cache_write_buffers(src, cache, cache_offset_bytes, bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
   cudaGraphNode_t node = nullptr;
-  const ds4rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
-  if (node_status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
+  if (node_status != DS41RT_STATUS_OK) {
     return node_status;
   }
 
   cudaKernelNodeParams existing = {};
   cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (existing.func != reinterpret_cast<void*>(kv_cache_write_bytes_kernel)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   const uint8_t* src_ptr = static_cast<const uint8_t*>(src.ptr);
@@ -860,7 +860,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_kv_cache_write_bytes_node(
   const int threads = 256;
   const size_t block_count = (bytes - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   cudaKernelNodeParams params = {};
@@ -873,60 +873,60 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_kv_cache_write_bytes_node(
 
   err = cudaGraphKernelNodeSetParams(node, &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec), node,
                                          &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_mla_kv_cache_unpack_bf16_node(
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_mla_kv_cache_unpack_bf16_node(
     void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index,
-    ds4rt_device_buffer_t payload, ds4rt_device_buffer_t kv_latent,
-    ds4rt_device_buffer_t k_rope, ds4rt_device_buffer_t dsa_key, size_t rows,
+    ds41rt_device_buffer_t payload, ds41rt_device_buffer_t kv_latent,
+    ds41rt_device_buffer_t k_rope, ds41rt_device_buffer_t dsa_key, size_t rows,
     size_t kv_lora_rank, size_t rope_dim, size_t dsa_dim, size_t payload_stride_bytes) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const uint8_t* payload_ptr = static_cast<const uint8_t*>(payload.ptr);
   uint16_t* kv_latent_ptr = static_cast<uint16_t*>(kv_latent.ptr);
   uint16_t* k_rope_ptr = static_cast<uint16_t*>(k_rope.ptr);
   uint16_t* dsa_key_ptr = static_cast<uint16_t*>(dsa_key.ptr);
-  const ds4rt_status_t valid = validate_mla_kv_cache_unpack_bf16_args(
+  const ds41rt_status_t valid = validate_mla_kv_cache_unpack_bf16_args(
       payload_ptr, kv_latent_ptr, k_rope_ptr, dsa_key_ptr, rows, kv_lora_rank, rope_dim, dsa_dim,
       payload_stride_bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
   cudaGraphNode_t node = nullptr;
-  const ds4rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
-  if (node_status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
+  if (node_status != DS41RT_STATUS_OK) {
     return node_status;
   }
 
   cudaKernelNodeParams existing = {};
   cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (existing.func != reinterpret_cast<void*>(mla_kv_cache_unpack_bf16_kernel)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   size_t width = 0;
   size_t total = 0;
   if (!checked_add(kv_lora_rank, rope_dim, &width) || !checked_add(width, dsa_dim, &width) ||
       !checked_mul(rows, width, &total)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int threads = 256;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t payload_stride_bf16 = payload_stride_bytes / sizeof(uint16_t);
   void* args[] = {
@@ -951,45 +951,45 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_mla_kv_cache_unpack_bf16_node(
 
   err = cudaGraphKernelNodeSetParams(node, &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec), node,
                                          &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_mla_kv_projected_split_bf16_node(
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_mla_kv_projected_split_bf16_node(
     void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index,
-    ds4rt_device_buffer_t projected, ds4rt_device_buffer_t k_nope, ds4rt_device_buffer_t v,
+    ds41rt_device_buffer_t projected, ds41rt_device_buffer_t k_nope, ds41rt_device_buffer_t v,
     size_t rows, size_t heads, size_t nope_dim, size_t v_dim) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const uint16_t* projected_ptr = static_cast<const uint16_t*>(projected.ptr);
   uint16_t* k_nope_ptr = static_cast<uint16_t*>(k_nope.ptr);
   uint16_t* v_ptr = static_cast<uint16_t*>(v.ptr);
-  const ds4rt_status_t valid = validate_mla_kv_projected_split_bf16_args(
+  const ds41rt_status_t valid = validate_mla_kv_projected_split_bf16_args(
       projected_ptr, k_nope_ptr, v_ptr, rows, heads, nope_dim, v_dim);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
   cudaGraphNode_t node = nullptr;
-  const ds4rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
-  if (node_status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
+  if (node_status != DS41RT_STATUS_OK) {
     return node_status;
   }
 
   cudaKernelNodeParams existing = {};
   cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (existing.func != reinterpret_cast<void*>(mla_kv_projected_split_bf16_kernel)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   size_t head_width = 0;
@@ -997,12 +997,12 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_mla_kv_projected_split_bf16_no
   size_t total = 0;
   if (!checked_add(nope_dim, v_dim, &head_width) || !checked_mul(rows, heads, &row_heads) ||
       !checked_mul(row_heads, head_width, &total)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int threads = 256;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   void* args[] = {
       &projected_ptr,
@@ -1024,86 +1024,86 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_mla_kv_projected_split_bf16_no
 
   err = cudaGraphKernelNodeSetParams(node, &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec), node,
                                          &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_write_bytes_async(const uint8_t* src,
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_write_bytes_async(const uint8_t* src,
                                                                 uint8_t* cache,
                                                                 size_t cache_offset_bytes,
                                                                 size_t bytes,
                                                                 void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_kv_cache_write_args(src, cache, cache_offset_bytes, bytes);
-  if (valid != DS4RT_STATUS_OK || bytes == 0) {
+  if (valid != DS41RT_STATUS_OK || bytes == 0) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   const int threads = 256;
   const size_t block_count = (bytes - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   kv_cache_write_bytes_kernel<<<static_cast<int>(block_count), threads, 0, stream>>>(
       src, cache, cache_offset_bytes, bytes);
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_write_bytes(const uint8_t* src, uint8_t* cache,
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_write_bytes(const uint8_t* src, uint8_t* cache,
                                                           size_t cache_offset_bytes,
                                                           size_t bytes) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_kv_cache_write_bytes_async(src, cache, cache_offset_bytes, bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t status =
+      ds41rt_cuda_kv_cache_write_bytes_async(src, cache, cache_offset_bytes, bytes, nullptr);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_read_bytes_async(const uint8_t* cache,
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_read_bytes_async(const uint8_t* cache,
                                                                uint8_t* dst,
                                                                size_t cache_offset_bytes,
                                                                size_t bytes,
                                                                void* cuda_stream) {
-  const ds4rt_status_t valid = validate_kv_cache_read_args(cache, dst, cache_offset_bytes, bytes);
-  if (valid != DS4RT_STATUS_OK || bytes == 0) {
+  const ds41rt_status_t valid = validate_kv_cache_read_args(cache, dst, cache_offset_bytes, bytes);
+  if (valid != DS41RT_STATUS_OK || bytes == 0) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   const int threads = 256;
   const size_t block_count = (bytes - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   kv_cache_read_bytes_kernel<<<static_cast<int>(block_count), threads, 0, stream>>>(
       cache, dst, cache_offset_bytes, bytes);
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_read_bytes(const uint8_t* cache, uint8_t* dst,
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_read_bytes(const uint8_t* cache, uint8_t* dst,
                                                          size_t cache_offset_bytes,
                                                          size_t bytes) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_kv_cache_read_bytes_async(cache, dst, cache_offset_bytes, bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t status =
+      ds41rt_cuda_kv_cache_read_bytes_async(cache, dst, cache_offset_bytes, bytes, nullptr);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_write_blocks_async(
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_write_blocks_async(
     const uint8_t* src, uint8_t* cache, const uint64_t* src_offsets,
     const uint64_t* cache_offsets, const uint64_t* block_bytes, size_t block_count,
     void* cuda_stream) {
-  const ds4rt_status_t valid = validate_kv_cache_write_blocks_args(
+  const ds41rt_status_t valid = validate_kv_cache_write_blocks_args(
       src, cache, src_offsets, cache_offsets, block_bytes, block_count);
-  if (valid != DS4RT_STATUS_OK || block_count == 0) {
+  if (valid != DS41RT_STATUS_OK || block_count == 0) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1113,24 +1113,24 @@ extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_write_blocks_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_write_blocks(
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_write_blocks(
     const uint8_t* src, uint8_t* cache, const uint64_t* src_offsets,
     const uint64_t* cache_offsets, const uint64_t* block_bytes, size_t block_count) {
-  const ds4rt_status_t status = ds4rt_cuda_kv_cache_write_blocks_async(
+  const ds41rt_status_t status = ds41rt_cuda_kv_cache_write_blocks_async(
       src, cache, src_offsets, cache_offsets, block_bytes, block_count, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_read_blocks_async(
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_read_blocks_async(
     const uint8_t* cache, uint8_t* dst, const uint64_t* cache_offsets,
     const uint64_t* dst_offsets, const uint64_t* block_bytes, size_t block_count,
     void* cuda_stream) {
-  const ds4rt_status_t valid = validate_kv_cache_read_blocks_args(
+  const ds41rt_status_t valid = validate_kv_cache_read_blocks_args(
       cache, dst, cache_offsets, dst_offsets, block_bytes, block_count);
-  if (valid != DS4RT_STATUS_OK || block_count == 0) {
+  if (valid != DS41RT_STATUS_OK || block_count == 0) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1140,25 +1140,25 @@ extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_read_blocks_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_kv_cache_read_blocks(
+extern "C" ds41rt_status_t ds41rt_cuda_kv_cache_read_blocks(
     const uint8_t* cache, uint8_t* dst, const uint64_t* cache_offsets,
     const uint64_t* dst_offsets, const uint64_t* block_bytes, size_t block_count) {
-  const ds4rt_status_t status = ds4rt_cuda_kv_cache_read_blocks_async(
+  const ds41rt_status_t status = ds41rt_cuda_kv_cache_read_blocks_async(
       cache, dst, cache_offsets, dst_offsets, block_bytes, block_count, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_cache_unpack_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_cache_unpack_bf16_async(
     const uint8_t* payload, uint16_t* kv_latent, uint16_t* k_rope, uint16_t* dsa_key, size_t rows,
     size_t kv_lora_rank, size_t rope_dim, size_t dsa_dim, size_t payload_stride_bytes,
     void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_cache_unpack_bf16_args(
+  const ds41rt_status_t valid = validate_mla_kv_cache_unpack_bf16_args(
       payload, kv_latent, k_rope, dsa_key, rows, kv_lora_rank, rope_dim, dsa_dim,
       payload_stride_bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1167,7 +1167,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_cache_unpack_bf16_async(
   const size_t total = rows * width;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   mla_kv_cache_unpack_bf16_kernel<<<static_cast<int>(block_count), threads, 0, stream>>>(
       payload, kv_latent, k_rope, dsa_key, rows, kv_lora_rank, rope_dim, dsa_dim,
@@ -1175,24 +1175,24 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_cache_unpack_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_cache_unpack_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_cache_unpack_bf16(
     const uint8_t* payload, uint16_t* kv_latent, uint16_t* k_rope, uint16_t* dsa_key, size_t rows,
     size_t kv_lora_rank, size_t rope_dim, size_t dsa_dim, size_t payload_stride_bytes) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_kv_cache_unpack_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_kv_cache_unpack_bf16_async(
       payload, kv_latent, k_rope, dsa_key, rows, kv_lora_rank, rope_dim, dsa_dim,
       payload_stride_bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_projected_split_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_projected_split_bf16_async(
     const uint16_t* projected, uint16_t* k_nope, uint16_t* v, size_t rows, size_t heads,
     size_t nope_dim, size_t v_dim, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_projected_split_bf16_args(
+  const ds41rt_status_t valid = validate_mla_kv_projected_split_bf16_args(
       projected, k_nope, v, rows, heads, nope_dim, v_dim);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1200,7 +1200,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_projected_split_bf16_async(
   const size_t total = rows * heads * (nope_dim + v_dim);
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   // FlashInfer graph replay can leave a consumed launch error in CUDA's
   // thread-local last-error slot. Report only this kernel's launch status.
@@ -1210,27 +1210,27 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_projected_split_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_projected_split_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_projected_split_bf16(
     const uint16_t* projected, uint16_t* k_nope, uint16_t* v, size_t rows, size_t heads,
     size_t nope_dim, size_t v_dim) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_kv_projected_split_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_kv_projected_split_bf16_async(
       projected, k_nope, v, rows, heads, nope_dim, v_dim, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_prepare_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_prepare_bf16_async(
     const uint16_t* projected, const uint32_t* positions, const uint16_t* norm_weight,
     uint16_t* prepared, size_t rows, size_t projected_stride_bytes,
     size_t prepared_stride_bytes, float eps, float theta, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_prepare_bf16_args(
+  const ds41rt_status_t valid = validate_mla_kv_prepare_bf16_args(
       projected, positions, norm_weight, prepared, rows, projected_stride_bytes,
       prepared_stride_bytes, eps, theta);
-  if (valid != DS4RT_STATUS_OK ||
+  if (valid != DS41RT_STATUS_OK ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return valid != DS4RT_STATUS_OK ? valid : DS4RT_STATUS_INVALID_ARGUMENT;
+    return valid != DS41RT_STATUS_OK ? valid : DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   // Capability probes in other backends may intentionally observe and handle
@@ -1243,19 +1243,19 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_prepare_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_rope_factors_f32_candidate_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_rope_factors_f32_candidate_async(
     const uint32_t* positions, float* factors, size_t rows, float theta,
     void* cuda_stream) {
   if (positions == nullptr || factors == nullptr || rows == 0 ||
       !std::isfinite(theta) || theta <= 0.0f ||
       rows > std::numeric_limits<size_t>::max() / 32) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t factor_pairs = rows * 32;
   constexpr size_t threads = 32;
   const size_t blocks = (factor_pairs + threads - 1) / threads;
   if (blocks > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   mla_rope_factors_f32_candidate_kernel<<<static_cast<int>(blocks), threads, 0, stream>>>(
@@ -1263,17 +1263,17 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_rope_factors_f32_candidate_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_prepare_bf16_precomputed_rope_candidate_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_prepare_bf16_precomputed_rope_candidate_async(
     const uint16_t* projected, const float* rope_factors,
     const uint16_t* norm_weight, uint16_t* prepared, size_t rows,
     size_t projected_stride_bytes, size_t prepared_stride_bytes, float eps,
     void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_prepare_bf16_args(
+  const ds41rt_status_t valid = validate_mla_kv_prepare_bf16_args(
       projected, reinterpret_cast<const uint32_t*>(rope_factors), norm_weight,
       prepared, rows, projected_stride_bytes, prepared_stride_bytes, eps, 1.0f);
-  if (valid != DS4RT_STATUS_OK ||
+  if (valid != DS41RT_STATUS_OK ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return valid != DS4RT_STATUS_OK ? valid : DS4RT_STATUS_INVALID_ARGUMENT;
+    return valid != DS41RT_STATUS_OK ? valid : DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   mla_kv_prepare_bf16_precomputed_rope_candidate_kernel<<<
@@ -1284,7 +1284,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_prepare_bf16_precomputed_rope_candid
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_finalize_store_candidate_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_finalize_store_candidate_async(
     const uint16_t* projected, const float* rope_factors,
     const uint16_t* norm_weight,
     uint8_t* cache_rows, uint16_t* attention_ready,
@@ -1292,14 +1292,14 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_finalize_store_candidate_async(
     size_t projected_stride_bytes, size_t cache_stride_bytes,
     size_t attention_stride_bytes, size_t dsa_stride_bytes,
     size_t dsa_values, int cache_format, float eps, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_finalize_store_candidate_args(
+  const ds41rt_status_t valid = validate_mla_kv_finalize_store_candidate_args(
       projected, rope_factors, norm_weight, cache_rows,
       attention_ready, dsa_normalized, rows, projected_stride_bytes,
       cache_stride_bytes, attention_stride_bytes, dsa_stride_bytes, dsa_values,
       cache_format, eps);
-  if (valid != DS4RT_STATUS_OK ||
+  if (valid != DS41RT_STATUS_OK ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return valid != DS4RT_STATUS_OK ? valid : DS4RT_STATUS_INVALID_ARGUMENT;
+    return valid != DS41RT_STATUS_OK ? valid : DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   const size_t projected_stride_bf16 =
@@ -1334,34 +1334,34 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_finalize_store_candidate_async(
               dsa_values, eps);
       break;
     default:
-      return DS4RT_STATUS_INVALID_ARGUMENT;
+      return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_prepare_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_prepare_bf16(
     const uint16_t* projected, const uint32_t* positions, const uint16_t* norm_weight,
     uint16_t* prepared, size_t rows, size_t projected_stride_bytes,
     size_t prepared_stride_bytes, float eps, float theta) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_kv_prepare_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_kv_prepare_bf16_async(
       projected, positions, norm_weight, prepared, rows, projected_stride_bytes,
       prepared_stride_bytes, eps, theta, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_pack_fp8_ds_mla_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_pack_fp8_ds_mla_async(
     const uint16_t* projected, uint8_t* packed, size_t rows, size_t projected_stride_bytes,
     size_t packed_stride_bytes, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_pack_fp8_ds_mla_args(
+  const ds41rt_status_t valid = validate_mla_kv_pack_fp8_ds_mla_args(
       projected, packed, rows, projected_stride_bytes, packed_stride_bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -1370,27 +1370,27 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_pack_fp8_ds_mla_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_pack_fp8_ds_mla(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_pack_fp8_ds_mla(
     const uint16_t* projected, uint8_t* packed, size_t rows, size_t projected_stride_bytes,
     size_t packed_stride_bytes) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_kv_pack_fp8_ds_mla_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_kv_pack_fp8_ds_mla_async(
       projected, packed, rows, projected_stride_bytes, packed_stride_bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_unpack_fp8_ds_mla_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_unpack_fp8_ds_mla_async(
     const uint8_t* packed, uint16_t* projected, size_t rows, size_t packed_stride_bytes,
     size_t projected_stride_bytes, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_unpack_fp8_ds_mla_args(
+  const ds41rt_status_t valid = validate_mla_kv_unpack_fp8_ds_mla_args(
       packed, projected, rows, packed_stride_bytes, projected_stride_bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -1399,27 +1399,27 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_unpack_fp8_ds_mla_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_unpack_fp8_ds_mla(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_unpack_fp8_ds_mla(
     const uint8_t* packed, uint16_t* projected, size_t rows, size_t packed_stride_bytes,
     size_t projected_stride_bytes) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_kv_unpack_fp8_ds_mla_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_kv_unpack_fp8_ds_mla_async(
       packed, projected, rows, packed_stride_bytes, projected_stride_bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla_async(
     const uint16_t* projected, uint8_t* packed, size_t rows, size_t projected_stride_bytes,
     size_t packed_stride_bytes, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_pack_mxfp4_ds_mla_args(
+  const ds41rt_status_t valid = validate_mla_kv_pack_mxfp4_ds_mla_args(
       projected, packed, rows, projected_stride_bytes, packed_stride_bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -1428,27 +1428,27 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla(
     const uint16_t* projected, uint8_t* packed, size_t rows, size_t projected_stride_bytes,
     size_t packed_stride_bytes) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla_async(
       projected, packed, rows, projected_stride_bytes, packed_stride_bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla_async(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla_async(
     const uint8_t* packed, uint16_t* projected, size_t rows, size_t packed_stride_bytes,
     size_t projected_stride_bytes, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_mla_kv_unpack_mxfp4_ds_mla_args(
+  const ds41rt_status_t valid = validate_mla_kv_unpack_mxfp4_ds_mla_args(
       packed, projected, rows, packed_stride_bytes, projected_stride_bytes);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
@@ -1457,12 +1457,12 @@ extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla(
+extern "C" ds41rt_status_t ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla(
     const uint8_t* packed, uint16_t* projected, size_t rows, size_t packed_stride_bytes,
     size_t projected_stride_bytes) {
-  const ds4rt_status_t status = ds4rt_cuda_mla_kv_unpack_mxfp4_ds_mla_async(
+  const ds41rt_status_t status = ds41rt_cuda_mla_kv_unpack_mxfp4_ds_mla_async(
       packed, projected, rows, packed_stride_bytes, projected_stride_bytes, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));

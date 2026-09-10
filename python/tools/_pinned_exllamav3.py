@@ -1,4 +1,4 @@
-"""Verify and import DS4RT's pinned exllamav3 quantizer source."""
+"""Verify and import DS41RT's pinned exllamav3 quantizer source."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ SOURCE = REPO_ROOT / "third_party/exllamav3"
 LOCK = REPO_ROOT / "third_party/exllamav3.lock.json"
 VERIFY_SCRIPT = REPO_ROOT / "scripts/verify-exllamav3-source.py"
 
-spec = importlib.util.spec_from_file_location("ds4rt_verify_exllamav3", VERIFY_SCRIPT)
+spec = importlib.util.spec_from_file_location("ds41rt_verify_exllamav3", VERIFY_SCRIPT)
 if spec is None or spec.loader is None:
     raise RuntimeError(f"cannot load exllamav3 verifier from {VERIFY_SCRIPT}")
 verifier = importlib.util.module_from_spec(spec)

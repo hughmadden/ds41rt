@@ -22,7 +22,7 @@ def test_container_uses_free_threaded_python_and_hashed_lock() -> None:
     assert "ENV TORCH_CUDA_ARCH_LIST=12.0" in DOCKERFILE
     assert "--require-hashes" in DOCKERFILE
     assert (
-        "--build-constraints /opt/ds4rt/quantization/build-requirements.lock"
+        "--build-constraints /opt/ds41rt/quantization/build-requirements.lock"
         in DOCKERFILE
     )
     assert "quantization/requirements.amd64.lock" in DOCKERFILE
@@ -39,9 +39,9 @@ def test_container_rejects_cross_architecture_build_contracts() -> None:
 
 def test_container_verifies_vendored_gptqmodel_before_import() -> None:
     verify = DOCKERFILE.index("verify-gptqmodel-source.py")
-    install = DOCKERFILE.index("--editable /opt/ds4rt/third_party/gptqmodel")
+    install = DOCKERFILE.index("--editable /opt/ds41rt/third_party/gptqmodel")
     assert verify < install
-    assert "DS4RT_GPTQMODEL_COMMIT" in DOCKERFILE
+    assert "DS41RT_GPTQMODEL_COMMIT" in DOCKERFILE
 
 
 def test_container_contains_target_and_joint_mtp_launcher() -> None:
@@ -70,12 +70,12 @@ def test_bake_targets_pin_identical_source_and_dependency_locks() -> None:
     build_requirements = (
         "9f21166fd088fd5eee2e9560c5d97b14201e0fde30d7ee27a43a56c24e104fd1"
     )
-    assert BAKE.count(f'DS4RT_GPTQMODEL_COMMIT = "{revision}"') == 2
-    assert BAKE.count('DS4RT_QUANT_MIN_GPUS = "2"') == 1
-    assert BAKE.count('DS4RT_QUANT_MIN_GPUS = "1"') == 1
-    assert BAKE.count(f'DS4RT_QUANT_REQUIREMENTS_SHA256 = "{amd64_requirements}"') == 1
-    assert BAKE.count(f'DS4RT_QUANT_REQUIREMENTS_SHA256 = "{arm64_requirements}"') == 1
+    assert BAKE.count(f'DS41RT_GPTQMODEL_COMMIT = "{revision}"') == 2
+    assert BAKE.count('DS41RT_QUANT_MIN_GPUS = "2"') == 1
+    assert BAKE.count('DS41RT_QUANT_MIN_GPUS = "1"') == 1
+    assert BAKE.count(f'DS41RT_QUANT_REQUIREMENTS_SHA256 = "{amd64_requirements}"') == 1
+    assert BAKE.count(f'DS41RT_QUANT_REQUIREMENTS_SHA256 = "{arm64_requirements}"') == 1
     assert (
-        BAKE.count(f'DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256 = "{build_requirements}"')
+        BAKE.count(f'DS41RT_QUANT_BUILD_REQUIREMENTS_SHA256 = "{build_requirements}"')
         == 2
     )

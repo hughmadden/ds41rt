@@ -2,7 +2,7 @@
 """Compare one combined packed-FP8 MLA launch with request-local launches.
 
 The inputs are self-contained trace directories emitted by
-DS4RT_REAL_FULL_PACKED_MLA_TRACE_DIR.  This deliberately uses production Q,
+DS41RT_REAL_FULL_PACKED_MLA_TRACE_DIR.  This deliberately uses production Q,
 KV, KV-B, and packed-W8 O tensors while placing each request at a distinct
 physical offset in one synthetic layer plane.
 """
@@ -54,7 +54,7 @@ class Trace:
     def load(cls, directory: Path) -> Trace:
         with (directory / "meta.json").open() as handle:
             meta = json.load(handle)
-        if meta["format"] != "ds4rt-packed-mla-trace-v1":
+        if meta["format"] != "ds41rt-packed-mla-trace-v1":
             raise ValueError(f"{directory} has unsupported format {meta['format']!r}")
         rows = int(meta["rows"])
         query_rows = int(meta["query_rows"])
@@ -118,7 +118,7 @@ def configure_native(path: Path) -> ctypes.CDLL:
     size = ctypes.c_size_t
     pointer = ctypes.c_void_p
 
-    native.ds4rt_cuda_matmul_bf16_strided_batched_cublas_async.argtypes = (
+    native.ds41rt_cuda_matmul_bf16_strided_batched_cublas_async.argtypes = (
         pointer,
         pointer,
         pointer,
@@ -131,8 +131,8 @@ def configure_native(path: Path) -> ctypes.CDLL:
         size,
         pointer,
     )
-    native.ds4rt_cuda_matmul_bf16_strided_batched_cublas_async.restype = ctypes.c_int
-    native.ds4rt_cuda_linear_bf16_strided_batched_cublas_async.argtypes = (
+    native.ds41rt_cuda_matmul_bf16_strided_batched_cublas_async.restype = ctypes.c_int
+    native.ds41rt_cuda_linear_bf16_strided_batched_cublas_async.argtypes = (
         pointer,
         pointer,
         pointer,
@@ -145,15 +145,15 @@ def configure_native(path: Path) -> ctypes.CDLL:
         size,
         pointer,
     )
-    native.ds4rt_cuda_linear_bf16_strided_batched_cublas_async.restype = ctypes.c_int
+    native.ds41rt_cuda_linear_bf16_strided_batched_cublas_async.restype = ctypes.c_int
     for name in (
-        "ds4rt_cuda_transpose_rows_heads_bf16_async",
-        "ds4rt_cuda_transpose_heads_rows_bf16_async",
+        "ds41rt_cuda_transpose_rows_heads_bf16_async",
+        "ds41rt_cuda_transpose_heads_rows_bf16_async",
     ):
         function = getattr(native, name)
         function.argtypes = (pointer, pointer, size, size, size, pointer)
         function.restype = ctypes.c_int
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async.argtypes = (
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async.argtypes = (
         pointer,
         pointer,
         pointer,
@@ -162,8 +162,8 @@ def configure_native(path: Path) -> ctypes.CDLL:
         size,
         pointer,
     )
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async.restype = ctypes.c_int
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.argtypes = (
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async.restype = ctypes.c_int
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.argtypes = (
         pointer,
         pointer,
         pointer,
@@ -173,7 +173,7 @@ def configure_native(path: Path) -> ctypes.CDLL:
         size,
         pointer,
     )
-    native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.restype = (
+    native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async.restype = (
         ctypes.c_int
     )
     return native
@@ -300,7 +300,7 @@ class Pipeline:
         q_absorbed_row = self.heads * self.rank
         for row in range(self.rows):
             check_status(
-                self.native.ds4rt_cuda_matmul_bf16_strided_batched_cublas_async(
+                self.native.ds41rt_cuda_matmul_bf16_strided_batched_cublas_async(
                     pointer(self.q_nope, row * q_nope_row),
                     pointer(self.kv_b),
                     pointer(self.q_absorbed, row * q_absorbed_row),
@@ -331,7 +331,7 @@ class Pipeline:
             chunks_per_block=1,
         )
         check_status(
-            self.native.ds4rt_cuda_transpose_rows_heads_bf16_async(
+            self.native.ds41rt_cuda_transpose_rows_heads_bf16_async(
                 pointer(self.attention),
                 pointer(self.attention_head_major),
                 self.rows,
@@ -343,7 +343,7 @@ class Pipeline:
         )
         value_weight_offset = self.nope_dim * self.rank
         check_status(
-            self.native.ds4rt_cuda_linear_bf16_strided_batched_cublas_async(
+            self.native.ds41rt_cuda_linear_bf16_strided_batched_cublas_async(
                 pointer(self.attention_head_major),
                 pointer(self.kv_b, value_weight_offset),
                 pointer(self.values_head_major),
@@ -359,7 +359,7 @@ class Pipeline:
             "value expansion",
         )
         check_status(
-            self.native.ds4rt_cuda_transpose_heads_rows_bf16_async(
+            self.native.ds41rt_cuda_transpose_heads_rows_bf16_async(
                 pointer(self.values_head_major),
                 pointer(self.values),
                 self.rows,
@@ -372,7 +372,7 @@ class Pipeline:
         input_dim = self.heads * self.value_dim
         if self.rows >= 4:
             check_status(
-                self.native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async(
+                self.native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_parity_batched_async(
                     pointer(self.values),
                     pointer(self.o_weight),
                     pointer(self.o_scales),
@@ -387,7 +387,7 @@ class Pipeline:
         else:
             for row in range(self.rows):
                 check_status(
-                    self.native.ds4rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
+                    self.native.ds41rt_cuda_linear_w8a16_group256_m1_warp_packed_async(
                         pointer(self.values, row * input_dim),
                         pointer(self.o_weight),
                         pointer(self.o_scales),
@@ -465,7 +465,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        default=Path("native/build-cuda-rdma-coordinator-aot/libds4rt_native.so"),
+        default=Path("native/build-cuda-rdma-coordinator-aot/libds41rt_native.so"),
     )
     parser.add_argument(
         "--physical-bases",

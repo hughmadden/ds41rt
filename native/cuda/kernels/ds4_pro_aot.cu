@@ -28,16 +28,16 @@
 
 namespace {
 
-constexpr size_t kHidden = DS4RT_DS4_PRO_HIDDEN_SIZE;
-constexpr size_t kIntermediate = DS4RT_DS4_PRO_TP_INTERMEDIATE_SIZE;
-constexpr size_t kExperts = DS4RT_DS4_PRO_NUM_EXPERTS;
-constexpr size_t kTopK = DS4RT_DS4_PRO_TOP_K;
+constexpr size_t kHidden = DS41RT_DS4_PRO_HIDDEN_SIZE;
+constexpr size_t kIntermediate = DS41RT_DS4_PRO_TP_INTERMEDIATE_SIZE;
+constexpr size_t kExperts = DS41RT_DS4_PRO_NUM_EXPERTS;
+constexpr size_t kTopK = DS41RT_DS4_PRO_TOP_K;
 constexpr size_t kW13Rows = 2 * kIntermediate;
-constexpr size_t kPrefillMaxRows = DS4RT_DS4_PRO_PREFILL_MAX_ROWS;
+constexpr size_t kPrefillMaxRows = DS41RT_DS4_PRO_PREFILL_MAX_ROWS;
 constexpr size_t kPrefillMaxPackedRouteSlots =
-    DS4RT_DS4_PRO_EXL3_K2_PREFILL_M2048_TOPK6_PACKED_ROUTE_SLOTS;
+    DS41RT_DS4_PRO_EXL3_K2_PREFILL_M2048_TOPK6_PACKED_ROUTE_SLOTS;
 constexpr size_t kPrefillMaxRouteBlocks =
-    DS4RT_DS4_PRO_EXL3_K2_PREFILL_M2048_TOPK6_MAX_M_BLOCKS;
+    DS41RT_DS4_PRO_EXL3_K2_PREFILL_M2048_TOPK6_MAX_M_BLOCKS;
 constexpr size_t kPrefillRouteBlockRows = 32;
 constexpr size_t kExl3Bits = 2;
 constexpr size_t kExl3TrellisWords = 16 * kExl3Bits;
@@ -61,7 +61,7 @@ constexpr size_t kDecodeFc2ScratchElements = 688'128;
 constexpr size_t kPrefillScratchElements = 3'145'728;
 constexpr size_t kWorkspaceElements = 48 * 4 + 2;
 constexpr size_t kSharedIntermediate =
-    DS4RT_DS4_PRO_SHARED_INTERMEDIATE_SIZE;
+    DS41RT_DS4_PRO_SHARED_INTERMEDIATE_SIZE;
 constexpr size_t kSharedChunkRows = 8;
 constexpr size_t kSharedWeightBytes = kHidden * kSharedIntermediate;
 constexpr size_t kSharedScaleMmaBytes =
@@ -74,42 +74,42 @@ constexpr size_t kMxfp8QuantThreads = 256;
 constexpr size_t kMxfp8QuantWarps = kMxfp8QuantThreads / 32;
 constexpr size_t kMxfp8QuantCtasPerSm = 4;
 
-ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Kernel_Module_t pro_decode_module;
-ds4rt_ds4_pro_tp4_exl3_k2_topk6_sum_Kernel_Module_t pro_topk6_sum_module;
-ds4rt_ds4_pro_shared_up_m1_Kernel_Module_t pro_shared_up_m1_module;
-ds4rt_ds4_pro_shared_up_m8_Kernel_Module_t pro_shared_up_m8_module;
-ds4rt_ds4_pro_shared_up_m2048_Kernel_Module_t pro_shared_up_m2048_module;
-ds4rt_ds4_pro_shared_down_m1_Kernel_Module_t pro_shared_down_m1_module;
-ds4rt_ds4_pro_shared_down_m8_Kernel_Module_t pro_shared_down_m8_module;
-ds4rt_ds4_pro_shared_down_m2048_Kernel_Module_t pro_shared_down_m2048_module;
-ds4rt_ds4_pro_shared_input_quant_m2048_Kernel_Module_t
+ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Kernel_Module_t pro_decode_module;
+ds41rt_ds4_pro_tp4_exl3_k2_topk6_sum_Kernel_Module_t pro_topk6_sum_module;
+ds41rt_ds4_pro_shared_up_m1_Kernel_Module_t pro_shared_up_m1_module;
+ds41rt_ds4_pro_shared_up_m8_Kernel_Module_t pro_shared_up_m8_module;
+ds41rt_ds4_pro_shared_up_m2048_Kernel_Module_t pro_shared_up_m2048_module;
+ds41rt_ds4_pro_shared_down_m1_Kernel_Module_t pro_shared_down_m1_module;
+ds41rt_ds4_pro_shared_down_m8_Kernel_Module_t pro_shared_down_m8_module;
+ds41rt_ds4_pro_shared_down_m2048_Kernel_Module_t pro_shared_down_m2048_module;
+ds41rt_ds4_pro_shared_input_quant_m2048_Kernel_Module_t
     pro_shared_input_quant_m2048_module;
-ds4rt_ds4_pro_shared_activated_quant_m2048_Kernel_Module_t
+ds41rt_ds4_pro_shared_activated_quant_m2048_Kernel_Module_t
     pro_shared_activated_quant_m2048_module;
-#define DS4RT_DEFINE_PRO_PREFILL_MODULE(M)                                     \
-  ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Kernel_Module_t               \
+#define DS41RT_DEFINE_PRO_PREFILL_MODULE(M)                                     \
+  ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Kernel_Module_t               \
       pro_prefill_m##M##_module;
-DS4RT_DEFINE_PRO_PREFILL_MODULE(2)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(4)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(8)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(16)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(32)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(64)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(128)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(256)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(512)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(1024)
-DS4RT_DEFINE_PRO_PREFILL_MODULE(2048)
-#undef DS4RT_DEFINE_PRO_PREFILL_MODULE
+DS41RT_DEFINE_PRO_PREFILL_MODULE(2)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(4)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(8)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(16)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(32)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(64)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(128)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(256)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(512)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(1024)
+DS41RT_DEFINE_PRO_PREFILL_MODULE(2048)
+#undef DS41RT_DEFINE_PRO_PREFILL_MODULE
 
 std::once_flag pro_module_init_once;
-ds4rt_status_t pro_module_init_status = DS4RT_STATUS_OK;
+ds41rt_status_t pro_module_init_status = DS41RT_STATUS_OK;
 
-bool has_bytes(ds4rt_device_buffer_t buffer, size_t required) {
+bool has_bytes(ds41rt_device_buffer_t buffer, size_t required) {
   return buffer.ptr != nullptr && buffer.bytes >= required;
 }
 
-bool is_aligned(ds4rt_device_buffer_t buffer, size_t alignment) {
+bool is_aligned(ds41rt_device_buffer_t buffer, size_t alignment) {
   return reinterpret_cast<uintptr_t>(buffer.ptr) % alignment == 0;
 }
 
@@ -117,12 +117,12 @@ void initialize_pro_modules_on_current_device() {
   int32_t device_id = 0;
   cudaError_t result = cudaGetDevice(&device_id);
   if (result != cudaSuccess) {
-    ds4rt_set_last_error_message(cudaGetErrorString(result));
-    pro_module_init_status = DS4RT_STATUS_INTERNAL_ERROR;
+    ds41rt_set_last_error_message(cudaGetErrorString(result));
+    pro_module_init_status = DS41RT_STATUS_INTERNAL_ERROR;
     return;
   }
 
-#define DS4RT_INIT_PRO_MODULE(prefix, module_value)                            \
+#define DS41RT_INIT_PRO_MODULE(prefix, module_value)                            \
   do {                                                                         \
     cudaLibrary_t *library = &(module_value).module;                           \
     result = cudaSuccess;                                                      \
@@ -132,8 +132,8 @@ void initialize_pro_modules_on_current_device() {
     } init_args = {&library, &result};                                         \
     _mlir_##prefix##_cuda_init(reinterpret_cast<void **>(&init_args));         \
     if (result != cudaSuccess) {                                               \
-      ds4rt_set_last_error_message(cudaGetErrorString(result));                \
-      pro_module_init_status = DS4RT_STATUS_INTERNAL_ERROR;                    \
+      ds41rt_set_last_error_message(cudaGetErrorString(result));                \
+      pro_module_init_status = DS41RT_STATUS_INTERNAL_ERROR;                    \
       return;                                                                  \
     }                                                                          \
     struct {                                                                   \
@@ -144,92 +144,92 @@ void initialize_pro_modules_on_current_device() {
     _mlir_##prefix##_cuda_load_to_device(                                      \
         reinterpret_cast<void **>(&load_args));                                \
     if (result != cudaSuccess) {                                               \
-      ds4rt_set_last_error_message(cudaGetErrorString(result));                \
-      pro_module_init_status = DS4RT_STATUS_INTERNAL_ERROR;                    \
+      ds41rt_set_last_error_message(cudaGetErrorString(result));                \
+      pro_module_init_status = DS41RT_STATUS_INTERNAL_ERROR;                    \
       return;                                                                  \
     }                                                                          \
   } while (false)
 
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_tp4_exl3_k2_decode_m1, pro_decode_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_tp4_exl3_k2_topk6_sum,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_tp4_exl3_k2_decode_m1, pro_decode_module);
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_tp4_exl3_k2_topk6_sum,
                         pro_topk6_sum_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_up_m1,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_up_m1,
                         pro_shared_up_m1_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_up_m8,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_up_m8,
                         pro_shared_up_m8_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_up_m2048,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_up_m2048,
                         pro_shared_up_m2048_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_down_m1,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_down_m1,
                         pro_shared_down_m1_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_down_m8,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_down_m8,
                         pro_shared_down_m8_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_down_m2048,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_down_m2048,
                         pro_shared_down_m2048_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_input_quant_m2048,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_input_quant_m2048,
                         pro_shared_input_quant_m2048_module);
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_shared_activated_quant_m2048,
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_shared_activated_quant_m2048,
                         pro_shared_activated_quant_m2048_module);
-#define DS4RT_INIT_PRO_PREFILL_MODULE(M)                                       \
-  DS4RT_INIT_PRO_MODULE(ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6,        \
+#define DS41RT_INIT_PRO_PREFILL_MODULE(M)                                       \
+  DS41RT_INIT_PRO_MODULE(ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6,        \
                         pro_prefill_m##M##_module)
-  DS4RT_INIT_PRO_PREFILL_MODULE(2);
-  DS4RT_INIT_PRO_PREFILL_MODULE(4);
-  DS4RT_INIT_PRO_PREFILL_MODULE(8);
-  DS4RT_INIT_PRO_PREFILL_MODULE(16);
-  DS4RT_INIT_PRO_PREFILL_MODULE(32);
-  DS4RT_INIT_PRO_PREFILL_MODULE(64);
-  DS4RT_INIT_PRO_PREFILL_MODULE(128);
-  DS4RT_INIT_PRO_PREFILL_MODULE(256);
-  DS4RT_INIT_PRO_PREFILL_MODULE(512);
-  DS4RT_INIT_PRO_PREFILL_MODULE(1024);
-  DS4RT_INIT_PRO_PREFILL_MODULE(2048);
-#undef DS4RT_INIT_PRO_PREFILL_MODULE
-#undef DS4RT_INIT_PRO_MODULE
+  DS41RT_INIT_PRO_PREFILL_MODULE(2);
+  DS41RT_INIT_PRO_PREFILL_MODULE(4);
+  DS41RT_INIT_PRO_PREFILL_MODULE(8);
+  DS41RT_INIT_PRO_PREFILL_MODULE(16);
+  DS41RT_INIT_PRO_PREFILL_MODULE(32);
+  DS41RT_INIT_PRO_PREFILL_MODULE(64);
+  DS41RT_INIT_PRO_PREFILL_MODULE(128);
+  DS41RT_INIT_PRO_PREFILL_MODULE(256);
+  DS41RT_INIT_PRO_PREFILL_MODULE(512);
+  DS41RT_INIT_PRO_PREFILL_MODULE(1024);
+  DS41RT_INIT_PRO_PREFILL_MODULE(2048);
+#undef DS41RT_INIT_PRO_PREFILL_MODULE
+#undef DS41RT_INIT_PRO_MODULE
 }
 
 bool buffers_share_device(
-    const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers) {
+    const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers) {
   const int device = buffers->input.device_id;
-#define DS4RT_PRO_SAME_DEVICE(field) buffers->field.device_id == device
+#define DS41RT_PRO_SAME_DEVICE(field) buffers->field.device_id == device
   const bool same =
-      DS4RT_PRO_SAME_DEVICE(w13_trellis) && DS4RT_PRO_SAME_DEVICE(w2_trellis) &&
-      DS4RT_PRO_SAME_DEVICE(gate_suh) && DS4RT_PRO_SAME_DEVICE(up_suh) &&
-      DS4RT_PRO_SAME_DEVICE(intermediate_rotations) &&
-      DS4RT_PRO_SAME_DEVICE(down_svh) && DS4RT_PRO_SAME_DEVICE(expert_map) &&
-      DS4RT_PRO_SAME_DEVICE(dummy_scale) &&
-      DS4RT_PRO_SAME_DEVICE(trellis_lut) &&
-      DS4RT_PRO_SAME_DEVICE(global_scale) && DS4RT_PRO_SAME_DEVICE(topk_ids) &&
-      DS4RT_PRO_SAME_DEVICE(topk_weights) &&
-      DS4RT_PRO_SAME_DEVICE(rotation_gate) &&
-      DS4RT_PRO_SAME_DEVICE(rotation_up) && DS4RT_PRO_SAME_DEVICE(fc1_output) &&
-      DS4RT_PRO_SAME_DEVICE(activated) &&
-      DS4RT_PRO_SAME_DEVICE(routed_output) &&
-      DS4RT_PRO_SAME_DEVICE(output_f32) && DS4RT_PRO_SAME_DEVICE(output_bf16) &&
-      DS4RT_PRO_SAME_DEVICE(packed_route_indices) &&
-      DS4RT_PRO_SAME_DEVICE(block_expert_ids) &&
-      DS4RT_PRO_SAME_DEVICE(packed_route_count) &&
-      DS4RT_PRO_SAME_DEVICE(expert_counts) &&
-      DS4RT_PRO_SAME_DEVICE(expert_offsets) &&
-      DS4RT_PRO_SAME_DEVICE(fc1_scratch) &&
-      DS4RT_PRO_SAME_DEVICE(fc2_scratch) && DS4RT_PRO_SAME_DEVICE(workspace);
-#undef DS4RT_PRO_SAME_DEVICE
+      DS41RT_PRO_SAME_DEVICE(w13_trellis) && DS41RT_PRO_SAME_DEVICE(w2_trellis) &&
+      DS41RT_PRO_SAME_DEVICE(gate_suh) && DS41RT_PRO_SAME_DEVICE(up_suh) &&
+      DS41RT_PRO_SAME_DEVICE(intermediate_rotations) &&
+      DS41RT_PRO_SAME_DEVICE(down_svh) && DS41RT_PRO_SAME_DEVICE(expert_map) &&
+      DS41RT_PRO_SAME_DEVICE(dummy_scale) &&
+      DS41RT_PRO_SAME_DEVICE(trellis_lut) &&
+      DS41RT_PRO_SAME_DEVICE(global_scale) && DS41RT_PRO_SAME_DEVICE(topk_ids) &&
+      DS41RT_PRO_SAME_DEVICE(topk_weights) &&
+      DS41RT_PRO_SAME_DEVICE(rotation_gate) &&
+      DS41RT_PRO_SAME_DEVICE(rotation_up) && DS41RT_PRO_SAME_DEVICE(fc1_output) &&
+      DS41RT_PRO_SAME_DEVICE(activated) &&
+      DS41RT_PRO_SAME_DEVICE(routed_output) &&
+      DS41RT_PRO_SAME_DEVICE(output_f32) && DS41RT_PRO_SAME_DEVICE(output_bf16) &&
+      DS41RT_PRO_SAME_DEVICE(packed_route_indices) &&
+      DS41RT_PRO_SAME_DEVICE(block_expert_ids) &&
+      DS41RT_PRO_SAME_DEVICE(packed_route_count) &&
+      DS41RT_PRO_SAME_DEVICE(expert_counts) &&
+      DS41RT_PRO_SAME_DEVICE(expert_offsets) &&
+      DS41RT_PRO_SAME_DEVICE(fc1_scratch) &&
+      DS41RT_PRO_SAME_DEVICE(fc2_scratch) && DS41RT_PRO_SAME_DEVICE(workspace);
+#undef DS41RT_PRO_SAME_DEVICE
   return same;
 }
 
-ds4rt_status_t
-validate_buffers(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
+ds41rt_status_t
+validate_buffers(const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
                  size_t capacity_rows) {
   if (buffers == nullptr || capacity_rows == 0 ||
       capacity_rows > kPrefillMaxRows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool decode = capacity_rows == 1;
   const size_t routed_rows = capacity_rows * kTopK;
   const size_t packed_route_elements =
-      decode ? DS4RT_DS4_PRO_EXL3_K2_DECODE_M1_PACKED_ROUTE_SLOTS
+      decode ? DS41RT_DS4_PRO_EXL3_K2_DECODE_M1_PACKED_ROUTE_SLOTS
              : kPrefillMaxPackedRouteSlots;
   const size_t route_block_elements =
-      decode ? DS4RT_DS4_PRO_EXL3_K2_DECODE_M1_MAX_M_BLOCKS
+      decode ? DS41RT_DS4_PRO_EXL3_K2_DECODE_M1_MAX_M_BLOCKS
              : kPrefillMaxRouteBlocks;
   const size_t fc1_scratch_elements =
       decode ? kDecodeFc1ScratchElements : kPrefillScratchElements;
@@ -274,7 +274,7 @@ validate_buffers(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
       has_bytes(buffers->fc2_scratch, fc2_scratch_elements * sizeof(float)) &&
       has_bytes(buffers->workspace, kWorkspaceElements * sizeof(int32_t));
   if (!valid) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const bool aligned =
       is_aligned(buffers->input, 16) && is_aligned(buffers->w13_trellis, 16) &&
@@ -301,34 +301,34 @@ validate_buffers(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
       is_aligned(buffers->fc2_scratch, 16) &&
       is_aligned(buffers->workspace, 16);
   return aligned && buffers_share_device(buffers)
-             ? DS4RT_STATUS_OK
-             : DS4RT_STATUS_INVALID_ARGUMENT;
+             ? DS41RT_STATUS_OK
+             : DS41RT_STATUS_INVALID_ARGUMENT;
 }
 
 bool shared_buffers_share_device(
-    const ds4rt_ds4_flash_shared_expert_fp8_buffers_t *buffers) {
+    const ds41rt_ds4_flash_shared_expert_fp8_buffers_t *buffers) {
   const int device = buffers->input.device_id;
-#define DS4RT_PRO_SHARED_SAME_DEVICE(field) buffers->field.device_id == device
+#define DS41RT_PRO_SHARED_SAME_DEVICE(field) buffers->field.device_id == device
   const bool same =
-      DS4RT_PRO_SHARED_SAME_DEVICE(w1_weight) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(w1_scale_mma) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(w3_weight) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(w3_scale_mma) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(w2_weight) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(w2_scale_mma) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(gate) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(up) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(activated) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(output) &&
-      DS4RT_PRO_SHARED_SAME_DEVICE(alpha);
-#undef DS4RT_PRO_SHARED_SAME_DEVICE
+      DS41RT_PRO_SHARED_SAME_DEVICE(w1_weight) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(w1_scale_mma) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(w3_weight) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(w3_scale_mma) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(w2_weight) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(w2_scale_mma) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(gate) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(up) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(activated) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(output) &&
+      DS41RT_PRO_SHARED_SAME_DEVICE(alpha);
+#undef DS41RT_PRO_SHARED_SAME_DEVICE
   return same;
 }
 
-ds4rt_status_t validate_shared_buffers(
-    const ds4rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows) {
+ds41rt_status_t validate_shared_buffers(
+    const ds41rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows) {
   if (buffers == nullptr || rows == 0 || rows > kPrefillMaxRows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool valid =
       has_bytes(buffers->input, rows * kHidden * sizeof(uint16_t)) &&
@@ -347,11 +347,11 @@ ds4rt_status_t validate_shared_buffers(
       has_bytes(buffers->output, rows * kHidden * sizeof(uint16_t)) &&
       has_bytes(buffers->alpha, sizeof(float));
   if (!valid) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   return shared_buffers_share_device(buffers)
-             ? DS4RT_STATUS_OK
-             : DS4RT_STATUS_INVALID_ARGUMENT;
+             ? DS41RT_STATUS_OK
+             : DS41RT_STATUS_INVALID_ARGUMENT;
 }
 
 size_t mxfp8_scale_mma_bytes(size_t rows, size_t size_k) {
@@ -363,30 +363,30 @@ size_t mxfp8_scale_mma_bytes(size_t rows, size_t size_k) {
 }
 
 bool pro_prefill_buffers_share_device(
-    const ds4rt_ds4_pro_shared_expert_fp8_prefill_buffers_t *buffers) {
+    const ds41rt_ds4_pro_shared_expert_fp8_prefill_buffers_t *buffers) {
   const int device = buffers->base.input.device_id;
-#define DS4RT_PRO_PREFILL_SAME_DEVICE(field)                                  \
+#define DS41RT_PRO_PREFILL_SAME_DEVICE(field)                                  \
   buffers->field.device_id == device
   const bool same =
-      DS4RT_PRO_PREFILL_SAME_DEVICE(input_q_values) &&
-      DS4RT_PRO_PREFILL_SAME_DEVICE(input_q_scale_rows) &&
-      DS4RT_PRO_PREFILL_SAME_DEVICE(input_q_scale_mma) &&
-      DS4RT_PRO_PREFILL_SAME_DEVICE(activated_q_values) &&
-      DS4RT_PRO_PREFILL_SAME_DEVICE(activated_q_scale_rows) &&
-      DS4RT_PRO_PREFILL_SAME_DEVICE(activated_q_scale_mma);
-#undef DS4RT_PRO_PREFILL_SAME_DEVICE
+      DS41RT_PRO_PREFILL_SAME_DEVICE(input_q_values) &&
+      DS41RT_PRO_PREFILL_SAME_DEVICE(input_q_scale_rows) &&
+      DS41RT_PRO_PREFILL_SAME_DEVICE(input_q_scale_mma) &&
+      DS41RT_PRO_PREFILL_SAME_DEVICE(activated_q_values) &&
+      DS41RT_PRO_PREFILL_SAME_DEVICE(activated_q_scale_rows) &&
+      DS41RT_PRO_PREFILL_SAME_DEVICE(activated_q_scale_mma);
+#undef DS41RT_PRO_PREFILL_SAME_DEVICE
   return same && shared_buffers_share_device(&buffers->base);
 }
 
-ds4rt_status_t validate_pro_prefill_buffers(
-    const ds4rt_ds4_pro_shared_expert_fp8_prefill_buffers_t *buffers,
+ds41rt_status_t validate_pro_prefill_buffers(
+    const ds41rt_ds4_pro_shared_expert_fp8_prefill_buffers_t *buffers,
     size_t rows) {
   if (buffers == nullptr || rows <= kSharedChunkRows ||
       rows > kPrefillMaxRows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t base_valid = validate_shared_buffers(&buffers->base, rows);
-  if (base_valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t base_valid = validate_shared_buffers(&buffers->base, rows);
+  if (base_valid != DS41RT_STATUS_OK) {
     return base_valid;
   }
   const size_t shared_values = rows * kSharedIntermediate;
@@ -407,7 +407,7 @@ ds4rt_status_t validate_pro_prefill_buffers(
       has_bytes(buffers->activated_q_scale_mma,
                 mxfp8_scale_mma_bytes(rows, kSharedIntermediate));
   if (!valid) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const bool aligned =
       is_aligned(buffers->input_q_values, 16) &&
@@ -417,8 +417,8 @@ ds4rt_status_t validate_pro_prefill_buffers(
       is_aligned(buffers->activated_q_scale_rows, 16) &&
       is_aligned(buffers->activated_q_scale_mma, 16);
   return aligned && pro_prefill_buffers_share_device(buffers)
-             ? DS4RT_STATUS_OK
-             : DS4RT_STATUS_INVALID_ARGUMENT;
+             ? DS41RT_STATUS_OK
+             : DS41RT_STATUS_INVALID_ARGUMENT;
 }
 
 int32_t mxfp8_quant_grid_x(size_t rows, size_t size_k) {
@@ -451,32 +451,32 @@ __global__ void pro_shared_swiglu_kernel(const uint16_t *gate,
   }
   float gate_value = bf16_to_f32(gate[index]);
   float up_value = bf16_to_f32(up[index]);
-  gate_value = fminf(gate_value, DS4RT_DS4_PRO_SWIGLU_LIMIT);
-  up_value = fminf(fmaxf(up_value, -DS4RT_DS4_PRO_SWIGLU_LIMIT),
-                   DS4RT_DS4_PRO_SWIGLU_LIMIT);
+  gate_value = fminf(gate_value, DS41RT_DS4_PRO_SWIGLU_LIMIT);
+  up_value = fminf(fmaxf(up_value, -DS41RT_DS4_PRO_SWIGLU_LIMIT),
+                   DS41RT_DS4_PRO_SWIGLU_LIMIT);
   const float silu = gate_value / (1.0f + expf(-gate_value));
   reinterpret_cast<__nv_bfloat16 *>(activated)[index] =
       __float2bfloat16_rn(silu * up_value);
 }
 
-#define DS4RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(NAME, M)                         \
+#define DS41RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(NAME, M)                         \
   int launch_pro_shared_##NAME##_m##M(                                        \
       void *source, void *weight, void *scale, void *output, void *alpha,      \
       int32_t rows, cudaStream_t stream) {                                     \
-    return cute_dsl_ds4rt_ds4_pro_shared_##NAME##_m##M##_wrapper(              \
+    return cute_dsl_ds41rt_ds4_pro_shared_##NAME##_m##M##_wrapper(              \
         &pro_shared_##NAME##_m##M##_module, source, source, weight, source,    \
         scale, output, alpha, rows, stream);                                   \
   }
-DS4RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(up, 1)
-DS4RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(up, 8)
-DS4RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(down, 1)
-DS4RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(down, 8)
-#undef DS4RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH
+DS41RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(up, 1)
+DS41RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(up, 8)
+DS41RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(down, 1)
+DS41RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH(down, 8)
+#undef DS41RT_DEFINE_PRO_SHARED_LINEAR_LAUNCH
 
 int launch_pro_shared_input_quant_m2048(
     void *source, void *values, void *scale_rows, void *scale_mma,
     int32_t rows, int32_t grid_x, cudaStream_t stream) {
-  return cute_dsl_ds4rt_ds4_pro_shared_input_quant_m2048_wrapper(
+  return cute_dsl_ds41rt_ds4_pro_shared_input_quant_m2048_wrapper(
       &pro_shared_input_quant_m2048_module, source, values, scale_rows,
       scale_mma, rows, grid_x, stream);
 }
@@ -484,22 +484,22 @@ int launch_pro_shared_input_quant_m2048(
 int launch_pro_shared_activated_quant_m2048(
     void *source, void *values, void *scale_rows, void *scale_mma,
     int32_t rows, int32_t grid_x, cudaStream_t stream) {
-  return cute_dsl_ds4rt_ds4_pro_shared_activated_quant_m2048_wrapper(
+  return cute_dsl_ds41rt_ds4_pro_shared_activated_quant_m2048_wrapper(
       &pro_shared_activated_quant_m2048_module, source, values, scale_rows,
       scale_mma, rows, grid_x, stream);
 }
 
-#define DS4RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH(NAME)                   \
+#define DS41RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH(NAME)                   \
   int launch_pro_shared_##NAME##_m2048(                                      \
       void *values, void *scale_mma, void *weight, void *weight_scale,        \
       void *output, void *alpha, int32_t rows, cudaStream_t stream) {         \
-    return cute_dsl_ds4rt_ds4_pro_shared_##NAME##_m2048_wrapper(              \
+    return cute_dsl_ds41rt_ds4_pro_shared_##NAME##_m2048_wrapper(              \
         &pro_shared_##NAME##_m2048_module, values, weight, scale_mma,         \
         weight_scale, output, alpha, alpha, alpha, alpha, rows, stream);      \
   }
-DS4RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH(up)
-DS4RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH(down)
-#undef DS4RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH
+DS41RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH(up)
+DS41RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH(down)
+#undef DS41RT_DEFINE_PRO_SHARED_PREFILL_LINEAR_LAUNCH
 
 __global__ void count_routes_kernel(const int32_t *topk_ids,
                                     int32_t *expert_counts,
@@ -567,8 +567,8 @@ __global__ void scatter_routes_kernel(const int32_t *topk_ids,
   packed_route_indices[destination] = static_cast<int32_t>(route);
 }
 
-ds4rt_status_t
-pack_routes(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
+ds41rt_status_t
+pack_routes(const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
             size_t rows, cudaStream_t stream) {
   cudaError_t error = cudaMemsetAsync(buffers->expert_counts.ptr, 0,
                                       kExperts * sizeof(int32_t), stream);
@@ -605,9 +605,9 @@ pack_routes(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
   return status_from_cuda(cudaGetLastError());
 }
 
-int launch_topk6_sum(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
+int launch_topk6_sum(const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
                      size_t active_m, cudaStream_t stream) {
-  return cute_dsl_ds4rt_ds4_pro_tp4_exl3_k2_topk6_sum_wrapper(
+  return cute_dsl_ds41rt_ds4_pro_tp4_exl3_k2_topk6_sum_wrapper(
       &pro_topk6_sum_module, buffers->routed_output.ptr,
       buffers->output_f32.ptr, buffers->topk_weights.ptr, buffers->topk_ids.ptr,
       buffers->expert_map.ptr, buffers->down_svh.ptr,
@@ -615,29 +615,29 @@ int launch_topk6_sum(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
       static_cast<int32_t>(active_m), stream);
 }
 
-int launch_decode(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
+int launch_decode(const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
                   cudaStream_t stream) {
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc1_bf16_flat_t fc1{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc1_bf16_flat_t fc1{
       buffers->fc1_output.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_activated_bf16_flat_t activated{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_activated_bf16_flat_t activated{
       buffers->activated.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc2_bf16_flat_t routed_output{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc2_bf16_flat_t routed_output{
       buffers->routed_output.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_packed_route_indices_t routes{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_packed_route_indices_t routes{
       buffers->topk_ids.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_block_expert_ids_t block_experts{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_block_expert_ids_t block_experts{
       buffers->block_expert_ids.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_packed_route_count_t route_count{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_packed_route_count_t route_count{
       buffers->packed_route_count.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_activation_amax_flat_t
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_activation_amax_flat_t
       activation_amax{buffers->global_scale.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc1_c_tmp_f32_flat_t fc1_scratch{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc1_c_tmp_f32_flat_t fc1_scratch{
       buffers->fc1_scratch.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc2_c_tmp_f32_flat_t fc2_scratch{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_fc2_c_tmp_f32_flat_t fc2_scratch{
       buffers->fc2_scratch.ptr};
-  ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_locks_i32_flat_t workspace{
+  ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_Tensor_locks_i32_flat_t workspace{
       buffers->workspace.ptr};
-  return cute_dsl_ds4rt_ds4_pro_tp4_exl3_k2_decode_m1_wrapper(
+  return cute_dsl_ds41rt_ds4_pro_tp4_exl3_k2_decode_m1_wrapper(
       &pro_decode_module, buffers->rotation_gate.ptr, buffers->rotation_up.ptr,
       buffers->input.ptr, buffers->w13_trellis.ptr, buffers->w2_trellis.ptr,
       static_cast<int64_t>(buffers->w13_trellis.bytes / sizeof(int32_t)),
@@ -650,37 +650,37 @@ int launch_decode(const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
       buffers->gate_suh.ptr, buffers->up_suh.ptr, buffers->expert_map.ptr,
       buffers->trellis_lut.ptr, buffers->trellis_lut.ptr,
       static_cast<int32_t>(kExperts), static_cast<int32_t>(kExperts), 1,
-      DS4RT_DS4_PRO_EXL3_K2_DECODE_M1_GRID_X, stream);
+      DS41RT_DS4_PRO_EXL3_K2_DECODE_M1_GRID_X, stream);
 }
 
 using ProPrefillLaunchFn = int (*)(
-    const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *, size_t, cudaStream_t);
+    const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *, size_t, cudaStream_t);
 
-#define DS4RT_DEFINE_PRO_PREFILL_LAUNCH(M)                                       \
+#define DS41RT_DEFINE_PRO_PREFILL_LAUNCH(M)                                       \
   int launch_prefill_m##M(                                                       \
-      const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,                  \
+      const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,                  \
       size_t active_m, cudaStream_t stream) {                                    \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t fc1{   \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_bf16_flat_t fc1{   \
         buffers->fc1_output.ptr};                                                \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t  \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activated_bf16_flat_t  \
         activated{buffers->activated.ptr};                                       \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t        \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_bf16_flat_t        \
         routed_output{buffers->routed_output.ptr};                               \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_indices_t \
         routes{buffers->packed_route_indices.ptr};                               \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_block_expert_ids_t     \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_block_expert_ids_t     \
         block_experts{buffers->block_expert_ids.ptr};                            \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_count_t   \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_packed_route_count_t   \
         route_count{buffers->packed_route_count.ptr};                            \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_activation_amax_flat_t \
         activation_amax{buffers->global_scale.ptr};                              \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t   \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc1_c_tmp_f32_flat_t   \
         fc1_scratch{buffers->fc1_scratch.ptr};                                   \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t   \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_fc2_c_tmp_f32_flat_t   \
         fc2_scratch{buffers->fc2_scratch.ptr};                                   \
-    ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_locks_i32_flat_t       \
+    ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_Tensor_locks_i32_flat_t       \
         workspace{buffers->workspace.ptr};                                       \
-    return cute_dsl_ds4rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_wrapper(      \
+    return cute_dsl_ds41rt_ds4_pro_tp4_exl3_k2_prefill_m##M##_topk6_wrapper(      \
         &pro_prefill_m##M##_module, buffers->rotation_gate.ptr,                  \
         buffers->rotation_up.ptr, buffers->input.ptr,                            \
         buffers->w13_trellis.ptr, buffers->w2_trellis.ptr,                      \
@@ -696,20 +696,20 @@ using ProPrefillLaunchFn = int (*)(
         buffers->trellis_lut.ptr, buffers->trellis_lut.ptr,                      \
         static_cast<int32_t>(kExperts), static_cast<int32_t>(kExperts),          \
         static_cast<int32_t>(active_m),                                          \
-        DS4RT_DS4_PRO_EXL3_K2_PREFILL_M##M##_TOPK6_GRID_X, stream);              \
+        DS41RT_DS4_PRO_EXL3_K2_PREFILL_M##M##_TOPK6_GRID_X, stream);              \
   }
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(2)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(4)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(8)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(16)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(32)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(64)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(128)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(256)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(512)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(1024)
-DS4RT_DEFINE_PRO_PREFILL_LAUNCH(2048)
-#undef DS4RT_DEFINE_PRO_PREFILL_LAUNCH
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(2)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(4)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(8)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(16)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(32)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(64)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(128)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(256)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(512)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(1024)
+DS41RT_DEFINE_PRO_PREFILL_LAUNCH(2048)
+#undef DS41RT_DEFINE_PRO_PREFILL_LAUNCH
 
 ProPrefillLaunchFn prefill_launcher(size_t capacity_rows) {
   switch (capacity_rows) {
@@ -742,31 +742,31 @@ ProPrefillLaunchFn prefill_launcher(size_t capacity_rows) {
 
 } // namespace
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_pro_spark_aot_available(int *out_available) {
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_pro_spark_aot_available(int *out_available) {
   if (out_available == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_available = 1;
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_spark_aot_init(void) {
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_pro_spark_aot_init(void) {
   std::call_once(pro_module_init_once,
                  initialize_pro_modules_on_current_device);
   return pro_module_init_status;
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_pro_shared_expert_fp8_bf16_async(
-    const ds4rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_pro_shared_expert_fp8_bf16_async(
+    const ds41rt_ds4_flash_shared_expert_fp8_buffers_t *buffers, size_t rows,
     void *cuda_stream) {
-  const ds4rt_status_t valid = validate_shared_buffers(buffers, rows);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_shared_buffers(buffers, rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_pro_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_pro_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
@@ -802,9 +802,9 @@ ds4rt_cuda_ds4_pro_shared_expert_fp8_bf16_async(
           static_cast<int32_t>(chunk_rows), stream);
     }
     if (gate_status != 0 || up_status != 0) {
-      ds4rt_set_last_error_message(
+      ds41rt_set_last_error_message(
           "DeepSeek-V4-Pro shared expert up-projection AOT launch failed");
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
     constexpr size_t kThreads = 256;
     const size_t values = chunk_rows * kSharedIntermediate;
@@ -826,24 +826,24 @@ ds4rt_cuda_ds4_pro_shared_expert_fp8_bf16_async(
           static_cast<int32_t>(chunk_rows), stream);
     }
     if (down_status != 0) {
-      ds4rt_set_last_error_message(
+      ds41rt_set_last_error_message(
           "DeepSeek-V4-Pro shared expert down-projection AOT launch failed");
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
   }
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_ds4_pro_shared_expert_fp8_prefill_bf16_async(
-    const ds4rt_ds4_pro_shared_expert_fp8_prefill_buffers_t *buffers,
+extern "C" ds41rt_status_t
+ds41rt_cuda_ds4_pro_shared_expert_fp8_prefill_bf16_async(
+    const ds41rt_ds4_pro_shared_expert_fp8_prefill_buffers_t *buffers,
     size_t rows, void *cuda_stream) {
-  const ds4rt_status_t valid = validate_pro_prefill_buffers(buffers, rows);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_pro_prefill_buffers(buffers, rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_pro_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_pro_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
@@ -853,9 +853,9 @@ ds4rt_cuda_ds4_pro_shared_expert_fp8_prefill_bf16_async(
   const int32_t activated_grid =
       mxfp8_quant_grid_x(rows, kSharedIntermediate);
   if (input_grid <= 0 || activated_grid <= 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro shared expert could not resolve quantizer grid");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
 
   int status = launch_pro_shared_input_quant_m2048(
@@ -863,9 +863,9 @@ ds4rt_cuda_ds4_pro_shared_expert_fp8_prefill_bf16_async(
       buffers->input_q_scale_rows.ptr, buffers->input_q_scale_mma.ptr,
       live_rows, input_grid, stream);
   if (status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro shared expert input quantization AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   status = launch_pro_shared_up_m2048(
       buffers->input_q_values.ptr, buffers->input_q_scale_mma.ptr,
@@ -876,9 +876,9 @@ ds4rt_cuda_ds4_pro_shared_expert_fp8_prefill_bf16_async(
       buffers->base.w3_weight.ptr, buffers->base.w3_scale_mma.ptr,
       buffers->base.up.ptr, buffers->base.alpha.ptr, live_rows, stream);
   if (status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro shared expert full-width up-projection AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
 
   constexpr size_t kThreads = 256;
@@ -899,31 +899,31 @@ ds4rt_cuda_ds4_pro_shared_expert_fp8_prefill_bf16_async(
       buffers->activated_q_scale_rows.ptr,
       buffers->activated_q_scale_mma.ptr, live_rows, activated_grid, stream);
   if (status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro shared expert activation quantization AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   status = launch_pro_shared_down_m2048(
       buffers->activated_q_values.ptr, buffers->activated_q_scale_mma.ptr,
       buffers->base.w2_weight.ptr, buffers->base.w2_scale_mma.ptr,
       buffers->base.output.ptr, buffers->base.alpha.ptr, live_rows, stream);
   if (status != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro shared expert full-width down-projection AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_spark_exl3_k2_decode_m1_async(
-    const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_pro_spark_exl3_k2_decode_m1_async(
+    const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers,
     void *cuda_stream) {
-  const ds4rt_status_t valid = validate_buffers(buffers, 1);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_buffers(buffers, 1);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_pro_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_pro_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
@@ -934,46 +934,46 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_spark_exl3_k2_decode_m1_async(
     return status_from_cuda(error);
   }
   if (launch_decode(buffers, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro Spark TP4 EXL3 K2 decode M1 AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (launch_topk6_sum(buffers, 1, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro Spark TP4 EXL3 K2 decode sum launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return ds4rt_cuda_f32_to_bf16_async(
+  return ds41rt_cuda_f32_to_bf16_async(
       static_cast<const float *>(buffers->output_f32.ptr),
       static_cast<uint16_t *>(buffers->output_bf16.ptr), kHidden, cuda_stream);
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_spark_exl3_k2_prefill_topk6_async(
-    const ds4rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers, size_t rows,
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_pro_spark_exl3_k2_prefill_topk6_async(
+    const ds41rt_ds4_pro_spark_exl3_k2_moe_buffers_t *buffers, size_t rows,
     void *cuda_stream) {
   size_t capacity_rows = 2;
   while (capacity_rows < rows && capacity_rows < kPrefillMaxRows) {
     capacity_rows *= 2;
   }
   if (rows < 2 || rows > capacity_rows) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const ProPrefillLaunchFn launcher = prefill_launcher(capacity_rows);
   if (launcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_buffers(buffers, capacity_rows);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_buffers(buffers, capacity_rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_ds4_pro_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_ds4_pro_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = pack_routes(buffers, rows, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = pack_routes(buffers, rows, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   cudaError_t error = cudaMemsetAsync(
@@ -982,16 +982,16 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_spark_exl3_k2_prefill_topk6_async(
     return status_from_cuda(error);
   }
   if (launcher(buffers, rows, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro Spark TP4 EXL3 K2 prefill AOT launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (launch_topk6_sum(buffers, rows, stream) != 0) {
-    ds4rt_set_last_error_message(
+    ds41rt_set_last_error_message(
         "DeepSeek-V4-Pro Spark TP4 EXL3 K2 prefill sum launch failed");
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return ds4rt_cuda_f32_to_bf16_async(
+  return ds41rt_cuda_f32_to_bf16_async(
       static_cast<const float *>(buffers->output_f32.ptr),
       static_cast<uint16_t *>(buffers->output_bf16.ptr), rows * kHidden,
       cuda_stream);

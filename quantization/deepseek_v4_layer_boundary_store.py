@@ -27,7 +27,7 @@ from gptqmodel.utils.exl3_projection_checkpoint import (
 from gptqmodel.utils.exl3_remote import validate_exl3_hessian_metrics
 
 
-BOUNDARY_SCHEMA = "ds4rt.deepseek-v4-layer-boundary"
+BOUNDARY_SCHEMA = "ds41rt.deepseek-v4-layer-boundary"
 BOUNDARY_SCHEMA_VERSION = 2
 BOUNDARY_CONTRACT = f"{BOUNDARY_SCHEMA}-v{BOUNDARY_SCHEMA_VERSION}"
 PAYLOAD_HASH_ALGORITHM = "xxh3-128"
@@ -636,7 +636,7 @@ class DeepSeekV4LayerBoundaryStore:
                     or not isinstance(route_evidence, dict)
                     or ledger_route_evidence != route_evidence
                     or route_evidence.get("schema")
-                    != "ds4rt.exl3-natural-route"
+                    != "ds41rt.exl3-natural-route"
                     or route_evidence.get("block_namespace") != "mtp"
                     or route_evidence.get("logical_layer") != logical_layer
                     or route_evidence.get("expert") != expert_index

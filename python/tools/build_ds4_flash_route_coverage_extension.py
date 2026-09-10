@@ -293,7 +293,7 @@ def build_extension(
         for record in extension_records
     )
     manifest = {
-        "schema": "ds4rt-flash-natural-route-coverage-extension-v1",
+        "schema": "ds41rt-flash-natural-route-coverage-extension-v1",
         "base_corpus": str(corpus_path.resolve()),
         "base_corpus_sha256": sha256_bytes(corpus_payload),
         "progress": str(progress_path.resolve()),

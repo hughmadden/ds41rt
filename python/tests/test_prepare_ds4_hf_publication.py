@@ -29,7 +29,7 @@ def make_snapshot(root: Path) -> Path:
         "quant_method": "exl3",
         "meta": {
             "fallback": None,
-            "ds4rt_error_ledger": {"path": "/internal/error-ledger.jsonl"},
+            "ds41rt_error_ledger": {"path": "/internal/error-ledger.jsonl"},
         },
     }
     write_json(root / "config.json", {"quantization_config": quantization})
@@ -58,7 +58,7 @@ def make_snapshot(root: Path) -> Path:
         "tokenizer_config.json",
     ):
         (root / name).write_text(f"{name}\n", encoding="utf-8")
-    (root / "ds4rt-gptqmodel-plan.json").write_text("internal\n", encoding="utf-8")
+    (root / "ds41rt-gptqmodel-plan.json").write_text("internal\n", encoding="utf-8")
     return root
 
 
@@ -76,7 +76,7 @@ def test_prepare_publication_has_only_standard_files_and_reuses_blobs(
 
     report = prepare_publication(snapshot, readme, output)
 
-    assert report["schema"] == "ds4rt-hf-standard-publication-v1"
+    assert report["schema"] == "ds41rt-hf-standard-publication-v1"
     assert report["files"] == 11
     assert report["shards"] == 2
     assert set(report["names"]) == {
@@ -92,7 +92,7 @@ def test_prepare_publication_has_only_standard_files_and_reuses_blobs(
         "tokenizer.json",
         "tokenizer_config.json",
     }
-    assert "ds4rt-gptqmodel-plan.json" not in report["names"]
+    assert "ds41rt-gptqmodel-plan.json" not in report["names"]
     assert os.stat(snapshot / "model-00001-of-00002.safetensors").st_ino == os.stat(
         output / "model-00001-of-00002.safetensors"
     ).st_ino
@@ -119,7 +119,7 @@ def test_standard_publication_can_be_staged_without_private_evidence(
     assert result["qualification"] == []
     assert result["files"] == 11
     assert (staged / "README.md").is_symlink()
-    assert not (staged / "ds4rt-gptqmodel-plan.json").exists()
+    assert not (staged / "ds41rt-gptqmodel-plan.json").exists()
 
 
 def test_prepare_publication_rejects_unindexed_shard_without_output(
@@ -154,8 +154,8 @@ def test_prepare_publication_compacts_exact_embedded_storage_map(tmp_path: Path)
         (output / "quantize_config.json").read_text(encoding="utf-8")
     )
     assert "tensor_storage" not in published["quantization_config"]
-    assert "ds4rt_error_ledger" not in published["quantization_config"]["meta"]
-    assert "ds4rt_error_ledger" not in published_external["meta"]
+    assert "ds41rt_error_ledger" not in published["quantization_config"]["meta"]
+    assert "ds41rt_error_ledger" not in published_external["meta"]
     assert published["quantization_config"]["bits"] == 2
     assert isinstance(published["quantization_config"]["bits"], int)
     assert published_external["bits"] == 2
@@ -189,13 +189,13 @@ def test_prepare_publication_preserves_portable_inline_mixed_policy(tmp_path: Pa
         "extra_bits": {"numerator": 1, "denominator": 5},
         "target_bpw": "11/5",
     }
-    config["quantization_config"]["meta"]["ds4rt_inline_mixed"] = policy
-    external["meta"]["ds4rt_inline_mixed"] = policy
+    config["quantization_config"]["meta"]["ds41rt_inline_mixed"] = policy
+    external["meta"]["ds41rt_inline_mixed"] = policy
     namespace_provenance = {"base": policy, "mtp": mtp_policy}
-    config["quantization_config"]["meta"]["ds4rt_error_ledger"] = {
+    config["quantization_config"]["meta"]["ds41rt_error_ledger"] = {
         "family_join": {"inline_mixed": namespace_provenance}
     }
-    external["meta"]["ds4rt_error_ledger"] = {
+    external["meta"]["ds41rt_error_ledger"] = {
         "family_join": {"inline_mixed": namespace_provenance}
     }
     write_json(snapshot / "config.json", config)
@@ -206,13 +206,13 @@ def test_prepare_publication_preserves_portable_inline_mixed_policy(tmp_path: Pa
 
     published = json.loads((output / "config.json").read_text(encoding="utf-8"))
     published_policy = published["quantization_config"]["meta"][
-        "ds4rt_inline_mixed"
+        "ds41rt_inline_mixed"
     ]
     assert published_policy["target_bpw"] == "21/10"
     assert published_policy["projection_ratio"] == {"w1": 3, "w3": 5, "w2": 8}
     assert "tier_plan_root" not in published_policy
     published_namespaces = published["quantization_config"]["meta"][
-        "ds4rt_inline_mixed_namespaces"
+        "ds41rt_inline_mixed_namespaces"
     ]
     assert published_namespaces["base"] == published_policy
     assert published_namespaces["mtp"]["target_bpw"] == "11/5"
@@ -223,8 +223,8 @@ def test_prepare_publication_rejects_invalid_inline_mixed_policy(tmp_path: Path)
     snapshot = make_snapshot(tmp_path / "snapshot")
     config = json.loads((snapshot / "config.json").read_text(encoding="utf-8"))
     external = json.loads((snapshot / "quantize_config.json").read_text(encoding="utf-8"))
-    config["quantization_config"]["meta"]["ds4rt_inline_mixed"] = "K2.1"
-    external["meta"]["ds4rt_inline_mixed"] = "K2.1"
+    config["quantization_config"]["meta"]["ds41rt_inline_mixed"] = "K2.1"
+    external["meta"]["ds41rt_inline_mixed"] = "K2.1"
     write_json(snapshot / "config.json", config)
     write_json(snapshot / "quantize_config.json", external)
 
@@ -275,7 +275,7 @@ def test_prepare_publication_rejects_pending_model_card(tmp_path: Path) -> None:
     readme = make_readme(tmp_path / "README.md")
     readme.write_text(
         readme.read_text(encoding="utf-8")
-        + "\n<!-- DS4RT_PUBLICATION_RESULTS_PENDING -->\n",
+        + "\n<!-- DS41RT_PUBLICATION_RESULTS_PENDING -->\n",
         encoding="utf-8",
     )
 

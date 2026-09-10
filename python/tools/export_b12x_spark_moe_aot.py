@@ -133,7 +133,7 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
         fused.compiled.export_to_c(
             str(output_dir),
             export_name,
-            f"ds4rt_b12x_{export_name}",
+            f"ds41rt_b12x_{export_name}",
         )
         persistent_grid = _w4a16_fused_persistent_grid_x(
             fused=fused,
@@ -155,10 +155,10 @@ def export_kernels(output_dir: Path, target_sms: int) -> None:
         macro = label.upper()
         config_lines.extend(
             [
-                f"#define DS4RT_B12X_W4A16_{macro}_GRID_X {persistent_grid}",
-                f"#define DS4RT_B12X_W4A16_{macro}_BLOCK_SIZE {block_size}",
-                f"#define DS4RT_B12X_W4A16_{macro}_PACKED_ROUTE_SLOTS {packed_route_slots}",
-                f"#define DS4RT_B12X_W4A16_{macro}_MAX_M_BLOCKS {max_m_blocks}",
+                f"#define DS41RT_B12X_W4A16_{macro}_GRID_X {persistent_grid}",
+                f"#define DS41RT_B12X_W4A16_{macro}_BLOCK_SIZE {block_size}",
+                f"#define DS41RT_B12X_W4A16_{macro}_PACKED_ROUTE_SLOTS {packed_route_slots}",
+                f"#define DS41RT_B12X_W4A16_{macro}_MAX_M_BLOCKS {max_m_blocks}",
             ]
         )
         metadata_lines.append(

@@ -881,26 +881,26 @@ __global__ void logits_sample_topk_topp_f32_cub_finalize_kernel(
   out_scores[row] = probs[selected_rank] / nucleus_mass;
 }
 
-ds4rt_status_t validate_lm_head_argmax_bf16_args(const uint16_t* hidden, const uint16_t* lm_head,
+ds41rt_status_t validate_lm_head_argmax_bf16_args(const uint16_t* hidden, const uint16_t* lm_head,
                                                  const uint32_t* out_indices,
                                                  const float* out_scores, size_t rows,
                                                  size_t hidden_dim, size_t vocab) {
   if (hidden == nullptr || lm_head == nullptr || out_indices == nullptr || out_scores == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden_dim == 0 || vocab == 0 ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       vocab > static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden_dim, &ignored) || !checked_mul(vocab, hidden_dim, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_dspark_terminal_greedy_bf16_args(
+ds41rt_status_t validate_dspark_terminal_greedy_bf16_args(
     const uint16_t* normalized_hidden_by_slot,
     const uint16_t* collapsed_hidden_by_slot, const uint16_t* shared_head,
     const uint16_t* markov_w1, const uint16_t* markov_w2,
@@ -922,7 +922,7 @@ ds4rt_status_t validate_dspark_terminal_greedy_bf16_args(
       markov_rank == 0 ||
       active_requests > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       vocab > static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(max_slots, kDsparkProposalTokens, &ignored) ||
@@ -938,34 +938,34 @@ ds4rt_status_t validate_dspark_terminal_greedy_bf16_args(
       !checked_mul(active_requests, vocab, &ignored) ||
       !checked_mul(active_requests, kDsparkProposalTokens + 1, &ignored) ||
       !checked_add(hidden_dim, markov_rank, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_lm_head_sample_topk_topp_bf16_args(
+ds41rt_status_t validate_lm_head_sample_topk_topp_bf16_args(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     const uint32_t* out_indices, const float* out_scores, size_t rows, size_t hidden_dim,
     size_t vocab, float temperature, size_t top_k, float top_p) {
   if (hidden == nullptr || lm_head == nullptr || random_uniforms == nullptr ||
       out_indices == nullptr || out_scores == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden_dim == 0 || vocab == 0 ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       vocab > static_cast<size_t>(std::numeric_limits<uint32_t>::max()) || top_k == 0 ||
       top_k > vocab || top_k > kMaxSampleTopK || temperature <= 0.0f ||
       !std::isfinite(temperature) || top_p <= 0.0f || top_p > 1.0f || !std::isfinite(top_p)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden_dim, &ignored) || !checked_mul(vocab, hidden_dim, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_lm_head_argmax_sample_topk_topp_bf16_staged_args(
+ds41rt_status_t validate_lm_head_argmax_sample_topk_topp_bf16_staged_args(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     const uint32_t* out_argmax_indices, const float* out_argmax_scores,
     const uint32_t* out_sample_indices, const float* out_sample_scores, const float* logits,
@@ -973,14 +973,14 @@ ds4rt_status_t validate_lm_head_argmax_sample_topk_topp_bf16_staged_args(
   if (hidden == nullptr || lm_head == nullptr || random_uniforms == nullptr ||
       out_argmax_indices == nullptr || out_argmax_scores == nullptr ||
       out_sample_indices == nullptr || out_sample_scores == nullptr || logits == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden_dim == 0 || vocab == 0 ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       vocab > static_cast<size_t>(std::numeric_limits<uint32_t>::max()) || top_k == 0 ||
       top_k > vocab || top_k > kMaxSampleTopK || temperature <= 0.0f ||
       !std::isfinite(temperature) || top_p <= 0.0f || top_p > 1.0f || !std::isfinite(top_p)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t hidden_values = 0;
   size_t weight_values = 0;
@@ -989,28 +989,28 @@ ds4rt_status_t validate_lm_head_argmax_sample_topk_topp_bf16_staged_args(
       !checked_mul(vocab, hidden_dim, &weight_values) ||
       !checked_mul(rows, vocab, &logits_values) ||
       logits_values > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_logits_argmax_args(const float* logits, const uint32_t* out_indices,
+ds41rt_status_t validate_logits_argmax_args(const float* logits, const uint32_t* out_indices,
                                            const float* out_scores, size_t rows, size_t vocab) {
   if (logits == nullptr || out_indices == nullptr || out_scores == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || vocab == 0 || rows > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       vocab > static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, vocab, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_logits_sample_topk_topp_args(const float* logits,
+ds41rt_status_t validate_logits_sample_topk_topp_args(const float* logits,
                                                      const float* random_uniforms,
                                                      const uint32_t* out_indices,
                                                      const float* out_scores, size_t rows,
@@ -1018,107 +1018,107 @@ ds4rt_status_t validate_logits_sample_topk_topp_args(const float* logits,
                                                      size_t top_k, float top_p) {
   if (logits == nullptr || random_uniforms == nullptr || out_indices == nullptr ||
       out_scores == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || vocab == 0 || rows > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       vocab > static_cast<size_t>(std::numeric_limits<uint32_t>::max()) || top_k == 0 ||
       top_k > vocab || top_k > kMaxSampleTopK || temperature <= 0.0f ||
       !std::isfinite(temperature) || top_p <= 0.0f || top_p > 1.0f || !std::isfinite(top_p)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, vocab, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_masked_logits_sample_topk_topp_candidate_args(
+ds41rt_status_t validate_masked_logits_sample_topk_topp_candidate_args(
     const float* logits, const uint32_t* token_bitmask, const float* random_uniforms,
     const uint32_t* out_indices, const float* out_scores, size_t rows, size_t vocab,
     size_t mask_words, float temperature, size_t top_k, float top_p) {
-  const ds4rt_status_t valid = validate_logits_sample_topk_topp_args(
+  const ds41rt_status_t valid = validate_logits_sample_topk_topp_args(
       logits, random_uniforms, out_indices, out_scores, rows, vocab, temperature, top_k, top_p
   );
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (token_bitmask == nullptr || top_k > kParallelSampleTopK || mask_words < (vocab + 31) / 32) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, mask_words, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_logits_sample_topk_topp_cub_args(
+ds41rt_status_t validate_logits_sample_topk_topp_cub_args(
     const float* logits, const float* random_uniforms, float* sorted_logits,
     uint32_t* unsorted_indices, uint32_t* sorted_indices, int* segment_offsets,
     uint32_t* out_indices, float* out_scores, void* cub_temp_storage,
     size_t cub_temp_storage_bytes, size_t rows, size_t vocab, float temperature, size_t top_k,
     float top_p) {
-  const ds4rt_status_t valid = validate_logits_sample_topk_topp_args(
+  const ds41rt_status_t valid = validate_logits_sample_topk_topp_args(
       logits, random_uniforms, out_indices, out_scores, rows, vocab, temperature, top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (sorted_logits == nullptr || unsorted_indices == nullptr || sorted_indices == nullptr ||
       segment_offsets == nullptr || cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t logits_values = 0;
   if (!checked_mul(rows, vocab, &logits_values) ||
       logits_values > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_lm_head_sample_topk_topp_bf16_cub_args(
+ds41rt_status_t validate_lm_head_sample_topk_topp_bf16_cub_args(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     float* logits_workspace, float* sorted_logits, uint32_t* unsorted_indices,
     uint32_t* sorted_indices, int* segment_offsets, uint32_t* out_indices, float* out_scores,
     void* cub_temp_storage, size_t cub_temp_storage_bytes, size_t rows, size_t hidden_dim,
     size_t vocab, float temperature, size_t top_k, float top_p) {
-  const ds4rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_args(
+  const ds41rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_args(
       hidden, lm_head, random_uniforms, out_indices, out_scores, rows, hidden_dim, vocab,
       temperature, top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (logits_workspace == nullptr || sorted_logits == nullptr || unsorted_indices == nullptr ||
       sorted_indices == nullptr || segment_offsets == nullptr || cub_temp_storage == nullptr ||
       cub_temp_storage_bytes == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t logits_values = 0;
   if (!checked_mul(rows, vocab, &logits_values) ||
       logits_values > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_bf16_graph_lm_head_argmax_buffers(
-    ds4rt_device_buffer_t hidden, ds4rt_device_buffer_t lm_head,
-    ds4rt_device_buffer_t out_indices, ds4rt_device_buffer_t out_scores, size_t rows,
+ds41rt_status_t validate_bf16_graph_lm_head_argmax_buffers(
+    ds41rt_device_buffer_t hidden, ds41rt_device_buffer_t lm_head,
+    ds41rt_device_buffer_t out_indices, ds41rt_device_buffer_t out_scores, size_t rows,
     size_t hidden_dim, size_t vocab) {
-  const ds4rt_status_t valid = validate_lm_head_argmax_bf16_args(
+  const ds41rt_status_t valid = validate_lm_head_argmax_bf16_args(
       static_cast<const uint16_t*>(hidden.ptr), static_cast<const uint16_t*>(lm_head.ptr),
       static_cast<const uint32_t*>(out_indices.ptr), static_cast<const float*>(out_scores.ptr),
       rows, hidden_dim, vocab);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t hidden_values = 0;
   size_t weight_values = 0;
   if (!checked_mul(rows, hidden_dim, &hidden_values) ||
       !checked_mul(vocab, hidden_dim, &weight_values)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t hidden_bytes = 0;
   size_t weight_bytes = 0;
@@ -1128,33 +1128,33 @@ ds4rt_status_t validate_bf16_graph_lm_head_argmax_buffers(
       !checked_mul(weight_values, sizeof(uint16_t), &weight_bytes) ||
       !checked_mul(rows, sizeof(uint32_t), &index_bytes) ||
       !checked_mul(rows, sizeof(float), &score_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (hidden.bytes < hidden_bytes || lm_head.bytes < weight_bytes ||
       out_indices.bytes < index_bytes || out_scores.bytes < score_bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_bf16_graph_lm_head_sample_topk_topp_buffers(
-    ds4rt_device_buffer_t hidden, ds4rt_device_buffer_t lm_head,
-    ds4rt_device_buffer_t random_uniforms, ds4rt_device_buffer_t out_indices,
-    ds4rt_device_buffer_t out_scores, size_t rows, size_t hidden_dim, size_t vocab,
+ds41rt_status_t validate_bf16_graph_lm_head_sample_topk_topp_buffers(
+    ds41rt_device_buffer_t hidden, ds41rt_device_buffer_t lm_head,
+    ds41rt_device_buffer_t random_uniforms, ds41rt_device_buffer_t out_indices,
+    ds41rt_device_buffer_t out_scores, size_t rows, size_t hidden_dim, size_t vocab,
     float temperature, size_t top_k, float top_p) {
-  const ds4rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_args(
+  const ds41rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_args(
       static_cast<const uint16_t*>(hidden.ptr), static_cast<const uint16_t*>(lm_head.ptr),
       static_cast<const float*>(random_uniforms.ptr), static_cast<const uint32_t*>(out_indices.ptr),
       static_cast<const float*>(out_scores.ptr), rows, hidden_dim, vocab, temperature, top_k,
       top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t hidden_values = 0;
   size_t weight_values = 0;
   if (!checked_mul(rows, hidden_dim, &hidden_values) ||
       !checked_mul(vocab, hidden_dim, &weight_values)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t hidden_bytes = 0;
   size_t weight_bytes = 0;
@@ -1166,45 +1166,45 @@ ds4rt_status_t validate_bf16_graph_lm_head_sample_topk_topp_buffers(
       !checked_mul(rows, sizeof(float), &random_bytes) ||
       !checked_mul(rows, sizeof(uint32_t), &index_bytes) ||
       !checked_mul(rows, sizeof(float), &score_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (hidden.bytes < hidden_bytes || lm_head.bytes < weight_bytes ||
       random_uniforms.bytes < random_bytes || out_indices.bytes < index_bytes ||
       out_scores.bytes < score_bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_lm_head_argmax_bf16_node(
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_lm_head_argmax_bf16_node(
     void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index,
-    ds4rt_device_buffer_t hidden, ds4rt_device_buffer_t lm_head,
-    ds4rt_device_buffer_t out_indices, ds4rt_device_buffer_t out_scores, size_t rows,
+    ds41rt_device_buffer_t hidden, ds41rt_device_buffer_t lm_head,
+    ds41rt_device_buffer_t out_indices, ds41rt_device_buffer_t out_scores, size_t rows,
     size_t hidden_dim, size_t vocab) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_bf16_graph_lm_head_argmax_buffers(
+  const ds41rt_status_t valid = validate_bf16_graph_lm_head_argmax_buffers(
       hidden, lm_head, out_indices, out_scores, rows, hidden_dim, vocab);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
   cudaGraphNode_t node = nullptr;
-  const ds4rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
-  if (node_status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
+  if (node_status != DS41RT_STATUS_OK) {
     return node_status;
   }
 
   cudaKernelNodeParams existing = {};
   cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (existing.func != reinterpret_cast<void*>(lm_head_argmax_bf16_kernel)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   const uint16_t* hidden_ptr = static_cast<const uint16_t*>(hidden.ptr);
@@ -1231,45 +1231,45 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_lm_head_argmax_bf16_node(
 
   err = cudaGraphKernelNodeSetParams(node, &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec), node,
                                          &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_lm_head_sample_topk_topp_bf16_node(
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_lm_head_sample_topk_topp_bf16_node(
     void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index,
-    ds4rt_device_buffer_t hidden, ds4rt_device_buffer_t lm_head,
-    ds4rt_device_buffer_t random_uniforms, ds4rt_device_buffer_t out_indices,
-    ds4rt_device_buffer_t out_scores, size_t rows, size_t hidden_dim, size_t vocab,
+    ds41rt_device_buffer_t hidden, ds41rt_device_buffer_t lm_head,
+    ds41rt_device_buffer_t random_uniforms, ds41rt_device_buffer_t out_indices,
+    ds41rt_device_buffer_t out_scores, size_t rows, size_t hidden_dim, size_t vocab,
     float temperature, size_t top_k, float top_p) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_bf16_graph_lm_head_sample_topk_topp_buffers(
+  const ds41rt_status_t valid = validate_bf16_graph_lm_head_sample_topk_topp_buffers(
       hidden, lm_head, random_uniforms, out_indices, out_scores, rows, hidden_dim, vocab,
       temperature, top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
   cudaGraphNode_t node = nullptr;
-  const ds4rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
-  if (node_status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
+  if (node_status != DS41RT_STATUS_OK) {
     return node_status;
   }
 
   cudaKernelNodeParams existing = {};
   cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (existing.func != reinterpret_cast<void*>(lm_head_sample_topk_topp_bf16_kernel)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   const uint16_t* hidden_ptr = static_cast<const uint16_t*>(hidden.ptr);
@@ -1301,22 +1301,22 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_lm_head_sample_topk_topp_bf16_
 
   err = cudaGraphKernelNodeSetParams(node, &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec), node,
                                          &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_argmax_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_argmax_bf16_async(
     const uint16_t* hidden, const uint16_t* lm_head, uint32_t* out_indices, float* out_scores,
     size_t rows, size_t hidden_dim, size_t vocab, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_lm_head_argmax_bf16_args(
+  const ds41rt_status_t valid = validate_lm_head_argmax_bf16_args(
       hidden, lm_head, out_indices, out_scores, rows, hidden_dim, vocab);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1325,25 +1325,25 @@ extern "C" ds4rt_status_t ds4rt_cuda_lm_head_argmax_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_argmax_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_argmax_bf16(
     const uint16_t* hidden, const uint16_t* lm_head, uint32_t* out_indices, float* out_scores,
     size_t rows, size_t hidden_dim, size_t vocab) {
-  const ds4rt_status_t status = ds4rt_cuda_lm_head_argmax_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_lm_head_argmax_bf16_async(
       hidden, lm_head, out_indices, out_scores, rows, hidden_dim, vocab, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_sample_topk_topp_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_sample_topk_topp_bf16_async(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     uint32_t* out_indices, float* out_scores, size_t rows, size_t hidden_dim, size_t vocab,
     float temperature, size_t top_k, float top_p, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_args(
+  const ds41rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_args(
       hidden, lm_head, random_uniforms, out_indices, out_scores, rows, hidden_dim, vocab,
       temperature, top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1359,28 +1359,28 @@ extern "C" ds4rt_status_t ds4rt_cuda_lm_head_sample_topk_topp_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_sample_topk_topp_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_sample_topk_topp_bf16(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     uint32_t* out_indices, float* out_scores, size_t rows, size_t hidden_dim, size_t vocab,
     float temperature, size_t top_k, float top_p) {
-  const ds4rt_status_t status = ds4rt_cuda_lm_head_sample_topk_topp_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_lm_head_sample_topk_topp_bf16_async(
       hidden, lm_head, random_uniforms, out_indices, out_scores, rows, hidden_dim, vocab,
       temperature, top_k, top_p, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_argmax_sample_topk_topp_bf16_staged_async(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_argmax_sample_topk_topp_bf16_staged_async(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     uint32_t* out_argmax_indices, float* out_argmax_scores, uint32_t* out_sample_indices,
     float* out_sample_scores, float* logits_workspace, size_t rows, size_t hidden_dim,
     size_t vocab, float temperature, size_t top_k, float top_p, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_lm_head_argmax_sample_topk_topp_bf16_staged_args(
+  const ds41rt_status_t valid = validate_lm_head_argmax_sample_topk_topp_bf16_staged_args(
       hidden, lm_head, random_uniforms, out_argmax_indices, out_argmax_scores, out_sample_indices,
       out_sample_scores, logits_workspace, rows, hidden_dim, vocab, temperature, top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1396,74 +1396,74 @@ extern "C" ds4rt_status_t ds4rt_cuda_lm_head_argmax_sample_topk_topp_bf16_staged
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_argmax_sample_topk_topp_bf16_staged(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_argmax_sample_topk_topp_bf16_staged(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     uint32_t* out_argmax_indices, float* out_argmax_scores, uint32_t* out_sample_indices,
     float* out_sample_scores, float* logits_workspace, size_t rows, size_t hidden_dim,
     size_t vocab, float temperature, size_t top_k, float top_p) {
-  const ds4rt_status_t status = ds4rt_cuda_lm_head_argmax_sample_topk_topp_bf16_staged_async(
+  const ds41rt_status_t status = ds41rt_cuda_lm_head_argmax_sample_topk_topp_bf16_staged_async(
       hidden, lm_head, random_uniforms, out_argmax_indices, out_argmax_scores, out_sample_indices,
       out_sample_scores, logits_workspace, rows, hidden_dim, vocab, temperature, top_k, top_p,
       nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_sample_topk_topp_bf16_cub_async(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_sample_topk_topp_bf16_cub_async(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     float* logits_workspace, float* sorted_logits, uint32_t* unsorted_indices,
     uint32_t* sorted_indices, int* segment_offsets, uint32_t* out_indices, float* out_scores,
     void* cub_temp_storage, size_t cub_temp_storage_bytes, size_t rows, size_t hidden_dim,
     size_t vocab, float temperature, size_t top_k, float top_p, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_cub_args(
+  const ds41rt_status_t valid = validate_lm_head_sample_topk_topp_bf16_cub_args(
       hidden, lm_head, random_uniforms, logits_workspace, sorted_logits, unsorted_indices,
       sorted_indices, segment_offsets, out_indices, out_scores, cub_temp_storage,
       cub_temp_storage_bytes, rows, hidden_dim, vocab, temperature, top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t logits_values = 0;
   if (!checked_mul(rows, vocab, &logits_values) ||
       logits_values > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   lm_head_logits_bf16_kernel<<<static_cast<int>(logits_values), kBlock, 0, stream>>>(
       hidden, lm_head, logits_workspace, rows, hidden_dim, vocab);
-  ds4rt_status_t status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = status_from_cuda(cudaGetLastError());
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
-  return ds4rt_cuda_logits_sample_topk_topp_f32_cub_async(
+  return ds41rt_cuda_logits_sample_topk_topp_f32_cub_async(
       logits_workspace, random_uniforms, sorted_logits, unsorted_indices, sorted_indices,
       segment_offsets, out_indices, out_scores, cub_temp_storage, cub_temp_storage_bytes, rows,
       vocab, temperature, top_k, top_p, cuda_stream);
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_lm_head_sample_topk_topp_bf16_cub(
+extern "C" ds41rt_status_t ds41rt_cuda_lm_head_sample_topk_topp_bf16_cub(
     const uint16_t* hidden, const uint16_t* lm_head, const float* random_uniforms,
     float* logits_workspace, float* sorted_logits, uint32_t* unsorted_indices,
     uint32_t* sorted_indices, int* segment_offsets, uint32_t* out_indices, float* out_scores,
     void* cub_temp_storage, size_t cub_temp_storage_bytes, size_t rows, size_t hidden_dim,
     size_t vocab, float temperature, size_t top_k, float top_p) {
-  const ds4rt_status_t status = ds4rt_cuda_lm_head_sample_topk_topp_bf16_cub_async(
+  const ds41rt_status_t status = ds41rt_cuda_lm_head_sample_topk_topp_bf16_cub_async(
       hidden, lm_head, random_uniforms, logits_workspace, sorted_logits, unsorted_indices,
       sorted_indices, segment_offsets, out_indices, out_scores, cub_temp_storage,
       cub_temp_storage_bytes, rows, hidden_dim, vocab, temperature, top_k, top_p, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_logits_argmax_f32_async(
+extern "C" ds41rt_status_t ds41rt_cuda_logits_argmax_f32_async(
     const float* logits, uint32_t* out_indices, float* out_scores, size_t rows, size_t vocab,
     void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_logits_argmax_args(logits, out_indices, out_scores, rows, vocab);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1472,18 +1472,18 @@ extern "C" ds4rt_status_t ds4rt_cuda_logits_argmax_f32_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_logits_argmax_f32(const float* logits,
+extern "C" ds41rt_status_t ds41rt_cuda_logits_argmax_f32(const float* logits,
                                                        uint32_t* out_indices, float* out_scores,
                                                        size_t rows, size_t vocab) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_logits_argmax_f32_async(logits, out_indices, out_scores, rows, vocab, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t status =
+      ds41rt_cuda_logits_argmax_f32_async(logits, out_indices, out_scores, rows, vocab, nullptr);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_dspark_terminal_greedy_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_dspark_terminal_greedy_bf16_async(
     const uint16_t* normalized_hidden_by_slot,
     const uint16_t* collapsed_hidden_by_slot, const uint16_t* shared_head,
     const uint16_t* markov_w1, const uint16_t* markov_w2,
@@ -1493,14 +1493,14 @@ extern "C" ds4rt_status_t ds4rt_cuda_dspark_terminal_greedy_bf16_async(
     uint32_t* output_token_ids, float* conditional_confidence,
     size_t active_requests, size_t max_slots, size_t hidden_dim, size_t vocab,
     size_t markov_rank, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_dspark_terminal_greedy_bf16_args(
+  const ds41rt_status_t valid = validate_dspark_terminal_greedy_bf16_args(
       normalized_hidden_by_slot, collapsed_hidden_by_slot, shared_head,
       markov_w1, markov_w2, confidence_weight, active_slot_ids,
       anchor_token_ids, compact_normalized_hidden, shared_logits,
       markov_embeddings, markov_logits, output_token_ids,
       conditional_confidence, active_requests, max_slots, hidden_dim, vocab,
       markov_rank);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1515,28 +1515,28 @@ extern "C" ds4rt_status_t ds4rt_cuda_dspark_terminal_greedy_bf16_async(
       request_blocks > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       markov_blocks > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       compact_rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   dspark_gather_normalized_bf16_kernel<<<static_cast<int>(hidden_blocks),
       threads, 0, stream>>>(normalized_hidden_by_slot, active_slot_ids,
                            compact_normalized_hidden, active_requests,
                            max_slots, hidden_dim);
-  ds4rt_status_t status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = status_from_cuda(cudaGetLastError());
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   dspark_initialize_anchor_tokens_kernel<<<static_cast<int>(request_blocks),
       threads, 0, stream>>>(anchor_token_ids, output_token_ids,
                            active_requests);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
-  status = ds4rt_cuda_linear_bf16_f32_cublas_async(
+  status = ds41rt_cuda_linear_bf16_f32_cublas_async(
       compact_normalized_hidden, shared_head, shared_logits, compact_rows,
       hidden_dim, vocab, cuda_stream);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
 
@@ -1549,15 +1549,15 @@ extern "C" ds4rt_status_t ds4rt_cuda_dspark_terminal_greedy_bf16_async(
         markov_w1, output_token_ids, markov_embeddings, active_requests,
         vocab, markov_rank, position);
     status = status_from_cuda(cudaGetLastError());
-    if (status != DS4RT_STATUS_OK) {
+    if (status != DS41RT_STATUS_OK) {
       return status;
     }
     const uint16_t* position_embedding =
         markov_embeddings + position * active_requests * markov_rank;
-    status = ds4rt_cuda_linear_bf16_f32_cublas_async(
+    status = ds41rt_cuda_linear_bf16_f32_cublas_async(
         position_embedding, markov_w2, markov_logits, active_requests,
         markov_rank, vocab, cuda_stream);
-    if (status != DS4RT_STATUS_OK) {
+    if (status != DS41RT_STATUS_OK) {
       return status;
     }
     dspark_add_markov_argmax_f32_kernel<<<static_cast<int>(active_requests),
@@ -1565,7 +1565,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_dspark_terminal_greedy_bf16_async(
                              output_token_ids, active_requests, vocab,
                              position);
     status = status_from_cuda(cudaGetLastError());
-    if (status != DS4RT_STATUS_OK) {
+    if (status != DS41RT_STATUS_OK) {
       return status;
     }
   }
@@ -1577,12 +1577,12 @@ extern "C" ds4rt_status_t ds4rt_cuda_dspark_terminal_greedy_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_logits_sample_topk_topp_f32_async(
+extern "C" ds41rt_status_t ds41rt_cuda_logits_sample_topk_topp_f32_async(
     const float* logits, const float* random_uniforms, uint32_t* out_indices, float* out_scores,
     size_t rows, size_t vocab, float temperature, size_t top_k, float top_p, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_logits_sample_topk_topp_args(
+  const ds41rt_status_t valid = validate_logits_sample_topk_topp_args(
       logits, random_uniforms, out_indices, out_scores, rows, vocab, temperature, top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1591,44 +1591,44 @@ extern "C" ds4rt_status_t ds4rt_cuda_logits_sample_topk_topp_f32_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_logits_sample_topk_topp_f32(
+extern "C" ds41rt_status_t ds41rt_cuda_logits_sample_topk_topp_f32(
     const float* logits, const float* random_uniforms, uint32_t* out_indices, float* out_scores,
     size_t rows, size_t vocab, float temperature, size_t top_k, float top_p) {
-  const ds4rt_status_t status = ds4rt_cuda_logits_sample_topk_topp_f32_async(
+  const ds41rt_status_t status = ds41rt_cuda_logits_sample_topk_topp_f32_async(
       logits, random_uniforms, out_indices, out_scores, rows, vocab, temperature, top_k, top_p,
       nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_logits_apply_bitmask_sample_topk_topp_f32_candidate_async(
+extern "C" ds41rt_status_t
+ds41rt_cuda_logits_apply_bitmask_sample_topk_topp_f32_candidate_async(
     const float* logits, const uint32_t* token_bitmask, const float* random_uniforms,
     float* masked_logits, uint32_t* out_indices, float* out_scores, size_t rows, size_t vocab,
     size_t mask_words, float temperature, size_t top_k, float top_p, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_masked_logits_sample_topk_topp_candidate_args(
+  const ds41rt_status_t valid = validate_masked_logits_sample_topk_topp_candidate_args(
       logits, token_bitmask, random_uniforms, out_indices, out_scores, rows, vocab, mask_words,
       temperature, top_k, top_p
   );
-  if (valid != DS4RT_STATUS_OK || masked_logits == nullptr) {
-    return valid == DS4RT_STATUS_OK ? DS4RT_STATUS_INVALID_ARGUMENT : valid;
+  if (valid != DS41RT_STATUS_OK || masked_logits == nullptr) {
+    return valid == DS41RT_STATUS_OK ? DS41RT_STATUS_INVALID_ARGUMENT : valid;
   }
   size_t values = 0;
   if (!checked_mul(rows, vocab, &values)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t blocks = (values + kBlock - 1) / kBlock;
   if (blocks > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   apply_token_bitmask_f32_candidate_kernel<<<static_cast<unsigned int>(blocks), kBlock, 0, stream>>>(
       logits, token_bitmask, masked_logits, rows, vocab, mask_words
   );
-  ds4rt_status_t status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = status_from_cuda(cudaGetLastError());
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   logits_sample_topk_topp_f32_kernel<<<static_cast<unsigned int>(rows), 1, 0, stream>>>(
@@ -1638,23 +1638,23 @@ ds4rt_cuda_logits_apply_bitmask_sample_topk_topp_f32_candidate_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_logits_masked_sample_topk_topp_f32_grid_candidate_async(
+extern "C" ds41rt_status_t ds41rt_cuda_logits_masked_sample_topk_topp_f32_grid_candidate_async(
     const float* logits, const uint32_t* token_bitmask, const float* random_uniforms,
     uint64_t* partial_keys, uint32_t* out_indices, float* out_scores, size_t rows, size_t vocab,
     size_t mask_words, size_t blocks_per_row, float temperature, size_t top_k, float top_p,
     void* cuda_stream) {
-  const ds4rt_status_t valid = validate_masked_logits_sample_topk_topp_candidate_args(
+  const ds41rt_status_t valid = validate_masked_logits_sample_topk_topp_candidate_args(
       logits, token_bitmask, random_uniforms, out_indices, out_scores, rows, vocab, mask_words,
       temperature, top_k, top_p
   );
-  if (valid != DS4RT_STATUS_OK || partial_keys == nullptr || blocks_per_row == 0 ||
+  if (valid != DS41RT_STATUS_OK || partial_keys == nullptr || blocks_per_row == 0 ||
       blocks_per_row > kBlock) {
-    return valid == DS4RT_STATUS_OK ? DS4RT_STATUS_INVALID_ARGUMENT : valid;
+    return valid == DS41RT_STATUS_OK ? DS41RT_STATUS_INVALID_ARGUMENT : valid;
   }
   size_t total_blocks = 0;
   if (!checked_mul(rows, blocks_per_row, &total_blocks) ||
       total_blocks > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   if (top_k == 1) {
@@ -1662,8 +1662,8 @@ extern "C" ds4rt_status_t ds4rt_cuda_logits_masked_sample_topk_topp_f32_grid_can
         static_cast<unsigned int>(total_blocks), kBlock, 0, stream>>>(
         logits, token_bitmask, partial_keys, rows, vocab, mask_words, blocks_per_row
     );
-    ds4rt_status_t status = status_from_cuda(cudaGetLastError());
-    if (status != DS4RT_STATUS_OK) {
+    ds41rt_status_t status = status_from_cuda(cudaGetLastError());
+    if (status != DS41RT_STATUS_OK) {
       return status;
     }
     masked_logits_argmax_finalize_f32_candidate_kernel<<<static_cast<unsigned int>(rows), kBlock,
@@ -1675,8 +1675,8 @@ extern "C" ds4rt_status_t ds4rt_cuda_logits_masked_sample_topk_topp_f32_grid_can
                                                       kBlock, 0, stream>>>(
         logits, token_bitmask, partial_keys, rows, vocab, mask_words, blocks_per_row
     );
-    ds4rt_status_t status = status_from_cuda(cudaGetLastError());
-    if (status != DS4RT_STATUS_OK) {
+    ds41rt_status_t status = status_from_cuda(cudaGetLastError());
+    if (status != DS41RT_STATUS_OK) {
       return status;
     }
     masked_logits_topk_finalize_f32_candidate_kernel<<<static_cast<unsigned int>(rows), kBlock, 0,
@@ -1688,17 +1688,17 @@ extern "C" ds4rt_status_t ds4rt_cuda_logits_masked_sample_topk_topp_f32_grid_can
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_logits_sample_topk_topp_f32_cub_async(
+extern "C" ds41rt_status_t ds41rt_cuda_logits_sample_topk_topp_f32_cub_async(
     const float* logits, const float* random_uniforms, float* sorted_logits,
     uint32_t* unsorted_indices, uint32_t* sorted_indices, int* segment_offsets,
     uint32_t* out_indices, float* out_scores, void* cub_temp_storage,
     size_t cub_temp_storage_bytes, size_t rows, size_t vocab, float temperature, size_t top_k,
     float top_p, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_logits_sample_topk_topp_cub_args(
+  const ds41rt_status_t valid = validate_logits_sample_topk_topp_cub_args(
       logits, random_uniforms, sorted_logits, unsorted_indices, sorted_indices, segment_offsets,
       out_indices, out_scores, cub_temp_storage, cub_temp_storage_bytes, rows, vocab, temperature,
       top_k, top_p);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1706,7 +1706,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_logits_sample_topk_topp_f32_cub_async(
   const size_t fill_values = std::max(logits_values, rows + 1);
   const size_t fill_blocks = (fill_values - 1) / kBlock + 1;
   if (fill_blocks > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   logits_sample_topk_topp_f32_cub_fill_indices_offsets_kernel<<<
       static_cast<unsigned int>(fill_blocks), kBlock, 0, stream>>>(unsorted_indices,
@@ -1729,17 +1729,17 @@ extern "C" ds4rt_status_t ds4rt_cuda_logits_sample_topk_topp_f32_cub_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_logits_sample_topk_topp_f32_cub(
+extern "C" ds41rt_status_t ds41rt_cuda_logits_sample_topk_topp_f32_cub(
     const float* logits, const float* random_uniforms, float* sorted_logits,
     uint32_t* unsorted_indices, uint32_t* sorted_indices, int* segment_offsets,
     uint32_t* out_indices, float* out_scores, void* cub_temp_storage,
     size_t cub_temp_storage_bytes, size_t rows, size_t vocab, float temperature, size_t top_k,
     float top_p) {
-  const ds4rt_status_t status = ds4rt_cuda_logits_sample_topk_topp_f32_cub_async(
+  const ds41rt_status_t status = ds41rt_cuda_logits_sample_topk_topp_f32_cub_async(
       logits, random_uniforms, sorted_logits, unsorted_indices, sorted_indices, segment_offsets,
       out_indices, out_scores, cub_temp_storage, cub_temp_storage_bytes, rows, vocab, temperature,
       top_k, top_p, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));

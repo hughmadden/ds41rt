@@ -10,7 +10,7 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 import torch
 
-from ds4rt_runtime.exl3_quantizer import (
+from ds41rt_runtime.exl3_quantizer import (
     ACTIVATION_CORPUS_SCHEMA,
     EXL3_ACTIVATION_RECIPE,
     EXL3_RECIPE,
@@ -524,7 +524,7 @@ def test_streaming_writer_publishes_standard_hybrid_hf_snapshot(tmp_path: Path) 
     evidence.chmod(0o600)
     writer.finish(
         {
-            "schema": "ds4rt-exl3-calibration-report-v1",
+            "schema": "ds41rt-exl3-calibration-report-v1",
             "recipe": EXL3_RECIPE,
             "layers": [],
         },
@@ -532,7 +532,7 @@ def test_streaming_writer_publishes_standard_hybrid_hf_snapshot(tmp_path: Path) 
     )
 
     config = json.loads((output / "config.json").read_text(encoding="utf-8"))
-    assert config["quantization_config"]["ds4rt"]["recipe"] == EXL3_RECIPE
+    assert config["quantization_config"]["ds41rt"]["recipe"] == EXL3_RECIPE
     calibration = config["quantization_config"]["calibration"]
     assert calibration["method"] == "layerwise_simulated_isotropic"
     assert calibration["hessian"] == "analytic_identity"
@@ -555,9 +555,9 @@ def test_streaming_writer_publishes_standard_hybrid_hf_snapshot(tmp_path: Path) 
     trellis_name = "layers.0.ffn.experts.0.w1.trellis"
     with safe_open(output / index[trellis_name], framework="pt") as shard:
         assert tuple(shard.get_tensor(trellis_name).shape) == (8, 32, 32)
-    assert not (output / ".ds4rt-exl3-state.json").exists()
+    assert not (output / ".ds41rt-exl3-state.json").exists()
     integrity = json.loads(
-        (output / "ds4rt-exl3-retained-native.json").read_text(encoding="utf-8")
+        (output / "ds41rt-exl3-retained-native.json").read_text(encoding="utf-8")
     )
     assert integrity["quantization_scope"] == "routed_experts_only"
     assert integrity["retained_tensor_count"] == 1
@@ -603,7 +603,7 @@ def test_streaming_writer_finish_reenters_after_metadata_rename(
 
     assert (output / "config.json").is_file()
     assert (output / "model.safetensors.index.json").is_file()
-    assert not (output / ".ds4rt-exl3-state.json").exists()
+    assert not (output / ".ds41rt-exl3-state.json").exists()
 
 
 def test_retained_native_integrity_rejects_changed_bytes(tmp_path: Path) -> None:
@@ -923,8 +923,8 @@ def test_activation_recipe_metadata_is_distinct_and_model_bound() -> None:
         },
     )
 
-    assert config["ds4rt"]["recipe"] == EXL3_ACTIVATION_RECIPE
-    assert config["ds4rt"]["recipe"] != EXL3_RECIPE
+    assert config["ds41rt"]["recipe"] == EXL3_ACTIVATION_RECIPE
+    assert config["ds41rt"]["recipe"] != EXL3_RECIPE
     assert config["calibration"]["activation_corpus_sha256"] == "a" * 64
     assert config["calibration"]["gate_clamp"] == [None, 10.0]
 
@@ -956,7 +956,7 @@ def test_resume_rejects_pre_clamp_calibration_report(tmp_path: Path) -> None:
         seed=7,
     )
     old_report = {
-        "schema": "ds4rt-exl3-calibration-report-v1",
+        "schema": "ds41rt-exl3-calibration-report-v1",
         "recipe": EXL3_RECIPE,
         "source_snapshot": str(plan.snapshot),
         "calibration_rows": 128,
@@ -985,7 +985,7 @@ def test_resume_clears_previous_development_stop_marker(tmp_path: Path) -> None:
         seed=7,
     )
     template = {
-        "schema": "ds4rt-exl3-calibration-report-v1",
+        "schema": "ds41rt-exl3-calibration-report-v1",
         "recipe": EXL3_RECIPE,
         "source_snapshot": str(plan.snapshot),
         "calibration_rows": 128,
@@ -1014,7 +1014,7 @@ def test_resume_rejects_changed_hessian_recipe(tmp_path: Path) -> None:
         seed=7,
     )
     template = {
-        "schema": "ds4rt-exl3-calibration-report-v1",
+        "schema": "ds41rt-exl3-calibration-report-v1",
         "recipe": EXL3_RECIPE,
         "source_snapshot": str(plan.snapshot),
         "calibration_rows": 128,

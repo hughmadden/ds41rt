@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit one completed DS4RT EXL3 block directly from live projection checkpoints."""
+"""Audit one completed DS41RT EXL3 block directly from live projection checkpoints."""
 
 from __future__ import annotations
 
@@ -49,8 +49,8 @@ from gptqmodel.utils.exl3_inline_mixed import (
 import quantize_flash_gptqmodel as launcher
 
 
-AUDIT_SCHEMA = "ds4rt-exl3-live-projection-block-audit-v1"
-TP4_RESIDENCY_SCHEMA = "ds4rt-exl3-runtime-tp4-residency-v1"
+AUDIT_SCHEMA = "ds41rt-exl3-live-projection-block-audit-v1"
+TP4_RESIDENCY_SCHEMA = "ds41rt-exl3-runtime-tp4-residency-v1"
 TP4_WORLD_SIZE = 4
 MCG_MARKER = 0xCBAC1FED
 PROJECTION_NAMES = {
@@ -608,7 +608,7 @@ def _validate_tensors(
     ):
         raise AuditError("projection rotations contain NaN or Inf")
     if int(tensors["mcg"].item()) & 0xFFFFFFFF != MCG_MARKER:
-        raise AuditError("projection MCG marker does not match the DS4RT codebook")
+        raise AuditError("projection MCG marker does not match the DS41RT codebook")
     return encoded_bytes
 
 
@@ -623,7 +623,7 @@ def _assignment_for_module(
     record = _read_object(path, f"assignment for {module}")
     digest = _validate_bound_record(record, label=f"assignment for {module}")
     if (
-        record.get("schema") != "ds4rt.exl3-dynamic-projection-assignments"
+        record.get("schema") != "ds41rt.exl3-dynamic-projection-assignments"
         or record.get("schema_version") != 1
         or record.get("scheduler") != expected_scheduler
         or record.get("assignment_key") != module
@@ -687,7 +687,7 @@ def _execution_ownership_for_module(
     ):
         raise AuditError(f"coordinator-only ownership differs for {module}")
     record = {
-        "schema": "ds4rt.exl3-coordinator-projection-ownership",
+        "schema": "ds41rt.exl3-coordinator-projection-ownership",
         "schema_version": 1,
         "plan_sha256": plan["plan_sha256"],
         "module": module,
@@ -1035,8 +1035,8 @@ def audit_block(
         except launcher.LaunchError as error:
             raise AuditError(str(error)) from error
     elif plan_schema in {
-        "ds4rt-deepseek-v4-dspark-overlay-plan-v1",
-        "ds4rt-deepseek-v4-dspark-overlay-plan-v2",
+        "ds41rt-deepseek-v4-dspark-overlay-plan-v1",
+        "ds41rt-deepseek-v4-dspark-overlay-plan-v2",
     }:
         digest = plan.get("plan_sha256")
         body = {key: value for key, value in plan.items() if key != "plan_sha256"}

@@ -185,12 +185,12 @@ def test_release_builds_materialize_and_verify_all_records() -> None:
     assert "sha256sum -c SPARKINFER_SHA256SUMS" in artifact_builder
 
     assert "sparkinfer-release-provenance.py" in image
-    assert "--verify /opt/ds4rt/share/SPARKINFER_PROVENANCE.json" in image
+    assert "--verify /opt/ds41rt/share/SPARKINFER_PROVENANCE.json" in image
     assert "sha256sum -c SPARKINFER_SHA256SUMS" in image
     assert "spark-moe-mode-common.sh" not in image
 
     assert release_builder.count(
-        ':/opt/ds4rt/share/SPARKINFER_SHA256SUMS"'
+        ':/opt/ds41rt/share/SPARKINFER_SHA256SUMS"'
     ) == 2
     assert '--verify "$repo_root/dist/$role/SPARKINFER_PROVENANCE.json"' in (
         release_builder

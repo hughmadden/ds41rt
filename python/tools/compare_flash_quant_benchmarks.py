@@ -119,7 +119,7 @@ def benchmark_cells(value: dict[str, Any]) -> tuple[str, dict[CellKey, dict[str,
 
 
 def acceptance(value: dict[str, Any], *, expected_model: str) -> dict[str, Any]:
-    if value.get("schema") != "ds4rt-draft-acceptance-summary-v2":
+    if value.get("schema") != "ds41rt-draft-acceptance-summary-v2":
         raise ValueError("acceptance summary has the wrong schema")
     if value.get("model") != expected_model:
         raise ValueError("acceptance summary and benchmark model differ")
@@ -270,7 +270,7 @@ def compare(
         for name, ratio in critical.items()
     }
     return {
-        "schema": "ds4rt-flash-quant-benchmark-comparison-v1",
+        "schema": "ds41rt-flash-quant-benchmark-comparison-v1",
         "baseline_model": baseline_model,
         "candidate_model": candidate_model,
         "llama_benchy_version": baseline_version,

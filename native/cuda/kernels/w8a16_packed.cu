@@ -20,15 +20,15 @@ constexpr size_t kSizeK = 16'384;
 constexpr size_t kScaleGroups = kSizeK / 256;
 constexpr size_t kLockElements = 1'024;
 
-ds4rt_w8a16_packed_o_m16_Kernel_Module_t module_m16;
-ds4rt_w8a16_packed_o_m32_Kernel_Module_t module_m32;
-ds4rt_w8a16_packed_o_m64_Kernel_Module_t module_m64;
-ds4rt_w8a16_packed_o_m128_Kernel_Module_t module_m128;
-ds4rt_w8a16_packed_o_m256_Kernel_Module_t module_m256;
+ds41rt_w8a16_packed_o_m16_Kernel_Module_t module_m16;
+ds41rt_w8a16_packed_o_m32_Kernel_Module_t module_m32;
+ds41rt_w8a16_packed_o_m64_Kernel_Module_t module_m64;
+ds41rt_w8a16_packed_o_m128_Kernel_Module_t module_m128;
+ds41rt_w8a16_packed_o_m256_Kernel_Module_t module_m256;
 std::once_flag module_init_once;
-ds4rt_status_t module_init_status = DS4RT_STATUS_OK;
+ds41rt_status_t module_init_status = DS41RT_STATUS_OK;
 
-bool buffer_has_bytes(ds4rt_device_buffer_t buffer, size_t required) {
+bool buffer_has_bytes(ds41rt_device_buffer_t buffer, size_t required) {
   return buffer.ptr != nullptr && buffer.bytes >= required;
 }
 
@@ -56,22 +56,22 @@ __global__ void initialize_packed_o_metadata_kernel(
 }
 
 void initialize_modules() {
-  ds4rt_w8a16_packed_o_m16_Kernel_Module_Load(&module_m16);
-  ds4rt_w8a16_packed_o_m32_Kernel_Module_Load(&module_m32);
-  ds4rt_w8a16_packed_o_m64_Kernel_Module_Load(&module_m64);
-  ds4rt_w8a16_packed_o_m128_Kernel_Module_Load(&module_m128);
-  ds4rt_w8a16_packed_o_m256_Kernel_Module_Load(&module_m256);
+  ds41rt_w8a16_packed_o_m16_Kernel_Module_Load(&module_m16);
+  ds41rt_w8a16_packed_o_m32_Kernel_Module_Load(&module_m32);
+  ds41rt_w8a16_packed_o_m64_Kernel_Module_Load(&module_m64);
+  ds41rt_w8a16_packed_o_m128_Kernel_Module_Load(&module_m128);
+  ds41rt_w8a16_packed_o_m256_Kernel_Module_Load(&module_m256);
   const cudaError_t error = cudaGetLastError();
   if (error != cudaSuccess) {
     module_init_status = status_from_cuda(error);
   }
 }
 
-ds4rt_status_t validate_buffers(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t rows,
+ds41rt_status_t validate_buffers(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t rows,
     size_t block_m) {
   if (buffers == nullptr || rows == 0 || rows > 256 || block_m == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t route_slots = round_up_rows(rows, block_m);
   const size_t route_blocks = route_slots / block_m;
@@ -93,12 +93,12 @@ ds4rt_status_t validate_buffers(
                         route_slots * sizeof(float)) ||
       !buffer_has_bytes(buffers->c_tmp, scratch_elements * sizeof(float)) ||
       !buffer_has_bytes(buffers->locks, kLockElements * sizeof(int32_t))) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-#define DS4RT_PACKED_O_ARGS(PREFIX)                                           \
+#define DS41RT_PACKED_O_ARGS(PREFIX)                                           \
   PREFIX##_Tensor_a_bf16_flat_t input{buffers->input.ptr};                    \
   PREFIX##_Tensor_b_i32_flat_t weight{buffers->weight.ptr};                   \
   PREFIX##_Tensor_c_bf16_flat_t output{buffers->output.ptr};                  \
@@ -114,66 +114,66 @@ ds4rt_status_t validate_buffers(
   PREFIX##_Tensor_c_tmp_f32_flat_t scratch{buffers->c_tmp.ptr};               \
   PREFIX##_Tensor_locks_i32_flat_t locks{buffers->locks.ptr}
 
-int launch_m16(const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers,
+int launch_m16(const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers,
                size_t rows, cudaStream_t stream) {
-  DS4RT_PACKED_O_ARGS(ds4rt_w8a16_packed_o_m16);
-  return cute_dsl_ds4rt_w8a16_packed_o_m16_wrapper(
+  DS41RT_PACKED_O_ARGS(ds41rt_w8a16_packed_o_m16);
+  return cute_dsl_ds41rt_w8a16_packed_o_m16_wrapper(
       &module_m16, &input, &weight, &output, &scales, &global_scale, &routes,
       &block_experts, &route_count, &topk, &scratch, &locks,
-      static_cast<int32_t>(rows), DS4RT_W8A16_PACKED_O_M16_GRID_X, stream);
+      static_cast<int32_t>(rows), DS41RT_W8A16_PACKED_O_M16_GRID_X, stream);
 }
 
-int launch_m32(const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers,
+int launch_m32(const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers,
                size_t rows, cudaStream_t stream) {
-  DS4RT_PACKED_O_ARGS(ds4rt_w8a16_packed_o_m32);
-  return cute_dsl_ds4rt_w8a16_packed_o_m32_wrapper(
+  DS41RT_PACKED_O_ARGS(ds41rt_w8a16_packed_o_m32);
+  return cute_dsl_ds41rt_w8a16_packed_o_m32_wrapper(
       &module_m32, &input, &weight, &output, &scales, &global_scale, &routes,
       &block_experts, &route_count, &topk, &scratch, &locks,
-      static_cast<int32_t>(rows), DS4RT_W8A16_PACKED_O_M32_GRID_X, stream);
+      static_cast<int32_t>(rows), DS41RT_W8A16_PACKED_O_M32_GRID_X, stream);
 }
 
-int launch_m64(const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers,
+int launch_m64(const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers,
                size_t rows, cudaStream_t stream) {
-  DS4RT_PACKED_O_ARGS(ds4rt_w8a16_packed_o_m64);
-  return cute_dsl_ds4rt_w8a16_packed_o_m64_wrapper(
+  DS41RT_PACKED_O_ARGS(ds41rt_w8a16_packed_o_m64);
+  return cute_dsl_ds41rt_w8a16_packed_o_m64_wrapper(
       &module_m64, &input, &weight, &output, &scales, &global_scale, &routes,
       &block_experts, &route_count, &topk, &scratch, &locks,
-      static_cast<int32_t>(rows), DS4RT_W8A16_PACKED_O_M64_GRID_X, stream);
+      static_cast<int32_t>(rows), DS41RT_W8A16_PACKED_O_M64_GRID_X, stream);
 }
 
-int launch_m128(const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers,
+int launch_m128(const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers,
                 size_t rows, cudaStream_t stream) {
-  DS4RT_PACKED_O_ARGS(ds4rt_w8a16_packed_o_m128);
-  return cute_dsl_ds4rt_w8a16_packed_o_m128_wrapper(
+  DS41RT_PACKED_O_ARGS(ds41rt_w8a16_packed_o_m128);
+  return cute_dsl_ds41rt_w8a16_packed_o_m128_wrapper(
       &module_m128, &input, &weight, &output, &scales, &global_scale, &routes,
       &block_experts, &route_count, &topk, &scratch, &locks,
-      static_cast<int32_t>(rows), DS4RT_W8A16_PACKED_O_M128_GRID_X, stream);
+      static_cast<int32_t>(rows), DS41RT_W8A16_PACKED_O_M128_GRID_X, stream);
 }
 
-int launch_m256(const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers,
+int launch_m256(const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers,
                 size_t rows, cudaStream_t stream) {
-  DS4RT_PACKED_O_ARGS(ds4rt_w8a16_packed_o_m256);
-  return cute_dsl_ds4rt_w8a16_packed_o_m256_wrapper(
+  DS41RT_PACKED_O_ARGS(ds41rt_w8a16_packed_o_m256);
+  return cute_dsl_ds41rt_w8a16_packed_o_m256_wrapper(
       &module_m256, &input, &weight, &output, &scales, &global_scale, &routes,
       &block_experts, &route_count, &topk, &scratch, &locks,
-      static_cast<int32_t>(rows), DS4RT_W8A16_PACKED_O_M256_GRID_X, stream);
+      static_cast<int32_t>(rows), DS41RT_W8A16_PACKED_O_M256_GRID_X, stream);
 }
 
-#undef DS4RT_PACKED_O_ARGS
+#undef DS41RT_PACKED_O_ARGS
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_w8a16_packed_o_aot_init(void) {
+extern "C" ds41rt_status_t ds41rt_cuda_w8a16_packed_o_aot_init(void) {
   std::call_once(module_init_once, initialize_modules);
   return module_init_status;
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_w8a16_packed_o_initialize_launch_buffers_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_w8a16_packed_o_initialize_launch_buffers_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t rows,
     size_t block_m, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_buffers(buffers, rows, block_m);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_buffers(buffers, rows, block_m);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   const size_t route_slots = round_up_rows(rows, block_m);
@@ -196,42 +196,42 @@ ds4rt_cuda_w8a16_packed_o_initialize_launch_buffers_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_w8a16_packed_o_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t rows,
+extern "C" ds41rt_status_t ds41rt_cuda_w8a16_packed_o_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t rows,
     void* cuda_stream) {
   size_t block_m = 0;
-  int (*launch)(const ds4rt_b12x_coordinator_w4a16_buffers_t*, size_t,
+  int (*launch)(const ds41rt_b12x_coordinator_w4a16_buffers_t*, size_t,
                 cudaStream_t) = nullptr;
   if (rows <= 16) {
-    block_m = DS4RT_W8A16_PACKED_O_M16_BLOCK_M;
+    block_m = DS41RT_W8A16_PACKED_O_M16_BLOCK_M;
     launch = launch_m16;
   } else if (rows <= 32) {
-    block_m = DS4RT_W8A16_PACKED_O_M32_BLOCK_M;
+    block_m = DS41RT_W8A16_PACKED_O_M32_BLOCK_M;
     launch = launch_m32;
   } else if (rows <= 64) {
-    block_m = DS4RT_W8A16_PACKED_O_M64_BLOCK_M;
+    block_m = DS41RT_W8A16_PACKED_O_M64_BLOCK_M;
     launch = launch_m64;
   } else if (rows <= 128) {
-    block_m = DS4RT_W8A16_PACKED_O_M128_BLOCK_M;
+    block_m = DS41RT_W8A16_PACKED_O_M128_BLOCK_M;
     launch = launch_m128;
   } else if (rows <= 256) {
-    block_m = DS4RT_W8A16_PACKED_O_M256_BLOCK_M;
+    block_m = DS41RT_W8A16_PACKED_O_M256_BLOCK_M;
     launch = launch_m256;
   } else {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_buffers(buffers, rows, block_m);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_buffers(buffers, rows, block_m);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_w8a16_packed_o_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_w8a16_packed_o_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   const int result = launch(buffers, rows, stream);
   if (result != 0) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   return status_from_cuda(cudaGetLastError());
 }

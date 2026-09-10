@@ -15,7 +15,7 @@ import triton.language as tl
 REFERENCE_ROOT = Path(__file__).resolve().parents[1] / "reference"
 sys.path.insert(0, str(REFERENCE_ROOT))
 
-from ds4rt_reference.triton_sampling_capture import (  # noqa: E402
+from ds41rt_reference.triton_sampling_capture import (  # noqa: E402
     _lm_head_logits_bf16,
 )
 

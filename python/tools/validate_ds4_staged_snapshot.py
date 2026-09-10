@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate one immutable staged DS4RT EXL3 snapshot for serving."""
+"""Validate one immutable staged DS41RT EXL3 snapshot for serving."""
 
 from __future__ import annotations
 
@@ -216,7 +216,7 @@ def validate_qualified_public_exl3_checkpoint(
         raise ValueError("qualified public weight index has the wrong shard geometry")
 
     return {
-        "schema": "ds4rt-qualified-public-exl3-snapshot-v1",
+        "schema": "ds41rt-qualified-public-exl3-snapshot-v1",
         "model_id": model_id,
         "revision": revision,
         "qualification_status": "production-qualified",
@@ -234,7 +234,7 @@ def validate_public_exl3_serving_checkpoint(
 ) -> dict[str, Any]:
     """Validate only the files a standard public HF EXL3 snapshot must serve.
 
-    Calibration ledgers, quantization-worker reports, and the local DS4RT
+    Calibration ledgers, quantization-worker reports, and the local DS41RT
     staging manifest qualify an export; they are deliberately not runtime
     dependencies.  The pinned Hugging Face revision plus the loader's full
     tensor-contract validation is the serving trust boundary.
@@ -310,7 +310,7 @@ def validate_public_exl3_serving_checkpoint(
             ) from error
 
     return {
-        "schema": "ds4rt-public-exl3-serving-snapshot-v1",
+        "schema": "ds41rt-public-exl3-serving-snapshot-v1",
         "model_id": model_id,
         "revision": revision,
         "checkpoint": str(snapshot),

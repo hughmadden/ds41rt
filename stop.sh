@@ -8,8 +8,8 @@ usage() {
   cat <<'EOF'
 Usage: ./stop.sh [--profile FILE]
 
-Gracefully stops release and WIP DS4RT processes on the coordinator and four
-Sparks selected by ds4rt.config. Release containers are removed; persistent
+Gracefully stops release and WIP DS41RT processes on the coordinator and four
+Sparks selected by ds41rt.config. Release containers are removed; persistent
 WIP development containers are stopped but retained. WIP slots, build caches,
 images, model caches, and unrelated containers are left untouched.
 
@@ -18,7 +18,7 @@ configuration file.
 EOF
 }
 
-config="$repo_root/ds4rt.config"
+config="$repo_root/ds41rt.config"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile|--config)
@@ -44,14 +44,14 @@ release_need ps
 docker info >/dev/null 2>&1 ||
   release_die "local Docker daemon is unavailable"
 
-echo "== stopping DS4RT release services =="
+echo "== stopping DS41RT release services =="
 wip_failed=0
 release_stop_wip_services || wip_failed=1
 release_stop_wip_containers || wip_failed=1
 ((wip_failed == 0)) ||
-  release_die "one or more WIP DS4RT processes or containers could not be stopped"
+  release_die "one or more WIP DS41RT processes or containers could not be stopped"
 release_stop_services \
   "$RELEASE_COORDINATOR_CONTAINER_NAME" \
   "$RELEASE_SPARK_CONTAINER_PREFIX" ||
-  release_die "one or more remote DS4RT services could not be stopped"
-echo "DS4RT release and WIP services are stopped."
+  release_die "one or more remote DS41RT services could not be stopped"
+echo "DS41RT release and WIP services are stopped."

@@ -21,9 +21,9 @@ class PipelineError(RuntimeError):
 
 
 def _run(command: list[str], phase: str) -> None:
-    print(f"ds4rt quantization pipeline: starting {phase}", flush=True)
+    print(f"ds41rt quantization pipeline: starting {phase}", flush=True)
     subprocess.run(command, check=True)
-    print(f"ds4rt quantization pipeline: completed {phase}", flush=True)
+    print(f"ds41rt quantization pipeline: completed {phase}", flush=True)
 
 
 def _remote_arguments(args: argparse.Namespace) -> list[str]:
@@ -160,7 +160,7 @@ def _write_base_audits(args: argparse.Namespace) -> None:
         )
         write_json_atomic(output, report)
     print(
-        f"ds4rt quantization pipeline: completed {layers} base block audits",
+        f"ds41rt quantization pipeline: completed {layers} base block audits",
         flush=True,
     )
 
@@ -193,7 +193,7 @@ def _canonical_command(args: argparse.Namespace, *, resume: bool) -> list[str]:
 def execute(args: argparse.Namespace) -> None:
     if args.canonical_output.exists():
         print(
-            "ds4rt quantization pipeline: canonical output already exists; complete",
+            "ds41rt quantization pipeline: canonical output already exists; complete",
             flush=True,
         )
         return
@@ -215,7 +215,7 @@ def execute(args: argparse.Namespace) -> None:
 
     if args.canonical_output.exists():
         print(
-            "ds4rt quantization pipeline: canonical output already exists; complete",
+            "ds41rt quantization pipeline: canonical output already exists; complete",
             flush=True,
         )
         return
@@ -279,7 +279,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mtp-sequence-anchor-cap", type=int, default=0)
     parser.add_argument("--legacy-integrated-parent", action="store_true")
     parser.add_argument("--remote-worker", action="append", nargs=3)
-    parser.add_argument("--remote-token-env", default="DS4RT_EXL3_WORKER_TOKEN")
+    parser.add_argument("--remote-token-env", default="DS41RT_EXL3_WORKER_TOKEN")
     parser.add_argument("--remote-timeout-seconds", type=float, default=7200.0)
     parser.add_argument("--remote-max-attempts", type=int, default=2)
     args = parser.parse_args()
@@ -301,10 +301,10 @@ def parse_args() -> argparse.Namespace:
         setattr(args, field, getattr(args, field).expanduser().resolve())
     defaults = {
         "base_run_state_dir": args.base_output.with_name(
-            f".{args.base_output.name}.ds4rt-run"
+            f".{args.base_output.name}.ds41rt-run"
         ),
         "mtp_overlay_run_state_dir": args.mtp_overlay_output.with_name(
-            f".{args.mtp_overlay_output.name}.ds4rt-run"
+            f".{args.mtp_overlay_output.name}.ds41rt-run"
         ),
     }
     for field, default in defaults.items():
@@ -329,7 +329,7 @@ def parse_args() -> argparse.Namespace:
         setattr(args, field, (value or default).expanduser().resolve())
     if args.canonical_work_dir is None:
         args.canonical_work_dir = args.canonical_output.with_name(
-            f".{args.canonical_output.name}.ds4rt-assembly"
+            f".{args.canonical_output.name}.ds41rt-assembly"
         )
     else:
         args.canonical_work_dir = args.canonical_work_dir.expanduser().resolve()

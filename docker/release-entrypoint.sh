@@ -15,7 +15,7 @@ print(candidates[-1] if candidates else "")
 PY
 )"
 
-runtime_libs=(/opt/ds4rt/lib)
+runtime_libs=(/opt/ds41rt/lib)
 if [[ -n "$python_libdir" ]]; then
   runtime_libs+=("$python_libdir")
 fi
@@ -24,6 +24,6 @@ if [[ -n "$cute_libdir" ]]; then
 fi
 runtime_path="$(IFS=:; printf '%s' "${runtime_libs[*]}")"
 export LD_LIBRARY_PATH="$runtime_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export DS4RT_PYTHON="${DS4RT_PYTHON:-$(command -v python3)}"
+export DS41RT_PYTHON="${DS41RT_PYTHON:-$(command -v python3)}"
 
 exec "$@"

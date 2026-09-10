@@ -199,7 +199,7 @@ def identity_key(payload: dict[str, Any]) -> str:
 
 def manifest_for(payload: dict[str, Any], key: str) -> dict[str, Any]:
     return {
-        "schema": "ds4rt.kernel_cache_identity.v1",
+        "schema": "ds41rt.kernel_cache_identity.v1",
         "identity": key,
         "payload": payload,
     }
@@ -251,7 +251,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-root", type=Path, required=True)
     parser.add_argument(
         "--environment-id",
-        default=os.environ.get("DS4RT_KERNEL_CACHE_ENVIRONMENT_ID", ""),
+        default=os.environ.get("DS41RT_KERNEL_CACHE_ENVIRONMENT_ID", ""),
     )
     parser.add_argument("--flashinfer-root", type=Path)
     return parser.parse_args()

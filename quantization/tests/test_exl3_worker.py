@@ -25,7 +25,7 @@ QUANTIZATION = Path(__file__).parents[1]
 if str(QUANTIZATION) not in sys.path:
     sys.path.insert(0, str(QUANTIZATION))
 SCRIPT = QUANTIZATION / "exl3_worker.py"
-SPEC = importlib.util.spec_from_file_location("ds4rt_exl3_worker", SCRIPT)
+SPEC = importlib.util.spec_from_file_location("ds41rt_exl3_worker", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
@@ -134,11 +134,11 @@ def processor_and_module(
     processor = EXL3Processor.__new__(EXL3Processor)
     processor.qcfg = SimpleNamespace(
         meta={
-            "ds4rt_error_ledger": {
+            "ds41rt_error_ledger": {
                 "family_join": {"source_revision": "test-source"},
                 "run": {
                     "projection_checkpoint": {
-                        "contract": "ds4rt.exl3-projection-checkpoint-v1",
+                        "contract": "ds41rt.exl3-projection-checkpoint-v1",
                         "root": str(checkpoint_root),
                     },
                     "remote_workers": {

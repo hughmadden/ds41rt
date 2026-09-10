@@ -23,7 +23,7 @@ from types import SimpleNamespace
 from typing import Any
 
 
-SCHEMA = "ds4rt-gptqmodel-flash-mtp-replay-v1"
+SCHEMA = "ds41rt-gptqmodel-flash-mtp-replay-v1"
 INPUT_KIND = "deterministic-structural-control-not-natural-calibration"
 
 

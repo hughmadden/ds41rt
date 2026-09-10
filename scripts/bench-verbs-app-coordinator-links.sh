@@ -13,37 +13,37 @@ Spark hosts run app-server remotely in the Spark container; the coordinator
 runs app-client locally. This does not build Spark images locally.
 
 Environment:
-  DS4RT_EXPERT_HOSTS                         default: ostrich,dodo,emu,kiwi
-  DS4RT_SPARK_IMAGE                          default: ds4rt-spark-expert-dev
-  DS4RT_SPARK_BUILD_IMAGE                    set 1 to build missing image on each Spark
-  DS4RT_VERBS_APP_WORKDIR                    default: $HOME/ds4rt-phase0-verbs-app
-  DS4RT_VERBS_APP_COORDINATOR_HOST           default: local short hostname
-  DS4RT_VERBS_APP_COORDINATOR_LINK_SUFFIX    default: .200gb
-  DS4RT_VERBS_APP_SPARK_LINK_SUFFIX          default: .200gb
-  DS4RT_VERBS_APP_COORDINATOR_RUNS           single, fanout, or single,fanout; default: single,fanout
-  DS4RT_VERBS_APP_PORT                       default: 18615
-  DS4RT_VERBS_APP_DURATION_SECS              default: 2
-  DS4RT_VERBS_APP_PAYLOAD_BYTES              default: Flash 1/2/4/8/16/64/256/512 BF16 rows
-  DS4RT_VERBS_APP_CHAIN_HOPS                 default: Flash model depth, 43
-  DS4RT_NATIVE_LIB                           default: native/build-rdma/libds4rt_native.so
-  DS4RT_VERBS_APP_KEEP_REMOTE                set 1 to keep staged remote workdirs
+  DS41RT_EXPERT_HOSTS                         default: ostrich,dodo,emu,kiwi
+  DS41RT_SPARK_IMAGE                          default: ds41rt-spark-expert-dev
+  DS41RT_SPARK_BUILD_IMAGE                    set 1 to build missing image on each Spark
+  DS41RT_VERBS_APP_WORKDIR                    default: $HOME/ds41rt-phase0-verbs-app
+  DS41RT_VERBS_APP_COORDINATOR_HOST           default: local short hostname
+  DS41RT_VERBS_APP_COORDINATOR_LINK_SUFFIX    default: .200gb
+  DS41RT_VERBS_APP_SPARK_LINK_SUFFIX          default: .200gb
+  DS41RT_VERBS_APP_COORDINATOR_RUNS           single, fanout, or single,fanout; default: single,fanout
+  DS41RT_VERBS_APP_PORT                       default: 18615
+  DS41RT_VERBS_APP_DURATION_SECS              default: 2
+  DS41RT_VERBS_APP_PAYLOAD_BYTES              default: Flash 1/2/4/8/16/64/256/512 BF16 rows
+  DS41RT_VERBS_APP_CHAIN_HOPS                 default: Flash model depth, 43
+  DS41RT_NATIVE_LIB                           default: native/build-rdma/libds41rt_native.so
+  DS41RT_VERBS_APP_KEEP_REMOTE                set 1 to keep staged remote workdirs
 EOF
   exit 0
 fi
 
-hosts_csv="${1:-${DS4RT_EXPERT_HOSTS:-ostrich,dodo,emu,kiwi}}"
-remote_dir="${DS4RT_VERBS_APP_WORKDIR:-}"
-image="${DS4RT_SPARK_IMAGE:-ds4rt-spark-expert-dev}"
-build_missing_image="${DS4RT_SPARK_BUILD_IMAGE:-0}"
-coordinator_host="${DS4RT_VERBS_APP_COORDINATOR_HOST:-$(hostname -s)}"
-coordinator_link_suffix="${DS4RT_VERBS_APP_COORDINATOR_LINK_SUFFIX:-.200gb}"
-spark_link_suffix="${DS4RT_VERBS_APP_SPARK_LINK_SUFFIX:-.200gb}"
-runs_csv="${DS4RT_VERBS_APP_COORDINATOR_RUNS:-single,fanout}"
-base_port="${DS4RT_VERBS_APP_PORT:-18615}"
-duration="${DS4RT_VERBS_APP_DURATION_SECS:-2}"
-payloads="${DS4RT_VERBS_APP_PAYLOAD_BYTES:-8192,16384,32768,65536,131072,524288,2097152,4194304}"
-keep_remote="${DS4RT_VERBS_APP_KEEP_REMOTE:-0}"
-native_lib="${DS4RT_NATIVE_LIB:-$repo_root/native/build-rdma/libds4rt_native.so}"
+hosts_csv="${1:-${DS41RT_EXPERT_HOSTS:-ostrich,dodo,emu,kiwi}}"
+remote_dir="${DS41RT_VERBS_APP_WORKDIR:-}"
+image="${DS41RT_SPARK_IMAGE:-ds41rt-spark-expert-dev}"
+build_missing_image="${DS41RT_SPARK_BUILD_IMAGE:-0}"
+coordinator_host="${DS41RT_VERBS_APP_COORDINATOR_HOST:-$(hostname -s)}"
+coordinator_link_suffix="${DS41RT_VERBS_APP_COORDINATOR_LINK_SUFFIX:-.200gb}"
+spark_link_suffix="${DS41RT_VERBS_APP_SPARK_LINK_SUFFIX:-.200gb}"
+runs_csv="${DS41RT_VERBS_APP_COORDINATOR_RUNS:-single,fanout}"
+base_port="${DS41RT_VERBS_APP_PORT:-18615}"
+duration="${DS41RT_VERBS_APP_DURATION_SECS:-2}"
+payloads="${DS41RT_VERBS_APP_PAYLOAD_BYTES:-8192,16384,32768,65536,131072,524288,2097152,4194304}"
+keep_remote="${DS41RT_VERBS_APP_KEEP_REMOTE:-0}"
+native_lib="${DS41RT_NATIVE_LIB:-$repo_root/native/build-rdma/libds41rt_native.so}"
 benchmark_dir="$repo_root/reports/phase0_artifacts/benchmarks"
 log_dir="$repo_root/reports/phase0_artifacts/logs"
 mkdir -p "$benchmark_dir" "$log_dir"
@@ -85,13 +85,13 @@ need python3
 if [ -z "$remote_dir" ]; then
   remote_dir="$(
     ssh -o BatchMode=yes "${hosts[0]}" \
-      'printf "%s/ds4rt-phase0-verbs-app" "$HOME"'
+      'printf "%s/ds41rt-phase0-verbs-app" "$HOME"'
   )"
 fi
 
 python_libs=()
-if [ -n "${DS4RT_PYTHON_LIBDIR:-}" ]; then
-  python_libs+=("$DS4RT_PYTHON_LIBDIR")
+if [ -n "${DS41RT_PYTHON_LIBDIR:-}" ]; then
+  python_libs+=("$DS41RT_PYTHON_LIBDIR")
 fi
 python_sysconfig_lib="$(python3 -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR") or "")')"
 if [ -n "$python_sysconfig_lib" ]; then
@@ -113,7 +113,7 @@ stage_repo() {
   rsync -az --delete \
     --exclude '.git' \
     --exclude '.venv/' \
-    --exclude '.ds4rt-cache/' \
+    --exclude '.ds41rt-cache/' \
     --exclude '.mypy_cache/' \
     --exclude '.pytest_cache/' \
     --exclude '.ruff_cache/' \
@@ -160,7 +160,7 @@ ensure_image() {
   if [ "$build_missing_image" != "1" ]; then
     cat >&2 <<EOF
 Spark image '$image' is missing on $host.
-Build it on the Spark by rerunning with DS4RT_SPARK_BUILD_IMAGE=1.
+Build it on the Spark by rerunning with DS41RT_SPARK_BUILD_IMAGE=1.
 EOF
     exit 2
   fi
@@ -172,7 +172,7 @@ image="$2"
 cd "$remote_dir"
 docker build \
   --platform linux/arm64 \
-  --build-arg DS4RT_ROLE=expert \
+  --build-arg DS41RT_ROLE=expert \
   --build-arg CUDA_ARCH=121 \
   --build-arg TARGET_PLATFORM=linux/arm64 \
   -f docker/Dockerfile.dev \
@@ -182,7 +182,7 @@ REMOTE
 
 build_remote() {
   local host="$1"
-  echo "== building ARM ds4rt and RDMA native library on $host =="
+  echo "== building ARM ds41rt and RDMA native library on $host =="
   ssh -o BatchMode=yes "$host" bash -s -- "$remote_dir" "$image" "$host" <<'REMOTE'
 set -euo pipefail
 remote_dir="$1"
@@ -195,24 +195,24 @@ docker_args=(
   --ipc=host
   --ulimit memlock=-1:-1
   --cap-add IPC_LOCK
-  -v "$remote_dir:/workspace/ds4rt"
+  -v "$remote_dir:/workspace/ds41rt"
   -v "$remote_dir/.cargo-registry:/opt/cargo/registry"
   -v "$remote_dir/.cargo-git:/opt/cargo/git"
-  -w /workspace/ds4rt
+  -w /workspace/ds41rt
 )
 if [ -e /dev/infiniband ]; then
   docker_args+=(--device=/dev/infiniband)
 fi
 docker "${docker_args[@]}" \
-  -e DS4RT_REMOTE_HOST="$host" \
+  -e DS41RT_REMOTE_HOST="$host" \
   "$image" \
   bash -lc '
 set -euo pipefail
-cargo build --manifest-path rust/Cargo.toml -p ds4rt-daemon
+cargo build --manifest-path rust/Cargo.toml -p ds41rt-daemon
 python3 python/tools/check_native_rdma_build.py \
   --clean \
   --build-dir native/build-rdma \
-  --output "reports/phase0_artifacts/benchmarks/native_rdma_build_${DS4RT_REMOTE_HOST}.json" \
+  --output "reports/phase0_artifacts/benchmarks/native_rdma_build_${DS41RT_REMOTE_HOST}.json" \
   --require-pass
 '
 REMOTE
@@ -253,11 +253,11 @@ run_remote_server() {
   local log="$5"
   ssh -o BatchMode=yes "$host" bash -s -- \
     "$remote_dir" "$image" "$peer" "$port" "$payloads" "$duration" \
-    "${DS4RT_VERBS_APP_ROUNDTRIP_ITERATIONS:-__DS4RT_UNSET__}" \
-    "${DS4RT_VERBS_APP_CHAIN_ITERATIONS:-__DS4RT_UNSET__}" \
-    "${DS4RT_VERBS_APP_CHAIN_HOPS:-43}" \
-    "${DS4RT_VERBS_APP_CONTROL_TIMEOUT_SECS:-__DS4RT_UNSET__}" \
-    "${DS4RT_VERBS_APP_IB_PORT_NUM:-__DS4RT_UNSET__}" >"$output" 2>"$log" <<'REMOTE'
+    "${DS41RT_VERBS_APP_ROUNDTRIP_ITERATIONS:-__DS41RT_UNSET__}" \
+    "${DS41RT_VERBS_APP_CHAIN_ITERATIONS:-__DS41RT_UNSET__}" \
+    "${DS41RT_VERBS_APP_CHAIN_HOPS:-43}" \
+    "${DS41RT_VERBS_APP_CONTROL_TIMEOUT_SECS:-__DS41RT_UNSET__}" \
+    "${DS41RT_VERBS_APP_IB_PORT_NUM:-__DS41RT_UNSET__}" >"$output" 2>"$log" <<'REMOTE'
 set -euo pipefail
 remote_dir="$1"
 image="$2"
@@ -272,7 +272,7 @@ chain_hops="${3-}"
 control_timeout="${4-}"
 ib_port="${5-}"
 for name in roundtrip_iterations chain_iterations control_timeout ib_port; do
-  if [ "${!name}" = "__DS4RT_UNSET__" ]; then
+  if [ "${!name}" = "__DS41RT_UNSET__" ]; then
     printf -v "$name" ''
   fi
 done
@@ -282,34 +282,34 @@ docker_args=(
   --ipc=host
   --ulimit memlock=-1:-1
   --cap-add IPC_LOCK
-  -v "$remote_dir:/workspace/ds4rt"
+  -v "$remote_dir:/workspace/ds41rt"
   -v "$remote_dir/.cargo-registry:/opt/cargo/registry"
   -v "$remote_dir/.cargo-git:/opt/cargo/git"
-  -w /workspace/ds4rt
+  -w /workspace/ds41rt
 )
 if [ -e /dev/infiniband ]; then
   docker_args+=(--device=/dev/infiniband)
 fi
 docker "${docker_args[@]}" \
-  -e DS4RT_NATIVE_LIB=/workspace/ds4rt/native/build-rdma/libds4rt_native.so \
-  -e DS4RT_VERBS_APP_ROUNDTRIP_ITERATIONS="$roundtrip_iterations" \
-  -e DS4RT_VERBS_APP_CHAIN_ITERATIONS="$chain_iterations" \
-  -e DS4RT_VERBS_APP_CHAIN_HOPS="$chain_hops" \
-  -e DS4RT_VERBS_APP_CONTROL_TIMEOUT_SECS="$control_timeout" \
-  -e DS4RT_VERBS_APP_IB_PORT_NUM="$ib_port" \
-  -e DS4RT_BENCH_PEER="$peer" \
-  -e DS4RT_BENCH_PORT="$port" \
-  -e DS4RT_BENCH_DURATION="$duration" \
-  -e DS4RT_BENCH_PAYLOADS="$payloads" \
+  -e DS41RT_NATIVE_LIB=/workspace/ds41rt/native/build-rdma/libds41rt_native.so \
+  -e DS41RT_VERBS_APP_ROUNDTRIP_ITERATIONS="$roundtrip_iterations" \
+  -e DS41RT_VERBS_APP_CHAIN_ITERATIONS="$chain_iterations" \
+  -e DS41RT_VERBS_APP_CHAIN_HOPS="$chain_hops" \
+  -e DS41RT_VERBS_APP_CONTROL_TIMEOUT_SECS="$control_timeout" \
+  -e DS41RT_VERBS_APP_IB_PORT_NUM="$ib_port" \
+  -e DS41RT_BENCH_PEER="$peer" \
+  -e DS41RT_BENCH_PORT="$port" \
+  -e DS41RT_BENCH_DURATION="$duration" \
+  -e DS41RT_BENCH_PAYLOADS="$payloads" \
   "$image" \
   bash -lc '
 set -euo pipefail
-exec rust/target/debug/ds4rt bench-rdma \
+exec rust/target/debug/ds41rt bench-rdma \
   --mode app-server \
-  --peer "$DS4RT_BENCH_PEER" \
-  --port "$DS4RT_BENCH_PORT" \
-  --duration-secs "$DS4RT_BENCH_DURATION" \
-  --payload-bytes "$DS4RT_BENCH_PAYLOADS"
+  --peer "$DS41RT_BENCH_PEER" \
+  --port "$DS41RT_BENCH_PORT" \
+  --duration-secs "$DS41RT_BENCH_DURATION" \
+  --payload-bytes "$DS41RT_BENCH_PAYLOADS"
 '
 REMOTE
 }
@@ -319,14 +319,14 @@ run_local_client() {
   local port="$2"
   local output="$3"
   local log="$4"
-  DS4RT_NATIVE_LIB="$native_lib" \
-  DS4RT_VERBS_APP_ROUNDTRIP_ITERATIONS="${DS4RT_VERBS_APP_ROUNDTRIP_ITERATIONS:-}" \
-  DS4RT_VERBS_APP_CHAIN_ITERATIONS="${DS4RT_VERBS_APP_CHAIN_ITERATIONS:-}" \
-  DS4RT_VERBS_APP_CHAIN_HOPS="${DS4RT_VERBS_APP_CHAIN_HOPS:-43}" \
-  DS4RT_VERBS_APP_CONTROL_TIMEOUT_SECS="${DS4RT_VERBS_APP_CONTROL_TIMEOUT_SECS:-}" \
-  DS4RT_VERBS_APP_IB_PORT_NUM="${DS4RT_VERBS_APP_IB_PORT_NUM:-}" \
+  DS41RT_NATIVE_LIB="$native_lib" \
+  DS41RT_VERBS_APP_ROUNDTRIP_ITERATIONS="${DS41RT_VERBS_APP_ROUNDTRIP_ITERATIONS:-}" \
+  DS41RT_VERBS_APP_CHAIN_ITERATIONS="${DS41RT_VERBS_APP_CHAIN_ITERATIONS:-}" \
+  DS41RT_VERBS_APP_CHAIN_HOPS="${DS41RT_VERBS_APP_CHAIN_HOPS:-43}" \
+  DS41RT_VERBS_APP_CONTROL_TIMEOUT_SECS="${DS41RT_VERBS_APP_CONTROL_TIMEOUT_SECS:-}" \
+  DS41RT_VERBS_APP_IB_PORT_NUM="${DS41RT_VERBS_APP_IB_PORT_NUM:-}" \
   RUSTFLAGS="${RUSTFLAGS:--Awarnings}" \
-  scripts/ds4rt bench-rdma \
+  scripts/ds41rt bench-rdma \
     --mode app-client \
     --peer "$peer" \
     --port "$port" \
@@ -343,7 +343,7 @@ pull_remote_artifacts() {
 remote_cleanup() {
   local host="$1"
   local port="$2"
-  ssh -o BatchMode=yes "$host" "pkill -f 'ds4rt bench-rdma --mode app-server .* --port $port' >/dev/null 2>&1 || true" >/dev/null 2>&1 || true
+  ssh -o BatchMode=yes "$host" "pkill -f 'ds41rt bench-rdma --mode app-server .* --port $port' >/dev/null 2>&1 || true" >/dev/null 2>&1 || true
 }
 
 run_single() {
@@ -382,7 +382,7 @@ from pathlib import Path
 for path_arg in sys.argv[1:]:
     path = Path(path_arg)
     data = json.loads(path.read_text(encoding="utf-8"))
-    runs = data["ds4rt_app_benchmark"]["app_transport_runs"]
+    runs = data["ds41rt_app_benchmark"]["app_transport_runs"]
     all_ok = bool(runs) and all(run["ok"] for run in runs)
     print(f"{path.name}: skipped={data['skipped']} runs={len(runs)} all_ok={all_ok}")
     for run in runs:
@@ -468,7 +468,7 @@ server_paths = [Path(value) for value in sys.argv[sep + 1:]]
 clients = []
 for path in client_paths:
     data = json.loads(path.read_text(encoding="utf-8"))
-    app = data.get("ds4rt_app_benchmark") or {}
+    app = data.get("ds41rt_app_benchmark") or {}
     runs = app.get("app_transport_runs") or []
     clients.append(
         {
@@ -488,7 +488,7 @@ for path in client_paths:
 servers = []
 for path in server_paths:
     data = json.loads(path.read_text(encoding="utf-8"))
-    app = data.get("ds4rt_app_benchmark") or {}
+    app = data.get("ds41rt_app_benchmark") or {}
     runs = app.get("app_transport_runs") or []
     servers.append(
         {

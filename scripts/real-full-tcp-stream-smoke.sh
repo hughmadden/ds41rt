@@ -5,10 +5,10 @@ url="${1:-${URL:-http://127.0.0.1:8000}}"
 model="${2:-${MODEL:-wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1}}"
 max_tokens="${3:-${MAX_TOKENS:-1}}"
 prompt="${PROMPT:-hi}"
-first_event_timeout_s="${DS4RT_REAL_FULL_TCP_STREAM_SMOKE_FIRST_EVENT_TIMEOUT_S:-10}"
-total_timeout_s="${DS4RT_REAL_FULL_TCP_STREAM_SMOKE_TOTAL_TIMEOUT_S:-900}"
-require_content="${DS4RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_CONTENT:-0}"
-require_done="${DS4RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_DONE:-0}"
+first_event_timeout_s="${DS41RT_REAL_FULL_TCP_STREAM_SMOKE_FIRST_EVENT_TIMEOUT_S:-10}"
+total_timeout_s="${DS41RT_REAL_FULL_TCP_STREAM_SMOKE_TOTAL_TIMEOUT_S:-900}"
+require_content="${DS41RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_CONTENT:-0}"
+require_done="${DS41RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_DONE:-0}"
 
 need() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -89,10 +89,10 @@ need jq
 need grep
 need mktemp
 require_positive_int MAX_TOKENS "$max_tokens"
-require_positive_int DS4RT_REAL_FULL_TCP_STREAM_SMOKE_FIRST_EVENT_TIMEOUT_S "$first_event_timeout_s"
-require_positive_int DS4RT_REAL_FULL_TCP_STREAM_SMOKE_TOTAL_TIMEOUT_S "$total_timeout_s"
-require_bool_flag DS4RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_CONTENT "$require_content"
-require_bool_flag DS4RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_DONE "$require_done"
+require_positive_int DS41RT_REAL_FULL_TCP_STREAM_SMOKE_FIRST_EVENT_TIMEOUT_S "$first_event_timeout_s"
+require_positive_int DS41RT_REAL_FULL_TCP_STREAM_SMOKE_TOTAL_TIMEOUT_S "$total_timeout_s"
+require_bool_flag DS41RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_CONTENT "$require_content"
+require_bool_flag DS41RT_REAL_FULL_TCP_STREAM_SMOKE_REQUIRE_DONE "$require_done"
 
 health="$(curl -fsS --connect-timeout 5 --max-time "$first_event_timeout_s" "${url}/health")"
 models="$(curl -fsS --connect-timeout 5 --max-time "$first_event_timeout_s" "${url}/v1/models")"

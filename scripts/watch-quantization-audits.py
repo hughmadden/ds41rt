@@ -20,10 +20,10 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 
-AUDITOR = "/opt/ds4rt/quantization/validate_projection_checkpoint_block.py"
-PLAN_NAME = "ds4rt-gptqmodel-plan.json"
-JOURNAL_NAME = ".ds4rt-exl3-error-journal.jsonl"
-AUDIT_SCHEMA = "ds4rt-exl3-live-projection-block-audit-v1"
+AUDITOR = "/opt/ds41rt/quantization/validate_projection_checkpoint_block.py"
+PLAN_NAME = "ds41rt-gptqmodel-plan.json"
+JOURNAL_NAME = ".ds41rt-exl3-error-journal.jsonl"
+AUDIT_SCHEMA = "ds41rt-exl3-live-projection-block-audit-v1"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 
 

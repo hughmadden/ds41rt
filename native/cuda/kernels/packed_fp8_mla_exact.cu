@@ -12,12 +12,12 @@
 #include <flashinfer/attention/sparse_mla_sm120/decode_dsv4_kernel.cuh>
 #include <flashinfer/attention/sparse_mla_sm120/model/kv_cache_traits.cuh>
 
-#include "../../include/ds4rt_native.h"
+#include "../../include/ds41rt_native.h"
 
 namespace flashinfer::sparse_mla_sm120 {
 
 template <ModelType MT, int NUM_HEADS, int TOPK, int PAGE_BLOCK_SIZE>
-__global__ void __launch_bounds__(DSV3_2_BLOCK_THREADS) ds4rt_sparse_mla_decode_dsv3_2_exact_grouped_kernel(
+__global__ void __launch_bounds__(DSV3_2_BLOCK_THREADS) ds41rt_sparse_mla_decode_dsv3_2_exact_grouped_kernel(
     const bf16* __restrict__ Q,               // [num_tokens, num_heads, d_qk=576] bf16
     const uint8_t* __restrict__ KV_cache,     // FP8 paged (V32 INLINE layout, 656 B/token)
     const int32_t* __restrict__ indices,      // [num_tokens, topk] int32
@@ -571,7 +571,7 @@ __global__ void __launch_bounds__(DSV3_2_BLOCK_THREADS) ds4rt_sparse_mla_decode_
 
 
 template <int NUM_HEADS, int TOPK>
-static ds4rt_status_t launch_ds4rt_exact_grouped(
+static ds41rt_status_t launch_ds41rt_exact_grouped(
     const bf16* q, const uint8_t* kv_cache, const int32_t* indices,
     bf16* mid_out, float* mid_lse, const int* topk_length, bf16* output,
     float* out_lse, int num_tokens, int chunks_per_block, float sm_scale,
@@ -591,12 +591,12 @@ static ds4rt_status_t launch_ds4rt_exact_grouped(
   constexpr int NUM_SPLITS = TOPK / DSV3_2_BI;
 
   auto kernel =
-      ds4rt_sparse_mla_decode_dsv3_2_exact_grouped_kernel<
+      ds41rt_sparse_mla_decode_dsv3_2_exact_grouped_kernel<
           ModelType::GLM_NSA, NUM_HEADS, TOPK, 64>;
   cudaError_t error = cudaFuncSetAttribute(
       kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, DYN_SMEM_BYTES);
   if (error != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
 
   const int head_blocks = (NUM_HEADS + HPB - 1) / HPB;
@@ -608,7 +608,7 @@ static ds4rt_status_t launch_ds4rt_exact_grouped(
       NUM_SPLITS, chunks_per_block, sm_scale, stride_kv_block);
   error = cudaGetLastError();
   if (error != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
 
   constexpr int MERGE_BLOCK_THREADS = 64;
@@ -619,14 +619,14 @@ static ds4rt_status_t launch_ds4rt_exact_grouped(
   merge_kernel<<<dim3(num_tokens, NUM_HEADS), dim3(MERGE_BLOCK_THREADS),
                  NUM_SPLITS * sizeof(float), stream>>>(
       mid_out, mid_lse, output, out_lse, nullptr, num_tokens, NUM_SPLITS);
-  return cudaGetLastError() == cudaSuccess ? DS4RT_STATUS_OK
-                                           : DS4RT_STATUS_INTERNAL_ERROR;
+  return cudaGetLastError() == cudaSuccess ? DS41RT_STATUS_OK
+                                           : DS41RT_STATUS_INTERNAL_ERROR;
 }
 
 }  // namespace flashinfer::sparse_mla_sm120
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_packed_fp8_mla_exact_grouped_async(
+extern "C" ds41rt_status_t
+ds41rt_cuda_packed_fp8_mla_exact_grouped_async(
     const void* q, const void* kv_cache, const void* indices, void* mid_out,
     void* mid_lse, const void* topk_length, void* output, void* out_lse,
     size_t num_tokens, size_t num_heads, size_t topk, size_t chunks_per_block,
@@ -635,16 +635,16 @@ ds4rt_cuda_packed_fp8_mla_exact_grouped_async(
       mid_out == nullptr || mid_lse == nullptr || topk_length == nullptr ||
       output == nullptr || out_lse == nullptr || num_tokens == 0 ||
       chunks_per_block == 0 || stride_kv_block == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (num_tokens > 64 || num_heads != 64 ||
       (topk != 1024 && topk != 2048)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   auto stream = static_cast<cudaStream_t>(stream_ptr);
   using namespace flashinfer::sparse_mla_sm120;
   if (topk == 1024) {
-    return launch_ds4rt_exact_grouped<64, 1024>(
+    return launch_ds41rt_exact_grouped<64, 1024>(
         static_cast<const bf16*>(q), static_cast<const uint8_t*>(kv_cache),
         static_cast<const int32_t*>(indices), static_cast<bf16*>(mid_out),
         static_cast<float*>(mid_lse), static_cast<const int*>(topk_length),
@@ -652,7 +652,7 @@ ds4rt_cuda_packed_fp8_mla_exact_grouped_async(
         static_cast<int>(num_tokens), static_cast<int>(chunks_per_block),
         sm_scale, stride_kv_block, stream);
   }
-  return launch_ds4rt_exact_grouped<64, 2048>(
+  return launch_ds41rt_exact_grouped<64, 2048>(
       static_cast<const bf16*>(q), static_cast<const uint8_t*>(kv_cache),
       static_cast<const int32_t*>(indices), static_cast<bf16*>(mid_out),
       static_cast<float*>(mid_lse), static_cast<const int*>(topk_length),

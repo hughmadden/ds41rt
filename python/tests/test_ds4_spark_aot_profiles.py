@@ -100,5 +100,5 @@ def test_flash_mixed_decode_uses_direct_routes_without_splitting_tiers() -> None
 def test_pro_profile_uses_distinct_aot_symbol_and_macro_names() -> None:
     profile = MODULE.KERNEL_PROFILES["pro"]
     assert profile.symbol_prefix == "ds4_pro"
-    assert profile.macro_prefix == "DS4RT_DS4_PRO"
+    assert profile.macro_prefix == "DS41RT_DS4_PRO"
     assert MODULE.KERNEL_PROFILES["flash"].symbol_prefix == "ds4_flash"

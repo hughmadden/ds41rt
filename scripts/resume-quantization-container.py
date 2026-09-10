@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed exact-plan resume for a stopped DS4RT quantization container.
+"""Fail-closed exact-plan resume for a stopped DS41RT quantization container.
 
 The source container is immutable evidence of the original launch.  This tool
 clones its content-addressed image, environment, mounts, and command, appending
@@ -30,42 +30,42 @@ IMAGE_ID_RE = re.compile(r"sha256:[0-9a-f]{64}\Z")
 ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 USER_RE = re.compile(r"[1-9][0-9]*:[1-9][0-9]*\Z")
 CONTAINER_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
-PLAN_FILENAME = "ds4rt-gptqmodel-plan.json"
-EXECUTION_UPGRADE_FILENAME = "ds4rt-execution-upgrade.json"
+PLAN_FILENAME = "ds41rt-gptqmodel-plan.json"
+EXECUTION_UPGRADE_FILENAME = "ds41rt-execution-upgrade.json"
 EXECUTION_UPGRADE_HISTORY_DIRNAME = "execution-upgrade-history"
-EXECUTION_UPGRADE_SCHEMA = "ds4rt-deepseek-v4-execution-upgrade-v1"
+EXECUTION_UPGRADE_SCHEMA = "ds41rt-deepseek-v4-execution-upgrade-v1"
 IMAGE_OWNED_UPGRADE_ENV = frozenset(
     {
-        "DS4RT_QUANT_BASE_IMAGE",
-        "DS4RT_QUANT_BUILD_REQUIREMENTS_SHA256",
-        "DS4RT_QUANT_CUDA_ARCH",
-        "DS4RT_QUANT_MIN_GPUS",
-        "DS4RT_QUANT_PYTHON_VERSION",
-        "DS4RT_QUANT_REQUIREMENTS_LOCK",
-        "DS4RT_QUANT_REQUIREMENTS_SHA256",
-        "DS4RT_QUANT_ROLE",
-        "DS4RT_QUANT_TARGET_PLATFORM",
+        "DS41RT_QUANT_BASE_IMAGE",
+        "DS41RT_QUANT_BUILD_REQUIREMENTS_SHA256",
+        "DS41RT_QUANT_CUDA_ARCH",
+        "DS41RT_QUANT_MIN_GPUS",
+        "DS41RT_QUANT_PYTHON_VERSION",
+        "DS41RT_QUANT_REQUIREMENTS_LOCK",
+        "DS41RT_QUANT_REQUIREMENTS_SHA256",
+        "DS41RT_QUANT_ROLE",
+        "DS41RT_QUANT_TARGET_PLATFORM",
     }
 )
-PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v5"
-PREVIOUS_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
-CURRENT_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v7"
+PLAN_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-plan-v5"
+PREVIOUS_PLAN_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-plan-v6"
+CURRENT_PLAN_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-plan-v7"
 SUPPORTED_PLAN_SCHEMAS = frozenset(
     (PLAN_SCHEMA, PREVIOUS_PLAN_SCHEMA, CURRENT_PLAN_SCHEMA)
 )
 STRICT_STORAGE_PLAN_SCHEMAS = frozenset(
     (PREVIOUS_PLAN_SCHEMA, CURRENT_PLAN_SCHEMA)
 )
-QUANTIZER = "/opt/ds4rt/quantization/quantize_flash_gptqmodel.py"
+QUANTIZER = "/opt/ds41rt/quantization/quantize_flash_gptqmodel.py"
 LEGACY_QUANTIZER_SUFFIX = PurePosixPath(
     "quantization/quantize_flash_gptqmodel.py"
 )
 ENTRYPOINT = [
     "/usr/bin/tini",
     "--",
-    "/usr/local/bin/ds4rt-quantization-entrypoint",
+    "/usr/local/bin/ds41rt-quantization-entrypoint",
 ]
-DEFAULT_PREFLIGHT_REPORT = "/tmp/ds4rt-quantization-preflight.json"
+DEFAULT_PREFLIGHT_REPORT = "/tmp/ds41rt-quantization-preflight.json"
 ALL_GPU_REQUEST = [
     {
         "Driver": "",
@@ -609,15 +609,15 @@ def build_resume_spec(
         raise ResumeError("source container does not bind a content-addressed image")
     environment, environment_map = parse_environment(config.get("Env"))
     require_image_digest = environment_map.get(
-        "DS4RT_QUANT_REQUIRE_IMAGE_DIGEST"
+        "DS41RT_QUANT_REQUIRE_IMAGE_DIGEST"
     )
     if (
-        environment_map.get("DS4RT_QUANT_IMAGE_DIGEST") != parent_image_id
+        environment_map.get("DS41RT_QUANT_IMAGE_DIGEST") != parent_image_id
         or require_image_digest not in {None, "1"}
         or (require_image_digest is None and upgrade_image_id is None)
-        or environment_map.get("DS4RT_QUANT_ROLE") != "coordinator"
-        or environment_map.get("DS4RT_QUANT_TARGET_PLATFORM") != "linux/amd64"
-        or environment_map.get("DS4RT_QUANT_CUDA_ARCH") != "120"
+        or environment_map.get("DS41RT_QUANT_ROLE") != "coordinator"
+        or environment_map.get("DS41RT_QUANT_TARGET_PLATFORM") != "linux/amd64"
+        or environment_map.get("DS41RT_QUANT_CUDA_ARCH") != "120"
     ):
         raise ResumeError("source environment does not bind the qualified image/GPU role")
 
@@ -679,7 +679,7 @@ def build_resume_spec(
     run_state_container = PurePosixPath(
         optional_option_value(command, "--run-state-dir")
         or PurePosixPath(output).with_name(
-            f".{PurePosixPath(output).name}.ds4rt-run"
+            f".{PurePosixPath(output).name}.ds41rt-run"
         )
     )
     host_run_state = map_container_path(os.fspath(run_state_container), binds)
@@ -730,7 +730,7 @@ def build_resume_spec(
     )
     plan_preflight = plan.get("preflight")
     expected_gpus = expected_gpus_from_plan(plan)
-    if environment_map.get("DS4RT_QUANT_MIN_GPUS") != str(len(expected_gpus)):
+    if environment_map.get("DS41RT_QUANT_MIN_GPUS") != str(len(expected_gpus)):
         raise ResumeError("source environment GPU count differs from the saved plan")
     if (
         not isinstance(plan_preflight, dict)
@@ -815,18 +815,18 @@ def build_resume_spec(
         raise ResumeError("fresh preflight report path is not canonical")
 
     environment = tuple(
-        f"DS4RT_QUANT_PREFLIGHT_REPORT={preflight_report}"
-        if record.startswith("DS4RT_QUANT_PREFLIGHT_REPORT=")
+        f"DS41RT_QUANT_PREFLIGHT_REPORT={preflight_report}"
+        if record.startswith("DS41RT_QUANT_PREFLIGHT_REPORT=")
         else record
         for record in environment
     )
     if not any(
-        record.startswith("DS4RT_QUANT_PREFLIGHT_REPORT=")
+        record.startswith("DS41RT_QUANT_PREFLIGHT_REPORT=")
         for record in environment
     ):
         environment = (
             *environment,
-            f"DS4RT_QUANT_PREFLIGHT_REPORT={preflight_report}",
+            f"DS41RT_QUANT_PREFLIGHT_REPORT={preflight_report}",
         )
     image_id = parent_image_id
     resume_arguments = ("--resume",)
@@ -845,18 +845,18 @@ def build_resume_spec(
             if record.split("=", 1)[0] not in IMAGE_OWNED_UPGRADE_ENV
         )
         environment = tuple(
-            f"DS4RT_QUANT_IMAGE_DIGEST={image_id}"
-            if record.startswith("DS4RT_QUANT_IMAGE_DIGEST=")
+            f"DS41RT_QUANT_IMAGE_DIGEST={image_id}"
+            if record.startswith("DS41RT_QUANT_IMAGE_DIGEST=")
             else record
             for record in environment
         )
         if not any(
-            record.startswith("DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=")
+            record.startswith("DS41RT_QUANT_REQUIRE_IMAGE_DIGEST=")
             for record in environment
         ):
             environment = (
                 *environment,
-                "DS4RT_QUANT_REQUIRE_IMAGE_DIGEST=1",
+                "DS41RT_QUANT_REQUIRE_IMAGE_DIGEST=1",
             )
         command_values = list(command)
         preflight_index = command_values.index("--preflight-report") + 1
@@ -907,7 +907,7 @@ def verify_local_image(spec: ResumeSpec, *, runner: Run = subprocess.run) -> Non
 
 
 def write_environment_file(records: Sequence[str]) -> Path:
-    descriptor, raw_path = tempfile.mkstemp(prefix="ds4rt-quant-resume-", suffix=".env")
+    descriptor, raw_path = tempfile.mkstemp(prefix="ds41rt-quant-resume-", suffix=".env")
     path = Path(raw_path)
     try:
         os.fchmod(descriptor, 0o600)

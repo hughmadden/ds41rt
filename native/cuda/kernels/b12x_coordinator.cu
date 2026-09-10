@@ -26,22 +26,22 @@ constexpr size_t kScratchElements = 2'097'152;
 constexpr size_t kLockElements = 1'024;
 constexpr int kQuantThreads = 32;
 
-ds4rt_b12x_coordinator_w4a16_q_b_m8_Kernel_Module_t q_b_module;
-ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Kernel_Module_t
+ds41rt_b12x_coordinator_w4a16_q_b_m8_Kernel_Module_t q_b_module;
+ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Kernel_Module_t
     q_b_m16_candidate_module;
-ds4rt_b12x_coordinator_w4a16_o_proj_m1_Kernel_Module_t o_proj_module;
-ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Kernel_Module_t
+ds41rt_b12x_coordinator_w4a16_o_proj_m1_Kernel_Module_t o_proj_module;
+ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Kernel_Module_t
     o_proj_m16_candidate_module;
-ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Kernel_Module_t
+ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Kernel_Module_t
     o_proj_tn64_candidate_module;
 std::once_flag module_init_once;
-ds4rt_status_t module_init_status = DS4RT_STATUS_OK;
+ds41rt_status_t module_init_status = DS41RT_STATUS_OK;
 std::once_flag q_b_m16_candidate_init_once;
-ds4rt_status_t q_b_m16_candidate_init_status = DS4RT_STATUS_OK;
+ds41rt_status_t q_b_m16_candidate_init_status = DS41RT_STATUS_OK;
 std::once_flag o_proj_m16_candidate_init_once;
-ds4rt_status_t o_proj_m16_candidate_init_status = DS4RT_STATUS_OK;
+ds41rt_status_t o_proj_m16_candidate_init_status = DS41RT_STATUS_OK;
 
-bool buffer_has_bytes(ds4rt_device_buffer_t buffer, size_t required) {
+bool buffer_has_bytes(ds41rt_device_buffer_t buffer, size_t required) {
   return buffer.ptr != nullptr && buffer.bytes >= required;
 }
 
@@ -218,45 +218,45 @@ __global__ void initialize_launch_metadata_kernel(
 }
 
 void initialize_modules() {
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Kernel_Module_Load(&q_b_module);
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Kernel_Module_Load(&o_proj_module);
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Kernel_Module_Load(
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Kernel_Module_Load(&q_b_module);
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Kernel_Module_Load(&o_proj_module);
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Kernel_Module_Load(
       &o_proj_tn64_candidate_module);
   const cudaError_t error = cudaGetLastError();
   if (error != cudaSuccess) {
-    ds4rt_set_last_error_message(cudaGetErrorString(error));
-    module_init_status = DS4RT_STATUS_INTERNAL_ERROR;
+    ds41rt_set_last_error_message(cudaGetErrorString(error));
+    module_init_status = DS41RT_STATUS_INTERNAL_ERROR;
   }
 }
 
 void initialize_q_b_m16_candidate_module() {
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Kernel_Module_Load(
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Kernel_Module_Load(
       &q_b_m16_candidate_module);
   const cudaError_t error = cudaGetLastError();
   if (error != cudaSuccess) {
-    ds4rt_set_last_error_message(cudaGetErrorString(error));
-    q_b_m16_candidate_init_status = DS4RT_STATUS_INTERNAL_ERROR;
+    ds41rt_set_last_error_message(cudaGetErrorString(error));
+    q_b_m16_candidate_init_status = DS41RT_STATUS_INTERNAL_ERROR;
   }
 }
 
 void initialize_o_proj_m16_candidate_module() {
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Kernel_Module_Load(
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Kernel_Module_Load(
       &o_proj_m16_candidate_module);
   const cudaError_t error = cudaGetLastError();
   if (error != cudaSuccess) {
-    ds4rt_set_last_error_message(cudaGetErrorString(error));
-    o_proj_m16_candidate_init_status = DS4RT_STATUS_INTERNAL_ERROR;
+    ds41rt_set_last_error_message(cudaGetErrorString(error));
+    o_proj_m16_candidate_init_status = DS41RT_STATUS_INTERNAL_ERROR;
   }
 }
 
-ds4rt_status_t validate_launch_buffers(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t size_k,
+ds41rt_status_t validate_launch_buffers(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t size_k,
     size_t size_n, size_t active_rows) {
   if (buffers == nullptr || active_rows == 0 || active_rows > kMaxQueryRows ||
       size_k > std::numeric_limits<size_t>::max() / size_n ||
       active_rows > std::numeric_limits<size_t>::max() / size_k ||
       active_rows > std::numeric_limits<size_t>::max() / size_n) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool valid =
       buffer_has_bytes(buffers->input, active_rows * size_k * sizeof(uint16_t)) &&
@@ -270,15 +270,15 @@ ds4rt_status_t validate_launch_buffers(
       buffer_has_bytes(buffers->topk_weights, kRouteSlots * sizeof(float)) &&
       buffer_has_bytes(buffers->c_tmp, kScratchElements * sizeof(float)) &&
       buffer_has_bytes(buffers->locks, kLockElements * sizeof(int32_t));
-  return valid ? DS4RT_STATUS_OK : DS4RT_STATUS_BUFFER_TOO_SMALL;
+  return valid ? DS41RT_STATUS_OK : DS41RT_STATUS_BUFFER_TOO_SMALL;
 }
 
-ds4rt_status_t validate_m16_candidate_buffers(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t size_k,
+ds41rt_status_t validate_m16_candidate_buffers(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t size_k,
     size_t size_n, size_t active_rows) {
   if (buffers == nullptr || active_rows == 0 ||
       active_rows > kM16CandidateRouteSlots) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const bool valid =
       buffer_has_bytes(buffers->input, active_rows * size_k * sizeof(uint16_t)) &&
@@ -295,196 +295,196 @@ ds4rt_status_t validate_m16_candidate_buffers(
                        kM16CandidateRouteSlots * sizeof(float)) &&
       buffer_has_bytes(buffers->c_tmp, kScratchElements * sizeof(float)) &&
       buffer_has_bytes(buffers->locks, kLockElements * sizeof(int32_t));
-  return valid ? DS4RT_STATUS_OK : DS4RT_STATUS_BUFFER_TOO_SMALL;
+  return valid ? DS41RT_STATUS_OK : DS41RT_STATUS_BUFFER_TOO_SMALL;
 }
 
-ds4rt_status_t reset_w4a16_locks_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, cudaStream_t stream) {
+ds41rt_status_t reset_w4a16_locks_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, cudaStream_t stream) {
   return status_from_cuda(
       cudaMemsetAsync(buffers->locks.ptr, 0, kLockElements * sizeof(int32_t), stream));
 }
 
-ds4rt_status_t check_aot_launch(int result, const char* label) {
+ds41rt_status_t check_aot_launch(int result, const char* label) {
   if (result == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
-  ds4rt_set_last_error_message(label);
-  return DS4RT_STATUS_INTERNAL_ERROR;
+  ds41rt_set_last_error_message(label);
+  return DS41RT_STATUS_INTERNAL_ERROR;
 }
 
-int launch_q_b(const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers,
+int launch_q_b(const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers,
                size_t active_rows, cudaStream_t stream) {
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_b_i32_flat_t weight{buffers->weight.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_scales_i32_flat_t scale{buffers->scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_global_scale_t global_scale{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_b_i32_flat_t weight{buffers->weight.ptr};
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_scales_i32_flat_t scale{buffers->scale.ptr};
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_global_scale_t global_scale{
       buffers->global_scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_packed_route_indices_t routes{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_packed_route_indices_t routes{
       buffers->packed_route_indices.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_block_expert_ids_t block_experts{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_block_expert_ids_t block_experts{
       buffers->block_expert_ids.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_packed_route_count_t route_count{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_packed_route_count_t route_count{
       buffers->packed_route_count.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_topk_weights_flat_t topk_weights{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_topk_weights_flat_t topk_weights{
       buffers->topk_weights.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_c_tmp_f32_flat_t scratch{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_c_tmp_f32_flat_t scratch{
       buffers->c_tmp.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_locks_i32_flat_t locks{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_locks_i32_flat_t locks{
       buffers->locks.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m8_Tensor_trellis_lut_flat_t trellis_lut{
+  ds41rt_b12x_coordinator_w4a16_q_b_m8_Tensor_trellis_lut_flat_t trellis_lut{
       buffers->scale.ptr};
-  return cute_dsl_ds4rt_b12x_coordinator_w4a16_q_b_m8_wrapper(
+  return cute_dsl_ds41rt_b12x_coordinator_w4a16_q_b_m8_wrapper(
       &q_b_module, buffers->input.ptr, buffers->input.ptr, &weight,
       buffers->output.ptr, &scale, &global_scale, &routes,
       &block_experts, &route_count, &topk_weights, &scratch, &locks, &trellis_lut,
-      static_cast<int32_t>(active_rows), DS4RT_B12X_COORDINATOR_Q_B_M8_GRID_X,
+      static_cast<int32_t>(active_rows), DS41RT_B12X_COORDINATOR_Q_B_M8_GRID_X,
       stream);
 }
 
 int launch_q_b_m16_candidate(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
     cudaStream_t stream) {
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_b_i32_flat_t weight{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_b_i32_flat_t weight{
       buffers->weight.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_scales_i32_flat_t scale{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_scales_i32_flat_t scale{
       buffers->scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_global_scale_t global_scale{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_global_scale_t global_scale{
       buffers->global_scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_packed_route_indices_t routes{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_packed_route_indices_t routes{
       buffers->packed_route_indices.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_block_expert_ids_t block_experts{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_block_expert_ids_t block_experts{
       buffers->block_expert_ids.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_packed_route_count_t route_count{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_packed_route_count_t route_count{
       buffers->packed_route_count.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_topk_weights_flat_t topk_weights{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_topk_weights_flat_t topk_weights{
       buffers->topk_weights.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_c_tmp_f32_flat_t scratch{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_c_tmp_f32_flat_t scratch{
       buffers->c_tmp.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_locks_i32_flat_t locks{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_locks_i32_flat_t locks{
       buffers->locks.ptr};
-  ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_trellis_lut_flat_t trellis_lut{
+  ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_Tensor_trellis_lut_flat_t trellis_lut{
       buffers->scale.ptr};
-  return cute_dsl_ds4rt_b12x_coordinator_w4a16_q_b_m16_candidate_wrapper(
+  return cute_dsl_ds41rt_b12x_coordinator_w4a16_q_b_m16_candidate_wrapper(
       &q_b_m16_candidate_module, buffers->input.ptr, buffers->input.ptr, &weight,
       buffers->output.ptr, &scale, &global_scale,
       &routes, &block_experts, &route_count, &topk_weights, &scratch, &locks,
       &trellis_lut,
       static_cast<int32_t>(active_rows),
-      DS4RT_B12X_COORDINATOR_Q_B_M16_CANDIDATE_GRID_X, stream);
+      DS41RT_B12X_COORDINATOR_Q_B_M16_CANDIDATE_GRID_X, stream);
 }
 
 int launch_o_proj_m16_candidate(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
     cudaStream_t stream) {
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_b_i32_flat_t weight{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_b_i32_flat_t weight{
       buffers->weight.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_scales_i32_flat_t scale{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_scales_i32_flat_t scale{
       buffers->scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_global_scale_t global_scale{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_global_scale_t global_scale{
       buffers->global_scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_packed_route_indices_t routes{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_packed_route_indices_t routes{
       buffers->packed_route_indices.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_block_expert_ids_t block_experts{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_block_expert_ids_t block_experts{
       buffers->block_expert_ids.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_packed_route_count_t route_count{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_packed_route_count_t route_count{
       buffers->packed_route_count.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_topk_weights_flat_t topk_weights{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_topk_weights_flat_t topk_weights{
       buffers->topk_weights.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_c_tmp_f32_flat_t scratch{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_c_tmp_f32_flat_t scratch{
       buffers->c_tmp.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_locks_i32_flat_t locks{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_locks_i32_flat_t locks{
       buffers->locks.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_trellis_lut_flat_t
+  ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_Tensor_trellis_lut_flat_t
       trellis_lut{buffers->scale.ptr};
-  return cute_dsl_ds4rt_b12x_coordinator_w4a16_o_proj_m16_candidate_wrapper(
+  return cute_dsl_ds41rt_b12x_coordinator_w4a16_o_proj_m16_candidate_wrapper(
       &o_proj_m16_candidate_module, buffers->input.ptr, buffers->input.ptr,
       &weight, buffers->output.ptr, &scale,
       &global_scale, &routes, &block_experts, &route_count, &topk_weights,
       &scratch, &locks, &trellis_lut, static_cast<int32_t>(active_rows),
-      DS4RT_B12X_COORDINATOR_O_PROJ_M16_CANDIDATE_GRID_X, stream);
+      DS41RT_B12X_COORDINATOR_O_PROJ_M16_CANDIDATE_GRID_X, stream);
 }
 
-int launch_o_proj(const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers,
+int launch_o_proj(const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers,
                   cudaStream_t stream) {
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_b_i32_flat_t weight{buffers->weight.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_scales_i32_flat_t scale{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_b_i32_flat_t weight{buffers->weight.ptr};
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_scales_i32_flat_t scale{
       buffers->scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_global_scale_t global_scale{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_global_scale_t global_scale{
       buffers->global_scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_packed_route_indices_t routes{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_packed_route_indices_t routes{
       buffers->packed_route_indices.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_block_expert_ids_t block_experts{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_block_expert_ids_t block_experts{
       buffers->block_expert_ids.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_packed_route_count_t route_count{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_packed_route_count_t route_count{
       buffers->packed_route_count.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_topk_weights_flat_t topk_weights{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_topk_weights_flat_t topk_weights{
       buffers->topk_weights.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_c_tmp_f32_flat_t scratch{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_c_tmp_f32_flat_t scratch{
       buffers->c_tmp.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_locks_i32_flat_t locks{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_locks_i32_flat_t locks{
       buffers->locks.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_trellis_lut_flat_t trellis_lut{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_Tensor_trellis_lut_flat_t trellis_lut{
       buffers->scale.ptr};
-  return cute_dsl_ds4rt_b12x_coordinator_w4a16_o_proj_m1_wrapper(
+  return cute_dsl_ds41rt_b12x_coordinator_w4a16_o_proj_m1_wrapper(
       &o_proj_module, buffers->input.ptr, buffers->input.ptr, &weight,
       buffers->output.ptr, &scale, &global_scale, &routes,
       &block_experts, &route_count, &topk_weights, &scratch, &locks, &trellis_lut, 1,
-      DS4RT_B12X_COORDINATOR_O_PROJ_M1_GRID_X, stream);
+      DS41RT_B12X_COORDINATOR_O_PROJ_M1_GRID_X, stream);
 }
 
 int launch_o_proj_tn64_candidate(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, cudaStream_t stream) {
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_b_i32_flat_t weight{
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, cudaStream_t stream) {
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_b_i32_flat_t weight{
       buffers->weight.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_scales_i32_flat_t scale{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_scales_i32_flat_t scale{
       buffers->scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_global_scale_t global_scale{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_global_scale_t global_scale{
       buffers->global_scale.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_packed_route_indices_t routes{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_packed_route_indices_t routes{
       buffers->packed_route_indices.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_block_expert_ids_t
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_block_expert_ids_t
       block_experts{buffers->block_expert_ids.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_packed_route_count_t
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_packed_route_count_t
       route_count{buffers->packed_route_count.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_topk_weights_flat_t
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_topk_weights_flat_t
       topk_weights{buffers->topk_weights.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_c_tmp_f32_flat_t scratch{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_c_tmp_f32_flat_t scratch{
       buffers->c_tmp.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_locks_i32_flat_t locks{
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_locks_i32_flat_t locks{
       buffers->locks.ptr};
-  ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_trellis_lut_flat_t
+  ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_Tensor_trellis_lut_flat_t
       trellis_lut{buffers->scale.ptr};
-  return cute_dsl_ds4rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_wrapper(
+  return cute_dsl_ds41rt_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_wrapper(
       &o_proj_tn64_candidate_module, buffers->input.ptr, buffers->input.ptr,
       &weight, buffers->output.ptr, &scale, &global_scale, &routes,
       &block_experts, &route_count, &topk_weights, &scratch, &locks, &trellis_lut, 1,
-      DS4RT_B12X_COORDINATOR_O_PROJ_M1_TN64_CANDIDATE_GRID_X, stream);
+      DS41RT_B12X_COORDINATOR_O_PROJ_M1_TN64_CANDIDATE_GRID_X, stream);
 }
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_coordinator_aot_available(
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_coordinator_aot_available(
     int* out_available) {
   if (out_available == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_available = 1;
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_coordinator_aot_init(void) {
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_coordinator_aot_init(void) {
   std::call_once(module_init_once, initialize_modules);
   return module_init_status;
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
-    ds4rt_device_buffer_t input_bf16, ds4rt_device_buffer_t payload_scratch,
-    ds4rt_device_buffer_t packed_weight, ds4rt_device_buffer_t packed_scale,
-    ds4rt_device_buffer_t global_scale, size_t size_k, size_t size_n,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
+    ds41rt_device_buffer_t input_bf16, ds41rt_device_buffer_t payload_scratch,
+    ds41rt_device_buffer_t packed_weight, ds41rt_device_buffer_t packed_scale,
+    ds41rt_device_buffer_t global_scale, size_t size_k, size_t size_n,
     void* cuda_stream) {
   if (size_k == 0 || size_n == 0 || size_k % 16 != 0 || size_n % 64 != 0 ||
       size_n > std::numeric_limits<size_t>::max() / size_k) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t input_bytes = size_n * size_k * sizeof(uint16_t);
   const size_t weight_bytes = size_n * size_k / 2;
@@ -495,7 +495,7 @@ ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
       !buffer_has_bytes(packed_weight, weight_bytes) ||
       !buffer_has_bytes(packed_scale, scale_bytes) ||
       !buffer_has_bytes(global_scale, sizeof(float))) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -512,14 +512,14 @@ ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
                                stream>>>(
       static_cast<const uint16_t*>(input_bf16.ptr), values,
       static_cast<float*>(global_scale.ptr));
-  ds4rt_status_t status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = status_from_cuda(cudaGetLastError());
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   prepare_tensor_scale_kernel<<<1, 1, 0, stream>>>(
       static_cast<float*>(global_scale.ptr));
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   const dim3 quant_grid(static_cast<unsigned int>(size_k / 16),
@@ -529,7 +529,7 @@ ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
       static_cast<uint8_t*>(payload_scratch.ptr),
       static_cast<const float*>(global_scale.ptr), size_n, size_k);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   const size_t words = weight_bytes / sizeof(uint32_t);
@@ -538,7 +538,7 @@ ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
       static_cast<const uint8_t*>(payload_scratch.ptr),
       static_cast<uint32_t*>(packed_weight.ptr), size_k, size_n);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   pack_payload_scale_kernel<<<
@@ -546,7 +546,7 @@ ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
       stream>>>(static_cast<const uint8_t*>(payload_scratch.ptr),
                 static_cast<uint8_t*>(packed_scale.ptr), size_k, size_n);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   finalize_tensor_scale_kernel<<<1, 1, 0, stream>>>(
@@ -554,16 +554,16 @@ ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
   if (buffers == nullptr || !buffer_has_bytes(buffers->global_scale, sizeof(float)) ||
       !buffer_has_bytes(buffers->packed_route_indices, kRouteSlots * sizeof(int32_t)) ||
       !buffer_has_bytes(buffers->block_expert_ids, sizeof(int32_t)) ||
       !buffer_has_bytes(buffers->packed_route_count, sizeof(int32_t)) ||
       !buffer_has_bytes(buffers->topk_weights, kRouteSlots * sizeof(float)) ||
       !buffer_has_bytes(buffers->locks, kLockElements * sizeof(int32_t))) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   cudaError_t error = cudaMemsetAsync(buffers->locks.ptr, 0, kLockElements * sizeof(int32_t),
@@ -579,53 +579,53 @@ ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_coordinator_w4a16_q_b_m8_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_coordinator_w4a16_q_b_m8_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
     void* cuda_stream) {
-  const ds4rt_status_t valid = validate_launch_buffers(
-      buffers, DS4RT_B12X_COORDINATOR_Q_B_M8_SIZE_K,
-      DS4RT_B12X_COORDINATOR_Q_B_M8_SIZE_N, active_rows);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_launch_buffers(
+      buffers, DS41RT_B12X_COORDINATOR_Q_B_M8_SIZE_K,
+      DS41RT_B12X_COORDINATOR_Q_B_M8_SIZE_N, active_rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_coordinator_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_coordinator_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  const ds4rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
-  if (reset != DS4RT_STATUS_OK) {
+  const ds41rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
+  if (reset != DS41RT_STATUS_OK) {
     return reset;
   }
   return check_aot_launch(launch_q_b(buffers, active_rows, stream),
                           "B12X coordinator Q-B W4A16 launch failed");
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_coordinator_w4a16_q_b_m1_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
-  return ds4rt_cuda_b12x_coordinator_w4a16_q_b_m8_async(buffers, 1, cuda_stream);
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_coordinator_w4a16_q_b_m1_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
+  return ds41rt_cuda_b12x_coordinator_w4a16_q_b_m8_async(buffers, 1, cuda_stream);
 }
 
 // Benchmark-only dSpark target-verifier candidate; serving does not reference it.
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_coordinator_w4a16_q_b_m16_candidate_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_coordinator_w4a16_q_b_m16_candidate_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
     void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_m16_candidate_buffers(
-          buffers, DS4RT_B12X_COORDINATOR_Q_B_M16_CANDIDATE_SIZE_K,
-          DS4RT_B12X_COORDINATOR_Q_B_M16_CANDIDATE_SIZE_N, active_rows);
-  if (valid != DS4RT_STATUS_OK) {
+          buffers, DS41RT_B12X_COORDINATOR_Q_B_M16_CANDIDATE_SIZE_K,
+          DS41RT_B12X_COORDINATOR_Q_B_M16_CANDIDATE_SIZE_N, active_rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   std::call_once(q_b_m16_candidate_init_once,
                  initialize_q_b_m16_candidate_module);
-  if (q_b_m16_candidate_init_status != DS4RT_STATUS_OK) {
+  if (q_b_m16_candidate_init_status != DS41RT_STATUS_OK) {
     return q_b_m16_candidate_init_status;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  const ds4rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
-  if (reset != DS4RT_STATUS_OK) {
+  const ds41rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
+  if (reset != DS41RT_STATUS_OK) {
     return reset;
   }
   return check_aot_launch(
@@ -634,25 +634,25 @@ ds4rt_cuda_b12x_coordinator_w4a16_q_b_m16_candidate_async(
 }
 
 // Benchmark-only dSpark target-verifier candidate; serving does not reference it.
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m16_candidate_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m16_candidate_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, size_t active_rows,
     void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_m16_candidate_buffers(
-          buffers, DS4RT_B12X_COORDINATOR_O_PROJ_M16_CANDIDATE_SIZE_K,
-          DS4RT_B12X_COORDINATOR_O_PROJ_M16_CANDIDATE_SIZE_N, active_rows);
-  if (valid != DS4RT_STATUS_OK) {
+          buffers, DS41RT_B12X_COORDINATOR_O_PROJ_M16_CANDIDATE_SIZE_K,
+          DS41RT_B12X_COORDINATOR_O_PROJ_M16_CANDIDATE_SIZE_N, active_rows);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   std::call_once(o_proj_m16_candidate_init_once,
                  initialize_o_proj_m16_candidate_module);
-  if (o_proj_m16_candidate_init_status != DS4RT_STATUS_OK) {
+  if (o_proj_m16_candidate_init_status != DS41RT_STATUS_OK) {
     return o_proj_m16_candidate_init_status;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  const ds4rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
-  if (reset != DS4RT_STATUS_OK) {
+  const ds41rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
+  if (reset != DS41RT_STATUS_OK) {
     return reset;
   }
   return check_aot_launch(
@@ -660,21 +660,21 @@ ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m16_candidate_async(
       "B12X coordinator O-projection M16 candidate launch failed");
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m1_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_launch_buffers(
-      buffers, DS4RT_B12X_COORDINATOR_O_PROJ_M1_SIZE_K,
-      DS4RT_B12X_COORDINATOR_O_PROJ_M1_SIZE_N, 1);
-  if (valid != DS4RT_STATUS_OK) {
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m1_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
+  const ds41rt_status_t valid = validate_launch_buffers(
+      buffers, DS41RT_B12X_COORDINATOR_O_PROJ_M1_SIZE_K,
+      DS41RT_B12X_COORDINATOR_O_PROJ_M1_SIZE_N, 1);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_coordinator_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_coordinator_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  const ds4rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
-  if (reset != DS4RT_STATUS_OK) {
+  const ds41rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
+  if (reset != DS41RT_STATUS_OK) {
     return reset;
   }
   return check_aot_launch(
@@ -682,22 +682,22 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m1_async(
       "B12X coordinator O-projection W4A16 launch failed");
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_async(
-    const ds4rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_launch_buffers(
-      buffers, DS4RT_B12X_COORDINATOR_O_PROJ_M1_TN64_CANDIDATE_SIZE_K,
-      DS4RT_B12X_COORDINATOR_O_PROJ_M1_TN64_CANDIDATE_SIZE_N, 1);
-  if (valid != DS4RT_STATUS_OK) {
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_async(
+    const ds41rt_b12x_coordinator_w4a16_buffers_t* buffers, void* cuda_stream) {
+  const ds41rt_status_t valid = validate_launch_buffers(
+      buffers, DS41RT_B12X_COORDINATOR_O_PROJ_M1_TN64_CANDIDATE_SIZE_K,
+      DS41RT_B12X_COORDINATOR_O_PROJ_M1_TN64_CANDIDATE_SIZE_N, 1);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_coordinator_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_coordinator_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  const ds4rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
-  if (reset != DS4RT_STATUS_OK) {
+  const ds41rt_status_t reset = reset_w4a16_locks_async(buffers, stream);
+  if (reset != DS41RT_STATUS_OK) {
     return reset;
   }
   return check_aot_launch(

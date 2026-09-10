@@ -35,7 +35,7 @@ def load_config(
     *,
     config_text: str = BASE_CONFIG,
 ) -> subprocess.CompletedProcess[str]:
-    config = tmp_path / "ds4rt.config"
+    config = tmp_path / "ds41rt.config"
     config.write_text(config_text + extra, encoding="utf-8")
     return subprocess.run(
         [
@@ -183,7 +183,7 @@ def test_release_facing_helpers_default_to_public_calibrated_pro_k2() -> None:
         ROOT / "scripts/api-constrained-smoke.sh",
         ROOT / "scripts/ask-file.sh",
         ROOT / "scripts/doctor.sh",
-        ROOT / "scripts/ds4rt-dev.sh",
+        ROOT / "scripts/ds41rt-dev.sh",
         ROOT / "scripts/phase0-spark-tcp-bench.sh",
         ROOT / "scripts/real-slice-tcp-smoke.sh",
         ROOT / "scripts/real-full-tcp-smoke.sh",
@@ -229,24 +229,24 @@ def test_release_benchmark_probe_has_explicit_startup_timeout() -> None:
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
 
     for name in (
-        "DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE",
-        "DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_PREFIX_ROWS",
-        "DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_NEW_ROWS",
-        "DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_REPEATS",
+        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE",
+        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_PREFIX_ROWS",
+        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_NEW_ROWS",
+        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_REPEATS",
     ):
         assert name in release
-    assert '"${DS4RT_RELEASE_READY_TIMEOUT_SECONDS:-900}"' in release
+    assert '"${DS41RT_RELEASE_READY_TIMEOUT_SECONDS:-900}"' in release
     assert "must be a positive integer" in release
 
 
 def test_spark_collective_receive_uses_active_deadline() -> None:
     reduction = (
-        ROOT / "rust/crates/ds4rt-daemon/src/commands/real_full/rdma_reduction.rs"
+        ROOT / "rust/crates/ds41rt-daemon/src/commands/real_full/rdma_reduction.rs"
     ).read_text(encoding="utf-8")
     transport = (
-        ROOT / "rust/crates/ds4rt-transport/src/verbs.rs"
+        ROOT / "rust/crates/ds41rt-transport/src/verbs.rs"
     ).read_text(encoding="utf-8")
-    native = (ROOT / "native/src/ds4rt_native.cc").read_text(encoding="utf-8")
+    native = (ROOT / "native/src/ds41rt_native.cc").read_text(encoding="utf-8")
 
     assert "SPARK_RDMA_EXCHANGE_TIMEOUT: Duration = Duration::from_secs(60)" in reduction
     assert "wait_recv_slot_with_timeout(SPARK_RDMA_EXCHANGE_TIMEOUT)" in reduction
@@ -342,7 +342,7 @@ def test_release_readiness_requires_exact_configured_api_identity() -> None:
         "data": [
             {"id": model_id},
             {"id": f"{model_id}-full"},
-            {"id": "ds4rt-tiny"},
+            {"id": "ds41rt-tiny"},
         ],
     }
     assert model_list_matches(exact, model_id).returncode == 0
@@ -374,7 +374,7 @@ def test_release_config_rejects_native_pro_and_gpu1(tmp_path: Path) -> None:
 
     gpu1 = load_config(tmp_path, "COORDINATOR_GPU=1\n")
     assert gpu1.returncode == 2
-    assert "GPU 1 is outside DS4RT" in gpu1.stderr
+    assert "GPU 1 is outside DS41RT" in gpu1.stderr
 
     malformed_uuid = load_config(tmp_path, "COORDINATOR_GPU_UUID=GPU-1\n")
     assert malformed_uuid.returncode == 2
@@ -468,8 +468,8 @@ def test_launchers_fingerprint_and_export_ds4_format_controls() -> None:
     for launcher_name in ("run.sh", "scripts/run-wip.sh"):
         launcher = (ROOT / launcher_name).read_text(encoding="utf-8")
         assert "SPARKINFER_EXL3" in launcher
-        assert "DS4RT_SPARKINFER_EXL3=$SPARKINFER_EXL3" in launcher
-        assert "DS4RT_MODEL_REVISION=$RELEASE_MODEL_REVISION" in launcher
+        assert "DS41RT_SPARKINFER_EXL3=$SPARKINFER_EXL3" in launcher
+        assert "DS41RT_MODEL_REVISION=$RELEASE_MODEL_REVISION" in launcher
         assert "release_api_advertises_model" in launcher
         assert "release_validate_model_list_file" in launcher
         assert '"$MODEL_VARIANT"' in launcher
@@ -487,22 +487,22 @@ def test_launchers_fingerprint_and_export_ds4_format_controls() -> None:
     assert '--gpus device="$RELEASE_COORDINATOR_GPU_UUID"' in wip
     assert "is not bound to the configured physical GPU" in wip
 
-    dev = (ROOT / "scripts" / "ds4rt-dev.sh").read_text(encoding="utf-8")
+    dev = (ROOT / "scripts" / "ds41rt-dev.sh").read_text(encoding="utf-8")
     assert "release_resolve_coordinator_gpu_identity" in dev
     assert '--gpus device="$RELEASE_COORDINATOR_GPU_UUID"' in dev
 
     phase0 = (ROOT / "scripts/phase0-spark-tcp-bench.sh").read_text(
         encoding="utf-8"
     )
-    assert 'model_revision="${DS4RT_MODEL_REVISION:-}"' in phase0
-    assert '-e DS4RT_MODEL_REVISION="$model_revision"' in phase0
+    assert 'model_revision="${DS41RT_MODEL_REVISION:-}"' in phase0
+    assert '-e DS41RT_MODEL_REVISION="$model_revision"' in phase0
     assert (
-        'wip_allow_historical_exl3_control="${DS4RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL:-0}"'
+        'wip_allow_historical_exl3_control="${DS41RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL:-0}"'
         in phase0
     )
     assert 'wip_allow_historical_exl3_control="${74:-0}"' in phase0
     assert (
-        '-e DS4RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL='
+        '-e DS41RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL='
         '"$wip_allow_historical_exl3_control"'
         in phase0
     )

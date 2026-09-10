@@ -24,7 +24,7 @@ from types import SimpleNamespace
 from typing import Any
 
 
-SCHEMA = "ds4rt-gptqmodel-flash-mtp-auxiliary-v1"
+SCHEMA = "ds41rt-gptqmodel-flash-mtp-auxiliary-v1"
 DEFAULT_CASES = ((0, 0, "w1"), (1, 127, "w2"), (2, 255, "w3"))
 PROJECTION_RUNTIME_NAMES = {
     "w1": "gate_proj",

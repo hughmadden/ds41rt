@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-import ds4rt_reference.deepseek_v4_dspark_capture as dspark_capture
-from ds4rt_reference.deepseek_v4_dspark_capture import (
+import ds41rt_reference.deepseek_v4_dspark_capture as dspark_capture
+from ds41rt_reference.deepseek_v4_dspark_capture import (
     DS4_DSPARK_CACHE_PAGE_BYTES,
     DS4_DSPARK_ENTRY_ACTIVATION_BLOCK_SIZE,
     DS4_DSPARK_NOISE_TOKEN_ID,

@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ds4rt_reference.rope_ref import apply_rope
+from ds41rt_reference.rope_ref import apply_rope
 
 
 def test_rope_position_zero_is_identity():

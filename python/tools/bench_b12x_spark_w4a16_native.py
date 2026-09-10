@@ -103,7 +103,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     message = ""
-    last_error = getattr(lib, "ds4rt_last_error_message", None)
+    last_error = getattr(lib, "ds41rt_last_error_message", None)
     if last_error is not None:
         error = ctypes.create_string_buffer(512)
         last_error(error, len(error))
@@ -281,7 +281,7 @@ def main() -> None:
     parser.add_argument(
         "--native-graph-api",
         action="store_true",
-        help="Use ds4rt's graph capture API instead of torch.cuda.CUDAGraph.",
+        help="Use ds41rt's graph capture API instead of torch.cuda.CUDAGraph.",
     )
     parser.add_argument(
         "--eager",
@@ -739,11 +739,11 @@ def main() -> None:
     )
 
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_cuda_b12x_spark_aot_init.restype = ctypes.c_int
+    lib.ds41rt_cuda_b12x_spark_aot_init.restype = ctypes.c_int
     decode_symbol = (
-        "ds4rt_cuda_b12x_spark_w4a16_decode_m1_fused_sum_nvfp4_async"
+        "ds41rt_cuda_b12x_spark_w4a16_decode_m1_fused_sum_nvfp4_async"
         if args.m1_fused_sum_candidate
-        else "ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async"
+        else "ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async"
     )
     decode_launch = getattr(lib, decode_symbol)
     decode_launch.argtypes = (
@@ -754,7 +754,7 @@ def main() -> None:
         ctypes.c_void_p,
     )
     decode_launch.restype = ctypes.c_int
-    prefill_launch = lib.ds4rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_async
+    prefill_launch = lib.ds41rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_async
     prefill_launch.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
         DeviceBuffer,
@@ -764,7 +764,7 @@ def main() -> None:
     )
     prefill_launch.restype = ctypes.c_int
     prefill_fp8_launch = (
-        lib.ds4rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_fp8_async
+        lib.ds41rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_fp8_async
     )
     prefill_fp8_launch.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
@@ -777,7 +777,7 @@ def main() -> None:
     )
     prefill_fp8_launch.restype = ctypes.c_int
     prefill_grid_launch = (
-        lib.ds4rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_grid_candidate_async
+        lib.ds41rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_grid_candidate_async
     )
     prefill_grid_launch.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
@@ -789,7 +789,7 @@ def main() -> None:
     )
     prefill_grid_launch.restype = ctypes.c_int
     m1_parity_launch = (
-        lib.ds4rt_cuda_b12x_spark_w4a16_m1_parity_m2_8_nvfp4_async
+        lib.ds41rt_cuda_b12x_spark_w4a16_m1_parity_m2_8_nvfp4_async
     )
     m1_parity_launch.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
@@ -801,7 +801,7 @@ def main() -> None:
     )
     m1_parity_launch.restype = ctypes.c_int
     grouped_m1_parity_launch = (
-        lib.ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_m2_8_nvfp4_async
+        lib.ds41rt_cuda_b12x_spark_w4a16_m1_parity_grouped_m2_8_nvfp4_async
     )
     grouped_m1_parity_launch.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
@@ -812,7 +812,7 @@ def main() -> None:
     )
     grouped_m1_parity_launch.restype = ctypes.c_int
     grouped_wide_m1_parity_launch = (
-        lib.ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_wide_m2_8_nvfp4_async
+        lib.ds41rt_cuda_b12x_spark_w4a16_m1_parity_grouped_wide_m2_8_nvfp4_async
     )
     grouped_wide_m1_parity_launch.argtypes = (
         ctypes.POINTER(SparkW4A16Buffers),
@@ -822,7 +822,7 @@ def main() -> None:
         ctypes.c_void_p,
     )
     grouped_wide_m1_parity_launch.restype = ctypes.c_int
-    copy_h2d = lib.ds4rt_copy_h2d_async
+    copy_h2d = lib.ds41rt_copy_h2d_async
     copy_h2d.argtypes = (
         DeviceBuffer,
         ctypes.c_void_p,
@@ -830,7 +830,7 @@ def main() -> None:
         ctypes.c_void_p,
     )
     copy_h2d.restype = ctypes.c_int
-    copy_d2d = lib.ds4rt_copy_d2d_async
+    copy_d2d = lib.ds41rt_copy_d2d_async
     copy_d2d.argtypes = (
         DeviceBuffer,
         DeviceBuffer,
@@ -838,26 +838,26 @@ def main() -> None:
         ctypes.c_void_p,
     )
     copy_d2d.restype = ctypes.c_int
-    lib.ds4rt_alloc_managed_device_buffer.argtypes = (
+    lib.ds41rt_alloc_managed_device_buffer.argtypes = (
         ctypes.c_size_t,
         ctypes.POINTER(DeviceBuffer),
     )
-    lib.ds4rt_alloc_managed_device_buffer.restype = ctypes.c_int
-    lib.ds4rt_free_device_buffer.argtypes = (ctypes.POINTER(DeviceBuffer),)
-    lib.ds4rt_free_device_buffer.restype = ctypes.c_int
-    graph_begin = lib.ds4rt_cuda_graph_begin_capture
+    lib.ds41rt_alloc_managed_device_buffer.restype = ctypes.c_int
+    lib.ds41rt_free_device_buffer.argtypes = (ctypes.POINTER(DeviceBuffer),)
+    lib.ds41rt_free_device_buffer.restype = ctypes.c_int
+    graph_begin = lib.ds41rt_cuda_graph_begin_capture
     graph_begin.argtypes = (ctypes.c_void_p,)
     graph_begin.restype = ctypes.c_int
-    graph_end = lib.ds4rt_cuda_graph_end_capture_retained
+    graph_end = lib.ds41rt_cuda_graph_end_capture_retained
     graph_end.argtypes = (ctypes.c_void_p, ctypes.POINTER(CudaGraphCaptureInfo))
     graph_end.restype = ctypes.c_int
-    graph_launch = lib.ds4rt_cuda_graph_launch
+    graph_launch = lib.ds41rt_cuda_graph_launch
     graph_launch.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
     graph_launch.restype = ctypes.c_int
-    graph_exec_destroy = lib.ds4rt_cuda_graph_exec_destroy
+    graph_exec_destroy = lib.ds41rt_cuda_graph_exec_destroy
     graph_exec_destroy.argtypes = (ctypes.c_void_p,)
     graph_exec_destroy.restype = ctypes.c_int
-    graph_destroy = lib.ds4rt_cuda_graph_destroy
+    graph_destroy = lib.ds41rt_cuda_graph_destroy
     graph_destroy.argtypes = (ctypes.c_void_p,)
     graph_destroy.restype = ctypes.c_int
 
@@ -870,7 +870,7 @@ def main() -> None:
             actual_bytes = tensor.numel() * tensor.element_size()
             check_status(
                 lib,
-                lib.ds4rt_alloc_managed_device_buffer(
+                lib.ds41rt_alloc_managed_device_buffer(
                     actual_bytes, ctypes.byref(allocation)
                 ),
                 "allocating managed packed weights",
@@ -910,7 +910,7 @@ def main() -> None:
         torch.cuda.synchronize()
     check_status(
         lib,
-        lib.ds4rt_cuda_b12x_spark_aot_init(),
+        lib.ds41rt_cuda_b12x_spark_aot_init(),
         "initializing SparkInfer AOT",
     )
 
@@ -919,21 +919,21 @@ def main() -> None:
     mapped_topk_weights = HostBuffer()
     input_payload_buffer = device_buffer(input_payload)
     if args.input_memory == "mapped":
-        lib.ds4rt_alloc_host_buffer.argtypes = (
+        lib.ds41rt_alloc_host_buffer.argtypes = (
             ctypes.c_size_t,
             ctypes.POINTER(HostBuffer),
         )
-        lib.ds4rt_alloc_host_buffer.restype = ctypes.c_int
-        lib.ds4rt_cuda_host_buffer_device_alias.argtypes = (
+        lib.ds41rt_alloc_host_buffer.restype = ctypes.c_int
+        lib.ds41rt_cuda_host_buffer_device_alias.argtypes = (
             HostBuffer,
             ctypes.POINTER(DeviceBuffer),
         )
-        lib.ds4rt_cuda_host_buffer_device_alias.restype = ctypes.c_int
-        lib.ds4rt_free_host_buffer.argtypes = (ctypes.POINTER(HostBuffer),)
-        lib.ds4rt_free_host_buffer.restype = ctypes.c_int
+        lib.ds41rt_cuda_host_buffer_device_alias.restype = ctypes.c_int
+        lib.ds41rt_free_host_buffer.argtypes = (ctypes.POINTER(HostBuffer),)
+        lib.ds41rt_free_host_buffer.restype = ctypes.c_int
         check_status(
             lib,
-            lib.ds4rt_alloc_host_buffer(input_payload.numel(), ctypes.byref(mapped_input)),
+            lib.ds41rt_alloc_host_buffer(input_payload.numel(), ctypes.byref(mapped_input)),
             "allocating mapped input payload",
         )
         host_payload = torch.empty(input_payload.shape, dtype=torch.uint8)
@@ -943,7 +943,7 @@ def main() -> None:
         input_payload_buffer = DeviceBuffer()
         check_status(
             lib,
-            lib.ds4rt_cuda_host_buffer_device_alias(
+            lib.ds41rt_cuda_host_buffer_device_alias(
                 mapped_input, ctypes.byref(input_payload_buffer)
             ),
             "mapping input payload into CUDA",
@@ -960,7 +960,7 @@ def main() -> None:
             ):
                 check_status(
                     lib,
-                    lib.ds4rt_alloc_host_buffer(
+                    lib.ds41rt_alloc_host_buffer(
                         tensor.numel() * tensor.element_size(), ctypes.byref(host_buffer)
                     ),
                     f"allocating mapped {label}",
@@ -1277,7 +1277,7 @@ def main() -> None:
                 "destroying native CUDA graph",
             )
     requested_grid_x_text = __import__("os").environ.get(
-        "DS4RT_B12X_SPARK_W4A16_DECODE_GRID_X", ""
+        "DS41RT_B12X_SPARK_W4A16_DECODE_GRID_X", ""
     )
     requested_grid_x = int(requested_grid_x_text or DEFAULT_DECODE_GRID_X)
     effective_grid_x = (
@@ -1361,18 +1361,18 @@ def main() -> None:
             if host_buffer.ptr:
                 check_status(
                     lib,
-                    lib.ds4rt_free_host_buffer(ctypes.byref(host_buffer)),
+                    lib.ds41rt_free_host_buffer(ctypes.byref(host_buffer)),
                     "freeing mapped route metadata",
                 )
         check_status(
             lib,
-            lib.ds4rt_free_host_buffer(ctypes.byref(mapped_input)),
+            lib.ds41rt_free_host_buffer(ctypes.byref(mapped_input)),
             "freeing mapped input payload",
         )
     for allocation in managed_weight_allocations:
         check_status(
             lib,
-            lib.ds4rt_free_device_buffer(ctypes.byref(allocation)),
+            lib.ds41rt_free_device_buffer(ctypes.byref(allocation)),
             "freeing managed packed weights",
         )
 

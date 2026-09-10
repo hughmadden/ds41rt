@@ -645,89 +645,89 @@ __global__ void router_topk_bf16_cub_finalize_kernel(
   }
 }
 
-ds4rt_status_t validate_router_topk_args(const float* hidden, const float* router_weight,
+ds41rt_status_t validate_router_topk_args(const float* hidden, const float* router_weight,
                                          const float* correction_bias,
                                          const uint32_t* topk_indices, const float* topk_scores,
                                          const float* topk_weights, size_t rows,
                                          size_t hidden_dim, size_t experts, size_t top_k) {
   if (hidden == nullptr || router_weight == nullptr || correction_bias == nullptr ||
       topk_indices == nullptr || topk_scores == nullptr || topk_weights == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden_dim == 0 || experts == 0 || top_k == 0 || top_k > experts ||
       top_k > kMaxRouterTopK) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden_dim, &ignored) ||
       !checked_mul(experts, hidden_dim, &ignored) ||
       !checked_mul(rows, top_k, &ignored) ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_router_topk_bf16_args(
+ds41rt_status_t validate_router_topk_bf16_args(
     const uint16_t* hidden, const uint16_t* router_weight, const float* correction_bias,
     const uint32_t* topk_indices, const float* topk_scores, const float* topk_weights,
     size_t rows, size_t hidden_dim, size_t experts, size_t top_k) {
   if (hidden == nullptr || router_weight == nullptr || correction_bias == nullptr ||
       topk_indices == nullptr || topk_scores == nullptr || topk_weights == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || hidden_dim == 0 || experts == 0 || top_k == 0 || top_k > experts ||
       top_k > kMaxRouterTopK ||
       experts > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, hidden_dim, &ignored) ||
       !checked_mul(experts, hidden_dim, &ignored) ||
       !checked_mul(rows, top_k, &ignored) ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_router_topk_bf16_cub_args(
+ds41rt_status_t validate_router_topk_bf16_cub_args(
     const uint16_t* hidden, const uint16_t* router_weight, const float* correction_bias,
     float* corrected_scores, float* sorted_corrected_scores, uint32_t* unsorted_indices,
     uint32_t* sorted_indices, int* segment_offsets, uint32_t* topk_indices, float* topk_scores,
     float* topk_weights, void* cub_temp_storage, size_t cub_temp_storage_bytes, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k) {
-  const ds4rt_status_t valid = validate_router_topk_bf16_args(
+  const ds41rt_status_t valid = validate_router_topk_bf16_args(
       hidden, router_weight, correction_bias, topk_indices, topk_scores, topk_weights, rows,
       hidden_dim, experts, top_k);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (corrected_scores == nullptr || sorted_corrected_scores == nullptr ||
       unsorted_indices == nullptr || sorted_indices == nullptr || segment_offsets == nullptr ||
       cub_temp_storage == nullptr || cub_temp_storage_bytes == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t score_values = 0;
   if (!checked_mul(rows, experts, &score_values) ||
       score_values > static_cast<size_t>(std::numeric_limits<int>::max()) ||
       rows > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_bf16_graph_router_topk_buffers(
-    ds4rt_device_buffer_t hidden, ds4rt_device_buffer_t router_weight,
-    ds4rt_device_buffer_t correction_bias, ds4rt_device_buffer_t topk_indices,
-    ds4rt_device_buffer_t topk_scores, ds4rt_device_buffer_t topk_weights, size_t rows,
+ds41rt_status_t validate_bf16_graph_router_topk_buffers(
+    ds41rt_device_buffer_t hidden, ds41rt_device_buffer_t router_weight,
+    ds41rt_device_buffer_t correction_bias, ds41rt_device_buffer_t topk_indices,
+    ds41rt_device_buffer_t topk_scores, ds41rt_device_buffer_t topk_weights, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k) {
-  const ds4rt_status_t valid = validate_router_topk_bf16_args(
+  const ds41rt_status_t valid = validate_router_topk_bf16_args(
       static_cast<const uint16_t*>(hidden.ptr), static_cast<const uint16_t*>(router_weight.ptr),
       static_cast<const float*>(correction_bias.ptr), static_cast<const uint32_t*>(topk_indices.ptr),
       static_cast<const float*>(topk_scores.ptr), static_cast<const float*>(topk_weights.ptr),
       rows, hidden_dim, experts, top_k);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t hidden_values = 0;
@@ -736,7 +736,7 @@ ds4rt_status_t validate_bf16_graph_router_topk_buffers(
   if (!checked_mul(rows, hidden_dim, &hidden_values) ||
       !checked_mul(experts, hidden_dim, &weight_values) ||
       !checked_mul(rows, top_k, &topk_values)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t hidden_bytes = 0;
   size_t weight_bytes = 0;
@@ -748,31 +748,31 @@ ds4rt_status_t validate_bf16_graph_router_topk_buffers(
       !checked_mul(experts, sizeof(float), &bias_bytes) ||
       !checked_mul(topk_values, sizeof(uint32_t), &index_bytes) ||
       !checked_mul(topk_values, sizeof(float), &score_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (hidden.bytes < hidden_bytes || router_weight.bytes < weight_bytes ||
       correction_bias.bytes < bias_bytes || topk_indices.bytes < index_bytes ||
       topk_scores.bytes < score_bytes || topk_weights.bytes < score_bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_router_topk_bf16_node(
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_router_topk_bf16_node(
     void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index,
-    ds4rt_device_buffer_t hidden, ds4rt_device_buffer_t router_weight,
-    ds4rt_device_buffer_t correction_bias, ds4rt_device_buffer_t topk_indices,
-    ds4rt_device_buffer_t topk_scores, ds4rt_device_buffer_t topk_weights, size_t rows,
+    ds41rt_device_buffer_t hidden, ds41rt_device_buffer_t router_weight,
+    ds41rt_device_buffer_t correction_bias, ds41rt_device_buffer_t topk_indices,
+    ds41rt_device_buffer_t topk_scores, ds41rt_device_buffer_t topk_weights, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_bf16_graph_router_topk_buffers(
+  const ds41rt_status_t valid = validate_bf16_graph_router_topk_buffers(
       hidden, router_weight, correction_bias, topk_indices, topk_scores, topk_weights, rows,
       hidden_dim, experts, top_k);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
@@ -812,35 +812,35 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_router_topk_bf16_node(
   const size_t topk_values = rows * top_k;
   const size_t init_blocks = (topk_values - 1) / kBlock + 1;
   if (init_blocks > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   auto update_kernel_node = [&](size_t node_index, void* expected_func,
-                                cudaKernelNodeParams* params) -> ds4rt_status_t {
+                                cudaKernelNodeParams* params) -> ds41rt_status_t {
     cudaGraphNode_t node = nullptr;
-    const ds4rt_status_t node_status =
+    const ds41rt_status_t node_status =
         find_kernel_node_by_index(cuda_graph, node_index, &node);
-    if (node_status != DS4RT_STATUS_OK) {
+    if (node_status != DS41RT_STATUS_OK) {
       return node_status;
     }
     cudaKernelNodeParams existing = {};
     cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
     if (err != cudaSuccess) {
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
     if (existing.func != expected_func) {
-      return DS4RT_STATUS_INVALID_ARGUMENT;
+      return DS41RT_STATUS_INVALID_ARGUMENT;
     }
     err = cudaGraphKernelNodeSetParams(node, params);
     if (err != cudaSuccess) {
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
     err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec),
                                            node, params);
     if (err != cudaSuccess) {
-      return DS4RT_STATUS_INTERNAL_ERROR;
+      return DS41RT_STATUS_INTERNAL_ERROR;
     }
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   };
 
   cudaKernelNodeParams init_params = {};
@@ -868,34 +868,34 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_router_topk_bf16_node(
   finalize_params.kernelParams = finalize_args;
   finalize_params.extra = nullptr;
 
-  ds4rt_status_t status = update_kernel_node(
+  ds41rt_status_t status = update_kernel_node(
       kernel_node_index, reinterpret_cast<void*>(router_topk_bf16_init_kernel), &init_params);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   status = update_kernel_node(kernel_node_index + 1,
                               reinterpret_cast<void*>(router_topk_bf16_score_kernel),
                               &score_params);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   status = update_kernel_node(kernel_node_index + 2,
                               reinterpret_cast<void*>(router_topk_bf16_finalize_kernel),
                               &finalize_params);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_router_topk_f32_async(
+extern "C" ds41rt_status_t ds41rt_cuda_router_topk_f32_async(
     const float* hidden, const float* router_weight, const float* correction_bias,
     uint32_t* topk_indices, float* topk_scores, float* topk_weights, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k, void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_router_topk_args(hidden, router_weight, correction_bias, topk_indices, topk_scores,
                                 topk_weights, rows, hidden_dim, experts, top_k);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -905,35 +905,35 @@ extern "C" ds4rt_status_t ds4rt_cuda_router_topk_f32_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_router_topk_f32(
+extern "C" ds41rt_status_t ds41rt_cuda_router_topk_f32(
     const float* hidden, const float* router_weight, const float* correction_bias,
     uint32_t* topk_indices, float* topk_scores, float* topk_weights, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_router_topk_f32_async(hidden, router_weight, correction_bias, topk_indices,
+  const ds41rt_status_t status =
+      ds41rt_cuda_router_topk_f32_async(hidden, router_weight, correction_bias, topk_indices,
                                        topk_scores, topk_weights, rows, hidden_dim, experts, top_k,
                                        nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_router_topk_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_router_topk_bf16_async(
     const uint16_t* hidden, const uint16_t* router_weight, const float* correction_bias,
     uint32_t* topk_indices, float* topk_scores, float* topk_weights, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_router_topk_bf16_args(
+  const ds41rt_status_t valid = validate_router_topk_bf16_args(
       hidden, router_weight, correction_bias, topk_indices, topk_scores, topk_weights, rows,
       hidden_dim, experts, top_k);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   const size_t topk_values = rows * top_k;
   const size_t init_blocks = (topk_values - 1) / kBlock + 1;
   if (init_blocks > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   router_topk_bf16_init_kernel<<<static_cast<unsigned int>(init_blocks), kBlock, 0, stream>>>(
       topk_indices, topk_scores, topk_weights, rows, top_k);
@@ -954,21 +954,21 @@ extern "C" ds4rt_status_t ds4rt_cuda_router_topk_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_router_topk_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_router_topk_bf16(
     const uint16_t* hidden, const uint16_t* router_weight, const float* correction_bias,
     uint32_t* topk_indices, float* topk_scores, float* topk_weights, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_router_topk_bf16_async(hidden, router_weight, correction_bias, topk_indices,
+  const ds41rt_status_t status =
+      ds41rt_cuda_router_topk_bf16_async(hidden, router_weight, correction_bias, topk_indices,
                                         topk_scores, topk_weights, rows, hidden_dim, experts,
                                         top_k, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_router_topk_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_flash_router_topk_bf16_async(
     const uint16_t *hidden, const uint16_t *router_weight,
     const float *correction_bias, const int64_t *token_to_experts,
     const int64_t *token_ids, uint32_t *topk_indices, float *topk_scores,
@@ -977,17 +977,17 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_router_topk_bf16_async(
       topk_indices == nullptr || topk_scores == nullptr ||
       topk_weights == nullptr || rows == 0 ||
       rows > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if ((hash_routing == 0 && correction_bias == nullptr) ||
       (hash_routing != 0 &&
        (token_to_experts == nullptr || token_ids == nullptr))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, kDs4FlashHiddenDim, &ignored) ||
       !checked_mul(rows, kDs4FlashTopK + kDs4FlashExperts, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1021,21 +1021,21 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_router_topk_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_router_topk_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_flash_router_topk_bf16(
     const uint16_t *hidden, const uint16_t *router_weight,
     const float *correction_bias, const int64_t *token_to_experts,
     const int64_t *token_ids, uint32_t *topk_indices, float *topk_scores,
     float *topk_weights, size_t rows, int hash_routing) {
-  const ds4rt_status_t status = ds4rt_cuda_ds4_flash_router_topk_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_ds4_flash_router_topk_bf16_async(
       hidden, router_weight, correction_bias, token_to_experts, token_ids,
       topk_indices, topk_scores, topk_weights, rows, hash_routing, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_router_refine_topk_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_flash_router_refine_topk_bf16_async(
     const uint16_t *hidden, const uint16_t *router_weight,
     const float *correction_bias, float *approximate_logits,
     uint32_t *topk_indices, float *topk_scores, float *topk_weights, size_t rows,
@@ -1045,14 +1045,14 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_router_refine_topk_bf16_async(
       topk_indices == nullptr || topk_scores == nullptr ||
       topk_weights == nullptr || rows == 0 ||
       rows > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, kDs4FlashHiddenDim, &ignored) ||
       !checked_mul(rows, kDs4FlashExperts, &ignored) ||
       !checked_mul(rows, kDs4FlashHybridCandidates, &ignored) ||
       !checked_mul(rows, kDs4FlashTopK, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1077,7 +1077,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_flash_router_refine_topk_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_router_topk_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_pro_router_topk_bf16_async(
     const uint16_t *hidden, const uint16_t *router_weight,
     const float *correction_bias, const int64_t *token_to_experts,
     const int64_t *token_ids, uint32_t *topk_indices, float *topk_scores,
@@ -1085,17 +1085,17 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_router_topk_bf16_async(
   if (hidden == nullptr || router_weight == nullptr || topk_indices == nullptr ||
       topk_scores == nullptr || topk_weights == nullptr || rows == 0 ||
       rows > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if ((hash_routing == 0 && correction_bias == nullptr) ||
       (hash_routing != 0 &&
        (token_to_experts == nullptr || token_ids == nullptr))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(rows, kDs4ProHiddenDim, &ignored) ||
       !checked_mul(rows, kDs4ProTopK + kDs4ProExperts, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1118,18 +1118,18 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_router_topk_bf16_async(
     // converting its logits in place avoids the one-block-per-(row, expert)
     // dot product without perturbing the latency/quality-sensitive path.
     if (rows > kDs4ProExactRouterMaxRows) {
-      const ds4rt_status_t score_status =
-          ds4rt_cuda_linear_bf16_f32_cublas_async(
+      const ds41rt_status_t score_status =
+          ds41rt_cuda_linear_bf16_f32_cublas_async(
               hidden, router_weight, raw_scores, rows, kDs4ProHiddenDim,
               kDs4ProExperts, cuda_stream);
-      if (score_status != DS4RT_STATUS_OK) {
+      if (score_status != DS41RT_STATUS_OK) {
         return score_status;
       }
       const size_t values = rows * kDs4ProExperts;
       const size_t blocks = (values + kBlock - 1) / kBlock;
       if (blocks >
           static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-        return DS4RT_STATUS_INVALID_ARGUMENT;
+        return DS41RT_STATUS_INVALID_ARGUMENT;
       }
       ds4_router_logits_to_scores_kernel<kDs4ProExperts>
           <<<static_cast<unsigned int>(blocks), kBlock, 0, stream>>>(
@@ -1152,31 +1152,31 @@ extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_router_topk_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_ds4_pro_router_topk_bf16(
+extern "C" ds41rt_status_t ds41rt_cuda_ds4_pro_router_topk_bf16(
     const uint16_t *hidden, const uint16_t *router_weight,
     const float *correction_bias, const int64_t *token_to_experts,
     const int64_t *token_ids, uint32_t *topk_indices, float *topk_scores,
     float *topk_weights, size_t rows, int hash_routing) {
-  const ds4rt_status_t status = ds4rt_cuda_ds4_pro_router_topk_bf16_async(
+  const ds41rt_status_t status = ds41rt_cuda_ds4_pro_router_topk_bf16_async(
       hidden, router_weight, correction_bias, token_to_experts, token_ids,
       topk_indices, topk_scores, topk_weights, rows, hash_routing, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_router_topk_bf16_cub_async(
+extern "C" ds41rt_status_t ds41rt_cuda_router_topk_bf16_cub_async(
     const uint16_t* hidden, const uint16_t* router_weight, const float* correction_bias,
     float* corrected_scores, float* sorted_corrected_scores, uint32_t* unsorted_indices,
     uint32_t* sorted_indices, int* segment_offsets, uint32_t* topk_indices, float* topk_scores,
     float* topk_weights, void* cub_temp_storage, size_t cub_temp_storage_bytes, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k, void* cuda_stream) {
-  const ds4rt_status_t valid = validate_router_topk_bf16_cub_args(
+  const ds41rt_status_t valid = validate_router_topk_bf16_cub_args(
       hidden, router_weight, correction_bias, corrected_scores, sorted_corrected_scores,
       unsorted_indices, sorted_indices, segment_offsets, topk_indices, topk_scores, topk_weights,
       cub_temp_storage, cub_temp_storage_bytes, rows, hidden_dim, experts, top_k);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1184,7 +1184,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_router_topk_bf16_cub_async(
   const size_t fill_values = std::max(score_values, rows + 1);
   const size_t fill_blocks = (fill_values - 1) / kBlock + 1;
   if (fill_blocks > static_cast<size_t>(std::numeric_limits<unsigned int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   router_topk_bf16_cub_fill_indices_offsets_kernel<<<
       static_cast<unsigned int>(fill_blocks), kBlock, 0, stream>>>(unsorted_indices,
@@ -1214,17 +1214,17 @@ extern "C" ds4rt_status_t ds4rt_cuda_router_topk_bf16_cub_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_router_topk_bf16_cub(
+extern "C" ds41rt_status_t ds41rt_cuda_router_topk_bf16_cub(
     const uint16_t* hidden, const uint16_t* router_weight, const float* correction_bias,
     float* corrected_scores, float* sorted_corrected_scores, uint32_t* unsorted_indices,
     uint32_t* sorted_indices, int* segment_offsets, uint32_t* topk_indices, float* topk_scores,
     float* topk_weights, void* cub_temp_storage, size_t cub_temp_storage_bytes, size_t rows,
     size_t hidden_dim, size_t experts, size_t top_k) {
-  const ds4rt_status_t status = ds4rt_cuda_router_topk_bf16_cub_async(
+  const ds41rt_status_t status = ds41rt_cuda_router_topk_bf16_cub_async(
       hidden, router_weight, correction_bias, corrected_scores, sorted_corrected_scores,
       unsorted_indices, sorted_indices, segment_offsets, topk_indices, topk_scores, topk_weights,
       cub_temp_storage, cub_temp_storage_bytes, rows, hidden_dim, experts, top_k, nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));

@@ -38,53 +38,53 @@ __global__ void embedding_lookup_bf16_kernel(const uint16_t* embedding, const ui
   out[idx] = embedding[token_id * hidden + col];
 }
 
-ds4rt_status_t validate_embedding_lookup_args(const float* embedding, const uint32_t* token_ids,
+ds41rt_status_t validate_embedding_lookup_args(const float* embedding, const uint32_t* token_ids,
                                               const float* out, size_t rows, size_t vocab,
                                               size_t hidden) {
   if (embedding == nullptr || token_ids == nullptr || out == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || vocab == 0 || hidden == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(vocab, hidden, &ignored) || !checked_mul(rows, hidden, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_embedding_lookup_bf16_args(const uint16_t* embedding,
+ds41rt_status_t validate_embedding_lookup_bf16_args(const uint16_t* embedding,
                                                    const uint32_t* token_ids,
                                                    const uint16_t* out, size_t rows, size_t vocab,
                                                    size_t hidden) {
   if (embedding == nullptr || token_ids == nullptr || out == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 0 || vocab == 0 || hidden == 0) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t ignored = 0;
   if (!checked_mul(vocab, hidden, &ignored) || !checked_mul(rows, hidden, &ignored)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-ds4rt_status_t validate_bf16_graph_embedding_lookup_buffers(
-    ds4rt_device_buffer_t embedding, ds4rt_device_buffer_t token_ids, ds4rt_device_buffer_t out,
+ds41rt_status_t validate_bf16_graph_embedding_lookup_buffers(
+    ds41rt_device_buffer_t embedding, ds41rt_device_buffer_t token_ids, ds41rt_device_buffer_t out,
     size_t rows, size_t vocab, size_t hidden) {
-  const ds4rt_status_t valid = validate_embedding_lookup_bf16_args(
+  const ds41rt_status_t valid = validate_embedding_lookup_bf16_args(
       static_cast<const uint16_t*>(embedding.ptr), static_cast<const uint32_t*>(token_ids.ptr),
       static_cast<const uint16_t*>(out.ptr), rows, vocab, hidden);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   size_t embedding_values = 0;
   size_t output_values = 0;
   if (!checked_mul(vocab, hidden, &embedding_values) ||
       !checked_mul(rows, hidden, &output_values)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   size_t embedding_bytes = 0;
   size_t token_bytes = 0;
@@ -92,43 +92,43 @@ ds4rt_status_t validate_bf16_graph_embedding_lookup_buffers(
   if (!checked_mul(embedding_values, sizeof(uint16_t), &embedding_bytes) ||
       !checked_mul(rows, sizeof(uint32_t), &token_bytes) ||
       !checked_mul(output_values, sizeof(uint16_t), &output_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (embedding.bytes < embedding_bytes || token_ids.bytes < token_bytes ||
       out.bytes < output_bytes) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_graph_update_embedding_lookup_bf16_node(
+extern "C" ds41rt_status_t ds41rt_cuda_graph_update_embedding_lookup_bf16_node(
     void* cuda_graph, void* cuda_graph_exec, size_t kernel_node_index,
-    ds4rt_device_buffer_t embedding, ds4rt_device_buffer_t token_ids, ds4rt_device_buffer_t out,
+    ds41rt_device_buffer_t embedding, ds41rt_device_buffer_t token_ids, ds41rt_device_buffer_t out,
     size_t rows, size_t vocab, size_t hidden) {
   if (cuda_graph == nullptr || cuda_graph_exec == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_bf16_graph_embedding_lookup_buffers(embedding, token_ids, out, rows, vocab, hidden);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
 
   cudaGraphNode_t node = nullptr;
-  const ds4rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
-  if (node_status != DS4RT_STATUS_OK) {
+  const ds41rt_status_t node_status = find_kernel_node_by_index(cuda_graph, kernel_node_index, &node);
+  if (node_status != DS41RT_STATUS_OK) {
     return node_status;
   }
 
   cudaKernelNodeParams existing = {};
   cudaError_t err = cudaGraphKernelNodeGetParams(node, &existing);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   if (existing.func != reinterpret_cast<void*>(embedding_lookup_bf16_kernel)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   const uint16_t* embedding_ptr = static_cast<const uint16_t*>(embedding.ptr);
@@ -146,7 +146,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_embedding_lookup_bf16_node(
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
 
   cudaKernelNodeParams params = {};
@@ -159,22 +159,22 @@ extern "C" ds4rt_status_t ds4rt_cuda_graph_update_embedding_lookup_bf16_node(
 
   err = cudaGraphKernelNodeSetParams(node, &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
   err = cudaGraphExecKernelNodeSetParams(reinterpret_cast<cudaGraphExec_t>(cuda_graph_exec), node,
                                          &params);
   if (err != cudaSuccess) {
-    return DS4RT_STATUS_INTERNAL_ERROR;
+    return DS41RT_STATUS_INTERNAL_ERROR;
   }
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_f32_async(
+extern "C" ds41rt_status_t ds41rt_cuda_embedding_lookup_f32_async(
     const float* embedding, const uint32_t* token_ids, float* out, size_t rows, size_t vocab,
     size_t hidden, void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_embedding_lookup_args(embedding, token_ids, out, rows, vocab, hidden);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -182,7 +182,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_f32_async(
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int blocks = static_cast<int>(block_count);
   embedding_lookup_f32_kernel<<<blocks, threads, 0, stream>>>(embedding, token_ids, out, rows,
@@ -190,25 +190,25 @@ extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_f32_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_f32(const float* embedding,
+extern "C" ds41rt_status_t ds41rt_cuda_embedding_lookup_f32(const float* embedding,
                                                           const uint32_t* token_ids, float* out,
                                                           size_t rows, size_t vocab,
                                                           size_t hidden) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_embedding_lookup_f32_async(embedding, token_ids, out, rows, vocab, hidden,
+  const ds41rt_status_t status =
+      ds41rt_cuda_embedding_lookup_f32_async(embedding, token_ids, out, rows, vocab, hidden,
                                             nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_bf16_async(
+extern "C" ds41rt_status_t ds41rt_cuda_embedding_lookup_bf16_async(
     const uint16_t* embedding, const uint32_t* token_ids, uint16_t* out, size_t rows, size_t vocab,
     size_t hidden, void* cuda_stream) {
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_embedding_lookup_bf16_args(embedding, token_ids, out, rows, vocab, hidden);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -216,7 +216,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_bf16_async(
   const size_t total = rows * hidden;
   const size_t block_count = (total - 1) / threads + 1;
   if (block_count > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int blocks = static_cast<int>(block_count);
   embedding_lookup_bf16_kernel<<<blocks, threads, 0, stream>>>(embedding, token_ids, out, rows,
@@ -224,14 +224,14 @@ extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_embedding_lookup_bf16(const uint16_t* embedding,
+extern "C" ds41rt_status_t ds41rt_cuda_embedding_lookup_bf16(const uint16_t* embedding,
                                                            const uint32_t* token_ids,
                                                            uint16_t* out, size_t rows,
                                                            size_t vocab, size_t hidden) {
-  const ds4rt_status_t status =
-      ds4rt_cuda_embedding_lookup_bf16_async(embedding, token_ids, out, rows, vocab, hidden,
+  const ds41rt_status_t status =
+      ds41rt_cuda_embedding_lookup_bf16_async(embedding, token_ids, out, rows, vocab, hidden,
                                              nullptr);
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return status_from_cuda(cudaStreamSynchronize(nullptr));

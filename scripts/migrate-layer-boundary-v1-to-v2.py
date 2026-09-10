@@ -23,7 +23,7 @@ from safetensors.torch import load_file as load_safetensors_file
 import xxhash
 
 
-SCHEMA = "ds4rt.deepseek-v4-layer-boundary"
+SCHEMA = "ds41rt.deepseek-v4-layer-boundary"
 LEGACY_VERSION = 1
 CURRENT_VERSION = 2
 PAYLOAD_HASH_ALGORITHM = "xxh3-128"

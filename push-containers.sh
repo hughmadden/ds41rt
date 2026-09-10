@@ -32,14 +32,14 @@ tag="$1"
 [[ "$tag" != latest ]] ||
   release_die "provide a version tag; latest is published automatically"
 
-release_load_config "$repo_root/ds4rt.config"
+release_load_config "$repo_root/ds41rt.config"
 release_need docker
 release_need ssh
 
-coordinator_repository="ghcr.io/tpurtell/ds4rt-coordinator"
-spark_repository="ghcr.io/tpurtell/ds4rt-spark-expert"
+coordinator_repository="ghcr.io/tpurtell/ds41rt-coordinator"
+spark_repository="ghcr.io/tpurtell/ds41rt-spark-expert"
 spark_host="$SPARK_0_HOST"
-expected_source="https://github.com/tpurtell/ds4rt-pro-rtx-4spark"
+expected_source="https://github.com/tpurtell/ds41rt"
 
 docker info >/dev/null 2>&1 ||
   release_die "local Docker daemon is unavailable"
@@ -91,7 +91,7 @@ REMOTE
 [[ "$spark_source" == "$expected_source" ]] ||
   release_die "$spark_host image is not linked to the release repository: $spark_source"
 
-echo "Publishing DS4RT containers"
+echo "Publishing DS41RT containers"
 echo "  revision:    $coordinator_revision"
 echo "  coordinator: $coordinator_repository:$tag"
 echo "  spark:       $spark_repository:$tag (from $spark_host)"

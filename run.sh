@@ -10,7 +10,7 @@ Usage: ./run.sh [--profile FILE] [--restart] [--dry-run]
        ./run.sh --wip [--wip-slot NAME] [--profile FILE] [--restart] [--dry-run]
                 [--allow-development-unqualified-exl3]
 
-Uses ds4rt.config beside this script by default. Despite the option name,
+Uses ds41rt.config beside this script by default. Despite the option name,
 --profile FILE selects an entire alternate configuration file.
 
 --restart  gracefully restarts the selected serving stack; WIP launches retain
@@ -28,7 +28,7 @@ for run_arg in "$@"; do
   fi
 done
 
-config="$repo_root/ds4rt.config"
+config="$repo_root/ds41rt.config"
 restart=0
 dry_run=0
 while [[ $# -gt 0 ]]; do
@@ -72,7 +72,7 @@ fi
 
 docker info >/dev/null 2>&1 || release_die "local Docker daemon is unavailable"
 if ((restart)); then
-  # Switching back from the persistent WIP lane stops only its DS4RT
+  # Switching back from the persistent WIP lane stops only its DS41RT
   # processes. The development containers, build caches, and slots survive.
   release_stop_wip_services || release_die "failed to stop one or more WIP services"
 fi
@@ -85,7 +85,7 @@ sparkinfer_commit="$(
     --print-revision
 )"
 coordinator_sparkinfer_commit="$(
-  docker image inspect -f '{{index .Config.Labels "io.ds4rt.sparkinfer.revision"}}' \
+  docker image inspect -f '{{index .Config.Labels "io.ds41rt.sparkinfer.revision"}}' \
     "$COORDINATOR_DOCKER_INFERENCE"
 )"
 [[ "$coordinator_sparkinfer_commit" == "$sparkinfer_commit" ]] ||
@@ -96,7 +96,7 @@ coordinator_engine_commit="$(
 )"
 case "$coordinator_engine_commit" in
   ""|"<no value>"|unknown|unknown-*)
-    release_die "coordinator image has no concrete DS4RT engine revision (run ./build.sh)"
+    release_die "coordinator image has no concrete DS41RT engine revision (run ./build.sh)"
     ;;
 esac
 
@@ -106,7 +106,7 @@ lane_b_csv="$(release_lane_b_csv)"
 expert_hosts_csv="$(release_expert_hosts_csv)"
 coordinator_container="$RELEASE_COORDINATOR_CONTAINER_NAME"
 spark_container_prefix="$RELEASE_SPARK_CONTAINER_PREFIX"
-state_dir="$repo_root/.ds4rt-release"
+state_dir="$repo_root/.ds41rt-release"
 mkdir -p "$state_dir"
 hf_home="${HF_HOME:-$HOME/.cache/huggingface}"
 mkdir -p "$hf_home"
@@ -124,7 +124,7 @@ for host in "$SPARK_0_HOST" "$SPARK_1_HOST" "$SPARK_2_HOST" "$SPARK_3_HOST"; do
     release_die "$host is unreachable or lacks image $SPARK_EXPERT_DOCKER_INFERENCE"
   remote_sparkinfer_commit="$(
     ssh -o BatchMode=yes "$host" \
-      "docker image inspect -f '{{index .Config.Labels \"io.ds4rt.sparkinfer.revision\"}}' '$SPARK_EXPERT_DOCKER_INFERENCE'"
+      "docker image inspect -f '{{index .Config.Labels \"io.ds41rt.sparkinfer.revision\"}}' '$SPARK_EXPERT_DOCKER_INFERENCE'"
   )"
   [[ "$remote_sparkinfer_commit" == "$sparkinfer_commit" ]] ||
     release_die "$host Spark image uses SparkInfer $remote_sparkinfer_commit; expected $sparkinfer_commit (run ./build.sh)"
@@ -133,7 +133,7 @@ for host in "$SPARK_0_HOST" "$SPARK_1_HOST" "$SPARK_2_HOST" "$SPARK_3_HOST"; do
       "docker image inspect -f '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' '$SPARK_EXPERT_DOCKER_INFERENCE'"
   )"
   [[ "$remote_engine_commit" == "$coordinator_engine_commit" ]] ||
-    release_die "$host Spark image uses DS4RT engine $remote_engine_commit; coordinator uses $coordinator_engine_commit (run ./build.sh)"
+    release_die "$host Spark image uses DS41RT engine $remote_engine_commit; coordinator uses $coordinator_engine_commit (run ./build.sh)"
   if ssh -o BatchMode=yes "$host" "docker container inspect '$release_container' >/dev/null 2>&1"; then
     image_state="$(
       ssh -o BatchMode=yes "$host" bash -s -- \
@@ -170,7 +170,7 @@ REMOTE
   else
     echo "  $host: image ready; no current release expert container"
   fi
-  if ssh -o BatchMode=yes "$host" "docker ps --format '{{.Names}}' | grep -Eq '^ds4rt-phase0-tcp-expertd-${host}-${EXPERT_PORT}$'" >/dev/null; then
+  if ssh -o BatchMode=yes "$host" "docker ps --format '{{.Names}}' | grep -Eq '^ds41rt-phase0-tcp-expertd-${host}-${EXPERT_PORT}$'" >/dev/null; then
     echo "  $host: legacy expert container currently occupies the GPU"
     ((running_legacy_sparks += 1))
   fi
@@ -195,9 +195,9 @@ if docker container inspect "$coordinator_container" >/dev/null 2>&1; then
     fi
   fi
 fi
-if ss -ltnp "sport = :${ADDR##*:}" 2>/dev/null | grep -q ds4rt &&
+if ss -ltnp "sport = :${ADDR##*:}" 2>/dev/null | grep -q ds41rt &&
   ! docker ps --format '{{.Names}}' | grep -Fx "$coordinator_container" >/dev/null; then
-  echo "  coordinator: host ds4rt API process currently occupies ${ADDR##*:}"
+  echo "  coordinator: host ds41rt API process currently occupies ${ADDR##*:}"
   host_api_running=1
 elif ((release_coordinator_running == 0 && stale_release_coordinator == 0)); then
   echo "  coordinator: image ready; no API process running"
@@ -232,7 +232,7 @@ resolve_profile() {
     -v "$hf_home:/root/.cache/huggingface:ro" \
     -e HF_HOME="$hf_home" \
     "$COORDINATOR_DOCKER_INFERENCE" \
-    python3 /opt/ds4rt/python/tools/resolve_serve_profile.py "${profile_args[@]}"
+    python3 /opt/ds41rt/python/tools/resolve_serve_profile.py "${profile_args[@]}"
 }
 
 resolved_json="$state_dir/resolved-profile.json"
@@ -244,7 +244,7 @@ resolved_dspark_draft_policy="$(
 [[ "$resolved_dspark_draft_policy" == "$DSPARK_DRAFT_POLICY" ]] ||
   release_die "profile resolver draft policy mismatch: requested $DSPARK_DRAFT_POLICY, resolved $resolved_dspark_draft_policy"
 resolved_fixed_drafts="$(
-  jq -r '.environment.DS4RT_REAL_FULL_DSPARK_FIXED_DRAFTS // ""' "$resolved_json"
+  jq -r '.environment.DS41RT_REAL_FULL_DSPARK_FIXED_DRAFTS // ""' "$resolved_json"
 )"
 if [[ "$DSPARK:$DSPARK_DRAFT_POLICY" == on:full ]]; then
   [[ "$resolved_fixed_drafts" == 5 ]] ||
@@ -321,7 +321,7 @@ if [[ "$expert_format" == exl3 ]]; then
     -v "$hf_home:/root/.cache/huggingface:ro" \
     -e HF_HOME="$hf_home" \
     "$image" \
-    python3 /opt/ds4rt/python/tools/validate_ds4_staged_snapshot.py \
+    python3 /opt/ds41rt/python/tools/validate_ds4_staged_snapshot.py \
       --checkpoint "$root/snapshots/$revision" \
       --model-id "$model_id" \
       --revision "$revision" \
@@ -353,7 +353,7 @@ if ((services_active)); then
       host_api_running == 0)); then
       coordinator_fingerprint="$(
         docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$coordinator_container" |
-          sed -n 's/^DS4RT_RELEASE_CONFIG_SHA256=//p'
+          sed -n 's/^DS41RT_RELEASE_CONFIG_SHA256=//p'
       )"
       spark_fingerprint_matches=1
       for host in "$SPARK_0_HOST" "$SPARK_1_HOST" "$SPARK_2_HOST" "$SPARK_3_HOST"; do
@@ -361,7 +361,7 @@ if ((services_active)); then
         remote_fingerprint="$(
           ssh -o BatchMode=yes "$host" \
             "docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' '$release_container'" |
-            sed -n 's/^DS4RT_RELEASE_CONFIG_SHA256=//p'
+            sed -n 's/^DS41RT_RELEASE_CONFIG_SHA256=//p'
         )"
         [[ "$remote_fingerprint" == "$deployment_fingerprint" ]] ||
           spark_fingerprint_matches=0
@@ -460,43 +460,43 @@ eval "$(
   jq -r '.environment | to_entries[] | "\(.key)=\(.value | @sh); export \(.key)"' \
     "$resolved_json"
 )"
-export DS4RT_SPARK_HOSTS="$hosts_csv"
-export DS4RT_REAL_FULL_SERVE_EXPERT_HOSTS="$expert_hosts_csv"
-export DS4RT_SPARK_IMAGE="$SPARK_EXPERT_DOCKER_INFERENCE"
-export DS4RT_SPARK_PREBUILT=1
-export DS4RT_MODEL_REVISION="$RELEASE_MODEL_REVISION"
+export DS41RT_SPARK_HOSTS="$hosts_csv"
+export DS41RT_REAL_FULL_SERVE_EXPERT_HOSTS="$expert_hosts_csv"
+export DS41RT_SPARK_IMAGE="$SPARK_EXPERT_DOCKER_INFERENCE"
+export DS41RT_SPARK_PREBUILT=1
+export DS41RT_MODEL_REVISION="$RELEASE_MODEL_REVISION"
 # Release images already contain the verified binary, native library, Python
 # sources, and pinned SparkInfer tree.  Staging the mutable checkout is both
 # unnecessary and unsafe: an old root-owned build tree can make rsync fail
 # before the prebuilt container is even launched.
-export DS4RT_SPARK_SKIP_STAGE=1
-export DS4RT_RELEASE_CONFIG_SHA256="$deployment_fingerprint"
-export DS4RT_SPARK_CONTAINER_PREFIX="$spark_container_prefix"
-export DS4RT_SPARK_EXPERT_PORT="$EXPERT_PORT"
-export DS4RT_SPARK_EXPERT_TRANSPORT=verbs-host
-export DS4RT_SPARK_KEEP_EXPERTS=1
-export DS4RT_SPARK_EXPERT_REAL_LAYER=all
-export DS4RT_PHASE0_SPARK_SKIP_BENCH=1
-export DS4RT_EXPERT_INTERMEDIATE_RDMA_PEERS="$lane_a_csv"
+export DS41RT_SPARK_SKIP_STAGE=1
+export DS41RT_RELEASE_CONFIG_SHA256="$deployment_fingerprint"
+export DS41RT_SPARK_CONTAINER_PREFIX="$spark_container_prefix"
+export DS41RT_SPARK_EXPERT_PORT="$EXPERT_PORT"
+export DS41RT_SPARK_EXPERT_TRANSPORT=verbs-host
+export DS41RT_SPARK_KEEP_EXPERTS=1
+export DS41RT_SPARK_EXPERT_REAL_LAYER=all
+export DS41RT_PHASE0_SPARK_SKIP_BENCH=1
+export DS41RT_EXPERT_INTERMEDIATE_RDMA_PEERS="$lane_a_csv"
 if [[ -n "$lane_b_csv" ]]; then
-  export DS4RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS="$lane_b_csv"
+  export DS41RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS="$lane_b_csv"
 else
-  unset DS4RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS || true
+  unset DS41RT_EXPERT_INTERMEDIATE_RDMA_ADDITIONAL_PEERS || true
 fi
 "$repo_root/scripts/phase0-spark-tcp-bench.sh" &
 spark_start_pid=$!
 
 env_file="$state_dir/coordinator.env"
 jq -r '.environment | to_entries[] | "\(.key)=\(.value)"' "$resolved_json" >"$env_file"
-if [[ -n "${DS4RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP:-}" ]]; then
-  echo "DS4RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP=$DS4RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP" \
+if [[ -n "${DS41RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP:-}" ]]; then
+  echo "DS41RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP=$DS41RT_REAL_FULL_DSPARK_PROFILE_AT_STARTUP" \
     >>"$env_file"
 fi
 for benchmark_env_name in \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_PREFIX_ROWS \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_NEW_ROWS \
-  DS4RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_REPEATS; do
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE \
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_PREFIX_ROWS \
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_NEW_ROWS \
+  DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_REPEATS; do
   if [[ -v "$benchmark_env_name" ]]; then
     printf '%s=%s\n' "$benchmark_env_name" "${!benchmark_env_name}" >>"$env_file"
   fi
@@ -504,23 +504,23 @@ done
 coordinator_image_id="$(docker image inspect -f '{{.Id}}' "$COORDINATOR_DOCKER_INFERENCE")"
 {
   echo "ADDR=$ADDR"
-  echo "DS4RT_REAL_FULL_SERVE_EXPERT_HOSTS=$expert_hosts_csv"
-  echo "DS4RT_SPARK_HOSTS=$hosts_csv"
-  echo "DS4RT_SPARK_EXPERT_PORT=$EXPERT_PORT"
-  echo "DS4RT_SPARKINFER_EXL3=$SPARKINFER_EXL3"
-  echo "DS4RT_MODEL_REVISION=$RELEASE_MODEL_REVISION"
-  echo "DS4RT_REAL_FULL_SERVE_START_EXPERTS=0"
-  echo "DS4RT_REAL_FULL_SERVE_BUILD_DAEMON=0"
-  echo "DS4RT_REAL_FULL_SERVE_BUILD_NATIVE=0"
-  echo "DS4RT_REAL_FULL_SERVE_REQUIRE_CUDA=1"
-  echo "DS4RT_REAL_FULL_SERVE_EXPERT_WARMUP_STATUS_FILE=/tmp/ds4rt-expert-warmup.status"
-  echo "DS4RT_BIN=/opt/ds4rt/bin/ds4rt"
-  echo "DS4RT_NATIVE_LIB=/opt/ds4rt/lib/libds4rt_native.so"
-  echo "DS4RT_ENGINE_COMMIT=$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$COORDINATOR_DOCKER_INFERENCE")"
-  echo "DS4RT_RELEASE_CONFIG_SHA256=$deployment_fingerprint"
-  echo "DS4RT_KERNEL_CACHE_BASE=/var/cache/ds4rt/kernels"
-  echo "DS4RT_KERNEL_CACHE_ENVIRONMENT_ID=$coordinator_image_id"
-  echo "DS4RT_RUNTIME_CATALOG_CACHE_DIR=/var/cache/ds4rt/catalogs"
+  echo "DS41RT_REAL_FULL_SERVE_EXPERT_HOSTS=$expert_hosts_csv"
+  echo "DS41RT_SPARK_HOSTS=$hosts_csv"
+  echo "DS41RT_SPARK_EXPERT_PORT=$EXPERT_PORT"
+  echo "DS41RT_SPARKINFER_EXL3=$SPARKINFER_EXL3"
+  echo "DS41RT_MODEL_REVISION=$RELEASE_MODEL_REVISION"
+  echo "DS41RT_REAL_FULL_SERVE_START_EXPERTS=0"
+  echo "DS41RT_REAL_FULL_SERVE_BUILD_DAEMON=0"
+  echo "DS41RT_REAL_FULL_SERVE_BUILD_NATIVE=0"
+  echo "DS41RT_REAL_FULL_SERVE_REQUIRE_CUDA=1"
+  echo "DS41RT_REAL_FULL_SERVE_EXPERT_WARMUP_STATUS_FILE=/tmp/ds41rt-expert-warmup.status"
+  echo "DS41RT_BIN=/opt/ds41rt/bin/ds41rt"
+  echo "DS41RT_NATIVE_LIB=/opt/ds41rt/lib/libds41rt_native.so"
+  echo "DS41RT_ENGINE_COMMIT=$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$COORDINATOR_DOCKER_INFERENCE")"
+  echo "DS41RT_RELEASE_CONFIG_SHA256=$deployment_fingerprint"
+  echo "DS41RT_KERNEL_CACHE_BASE=/var/cache/ds41rt/kernels"
+  echo "DS41RT_KERNEL_CACHE_ENVIRONMENT_ID=$coordinator_image_id"
+  echo "DS41RT_RUNTIME_CATALOG_CACHE_DIR=/var/cache/ds41rt/catalogs"
 } >>"$env_file"
 
 mkdir -p "$state_dir/kernel-cache" "$state_dir/catalog-cache"
@@ -538,8 +538,8 @@ docker_args=(
   -v "$repo_root:$repo_root:ro"
   -v "$hf_home:$hf_home:ro"
   -v "$hf_home:/root/.cache/huggingface:ro"
-  -v "$state_dir/kernel-cache:/var/cache/ds4rt/kernels"
-  -v "$state_dir/catalog-cache:/var/cache/ds4rt/catalogs"
+  -v "$state_dir/kernel-cache:/var/cache/ds41rt/kernels"
+  -v "$state_dir/catalog-cache:/var/cache/ds41rt/catalogs"
   -e HF_HOME="$hf_home"
 )
 if [[ -e /dev/infiniband ]]; then
@@ -547,7 +547,7 @@ if [[ -e /dev/infiniband ]]; then
 fi
 docker_args+=(
   "$COORDINATOR_DOCKER_INFERENCE"
-  /opt/ds4rt/scripts/real-full-tcp-serve.sh
+  /opt/ds41rt/scripts/real-full-tcp-serve.sh
 )
 
 echo "== starting coordinator container =="
@@ -563,9 +563,9 @@ if ! wait "$spark_start_pid"; then
   release_die "one or more Spark experts failed during parallel startup"
 fi
 
-ready_timeout_seconds="${DS4RT_RELEASE_READY_TIMEOUT_SECONDS:-900}"
+ready_timeout_seconds="${DS41RT_RELEASE_READY_TIMEOUT_SECONDS:-900}"
 [[ "$ready_timeout_seconds" =~ ^[1-9][0-9]*$ ]] ||
-  release_die "DS4RT_RELEASE_READY_TIMEOUT_SECONDS must be a positive integer"
+  release_die "DS41RT_RELEASE_READY_TIMEOUT_SECONDS must be a positive integer"
 deadline=$((SECONDS + ready_timeout_seconds))
 until release_api_advertises_model \
   "http://127.0.0.1:${ADDR##*:}" "$RELEASE_MODEL_ID"; do
@@ -586,7 +586,7 @@ done
 
 curl -fsS "http://127.0.0.1:${ADDR##*:}/v1/models" >"$state_dir/models.json"
 release_validate_model_list_file "$state_dir/models.json" "$RELEASE_MODEL_ID"
-echo "DS4RT release server is ready at http://127.0.0.1:${ADDR##*:}/v1/"
+echo "DS41RT release server is ready at http://127.0.0.1:${ADDR##*:}/v1/"
 echo "  profile:     $PROFILE"
 echo "  model:       $RELEASE_MODEL_ID"
 echo "  variant:     $MODEL_VARIANT"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect bounded native Flash expert-input activations from a live DS4RT API."""
+"""Collect bounded native Flash expert-input activations from a live DS41RT API."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ from validate_ds4_flash_generation_ab import (
 )
 
 
-SCHEMA = "ds4rt-flash-exl3-activation-corpus-v2"
-PROGRESS_SCHEMA = "ds4rt-flash-exl3-activation-progress-v2"
+SCHEMA = "ds41rt-flash-exl3-activation-corpus-v2"
+PROGRESS_SCHEMA = "ds41rt-flash-exl3-activation-progress-v2"
 LEGACY_CAPTURE_RE = re.compile(
     r"^layer_(?P<layer>[0-9]+)_rows_(?P<rows>[0-9]+)_expert_input\.bf16$"
 )
@@ -38,8 +38,8 @@ ROUTE_RECORD = struct.Struct("<Hf")
 ROUTE_RECORD_FORMAT = "u16le_expert_id_f32le_gate_weight"
 POSITION_RECORD = struct.Struct("<Q")
 POSITION_RECORD_FORMAT = "u64le_absolute_token_position"
-RETENTION_CONTROL_FILE = ".ds4rt_route_retention_control_v1.bin"
-RETENTION_CONTROL_MAGIC = b"DS4RTRC1"
+RETENTION_CONTROL_FILE = ".ds41rt_route_retention_control_v1.bin"
+RETENTION_CONTROL_MAGIC = b"DS41RRC1"
 IDENTIFIER_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 

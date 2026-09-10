@@ -61,75 +61,75 @@ constexpr size_t kB12xTp4Intermediate = 512;
 constexpr size_t kB12xOutput = 6144;
 constexpr size_t kB12xExperts = 256;
 constexpr size_t kB12xTopK = 8;
-ds4rt_b12x_moe_tp4_w4a16_decode_m1_Kernel_Module_t moe_tp4_w4a16_decode_m1_module;
-ds4rt_b12x_moe_tp4_w4a16_decode_m1_fused_sum_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_decode_m1_Kernel_Module_t moe_tp4_w4a16_decode_m1_module;
+ds41rt_b12x_moe_tp4_w4a16_decode_m1_fused_sum_Kernel_Module_t
     moe_tp4_w4a16_decode_m1_fused_sum_module;
-#define DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(M)                                  \
-  ds4rt_b12x_moe_tp4_w4a16_m1_parity_m##M##_topk8_Kernel_Module_t              \
+#define DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(M)                                  \
+  ds41rt_b12x_moe_tp4_w4a16_m1_parity_m##M##_topk8_Kernel_Module_t              \
       moe_tp4_w4a16_m1_parity_m##M##_topk8_module;
-DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(2)
-DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(3)
-DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(4)
-DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(5)
-DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(6)
-DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(7)
-DS4RT_DEFINE_W4A16_M1_PARITY_MODULE(8)
-#undef DS4RT_DEFINE_W4A16_M1_PARITY_MODULE
-#define DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(M)                          \
-  ds4rt_b12x_moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8_Kernel_Module_t      \
+DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(2)
+DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(3)
+DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(4)
+DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(5)
+DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(6)
+DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(7)
+DS41RT_DEFINE_W4A16_M1_PARITY_MODULE(8)
+#undef DS41RT_DEFINE_W4A16_M1_PARITY_MODULE
+#define DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(M)                          \
+  ds41rt_b12x_moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8_Kernel_Module_t      \
       moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8_module;
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(2)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(3)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(4)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(5)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(6)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(7)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(8)
-#undef DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE
-#define DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(M)                    \
-  ds4rt_b12x_moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8_Kernel_Module_t \
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(2)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(3)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(4)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(5)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(6)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(7)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE(8)
+#undef DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_MODULE
+#define DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(M)                    \
+  ds41rt_b12x_moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8_Kernel_Module_t \
       moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8_module;
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(2)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(3)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(4)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(5)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(6)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(7)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(8)
-#undef DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE
-ds4rt_b12x_moe_tp4_w4a16_prefill_m2_topk8_Kernel_Module_t
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(2)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(3)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(4)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(5)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(6)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(7)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(8)
+#undef DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_MODULE
+ds41rt_b12x_moe_tp4_w4a16_prefill_m2_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m2_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m4_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m4_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m4_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m8_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m8_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m8_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m16_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m16_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m16_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m32_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m32_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m32_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m64_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m64_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m64_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m128_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m128_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m128_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m256_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m256_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m256_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m1024_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m1024_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m1024_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m2048_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m2048_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m2048_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_prefill_m512_topk8_Kernel_Module_t
+ds41rt_b12x_moe_tp4_w4a16_prefill_m512_topk8_Kernel_Module_t
     moe_tp4_w4a16_prefill_m512_topk8_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m1_Kernel_Module_t moe_tp4_w4a16_top1_m1_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m2_Kernel_Module_t moe_tp4_w4a16_top1_m2_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m4_Kernel_Module_t moe_tp4_w4a16_top1_m4_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m8_Kernel_Module_t moe_tp4_w4a16_top1_m8_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m16_Kernel_Module_t moe_tp4_w4a16_top1_m16_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m32_Kernel_Module_t moe_tp4_w4a16_top1_m32_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m64_Kernel_Module_t moe_tp4_w4a16_top1_m64_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m128_Kernel_Module_t moe_tp4_w4a16_top1_m128_module;
-ds4rt_b12x_moe_tp4_w4a16_top1_m256_Kernel_Module_t moe_tp4_w4a16_top1_m256_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m1_Kernel_Module_t moe_tp4_w4a16_top1_m1_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m2_Kernel_Module_t moe_tp4_w4a16_top1_m2_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m4_Kernel_Module_t moe_tp4_w4a16_top1_m4_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m8_Kernel_Module_t moe_tp4_w4a16_top1_m8_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m16_Kernel_Module_t moe_tp4_w4a16_top1_m16_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m32_Kernel_Module_t moe_tp4_w4a16_top1_m32_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m64_Kernel_Module_t moe_tp4_w4a16_top1_m64_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m128_Kernel_Module_t moe_tp4_w4a16_top1_m128_module;
+ds41rt_b12x_moe_tp4_w4a16_top1_m256_Kernel_Module_t moe_tp4_w4a16_top1_m256_module;
 std::once_flag b12x_module_init_once;
-ds4rt_status_t b12x_module_init_status = DS4RT_STATUS_OK;
+ds41rt_status_t b12x_module_init_status = DS41RT_STATUS_OK;
 constexpr size_t kB12xW4a16LockElements = 48 * 4 + 2;
 constexpr int kB12xW4a16DecodeMaxGridX =
     static_cast<int>((kB12xW4a16LockElements - 2) / 2);
@@ -139,15 +139,15 @@ constexpr int kB12xW4a16Top1GridX = 48;
 
 int w4a16_decode_grid_x() {
   static const int grid_x = [] {
-    const char* raw = std::getenv("DS4RT_B12X_SPARK_W4A16_DECODE_GRID_X");
+    const char* raw = std::getenv("DS41RT_B12X_SPARK_W4A16_DECODE_GRID_X");
     if (raw == nullptr || *raw == '\0') {
-      return DS4RT_B12X_W4A16_DECODE_M1_GRID_X;
+      return DS41RT_B12X_W4A16_DECODE_M1_GRID_X;
     }
     char* end = nullptr;
     const long parsed = std::strtol(raw, &end, 10);
     if (end == raw || *end != '\0' || parsed <= 0 ||
         parsed > kB12xW4a16DecodeMaxGridX) {
-      return DS4RT_B12X_W4A16_DECODE_M1_GRID_X;
+      return DS41RT_B12X_W4A16_DECODE_M1_GRID_X;
     }
     return static_cast<int>(parsed);
   }();
@@ -157,14 +157,14 @@ int w4a16_decode_grid_x() {
 bool w4a16_m1_fused_sum_enabled() {
   static const bool enabled = [] {
     const char* raw =
-        std::getenv("DS4RT_B12X_SPARK_W4A16_M1_FUSED_SUM");
+        std::getenv("DS41RT_B12X_SPARK_W4A16_M1_FUSED_SUM");
     return raw != nullptr && *raw != '\0' &&
            !(raw[0] == '0' && raw[1] == '\0');
   }();
   return enabled;
 }
 
-bool buffer_has_bytes(ds4rt_device_buffer_t buffer, size_t required) {
+bool buffer_has_bytes(ds41rt_device_buffer_t buffer, size_t required) {
   return buffer.ptr != nullptr && buffer.bytes >= required;
 }
 
@@ -384,100 +384,100 @@ __global__ void initialize_w4a16_top1_routes_kernel(
 }
 
 void initialize_b12x_modules() {
-  ds4rt_b12x_moe_tp4_w4a16_decode_m1_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_decode_m1_Kernel_Module_Load(
       &moe_tp4_w4a16_decode_m1_module);
-  ds4rt_b12x_moe_tp4_w4a16_decode_m1_fused_sum_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_decode_m1_fused_sum_Kernel_Module_Load(
       &moe_tp4_w4a16_decode_m1_fused_sum_module);
-#define DS4RT_LOAD_W4A16_M1_PARITY_MODULE(M)                                    \
-  ds4rt_b12x_moe_tp4_w4a16_m1_parity_m##M##_topk8_Kernel_Module_Load(           \
+#define DS41RT_LOAD_W4A16_M1_PARITY_MODULE(M)                                    \
+  ds41rt_b12x_moe_tp4_w4a16_m1_parity_m##M##_topk8_Kernel_Module_Load(           \
       &moe_tp4_w4a16_m1_parity_m##M##_topk8_module);
-  DS4RT_LOAD_W4A16_M1_PARITY_MODULE(2)
-  DS4RT_LOAD_W4A16_M1_PARITY_MODULE(3)
-  DS4RT_LOAD_W4A16_M1_PARITY_MODULE(4)
-  DS4RT_LOAD_W4A16_M1_PARITY_MODULE(5)
-  DS4RT_LOAD_W4A16_M1_PARITY_MODULE(6)
-  DS4RT_LOAD_W4A16_M1_PARITY_MODULE(7)
-  DS4RT_LOAD_W4A16_M1_PARITY_MODULE(8)
-#undef DS4RT_LOAD_W4A16_M1_PARITY_MODULE
-#define DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(M)                           \
-  ds4rt_b12x_moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8_Kernel_Module_Load(  \
+  DS41RT_LOAD_W4A16_M1_PARITY_MODULE(2)
+  DS41RT_LOAD_W4A16_M1_PARITY_MODULE(3)
+  DS41RT_LOAD_W4A16_M1_PARITY_MODULE(4)
+  DS41RT_LOAD_W4A16_M1_PARITY_MODULE(5)
+  DS41RT_LOAD_W4A16_M1_PARITY_MODULE(6)
+  DS41RT_LOAD_W4A16_M1_PARITY_MODULE(7)
+  DS41RT_LOAD_W4A16_M1_PARITY_MODULE(8)
+#undef DS41RT_LOAD_W4A16_M1_PARITY_MODULE
+#define DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(M)                           \
+  ds41rt_b12x_moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8_Kernel_Module_Load(  \
       &moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8_module);
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(2)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(3)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(4)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(5)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(6)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(7)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(8)
-#undef DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE
-#define DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(M)                      \
-  ds4rt_b12x_moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8_Kernel_Module_Load( \
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(2)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(3)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(4)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(5)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(6)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(7)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE(8)
+#undef DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_MODULE
+#define DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(M)                      \
+  ds41rt_b12x_moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8_Kernel_Module_Load( \
       &moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8_module);
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(2)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(3)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(4)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(5)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(6)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(7)
-  DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(8)
-#undef DS4RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m2_topk8_Kernel_Module_Load(
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(2)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(3)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(4)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(5)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(6)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(7)
+  DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE(8)
+#undef DS41RT_LOAD_W4A16_M1_PARITY_GROUPED_WIDE_MODULE
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m2_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m2_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m4_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m4_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m4_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m8_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m8_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m8_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m16_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m16_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m16_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m32_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m32_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m32_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m64_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m64_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m64_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m128_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m128_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m128_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m256_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m256_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m256_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m1024_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m1024_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m1024_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m2048_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m2048_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m2048_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_prefill_m512_topk8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_prefill_m512_topk8_Kernel_Module_Load(
       &moe_tp4_w4a16_prefill_m512_topk8_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m1_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m1_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m1_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m2_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m2_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m2_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m4_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m4_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m4_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m8_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m8_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m8_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m16_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m16_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m16_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m32_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m32_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m32_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m64_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m64_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m64_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m128_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m128_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m128_module);
-  ds4rt_b12x_moe_tp4_w4a16_top1_m256_Kernel_Module_Load(
+  ds41rt_b12x_moe_tp4_w4a16_top1_m256_Kernel_Module_Load(
       &moe_tp4_w4a16_top1_m256_module);
   const cudaError_t error = cudaGetLastError();
   if (error != cudaSuccess) {
-    ds4rt_set_last_error_message(cudaGetErrorString(error));
-    b12x_module_init_status = DS4RT_STATUS_INTERNAL_ERROR;
+    ds41rt_set_last_error_message(cudaGetErrorString(error));
+    b12x_module_init_status = DS41RT_STATUS_INTERNAL_ERROR;
   }
 }
 
-ds4rt_status_t check_aot_launch(int result, const char* label) {
+ds41rt_status_t check_aot_launch(int result, const char* label) {
   if (result == 0) {
-    return DS4RT_STATUS_OK;
+    return DS41RT_STATUS_OK;
   }
-  ds4rt_set_last_error_message(label);
-  return DS4RT_STATUS_INTERNAL_ERROR;
+  ds41rt_set_last_error_message(label);
+  return DS41RT_STATUS_INTERNAL_ERROR;
 }
 
-#define DS4RT_DEFINE_W4A16_LAUNCH(function_name, prefix, module_name, default_grid_x)          \
-  int function_name##_grid(const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,                \
+#define DS41RT_DEFINE_W4A16_LAUNCH(function_name, prefix, module_name, default_grid_x)          \
+  int function_name##_grid(const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,                \
                            size_t active_m, int grid_x, cudaStream_t stream) {                  \
     prefix##_Tensor_fc1_bf16_flat_t fc1{buffers->fc1_output.ptr};                              \
     prefix##_Tensor_activated_bf16_flat_t activated{buffers->activated.ptr};                   \
@@ -505,148 +505,148 @@ ds4rt_status_t check_aot_launch(int result, const char* label) {
         static_cast<int32_t>(kB12xExperts), 0,                                                  \
         static_cast<int32_t>(active_m), static_cast<int32_t>(grid_x), stream);                  \
   }                                                                                            \
-  int function_name(const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t active_m,      \
+  int function_name(const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t active_m,      \
                     cudaStream_t stream) {                                                     \
     return function_name##_grid(buffers, active_m, static_cast<int>(default_grid_x), stream);  \
   }
 
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_decode_m1, ds4rt_b12x_moe_tp4_w4a16_decode_m1,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_decode_m1, ds41rt_b12x_moe_tp4_w4a16_decode_m1,
     moe_tp4_w4a16_decode_m1_module, w4a16_decode_grid_x())
-DS4RT_DEFINE_W4A16_LAUNCH(
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_decode_m1_fused_sum,
-    ds4rt_b12x_moe_tp4_w4a16_decode_m1_fused_sum,
+    ds41rt_b12x_moe_tp4_w4a16_decode_m1_fused_sum,
     moe_tp4_w4a16_decode_m1_fused_sum_module,
-    DS4RT_B12X_W4A16_DECODE_M1_FUSED_SUM_GRID_X)
-#define DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(M)                                  \
-  DS4RT_DEFINE_W4A16_LAUNCH(                                                    \
+    DS41RT_B12X_W4A16_DECODE_M1_FUSED_SUM_GRID_X)
+#define DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(M)                                  \
+  DS41RT_DEFINE_W4A16_LAUNCH(                                                    \
       launch_w4a16_m1_parity_m##M##_topk8,                                     \
-      ds4rt_b12x_moe_tp4_w4a16_m1_parity_m##M##_topk8,                         \
+      ds41rt_b12x_moe_tp4_w4a16_m1_parity_m##M##_topk8,                         \
       moe_tp4_w4a16_m1_parity_m##M##_topk8_module,                             \
-      DS4RT_B12X_W4A16_M1_PARITY_M##M##_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(2)
-DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(3)
-DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(4)
-DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(5)
-DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(6)
-DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(7)
-DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH(8)
-#undef DS4RT_DEFINE_W4A16_M1_PARITY_LAUNCH
-#define DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(M)                         \
-  DS4RT_DEFINE_W4A16_LAUNCH(                                                   \
+      DS41RT_B12X_W4A16_M1_PARITY_M##M##_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(2)
+DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(3)
+DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(4)
+DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(5)
+DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(6)
+DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(7)
+DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH(8)
+#undef DS41RT_DEFINE_W4A16_M1_PARITY_LAUNCH
+#define DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(M)                         \
+  DS41RT_DEFINE_W4A16_LAUNCH(                                                   \
       launch_w4a16_m1_parity_grouped_m##M##_topk8,                            \
-      ds4rt_b12x_moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8,                \
+      ds41rt_b12x_moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8,                \
       moe_tp4_w4a16_m1_parity_grouped_m##M##_topk8_module,                    \
-      DS4RT_B12X_W4A16_M1_PARITY_GROUPED_M##M##_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(2)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(3)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(4)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(5)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(6)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(7)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(8)
-#undef DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH
-#define DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(M)                    \
-  DS4RT_DEFINE_W4A16_LAUNCH(                                                   \
+      DS41RT_B12X_W4A16_M1_PARITY_GROUPED_M##M##_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(2)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(3)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(4)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(5)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(6)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(7)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH(8)
+#undef DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_LAUNCH
+#define DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(M)                    \
+  DS41RT_DEFINE_W4A16_LAUNCH(                                                   \
       launch_w4a16_m1_parity_grouped_wide_m##M##_topk8,                       \
-      ds4rt_b12x_moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8,           \
+      ds41rt_b12x_moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8,           \
       moe_tp4_w4a16_m1_parity_grouped_wide_m##M##_topk8_module,               \
-      DS4RT_B12X_W4A16_M1_PARITY_GROUPED_WIDE_M##M##_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(2)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(3)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(4)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(5)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(6)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(7)
-DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(8)
-#undef DS4RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH
-DS4RT_DEFINE_W4A16_LAUNCH(
+      DS41RT_B12X_W4A16_M1_PARITY_GROUPED_WIDE_M##M##_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(2)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(3)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(4)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(5)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(6)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(7)
+DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH(8)
+#undef DS41RT_DEFINE_W4A16_M1_PARITY_GROUPED_WIDE_LAUNCH
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m2_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m2_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m2_topk8,
     moe_tp4_w4a16_prefill_m2_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M2_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M2_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m4_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m4_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m4_topk8,
     moe_tp4_w4a16_prefill_m4_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M4_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M4_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m8_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m8_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m8_topk8,
     moe_tp4_w4a16_prefill_m8_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M8_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M8_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m16_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m16_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m16_topk8,
     moe_tp4_w4a16_prefill_m16_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M16_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M16_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m32_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m32_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m32_topk8,
     moe_tp4_w4a16_prefill_m32_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M32_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M32_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m64_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m64_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m64_topk8,
     moe_tp4_w4a16_prefill_m64_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M64_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M64_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m128_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m128_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m128_topk8,
     moe_tp4_w4a16_prefill_m128_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M128_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M128_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m256_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m256_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m256_topk8,
     moe_tp4_w4a16_prefill_m256_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M256_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M256_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m512_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m512_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m512_topk8,
     moe_tp4_w4a16_prefill_m512_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M512_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M512_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m1024_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m1024_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m1024_topk8,
     moe_tp4_w4a16_prefill_m1024_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M1024_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
+    DS41RT_B12X_W4A16_PREFILL_M1024_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
     launch_w4a16_prefill_m2048_topk8,
-    ds4rt_b12x_moe_tp4_w4a16_prefill_m2048_topk8,
+    ds41rt_b12x_moe_tp4_w4a16_prefill_m2048_topk8,
     moe_tp4_w4a16_prefill_m2048_topk8_module,
-    DS4RT_B12X_W4A16_PREFILL_M2048_TOPK8_GRID_X)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m1, ds4rt_b12x_moe_tp4_w4a16_top1_m1,
+    DS41RT_B12X_W4A16_PREFILL_M2048_TOPK8_GRID_X)
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m1, ds41rt_b12x_moe_tp4_w4a16_top1_m1,
     moe_tp4_w4a16_top1_m1_module, kB12xW4a16Top1M1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m2, ds4rt_b12x_moe_tp4_w4a16_top1_m2,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m2, ds41rt_b12x_moe_tp4_w4a16_top1_m2,
     moe_tp4_w4a16_top1_m2_module, kB12xW4a16Top1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m4, ds4rt_b12x_moe_tp4_w4a16_top1_m4,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m4, ds41rt_b12x_moe_tp4_w4a16_top1_m4,
     moe_tp4_w4a16_top1_m4_module, kB12xW4a16Top1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m8, ds4rt_b12x_moe_tp4_w4a16_top1_m8,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m8, ds41rt_b12x_moe_tp4_w4a16_top1_m8,
     moe_tp4_w4a16_top1_m8_module, kB12xW4a16Top1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m16, ds4rt_b12x_moe_tp4_w4a16_top1_m16,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m16, ds41rt_b12x_moe_tp4_w4a16_top1_m16,
     moe_tp4_w4a16_top1_m16_module, kB12xW4a16Top1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m32, ds4rt_b12x_moe_tp4_w4a16_top1_m32,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m32, ds41rt_b12x_moe_tp4_w4a16_top1_m32,
     moe_tp4_w4a16_top1_m32_module, kB12xW4a16Top1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m64, ds4rt_b12x_moe_tp4_w4a16_top1_m64,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m64, ds41rt_b12x_moe_tp4_w4a16_top1_m64,
     moe_tp4_w4a16_top1_m64_module, kB12xW4a16Top1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m128, ds4rt_b12x_moe_tp4_w4a16_top1_m128,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m128, ds41rt_b12x_moe_tp4_w4a16_top1_m128,
     moe_tp4_w4a16_top1_m128_module, kB12xW4a16Top1GridX)
-DS4RT_DEFINE_W4A16_LAUNCH(
-    launch_w4a16_top1_m256, ds4rt_b12x_moe_tp4_w4a16_top1_m256,
+DS41RT_DEFINE_W4A16_LAUNCH(
+    launch_w4a16_top1_m256, ds41rt_b12x_moe_tp4_w4a16_top1_m256,
     moe_tp4_w4a16_top1_m256_module, kB12xW4a16Top1GridX)
 
-#undef DS4RT_DEFINE_W4A16_LAUNCH
+#undef DS41RT_DEFINE_W4A16_LAUNCH
 
-ds4rt_status_t validate_w4a16_moe_buffers(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t capacity_rows,
+ds41rt_status_t validate_w4a16_moe_buffers(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t capacity_rows,
     size_t top_k) {
   constexpr size_t w13_weight_bytes =
       kB12xExperts * 2 * kB12xTp4Intermediate * kB12xHidden / 2;
@@ -658,13 +658,13 @@ ds4rt_status_t validate_w4a16_moe_buffers(
       kB12xExperts * kB12xOutput * kB12xTp4Intermediate / 16;
   constexpr size_t expert_scalars_bytes = kB12xExperts * sizeof(float);
   constexpr size_t max_packed_route_slots =
-      DS4RT_B12X_W4A16_PREFILL_M2048_TOPK8_PACKED_ROUTE_SLOTS;
+      DS41RT_B12X_W4A16_PREFILL_M2048_TOPK8_PACKED_ROUTE_SLOTS;
   constexpr size_t max_route_blocks =
-      DS4RT_B12X_W4A16_PREFILL_M2048_TOPK8_MAX_M_BLOCKS;
+      DS41RT_B12X_W4A16_PREFILL_M2048_TOPK8_MAX_M_BLOCKS;
   constexpr size_t max_scratch_elements = 1572864;
   if (buffers == nullptr || capacity_rows == 0 || capacity_rows > kB12xW4a16MaxRows ||
       (top_k != 1 && top_k != kB12xTopK)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t output_rows =
       top_k == kB12xTopK ? capacity_rows * top_k : capacity_rows;
@@ -691,18 +691,18 @@ ds4rt_status_t validate_w4a16_moe_buffers(
       buffer_has_bytes(buffers->fc1_scratch, max_scratch_elements * sizeof(float)) &&
       buffer_has_bytes(buffers->fc2_scratch, max_scratch_elements * sizeof(float)) &&
       buffer_has_bytes(buffers->locks, kB12xW4a16LockElements * sizeof(int32_t));
-  return valid ? DS4RT_STATUS_OK : DS4RT_STATUS_BUFFER_TOO_SMALL;
+  return valid ? DS41RT_STATUS_OK : DS41RT_STATUS_BUFFER_TOO_SMALL;
 }
 
-ds4rt_status_t reset_w4a16_locks_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers, cudaStream_t stream) {
+ds41rt_status_t reset_w4a16_locks_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers, cudaStream_t stream) {
   return status_from_cuda(
       cudaMemsetAsync(buffers->locks.ptr, 0, kB12xW4a16LockElements * sizeof(int32_t), stream));
 }
 
-using W4A16LaunchFn = int (*)(const ds4rt_b12x_spark_w4a16_moe_buffers_t*, size_t,
+using W4A16LaunchFn = int (*)(const ds41rt_b12x_spark_w4a16_moe_buffers_t*, size_t,
                               cudaStream_t);
-using W4A16GridLaunchFn = int (*)(const ds4rt_b12x_spark_w4a16_moe_buffers_t*, size_t,
+using W4A16GridLaunchFn = int (*)(const ds41rt_b12x_spark_w4a16_moe_buffers_t*, size_t,
                                   int, cudaStream_t);
 
 W4A16LaunchFn w4a16_m1_parity_launcher(size_t rows) {
@@ -849,29 +849,29 @@ W4A16GridLaunchFn w4a16_prefill_grid_launcher(size_t capacity_rows) {
 
 }  // namespace
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_aot_available(int* out_available) {
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_spark_aot_available(int* out_available) {
   if (out_available == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   *out_available = 1;
-  return DS4RT_STATUS_OK;
+  return DS41RT_STATUS_OK;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_aot_init(void) {
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_spark_aot_init(void) {
   std::call_once(b12x_module_init_once, initialize_b12x_modules);
   return b12x_module_init_status;
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_weight_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination, size_t size_k,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_w4a16_pack_weight_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination, size_t size_k,
     size_t size_n, size_t row_rotation, void* cuda_stream) {
   if (size_k == 0 || size_n == 0 || size_k % 16 != 0 || size_n % 64 != 0 ||
       row_rotation >= size_n || size_n > std::numeric_limits<size_t>::max() / size_k) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t bytes = size_n * size_k / 2;
   if (!buffer_has_bytes(source, bytes) || !buffer_has_bytes(destination, bytes)) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const size_t words = bytes / sizeof(uint32_t);
   constexpr size_t threads = 256;
@@ -883,8 +883,8 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_weight_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_weight_strided_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination, size_t size_k,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_w4a16_pack_weight_strided_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination, size_t size_k,
     size_t source_size_k, size_t source_start_k, size_t size_n, size_t row_rotation,
     void* cuda_stream) {
   if (size_k == 0 || source_size_k == 0 || size_n == 0 || size_k % 16 != 0 ||
@@ -893,13 +893,13 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_weight_strided_async(
       size_n % 64 != 0 || row_rotation >= size_n ||
       size_n > std::numeric_limits<size_t>::max() / source_size_k ||
       size_n > std::numeric_limits<size_t>::max() / size_k) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t source_bytes = size_n * source_size_k / 2;
   const size_t destination_bytes = size_n * size_k / 2;
   if (!buffer_has_bytes(source, source_bytes) ||
       !buffer_has_bytes(destination, destination_bytes)) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const size_t words = destination_bytes / sizeof(uint32_t);
   constexpr size_t threads = 256;
@@ -911,17 +911,17 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_weight_strided_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_scale_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination, size_t size_k,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_w4a16_pack_scale_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination, size_t size_k,
     size_t size_n, size_t row_rotation, float scale_factor, void* cuda_stream) {
   if (size_k == 0 || size_n == 0 || size_k % 16 != 0 || size_n % 64 != 0 ||
       row_rotation >= size_n || !isfinite(scale_factor) || scale_factor <= 0.0f ||
       size_n > std::numeric_limits<size_t>::max() / (size_k / 16)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t bytes = size_n * (size_k / 16);
   if (!buffer_has_bytes(source, bytes) || !buffer_has_bytes(destination, bytes)) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   constexpr size_t threads = 256;
   const size_t blocks = (bytes + threads - 1) / threads;
@@ -932,8 +932,8 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_scale_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_scale_strided_async(
-    ds4rt_device_buffer_t source, ds4rt_device_buffer_t destination, size_t size_k,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_w4a16_pack_scale_strided_async(
+    ds41rt_device_buffer_t source, ds41rt_device_buffer_t destination, size_t size_k,
     size_t source_size_k, size_t source_start_k, size_t size_n, size_t row_rotation,
     float scale_factor, void* cuda_stream) {
   if (size_k == 0 || source_size_k == 0 || size_n == 0 || size_k % 16 != 0 ||
@@ -943,13 +943,13 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_scale_strided_async(
       scale_factor <= 0.0f ||
       size_n > std::numeric_limits<size_t>::max() / (source_size_k / 16) ||
       size_n > std::numeric_limits<size_t>::max() / (size_k / 16)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const size_t source_bytes = size_n * (source_size_k / 16);
   const size_t destination_bytes = size_n * (size_k / 16);
   if (!buffer_has_bytes(source, source_bytes) ||
       !buffer_has_bytes(destination, destination_bytes)) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   constexpr size_t threads = 256;
   const size_t blocks = (destination_bytes + threads - 1) / threads;
@@ -960,19 +960,19 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_w4a16_pack_scale_strided_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_gather_nvfp4_rows_bf16_async(
-    ds4rt_device_buffer_t payload, size_t source_rows, size_t source_row_stride_bytes,
-    ds4rt_device_buffer_t row_indices, ds4rt_device_buffer_t output, size_t rows,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_gather_nvfp4_rows_bf16_async(
+    ds41rt_device_buffer_t payload, size_t source_rows, size_t source_row_stride_bytes,
+    ds41rt_device_buffer_t row_indices, ds41rt_device_buffer_t output, size_t rows,
     size_t hidden_dim, void* cuda_stream) {
   const size_t logical_row_bytes = hidden_dim / 2 + hidden_dim / 16;
   if (source_rows == 0 || rows == 0 || rows > source_rows || hidden_dim == 0 ||
       hidden_dim % 16 != 0 || source_row_stride_bytes < logical_row_bytes) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (!buffer_has_bytes(payload, source_rows * source_row_stride_bytes) ||
       !buffer_has_bytes(row_indices, rows * sizeof(uint32_t)) ||
       !buffer_has_bytes(output, rows * hidden_dim * sizeof(uint16_t))) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const size_t values = rows * hidden_dim;
   constexpr size_t threads = 256;
@@ -985,9 +985,9 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_gather_nvfp4_rows_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_dequantize_nvfp4_rows_bf16_async(
-    ds4rt_device_buffer_t payload, size_t row_stride_bytes,
-    ds4rt_device_buffer_t output, size_t rows, size_t hidden_dim,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_dequantize_nvfp4_rows_bf16_async(
+    ds41rt_device_buffer_t payload, size_t row_stride_bytes,
+    ds41rt_device_buffer_t output, size_t rows, size_t hidden_dim,
     void* cuda_stream) {
   const size_t logical_row_bytes = hidden_dim / 2 + hidden_dim / 16;
   if (rows == 0 || hidden_dim == 0 || hidden_dim % 16 != 0 ||
@@ -995,11 +995,11 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_dequantize_nvfp4_rows_bf16_async(
       rows > std::numeric_limits<size_t>::max() / row_stride_bytes ||
       rows > std::numeric_limits<size_t>::max() / hidden_dim ||
       rows * hidden_dim > std::numeric_limits<size_t>::max() / sizeof(uint16_t)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (!buffer_has_bytes(payload, rows * row_stride_bytes) ||
       !buffer_has_bytes(output, rows * hidden_dim * sizeof(uint16_t))) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
   const size_t values = rows * hidden_dim;
   constexpr size_t threads = 256;
@@ -1012,30 +1012,30 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_dequantize_nvfp4_rows_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-ds4rt_status_t launch_w4a16_decode_m1_nvfp4_grid(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    ds4rt_device_buffer_t topk_ids, int grid_x, void* cuda_stream) {
+ds41rt_status_t launch_w4a16_decode_m1_nvfp4_grid(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    ds41rt_device_buffer_t topk_ids, int grid_x, void* cuda_stream) {
   constexpr size_t input_payload_bytes = kB12xHidden / 2 + kB12xHidden / 16;
   if (grid_x < 0 || grid_x > kB12xW4a16DecodeResidentGridX) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_w4a16_moe_buffers(buffers, 1, kB12xTopK);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_w4a16_moe_buffers(buffers, 1, kB12xTopK);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (input_payload_stride_bytes < input_payload_bytes ||
       !buffer_has_bytes(input_payload, input_payload_stride_bytes) ||
       !buffer_has_bytes(topk_ids, kB12xTopK * sizeof(int32_t))) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr int threads = 256;
@@ -1044,10 +1044,10 @@ ds4rt_status_t launch_w4a16_decode_m1_nvfp4_grid(
       static_cast<const uint8_t*>(input_payload.ptr),
       static_cast<uint16_t*>(buffers->input.ptr), kB12xHidden);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
-  ds4rt_b12x_spark_w4a16_moe_buffers_t launch_buffers = *buffers;
+  ds41rt_b12x_spark_w4a16_moe_buffers_t launch_buffers = *buffers;
   launch_buffers.packed_route_indices = topk_ids;
   const int launch_status =
       grid_x == 0
@@ -1055,7 +1055,7 @@ ds4rt_status_t launch_w4a16_decode_m1_nvfp4_grid(
           : launch_w4a16_decode_m1_grid(&launch_buffers, 1, grid_x, stream);
   status = check_aot_launch(
       launch_status, "B12X Spark packed W4A16 decode M1 launch failed");
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   sum_w4a16_topk_bf16_kernel<<<blocks, threads, 0, stream>>>(
@@ -1064,37 +1064,37 @@ ds4rt_status_t launch_w4a16_decode_m1_nvfp4_grid(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    ds4rt_device_buffer_t topk_ids, void* cuda_stream) {
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    ds41rt_device_buffer_t topk_ids, void* cuda_stream) {
   return launch_w4a16_decode_m1_nvfp4_grid(
       buffers, input_payload, input_payload_stride_bytes, topk_ids,
       0, cuda_stream);
 }
 
-ds4rt_status_t launch_w4a16_decode_m1_fused_sum_nvfp4(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    ds4rt_device_buffer_t topk_ids, void* cuda_stream) {
+ds41rt_status_t launch_w4a16_decode_m1_fused_sum_nvfp4(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    ds41rt_device_buffer_t topk_ids, void* cuda_stream) {
   constexpr size_t input_payload_bytes = kB12xHidden / 2 + kB12xHidden / 16;
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_w4a16_moe_buffers(buffers, 1, kB12xTopK);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
   if (input_payload_stride_bytes < input_payload_bytes ||
       !buffer_has_bytes(input_payload, input_payload_stride_bytes) ||
       !buffer_has_bytes(topk_ids, kB12xTopK * sizeof(int32_t))) {
-    return DS4RT_STATUS_BUFFER_TOO_SMALL;
+    return DS41RT_STATUS_BUFFER_TOO_SMALL;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr int threads = 256;
@@ -1104,50 +1104,50 @@ ds4rt_status_t launch_w4a16_decode_m1_fused_sum_nvfp4(
       static_cast<const uint8_t*>(input_payload.ptr),
       static_cast<uint16_t*>(buffers->input.ptr), kB12xHidden);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
-  ds4rt_b12x_spark_w4a16_moe_buffers_t launch_buffers = *buffers;
+  ds41rt_b12x_spark_w4a16_moe_buffers_t launch_buffers = *buffers;
   launch_buffers.packed_route_indices = topk_ids;
   return check_aot_launch(
       launch_w4a16_decode_m1_fused_sum(&launch_buffers, 1, stream),
       "B12X Spark packed W4A16 decode M1 fused-sum launch failed");
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_w4a16_decode_m1_fused_sum_nvfp4_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    ds4rt_device_buffer_t topk_ids, void* cuda_stream) {
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_w4a16_decode_m1_fused_sum_nvfp4_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    ds41rt_device_buffer_t topk_ids, void* cuda_stream) {
   return launch_w4a16_decode_m1_fused_sum_nvfp4(
       buffers, input_payload, input_payload_stride_bytes, topk_ids,
       cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_w4a16_m1_parity_m2_8_nvfp4_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    ds4rt_device_buffer_t topk_ids, size_t rows, void* cuda_stream) {
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_w4a16_m1_parity_m2_8_nvfp4_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    ds41rt_device_buffer_t topk_ids, size_t rows, void* cuda_stream) {
   constexpr size_t input_payload_bytes = kB12xHidden / 2 + kB12xHidden / 16;
   W4A16LaunchFn launcher = w4a16_m1_parity_launcher(rows);
   if (launcher == nullptr || input_payload_stride_bytes < input_payload_bytes ||
       !buffer_has_bytes(input_payload, rows * input_payload_stride_bytes) ||
       !buffer_has_bytes(topk_ids, rows * kB12xTopK * sizeof(int32_t))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_w4a16_moe_buffers(buffers, rows, kB12xTopK);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_w4a16_moe_buffers(buffers, rows, kB12xTopK);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr size_t threads = 256;
@@ -1158,16 +1158,16 @@ ds4rt_cuda_b12x_spark_w4a16_m1_parity_m2_8_nvfp4_async(
       static_cast<const uint8_t*>(input_payload.ptr), input_payload_stride_bytes,
       static_cast<uint16_t*>(buffers->input.ptr), rows, kB12xHidden);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
 
-  ds4rt_b12x_spark_w4a16_moe_buffers_t launch_buffers = *buffers;
+  ds41rt_b12x_spark_w4a16_moe_buffers_t launch_buffers = *buffers;
   launch_buffers.packed_route_indices = topk_ids;
   status = check_aot_launch(
       launcher(&launch_buffers, rows, stream),
       "B12X Spark ordered direct-top-k W4A16 M=2..8 launch failed");
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   sum_w4a16_topk_bf16_kernel<<<static_cast<unsigned int>(blocks), threads, 0,
@@ -1177,30 +1177,30 @@ ds4rt_cuda_b12x_spark_w4a16_m1_parity_m2_8_nvfp4_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_m2_8_nvfp4_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_w4a16_m1_parity_grouped_m2_8_nvfp4_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
     size_t rows, void* cuda_stream) {
   constexpr size_t input_payload_bytes = kB12xHidden / 2 + kB12xHidden / 16;
   W4A16LaunchFn launcher = w4a16_m1_parity_grouped_launcher(rows);
   if (launcher == nullptr || input_payload_stride_bytes < input_payload_bytes ||
       !buffer_has_bytes(input_payload, rows * input_payload_stride_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_w4a16_moe_buffers(buffers, rows, kB12xTopK);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr size_t threads = 256;
@@ -1212,14 +1212,14 @@ ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_m2_8_nvfp4_async(
       input_payload_stride_bytes,
       static_cast<uint16_t*>(buffers->input.ptr), rows, kB12xHidden);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
 
   status = check_aot_launch(
       launcher(buffers, rows, stream),
       "B12X Spark grouped block-8 W4A16 M=2..8 launch failed");
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   sum_w4a16_topk_bf16_kernel<<<static_cast<unsigned int>(blocks), threads, 0,
@@ -1229,30 +1229,30 @@ ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_m2_8_nvfp4_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_wide_m2_8_nvfp4_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_w4a16_m1_parity_grouped_wide_m2_8_nvfp4_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
     size_t rows, void* cuda_stream) {
   constexpr size_t input_payload_bytes = kB12xHidden / 2 + kB12xHidden / 16;
   W4A16LaunchFn launcher = w4a16_m1_parity_grouped_wide_launcher(rows);
   if (launcher == nullptr || input_payload_stride_bytes < input_payload_bytes ||
       !buffer_has_bytes(input_payload, rows * input_payload_stride_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_w4a16_moe_buffers(buffers, rows, kB12xTopK);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr size_t threads = 256;
@@ -1264,14 +1264,14 @@ ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_wide_m2_8_nvfp4_async(
       input_payload_stride_bytes,
       static_cast<uint16_t*>(buffers->input.ptr), rows, kB12xHidden);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
 
   status = check_aot_launch(
       launcher(buffers, rows, stream),
       "B12X Spark grouped-wide W4A16 M=2..8 launch failed");
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   sum_w4a16_topk_bf16_kernel<<<static_cast<unsigned int>(blocks), threads, 0,
@@ -1281,23 +1281,23 @@ ds4rt_cuda_b12x_spark_w4a16_m1_parity_grouped_wide_m2_8_nvfp4_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    ds4rt_device_buffer_t topk_ids, int grid_x, void* cuda_stream) {
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    ds41rt_device_buffer_t topk_ids, int grid_x, void* cuda_stream) {
   if (grid_x <= 0 || grid_x > kB12xW4a16DecodeResidentGridX) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   return launch_w4a16_decode_m1_nvfp4_grid(
       buffers, input_payload, input_payload_stride_bytes, topk_ids, grid_x,
       cuda_stream);
 }
 
-static ds4rt_status_t launch_w4a16_prefill_topk8_nvfp4(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    size_t rows, ds4rt_device_buffer_t output_fp8,
+static ds41rt_status_t launch_w4a16_prefill_topk8_nvfp4(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    size_t rows, ds41rt_device_buffer_t output_fp8,
     size_t output_fp8_row_stride_bytes, bool fuse_fp8_response,
     int grid_x, void* cuda_stream) {
   size_t capacity_rows = 2;
@@ -1312,18 +1312,18 @@ static ds4rt_status_t launch_w4a16_prefill_topk8_nvfp4(
        (output_fp8_row_stride_bytes < kB12xHidden + sizeof(float) ||
         !buffer_has_bytes(output_fp8,
                           rows * output_fp8_row_stride_bytes)))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   if (rows == 1 && w4a16_m1_fused_sum_enabled()) {
-    const ds4rt_status_t fused_status =
+    const ds41rt_status_t fused_status =
         launch_w4a16_decode_m1_fused_sum_nvfp4(
             buffers, input_payload, input_payload_stride_bytes,
             buffers->packed_route_indices, cuda_stream);
-    if (fused_status != DS4RT_STATUS_OK) {
+    if (fused_status != DS41RT_STATUS_OK) {
       return fused_status;
     }
     if (fuse_fp8_response) {
-      return ds4rt_cuda_bf16_rows_to_fp8_e4m3_row_scaled_async(
+      return ds41rt_cuda_bf16_rows_to_fp8_e4m3_row_scaled_async(
           static_cast<const uint16_t*>(buffers->output.ptr),
           static_cast<uint8_t*>(output_fp8.ptr), 1, kB12xHidden,
           output_fp8_row_stride_bytes, cuda_stream);
@@ -1333,19 +1333,19 @@ static ds4rt_status_t launch_w4a16_prefill_topk8_nvfp4(
         kB12xHidden * sizeof(uint16_t), cudaMemcpyDeviceToDevice,
         reinterpret_cast<cudaStream_t>(cuda_stream)));
   }
-  const ds4rt_status_t valid =
+  const ds41rt_status_t valid =
       validate_w4a16_moe_buffers(buffers, capacity_rows, kB12xTopK);
-  if (valid != DS4RT_STATUS_OK) {
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
 
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr size_t threads = 256;
@@ -1356,7 +1356,7 @@ static ds4rt_status_t launch_w4a16_prefill_topk8_nvfp4(
       static_cast<const uint8_t*>(input_payload.ptr), input_payload_stride_bytes,
       static_cast<uint16_t*>(buffers->input.ptr), rows, kB12xHidden);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   W4A16LaunchFn launcher = &launch_w4a16_prefill_m2048_topk8;
@@ -1384,14 +1384,14 @@ static ds4rt_status_t launch_w4a16_prefill_topk8_nvfp4(
   const W4A16GridLaunchFn grid_launcher =
       grid_x > 0 ? w4a16_prefill_grid_launcher(capacity_rows) : nullptr;
   if (grid_x > 0 && grid_launcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const int launch_status = grid_launcher != nullptr
                                 ? grid_launcher(buffers, rows, grid_x, stream)
                                 : launcher(buffers, rows, stream);
   status = check_aot_launch(
       launch_status, "B12X Spark packed W4A16 prefill top-k=8 launch failed");
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   if (fuse_fp8_response) {
@@ -1409,47 +1409,47 @@ static ds4rt_status_t launch_w4a16_prefill_topk8_nvfp4(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
     size_t rows, void* cuda_stream) {
   return launch_w4a16_prefill_topk8_nvfp4(
       buffers, input_payload, input_payload_stride_bytes, rows,
-      ds4rt_device_buffer_t{}, 0, false, 0, cuda_stream);
+      ds41rt_device_buffer_t{}, 0, false, 0, cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_grid_candidate_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_grid_candidate_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
     size_t rows, int grid_x, void* cuda_stream) {
   if (grid_x <= 0 || grid_x > kB12xW4a16DecodeMaxGridX) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   return launch_w4a16_prefill_topk8_nvfp4(
       buffers, input_payload, input_payload_stride_bytes, rows,
-      ds4rt_device_buffer_t{}, 0, false, grid_x, cuda_stream);
+      ds41rt_device_buffer_t{}, 0, false, grid_x, cuda_stream);
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_fp8_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers,
-    ds4rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
-    size_t rows, ds4rt_device_buffer_t output_fp8,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_fp8_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers,
+    ds41rt_device_buffer_t input_payload, size_t input_payload_stride_bytes,
+    size_t rows, ds41rt_device_buffer_t output_fp8,
     size_t output_fp8_row_stride_bytes, void* cuda_stream) {
   return launch_w4a16_prefill_topk8_nvfp4(
       buffers, input_payload, input_payload_stride_bytes, rows, output_fp8,
       output_fp8_row_stride_bytes, true, 0, cuda_stream);
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_sum_topk8_bf16_async(
-    ds4rt_device_buffer_t routed_bf16, ds4rt_device_buffer_t output_bf16,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_spark_sum_topk8_bf16_async(
+    ds41rt_device_buffer_t routed_bf16, ds41rt_device_buffer_t output_bf16,
     size_t rows, void* cuda_stream) {
   const size_t routed_values = rows * kB12xTopK * kB12xHidden;
   const size_t output_values = rows * kB12xHidden;
   if (rows == 0 || !buffer_has_bytes(routed_bf16, routed_values * sizeof(uint16_t)) ||
       !buffer_has_bytes(output_bf16, output_values * sizeof(uint16_t))) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   constexpr int threads = 256;
   const size_t blocks = (output_values + threads - 1) / threads;
@@ -1461,16 +1461,16 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_sum_topk8_bf16_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t
-ds4rt_cuda_b12x_spark_sum_topk8_bf16_to_fp8_async(
-    ds4rt_device_buffer_t routed_bf16, ds4rt_device_buffer_t output_fp8,
+extern "C" ds41rt_status_t
+ds41rt_cuda_b12x_spark_sum_topk8_bf16_to_fp8_async(
+    ds41rt_device_buffer_t routed_bf16, ds41rt_device_buffer_t output_fp8,
     size_t rows, size_t output_row_stride_bytes, void* cuda_stream) {
   const size_t routed_values = rows * kB12xTopK * kB12xHidden;
   const size_t minimum_output_row_bytes = kB12xHidden + sizeof(float);
   if (rows == 0 || output_row_stride_bytes < minimum_output_row_bytes ||
       !buffer_has_bytes(routed_bf16, routed_values * sizeof(uint16_t)) ||
       !buffer_has_bytes(output_fp8, rows * output_row_stride_bytes)) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   constexpr int threads = 256;
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
@@ -1482,27 +1482,27 @@ ds4rt_cuda_b12x_spark_sum_topk8_bf16_to_fp8_async(
   return status_from_cuda(cudaGetLastError());
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_w4a16_top1_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t rows,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_spark_w4a16_top1_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t rows,
     size_t capacity_rows, uint32_t expert_id, void* cuda_stream) {
   if (rows == 0 || rows > capacity_rows || expert_id >= kB12xExperts) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const W4A16LaunchFn launcher = w4a16_top1_launcher(capacity_rows);
   if (launcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_w4a16_moe_buffers(buffers, capacity_rows, 1);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_w4a16_moe_buffers(buffers, capacity_rows, 1);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr size_t threads = 256;
@@ -1516,7 +1516,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_w4a16_top1_async(
       static_cast<float*>(buffers->topk_weights.ptr), rows, capacity_rows, expert_id,
       capacity_rows <= 8);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return check_aot_launch(
@@ -1524,28 +1524,28 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_w4a16_top1_async(
       "B12X Spark packed W4A16 top-k=1 launch failed");
 }
 
-extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async(
-    const ds4rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t rows,
+extern "C" ds41rt_status_t ds41rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async(
+    const ds41rt_b12x_spark_w4a16_moe_buffers_t* buffers, size_t rows,
     size_t capacity_rows, uint32_t expert_id, int grid_x, void* cuda_stream) {
   if (rows == 0 || rows > capacity_rows || expert_id >= kB12xExperts || grid_x <= 0 ||
       grid_x > kB12xW4a16DecodeMaxGridX) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
   const W4A16GridLaunchFn launcher = w4a16_top1_grid_launcher(capacity_rows);
   if (launcher == nullptr) {
-    return DS4RT_STATUS_INVALID_ARGUMENT;
+    return DS41RT_STATUS_INVALID_ARGUMENT;
   }
-  const ds4rt_status_t valid = validate_w4a16_moe_buffers(buffers, capacity_rows, 1);
-  if (valid != DS4RT_STATUS_OK) {
+  const ds41rt_status_t valid = validate_w4a16_moe_buffers(buffers, capacity_rows, 1);
+  if (valid != DS41RT_STATUS_OK) {
     return valid;
   }
-  const ds4rt_status_t initialized = ds4rt_cuda_b12x_spark_aot_init();
-  if (initialized != DS4RT_STATUS_OK) {
+  const ds41rt_status_t initialized = ds41rt_cuda_b12x_spark_aot_init();
+  if (initialized != DS41RT_STATUS_OK) {
     return initialized;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  ds4rt_status_t status = reset_w4a16_locks_async(buffers, stream);
-  if (status != DS4RT_STATUS_OK) {
+  ds41rt_status_t status = reset_w4a16_locks_async(buffers, stream);
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   constexpr size_t threads = 256;
@@ -1558,7 +1558,7 @@ extern "C" ds4rt_status_t ds4rt_cuda_b12x_spark_w4a16_top1_grid_candidate_async(
       static_cast<float*>(buffers->topk_weights.ptr), rows, capacity_rows, expert_id,
       capacity_rows <= 8);
   status = status_from_cuda(cudaGetLastError());
-  if (status != DS4RT_STATUS_OK) {
+  if (status != DS41RT_STATUS_OK) {
     return status;
   }
   return check_aot_launch(

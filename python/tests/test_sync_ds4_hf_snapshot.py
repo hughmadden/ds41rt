@@ -39,7 +39,7 @@ def make_cache(
     config = {"model_type": "deepseek_v4"}
     if gptqmodel:
         config["quantization_config"] = {
-            "meta": {"ds4rt_error_ledger": {"test": True}}
+            "meta": {"ds41rt_error_ledger": {"test": True}}
         }
     payloads = {
         "config.json": (json.dumps(config, separators=(",", ":")) + "\n").encode(),
@@ -73,14 +73,14 @@ def make_cache(
     include_qualification = gptqmodel if qualification is None else qualification
     if include_qualification:
         qualification_root = root / (
-            "ds4rt-development-evidence"
+            "ds41rt-development-evidence"
             if development_unqualified
-            else "ds4rt-qualifications"
+            else "ds41rt-qualifications"
         ) / revision
         qualification_root.mkdir(parents=True)
         report_payloads = {
             "retained-native.json": json.dumps(
-                {"schema": "ds4rt-exl3-retained-native-integrity-v1"}
+                {"schema": "ds41rt-exl3-retained-native-integrity-v1"}
             ).encode(),
             (
                 "diagnostic-quality.json"
@@ -88,7 +88,7 @@ def make_cache(
                 else "expert-quality.json"
             ): json.dumps(
                 {
-                    "schema": "ds4rt-exl3-checkpoint-quality-v1",
+                    "schema": "ds41rt-exl3-checkpoint-quality-v1",
                     "validation_contract": {"sha256": "1" * 64},
                 }
             ).encode(),
@@ -118,7 +118,7 @@ def make_cache(
             )
         else:
             manifest["qualification"] = qualification_entries
-    manifests = root / "ds4rt-manifests"
+    manifests = root / "ds41rt-manifests"
     manifests.mkdir()
     (manifests / f"{revision}.json").write_text(
         json.dumps(manifest) + "\n", encoding="utf-8"
@@ -256,7 +256,7 @@ def test_remote_verifier_rejects_tampered_qualification_before_ref(
     previous = "0" * 64
     ref = root / "refs" / "main"
     ref.write_text(previous + "\n", encoding="utf-8")
-    quality = root / "ds4rt-qualifications" / revision / "expert-quality.json"
+    quality = root / "ds41rt-qualifications" / revision / "expert-quality.json"
     quality.write_bytes(b"x" * quality.stat().st_size)
 
     result = subprocess.run(

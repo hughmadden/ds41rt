@@ -3,7 +3,7 @@ import os
 import pytest
 import torch
 
-from ds4rt_reference.deepseek_v4_dspark_capture import (
+from ds41rt_reference.deepseek_v4_dspark_capture import (
     bind_deepseek_v4_dspark_proposal_entry,
     capture_deepseek_v4_dspark_block_attention,
     capture_deepseek_v4_dspark_block_post_dispatch,
@@ -14,7 +14,7 @@ from ds4rt_reference.deepseek_v4_dspark_capture import (
     prepare_deepseek_v4_dspark_terminal_collapse,
     run_deepseek_v4_dspark_proposal_entry,
 )
-from ds4rt_reference.deepseek_v4_mhc_capture import plan_deepseek_v4_mhc
+from ds41rt_reference.deepseek_v4_mhc_capture import plan_deepseek_v4_mhc
 
 
 pytestmark = pytest.mark.skipif(
@@ -167,8 +167,8 @@ def test_flash_terminal_collapse_retains_raw_and_normalized_hidden() -> None:
 
 @pytest.mark.parametrize(("max_batch", "request_slot"), [(1, 0), (16, 1)])
 @pytest.mark.skipif(
-    os.environ.get("DS4RT_RUN_GPU_QUALIFICATION") != "1",
-    reason="set DS4RT_RUN_GPU_QUALIFICATION=1 for full block capture",
+    os.environ.get("DS41RT_RUN_GPU_QUALIFICATION") != "1",
+    reason="set DS41RT_RUN_GPU_QUALIFICATION=1 for full block capture",
 )
 def test_flash_block_capture_replays_across_tp4_dispatch_boundary(
     max_batch: int, request_slot: int

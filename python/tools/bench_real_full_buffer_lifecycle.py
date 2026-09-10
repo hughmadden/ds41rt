@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def ds4rt_vram_mib(server_pid: int | None) -> tuple[int, int]:
+def ds41rt_vram_mib(server_pid: int | None) -> tuple[int, int]:
     output = subprocess.check_output(
         [
             "nvidia-smi",
@@ -53,10 +53,10 @@ def ds4rt_vram_mib(server_pid: int | None) -> tuple[int, int]:
         matches = [process for process in processes if process[0] == server_pid]
     else:
         matches = [
-            process for process in processes if os.path.basename(process[2]) == "ds4rt"
+            process for process in processes if os.path.basename(process[2]) == "ds41rt"
         ]
     if len(matches) != 1:
-        target = f"PID {server_pid}" if server_pid is not None else "one ds4rt process"
+        target = f"PID {server_pid}" if server_pid is not None else "one ds41rt process"
         raise RuntimeError(f"expected {target} in nvidia-smi, found {matches!r}")
     pid, memory_mib, _ = matches[0]
     return pid, memory_mib
@@ -79,7 +79,7 @@ def execute_probe(args: argparse.Namespace, repetitions: int) -> dict[str, objec
     with urllib.request.urlopen(request, timeout=args.timeout) as response:
         result = json.load(response)
     elapsed_seconds = time.monotonic() - started
-    pid, memory_mib = ds4rt_vram_mib(args.server_pid)
+    pid, memory_mib = ds41rt_vram_mib(args.server_pid)
     usage = result["usage"]
     real_full = result.get("metrics", {}).get("real_full", {})
     return {
@@ -100,7 +100,7 @@ def main() -> None:
     ):
         raise SystemExit("--prompt-repetitions must contain positive values")
 
-    server_pid, baseline_mib = ds4rt_vram_mib(args.server_pid)
+    server_pid, baseline_mib = ds41rt_vram_mib(args.server_pid)
     args.server_pid = server_pid
     targets = list(args.prompt_repetitions)
     sequence = targets + [min(targets), max(targets)]

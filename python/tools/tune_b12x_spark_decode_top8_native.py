@@ -61,14 +61,14 @@ def main() -> None:
         DeviceBuffer,
         ctypes.c_void_p,
     )
-    native.lib.ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async.argtypes = decode_args
-    native.lib.ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async.restype = ctypes.c_int
-    native.lib.ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async.argtypes = (
+    native.lib.ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async.argtypes = decode_args
+    native.lib.ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async.restype = ctypes.c_int
+    native.lib.ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async.argtypes = (
         *decode_args[:-1],
         ctypes.c_int,
         ctypes.c_void_p,
     )
-    native.lib.ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async.restype = (
+    native.lib.ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async.restype = (
         ctypes.c_int
     )
 
@@ -107,7 +107,7 @@ def main() -> None:
         for expert_id in range(TOP_K):
             copy_source(rng.randbytes(w13_weight_bytes))
             native.check(
-                native.lib.ds4rt_cuda_b12x_w4a16_pack_weight_async(
+                native.lib.ds41rt_cuda_b12x_w4a16_pack_weight_async(
                     pack_source.buffer(advertised_bytes=w13_weight_bytes),
                     w13_weight.buffer(
                         offset=expert_id * w13_weight_bytes,
@@ -123,7 +123,7 @@ def main() -> None:
             runtime.check(runtime.lib.cudaStreamSynchronize(stream), "finish W13 pack")
             copy_source(rng.randbytes(w2_weight_bytes))
             native.check(
-                native.lib.ds4rt_cuda_b12x_w4a16_pack_weight_async(
+                native.lib.ds41rt_cuda_b12x_w4a16_pack_weight_async(
                     pack_source.buffer(advertised_bytes=w2_weight_bytes),
                     w2_weight.buffer(
                         offset=expert_id * w2_weight_bytes,
@@ -145,7 +145,7 @@ def main() -> None:
             "initialize W13 scales",
         )
         native.check(
-            native.lib.ds4rt_cuda_b12x_w4a16_pack_scale_async(
+            native.lib.ds41rt_cuda_b12x_w4a16_pack_scale_async(
                 pack_source.buffer(advertised_bytes=w13_scale_bytes),
                 w13_scale.buffer(advertised_bytes=w13_scale_bytes),
                 HIDDEN,
@@ -163,7 +163,7 @@ def main() -> None:
             "initialize W2 scales",
         )
         native.check(
-            native.lib.ds4rt_cuda_b12x_w4a16_pack_scale_async(
+            native.lib.ds41rt_cuda_b12x_w4a16_pack_scale_async(
                 pack_source.buffer(advertised_bytes=w2_scale_bytes),
                 w2_scale.buffer(advertised_bytes=w2_scale_bytes),
                 INTERMEDIATE,
@@ -237,7 +237,7 @@ def main() -> None:
 
         def launch_current() -> None:
             native.check(
-                native.lib.ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async(
+                native.lib.ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_async(
                     ctypes.byref(buffers),
                     input_payload.buffer(),
                     INPUT_PAYLOAD_BYTES,
@@ -249,7 +249,7 @@ def main() -> None:
 
         def launch_grid(grid: int) -> None:
             native.check(
-                native.lib.ds4rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async(
+                native.lib.ds41rt_cuda_b12x_spark_w4a16_decode_m1_nvfp4_grid_candidate_async(
                     ctypes.byref(buffers),
                     input_payload.buffer(),
                     INPUT_PAYLOAD_BYTES,
@@ -320,7 +320,7 @@ def main() -> None:
         )
     finally:
         for graph_exec in graph_execs:
-            native.lib.ds4rt_cuda_graph_exec_destroy(graph_exec)
+            native.lib.ds41rt_cuda_graph_exec_destroy(graph_exec)
         runtime.lib.cudaStreamDestroy(stream)
 
 

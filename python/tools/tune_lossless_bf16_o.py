@@ -206,7 +206,7 @@ def main() -> None:
     parser.add_argument(
         "--native-library",
         type=Path,
-        help="also benchmark ds4rt's native SM120 lossless GEMV",
+        help="also benchmark ds41rt's native SM120 lossless GEMV",
     )
     parser.add_argument(
         "--scan-all-layers",
@@ -214,7 +214,7 @@ def main() -> None:
         help="scan every Q-B/O tensor for the required per-tile escape capacity",
     )
     args = parser.parse_args()
-    with Path(".ds4rt-cache/model-artifacts/diagnostic/model_catalog.json").open() as handle:
+    with Path(".ds41rt-cache/model-artifacts/diagnostic/model_catalog.json").open() as handle:
         catalog = json.load(handle)
     if args.scan_all_layers:
         scan_all_projection_layers(catalog)
@@ -380,7 +380,7 @@ def main() -> None:
 
     if args.native_library is not None:
         native = ctypes.CDLL(str(args.native_library.resolve()))
-        native_launch = native.ds4rt_cuda_linear_lossless_bf16_m1_async
+        native_launch = native.ds41rt_cuda_linear_lossless_bf16_m1_async
         native_launch.argtypes = (
             ctypes.c_void_p,
             ctypes.c_void_p,

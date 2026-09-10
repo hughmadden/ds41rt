@@ -7,8 +7,8 @@ native/build-cuda-*/
 native/build-rdma/
 build/
 dist/
-.ds4rt-release/
-.ds4rt-release-image/
+.ds41rt-release/
+.ds41rt-release-image/
 __pycache__/
 *.py[cod]
 *.so
@@ -22,7 +22,7 @@ __pycache__/
 .coverage
 htmlcov/
 .env
-.ds4rt-cache/
+.ds41rt-cache/
 # Tool-evaluation output generated in the repository root.
 data/benchmarks.sqlite
 runs/
@@ -42,4 +42,4 @@ reports/phase0_artifacts/smoke/
 # commit their manifests and hashes, not raw activation rows.
 reports/quantization/router-replay-inputs/*.bf16
 reports/quantization/router-replay-inputs/*.bin
-.ds4rt-wip/
+.ds41rt-wip/

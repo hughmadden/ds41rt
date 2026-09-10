@@ -228,7 +228,7 @@ nvtx = [
 ]
 
 [[package]]
-name = "ds4rt-reference"
+name = "ds41rt-reference"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

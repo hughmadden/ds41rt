@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ds4rt_reference.prefill_ref import TinyPrefillWeights, tiny_prefill_chunked
+from ds41rt_reference.prefill_ref import TinyPrefillWeights, tiny_prefill_chunked
 
 
 def make_identityish_weights() -> TinyPrefillWeights:

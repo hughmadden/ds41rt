@@ -48,34 +48,34 @@ class Projection:
 
 PROJECTIONS = {
     "q_b": Projection(
-        "Q-B", 16_384, 2_048, "ds4rt_cuda_b12x_coordinator_w4a16_q_b_m8_async", 8
+        "Q-B", 16_384, 2_048, "ds41rt_cuda_b12x_coordinator_w4a16_q_b_m8_async", 8
     ),
     "q_b_m16_candidate": Projection(
         "Q-B M16 candidate",
         16_384,
         2_048,
-        "ds4rt_cuda_b12x_coordinator_w4a16_q_b_m16_candidate_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_q_b_m16_candidate_async",
         16,
     ),
     "o_proj": Projection(
         "O-projection",
         6_144,
         16_384,
-        "ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m1_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m1_async",
         1,
     ),
     "o_proj_m16_candidate": Projection(
         "O-projection M16 candidate",
         6_144,
         16_384,
-        "ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m16_candidate_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m16_candidate_async",
         16,
     ),
     "o_proj_tn64_candidate": Projection(
         "O-projection TN64 candidate",
         6_144,
         16_384,
-        "ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m1_tn64_candidate_async",
         1,
     ),
 }
@@ -89,13 +89,13 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error_message(error, len(error))
+    lib.ds41rt_last_error_message(error, len(error))
     raise RuntimeError(f"{action} failed with status {status}: {error.value.decode()}")
 
 
 def configure_abi(lib: ctypes.CDLL, projection: Projection) -> ctypes._CFuncPtr:
-    lib.ds4rt_cuda_b12x_coordinator_aot_init.restype = ctypes.c_int
-    lib.ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async.argtypes = (
+    lib.ds41rt_cuda_b12x_coordinator_aot_init.restype = ctypes.c_int
+    lib.ds41rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async.argtypes = (
         DeviceBuffer,
         DeviceBuffer,
         DeviceBuffer,
@@ -105,12 +105,12 @@ def configure_abi(lib: ctypes.CDLL, projection: Projection) -> ctypes._CFuncPtr:
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    lib.ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async.restype = ctypes.c_int
-    lib.ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.argtypes = (
+    lib.ds41rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async.restype = ctypes.c_int
+    lib.ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.argtypes = (
         ctypes.POINTER(CoordinatorBuffers),
         ctypes.c_void_p,
     )
-    lib.ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.restype = ctypes.c_int
+    lib.ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async.restype = ctypes.c_int
     launch = getattr(lib, projection.launch_symbol)
     if projection.max_rows > 1:
         launch.argtypes = (
@@ -153,7 +153,7 @@ def main() -> None:
         )
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
     launch = configure_abi(lib, projection)
-    check_status(lib, lib.ds4rt_cuda_b12x_coordinator_aot_init(), "AOT initialization")
+    check_status(lib, lib.ds41rt_cuda_b12x_coordinator_aot_init(), "AOT initialization")
 
     weight = torch.randn(
         (projection.size_n, projection.size_k), device="cuda", dtype=torch.bfloat16
@@ -206,7 +206,7 @@ def main() -> None:
 
     check_status(
         lib,
-        lib.ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
+        lib.ds41rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async(
             device_buffer(weight),
             device_buffer(payload),
             device_buffer(packed_weight),
@@ -220,7 +220,7 @@ def main() -> None:
     )
     check_status(
         lib,
-        lib.ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async(
+        lib.ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async(
             ctypes.byref(buffers), stream
         ),
         "launch-buffer initialization",

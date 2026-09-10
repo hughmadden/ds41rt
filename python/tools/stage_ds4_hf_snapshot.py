@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage a complete DS4RT EXL3 artifact as an immutable Hugging Face snapshot."""
+"""Stage a complete DS41RT EXL3 artifact as an immutable Hugging Face snapshot."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
+from ds41rt_runtime.exl3_artifact_contract import (  # noqa: E402
     ARTIFACT_FILE as GPTQMODEL_ARTIFACT_FILE,
     LEDGER_FILE as GPTQMODEL_LEDGER_FILE,
     LEDGER_MANIFEST_FILE as GPTQMODEL_LEDGER_MANIFEST_FILE,
@@ -33,7 +33,7 @@ from ds4rt_runtime.exl3_artifact_contract import (  # noqa: E402
 )
 from prepare_ds4_hf_publication import publication_sources  # noqa: E402
 
-MANIFEST_SCHEMA = "ds4rt-hf-staged-snapshot-v1"
+MANIFEST_SCHEMA = "ds41rt-hf-staged-snapshot-v1"
 EXL3_V2_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v2"
 EXL3_V3_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v3_flash_activation_pilot"
 EXL3_V4_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
@@ -41,9 +41,9 @@ EXL3_K3_V4_RECIPE = "deepseek_v4_exl3_trellis_3bpw_v4_flash_natural_route"
 EXL3_RECIPES = frozenset(
     (EXL3_V2_RECIPE, EXL3_V3_RECIPE, EXL3_V4_RECIPE, EXL3_K3_V4_RECIPE)
 )
-DEBUG_DIRECTORY = ".ds4rt-exl3-debug"
-QUALITY_REPORT_SCHEMA = "ds4rt-exl3-checkpoint-quality-v1"
-QUALITY_GPU_SCHEMA = "ds4rt-quality-physical-gpu-v1"
+DEBUG_DIRECTORY = ".ds41rt-exl3-debug"
+QUALITY_REPORT_SCHEMA = "ds41rt-exl3-checkpoint-quality-v1"
+QUALITY_GPU_SCHEMA = "ds41rt-quality-physical-gpu-v1"
 GPTQMODEL_PRODUCTION_SAMPLING_POLICY = "natural-target-stratified-mtp-rms-isotropic"
 DEVELOPMENT_QUALIFICATION_STATUS = "development-unqualified"
 DEVELOPMENT_BLOCKERS = (
@@ -56,18 +56,18 @@ MIN_DSPARK_QUANT_COSINE = 0.84
 MAX_DSPARK_QUANT_RELATIVE_L2 = 0.56
 MIN_TP_COSINE = 0.999
 MAX_TP_RELATIVE_L2 = 0.03
-MULTIGPU_QUALIFICATION_FILE = "ds4rt-exl3-multigpu-production.json"
-ERROR_LEDGER_FILE = "ds4rt-exl3-error-ledger.jsonl"
-ERROR_LEDGER_MANIFEST_FILE = "ds4rt-exl3-error-ledger.manifest.json"
-ERROR_LEDGER_SCHEMA = "ds4rt.exl3-error-ledger"
-ROUTE_EVIDENCE_SCHEMA = "ds4rt.exl3-natural-route"
+MULTIGPU_QUALIFICATION_FILE = "ds41rt-exl3-multigpu-production.json"
+ERROR_LEDGER_FILE = "ds41rt-exl3-error-ledger.jsonl"
+ERROR_LEDGER_MANIFEST_FILE = "ds41rt-exl3-error-ledger.manifest.json"
+ERROR_LEDGER_SCHEMA = "ds41rt.exl3-error-ledger"
+ROUTE_EVIDENCE_SCHEMA = "ds41rt.exl3-natural-route"
 REQUIRED_FILES = (
     "config.json",
     "model.safetensors.index.json",
     "quantization_config.json",
-    "ds4rt-exl3-calibration.json",
-    "ds4rt-exl3-quality.json",
-    "ds4rt-exl3-retained-native.json",
+    "ds41rt-exl3-calibration.json",
+    "ds41rt-exl3-quality.json",
+    "ds41rt-exl3-retained-native.json",
 )
 GPTQMODEL_REQUIRED_FILES = (
     "config.json",
@@ -230,15 +230,15 @@ def validate_quantization_contract(
     if is_gptqmodel_native_exl3(quant):
         validate_gptqmodel_native_exl3(quant, model_config=model_config)
         return EXL3_V4_RECIPE if int(quant["bits"]) == 2 else EXL3_K3_V4_RECIPE
-    ds4rt = quant.get("ds4rt")
-    if not isinstance(ds4rt, dict):
-        raise ValueError(f"{source} has no quantization_config.ds4rt object")
-    if ds4rt.get("calibrated") is not True:
-        raise ValueError(f"{source} must declare ds4rt.calibrated=true")
-    recipe = ds4rt.get("recipe")
+    ds41rt = quant.get("ds41rt")
+    if not isinstance(ds41rt, dict):
+        raise ValueError(f"{source} has no quantization_config.ds41rt object")
+    if ds41rt.get("calibrated") is not True:
+        raise ValueError(f"{source} must declare ds41rt.calibrated=true")
+    recipe = ds41rt.get("recipe")
     if recipe not in EXL3_RECIPES:
         raise ValueError(
-            f"{source} must declare a recognized DS4RT recipe, got {recipe!r}"
+            f"{source} must declare a recognized DS41RT recipe, got {recipe!r}"
         )
     return str(recipe)
 
@@ -890,7 +890,7 @@ def quality_snapshot_identity(snapshot: Path) -> dict[str, Any]:
         "config.json",
         "model.safetensors.index.json",
         "quantize_config.json",
-        "ds4rt-exl3-calibration.json",
+        "ds41rt-exl3-calibration.json",
         GPTQMODEL_PLAN_FILE,
         GPTQMODEL_RUN_FILE,
         GPTQMODEL_ARTIFACT_FILE,
@@ -1419,7 +1419,7 @@ def validate_gptqmodel_retained_native_report(
         raise ValueError("GPTQModel config has invalid retained-native geometry")
     blocks = hidden_layers + len(dspark_targets)
     if (
-        report.get("schema") != "ds4rt-exl3-retained-native-integrity-v1"
+        report.get("schema") != "ds41rt-exl3-retained-native-integrity-v1"
         or report.get("recipe")
         != (
             GPTQMODEL_RECIPE
@@ -1632,7 +1632,7 @@ def validate_multigpu_qualification(
     expected_shapes = [[hidden, intermediate], [intermediate, hidden]]
     expected_seed = calibration.get("seed")
     if (
-        report.get("schema") != "ds4rt-exl3-multigpu-qualification-v1"
+        report.get("schema") != "ds41rt-exl3-multigpu-qualification-v1"
         or report.get("status") != "bit-exact"
         or report.get("devices") != devices
         or report.get("device_ratios") != embedded.get("device_ratios")
@@ -1677,7 +1677,7 @@ def discover_artifact_files(snapshot: Path) -> list[tuple[Path, PurePosixPath]]:
                 continue
             if path.is_symlink():
                 raise ValueError(f"artifact file must not be a symlink: {path}")
-            if name == ".ds4rt-exl3-state.json" or is_temporary_name(name):
+            if name == ".ds41rt-exl3-state.json" or is_temporary_name(name):
                 raise ValueError(
                     f"artifact contains incomplete or temporary file: {path}"
                 )
@@ -1753,7 +1753,7 @@ def validate_complete_artifact(snapshot: Path) -> list[tuple[Path, PurePosixPath
             quant,
             model_config=config,
         )
-        ledger_meta = quant.get("meta", {}).get("ds4rt_error_ledger", {})
+        ledger_meta = quant.get("meta", {}).get("ds41rt_error_ledger", {})
         projection_sources = (
             ledger_meta.get("projection_sources")
             if isinstance(ledger_meta, dict)
@@ -1791,17 +1791,17 @@ def validate_complete_artifact(snapshot: Path) -> list[tuple[Path, PurePosixPath
     qconfig = read_json_object(snapshot / "quantization_config.json")
     if validate_quantization_contract(qconfig, "quantization_config.json") != recipe:
         raise ValueError(
-            "config and quantization_config declare different DS4RT recipes"
+            "config and quantization_config declare different DS41RT recipes"
         )
     if recipe == EXL3_V4_RECIPE:
         validate_error_ledger(snapshot, config)
-    calibration = read_json_object(snapshot / "ds4rt-exl3-calibration.json")
+    calibration = read_json_object(snapshot / "ds41rt-exl3-calibration.json")
     if calibration.get("incomplete") is True:
         raise ValueError("calibration report still declares the artifact incomplete")
     if calibration.get("recipe") != recipe:
-        raise ValueError("calibration report does not match the DS4RT recipe")
+        raise ValueError("calibration report does not match the DS41RT recipe")
     validate_multigpu_qualification(calibration, config, snapshot)
-    quality = read_json_object(snapshot / "ds4rt-exl3-quality.json")
+    quality = read_json_object(snapshot / "ds41rt-exl3-quality.json")
     validate_quality_report(quality, calibration, config, snapshot)
     hidden_layers = config["num_hidden_layers"]
     expected_layer_ids = list(
@@ -1810,9 +1810,9 @@ def validate_complete_artifact(snapshot: Path) -> list[tuple[Path, PurePosixPath
     expert_count = config["n_routed_experts"]
     quality_layers = quality["layers"]
     expert_ids = quality["expert_ids"]
-    integrity = read_json_object(snapshot / "ds4rt-exl3-retained-native.json")
+    integrity = read_json_object(snapshot / "ds41rt-exl3-retained-native.json")
     if (
-        integrity.get("schema") != "ds4rt-exl3-retained-native-integrity-v1"
+        integrity.get("schema") != "ds41rt-exl3-retained-native-integrity-v1"
         or integrity.get("recipe") != recipe
         or integrity.get("quantization_scope") != "routed_experts_only"
     ):
@@ -2053,7 +2053,7 @@ def validate_existing_snapshot(
 def publish_snapshot(
     snapshot_path: Path, files: Iterable[ArtifactFile], blobs: Path, model_root: Path
 ) -> None:
-    temporary = model_root / f".ds4rt-stage-{snapshot_path.name}-{os.getpid()}"
+    temporary = model_root / f".ds41rt-stage-{snapshot_path.name}-{os.getpid()}"
     if temporary.exists():
         raise ValueError(f"temporary staging path already exists: {temporary}")
     temporary.mkdir()
@@ -2275,7 +2275,7 @@ def stage_snapshot(
     refs = model_root / "refs"
     blobs = model_root / "blobs"
     snapshots = model_root / "snapshots"
-    manifests = model_root / "ds4rt-manifests"
+    manifests = model_root / "ds41rt-manifests"
     for directory in (refs, blobs, snapshots, manifests):
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -2300,12 +2300,12 @@ def stage_snapshot(
         publish_snapshot(snapshot_path, files, blobs, model_root)
 
     if qualification_reports:
-        qualification_root = model_root / "ds4rt-qualifications" / revision
+        qualification_root = model_root / "ds41rt-qualifications" / revision
         qualification_root.mkdir(parents=True, exist_ok=True)
         for report in qualification_reports:
             install_qualification_report(report, qualification_root / report.name)
     if development_reports:
-        evidence_root = model_root / "ds4rt-development-evidence" / revision
+        evidence_root = model_root / "ds41rt-development-evidence" / revision
         evidence_root.mkdir(parents=True, exist_ok=True)
         for report in development_reports:
             install_qualification_report(report, evidence_root / report.name)

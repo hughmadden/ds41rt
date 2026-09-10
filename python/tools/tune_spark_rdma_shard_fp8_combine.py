@@ -58,18 +58,18 @@ class MappedAllocation:
         self.host = HostBuffer()
         self.device = DeviceBuffer()
         native.check(
-            native.lib.ds4rt_alloc_host_buffer(nbytes, ctypes.byref(self.host)),
+            native.lib.ds41rt_alloc_host_buffer(nbytes, ctypes.byref(self.host)),
             f"allocate {nbytes} mapped host bytes",
         )
         try:
             native.check(
-                native.lib.ds4rt_cuda_host_buffer_device_alias(
+                native.lib.ds41rt_cuda_host_buffer_device_alias(
                     self.host, ctypes.byref(self.device)
                 ),
                 "map host allocation into CUDA",
             )
         except Exception:
-            native.lib.ds4rt_free_host_buffer(ctypes.byref(self.host))
+            native.lib.ds41rt_free_host_buffer(ctypes.byref(self.host))
             raise
 
     def write(self, payload: bytes) -> None:
@@ -80,7 +80,7 @@ class MappedAllocation:
     def close(self) -> None:
         if self.host.ptr:
             self.native.check(
-                self.native.lib.ds4rt_free_host_buffer(ctypes.byref(self.host)),
+                self.native.lib.ds41rt_free_host_buffer(ctypes.byref(self.host)),
                 "free mapped host allocation",
             )
             self.host = HostBuffer()
@@ -110,16 +110,16 @@ def peer_payload(rows: int, peer: int, rail: int) -> bytes:
 
 def configure_native(native: NativeLibrary) -> tuple[ctypes._CFuncPtr, ...]:
     lib = native.lib
-    lib.ds4rt_alloc_host_buffer.argtypes = (
+    lib.ds41rt_alloc_host_buffer.argtypes = (
         ctypes.c_size_t,
         ctypes.POINTER(HostBuffer),
     )
-    lib.ds4rt_cuda_host_buffer_device_alias.argtypes = (
+    lib.ds41rt_cuda_host_buffer_device_alias.argtypes = (
         HostBuffer,
         ctypes.POINTER(DeviceBuffer),
     )
-    lib.ds4rt_free_host_buffer.argtypes = (ctypes.POINTER(HostBuffer),)
-    current = lib.ds4rt_cuda_reduce_route_shards_to_f32_async
+    lib.ds41rt_free_host_buffer.argtypes = (ctypes.POINTER(HostBuffer),)
+    current = lib.ds41rt_cuda_reduce_route_shards_to_f32_async
     current.argtypes = (
         ctypes.POINTER(RouteShardBuffers),
         ctypes.c_size_t,
@@ -130,7 +130,7 @@ def configure_native(native: NativeLibrary) -> tuple[ctypes._CFuncPtr, ...]:
         ctypes.c_uint32,
         ctypes.c_void_p,
     )
-    pack = lib.ds4rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_async
+    pack = lib.ds41rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_async
     pack.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -140,7 +140,7 @@ def configure_native(native: NativeLibrary) -> tuple[ctypes._CFuncPtr, ...]:
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    fused = lib.ds4rt_cuda_reduce_route_shards_bf16_fp8_to_fp8_rail_candidate_async
+    fused = lib.ds41rt_cuda_reduce_route_shards_bf16_fp8_to_fp8_rail_candidate_async
     fused.argtypes = (
         ctypes.POINTER(FusedRailBuffers),
         ctypes.c_size_t,
@@ -150,7 +150,7 @@ def configure_native(native: NativeLibrary) -> tuple[ctypes._CFuncPtr, ...]:
         ctypes.c_size_t,
         ctypes.c_void_p,
     )
-    f32_to_bf16 = lib.ds4rt_cuda_f32_to_bf16_async
+    f32_to_bf16 = lib.ds41rt_cuda_f32_to_bf16_async
     f32_to_bf16.argtypes = (
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -158,9 +158,9 @@ def configure_native(native: NativeLibrary) -> tuple[ctypes._CFuncPtr, ...]:
         ctypes.c_void_p,
     )
     for function in (
-        lib.ds4rt_alloc_host_buffer,
-        lib.ds4rt_cuda_host_buffer_device_alias,
-        lib.ds4rt_free_host_buffer,
+        lib.ds41rt_alloc_host_buffer,
+        lib.ds41rt_cuda_host_buffer_device_alias,
+        lib.ds41rt_free_host_buffer,
         current,
         pack,
         fused,
@@ -378,7 +378,7 @@ def main() -> None:
             raise SystemExit("fused output differs from the current path")
     finally:
         for graph in graphs:
-            native.lib.ds4rt_cuda_graph_exec_destroy(graph)
+            native.lib.ds41rt_cuda_graph_exec_destroy(graph)
         for allocation in reversed(mapped):
             allocation.close()
         runtime.lib.cudaStreamDestroy(stream)

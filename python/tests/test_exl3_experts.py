@@ -5,19 +5,19 @@ import json
 
 import pytest
 
-from ds4rt_runtime.exl3_experts import (
+from ds41rt_runtime.exl3_experts import (
     EXL3_W13_PROJECTION_LAYOUT,
     checkpoint_tensor_names,
     load_exl3_expert_tp_layer,
     read_exl3_expert_config,
 )
-from ds4rt_runtime.exl3_quantizer import (
+from ds41rt_runtime.exl3_quantizer import (
     EXL3_ACTIVATION_RECIPE,
     EXL3_FORCED_ACTIVATION_RECIPE,
     EXL3_ROUTE_REPLAY_ARTIFACT_FILENAME,
     exl3_quantization_config,
 )
-from ds4rt_runtime.native_experts import (
+from ds41rt_runtime.native_experts import (
     GPTQMODEL_EXPERT_LAYOUT,
     NativeExpertConfig,
 )
@@ -93,13 +93,13 @@ def test_projection_major_exl3_uses_kernel_native_gate_then_up_planes():
 def test_exl3_config_fails_closed_on_noncalibrated_or_non_tp4_artifact(tmp_path):
     _write_config(tmp_path / "config.json")
     raw = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
-    raw["quantization_config"]["ds4rt"]["calibrated"] = False
+    raw["quantization_config"]["ds41rt"]["calibrated"] = False
     (tmp_path / "config.json").write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(ValueError, match="calibrated"):
         read_exl3_expert_config(tmp_path)
 
-    raw["quantization_config"]["ds4rt"]["calibrated"] = True
-    raw["quantization_config"]["ds4rt"]["expert_tp_world_size"] = 2
+    raw["quantization_config"]["ds41rt"]["calibrated"] = True
+    raw["quantization_config"]["ds41rt"]["expert_tp_world_size"] = 2
     (tmp_path / "config.json").write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(ValueError, match="expert_tp_world_size"):
         read_exl3_expert_config(tmp_path)
@@ -150,7 +150,7 @@ def test_exl3_config_accepts_checkpoint_bound_forced_activation_pilot(tmp_path):
 
 def test_exl3_config_accepts_checkpoint_bound_natural_route_calibration(tmp_path):
     _write_config(tmp_path / "config.json")
-    replay_payload = b'{"schema":"ds4rt-flash-route-replay-v1","status":"exact"}\n'
+    replay_payload = b'{"schema":"ds41rt-flash-route-replay-v1","status":"exact"}\n'
     (tmp_path / EXL3_ROUTE_REPLAY_ARTIFACT_FILENAME).write_bytes(replay_payload)
     raw = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
     raw["quantization_config"] = exl3_quantization_config(

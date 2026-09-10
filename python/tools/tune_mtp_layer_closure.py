@@ -17,7 +17,7 @@ REFERENCE_ROOT = Path(__file__).resolve().parents[1] / "reference"
 if str(REFERENCE_ROOT) not in sys.path:
     sys.path.insert(0, str(REFERENCE_ROOT))
 
-from ds4rt_reference.b12x_mla_capture import (  # noqa: E402
+from ds41rt_reference.b12x_mla_capture import (  # noqa: E402
     capture_flashinfer_mla_rope_attention,
     prepare_flashinfer_mla_rope_attention,
 )
@@ -57,7 +57,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error(error, len(error))
+    lib.ds41rt_last_error(error, len(error))
     raise RuntimeError(f"{action} failed with status {status}: {error.value.decode()}")
 
 
@@ -573,17 +573,17 @@ def main() -> None:
     device = torch.device("cuda", torch.cuda.current_device())
     properties = torch.cuda.get_device_properties(device)
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    lib.ds4rt_last_error.restype = ctypes.c_int
-    lib.ds4rt_cuda_b12x_coordinator_aot_init.restype = ctypes.c_int
+    lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    lib.ds41rt_last_error.restype = ctypes.c_int
+    lib.ds41rt_cuda_b12x_coordinator_aot_init.restype = ctypes.c_int
     check_status(
         lib,
-        lib.ds4rt_cuda_b12x_coordinator_aot_init(),
+        lib.ds41rt_cuda_b12x_coordinator_aot_init(),
         "coordinator AOT initialization",
     )
     pack_weight = configure(
         lib,
-        "ds4rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_quantize_pack_weight_async",
         (
             DeviceBuffer,
             DeviceBuffer,
@@ -597,32 +597,32 @@ def main() -> None:
     )
     initialize_buffers = configure(
         lib,
-        "ds4rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_initialize_launch_buffers_async",
         (ctypes.POINTER(CoordinatorBuffers), ctypes.c_void_p),
     )
     q_b_launch = configure(
         lib,
-        "ds4rt_cuda_b12x_coordinator_w4a16_q_b_m8_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_q_b_m8_async",
         (ctypes.POINTER(CoordinatorBuffers), ctypes.c_size_t, ctypes.c_void_p),
     )
     q_b_m16_launch = configure(
         lib,
-        "ds4rt_cuda_b12x_coordinator_w4a16_q_b_m16_candidate_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_q_b_m16_candidate_async",
         (ctypes.POINTER(CoordinatorBuffers), ctypes.c_size_t, ctypes.c_void_p),
     )
     o_launch = configure(
         lib,
-        "ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m1_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m1_async",
         (ctypes.POINTER(CoordinatorBuffers), ctypes.c_void_p),
     )
     o_m16_launch = configure(
         lib,
-        "ds4rt_cuda_b12x_coordinator_w4a16_o_proj_m16_candidate_async",
+        "ds41rt_cuda_b12x_coordinator_w4a16_o_proj_m16_candidate_async",
         (ctypes.POINTER(CoordinatorBuffers), ctypes.c_size_t, ctypes.c_void_p),
     )
     rmsnorm = configure(
         lib,
-        "ds4rt_cuda_rmsnorm_bf16_async",
+        "ds41rt_cuda_rmsnorm_bf16_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -635,7 +635,7 @@ def main() -> None:
     )
     linear = configure(
         lib,
-        "ds4rt_cuda_linear_bf16_cublas_async",
+        "ds41rt_cuda_linear_bf16_cublas_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -649,7 +649,7 @@ def main() -> None:
     )
     q_a_candidate = configure(
         lib,
-        "ds4rt_cuda_mla_scalar_qa_batched_norm_candidate_async",
+        "ds41rt_cuda_mla_scalar_qa_batched_norm_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -667,7 +667,7 @@ def main() -> None:
     )
     kv_finalize = configure(
         lib,
-        "ds4rt_cuda_mla_kv_finalize_store_candidate_async",
+        "ds41rt_cuda_mla_kv_finalize_store_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,

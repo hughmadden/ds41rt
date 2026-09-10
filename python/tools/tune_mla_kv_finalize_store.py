@@ -65,7 +65,7 @@ def check_status(lib: ctypes.CDLL, status: int, action: str) -> None:
     if status == 0:
         return
     error = ctypes.create_string_buffer(512)
-    lib.ds4rt_last_error(error, len(error))
+    lib.ds41rt_last_error(error, len(error))
     raise RuntimeError(f"{action} failed with status {status}: {error.value.decode()}")
 
 
@@ -170,11 +170,11 @@ def main() -> None:
     device = torch.device("cuda", torch.cuda.current_device())
     properties = torch.cuda.get_device_properties(device)
     lib = ctypes.CDLL(str(args.native_lib.resolve()))
-    lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-    lib.ds4rt_last_error.restype = ctypes.c_int
+    lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+    lib.ds41rt_last_error.restype = ctypes.c_int
     rmsnorm = configure(
         lib,
-        "ds4rt_cuda_rmsnorm_bf16_async",
+        "ds41rt_cuda_rmsnorm_bf16_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -187,7 +187,7 @@ def main() -> None:
     )
     linear = configure(
         lib,
-        "ds4rt_cuda_linear_bf16_cublas_async",
+        "ds41rt_cuda_linear_bf16_cublas_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -201,7 +201,7 @@ def main() -> None:
     )
     layernorm = configure(
         lib,
-        "ds4rt_cuda_layernorm_affine_bf16_async",
+        "ds41rt_cuda_layernorm_affine_bf16_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -215,7 +215,7 @@ def main() -> None:
     )
     prepare_precomputed = configure(
         lib,
-        "ds4rt_cuda_mla_kv_prepare_bf16_precomputed_rope_candidate_async",
+        "ds41rt_cuda_mla_kv_prepare_bf16_precomputed_rope_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -230,7 +230,7 @@ def main() -> None:
     )
     factor_launch = configure(
         lib,
-        "ds4rt_cuda_mla_rope_factors_f32_candidate_async",
+        "ds41rt_cuda_mla_rope_factors_f32_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -241,7 +241,7 @@ def main() -> None:
     )
     pack_fp8 = configure(
         lib,
-        "ds4rt_cuda_mla_kv_pack_fp8_ds_mla_async",
+        "ds41rt_cuda_mla_kv_pack_fp8_ds_mla_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -253,12 +253,12 @@ def main() -> None:
     )
     pack_nvfp4 = configure(
         lib,
-        "ds4rt_cuda_mla_kv_pack_mxfp4_ds_mla_async",
+        "ds41rt_cuda_mla_kv_pack_mxfp4_ds_mla_async",
         pack_fp8.argtypes,
     )
     write_blocks = configure(
         lib,
-        "ds4rt_cuda_kv_cache_write_blocks_async",
+        "ds41rt_cuda_kv_cache_write_blocks_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -271,7 +271,7 @@ def main() -> None:
     )
     candidate = configure(
         lib,
-        "ds4rt_cuda_mla_kv_finalize_store_candidate_async",
+        "ds41rt_cuda_mla_kv_finalize_store_candidate_async",
         (
             ctypes.c_void_p,
             ctypes.c_void_p,

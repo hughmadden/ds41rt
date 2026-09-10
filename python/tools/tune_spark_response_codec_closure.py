@@ -120,22 +120,22 @@ def configure(lib: ctypes.CDLL, symbol: str, argtypes: tuple[object, ...]):
 class NativeRuntime:
     def __init__(self, path: Path) -> None:
         self.lib = ctypes.CDLL(str(path.resolve()))
-        self.lib.ds4rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
-        self.lib.ds4rt_cuda_graph_begin_capture.argtypes = (ctypes.c_void_p,)
-        self.lib.ds4rt_cuda_graph_end_capture.argtypes = (
+        self.lib.ds41rt_last_error.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+        self.lib.ds41rt_cuda_graph_begin_capture.argtypes = (ctypes.c_void_p,)
+        self.lib.ds41rt_cuda_graph_end_capture.argtypes = (
             ctypes.c_void_p,
             ctypes.POINTER(ctypes.c_void_p),
         )
-        self.lib.ds4rt_cuda_graph_launch.argtypes = (
+        self.lib.ds41rt_cuda_graph_launch.argtypes = (
             ctypes.c_void_p,
             ctypes.c_void_p,
         )
-        self.lib.ds4rt_cuda_graph_exec_destroy.argtypes = (ctypes.c_void_p,)
+        self.lib.ds41rt_cuda_graph_exec_destroy.argtypes = (ctypes.c_void_p,)
         for symbol in (
-            "ds4rt_cuda_graph_begin_capture",
-            "ds4rt_cuda_graph_end_capture",
-            "ds4rt_cuda_graph_launch",
-            "ds4rt_cuda_graph_exec_destroy",
+            "ds41rt_cuda_graph_begin_capture",
+            "ds41rt_cuda_graph_end_capture",
+            "ds41rt_cuda_graph_launch",
+            "ds41rt_cuda_graph_exec_destroy",
         ):
             getattr(self.lib, symbol).restype = ctypes.c_int
 
@@ -143,20 +143,20 @@ class NativeRuntime:
         if status == 0:
             return
         error = ctypes.create_string_buffer(512)
-        self.lib.ds4rt_last_error(error, len(error))
+        self.lib.ds41rt_last_error(error, len(error))
         raise RuntimeError(
             f"{action} failed with status {status}: {error.value.decode()}"
         )
 
     def capture(self, stream: ctypes.c_void_p, operation) -> ctypes.c_void_p:
         self.check(
-            self.lib.ds4rt_cuda_graph_begin_capture(stream),
+            self.lib.ds41rt_cuda_graph_begin_capture(stream),
             "begin graph capture",
         )
         operation()
         graph_exec = ctypes.c_void_p()
         self.check(
-            self.lib.ds4rt_cuda_graph_end_capture(stream, ctypes.byref(graph_exec)),
+            self.lib.ds41rt_cuda_graph_end_capture(stream, ctypes.byref(graph_exec)),
             "end graph capture",
         )
         if graph_exec.value is None:
@@ -196,42 +196,42 @@ def main() -> None:
     size = ctypes.c_size_t
     zero = configure(
         native.lib,
-        "ds4rt_cuda_zero_f32_async",
+        "ds41rt_cuda_zero_f32_async",
         (pointer, size, pointer),
     )
     aggregate = configure(
         native.lib,
-        "ds4rt_cuda_scatter_add_rows_bf16_weighted_to_f32_async",
+        "ds41rt_cuda_scatter_add_rows_bf16_weighted_to_f32_async",
         (pointer, pointer, pointer, pointer, size, size, pointer),
     )
     pack_bf16 = configure(
         native.lib,
-        "ds4rt_cuda_gather_rows_f32_to_bf16_candidate_async",
+        "ds41rt_cuda_gather_rows_f32_to_bf16_candidate_async",
         (pointer, pointer, pointer, size, size, pointer),
     )
     pack_fp8 = configure(
         native.lib,
-        "ds4rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_register_candidate_async",
+        "ds41rt_cuda_gather_rows_f32_to_fp8_e4m3_row_scaled_register_candidate_async",
         (pointer, pointer, pointer, size, size, size, pointer),
     )
     pack_nvfp4 = configure(
         native.lib,
-        "ds4rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_policy_candidate_async",
+        "ds41rt_cuda_gather_rows_f32_to_nvfp4_e2m1_fp8_e4m3_policy_candidate_async",
         (pointer, pointer, pointer, size, size, size, pointer),
     )
     decode_bf16 = configure(
         native.lib,
-        "ds4rt_cuda_scatter_add_rows_bf16_to_f32_async",
+        "ds41rt_cuda_scatter_add_rows_bf16_to_f32_async",
         (pointer, pointer, pointer, size, size, pointer),
     )
     decode_fp8 = configure(
         native.lib,
-        "ds4rt_cuda_scatter_add_rows_fp8_e4m3_row_scaled_to_f32_async",
+        "ds41rt_cuda_scatter_add_rows_fp8_e4m3_row_scaled_to_f32_async",
         (pointer, size, pointer, pointer, size, size, pointer),
     )
     decode_nvfp4 = configure(
         native.lib,
-        "ds4rt_cuda_scatter_add_rows_nvfp4_e2m1_fp8_e4m3_to_f32_async",
+        "ds41rt_cuda_scatter_add_rows_nvfp4_e2m1_fp8_e4m3_to_f32_async",
         (pointer, size, pointer, pointer, size, size, pointer),
     )
 
@@ -571,7 +571,7 @@ def main() -> None:
             results.append(result)
             print(json.dumps(result, sort_keys=True), flush=True)
             for graph_exec in row_graphs:
-                native.lib.ds4rt_cuda_graph_exec_destroy(graph_exec)
+                native.lib.ds41rt_cuda_graph_exec_destroy(graph_exec)
 
         report = {
             "benchmark": "spark_response_codec_closure",

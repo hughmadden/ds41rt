@@ -32,18 +32,18 @@ from deepseek_v4_mtp_prefix_store import (
 )
 from preflight import report_identity_sha256
 
-PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v7"
-LEGACY_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v5"
-PREVIOUS_PLAN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-plan-v6"
+PLAN_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-plan-v7"
+LEGACY_PLAN_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-plan-v5"
+PREVIOUS_PLAN_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-plan-v6"
 SUPPORTED_PLAN_SCHEMAS = frozenset(
     (LEGACY_PLAN_SCHEMA, PREVIOUS_PLAN_SCHEMA, PLAN_SCHEMA)
 )
 STRICT_STORAGE_PLAN_SCHEMAS = frozenset((PREVIOUS_PLAN_SCHEMA, PLAN_SCHEMA))
-RUN_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-run-v5"
-BASE_PREFIX_RUN_SCHEMA = "ds4rt-deepseek-v4-base-prefix-run-v1"
-ARTIFACT_MANIFEST_SCHEMA = "ds4rt-deepseek-v4-gptqmodel-artifact-v1"
-CALIBRATION_MANIFEST_SCHEMA = "ds4rt-flash-exl3-calibration-corpus-v3"
-ROUTE_SCREEN_SCHEMA = "ds4rt-flash-natural-route-distribution-v1"
+RUN_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-run-v5"
+BASE_PREFIX_RUN_SCHEMA = "ds41rt-deepseek-v4-base-prefix-run-v1"
+ARTIFACT_MANIFEST_SCHEMA = "ds41rt-deepseek-v4-gptqmodel-artifact-v1"
+CALIBRATION_MANIFEST_SCHEMA = "ds41rt-flash-exl3-calibration-corpus-v3"
+ROUTE_SCREEN_SCHEMA = "ds41rt-flash-natural-route-distribution-v1"
 ROUTE_QUALIFICATION_SCREEN = "screen-report"
 ROUTE_QUALIFICATION_INLINE = "inline-full-corpus"
 ROUTE_QUALIFICATION_MODES = (
@@ -51,8 +51,8 @@ ROUTE_QUALIFICATION_MODES = (
     ROUTE_QUALIFICATION_INLINE,
 )
 NATURAL_ROUTE_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
-ROUTE_EVIDENCE_CONTRACT = "ds4rt.exl3-natural-route"
-ZERO_ROUTE_RECOVERY_CONTRACT = "ds4rt.exl3-zero-route-recovery"
+ROUTE_EVIDENCE_CONTRACT = "ds41rt.exl3-natural-route"
+ZERO_ROUTE_RECOVERY_CONTRACT = "ds41rt.exl3-zero-route-recovery"
 ZERO_ROUTE_RECOVERY_TRIGGER = "natural-route-count-below-1024"
 ZERO_ROUTE_RECOVERY_SAMPLE_SOURCE = "same-fixed-calibration-selection"
 ZERO_ROUTE_RECOVERY_CAPTURE_METHOD = (
@@ -67,8 +67,8 @@ ZERO_ROUTE_RECOVERY_TARGET_SAMPLE_COUNT = 1024
 ZERO_ROUTE_RECOVERY_IDENTITY_POLICY = (
     "normalized-2i-residual-to-effective-count-1024-v2"
 )
-PROJECTION_CHECKPOINT_CONTRACT = "ds4rt.exl3-projection-checkpoint-v1"
-REMOTE_WORKER_CONTRACT = "ds4rt.exl3-remote-worker-v1"
+PROJECTION_CHECKPOINT_CONTRACT = "ds41rt.exl3-projection-checkpoint-v1"
+REMOTE_WORKER_CONTRACT = "ds41rt.exl3-remote-worker-v1"
 REMOTE_WORKER_SCHEDULER = "dynamic-pipelined-slot-projection-v2"
 REMOTE_PIPELINE_DEPTH = 2
 REMOTE_POSTPROCESS_ALLOWANCE = 1
@@ -87,11 +87,11 @@ PREFLIGHT_ROLE_CONTRACTS = {
     "coordinator": ("linux/amd64", "120"),
     "expert": ("linux/arm64", "121"),
 }
-PLAN_FILENAME = "ds4rt-gptqmodel-plan.json"
-RUN_FILENAME = "ds4rt-gptqmodel-run.json"
-BASE_PREFIX_RUN_FILENAME = "ds4rt-base-prefix-run.json"
-ARTIFACT_MANIFEST_FILENAME = "ds4rt-gptqmodel-artifact.json"
-ERROR_JOURNAL_FILENAME = ".ds4rt-exl3-error-journal.jsonl"
+PLAN_FILENAME = "ds41rt-gptqmodel-plan.json"
+RUN_FILENAME = "ds41rt-gptqmodel-run.json"
+BASE_PREFIX_RUN_FILENAME = "ds41rt-base-prefix-run.json"
+ARTIFACT_MANIFEST_FILENAME = "ds41rt-gptqmodel-artifact.json"
+ERROR_JOURNAL_FILENAME = ".ds41rt-exl3-error-journal.jsonl"
 INLINE_MIXED_CANDIDATE_JOURNAL_FILENAME = (
     f"{ERROR_JOURNAL_FILENAME}.k2-candidates"
 )
@@ -110,14 +110,14 @@ INLINE_MIXED_SCHEMA = "gptqmodel.exl3-inline-mixed"
 INLINE_MIXED_SCORE = (
     "k2-hessian-weighted-relative-error-times-natural-gate-squared-mass-v1"
 )
-CAPTURE_FRONTIER_CONTRACT = "ds4rt.exl3-capture-frontier-v1"
+CAPTURE_FRONTIER_CONTRACT = "ds41rt.exl3-capture-frontier-v1"
 HOST_RSS_LIMIT_BYTES = 150 * 1024**3
 CUDA_ALLOCATION_LIMIT_BYTES = 82 * 1024**3
 MEMORY_TELEMETRY_INTERVAL_BATCHES = 64
 DEFAULT_CAPTURE_BATCH_CHECKPOINT_INTERVAL = 64
-EXECUTION_UPGRADE_FILENAME = "ds4rt-execution-upgrade.json"
+EXECUTION_UPGRADE_FILENAME = "ds41rt-execution-upgrade.json"
 EXECUTION_UPGRADE_HISTORY_DIRNAME = "execution-upgrade-history"
-EXECUTION_UPGRADE_SCHEMA = "ds4rt-deepseek-v4-execution-upgrade-v1"
+EXECUTION_UPGRADE_SCHEMA = "ds41rt-deepseek-v4-execution-upgrade-v1"
 BOUNDARY_DIRECTORY_RE = re.compile(
     r"layer-(?P<layer>[0-9]{6})-(?P<digest>[0-9a-f]{16})\Z"
 )
@@ -485,7 +485,7 @@ def deepseek_v4_namespace_audit(
             raise LaunchError(f"source MTP block {block} learned router is incomplete")
 
     return {
-        "contract": "ds4rt.deepseek-v4-native-namespace-audit-v1",
+        "contract": "ds41rt.deepseek-v4-native-namespace-audit-v1",
         "base_layers": layer_count,
         "mtp_blocks": 3,
         "routed_experts_per_block": expert_count,
@@ -898,7 +898,7 @@ def remote_worker_configuration(
     cuda_workers_per_device = math.ceil(
         orchestration_workers / len(coordinator_slots)
     )
-    token_env = getattr(args, "remote_token_env", "DS4RT_EXL3_WORKER_TOKEN")
+    token_env = getattr(args, "remote_token_env", "DS41RT_EXL3_WORKER_TOKEN")
     timeout_seconds = getattr(args, "remote_timeout_seconds", 7200.0)
     max_attempts = getattr(args, "remote_max_attempts", 2)
     if (
@@ -1000,7 +1000,7 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
     run_state = (
         raw_run_state.expanduser().resolve()
         if raw_run_state is not None
-        else output.with_name(f".{output.name}.ds4rt-run")
+        else output.with_name(f".{output.name}.ds41rt-run")
     )
     raw_projection_root = getattr(args, "projection_checkpoint_dir", None)
     projection_root = (
@@ -1120,7 +1120,7 @@ def build_plan(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         "bits": bits,
         "codebook": "mcg",
         "module_include": BASE_EXPERT_PATTERN,
-        "operator_contract": "ds4rt-deepseek-v4-target-plus-joint-mtp-v1",
+        "operator_contract": "ds41rt-deepseek-v4-target-plus-joint-mtp-v1",
         "route_evidence_contract": ROUTE_EVIDENCE_CONTRACT,
         "zero_route_recovery_contract": ZERO_ROUTE_RECOVERY_CONTRACT,
         "mtp_anchor_selection": mtp_anchor_selection,
@@ -1422,7 +1422,7 @@ def _latest_boundary_resume_identity(
         key: value for key, value in manifest.items() if key != "manifest_sha256"
     }
     if (
-        manifest.get("schema") != "ds4rt.deepseek-v4-layer-boundary"
+        manifest.get("schema") != "ds41rt.deepseek-v4-layer-boundary"
         or manifest.get("schema_version") != 2
         or manifest.get("payload_hash_algorithm") != "xxh3-128"
         or manifest.get("plan_sha256") != plan.get("plan_sha256")
@@ -1988,7 +1988,7 @@ def _validate_upgrade_remote_workers(
     if (
         observed_endpoints != expected_endpoints
         or observed_preflights != expected_preflights
-        or getattr(args, "remote_token_env", "DS4RT_EXL3_WORKER_TOKEN")
+        or getattr(args, "remote_token_env", "DS41RT_EXL3_WORKER_TOKEN")
         != expected.get("token_env")
         or getattr(args, "remote_timeout_seconds", 7200.0)
         != expected.get("timeout_seconds")
@@ -2007,7 +2007,7 @@ def build_execution_upgrade(
     run_state = (
         raw_run_state.expanduser().resolve()
         if raw_run_state is not None
-        else output.with_name(f".{output.name}.ds4rt-run")
+        else output.with_name(f".{output.name}.ds41rt-run")
     )
     _regular_directory(run_state, "run-state directory")
     plan = read_json_object(run_state / PLAN_FILENAME)
@@ -2314,7 +2314,7 @@ def preflight_lazy_nonpersistent_buffers(
             )
 
     report = {
-        "schema": "ds4rt-deepseek-v4-lazy-direct-state-preflight-v1",
+        "schema": "ds41rt-deepseek-v4-lazy-direct-state-preflight-v1",
         "plan_sha256": plan_sha256,
         "device": str(target_device),
         "first_compressed_layer": first_compressed,
@@ -2392,10 +2392,10 @@ def _make_quantize_config_metadata_portable(quantize_config: Any) -> None:
     """Remove coordinator-local state paths before serializing an artifact."""
 
     meta = copy.deepcopy(getattr(quantize_config, "meta", None) or {})
-    mixed = meta.get("ds4rt_inline_mixed")
+    mixed = meta.get("ds41rt_inline_mixed")
     if isinstance(mixed, dict):
         mixed.pop("tier_plan_root", None)
-        meta["ds4rt_inline_mixed"] = mixed
+        meta["ds41rt_inline_mixed"] = mixed
     quantize_config.meta = meta
 
 
@@ -2555,10 +2555,10 @@ def execute(
     if not coordinator_devices:
         raise LaunchError("quantization plan has no coordinator GPU")
     primary_device = coordinator_devices[0]
-    qcfg_meta = {"ds4rt_error_ledger": plan["ledger_provenance"]}
+    qcfg_meta = {"ds41rt_error_ledger": plan["ledger_provenance"]}
     base_mixed_policy = plan.get("inline_mixed", {}).get("base")
     if base_mixed_policy is not None:
-        qcfg_meta["ds4rt_inline_mixed"] = base_mixed_policy
+        qcfg_meta["ds41rt_inline_mixed"] = base_mixed_policy
     qcfg = EXL3Config(
         bits=int(plan["exl3"]["bits"]),
         codebook="mcg",
@@ -2753,9 +2753,9 @@ def execute(
                 getattr(mtp_model.quantize_config, "meta", None) or {}
             )
             if mtp_mixed_policy is None:
-                mtp_meta.pop("ds4rt_inline_mixed", None)
+                mtp_meta.pop("ds41rt_inline_mixed", None)
             else:
-                mtp_meta["ds4rt_inline_mixed"] = mtp_mixed_policy
+                mtp_meta["ds41rt_inline_mixed"] = mtp_mixed_policy
             mtp_model.quantize_config.meta = mtp_meta
             mtp_model.configure_mtp_activation_store(
                 os.fspath(run_state / MTP_ACTIVATION_DIRNAME),
@@ -2941,7 +2941,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--remote-token-env",
-        default="DS4RT_EXL3_WORKER_TOKEN",
+        default="DS41RT_EXL3_WORKER_TOKEN",
     )
     parser.add_argument("--remote-timeout-seconds", type=float, default=7200.0)
     parser.add_argument("--remote-max-attempts", type=int, default=2)

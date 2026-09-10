@@ -24,11 +24,11 @@ import tempfile
 from typing import Any, Iterable
 
 
-PLAN_FILENAME = "ds4rt-gptqmodel-plan.json"
-JOURNAL_FILENAME = ".ds4rt-exl3-error-journal.jsonl"
+PLAN_FILENAME = "ds41rt-gptqmodel-plan.json"
+JOURNAL_FILENAME = ".ds41rt-exl3-error-journal.jsonl"
 CHECKPOINT_DIRNAME = "projection-checkpoints"
 QUARANTINE_DIRNAME = "rejected-attempts"
-CHECKPOINT_SCHEMA = "ds4rt.exl3-projection-checkpoint"
+CHECKPOINT_SCHEMA = "ds41rt.exl3-projection-checkpoint"
 CHECKPOINT_SCHEMA_VERSION = 1
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -486,7 +486,7 @@ def recover(
     )
     retained, rejected = scan_checkpoints(checkpoint_root, journal)
     attempt_contract = {
-        "schema": "ds4rt.quantization-rejected-attempt",
+        "schema": "ds41rt.quantization-rejected-attempt",
         "schema_version": 1,
         "plan_sha256": expected_plan_sha256,
         "accepted_prefix": {

@@ -4,7 +4,7 @@
 This is a bounded equivalence test, not a calibration corpus.  It verifies the
 captured input and route records, resolves the real checkpoint router tensors
 through GPTQModel's LazyTurtle aliases, and compares both stock Transformers
-BF16 routing and DS4RT's patched FP32 calibration routing with the native
+BF16 routing and DS41RT's patched FP32 calibration routing with the native
 serving records.  The patched route must select exactly the same expert set on
 every row, reproduce route weights within a small FP32 tolerance, and repeat
 bit-for-bit on the same GPU.
@@ -25,8 +25,8 @@ from types import SimpleNamespace
 from typing import Any
 
 
-SCHEMA = "ds4rt-gptqmodel-flash-router-replay-v1"
-INPUT_SCHEMA = "ds4rt-flash-router-replay-subset-v1"
+SCHEMA = "ds41rt-gptqmodel-flash-router-replay-v1"
+INPUT_SCHEMA = "ds41rt-flash-router-replay-subset-v1"
 REQUIRED_PURPOSE = "bounded route equivalence only; never GPTQ calibration input"
 ROUTE_VALUE = struct.Struct("<Hf")
 DEFAULT_WEIGHT_ATOL = 5e-7

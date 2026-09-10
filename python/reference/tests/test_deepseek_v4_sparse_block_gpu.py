@@ -4,11 +4,11 @@ import os
 
 import pytest
 import torch
-from ds4rt_reference.deepseek_v4_attention_layer_capture import (
+from ds41rt_reference.deepseek_v4_attention_layer_capture import (
     bind_deepseek_v4_sliding_attention_layer,
     run_deepseek_v4_sliding_attention_layer,
 )
-from ds4rt_reference.deepseek_v4_sparse_block_capture import (
+from ds41rt_reference.deepseek_v4_sparse_block_capture import (
     bind_deepseek_v4_sparse_block,
     bind_deepseek_v4_sparse_block_arena,
     plan_deepseek_v4_sparse_block,
@@ -19,8 +19,8 @@ from b12x.attention import dsv4_producer
 from b12x.gemm import wo_projection
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("DS4RT_RUN_GPU_QUALIFICATION") != "1",
-    reason="set DS4RT_RUN_GPU_QUALIFICATION=1 for the explicit GPU0 qualification",
+    os.environ.get("DS41RT_RUN_GPU_QUALIFICATION") != "1",
+    reason="set DS41RT_RUN_GPU_QUALIFICATION=1 for the explicit GPU0 qualification",
 )
 
 

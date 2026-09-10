@@ -50,15 +50,15 @@ def configure_native(path: Path):
         ctypes.c_void_p,
     )
     for name in (
-        "ds4rt_cuda_ds4_flash_w4a16_pack_weight_async",
-        "ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async",
+        "ds41rt_cuda_ds4_flash_w4a16_pack_weight_async",
+        "ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async",
     ):
         function = getattr(library, name)
         function.argtypes = contiguous_args
         function.restype = ctypes.c_int
     for name in (
-        "ds4rt_cuda_ds4_flash_w4a16_pack_weight_strided_async",
-        "ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_strided_async",
+        "ds41rt_cuda_ds4_flash_w4a16_pack_weight_strided_async",
+        "ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_strided_async",
     ):
         function = getattr(library, name)
         function.argtypes = strided_args
@@ -68,7 +68,7 @@ def configure_native(path: Path):
 
 def require_ok(status: int, action: str) -> None:
     if status != 0:
-        raise RuntimeError(f"{action} failed with ds4rt status {status}")
+        raise RuntimeError(f"{action} failed with ds41rt status {status}")
 
 
 def compare_bytes(actual, expected, label: str) -> dict[str, int | str]:
@@ -115,7 +115,7 @@ def run(native_path: Path, seed: int) -> list[dict[str, int | str]]:
     )
     fc1_actual = torch.empty_like(fc1_expected)
     require_ok(
-        native.ds4rt_cuda_ds4_flash_w4a16_pack_weight_async(
+        native.ds41rt_cuda_ds4_flash_w4a16_pack_weight_async(
             tensor_buffer(fc1_source),
             tensor_buffer(fc1_actual),
             fc1_k,
@@ -137,7 +137,7 @@ def run(native_path: Path, seed: int) -> list[dict[str, int | str]]:
     )
     fc1_scale_actual = torch.empty_like(fc1_scale_expected)
     require_ok(
-        native.ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
+        native.ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_async(
             tensor_buffer(fc1_scale_source),
             tensor_buffer(fc1_scale_actual),
             fc1_k,
@@ -166,7 +166,7 @@ def run(native_path: Path, seed: int) -> list[dict[str, int | str]]:
     )
     fc2_actual = torch.empty_like(fc2_expected)
     require_ok(
-        native.ds4rt_cuda_ds4_flash_w4a16_pack_weight_strided_async(
+        native.ds41rt_cuda_ds4_flash_w4a16_pack_weight_strided_async(
             tensor_buffer(fc2_source),
             tensor_buffer(fc2_actual),
             fc2_k,
@@ -196,7 +196,7 @@ def run(native_path: Path, seed: int) -> list[dict[str, int | str]]:
     )
     fc2_scale_actual = torch.empty_like(fc2_scale_expected)
     require_ok(
-        native.ds4rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_strided_async(
+        native.ds41rt_cuda_ds4_flash_w4a16_pack_e8m0_scale_strided_async(
             tensor_buffer(fc2_scale_source),
             tensor_buffer(fc2_scale_actual),
             fc2_k,

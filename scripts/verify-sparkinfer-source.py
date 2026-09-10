@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify DS4RT's pinned SparkInfer source and report its provenance."""
+"""Verify DS41RT's pinned SparkInfer source and report its provenance."""
 
 from __future__ import annotations
 

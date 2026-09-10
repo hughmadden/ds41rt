@@ -58,7 +58,7 @@ def test_checkpoint_recipe_distinguishes_native_and_production_exl3(
             {
                 "quantization_config": {
                     "quant_method": "exl3",
-                    "ds4rt": {"recipe": "deepseek_v4_exl3_trellis_2bpw_v2"},
+                    "ds41rt": {"recipe": "deepseek_v4_exl3_trellis_2bpw_v2"},
                 }
             }
         ),
@@ -75,7 +75,7 @@ def test_checkpoint_recipe_distinguishes_native_and_production_exl3(
             {
                 "quantization_config": {
                     "quant_method": "exl3",
-                    "ds4rt": {
+                    "ds41rt": {
                         "recipe": "deepseek_v4_exl3_trellis_2bpw_v3_flash_activation_pilot"
                     },
                 }
@@ -91,7 +91,7 @@ def test_checkpoint_recipe_distinguishes_native_and_production_exl3(
             {
                 "quantization_config": {
                     "quant_method": "exl3",
-                    "ds4rt": {
+                    "ds41rt": {
                         "recipe": "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
                     },
                 }
@@ -108,13 +108,13 @@ def test_checkpoint_recipe_distinguishes_native_and_production_exl3(
             {
                 "quantization_config": {
                     "quant_method": "exl3",
-                    "ds4rt": {"recipe": "retired-recipe"},
+                    "ds41rt": {"recipe": "retired-recipe"},
                 }
             }
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="unsupported DS4RT EXL3 recipe"):
+    with pytest.raises(ValueError, match="unsupported DS41RT EXL3 recipe"):
         checkpoint_quantization_recipe(checkpoint)
 
 
@@ -163,7 +163,7 @@ def test_checkpoint_recipe_accepts_exact_compact_public_gptqmodel_config(
 
     declaration["bits"] = 2.0
     declaration["meta"] = {
-        "ds4rt_inline_mixed": {
+        "ds41rt_inline_mixed": {
             "schema": "gptqmodel.exl3-inline-mixed",
             "schema_version": 1,
             "namespace": "base",
@@ -189,7 +189,7 @@ def test_checkpoint_recipe_accepts_exact_compact_public_gptqmodel_config(
         == generation.GPTQMODEL_RECIPE_MIXED_K2_K3
     )
 
-    declaration["meta"]["ds4rt_inline_mixed"]["target_bpw"] = "22/10"
+    declaration["meta"]["ds41rt_inline_mixed"]["target_bpw"] = "22/10"
     (checkpoint / "config.json").write_text(
         json.dumps({"quantization_config": declaration}), encoding="utf-8"
     )
@@ -210,7 +210,7 @@ def test_checkpoint_recipe_accepts_exact_compact_public_gptqmodel_config(
     (checkpoint / "quantize_config.json").write_text(
         json.dumps(external), encoding="utf-8"
     )
-    with pytest.raises(ValueError, match="unsupported DS4RT EXL3 recipe"):
+    with pytest.raises(ValueError, match="unsupported DS41RT EXL3 recipe"):
         checkpoint_quantization_recipe(checkpoint)
 
 
@@ -226,7 +226,7 @@ def staged_exl3_checkpoint(
             {
                 "quantization_config": {
                     "quant_method": "exl3",
-                    "ds4rt": {
+                    "ds41rt": {
                         "recipe": "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
                     },
                 }
@@ -234,22 +234,22 @@ def staged_exl3_checkpoint(
         ).encode(),
         "model.safetensors.index.json": b'{"weight_map":{"x":"model.safetensors"}}',
         "quantization_config.json": b"{}",
-        "ds4rt-exl3-calibration.json": b"{}",
-        "ds4rt-exl3-quality.json": b"{}",
-        "ds4rt-exl3-retained-native.json": b"{}",
-        "ds4rt-exl3-multigpu-production.json": b"{}",
-        "ds4rt-exl3-error-ledger.jsonl": b"{}\n",
-        "ds4rt-exl3-error-ledger.manifest.json": b"{}",
+        "ds41rt-exl3-calibration.json": b"{}",
+        "ds41rt-exl3-quality.json": b"{}",
+        "ds41rt-exl3-retained-native.json": b"{}",
+        "ds41rt-exl3-multigpu-production.json": b"{}",
+        "ds41rt-exl3-error-ledger.jsonl": b"{}\n",
+        "ds41rt-exl3-error-ledger.manifest.json": b"{}",
         "model.safetensors": b"trellis",
     }
     if not include_error_ledger:
-        del contents["ds4rt-exl3-error-ledger.jsonl"]
-        del contents["ds4rt-exl3-error-ledger.manifest.json"]
+        del contents["ds41rt-exl3-error-ledger.jsonl"]
+        del contents["ds41rt-exl3-error-ledger.manifest.json"]
     if include_readme:
         contents["README.md"] = b"original model card\n"
     if standard_files_only:
         for path in tuple(contents):
-            if path.startswith("ds4rt-") or path == "quantization_config.json":
+            if path.startswith("ds41rt-") or path == "quantization_config.json":
                 del contents[path]
     entries = []
     for path, content in sorted(contents.items()):
@@ -261,7 +261,7 @@ def staged_exl3_checkpoint(
             }
         )
     canonical = json.dumps(
-        {"schema": "ds4rt-hf-staged-snapshot-v1", "files": entries},
+        {"schema": "ds41rt-hf-staged-snapshot-v1", "files": entries},
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
@@ -269,7 +269,7 @@ def staged_exl3_checkpoint(
     model_root = tmp_path / "models--tpurtell--flash-exl3"
     blobs = model_root / "blobs"
     snapshot = model_root / "snapshots" / revision
-    manifest_dir = model_root / "ds4rt-manifests"
+    manifest_dir = model_root / "ds41rt-manifests"
     blobs.mkdir(parents=True)
     snapshot.mkdir(parents=True)
     manifest_dir.mkdir()
@@ -282,7 +282,7 @@ def staged_exl3_checkpoint(
     (manifest_dir / f"{revision}.json").write_text(
         json.dumps(
             {
-                "schema": "ds4rt-hf-staged-snapshot-v1",
+                "schema": "ds41rt-hf-staged-snapshot-v1",
                 "model_id": "tpurtell/flash-exl3",
                 "revision": revision,
                 "source_snapshot": "/immutable/source",
@@ -305,7 +305,7 @@ def staged_gptqmodel_checkpoint(tmp_path: Path, *, bits: int = 2) -> Path:
         "quantization_config": {
             "quant_method": "exl3",
             "bits": float(bits),
-            "meta": {"ds4rt_error_ledger": {}},
+            "meta": {"ds41rt_error_ledger": {}},
         }
     }
     contents = {
@@ -314,11 +314,11 @@ def staged_gptqmodel_checkpoint(tmp_path: Path, *, bits: int = 2) -> Path:
             b'{"weight_map":{"x":"model.safetensors"}}'
         ),
         "quantize_config.json": json.dumps(config["quantization_config"]).encode(),
-        "ds4rt-gptqmodel-plan.json": b"{}",
-        "ds4rt-gptqmodel-run.json": b"{}",
-        "ds4rt-gptqmodel-artifact.json": b"{}",
-        "ds4rt-exl3-error-ledger.jsonl": b"{}\n",
-        "ds4rt-exl3-error-ledger.manifest.json": b"{}",
+        "ds41rt-gptqmodel-plan.json": b"{}",
+        "ds41rt-gptqmodel-run.json": b"{}",
+        "ds41rt-gptqmodel-artifact.json": b"{}",
+        "ds41rt-exl3-error-ledger.jsonl": b"{}\n",
+        "ds41rt-exl3-error-ledger.manifest.json": b"{}",
         "model.safetensors": b"trellis",
     }
     entries = [
@@ -330,7 +330,7 @@ def staged_gptqmodel_checkpoint(tmp_path: Path, *, bits: int = 2) -> Path:
         for path, content in sorted(contents.items())
     ]
     canonical = json.dumps(
-        {"schema": "ds4rt-hf-staged-snapshot-v1", "files": entries},
+        {"schema": "ds41rt-hf-staged-snapshot-v1", "files": entries},
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
@@ -338,8 +338,8 @@ def staged_gptqmodel_checkpoint(tmp_path: Path, *, bits: int = 2) -> Path:
     model_root = tmp_path / "models--tpurtell--flash-gptqmodel-exl3"
     blobs = model_root / "blobs"
     snapshot = model_root / "snapshots" / revision
-    manifest_dir = model_root / "ds4rt-manifests"
-    qualification_dir = model_root / "ds4rt-qualifications" / revision
+    manifest_dir = model_root / "ds41rt-manifests"
+    qualification_dir = model_root / "ds41rt-qualifications" / revision
     blobs.mkdir(parents=True)
     snapshot.mkdir(parents=True)
     manifest_dir.mkdir()
@@ -357,7 +357,7 @@ def staged_gptqmodel_checkpoint(tmp_path: Path, *, bits: int = 2) -> Path:
         for name in generation.GPTQMODEL_IDENTITY_FILES
     }
     retained = {
-        "schema": "ds4rt-exl3-retained-native-integrity-v1",
+        "schema": "ds41rt-exl3-retained-native-integrity-v1",
         "recipe": recipe,
         "quantization_scope": "routed_experts_only",
         "exl3_snapshot": source_snapshot,
@@ -388,19 +388,19 @@ def staged_gptqmodel_checkpoint(tmp_path: Path, *, bits: int = 2) -> Path:
         ).encode()
     ).hexdigest()
     quality = {
-        "schema": "ds4rt-exl3-checkpoint-quality-v1",
+        "schema": "ds41rt-exl3-checkpoint-quality-v1",
         "validation_contract": {**contract_body, "sha256": contract_sha256},
     }
     qualification_entries = []
     for name, schema, report in (
         (
             "retained-native.json",
-            "ds4rt-exl3-retained-native-integrity-v1",
+            "ds41rt-exl3-retained-native-integrity-v1",
             retained,
         ),
         (
             "expert-quality.json",
-            "ds4rt-exl3-checkpoint-quality-v1",
+            "ds41rt-exl3-checkpoint-quality-v1",
             quality,
         ),
     ):
@@ -419,7 +419,7 @@ def staged_gptqmodel_checkpoint(tmp_path: Path, *, bits: int = 2) -> Path:
     (manifest_dir / f"{revision}.json").write_text(
         json.dumps(
             {
-                "schema": "ds4rt-hf-staged-snapshot-v1",
+                "schema": "ds41rt-hf-staged-snapshot-v1",
                 "model_id": "tpurtell/flash-gptqmodel-exl3",
                 "revision": revision,
                 "source_snapshot": source_snapshot,
@@ -466,8 +466,8 @@ def test_legacy_control_requires_explicit_override_for_missing_error_ledger(
     assert identity["development_override"] == {
         "kind": "wip-standard-artifact-without-private-evidence",
         "missing_production_evidence": [
-            "ds4rt-exl3-error-ledger.jsonl",
-            "ds4rt-exl3-error-ledger.manifest.json",
+            "ds41rt-exl3-error-ledger.jsonl",
+            "ds41rt-exl3-error-ledger.manifest.json",
         ],
     }
 
@@ -488,12 +488,12 @@ def test_wip_override_accepts_standard_artifact_without_private_evidence(
         "wip-standard-artifact-without-private-evidence"
     )
     assert identity["development_override"]["missing_production_evidence"] == [
-        "ds4rt-exl3-calibration.json",
-        "ds4rt-exl3-error-ledger.jsonl",
-        "ds4rt-exl3-error-ledger.manifest.json",
-        "ds4rt-exl3-multigpu-production.json",
-        "ds4rt-exl3-quality.json",
-        "ds4rt-exl3-retained-native.json",
+        "ds41rt-exl3-calibration.json",
+        "ds41rt-exl3-error-ledger.jsonl",
+        "ds41rt-exl3-error-ledger.manifest.json",
+        "ds41rt-exl3-multigpu-production.json",
+        "ds41rt-exl3-quality.json",
+        "ds41rt-exl3-retained-native.json",
         "quantization_config.json",
     ]
 
@@ -527,7 +527,7 @@ def test_wip_override_accepts_model_card_size_drift_only(tmp_path: Path) -> None
 
 def test_collection_model_is_derived_from_staged_identity() -> None:
     identity = {
-        "schema": "ds4rt-hf-staged-snapshot-v1",
+        "schema": "ds41rt-hf-staged-snapshot-v1",
         "model_id": "tpurtell/DeepSeek-V4-Flash-0731-EXL3-2bpw-v4",
         "revision": "a" * 64,
     }
@@ -611,7 +611,7 @@ def test_staged_gptqmodel_checkpoint_rejects_missing_qualification(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     checkpoint = staged_gptqmodel_checkpoint(tmp_path)
-    manifest = checkpoint.parent.parent / "ds4rt-manifests" / f"{checkpoint.name}.json"
+    manifest = checkpoint.parent.parent / "ds41rt-manifests" / f"{checkpoint.name}.json"
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     payload.pop("qualification")
     manifest.write_text(json.dumps(payload), encoding="utf-8")
@@ -636,10 +636,10 @@ def test_staged_gptqmodel_checkpoint_rejects_rebound_qualification(
 ) -> None:
     checkpoint = staged_gptqmodel_checkpoint(tmp_path)
     model_root = checkpoint.parent.parent
-    manifest_path = model_root / "ds4rt-manifests" / f"{checkpoint.name}.json"
+    manifest_path = model_root / "ds41rt-manifests" / f"{checkpoint.name}.json"
     qualification_path = (
         model_root
-        / "ds4rt-qualifications"
+        / "ds41rt-qualifications"
         / checkpoint.name
         / "retained-native.json"
     )
@@ -768,7 +768,7 @@ def run_report(
             }
             if label == "native"
             else {
-                "schema": "ds4rt-hf-staged-snapshot-v1",
+                "schema": "ds41rt-hf-staged-snapshot-v1",
                 "revision": "a" * 64,
             }
         ),
@@ -874,7 +874,7 @@ def test_matrix_requires_all_dspark_and_concurrency_cells(tmp_path: Path) -> Non
         },
     }
     assert report["artifact_identities"]["candidate"] == {
-        "schema": "ds4rt-hf-staged-snapshot-v1",
+        "schema": "ds41rt-hf-staged-snapshot-v1",
         "revision": "a" * 64,
     }
 
@@ -966,7 +966,7 @@ def test_collect_matrix_arm_uses_one_service_for_c1_through_c4(monkeypatch) -> N
         return {
             "service_instance_id": "00000000-0000-4000-8000-000000000001",
             "artifact_identity": {
-                "schema": "ds4rt-hf-staged-snapshot-v1",
+                "schema": "ds41rt-hf-staged-snapshot-v1",
                 "revision": "a" * 64,
             },
             "suite_sha256": "suite",
@@ -1009,7 +1009,7 @@ def test_collect_matrix_arm_rejects_service_restart(monkeypatch) -> None:
                 else "00000000-0000-4000-8000-000000000002"
             ),
             "artifact_identity": {
-                "schema": "ds4rt-hf-staged-snapshot-v1",
+                "schema": "ds41rt-hf-staged-snapshot-v1",
                 "revision": "a" * 64,
             },
             "suite_sha256": "suite",

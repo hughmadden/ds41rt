@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ds4rt_runtime.exl3_quantizer import (  # noqa: E402
+from ds41rt_runtime.exl3_quantizer import (  # noqa: E402
     EXL3_ACTIVATION_RECIPE,
     EXL3_FORCED_ACTIVATION_RECIPE,
     EXL3_ROUTE_REPLAY_ARTIFACT_FILENAME,
@@ -23,7 +23,7 @@ from ds4rt_runtime.exl3_quantizer import (  # noqa: E402
     run_layerwise_quantization,
 )
 
-MULTIGPU_QUALIFICATION_FILE = "ds4rt-exl3-multigpu-production.json"
+MULTIGPU_QUALIFICATION_FILE = "ds41rt-exl3-multigpu-production.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -208,9 +208,9 @@ def main() -> None:
     import _pinned_exllamav3
 
     debug_dir = args.debug_dir or (
-        args.output / ".ds4rt-exl3-debug"
+        args.output / ".ds41rt-exl3-debug"
         if args.output is not None
-        else Path(".ds4rt-cache/quality/exl3-multigpu-qualification-debug")
+        else Path(".ds41rt-cache/quality/exl3-multigpu-qualification-debug")
     )
     multigpu_qualification = qualify_multigpu_batch_equivalence(
         quantize_exl3_batch=_pinned_exllamav3.quantize_exl3_batch,

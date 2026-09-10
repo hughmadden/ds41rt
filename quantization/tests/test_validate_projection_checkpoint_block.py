@@ -33,7 +33,7 @@ assert CANONICAL_SPEC is not None and CANONICAL_SPEC.loader is not None
 CANONICAL = importlib.util.module_from_spec(CANONICAL_SPEC)
 CANONICAL_SPEC.loader.exec_module(CANONICAL)
 
-from ds4rt_runtime.exl3_quantizer import OutputTensor  # noqa: E402
+from ds41rt_runtime.exl3_quantizer import OutputTensor  # noqa: E402
 
 from gptqmodel.utils.exl3_error_ledger import (  # noqa: E402
     append_exl3_error_journal,
@@ -89,7 +89,7 @@ def _route_evidence(
     logical_layer: int = 0,
 ) -> dict[str, object]:
     return {
-        "schema": "ds4rt.exl3-natural-route",
+        "schema": "ds41rt.exl3-natural-route",
         "schema_version": 1,
         "block_namespace": block_namespace,
         "logical_layer": logical_layer,
@@ -192,7 +192,7 @@ def _make_run_state(
         "recipe": "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route",
         "bits": bits,
         "codebook": "mcg",
-        "route_evidence_contract": "ds4rt.exl3-natural-route",
+        "route_evidence_contract": "ds41rt.exl3-natural-route",
         "quantizer_numerics": {
             "sigma_reg": 0.025,
             "hessian_capture": "raw-xtx-sum-fp32-v1",
@@ -201,24 +201,24 @@ def _make_run_state(
         },
     }
     mtp_anchor_selection = {
-        "contract": "ds4rt-mtp-anchor-stratified-v1",
+        "contract": "ds41rt-mtp-anchor-stratified-v1",
         "count": 8,
         "seed": 20260809,
     }
     mtp_replay_batching = {
-        "contract": "ds4rt-mtp-source-sequence-anchor-batches-v1",
+        "contract": "ds41rt-mtp-source-sequence-anchor-batches-v1",
         "proposal_rows_per_anchor": 5,
         "source_sequence_anchor_cap": None,
     }
     family_join["mtp_anchor_selection"] = mtp_anchor_selection
     family_join["mtp_replay_batching"] = mtp_replay_batching
     if recover_expert is not None:
-        family_join["zero_route_recovery_contract"] = "ds4rt.exl3-zero-route-recovery"
+        family_join["zero_route_recovery_contract"] = "ds41rt.exl3-zero-route-recovery"
     plan = {
         "schema": (
-            "ds4rt-deepseek-v4-dspark-overlay-plan-v2"
+            "ds41rt-deepseek-v4-dspark-overlay-plan-v2"
             if overlay
-            else "ds4rt-deepseek-v4-gptqmodel-plan-v5"
+            else "ds41rt-deepseek-v4-gptqmodel-plan-v5"
         ),
         "source": {
             "geometry": {
@@ -231,7 +231,7 @@ def _make_run_state(
         },
         "run_state_dir": str(run_state),
         "projection_checkpoint": {
-            "contract": "ds4rt.exl3-projection-checkpoint-v1",
+            "contract": "ds41rt.exl3-projection-checkpoint-v1",
             "root": str(checkpoint_root),
         },
         "remote_workers": {
@@ -253,17 +253,17 @@ def _make_run_state(
     if overlay:
         plan["scope"] = "mtp-routed-experts-only"
     plan["plan_sha256"] = hashlib.sha256(canonical_json_bytes(plan)).hexdigest()
-    _write_json(run_state / "ds4rt-gptqmodel-plan.json", plan)
+    _write_json(run_state / "ds41rt-gptqmodel-plan.json", plan)
 
     store = EXL3ProjectionCheckpointStore(checkpoint_root)
-    journal = run_state / ".ds4rt-exl3-error-journal.jsonl"
+    journal = run_state / ".ds41rt-exl3-error-journal.jsonl"
     execution = {
         "kind": "coordinator",
         "device": "cuda:0",
         "gpu_uuid": "GPU-test",
         "preflight_sha256": "a" * 64,
         "image_digest": "sha256:" + "b" * 64,
-        "remote_contract": "ds4rt.exl3-remote-worker-v1",
+        "remote_contract": "ds41rt.exl3-remote-worker-v1",
     }
     projection_names = {
         "w1": "gate_proj",
@@ -355,7 +355,7 @@ def _make_run_state(
                         else None
                     ),
                     "authorization": {
-                        "schema": ("ds4rt.exl3-zero-route-recovery-authorization"),
+                        "schema": ("ds41rt.exl3-zero-route-recovery-authorization"),
                         "schema_version": 1,
                         "kind": "immutable-family-join",
                         "recovery_contract": MODULE.ZERO_ROUTE_RECOVERY_SCHEMA,
@@ -447,7 +447,7 @@ def _make_run_state(
 
                 key_sha256 = hashlib.sha256(module.encode()).hexdigest()
                 assignment_body = {
-                    "schema": "ds4rt.exl3-dynamic-projection-assignments",
+                    "schema": "ds41rt.exl3-dynamic-projection-assignments",
                     "schema_version": 1,
                     "scheduler": "dynamic-pipelined-slot-projection-v2",
                     "topology_sha256": "c" * 64,
@@ -480,7 +480,7 @@ def _make_inline_mixed_run_state(
     """Rewrite the small uniform fixture as an authenticated K2/K3 run."""
 
     run_state = _make_run_state(tmp_path, include_mtp=include_mtp)
-    plan_path = run_state / "ds4rt-gptqmodel-plan.json"
+    plan_path = run_state / "ds41rt-gptqmodel-plan.json"
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     checkpoint_root = run_state / "projection-checkpoints"
     old_store = EXL3ProjectionCheckpointStore(checkpoint_root)
@@ -492,8 +492,8 @@ def _make_inline_mixed_run_state(
         old_entries.append((request, tensors, result))
 
     shutil.rmtree(checkpoint_root)
-    (run_state / ".ds4rt-exl3-error-journal.jsonl").unlink()
-    candidate_journal = run_state / ".ds4rt-exl3-error-journal.jsonl.k2-candidates"
+    (run_state / ".ds41rt-exl3-error-journal.jsonl").unlink()
+    candidate_journal = run_state / ".ds41rt-exl3-error-journal.jsonl.k2-candidates"
     tier_root = run_state / "inline-mixed-tier-plans"
     namespaces = ["base", *(["mtp"] if include_mtp else [])]
     policies = {
@@ -607,7 +607,7 @@ def _make_inline_mixed_run_state(
             {entry["module"]: tier_plan for entry in tier_plan["selected"]}
         )
 
-    journal = run_state / ".ds4rt-exl3-error-journal.jsonl"
+    journal = run_state / ".ds41rt-exl3-error-journal.jsonl"
     for module, (
         candidate_request,
         candidate_result,
@@ -900,7 +900,7 @@ def test_audit_rejects_incomplete_projection_block(tmp_path: Path) -> None:
 
 def _canonical_generated_tensors(run_state: Path) -> tuple[OutputTensor, ...]:
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
     dtype_names = {
         torch.int16: "I16",
@@ -930,7 +930,7 @@ def _canonical_generated_tensors(run_state: Path) -> tuple[OutputTensor, ...]:
 
 def _write_complete_block_audits(run_state: Path, report_dir: Path) -> Path:
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
     geometry = plan["source"]["geometry"]
     for namespace, count in (
@@ -956,7 +956,7 @@ def test_canonical_block_audit_set_binds_complete_base_and_mtp_reports(
     run_state = _make_run_state(tmp_path, include_mtp=True)
     report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
 
     report = CANONICAL.validate_block_audit_set(report_dir, plan)
@@ -986,7 +986,7 @@ def test_canonical_block_audit_set_binds_inline_mixed_tier_plans(
     run_state = _make_inline_mixed_run_state(tmp_path)
     report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
 
     report = CANONICAL.validate_block_audit_set(
@@ -1009,7 +1009,7 @@ def test_canonical_block_audit_set_accepts_mtp_identity_recovery(
     )
     report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
 
     report = CANONICAL.validate_block_audit_set(report_dir, plan)
@@ -1029,7 +1029,7 @@ def test_canonical_block_audit_set_accepts_mtp_router_topup(
     )
     report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
 
     report = CANONICAL.validate_block_audit_set(report_dir, plan)
@@ -1049,7 +1049,7 @@ def test_canonical_block_audit_set_accepts_low_positive_mixed_topup(
     )
     report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
 
     report = CANONICAL.validate_block_audit_set(report_dir, plan)
@@ -1070,7 +1070,7 @@ def test_canonical_block_audit_set_accepts_base_learned_router_topup(
     )
     report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
 
     report = CANONICAL.validate_block_audit_set(report_dir, plan)
@@ -1086,14 +1086,14 @@ def test_composite_block_audits_join_base_and_replacement_mtp_plans(
     (tmp_path / "mtp").mkdir()
     base_run = _make_run_state(tmp_path / "base", include_mtp=True)
     base_plan = json.loads(
-        (base_run / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (base_run / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
     base_reports = _write_complete_block_audits(
         base_run,
         tmp_path / "base-reports",
     )
     mtp_run = _make_run_state(tmp_path / "mtp", overlay=True)
-    mtp_plan_path = mtp_run / "ds4rt-gptqmodel-plan.json"
+    mtp_plan_path = mtp_run / "ds41rt-gptqmodel-plan.json"
     mtp_plan = json.loads(mtp_plan_path.read_text(encoding="utf-8"))
     mtp_body = {key: value for key, value in mtp_plan.items() if key != "plan_sha256"}
     mtp_body["target_parent"] = {"plan_sha256": base_plan["plan_sha256"]}
@@ -1135,7 +1135,7 @@ def test_canonical_block_audit_set_rejects_missing_or_partial_report(
     run_state = _make_run_state(tmp_path, include_mtp=True)
     report_dir = _write_complete_block_audits(run_state, tmp_path / "reports")
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
     mtp_report = report_dir / "mtp-layer-0-projection-audit.json"
     mtp_report.unlink()
@@ -1166,7 +1166,7 @@ def test_canonical_assembly_streams_complete_base_and_mtp_run(
     tmp_path: Path,
 ) -> None:
     run_state = _make_run_state(tmp_path, include_mtp=True)
-    plan_path = run_state / "ds4rt-gptqmodel-plan.json"
+    plan_path = run_state / "ds41rt-gptqmodel-plan.json"
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
 
     # Exercise an actual host/container bind-mount alias. The immutable plan
@@ -1226,7 +1226,7 @@ def test_canonical_assembly_streams_authoritative_inline_mixed_tiers(
 ) -> None:
     run_state = _make_inline_mixed_run_state(tmp_path)
     plan = json.loads(
-        (run_state / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (run_state / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
     generated = _canonical_generated_tensors(run_state)
     written: dict[str, torch.Tensor] = {}
@@ -1266,10 +1266,10 @@ def test_composite_projection_assembly_ignores_parent_mtp_and_uses_overlay(
     (tmp_path / "mtp").mkdir()
     base_run = _make_run_state(tmp_path / "base", include_mtp=True)
     base_plan = json.loads(
-        (base_run / "ds4rt-gptqmodel-plan.json").read_text(encoding="utf-8")
+        (base_run / "ds41rt-gptqmodel-plan.json").read_text(encoding="utf-8")
     )
     mtp_run = _make_run_state(tmp_path / "mtp", overlay=True)
-    mtp_plan_path = mtp_run / "ds4rt-gptqmodel-plan.json"
+    mtp_plan_path = mtp_run / "ds41rt-gptqmodel-plan.json"
     mtp_plan = json.loads(mtp_plan_path.read_text(encoding="utf-8"))
     mtp_body = {key: value for key, value in mtp_plan.items() if key != "plan_sha256"}
     mtp_body["target_parent"] = {"plan_sha256": base_plan["plan_sha256"]}
@@ -1376,7 +1376,7 @@ def test_composite_quant_config_binds_distinct_base_and_mtp_provenance(
     (tmp_path / "mtp").mkdir()
     base_run = _make_run_state(tmp_path / "base", include_mtp=True)
     mtp_run = _make_run_state(tmp_path / "mtp", overlay=True)
-    base_plan_path = base_run / "ds4rt-gptqmodel-plan.json"
+    base_plan_path = base_run / "ds41rt-gptqmodel-plan.json"
     base_plan = json.loads(base_plan_path.read_text(encoding="utf-8"))
     base_body = {key: value for key, value in base_plan.items() if key != "plan_sha256"}
     base_body["ledger_provenance"]["run"] = {"source": "base"}
@@ -1385,7 +1385,7 @@ def test_composite_quant_config_binds_distinct_base_and_mtp_provenance(
         "plan_sha256": hashlib.sha256(canonical_json_bytes(base_body)).hexdigest(),
     }
     _write_json(base_plan_path, base_plan)
-    mtp_plan_path = mtp_run / "ds4rt-gptqmodel-plan.json"
+    mtp_plan_path = mtp_run / "ds41rt-gptqmodel-plan.json"
     mtp_plan = json.loads(mtp_plan_path.read_text(encoding="utf-8"))
     mtp_body = {key: value for key, value in mtp_plan.items() if key != "plan_sha256"}
     mtp_body["ledger_provenance"]["run"] = {"source": "mtp"}
@@ -1404,7 +1404,7 @@ def test_composite_quant_config_binds_distinct_base_and_mtp_provenance(
         mtp_plan=mtp_plan,
     )
 
-    provenance = quant["meta"]["ds4rt_error_ledger"]
+    provenance = quant["meta"]["ds41rt_error_ledger"]
     assert quant["tensor_storage"] == storage
     assert quant["module_include"] == [CANONICAL.launcher.BASE_EXPERT_PATTERN]
     assert provenance["family_join"] == base_plan["ledger_provenance"]["family_join"]

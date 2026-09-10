@@ -20,7 +20,7 @@ from compare_ds4_flash_exl3_control import (  # noqa: E402
     resolve_control_layout,
     stratified_expert_ids,
 )
-from ds4rt_runtime.native_experts import NativeExpertConfig  # noqa: E402
+from ds41rt_runtime.native_experts import NativeExpertConfig  # noqa: E402
 
 
 def native_config() -> NativeExpertConfig:

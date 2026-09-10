@@ -27,9 +27,9 @@ from typing import Any, Iterable, NamedTuple
 from preflight import report_identity_sha256
 
 
-SCHEMA = "ds4rt.exl3-real-family-remote-parity-v1"
+SCHEMA = "ds41rt.exl3-real-family-remote-parity-v1"
 CALIBRATION_SCOPE = "legacy_real_activation_hardware_parity_not_production"
-FAMILY_JOIN_CONTRACT = "ds4rt.exl3-real-family-parity-v1"
+FAMILY_JOIN_CONTRACT = "ds41rt.exl3-real-family-parity-v1"
 EXL3_SEED = 787
 SIGMA_REG = 0.025
 CROSS_DEVICE_MIN_COSINE = 0.995
@@ -357,7 +357,7 @@ def run(
 ) -> dict[str, Any]:
     import torch
 
-    from ds4rt_runtime.exl3_quantizer import (
+    from ds41rt_runtime.exl3_quantizer import (
         accumulate_activation_hessian,
         forced_expert_down_activations,
         hessian_data,
@@ -563,7 +563,7 @@ def run(
         )
         wire_manifest = {
             "schema": REMOTE_REQUEST_SCHEMA,
-            "contract": "ds4rt.exl3-remote-worker-v1",
+            "contract": "ds41rt.exl3-remote-worker-v1",
             "request": request_manifest,
         }
         request_bytes = len(
@@ -778,8 +778,8 @@ def run(
                 if control_endpoint.name != assigned.name:
                     del control_tensors
         response_manifest = {
-            "schema": "ds4rt.exl3-remote-result",
-            "contract": "ds4rt.exl3-remote-worker-v1",
+            "schema": "ds41rt.exl3-remote-result",
+            "contract": "ds41rt.exl3-remote-worker-v1",
             "request_sha256": request_manifest["request_sha256"],
             "checkpoint_hit": transport["worker_checkpoint_hit"],
             "result": remote_result,
@@ -998,7 +998,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=root / "third_party" / "gptqmodel.lock.json",
     )
-    parser.add_argument("--token-env", default="DS4RT_EXL3_WORKER_TOKEN")
+    parser.add_argument("--token-env", default="DS41RT_EXL3_WORKER_TOKEN")
     parser.add_argument("--layer", type=int, default=0)
     parser.add_argument("--expert", type=int, default=0)
     parser.add_argument("--down-rows", type=int, default=512)

@@ -20,7 +20,7 @@ image_id="$6"
   echo "invalid WIP slot: $slot" >&2
   exit 2
 }
-[[ -x "$build_output/ds4rt" && -s "$build_output/libds4rt_native.so" ]] || {
+[[ -x "$build_output/ds41rt" && -s "$build_output/libds41rt_native.so" ]] || {
   echo "WIP build output is incomplete: $build_output" >&2
   exit 2
 }
@@ -32,21 +32,21 @@ image_id="$6"
 slot_root="/wip/slots/$slot/$role"
 incoming="/wip/incoming/${slot}.${role}.$$"
 rm -rf "$incoming"
-mkdir -p "$incoming/workspace/.ds4rt-wip"
+mkdir -p "$incoming/workspace/.ds41rt-wip"
 cp -a "$source_dir/." "$incoming/workspace/"
-install -m 0755 "$build_output/ds4rt" "$incoming/workspace/.ds4rt-wip/ds4rt"
+install -m 0755 "$build_output/ds41rt" "$incoming/workspace/.ds41rt-wip/ds41rt"
 install -m 0755 \
-  "$build_output/libds4rt_native.so" \
-  "$incoming/workspace/.ds4rt-wip/libds4rt_native.so"
+  "$build_output/libds41rt_native.so" \
+  "$incoming/workspace/.ds41rt-wip/libds41rt_native.so"
 install -m 0644 \
   "$build_output/ARTIFACT_SHA256SUMS" \
-  "$incoming/workspace/.ds4rt-wip/ARTIFACT_SHA256SUMS"
+  "$incoming/workspace/.ds41rt-wip/ARTIFACT_SHA256SUMS"
 
 python3 "$source_dir/scripts/verify-release-source-manifest.py" \
   --source "$incoming/workspace" \
   --write "$incoming/SOURCE_SHA256SUMS"
 source_manifest_sha256="$(sha256sum "$incoming/SOURCE_SHA256SUMS" | awk '{print $1}')"
-artifact_sha256="$(sha256sum "$incoming/workspace/.ds4rt-wip/ARTIFACT_SHA256SUMS" | awk '{print $1}')"
+artifact_sha256="$(sha256sum "$incoming/workspace/.ds41rt-wip/ARTIFACT_SHA256SUMS" | awk '{print $1}')"
 sparkinfer_revision="$(
   python3 "$source_dir/scripts/verify-sparkinfer-source.py" \
     --source "$source_dir/third_party/sparkinfer" \
