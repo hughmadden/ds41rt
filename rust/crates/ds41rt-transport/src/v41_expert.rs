@@ -9,6 +9,8 @@ use anyhow::{ensure, Context, Result};
 
 mod chunks;
 pub use chunks::V41Tp4ChunkReceiver;
+mod tcp;
+pub use tcp::V41Tp4Tcp;
 
 pub const V41_HIDDEN: u32 = 5120;
 pub const V41_BACKBONE_TOPK: u32 = 6;

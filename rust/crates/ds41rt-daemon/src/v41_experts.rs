@@ -1,6 +1,7 @@
 //! Native V4.1 expert residency; one GPU worker owns each layer and its buffers.
 mod execution;
 pub(crate) mod service;
+pub(crate) mod coordinator;
 pub(crate) use execution::{ExpertExecution, ExpertExecutionBudget, HostExpertExchange};
 
 use anyhow::{ensure, Context, Result};

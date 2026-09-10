@@ -72,3 +72,5 @@ Bounded TP response progress: row-indexed frame production, incremental four-ran
 TCP streaming progress: the service listener now supports opt-in bounded streaming callbacks and the persistent client consumes bounded multi-frame responses with connection disposal on error or cancellation, while native executor registration and runtime qualification remain pending.
 
 Native service progress: `expertd-native` registers a dedicated GPU worker with full TP-rank residency, pre-admitted loading/workspace budgets, shared execution scratch and bounded queues, while deployment migration, coordinator dispatch and runtime qualification remain open in `docs/ds41-native-expert-service.md`.
+
+Coordinator TP progress: concurrent four-peer dispatch now feeds an owned RTX wave through validated chunk copies and completion-gated native reduction, while model scheduler wiring, device ingress, RDMA and runtime qualification remain pending.
