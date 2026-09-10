@@ -17,17 +17,53 @@ struct Variant {
   ModuleFn initialize;
   ModuleFn load;
   LaunchFn launch;
+  uint64_t scratch_offsets[DS41RT_V41_EXPERT_POINTERS];
   cudaLibrary_t library = nullptr;
   int device = -1;
   ~Variant() { if (library) cudaLibraryUnload(library); }
 };
 Variant variants[] = {DS41RT_V41_VARIANTS};
 std::mutex initialization_mutex;
+Variant* by_handle(void* handle) {
+  for (auto& variant : variants) if (&variant == handle) return &variant;
+  return nullptr;
+}
+bool valid_scratch(Variant* variant, void* storage, uint64_t bytes) {
+  return variant && variant->device >= 0 && storage &&
+    reinterpret_cast<uintptr_t>(storage) % 16 == 0 && bytes >= variant->info.scratch_bytes &&
+    reinterpret_cast<uintptr_t>(storage) <= UINTPTR_MAX - variant->info.scratch_bytes;
+}
 Variant* by_capacity(int32_t capacity) {
   for (auto& variant : variants)
     if (variant.info.capacity_rows == static_cast<uint32_t>(capacity)) return &variant;
   return nullptr;
 }
+}
+
+extern "C" int32_t ds41rt_v41_initialize_scratch_storage_async(
+    void*, uint64_t, uint64_t, uint64_t, uint32_t, void*);
+
+extern "C" int32_t ds41rt_v41_expert_bind_scratch(void* kernel, void* storage,
+    uint64_t bytes, void* tensors[DS41RT_V41_EXPERT_POINTERS]) {
+  auto* variant = by_handle(kernel);
+  if (!valid_scratch(variant, storage, bytes) || !tensors) return cudaErrorInvalidValue;
+  for (int slot = 0; slot < DS41RT_V41_EXPERT_POINTERS; ++slot)
+    if (variant->scratch_offsets[slot] != UINT64_MAX)
+      tensors[slot] = static_cast<char*>(storage) + variant->scratch_offsets[slot];
+  return cudaSuccess;
+}
+
+extern "C" int32_t ds41rt_v41_expert_initialize_scratch_async(void* kernel,
+    void* storage, uint64_t bytes, void* stream) {
+  auto* variant = by_handle(kernel);
+  if (!valid_scratch(variant, storage, bytes)) return cudaErrorInvalidValue;
+  int device = -1;
+  auto status = cudaGetDevice(&device);
+  if (status != cudaSuccess) return status;
+  if (device != variant->device) return cudaErrorInvalidDevice;
+  return ds41rt_v41_initialize_scratch_storage_async(storage, variant->info.scratch_bytes,
+      variant->scratch_offsets[37], variant->scratch_offsets[40],
+      variant->info.experts, stream);
 }
 
 extern "C" int32_t ds41rt_v41_expert_info(int32_t capacity, ds41rt_v41_expert_info_t* out) {

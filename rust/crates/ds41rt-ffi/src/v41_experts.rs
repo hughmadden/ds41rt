@@ -124,6 +124,8 @@ impl V41ExpertLaunchArgs {
 type InfoFn = unsafe extern "C" fn(i32, *mut V41ExpertInfo) -> i32;
 type InitializeFn = unsafe extern "C" fn(i32, *mut *mut c_void) -> i32;
 type LaunchFn = unsafe extern "C" fn(*mut c_void, *const V41ExpertLaunchArgs) -> i32;
+type BindScratchFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut *mut c_void) -> i32;
+type InitScratchFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut c_void) -> i32;
 type ReduceFn = unsafe extern "C" fn(
     *const *const f32,
     *const u16,
@@ -173,6 +175,8 @@ pub struct V41ExpertKernel<'a> {
     _library: &'a NativeLibrary,
     handle: NonNull<c_void>,
     launch: LaunchFn,
+    bind_scratch: BindScratchFn,
+    initialize_scratch: InitScratchFn,
     info: V41ExpertInfo,
 }
 
@@ -231,6 +235,16 @@ impl NativeLibrary {
                 .get::<InitializeFn>(b"ds41rt_v41_expert_initialize")?
         };
         let launch = unsafe { *self.lib.get::<LaunchFn>(b"ds41rt_v41_expert_launch")? };
+        let bind_scratch = unsafe {
+            *self
+                .lib
+                .get::<BindScratchFn>(b"ds41rt_v41_expert_bind_scratch")?
+        };
+        let initialize_scratch = unsafe {
+            *self
+                .lib
+                .get::<InitScratchFn>(b"ds41rt_v41_expert_initialize_scratch_async")?
+        };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { initialize(i32::try_from(capacity)?, &mut handle) };
         ensure!(
@@ -241,6 +255,8 @@ impl NativeLibrary {
             _library: self,
             handle: NonNull::new(handle).context("native expert returned a null kernel handle")?,
             launch,
+            bind_scratch,
+            initialize_scratch,
             info,
         })
     }
@@ -249,6 +265,46 @@ impl NativeLibrary {
 impl V41ExpertKernel<'_> {
     pub fn info(&self) -> &V41ExpertInfo {
         &self.info
+    }
+
+    /// Bind the exported scratch views; external tensor slots remain unchanged.
+    /// # Safety
+    /// Storage must be a live, aligned CUDA allocation of at least `bytes` bytes.
+    /// The resulting pointers borrow storage and do not extend its lifetime.
+    pub unsafe fn bind_scratch(
+        &self,
+        storage: *mut c_void,
+        bytes: u64,
+        tensors: &mut [*mut c_void; V41_EXPERT_POINTER_COUNT],
+    ) -> Result<()> {
+        let status = unsafe {
+            (self.bind_scratch)(self.handle.as_ptr(), storage, bytes, tensors.as_mut_ptr())
+        };
+        ensure!(
+            status == 0,
+            "V4.1 scratch binding failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+
+    /// Initialize the native recipe's scratch once before use and graph capture.
+    /// # Safety
+    /// Storage must be exclusively owned CUDA memory of at least `bytes` bytes
+    /// on this kernel's device; it must remain alive until stream completion.
+    /// Order this initialization before every launch that uses the storage.
+    pub unsafe fn initialize_scratch(
+        &self,
+        storage: *mut c_void,
+        bytes: u64,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let status =
+            unsafe { (self.initialize_scratch)(self.handle.as_ptr(), storage, bytes, stream) };
+        ensure!(
+            status == 0,
+            "V4.1 scratch initialization failed with CUDA status {status}"
+        );
+        Ok(())
     }
 
     /// # Safety

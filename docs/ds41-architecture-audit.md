@@ -152,3 +152,5 @@ Wire revision 3 now preserves FP32 gate weights in twelve-byte entries and provi
 The native expert AOT export path now distinguishes logical Spark width 576 from b12x's prepared width 640, records planner-owned scratch layouts, and passes M16 C-entry arithmetic/graph checks in linked RTX and GB10 libraries; runtime weight budgets must include this padding and Rust execution integration remains open.
 
 The checked Rust/C expert launch bridge and CUDA route reducer now cover native dSpark launch through final reduction, with an M16 numerical/graph fixture on RTX and exact standalone reduction on both RTX GPUs and ostrich; Python weight/scratch preparation and inherited transport/model execution remain to be replaced, as recorded in `ds41-native-route-reduction-qualification.md`.
+
+Native expert scratch views and initialization now derive directly from the exported b12x planner and execute through Rust on RTX/ostrich, including Spark width-640 padding; native checkpoint weight preparation and scheduler-owned GPU allocations remain open in `ds41-native-expert-scratch-qualification.md`.

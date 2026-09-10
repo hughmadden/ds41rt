@@ -54,3 +54,5 @@ AOT progress: role-specific native expert exports and b12x-owned scratch manifes
 Native bridge progress: the Rust argument builder and checked C expert launch interface pass M16 numerical/graph checks on RTX and ostrich, with generated ABI validation and device/SM guards; native preparation, reduction and serving integration remain open in `docs/ds41-native-expert-bridge-qualification.md`.
 
 Native reduction progress: CUDA/Rust expert route reduction now passes exact standalone checks on both RTX GPUs and ostrich and the M16 dSpark AOT graph path on RTX, while native preparation, per-route transport and serving integration remain open in `docs/ds41-native-route-reduction-qualification.md`.
+
+Native scratch progress: planner-derived C/Rust scratch binding and initialization now pass all six capacities and M16 expert/graph execution on RTX and ostrich, while native weight packing, engine allocation ownership and transport integration remain open in `docs/ds41-native-expert-scratch-qualification.md`.

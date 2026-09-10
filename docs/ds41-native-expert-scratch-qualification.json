@@ -1,0 +1,124 @@
+{
+  "source_sha256": {
+    "native/src/v41_experts.cc": "2f84e98ff2bb09fb13c7a7f0c9eecb8f33bcb05a36166eaa32a5e3eabfce2699",
+    "native/include/ds41rt_v41_experts.h": "ad21455e5b579ad3b86ada15df19ffe15324cba2d2d153286e22a199ed54dd42",
+    "native/cuda/kernels/v41_route_reduce.cu": "94374c5592e5de2ea39f6acad5fd0910e72e3f4f99dfff1a20a181bf1033266b",
+    "python/tools/export_b12x_v41_experts_aot.py": "6d4500c6b17963e5629f37fca63b4e0458bae9b35ab90908fd2ca5701db2dd22",
+    "rust/crates/ds41rt-ffi/src/v41_experts.rs": "b202f55883b4baae5f3ca160da45b629b60ca80d272e87239669bde489d21a47"
+  },
+  "native_library_sha256": {
+    "rtx": "28ca3e1f965cdf2a3fd9793037e46d764ded19512358538ef2e6d843f08346b5",
+    "ostrich": "faf2d61d94ffd49bf2224cd8e85166f5b3d94b1a7547c81e0d04eab16001cfb6"
+  },
+  "layouts": {
+    "rtx": {
+      "role": "coordinator",
+      "variants": [
+        {
+          "capacity": 1,
+          "bytes": 475468,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 16,
+          "bytes": 7301640,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 80,
+          "bytes": 22776504,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 256,
+          "bytes": 37729308,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 1024,
+          "bytes": 118883676,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 4096,
+          "bytes": 379938780,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        }
+      ]
+    },
+    "ostrich": {
+      "role": "spark",
+      "variants": [
+        {
+          "capacity": 1,
+          "bytes": 736440,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 16,
+          "bytes": 11881748,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 80,
+          "bytes": 50271284,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 256,
+          "bytes": 78353916,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 1024,
+          "bytes": 200943996,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        },
+        {
+          "capacity": 4096,
+          "bytes": 728644348,
+          "pointer_bindings_initialization_guard_rejections": "passed"
+        }
+      ]
+    }
+  },
+  "expert_execution": {
+    "rtx": {
+      "path": "Rust native scratch initialization/binding -> AOT expert -> Rust CUDA reducer",
+      "case": [
+        16,
+        2304,
+        128
+      ],
+      "numeric_and_mutated_graph": "passed"
+    },
+    "ostrich": {
+      "path": "Rust native scratch initialization/binding -> AOT expert -> Rust CUDA reducer",
+      "case": [
+        16,
+        576,
+        384
+      ],
+      "numeric_and_mutated_graph": "passed"
+    }
+  },
+  "export_validation": {
+    "fixture": "/tmp/ds41-v41-scratch-abi.iaz5zkwn",
+    "valid_header_byte_identical": true,
+    "rejections": {
+      "unknown_init": "unsupported V4.1 scratch layout or initialization",
+      "dtype_drift": "unsupported V4.1 scratch dtype or extent",
+      "overlap": "unsupported V4.1 scratch layout or initialization",
+      "incorrect_extent": "unsupported V4.1 scratch dtype or extent",
+      "missing_tensor": "unsupported V4.1 core scratch inventory",
+      "duplicate_tensor": "unsupported V4.1 core scratch inventory"
+    },
+    "spark_valid_header_byte_identical": true
+  },
+  "fixture_sha256": {
+    "check_scratch_layout.py": "e3cd173ff1e6ce335cb3e33335f144116f21cbd68c3e9fc46082abef244be1f9",
+    "qualify_native_scratch.py": "39d71488996009787604da5f3cd3ee7f3fea68e0befe852effb33778b9d75ad6"
+  },
+  "daemon_check": "passed, 427 existing warnings",
+  "scope": "Native scratch binding/initialization through M16 expert and reduction on RTX 0 and ostrich; all six scratch capacities checked; Python weight packing and engine ownership integration remain open."
+}

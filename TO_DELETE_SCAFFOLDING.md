@@ -13,3 +13,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-rust-bridge/` and `/tmp/ds41-v41-abi-mutations.ggwbi658/`, plus the Rust cdylib and Python bridge fixtures inside the existing local/ostrich AOT staging directories, after production native weight/scratch preparation replaces them; retain the C/Rust bridge and recorded evidence.
 
 - Delete `qualify_reduce.py`, `debug_reduce.py`, `qualify_full_expert.py`, their logs/graph dumps under `/tmp/ds41-v41-aot/`, and the copied ostrich reduction fixture with the existing AOT scaffolding after checkpoint-backed execution replaces these synthetic checks.
+
+- Delete `/tmp/ds41-v41-scratch-abi.iaz5zkwn/`, `/tmp/ds41-v41-scratch-spark-abi/`, and `check_scratch_layout.py` / `qualify_native_scratch.py` in the local/ostrich AOT staging trees after checkpoint-backed expert execution replaces the native scratch fixtures; retain the production exporter, C/Rust APIs and evidence.

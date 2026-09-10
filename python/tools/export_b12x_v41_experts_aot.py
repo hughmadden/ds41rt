@@ -60,6 +60,21 @@ POINTER_SLOTS = (
     "token_map_ptr",
     "token_weights_ptr",
 )
+# Aliased views have the same base address in b12x's core workspace.
+SCRATCH_SLOTS = {
+    "packed_a_ptr": "packed_input", "packed_a_storage_ptr": "packed_input",
+    "sfa_ptr": "packed_input_scale", "scale_storage_ptr": "packed_input_scale",
+    "intermediate_ptr": "materialized_intermediate",
+    **{name: name for name in ("barrier_count", "barrier_epoch", "pair_head",
+       "producers_done_count", "all_work_published", "task_head", "task_tail",
+       "row_counts", "expert_write_rows", "expert_tile_base")},
+    **{name + "_ptr": name for name in ("task_ready", "task_expert", "task_m_tile",
+       "task_slice_begin", "task_slice_count", "task_valid_rows", "tile_write_count",
+       "token_map", "token_weights")},
+    "input_global_scale": "input_gs", "global_scale": "down_input_scale",
+    "scatter_ptr": "route_output",
+}
+
 SCALAR_SLOTS = (
     "num_tokens",
     "max_rows",
@@ -141,13 +156,40 @@ def write_native_bridge(output_dir: Path, manifest: dict) -> None:
             variant["physical_tiles"],
             variant["max_active_clusters"],
         ]
+        scratch = {tensor["name"]: tensor for tensor in variant["scratch_tensors"]}
+        if len(scratch) != len(variant["scratch_tensors"]) or set(scratch) != set(SCRATCH_SLOTS.values()):
+            raise ValueError("unsupported V4.1 core scratch inventory")
+        dtypes = {name: ("int32", 4) for name in scratch}
+        dtypes.update({name: ("float32", 4) for name in
+                       ("token_weights", "route_output", "input_gs", "down_input_scale")})
+        dtypes.update({"materialized_intermediate": ("bfloat16", 2),
+                       "packed_input": ("uint8", 1), "packed_input_scale": ("uint8", 1)})
+        end = 0
+        for tensor in variant["scratch_tensors"]:
+            dtype, itemsize = dtypes[tensor["name"]]
+            if (tensor["dtype"] != dtype or not tensor["shape"]
+                    or any(not isinstance(dim, int) or dim <= 0 for dim in tensor["shape"])
+                    or math.prod(tensor["shape"]) * itemsize != tensor["nbytes"]):
+                raise ValueError("unsupported V4.1 scratch dtype or extent")
+            if (tensor["init"] not in ("zeros", "empty") or tensor["offset"] % 16
+                    or tensor["offset"] < end or tensor["nbytes"] <= 0):
+                raise ValueError("unsupported V4.1 scratch layout or initialization")
+            end = tensor["offset"] + tensor["nbytes"]
+        if end != variant["core_scratch_nbytes"]:
+            raise ValueError("inconsistent V4.1 scratch capacity")
+        for scale in ("input_gs", "down_input_scale"):
+            if scratch[scale]["dtype"] != "float32" or scratch[scale]["shape"] != [geometry["experts"]]:
+                raise ValueError("unsupported native expert global scale layout")
+        offsets = [str(scratch[SCRATCH_SLOTS[slot]]["offset"]) if slot in SCRATCH_SLOTS
+                   else "UINT64_MAX" for slot in POINTER_SLOTS]
+        variant["scratch_pointer_offsets"] = [int(x) if x != "UINT64_MAX" else None for x in offsets]
         entries.append(
             "{{"
             + ", ".join(map(str, info))
             + "}, "
             + f"_mlir_ds41rt_{name}_cuda_init, _mlir_ds41rt_{name}_cuda_load_to_device, "
             + entry[1]
-            + "}"
+            + ", {" + ", ".join(offsets) + "}}"
         )
         includes.append(f'#include "{name}.h"')
     manifest["native_abi_version"] = 1

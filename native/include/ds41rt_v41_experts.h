@@ -42,6 +42,14 @@ typedef struct ds41rt_v41_expert_info_t {
 int32_t ds41rt_v41_expert_info(int32_t capacity, ds41rt_v41_expert_info_t* out);
 int32_t ds41rt_v41_expert_initialize(int32_t capacity, void** out_kernel);
 int32_t ds41rt_v41_expert_launch(void* kernel, const ds41rt_v41_expert_launch_t* args);
+/* Caller-owned scratch must be 16-byte aligned and at least info.scratch_bytes.
+ * Bind writes only scratch pointer slots, preserving caller weight/input slots.
+ * Initialize once before use/capture, with exclusive ownership on this stream;
+ * it zeros storage and sets the native E8M0 recipe's global scales to one. */
+int32_t ds41rt_v41_expert_bind_scratch(void* kernel, void* storage,
+    uint64_t bytes, void* tensors[DS41RT_V41_EXPERT_POINTERS]);
+int32_t ds41rt_v41_expert_initialize_scratch_async(void* kernel, void* storage,
+    uint64_t bytes, void* stream);
 /* Reduce contiguous FP32 [rows,topk,5120] route planes into BF16 [rows,5120].
  * Supported geometries: ranks=1/topk=3 (RTX dSpark), ranks=4/topk=6 (backbone).
  * planes is a host array of device pointers; unused slots must be null.

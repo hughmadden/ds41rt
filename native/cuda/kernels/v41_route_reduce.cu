@@ -6,6 +6,10 @@
 
 namespace {
 constexpr uint64_t hidden = 5120;
+__global__ void initialize_global_scales(float* input, float* down, uint32_t count) {
+  const uint32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index < count) { input[index] = 1.0f; down[index] = 1.0f; }
+}
 template<int Ranks, int TopK>
 __global__ void reduce_routes(const float* p0, const float* p1,
     const float* p2, const float* p3, const __nv_bfloat16* shared,
@@ -35,6 +39,19 @@ bool overlaps(const void* a, uint64_t a_bytes, const void* b, uint64_t b_bytes) 
   // Subtraction avoids overflow at the upper end of the address space.
   return av <= bv ? bv - av < a_bytes : av - bv < b_bytes;
 }
+}
+
+extern "C" int32_t ds41rt_v41_initialize_scratch_storage_async(void* storage,
+    uint64_t bytes, uint64_t input_offset, uint64_t down_offset,
+    uint32_t experts, void* stream) {
+  auto cuda_stream = static_cast<cudaStream_t>(stream);
+  auto status = cudaMemsetAsync(storage, 0, bytes, cuda_stream);
+  if (status != cudaSuccess) return status;
+  auto* base = static_cast<char*>(storage);
+  initialize_global_scales<<<(experts + 255) / 256, 256, 0, cuda_stream>>>(
+      reinterpret_cast<float*>(base + input_offset),
+      reinterpret_cast<float*>(base + down_offset), experts);
+  return cudaGetLastError();
 }
 
 extern "C" int32_t ds41rt_v41_reduce_routes_async(const float* const planes[4],
