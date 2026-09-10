@@ -15,9 +15,9 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [ ] Implement deterministic engram tokenizer compression, prime layouts, hashes, image barriers, and per-request history.
 - [ ] Memory-map native engram weights and scales with bounded asynchronous prefetch, deduplication, staging, and request-safe cancellation.
 - [ ] Wire early engram prefetch for decode, speculative verification, and batched prefill with rollback-safe history.
-- [ ] Implement native FP4 backbone and dSpark expert tensor parallelism through the AFD transport with appropriate SparkInfer/b12x kernels.
+- [ ] Implement native FP4 backbone expert tensor parallelism through the AFD transport with appropriate SparkInfer/b12x kernels.
 - [ ] Implement native image processing, ViT, aligner, image-span embeddings, and vision routing through the serving API.
-- [ ] Budget and qualify RTX-resident dSpark against remote-expert placement, including concurrency-16 workspace and coordinator contention.
+- [ ] Place all dSpark stages and experts on the coordinator RTX and include their native weights, caches, and concurrency-16 workspace in its memory budget.
 - [ ] Implement all three dSpark stages, Markov and confidence heads, proposal verification, sampling, acceptance, and state rollback.
 - [ ] Extend admission, scheduling, graph shapes, cache ownership, and cancellation to 16 concurrent requests with alternating waves.
 - [ ] Qualify native numerical paths and CUDA graph replay on both local RTX GPUs and on ostrich and dodo without using emu or kiwi.

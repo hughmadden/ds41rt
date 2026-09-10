@@ -21,7 +21,7 @@ The authoritative sources are the [official checkpoint](https://huggingface.co/d
 | Engram | Layers 1 and 14, orders 2/3/4, eight heads per order, 256 dimensions per fetched row | Deterministic hashes and asynchronous mapped table access |
 | Engram gate | Per-stream normalized dot product, signed square root, sigmoid, shared value residual addition | Fused gate must preserve per-stream normalization and image masking |
 | Vision | 32 layers, width 1024, 16 heads, patch size 14, bidirectional 2D RoPE | Native ViT plus 3×3 spatial folding and GELU aligner |
-| dSpark | Three independent stages, 128 routed experts each, top-3, five proposal positions | Distinct weights with shared expert kernels and transport |
+| dSpark | Three independent stages, 128 routed experts each, top-3, five proposal positions | Distinct RTX-resident weights using local expert kernels |
 | dSpark conditioning | Means of incoming mHC streams at target layers 37/38/39 | Capture attention inputs rather than block outputs |
 | dSpark heads | Shared token embedding/output head, rank-256 Markov head and confidence head | Implement proposal distribution, adaptive verification, and rollback |
 
@@ -47,12 +47,12 @@ On 2026-09-10 the coordinator exposes two RTX PRO 6000 Blackwell GPUs with 97887
 
 No access to emu or kiwi has been attempted, and no full-model execution or GPU numerical qualification has yet been performed.
 
-## dSpark placement candidate
+## dSpark placement decision
 
-Evaluate placing all dSpark execution on the coordinator RTX to eliminate its three remote expert boundaries before target verification.
+Place all dSpark execution on the coordinator RTX, as requested, eliminating its three remote expert boundaries before target verification.
 
 The routed expert payload lower bound is `3 stages × 128 experts × 3 projections × 5120 × 2304 × 0.5 bytes = 6.328125 GiB`, excluding scales, shared experts, attention, special heads, cache, workspace, and allocator overhead.
 
 Shared token embedding and vocabulary head storage need not be duplicated on the same GPU, but memory planning must account for their execution workspaces and contention with target attention at concurrency 16.
 
-Keep the remote expert placement available until measured memory and latency establish the preferred policy; target verification still uses backbone AFD and proposal acceptance remains checkpoint-dependent.
+No placement comparison gate is required; target verification still uses backbone AFD and proposal acceptance remains checkpoint-dependent.
