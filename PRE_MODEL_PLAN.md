@@ -42,3 +42,5 @@ Checkpoint contract progress: a strict typed reader validates every official nes
 Container evidence: `./build.sh --spark-hosts ostrich,dodo` now completes from a dirty checkout with an automatic manifest, native coordinator/Spark builds, artifact exports, and distribution to both available Sparks, while full run/restart/stop qualification remains open.
 
 Native loader progress: the 96,085-tensor checkpoint contract now validates physical storage and exposes bounded Spark TP4 staging, RTX-only dSpark staging, and host-only engram mapping/prefetch, with native storage budgets recorded and execution workspace budgeting/integration still pending.
+
+Native expert progress: `silu_v41` now preserves official projection rounding and intermediate router weighting with FP32 per-route accumulation, passing six native/graph cases on both RTX GPUs and ostrich/dodo, while TP-global rounding and runtime integration remain open in `docs/ds41-expert-qualification.md`.

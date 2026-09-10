@@ -1,0 +1,120 @@
+{
+  "sparkinfer_revision": "be1b4b90edb44c528ea7554bd9959569b316631b",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "shapes": [
+    [
+      1,
+      576,
+      8
+    ],
+    [
+      16,
+      576,
+      384
+    ],
+    [
+      80,
+      576,
+      8
+    ],
+    [
+      1,
+      2304,
+      8
+    ],
+    [
+      16,
+      2304,
+      128
+    ],
+    [
+      80,
+      2304,
+      8
+    ]
+  ],
+  "hidden_size": 5120,
+  "topk_by_intermediate": {
+    "576": 6,
+    "2304": 3
+  },
+  "limits": {
+    "relative_l2": 0.01,
+    "cosine_min": 0.9999
+  },
+  "device_results": {
+    "rtx0": {
+      "log": "......                                                                   [100%]\n6 passed in 15.97s\n",
+      "command": "python3 -m pytest -q tests/moe/test_v41_expert_numerics.py -x -o cache_dir=/tmp/pytest-cache"
+    },
+    "rtx1": {
+      "log": "......                                                                   [100%]\n6 passed in 16.08s\n",
+      "command": "python3 -m pytest -q tests/moe/test_v41_expert_numerics.py -x -o cache_dir=/tmp/pytest-cache"
+    },
+    "ostrich": {
+      "log": "......                                                                   [100%]\n6 passed in 19.89s\n",
+      "command": "python3 -m pytest -q tests/moe/test_v41_expert_numerics.py -x -o cache_dir=/tmp/pytest-cache"
+    },
+    "dodo": {
+      "log": "......                                                                   [100%]\n6 passed in 19.66s\n",
+      "command": "python3 -m pytest -q tests/moe/test_v41_expert_numerics.py -x -o cache_dir=/tmp/pytest-cache"
+    }
+  },
+  "official_reference_comparisons": [
+    {
+      "intermediate": 576,
+      "tokens": 1,
+      "experts": 8,
+      "cosine": 0.9999993443489075,
+      "relative_l2": 0.0016271141357719898,
+      "max_abs": 0.24609375
+    },
+    {
+      "intermediate": 576,
+      "tokens": 16,
+      "experts": 8,
+      "cosine": 1.0000001192092896,
+      "relative_l2": 0.0016661296831443906,
+      "max_abs": 0.296875
+    },
+    {
+      "intermediate": 576,
+      "tokens": 80,
+      "experts": 8,
+      "cosine": 0.9999889135360718,
+      "relative_l2": 0.001661430113017559,
+      "max_abs": 0.4921875
+    },
+    {
+      "intermediate": 2304,
+      "tokens": 1,
+      "experts": 8,
+      "cosine": 0.9999988079071045,
+      "relative_l2": 0.0016889531398192048,
+      "max_abs": 0.875
+    },
+    {
+      "intermediate": 2304,
+      "tokens": 16,
+      "experts": 8,
+      "cosine": 0.9999968409538269,
+      "relative_l2": 0.0016880265902727842,
+      "max_abs": 0.9375
+    },
+    {
+      "intermediate": 2304,
+      "tokens": 80,
+      "experts": 8,
+      "cosine": 0.9999756217002869,
+      "relative_l2": 0.0016825858037918806,
+      "max_abs": 1.0
+    }
+  ],
+  "scope": "Isolated native expert kernels; no transport, complete shared-expert sum, runtime integration, or throughput qualification.",
+  "qualification_notes": [
+    "RTX1 suite predates the added rejection of nondeterministic direct kernel construction; no numerical change followed.",
+    "Suite source was subsequently range-formatted without semantic changes.",
+    "The sequential official comparison was interrupted after four cases when source formatting changed Triton inspect line positions; the two remaining cases completed in a fresh process after source was frozen.",
+    "Reference outputs were produced by the actual pinned Expert with TileLang 0.1.8 and apache-tvm-ffi 0.1.6; the six-case regression suite uses an independent tensor oracle."
+  ]
+}

@@ -138,3 +138,9 @@ The catalog exposes bounded caller-owned tensor staging, coalesced W2 column rea
 Qualification passes 63 loader tests, the full 48-shard sparse-header fixture, six adversarial catalog rejection cases, and nonzero mapped first/last-row prefetch/gather checks at the full native engram dimensions; this does not qualify checkpoint payload integrity or model execution.
 
 Run `cargo run --manifest-path rust/Cargo.toml -p ds41rt-loader --example v41_catalog -- SNAPSHOT` to inspect a complete official snapshot's native storage contract without loading its tensor payloads.
+
+## Native expert arithmetic boundary
+
+The official FP4 expert rounds FC1 projections to BF16 and applies routing weights to the clamped SwiGLU intermediate before BF16/FP8 quantization for FC2, so post-FC2 route weighting is numerically different.
+
+The new b12x `silu_v41` contract implements this sequence and accumulates all local FC2 slices in FP32 before each expert's BF16 output boundary; `docs/ds41-expert-qualification.md` records four-device native/graph checks and the still-open TP-global reduction requirement.
