@@ -63,3 +63,5 @@ Official `wo_a` conversion now adds 201,326,592 resident BF16 bytes and three ou
 Owned attention adds 15,974,784 bytes per three-stage capacity-80 wave for rotated queries, private KV and descriptors, bringing the partial two-wave total to 8,843,334,488 device bytes plus 128 pinned bytes per attention owner; producer/frequency and larger prefill storage, shared vocabulary and driver/graph allocations remain separate, with complete wave qualification in `ds41-attention-wave-qualification.md`.
 
 The committed main-context owner adds 5,118,988 device bytes per capacity-80 wave beyond the already-counted main projection, including three separate committed-KV projection workspaces and normalized/rotated buffers; the partial two-wave total becomes 8,853,572,464 bytes, and a standalone capacity-4096 producer requires 495,452,176 bytes that must be budgeted explicitly for larger prefill batches.
+
+Native frequency generation adds 640 device bytes to the capacity-80 main-context owner and 640 device plus 640 pinned bytes per capacity-80 attention stage, bringing the partial two-wave device estimate to 8,853,577,584 bytes without a persistent frequency table.

@@ -32,3 +32,14 @@ int32_t ds41rt_v41_attention_kv(const uint16_t* input,const uint16_t* weight,
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// U64 absolute positions [rows] -> FP32 complex frequencies [rows,32,2].
+// dSpark fixed RoPE64/base10000/no-YaRN; output is disjoint from positions.
+int32_t ds41rt_v41_dspark_frequencies(const uint64_t* positions,
+    float* output, int32_t rows, void* stream);
+#ifdef __cplusplus
+}
+#endif

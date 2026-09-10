@@ -183,3 +183,25 @@ extern "C" int32_t ds41rt_v41_attention_kv(const uint16_t* input,const uint16_t*
       reinterpret_cast<const __nv_bfloat16*>(input),reinterpret_cast<const __nv_bfloat16*>(weight),freq,reinterpret_cast<__nv_bfloat16*>(output));
   return cudaGetLastError();
 }
+
+namespace {
+__global__ void dspark_frequencies_kernel(const uint64_t* positions, float* output) {
+  const uint64_t row=blockIdx.x;
+  const int pair=threadIdx.x;
+  // Match CUDA reference FP32 pow, reciprocal, outer product and polar;
+  // dSpark pure window attention has base 10000 and no YaRN.
+  const float inverse=__fdiv_rn(1.0f,powf(10000.0f,float(pair)/32.0f));
+  const float phase=__fmul_rn(__ull2float_rn(positions[row]),inverse);
+  output[row*64+pair*2]=cosf(phase);
+  output[row*64+pair*2+1]=sinf(phase);
+}
+}
+extern "C" int32_t ds41rt_v41_dspark_frequencies(const uint64_t* positions,
+    float* output, int32_t rows, void* stream) {
+  if(rows<1 || rows>4096) return cudaErrorInvalidValue;
+  const uint64_t p=uint64_t(rows)*8, o=uint64_t(rows)*256;
+  if(!valid(positions,p,8) || !valid(output,o,4) || !disjoint(positions,p,output,o))
+    return cudaErrorInvalidValue;
+  dspark_frequencies_kernel<<<rows,32,0,reinterpret_cast<cudaStream_t>(stream)>>>(positions,output);
+  return cudaGetLastError();
+}

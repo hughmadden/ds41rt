@@ -1,0 +1,204 @@
+{
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "b12x_revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "hashes": {
+    "native/cuda/kernels/v41_attention_ops.cu": "2408de7ef1fceddf1f81faff8219ad905131e5208517f16b5c82863d41b9e243",
+    "native/include/ds41rt_v41_attention_ops.h": "14f7b6b47c118caac8b853aca4cac42b0b923b05f61feb26133adf38ea13d279",
+    "rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "d32c689a8cd568a9b038a996b0b86bc1d3f36b8a6d1badbd740c56f7136ea67f",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/attention_wave.rs": "ede85981e8d6bfee4a7ac4415e132cc33edde1d6b6747d4b50e3dc2ce99cc35a",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/main_context.rs": "f7de1abad196701f8c667a1440363c2084e77e12da28f48aa8569ddebeb5cae0",
+    "scripts/qualify-ds41-dspark-frequencies.py": "57a83e4306fc5f494684b687d0adbb18ab4121c4b9c03df26735638a7e44f587",
+    "/tmp/ds41-main-context/generate.py": "84ea2ce4f7438a4e0531af3cb306d439be8a010dc79060b52eb8f9670b15dbf7",
+    "/tmp/ds41-main-context/src/main.rs": "47ec5821a7fd7408e99d12da23977e48acbd976c546e8c4ed196e7ecdfc2bf96",
+    "/tmp/ds41-attention-wave/generate.py": "5fafcb8600d7991b957f4896ee6e3264f79b602962e1db2105d11bad0bb293a0",
+    "/tmp/ds41-attention-wave/src/main.rs": "9e6d0f4954485509e4ce3c89bb4a03e9b22be9a17fbc65c10b16e962f696a979"
+  },
+  "frequency_results": {
+    "rtx0": {
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "results": [
+        {
+          "rows": 1,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 16,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 80,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 255,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 1023,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 4095,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 4096,
+          "replay_batches": 256,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        }
+      ],
+      "native_sha256": "1ff005b09e3f4175ea06218389f31dfe5ae7514216bd2dd32cb76cea658525aa",
+      "qualifier_sha256": "57a83e4306fc5f494684b687d0adbb18ab4121c4b9c03df26735638a7e44f587"
+    },
+    "rtx1": {
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "results": [
+        {
+          "rows": 1,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 16,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 80,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 255,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 1023,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 4095,
+          "replay_batches": 1,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        },
+        {
+          "rows": 4096,
+          "replay_batches": 256,
+          "max_abs": 0.0,
+          "different_fp32": 0
+        }
+      ],
+      "native_sha256": "1ff005b09e3f4175ea06218389f31dfe5ae7514216bd2dd32cb76cea658525aa",
+      "qualifier_sha256": "57a83e4306fc5f494684b687d0adbb18ab4121c4b9c03df26735638a7e44f587"
+    }
+  },
+  "owner_logs": {
+    "/tmp/ds41-frequencies-main-rtx0.log": {
+      "sha256": "4b9d47b2460099d196101fc1626642d2142d712a182cc48efd104b549d402f41",
+      "results": [
+        "PASS capacity=1 rows=1 case=0 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=1 rows=1 case=1 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=16 rows=13 case=0 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=16 rows=13 case=1 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=80 rows=73 case=0 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=80 rows=73 case=1 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=256 rows=255 case=0 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=256 rows=255 case=1 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=1024 rows=1001 case=0 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=1024 rows=1001 case=1 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=4096 rows=4095 case=0 max_abs=0 changed=0 bytes=495484944",
+        "PASS capacity=4096 rows=4095 case=1 max_abs=0 changed=0 bytes=495484944",
+        "PASS additional80=5119628 two_wave80=8853577584"
+      ]
+    },
+    "/tmp/ds41-frequencies-wave-rtx0.log": {
+      "sha256": "81e56e50de12d515cba80456cf6f3e40e5f02b7bb0e55dcbc0e676e70bc4d784",
+      "results": [
+        "PASS stage=0 requests=1 case=0 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=1 case=1 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=0 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=1 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=0 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=1 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=0 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=1 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=0 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=1 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=0 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=1 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=0 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=1 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=0 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=1 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=0 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=1 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true"
+      ]
+    },
+    "/tmp/ds41-frequencies-main-rtx1.log": {
+      "sha256": "4b9d47b2460099d196101fc1626642d2142d712a182cc48efd104b549d402f41",
+      "results": [
+        "PASS capacity=1 rows=1 case=0 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=1 rows=1 case=1 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=16 rows=13 case=0 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=16 rows=13 case=1 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=80 rows=73 case=0 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=80 rows=73 case=1 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=256 rows=255 case=0 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=256 rows=255 case=1 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=1024 rows=1001 case=0 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=1024 rows=1001 case=1 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=4096 rows=4095 case=0 max_abs=0 changed=0 bytes=495484944",
+        "PASS capacity=4096 rows=4095 case=1 max_abs=0 changed=0 bytes=495484944",
+        "PASS additional80=5119628 two_wave80=8853577584"
+      ]
+    },
+    "/tmp/ds41-frequencies-wave-rtx1.log": {
+      "sha256": "81e56e50de12d515cba80456cf6f3e40e5f02b7bb0e55dcbc0e676e70bc4d784",
+      "results": [
+        "PASS stage=0 requests=1 case=0 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=1 case=1 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=0 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=1 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=0 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=1 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=0 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=1 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=0 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=1 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=0 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=1 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=0 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=1 bytes=8934584 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=0 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=1 bytes=9600264 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=0 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=1 bytes=31235856 max_error=0 changed_elements=0 ring_unchanged=true"
+      ]
+    }
+  },
+  "partial_two_wave_device_bytes80": 8853577584,
+  "real_checkpoint_loaded": false
+}

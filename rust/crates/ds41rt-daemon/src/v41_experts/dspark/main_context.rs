@@ -14,6 +14,7 @@ pub(crate) struct DsparkMainContext<'weights, 'library> {
     main_norm: Ds41rtDeviceBuffer,
     kv_norm: [Ds41rtDeviceBuffer; 3],
     normalized: DeviceAllocation<'library>,
+    positions: DeviceAllocation<'library>,
     frequencies: DeviceAllocation<'library>,
     rotated: [DeviceAllocation<'library>; 3],
     capacity: u32,
@@ -57,6 +58,7 @@ impl<'library> DsparkWeights<'library> {
                 self.tensor("mtp.2.attn.kv_norm.weight")?,
             ],
             normalized: DeviceAllocation::new(library, capacity as usize * 10240)?,
+            positions: DeviceAllocation::new(library, capacity as usize * 8)?,
             frequencies: DeviceAllocation::new(library, capacity as usize * 256)?,
             rotated: [
                 DeviceAllocation::new(library, capacity as usize * 1024)?,
@@ -77,7 +79,7 @@ impl DsparkMainContext<'_, '_> {
             [1, 16, 80, 256, 1024, 4096].contains(&capacity),
             "invalid main context capacity"
         );
-        Ok(capacity as usize * (10240 + 256 + 3 * 1024)
+        Ok(capacity as usize * (10240 + 256 + 8 + 3 * 1024)
             + 3 * DsparkProjection::device_bytes(library, ProjectionKind::Kv(0), capacity)?)
     }
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -93,9 +95,9 @@ impl DsparkMainContext<'_, '_> {
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.main.input()
     }
-    /// FP32 [capacity,32,2] complex frequencies at committed main positions.
-    pub fn frequencies(&self) -> Ds41rtDeviceBuffer {
-        self.frequencies.buffer
+    /// U64 [capacity] absolute committed main positions.
+    pub fn positions(&self) -> Ds41rtDeviceBuffer {
+        self.positions.buffer
     }
     fn prepare(&mut self, rows: u32) -> Result<()> {
         self.ready = None;
@@ -111,6 +113,8 @@ impl DsparkMainContext<'_, '_> {
     unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
         let stream = self.stream.raw;
         unsafe {
+            self.ops
+                .frequencies(self.positions.buffer, self.frequencies.buffer, rows, stream)?;
             self.main
                 .enqueue(self.main.input(), self.main.output_storage(), rows, stream)?;
             self.ops.norm(
@@ -145,7 +149,7 @@ impl DsparkMainContext<'_, '_> {
         Ok(())
     }
     /// # Safety
-    /// Inputs and frequencies must be initialized, finite and on this device;
+    /// Hidden inputs must be finite and positions initialized on this device;
     /// serialize writes and all borrowed outputs through completion/replay.
     pub unsafe fn execute(&mut self, rows: u32) -> Result<()> {
         self.prepare(rows)?;

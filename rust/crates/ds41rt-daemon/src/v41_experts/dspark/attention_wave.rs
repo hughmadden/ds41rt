@@ -18,6 +18,7 @@ pub(crate) struct DsparkAttentionWave<'weights, 'library> {
     sink: Ds41rtDeviceBuffer,
     query: DeviceAllocation<'library>,
     draft: DeviceAllocation<'library>,
+    positions: DeviceAllocation<'library>,
     descriptors: DeviceAllocation<'library>,
     staging: HostAllocation<'library>,
     requests: u32,
@@ -66,8 +67,9 @@ impl<'library> DsparkWeights<'library> {
             sink: self.tensor(&format!("mtp.{stage}.attn.attn_sink"))?,
             query: DeviceAllocation::new(library, rows as usize * 65536)?,
             draft: DeviceAllocation::new(library, rows as usize * 1024)?,
+            positions: DeviceAllocation::new(library, rows as usize * 8)?,
             descriptors: DeviceAllocation::new(library, 128)?,
-            staging: HostAllocation::new(library, 128)?,
+            staging: HostAllocation::new(library, 128 + rows as usize * 8)?,
             requests,
             graph: None,
             ready: None,
@@ -85,7 +87,7 @@ impl DsparkAttentionWave<'_, '_> {
     }
     pub fn additional_bytes(rows: u32) -> Result<usize> {
         ensure!((1..=4096).contains(&rows), "invalid attention wave rows");
-        Ok(rows as usize * (65536 + 1024) + 128)
+        Ok(rows as usize * (65536 + 1024 + 8) + 128)
     }
     pub fn device_bytes(library: &NativeLibrary, requests: u32) -> Result<usize> {
         ensure!(
@@ -110,9 +112,6 @@ impl DsparkAttentionWave<'_, '_> {
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.qa.input()
     }
-    pub fn frequencies(&self) -> Ds41rtDeviceBuffer {
-        self.output.frequencies()
-    }
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
@@ -128,18 +127,36 @@ impl DsparkAttentionWave<'_, '_> {
         );
         window.attention_read(requests)
     }
-    fn upload(&mut self, read: &WindowRead) -> Result<()> {
+    fn upload(&mut self, read: &WindowRead, requests: &[(WindowLease, u64)]) -> Result<()> {
         let bytes =
             unsafe { std::slice::from_raw_parts(read.descriptors.as_ptr().cast::<u8>(), 128) };
-        self.staging.bytes_mut().copy_from_slice(bytes);
+        let staging = self.staging.bytes_mut();
+        staging[..128].copy_from_slice(bytes);
+        staging[128..].fill(0);
+        for (request, &(_, end)) in requests.iter().enumerate() {
+            for draft in 0..5 {
+                let offset = 128 + (request * 5 + draft) * 8;
+                // attention_read checked end+5 before this upload.
+                staging[offset..offset + 8].copy_from_slice(&(end + draft as u64).to_ne_bytes());
+            }
+        }
         self.stream
             .library
-            .copy_h2d(self.descriptors.buffer, self.staging.bytes_mut())
+            .copy_h2d(self.descriptors.buffer, &staging[..128])?;
+        self.stream
+            .library
+            .copy_h2d(self.positions.buffer, &staging[128..])
     }
     unsafe fn enqueue(&mut self, read: &WindowRead, requests: u32) -> Result<()> {
         let rows = requests * 5;
         let stream = self.stream.raw;
         unsafe {
+            self.ops.frequencies(
+                self.positions.buffer,
+                self.output.frequencies(),
+                rows,
+                stream,
+            )?;
             self.qa
                 .enqueue(self.qa.input(), self.qa.output_storage(), rows, stream)?;
             self.ops.norm(
@@ -187,16 +204,16 @@ impl DsparkAttentionWave<'_, '_> {
         }
     }
     /// # Safety
-    /// Initialize finite normalized BF16 hidden rows [requests,5,5120] and FP32
-    /// complex frequencies at each request's committed_end..committed_end+5;
-    /// complete producer writes and serialize raw input/frequency view reuse.
+    /// Initialize finite normalized BF16 hidden rows [requests,5,5120];
+    /// complete producer writes and serialize raw input view reuse. Frequencies
+    /// are generated from the generation-checked committed ends on this stream.
     pub unsafe fn execute(
         &mut self,
         window: &DsparkWindow<'_>,
         requests: &[(WindowLease, u64)],
     ) -> Result<Ds41rtDeviceBuffer> {
         let read = self.prepare(window, requests)?;
-        self.upload(&read)?;
+        self.upload(&read, requests)?;
         let launched = unsafe { self.enqueue(&read, requests.len() as u32) };
         let drained = self.synchronize();
         launched.and(drained)?;
@@ -251,7 +268,7 @@ impl DsparkAttentionWave<'_, '_> {
             count as usize == requests.len() && owner == read.owner,
             "attention wave capture binding differs"
         );
-        self.upload(&read)?;
+        self.upload(&read, requests)?;
         let launched = unsafe {
             self.stream
                 .library

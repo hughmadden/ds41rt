@@ -94,3 +94,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 
 - `/tmp/ds41-main-context/` contains disposable sparse synthetic checkpoint shards, copied Rust fixture modules, generators and expected BF16 outputs; remove it and `rust/target/debug/ds41-main-context-fixture` during Goal 2 cleanup.
 - `/tmp/ds41-main-context-*.log` records producer compilation and both RTX qualification runs and can be removed after review of the checked-in qualification artifacts.
+
+- `/tmp/ds41-frequencies-*.log` and `/tmp/ds41-v41-aot/frequencies-rtx{0,1}.json` are disposable native-frequency and composed-owner qualification outputs; the updated temporary main-context/attention-wave generators and fixtures remain covered by their existing cleanup entries.

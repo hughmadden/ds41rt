@@ -147,3 +147,12 @@ Validation: 63 targeted Python/launcher checks passed; shell syntax and build/ru
 - [ ] Connect decoder tap gathering and native frequencies to the producer and compose the complete three-stage draft/verification lifecycle.
 
 Evidence and remaining limits are recorded in `docs/ds41-main-context-qualification.md` and its JSON companion.
+
+### Native dSpark position frequencies (2026-09-11)
+
+- [x] Generate dSpark RoPE64/base10000/no-YaRN frequencies inside the owned main-context and draft-attention graphs.
+- [x] Derive private draft positions directly from generation-checked committed ends and remove caller-provided draft frequencies.
+- [x] Compare all 1,048,576 context positions bitwise with the official CUDA reference and requalify both composed owners on both RTX GPUs.
+- [ ] Gather target-layer attention-input stream means after engram updates and connect the complete three-stage verification lifecycle.
+
+Evidence and limits are recorded in `docs/ds41-dspark-frequencies-qualification.md` and its JSON companion.
