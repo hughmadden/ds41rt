@@ -1,0 +1,36 @@
+{
+  "scope": "Device index page-table and committed-length publication; consumers and full-model qualification remain open",
+  "sources_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_compressor.rs": "b9382511893b9c134e5b55e11fd444a6a83d8389fa0c5f25adb7df327d0fab38",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/index_cache.rs": "ab723db611c976bcc080e2e3d54bc61f7b2d746d9f7972ce6b5c2e1ae7dc93f6"
+  },
+  "fixture_sources_sha256": {
+    "/tmp/ds41-compressor-owner/src/main.rs": "91e1157b5db8df01970bd3e0577fe7fdce58f5560ffe369354b06ee38983cf09",
+    "/tmp/ds41-compressor-owner/src/v41_tensors.rs": "a54889f4213d5c7d791c0507ebc1a820b5ade49e02455f0efd8ad93c8bb62c03",
+    "/tmp/ds41-compressor-owner/src/v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e",
+    "/tmp/ds41-compressor-owner/src/v41_compressor.rs": "b9382511893b9c134e5b55e11fd444a6a83d8389fa0c5f25adb7df327d0fab38",
+    "/tmp/ds41-compressor-owner/src/v41_compressor/index_cache.rs": "ab723db611c976bcc080e2e3d54bc61f7b2d746d9f7972ce6b5c2e1ae7dc93f6"
+  },
+  "build_logs_sha256": {
+    "/tmp/ds41-index-table-rust-build.log": "2bccc061ee0d683e4fb7ff554b24a0135c2209c432189912ae2d176d6bfeee5e",
+    "/tmp/ds41-index-table-owner-build.log": "e47606ea20fc0c613569894a8003b2b8f2f2305eb5fa1df3ef4a7f9218fb910c"
+  },
+  "gpus": {
+    "0": {
+      "owner_cases": 55,
+      "pool_cases": 4,
+      "maximum_stride_case": 1,
+      "log_sha256": "0e4f6ac85d2b96a9e943c1f5e4c8d02eab5c52511b060f8dfddd7aadaa92525e"
+    },
+    "1": {
+      "owner_cases": 55,
+      "pool_cases": 4,
+      "maximum_stride_case": 1,
+      "log_sha256": "0e4f6ac85d2b96a9e943c1f5e4c8d02eab5c52511b060f8dfddd7aadaa92525e"
+    }
+  },
+  "device_metadata_bytes_64pages_16slots": 4224,
+  "pinned_metadata_bytes_64pages_16slots": 384,
+  "device_metadata_bytes_maximum": 262272,
+  "failure_path_fault_injected": false
+}

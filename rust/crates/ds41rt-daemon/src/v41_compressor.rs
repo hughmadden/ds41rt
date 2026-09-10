@@ -56,7 +56,7 @@ pub(crate) struct CompressorState<'a> {
 impl<'a> CompressorState<'a> {
     pub fn device_bytes(layer: usize, slots: usize, index_pages: usize) -> Result<usize> {
         ensure!((1..=16).contains(&slots), "invalid compressor slot count");
-        Ok(IndexCache::device_bytes(index_pages)?
+        Ok(IndexCache::device_bytes(index_pages, slots)?
             + if ratio(layer)? == 2 { slots * 4096 } else { 0 })
     }
     pub fn new(
@@ -74,7 +74,7 @@ impl<'a> CompressorState<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| anyhow::anyhow!("compressor owner IDs exhausted"))?;
         Ok(Self {
-            index: IndexCache::new(library, index_pages)?,
+            index: IndexCache::new(library, index_pages, slots)?,
             pending: if ratio(layer)? == 2 {
                 Some([
                     DeviceAllocation::new(library, slots * 2048)?,
@@ -102,6 +102,7 @@ impl<'a> CompressorState<'a> {
             .generation
             .checked_add(1)
             .context("compressor generation exhausted")?;
+        self.index.reset(slot)?;
         self.slots[slot] = Slot {
             generation,
             request: Some(request),
@@ -143,9 +144,8 @@ impl<'a> CompressorState<'a> {
     /// All device consumers of this request's cache must have finished.
     pub fn release(&mut self, lease: CompressorLease) -> Result<()> {
         let slot = self.validate(lease)?;
-        self.index.release(slot);
         self.slots[slot].request = None;
-        Ok(())
+        self.index.release(slot)
     }
     /// Invalidate participating requests after an external cache transaction fails.
     pub fn invalidate(&mut self, leases: &[CompressorLease]) -> Result<()> {
@@ -153,11 +153,13 @@ impl<'a> CompressorState<'a> {
             .iter()
             .map(|&l| self.validate(l))
             .collect::<Result<Vec<_>>>()?;
+        let mut result = Ok(());
         for slot in slots {
-            self.index.release(slot);
             self.slots[slot].request = None;
+            let released = self.index.release(slot);
+            result = result.and(released);
         }
-        Ok(())
+        result
     }
 }
 pub(crate) struct CompressorWeights<'a> {
@@ -741,13 +743,18 @@ impl CompressorWave<'_, '_> {
                     }
                 }
             }
+            unsafe {
+                state.index.upload(&plan, self.stream.raw)?;
+            }
             Ok(())
         })();
         let drained = self.synchronize();
         if let Err(error) = write.and(drained) {
             for chunk in &prepared.chunks {
-                state.index.release(chunk.lease.slot);
                 state.slots[chunk.lease.slot].request = None;
+                if let Err(error) = state.index.release(chunk.lease.slot) {
+                    tracing::error!(%error, "clearing failed index transaction metadata");
+                }
             }
             return Err(error);
         }
