@@ -11,6 +11,7 @@ mod v41_index_query;
 mod v41_index_selection;
 mod v41_experts;
 mod v41_memory;
+mod v41_window;
 mod v41_dspark_cache;
 mod v41_tensors;
 mod v41_engram;

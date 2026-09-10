@@ -49,6 +49,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Score causal, strided index proposals without cache mutation and expose lease/version-checked compressor views.
 - [x] Compose learned queries, causal views and captured selection with exact proposal-snapshot candidate sharing across index layers.
 - [x] Persist fixed K32 FP8 compressed-source KV with paired index/KV page ownership and accepted-prefix publication.
+- [x] Own real-weight FP8 backbone window production, private proposals and accepted ring writes across all 40 layers and 16 requests.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -123,3 +124,5 @@ Causal index proposals and borrowed compressor views are qualified in `docs/ds41
 Owned query/selection composition and candidate sharing are qualified in `docs/ds41-index-selection-qualification.md`; persistent FP8 KV, sparse attention and backbone scheduling remain open.
 
 Fixed FP8 source KV and paired index/KV commit are qualified in `docs/ds41-kv-qualification.md`; window ownership and sparse attention consumption remain open.
+
+Fixed FP8 backbone windows are qualified in `docs/ds41-window-qualification.md`; sparse attention consumption, dSpark storage conversion and backbone/scheduler integration remain open.

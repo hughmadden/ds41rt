@@ -1,0 +1,19 @@
+# Fixed FP8 backbone window ownership
+
+`v41_window.rs` owns each backbone layer's 128-token window, its real checkpoint projection/norm weights, and independent captured proposal waves. All 40 layers use E4M3 values with one E8M0 scale per 32 coordinates, including the rotary tail. This matches the pinned reference window encoding and introduces no serving profiles.
+
+Each request slot has a generation-checked lease, committed token end and version. A wave projects hidden rows through the official FP8 `wkv`, applies RMS normalization with epsilon 1e-20, generates layer-specific frequencies, rotates the final 64 coordinates and packs FP8 values/scales. Weights are shared between waves. Borrowed proposals expose committed ring storage and private proposed rows; query metadata identifies their logical positions. Outputs are invalidated by competing commits, release/reuse or a new preparation.
+
+Accepted-prefix commit writes only the newest 128 accepted rows per request. This makes ring destinations unique even when a prefill chunk exceeds the window. A CPU oracle instead writes every accepted row sequentially, and compares the resulting complete ring. Rejected rows never enter committed storage. Device end publication follows data writes on the same stream; host ends/versions advance after synchronization. A write failure revokes participating leases and attempts to clear device ends, without promising rollback of physical bytes. The outer transaction across every model layer remains a scheduler responsibility.
+
+The per-layer persistent allocation is 67,592 bytes per request, or 1,081,472 bytes for 16 requests. Shared real weights and packed scales occupy 2,706,944 bytes. Wave allocation is the exported FP8 scratch requirement plus four bytes and 13,088 bytes per capacity row; at 4096 rows it is 75,890,692 bytes. Admission checks these budgets before allocation. Supported capacities are 1, 16, 80, 256, 1024 and 4096.
+
+## Qualification
+
+The external owner fixture passes **280 checks per RTX PRO 6000 Blackwell GPU**: every layer at all six capacities, plus a lifecycle case per layer. It uses real checkpoint weights, two competing captured waves, varied accepted prefixes including zero, rejected over-acceptance, changed-input replay, reordered request slots, ring wraparound, duplicate request rejection, exact device end publication, stale outputs, release/reuse and invalidation. All 16 physical rings are compared in full after each transaction; proposal execution must leave them unchanged. Exact and one-byte-short memory budgets are exercised.
+
+`scripts/qualify-ds41-window.py` checks **264 real-weight output sets per GPU** against the pinned reference: all 40 layers and six capacities, plus changed-input replay for layers 0, 1, 20 and 39. Projection and normalization pass elementwise `rtol=0.008, atol=0.002`; their largest absolute differences are 0.0078125 and 0.015625 respectively on both GPUs. Projection is compared to the actual reference FP8 GEMM. Normalization is compared using the native projected BF16 input, isolating that stage's arithmetic. Frequencies are exact. Rotary and FP8 value/scale bytes are exact when the actual reference functions receive the native normalized BF16 intermediate. This is component qualification, not a claim of byte-exact end-to-end GEMM output.
+
+The qualifier pins reference source hashes and records weight/vector payload hashes. It uses TileLang 0.1.8 with the previously documented `tir.disable_vectorize=True` quantizer workaround, preserving model source and arithmetic. Daemon and owner-fixture builds pass. The adjacent JSON records source, fixture, build and result hashes; temporary drivers/vectors stay outside Git.
+
+Sparse attention consumption, dSpark persistent FP8 storage, target-layer execution and scheduler integration remain open. These checks establish no full-model readiness or throughput result.
