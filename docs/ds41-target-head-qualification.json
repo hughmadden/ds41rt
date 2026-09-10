@@ -1,0 +1,204 @@
+{
+  "status": "partial; final RTX and dSpark requalification pending",
+  "production_source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_target_head.rs": "4522e7b5f00221aebb3905286edc30b8aa15a02b6f6d22001addf2be915c4462",
+    "rust/crates/ds41rt-daemon/src/v41_block.rs": "daf41fcc2c70875a8a1b0fcd33ea1571cb818cb779ac977d470f97a9d12d919c",
+    "native/cuda/kernels/v41_dspark.cu": "2b6ae8ddd529f14b58675cd9763895a689b3b00b7ee1fee6ec9eace2f79cd760",
+    "scripts/qualify-ds41-target-head.py": "ed30652d009c97aef15c10b9861550d39b97cfe6bf2ad963d9927a5b3eeacb96"
+  },
+  "spark_numerical": {
+    "device": 0,
+    "device_name": "NVIDIA GB10",
+    "torch_version": "2.12.0a0+5aff3928d8.nv26.05",
+    "cuda_version": "13.2",
+    "scope": "Real target head stage comparisons only; no full-model logits claim",
+    "projection_tolerance": {
+      "rtol": 2e-05,
+      "atol": 2e-05
+    },
+    "norm_tolerance": {
+      "rtol": 0.008,
+      "atol": 0.002
+    },
+    "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+    "weight_payloads_sha256": {
+      "norm.weight": "9cd3b57cd9513541b9771bf66c9b356bf1a7b20ff050ed69f7e97cff9fedd428",
+      "head.weight": "68f446ddda4243d5c8d57d2a9729c125f7fb8b2ee050c78ac6ff5e0cacde6789"
+    },
+    "cases": [
+      {
+        "prefix": "m1-c0",
+        "rows": 1,
+        "bound": false,
+        "collapse_max_abs": 0.0,
+        "norm_same_input_max_abs": 0.0,
+        "fp64_oracle_max_abs": 2.5033950805664062e-06,
+        "projection_same_input_max_abs": 0.0,
+        "chained_max_abs": 0.0,
+        "argmax_agreement": 1.0,
+        "payloads_sha256": {
+          "residual": "42a39d819525740e7c1ba78e0fcd4d62429116d6cf3343a9424ac4e4c65b5e3e",
+          "pre": "e366f55572bf304e2af3670e753bbd3dc0b5046a5783d3974b64374c202ef517",
+          "collapsed": "e651fc35881960d783dceaca08f53b31caaee5b0c57696557ccbec615d801a09",
+          "normalized": "ffa612b71b6da88157e027c46368de242bbad392589486c6263dc20d42f6376b",
+          "logits": "5948d58b78b007904308130feb537e79e946217c39173d37d7b5cb69ddf90691"
+        }
+      },
+      {
+        "prefix": "m1-c1",
+        "rows": 1,
+        "bound": false,
+        "collapse_max_abs": 0.0,
+        "norm_same_input_max_abs": 0.0,
+        "fp64_oracle_max_abs": 2.384185791015625e-06,
+        "projection_same_input_max_abs": 0.0,
+        "chained_max_abs": 0.0,
+        "argmax_agreement": 1.0,
+        "payloads_sha256": {
+          "residual": "f7fb951ec185e3fe1f3b804a3742213e559bf8819b1deabe9b41afb9830e9135",
+          "pre": "370b387e28e0f74f412db9e5db9d0dfb4ebe983400dacd73e5d9e2ee707d5428",
+          "collapsed": "f75319a44c7e40f6504fd4c62ff2972241b4240884a18ccb5cac5400e6acc62b",
+          "normalized": "8d9310a653b258af082a5c5566c719d550ec77e3e0d1f2022a0730bffcbd5165",
+          "logits": "390f4bc7352d474c3525b615796640267e2c38cd9d9f726fb05ef491f3151a5d"
+        }
+      },
+      {
+        "prefix": "m16-c0",
+        "rows": 16,
+        "bound": false,
+        "collapse_max_abs": 0.0,
+        "norm_same_input_max_abs": 0.0,
+        "fp64_oracle_max_abs": 6.866455078125e-05,
+        "projection_same_input_max_abs": 6.866455078125e-05,
+        "chained_max_abs": 6.866455078125e-05,
+        "argmax_agreement": 1.0,
+        "payloads_sha256": {
+          "residual": "9ecdc6ef88ef71f4b8ce87cf18823bef9746d0e5027fca1a4088a57779315bf7",
+          "pre": "3badde1080a04e38dbe9f0f7257aaafc7e38838b5f8d12a4cc25b0a0f8ad692d",
+          "collapsed": "a82f6ee1ce3dfe46684e4614d6d617f452d23370ce51da8afb3e8d9ed934b927",
+          "normalized": "21db4382b65effdc21f103a99da04b8aa71b86d65b65815580fd7bd072c1daf8",
+          "logits": "c8999d658c5da5a6d3a692d7822f68133490ffde01aa390fc908b7aebeffa38e"
+        }
+      },
+      {
+        "prefix": "m16-c1",
+        "rows": 16,
+        "bound": false,
+        "collapse_max_abs": 0.0,
+        "norm_same_input_max_abs": 0.0,
+        "fp64_oracle_max_abs": 3.910064697265625e-05,
+        "projection_same_input_max_abs": 3.910064697265625e-05,
+        "chained_max_abs": 3.910064697265625e-05,
+        "argmax_agreement": 1.0,
+        "payloads_sha256": {
+          "residual": "544ca06c5b4febf4bc1783c2c59f75a1db2a8f9fcabd55049150d6c7ca2aed16",
+          "pre": "351542050609ca135ded9de22802e287ceba3bc78f06e426601b22c18872c01a",
+          "collapsed": "1f342adf2e2a97e1658041a60f01703fb2b554115d4b15ee9434cf42fbc898b1",
+          "normalized": "9c57e3222a09d9661835ef1d8d4344071f9fd78c1e35ec2f3c9f9757bcbe1c44",
+          "logits": "a06f2222b7fcd82a28ebfedca23ac3e19734d7cb434a291ccc1f96774b99fc11"
+        }
+      },
+      {
+        "prefix": "m80-c0",
+        "rows": 80,
+        "bound": false,
+        "collapse_max_abs": 0.0,
+        "norm_same_input_max_abs": 0.001953125,
+        "fp64_oracle_max_abs": 7.82012939453125e-05,
+        "projection_same_input_max_abs": 7.2479248046875e-05,
+        "chained_max_abs": 0.0015347003936767578,
+        "argmax_agreement": 1.0,
+        "payloads_sha256": {
+          "residual": "4e6960cc47f8ec6c5cf11bb893210bf129d9a8dd3d142ceadcf353c2cba88c04",
+          "pre": "f6a1a1c48c95265aac037c1f8b13ec02e052c8ee089c57aabf78058729962c6c",
+          "collapsed": "8182e8df79ae58738f7292a7b0fb7390035f7adb3dbe4a354f8eaadbdb154a18",
+          "normalized": "b28a0254ce5c04a75691abf78012f45a44f023226e3144790e791c00932a8942",
+          "logits": "3b4edf43681f50ba111894acc133800771f33ed6f889be6dda6f3ffe33bec5b8"
+        }
+      },
+      {
+        "prefix": "m80-c1",
+        "rows": 80,
+        "bound": false,
+        "collapse_max_abs": 0.0,
+        "norm_same_input_max_abs": 0.00390625,
+        "fp64_oracle_max_abs": 4.00543212890625e-05,
+        "projection_same_input_max_abs": 3.910064697265625e-05,
+        "chained_max_abs": 0.0033320188522338867,
+        "argmax_agreement": 1.0,
+        "payloads_sha256": {
+          "residual": "a075d08918af22824a30de93caf0d5a88ed708c588034985b183ed175962ef6c",
+          "pre": "0f6a31748c654e7b8cab84dd156de2b79d21bf338cae1ab47808d59305f7a668",
+          "collapsed": "2a1a55e616099599f96666bb6cc3db6b1ccb0eb4fcea70791ad7968654ab5bdb",
+          "normalized": "302ce444f5253b4d7923f14e672a91f75cefa6ed5b850ade3acd49bca96c7525",
+          "logits": "b3c5916b15ea955c456c1bb2a5180f898066ea8143fea1529e0a969cc67edeaa"
+        }
+      }
+    ]
+  },
+  "logs": {
+    "ds41-target-head-pedantic-native-build": {
+      "sha256": "9a03f277b9fcecec06714e01a38085bf1c033732e04f3fae07c030630d511f8e",
+      "tail": "[  2%] Verifying pinned SparkInfer source\nverified SparkInfer revision=aeb1d8c18e99809797c76af6fbfaca1273c36ff6 source_tree_sha256=ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f source=/workspace/ds41rt/third_party/sparkinfer\n[  2%] Built target ds41rt_verify_sparkinfer_source\n[  5%] Built target ds41rt_v41_experts_export\n[  8%] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark.cu.o\n[ 10%] Linking CXX shared library libds41rt_native.so\n[ 89%] Built target ds41rt_native\n[ 91%] Building CXX object CMakeFiles/ds41rt_native_selftest.dir/tests/native_selftest.cc.o\n[ 94%] Building CXX object CMakeFiles/ds41rt_cuda_selftest.dir/tests/cuda_selftest.cc.o\n[ 97%] Linking CXX executable ds41rt_native_selftest\n[ 97%] Built target ds41rt_native_selftest\n[100%] Linking CXX executable ds41rt_cuda_selftest\n[100%] Built target ds41rt_cuda_selftest\n"
+    },
+    "ds41-target-head-pedantic-sm120-build": {
+      "sha256": "85fecf7efecd7a4a9e4f35fc2947d2bc0ad15a8b142d747cede96e7fa872ec42",
+      "tail": "[0/2] Re-checking globbed directories...\n[1/23] Verifying pinned SparkInfer source\nverified SparkInfer revision=aeb1d8c18e99809797c76af6fbfaca1273c36ff6 source_tree_sha256=ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f source=/workspace/ds41rt/third_party/sparkinfer\n[2/23] Building CXX object CMakeFiles/ds41rt_native.dir/src/ds41rt_native.cc.o\n[3/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/mla_indexing.cu.o\n[4/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/norm.cu.o\n[5/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/engram.cu.o\n[6/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark.cu.o\n[7/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/mlp.cu.o\n[8/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/kv_cache.cu.o\n[9/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/residual.cu.o\n[10/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/embedding.cu.o\n[11/23] Building CXX object CMakeFiles/ds41rt_native_selftest.dir/tests/native_selftest.cc.o\n[12/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/nibbles.cu.o\n[13/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/ds4_flash_direct.cu.o\n[14/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/nvfp4_payload.cu.o\n[15/23] Building CXX object CMakeFiles/ds41rt_cuda_selftest.dir/tests/cuda_selftest.cc.o\n[16/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/attention.cu.o\n[17/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/router.cu.o\n[18/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/sampling.cu.o\n[19/23] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/linear.cu.o\n/workspace/ds41rt/native/cuda/kernels/linear.cu(932): warning #177-D: function \"<unnamed>::triton_driver_kernel_data\" was declared but never referenced\n  ds41rt_status_t triton_driver_kernel_data(const char* cache_key,\n                  ^\n\nRemark: The warnings can be suppressed with \"-diag-suppress <warning-number>\"\n\n[20/23] Linking CXX shared library libds41rt_native.so\n[21/23] Linking CXX executable ds41rt_native_selftest\n[22/23] Linking CXX executable ds41rt_cuda_selftest\n"
+    },
+    "ds41-target-head-pedantic-owner-build": {
+      "sha256": "659b0724a404c3407bc8f6ae814bf048cfa93a7250cf4a10ba5ac20901b44af8",
+      "tail": "_query.rs:170:12\n    |\n169 | impl IndexQueryWave<'_, '_> {\n    | --------------------------- associated items in this implementation\n170 |     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n178 |     pub fn query_rank(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^^^^^^\n...\n182 |     pub fn hidden(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^^\n...\n186 |     pub fn positions(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^^^^^\n...\n189 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n192 |     fn validate(&mut self, rows: u32) -> Result<()> {\n    |        ^^^^^^^^\n...\n202 |     unsafe fn enqueue(&self, rows: u32) -> Result<()> {\n    |               ^^^^^^^\n...\n245 |     pub unsafe fn execute(&mut self, rows: u32) -> Result<IndexQueryOutput<'_>> {\n    |                   ^^^^^^^\n...\n254 |     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {\n    |                   ^^^^^^^\n...\n288 |     pub unsafe fn replay(&mut self, rows: u32) -> Result<IndexQueryOutput<'_>> {\n    |                   ^^^^^^\n...\n303 |     pub unsafe fn execute_attention(\n    |                   ^^^^^^^^^^^^^^^^^\n...\n341 |     pub fn output(&self) -> Result<IndexQueryOutput<'_>> {\n    |            ^^^^^^\n...\n357 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n\nwarning: constant `WIDTH` is never used\n  --> src/v41_index_selection.rs:11:7\n   |\n11 | const WIDTH: usize = 16384;\n   |       ^^^^^\n\nwarning: constant `BLOCKS` is never used\n  --> src/v41_index_selection.rs:12:7\n   |\n12 | const BLOCKS: usize = WIDTH / 8;\n   |       ^^^^^^\n\nwarning: struct `SelectionRequest` is never constructed\n  --> src/v41_index_selection.rs:14:19\n   |\n14 | pub(crate) struct SelectionRequest<'a> {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: struct `IndexSelectionOutput` is never constructed\n  --> src/v41_index_selection.rs:19:19\n   |\n19 | pub(crate) struct IndexSelectionOutput<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^^^\n\nwarning: struct `Ready` is never constructed\n  --> src/v41_index_selection.rs:29:8\n   |\n29 | struct Ready {\n   |        ^^^^^\n\nwarning: methods `validate_query` and `validate_attention` are never used\n  --> src/v41_index_selection.rs:36:12\n   |\n35 | impl IndexSelectionOutput<'_> {\n   | ----------------------------- methods in this implementation\n36 |     pub fn validate_query(&self, query: QueryBinding) -> Result<()> {\n   |            ^^^^^^^^^^^^^^\n...\n47 |     pub fn validate_attention(&self, layer: usize, bindings: &[(IndexBinding, u64)]) -> Result<()> {\n   |            ^^^^^^^^^^^^^^^^^^\n\nwarning: struct `IndexSelectionWave` is never constructed\n  --> src/v41_index_selection.rs:62:19\n   |\n62 | pub(crate) struct IndexSelectionWave<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^\n\nwarning: function `slice` is never used\n  --> src/v41_index_selection.rs:73:4\n   |\n73 | fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {\n   |    ^^^^^\n\nwarning: multiple associated items are never used\n   --> src/v41_index_selection.rs:80:8\n    |\n 79 | impl<'a> IndexSelectionWave<'a> {\n    | ------------------------------- associated items in this implementation\n 80 |     fn sizes(capacity: usize) -> Result<[usize; 13]> {\n    |        ^^^^^\n...\n102 |     pub fn device_bytes(capacity: usize) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n105 |     pub fn new(library: &'a NativeLibrary, capacity: usize, budget: usize) -> Result<Self> {\n    |            ^^^\n...\n128 |     fn b(&self, i: usize) -> Ds41rtDeviceBuffer {\n    |        ^\n...\n131 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n134 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n...\n144 |     unsafe fn enqueue(\n    |               ^^^^^^^\n...\n251 |     pub unsafe fn execute<'s>(\n    |                   ^^^^^^^\n\nwarning: struct `AttentionRequest` is never constructed\n  --> src/v41_sparse_attention.rs:14:19\n   |\n14 | pub(crate) struct AttentionRequest<'a> {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: struct `SparseAttentionOutput` is never constructed\n  --> src/v41_sparse_attention.rs:19:19\n   |\n19 | pub(crate) struct SparseAttentionOutput<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: methods `binding` and `tokens` are never used\n  --> src/v41_sparse_attention.rs:28:12\n   |\n27 | impl SparseAttentionOutput<'_> {\n   | ------------------------------ methods in this implementation\n28 |     pub fn binding(&self) -> Result<QueryBinding> {\n   |            ^^^^^^^\n...\n33 |     pub fn tokens(&self) -> Result<&[u64]> {\n   |            ^^^^^^\n\nwarning: struct `SparseAttentionWave` is never constructed\n  --> src/v41_sparse_attention.rs:39:19\n   |\n39 | pub(crate) struct SparseAttentionWave<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^^\n\nwarning: struct `RequestLaunch` is never constructed\n  --> src/v41_sparse_attention.rs:49:8\n   |\n49 | struct RequestLaunch {\n   |        ^^^^^^^^^^^^^\n\nwarning: function `slice` is never used\n  --> src/v41_sparse_attention.rs:55:4\n   |\n55 | fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {\n   |    ^^^^^\n\nwarning: multiple associated items are never used\n   --> src/v41_sparse_attention.rs:62:12\n    |\n 61 | impl<'a> SparseAttentionWave<'a> {\n    | -------------------------------- associated items in this implementation\n 62 |     pub fn device_bytes(capacity: usize) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n 69 |     pub fn new(library: &'a NativeLibrary, capacity: usize, budget: usize) -> Result<Self> {\n    |            ^^^\n...\n 88 |     pub fn input(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^\n...\n 91 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n 94 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n...\n103 |     unsafe fn enqueue(\n    |               ^^^^^^^\n...\n132 |     pub unsafe fn execute_query<'s>(\n    |                   ^^^^^^^^^^^^^\n...\n168 |     pub unsafe fn execute<'s>(\n    |                   ^^^^^^^\n\nwarning: field `resident_bytes` is never read\n  --> src/v41_tensors.rs:10:5\n   |\n 8 | pub(crate) struct NativeRtxTensors<'a> {\n   |                   ---------------- field in this struct\n 9 |     tensors: BTreeMap<String, DeviceAllocation<'a>>,\n10 |     resident_bytes: usize,\n   |     ^^^^^^^^^^^^^^\n\nwarning: method `resident_bytes` is never used\n  --> src/v41_tensors.rs:78:12\n   |\n12 | impl<'a> NativeRtxTensors<'a> {\n   | ----------------------------- method in this implementation\n...\n78 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: `ds41-target-head-spark-fixture` (bin \"ds41-target-head-spark-fixture\") generated 115 warnings (run `cargo fix --bin \"ds41-target-head-spark-fixture\" -p ds41-target-head-spark-fixture` to apply 11 suggestions)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.75s\n"
+    },
+    "ds41-target-head-owner-final-build": {
+      "sha256": "2b9f1a1514091bde73a437625e96b36bcfe80c4fb1bf0b62b59bbd96c09b1d27",
+      "tail": " --> crates/ds41rt-daemon/src/v41_dspark_cache.rs:36:19\n   |\n36 | pub(crate) struct WindowRead {\n   |                   ^^^^^^^^^^\n\nwarning: struct `DsparkWindow` is never constructed\n  --> crates/ds41rt-daemon/src/v41_dspark_cache.rs:42:19\n   |\n42 | pub(crate) struct DsparkWindow<'a> {\n   |                   ^^^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_dspark_cache.rs:56:12\n    |\n 55 | impl<'a> DsparkWindow<'a> {\n    | ------------------------- associated items in this implementation\n 56 |     pub fn device_bytes(slots: usize, source_rows: u32) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n 63 |     pub fn new(\n    |            ^^^\n...\n115 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n118 |     unsafe fn enqueue(&self) -> Result<()> {\n    |               ^^^^^^^\n...\n130 |     pub fn begin_request(&mut self, slot: usize, request: u64) -> Result<WindowLease> {\n    |            ^^^^^^^^^^^^^\n...\n154 |     fn validate(&self, lease: WindowLease) -> Result<usize> {\n    |        ^^^^^^^^\n...\n167 |     pub fn request_id(&self, lease: WindowLease) -> Result<u64> {\n    |            ^^^^^^^^^^\n...\n171 |     pub fn release(&mut self, lease: WindowLease) -> Result<()> {\n    |            ^^^^^^^\n...\n178 |     pub fn source(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^^\n...\n181 |     fn prepare_write(&self, chunks: &[WindowChunk], source_rows: u32)\n    |        ^^^^^^^^^^^^^\n...\n229 |     pub fn validate_write(&self, chunks: &[WindowChunk], source_rows: u32) -> Result<()> {\n    |            ^^^^^^^^^^^^^^\n...\n236 |     pub unsafe fn write(&mut self, chunks: &[WindowChunk]) -> Result<()> {\n    |                   ^^^^^\n...\n268 |     pub fn attention_read(&self, requests: &[(WindowLease, u64)]) -> Result<WindowRead> {\n    |            ^^^^^^^^^^^^^^\n...\n302 |     pub fn view(&self, lease: WindowLease) -> Result<WindowView> {\n    |            ^^^^\n\nwarning: struct `NativeRtxTensors` is never constructed\n --> crates/ds41rt-daemon/src/v41_tensors.rs:8:19\n  |\n8 | pub(crate) struct NativeRtxTensors<'a> {\n  |                   ^^^^^^^^^^^^^^^^\n\nwarning: associated items `plan`, `load`, `get`, and `resident_bytes` are never used\n  --> crates/ds41rt-daemon/src/v41_tensors.rs:13:12\n   |\n12 | impl<'a> NativeRtxTensors<'a> {\n   | ----------------------------- associated items in this implementation\n13 |     pub fn plan(catalog: &OfficialV41Catalog, names: &[String]) -> Result<usize> {\n   |            ^^^^\n...\n30 |     pub fn load(\n   |            ^^^^\n...\n71 |     pub fn get(&self, name: &str) -> Result<Ds41rtDeviceBuffer> {\n   |            ^^^\n...\n78 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: struct `VocabularyHead` is never constructed\n  --> crates/ds41rt-daemon/src/v41_tensors.rs:85:19\n   |\n85 | pub(crate) struct VocabularyHead<'library> {\n   |                   ^^^^^^^^^^^^^^\n\nwarning: associated items `plan`, `load`, and `weight` are never used\n   --> crates/ds41rt-daemon/src/v41_tensors.rs:89:12\n    |\n 88 | impl<'library> VocabularyHead<'library> {\n    | --------------------------------------- associated items in this implementation\n 89 |     pub fn plan(catalog: &OfficialV41Catalog) -> Result<usize> {\n    |            ^^^^\n...\n 92 |     pub fn load(\n    |            ^^^^\n...\n108 |     pub fn weight(&self) -> Result<Ds41rtDeviceBuffer> {\n    |            ^^^^^^\n\nwarning: struct `EngramDeviceRows` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram.rs:10:19\n   |\n10 | pub(crate) struct EngramDeviceRows<'a> {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: struct `EngramDeviceView` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram.rs:21:19\n   |\n21 | pub(crate) struct EngramDeviceView {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: enum `EngramUploadPoll` is never used\n  --> crates/ds41rt-daemon/src/v41_engram.rs:27:17\n   |\n27 | pub(crate) enum EngramUploadPoll {\n   |                 ^^^^^^^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_engram.rs:34:12\n    |\n 32 | impl<'a> EngramDeviceRows<'a> {\n    | ----------------------------- associated items in this implementation\n 33 |     /// Validate current request generations before consuming an early gather.\n 34 |     pub fn poll_wave(\n    |            ^^^^^^^^^\n...\n 50 |     pub fn poll_upload(&mut self, ticket: &mut EngramGatherTicket) -> Result<EngramUploadPoll> {\n    |            ^^^^^^^^^^^\n...\n 62 |     pub fn device_bytes(capacity: usize) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n 71 |     pub fn new(\n    |            ^^^\n...\n 96 |     pub fn upload(&mut self, gathered: &EngramGatherView<'_>) -> Result<EngramDeviceView> {\n    |            ^^^^^^\n...\n129 |     pub fn view(&self) -> Result<EngramDeviceView> {\n    |            ^^^^\n...\n142 |     pub fn synchronize(&self) -> Result<()> {\n    |            ^^^^^^^^^^^\n\nwarning: struct `EngramLayerWeights` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:11:19\n   |\n11 | pub(crate) struct EngramLayerWeights<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^\n\nwarning: associated items `load` and `resident_bytes` are never used\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:19:12\n   |\n18 | impl<'a> EngramLayerWeights<'a> {\n   | ------------------------------- associated items in this implementation\n19 |     pub fn load(\n   |            ^^^^\n...\n64 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: struct `EngramGate` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:69:19\n   |\n69 | pub(crate) struct EngramGate<'weights, 'library> {\n   |                   ^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_engram/layer.rs:85:12\n    |\n 84 | impl<'weights, 'library> EngramGate<'weights, 'library> {\n    | ------------------------------------------------------- associated items in this implementation\n 85 |     pub fn new(\n    |            ^^^\n...\n143 |     pub unsafe fn execute(\n    |                   ^^^^^^^\n...\n159 |     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] {\n    |            ^^^^^^\n...\n166 |     unsafe fn stage_inputs(\n    |               ^^^^^^^^^^^^\n...\n228 |     unsafe fn enqueue(&self, rows: usize) -> Result<()> {\n    |               ^^^^^^^\n...\n256 |     pub unsafe fn capture(\n    |                   ^^^^^^^\n...\n291 |     pub unsafe fn replay(\n    |                   ^^^^^^\n...\n312 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n...\n323 |     pub fn output(&self) -> Result<Ds41rtDeviceBuffer> {\n    |            ^^^^^^\n...\n331 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n\nwarning: `ds41rt-daemon` (bin \"ds41rt\") generated 633 warnings (run `cargo fix --bin \"ds41rt\" -p ds41rt-daemon` to apply 89 suggestions)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.90s\n"
+    },
+    "ds41-target-head-pedantic-owner-run": {
+      "sha256": "546a222dd2c3db0d86dad87ea10625ce5a56c18263899c472e933f29b8fd6592",
+      "tail": "PASS raw rows=1 two_waves_exact=true budget_bytes=4772880\nPASS raw rows=16 two_waves_exact=true budget_bytes=13451520\nPASS raw rows=80 two_waves_exact=true budget_bytes=50480384\n"
+    },
+    "ds41-target-head-pedantic-owner-math": {
+      "sha256": "90ecfb0ad633491ef6dde9bcbdd759066171a45c67b160f11d40ee19e137aa64",
+      "tail": "PASS m1-c0 rows=1 real_target_head=true bound=False\nPASS m1-c1 rows=1 real_target_head=true bound=False\nPASS m16-c0 rows=16 real_target_head=true bound=False\nPASS m16-c1 rows=16 real_target_head=true bound=False\nPASS m80-c0 rows=80 real_target_head=true bound=False\nPASS m80-c1 rows=80 real_target_head=true bound=False\n"
+    },
+    "ds41-target-head-pedantic-owner-artifacts": {
+      "sha256": "f77c30a2503539a1ff9fbf3d565bc6a09146b4ff419891800e12f36effad5355",
+      "tail": "ee13b20d228985d38e3372fa91e0dc6b68c83a04fb780d784bcbee8705f7f167  /tmp/ds41-real-tp4/audit/cmake/libds41rt_native.so\n071b3c87155d36bb98104ad60b2b3da226715cfdf8fe0dcff2f82dfd4a856b7f  /tmp/ds41-tp4-four-host/audit/target/debug/ds41-target-head-spark-fixture\nff8b34da00fb93e8e1c175aacff534cb90b66c589166573243afe3b6a8a69552  /tmp/ds41-target-head-spark/src/main.rs\nf3a34a24ed3221c8c7fb59898f927cbf0650614c3f171aaf0a9f02c431973156  /tmp/ds41-target-head-spark/src/v41_target_head.rs\nsha256:a641a14143728cefc9989807c92b6aff59858adb64d835c7033183148894152d\n"
+    },
+    "ds41-target-head-pedantic-timing": {
+      "sha256": "afd087fe86f8e2da7d9f7e989ba7f0bf0ef205cea745661d0c098f14ec908270",
+      "tail": "TIME m1-c0: 8.228464 ms\nPASS m1-c0 rows=1 real_target_head=true bound=False\nTIME m1-c1: 7.840205 ms\nPASS m1-c1 rows=1 real_target_head=true bound=False\nTIME m16-c0: 13.178262 ms\nPASS m16-c0 rows=16 real_target_head=true bound=False\nTIME m16-c1: 13.203098 ms\nPASS m16-c1 rows=16 real_target_head=true bound=False\nTIME m80-c0: 26.492197 ms\nPASS m80-c0 rows=80 real_target_head=true bound=False\nTIME m80-c1: 26.516776 ms\nPASS m80-c1 rows=80 real_target_head=true bound=False\n"
+    },
+    "ds41-target-head-spark-math": {
+      "sha256": "328946c47f5c71c2207b51380f32a3d59422b36505627d1b51813be00c72efb7",
+      "tail": "PASS m1-c0 rows=1 real_target_head=true bound=False\nPASS m1-c1 rows=1 real_target_head=true bound=False\nTraceback (most recent call last):\n  File \"/check/scripts/qualify-ds41-target-head.py\", line 53, in <module>\n    if __name__=='__main__':main()\n                            ^^^^^^\n  File \"/check/scripts/qualify-ds41-target-head.py\", line 44, in main\n    torch.testing.assert_close(t['logits'],logits,rtol=2e-5,atol=2e-5)\n  File \"/usr/local/lib/python3.12/dist-packages/torch/testing/_comparison.py\", line 1631, in assert_close\n    raise error_metas[0].to_error(msg)\nAssertionError: Tensor-likes are not close!\n\nMismatched elements: 2020 / 2068480 (0.1%)\nGreatest absolute difference: 5.269050598144531e-05 at index (0, 2, 93319) (up to 2e-05 allowed)\nGreatest relative difference: 0.14697901904582977 at index (0, 15, 101777) (up to 2e-05 allowed)\n"
+    },
+    "ds41-target-head-fp32-failure-rtx0": {
+      "sha256": "789638d01f408bdc216ad8203593351c689849aacd76ad58a4a51a5b1ed92678",
+      "tail": "PASS m1-c0 rows=1 real_target_head=true bound=False\nPASS m1-c1 rows=1 real_target_head=true bound=False\nPASS m16-c0 rows=16 real_target_head=true bound=False\nPASS m16-c1 rows=16 real_target_head=true bound=False\nTraceback (most recent call last):\n  File \"/home/tj/Developer/ds41rt/scripts/qualify-ds41-target-head.py\", line 50, in <module>\n    if __name__=='__main__':main()\n                            ^^^^^^\n  File \"/home/tj/Developer/ds41rt/scripts/qualify-ds41-target-head.py\", line 43, in main\n    torch.testing.assert_close(t['logits'],logits,rtol=2e-5,atol=2e-5)\n  File \"/home/tj/Developer/ds41rt/.venv/lib/python3.12/site-packages/torch/testing/_comparison.py\", line 1631, in assert_close\n    raise error_metas[0].to_error(msg)\nAssertionError: Tensor-likes are not close!\n\nMismatched elements: 9334 / 10342400 (0.1%)\nGreatest absolute difference: 5.888938903808594e-05 at index (0, 32, 79823) (up to 2e-05 allowed)\nGreatest relative difference: 0.31961286067962646 at index (0, 17, 27199) (up to 2e-05 allowed)\n"
+    },
+    "ds41-target-head-fp32-failure-rtx1": {
+      "sha256": "789638d01f408bdc216ad8203593351c689849aacd76ad58a4a51a5b1ed92678",
+      "tail": "PASS m1-c0 rows=1 real_target_head=true bound=False\nPASS m1-c1 rows=1 real_target_head=true bound=False\nPASS m16-c0 rows=16 real_target_head=true bound=False\nPASS m16-c1 rows=16 real_target_head=true bound=False\nTraceback (most recent call last):\n  File \"/home/tj/Developer/ds41rt/scripts/qualify-ds41-target-head.py\", line 50, in <module>\n    if __name__=='__main__':main()\n                            ^^^^^^\n  File \"/home/tj/Developer/ds41rt/scripts/qualify-ds41-target-head.py\", line 43, in main\n    torch.testing.assert_close(t['logits'],logits,rtol=2e-5,atol=2e-5)\n  File \"/home/tj/Developer/ds41rt/.venv/lib/python3.12/site-packages/torch/testing/_comparison.py\", line 1631, in assert_close\n    raise error_metas[0].to_error(msg)\nAssertionError: Tensor-likes are not close!\n\nMismatched elements: 9334 / 10342400 (0.1%)\nGreatest absolute difference: 5.888938903808594e-05 at index (0, 32, 79823) (up to 2e-05 allowed)\nGreatest relative difference: 0.31961286067962646 at index (0, 17, 27199) (up to 2e-05 allowed)\n"
+    },
+    "ds41-target-head-probe": {
+      "sha256": "8460e3402ca611cb680023ae65c371df7ff8786c131468b8bf3c8b4b407929be",
+      "tail": "native vs FP64 0.000209808349609375 reference vs FP64 2.288818359375e-05\nTraceback (most recent call last):\n  File \"/tmp/ds41-target-head-probe.py\", line 53, in <module>\n    if __name__=='__main__':main()\n                            ^^^^^^\n  File \"/tmp/ds41-target-head-probe.py\", line 46, in main\n    torch.testing.assert_close(t['logits'],oracle,rtol=2e-5,atol=2e-5)\n  File \"/home/tj/Developer/ds41rt/.venv/lib/python3.12/site-packages/torch/testing/_comparison.py\", line 1631, in assert_close\n    raise error_metas[0].to_error(msg)\nAssertionError: Tensor-likes are not close!\n\nMismatched elements: 8643 / 10342400 (0.1%)\nGreatest absolute difference: 5.650520324707031e-05 at index (0, 32, 79823) (up to 2e-05 allowed)\nGreatest relative difference: 0.2596549689769745 at index (0, 18, 71542) (up to 2e-05 allowed)\n"
+    },
+    "ds41-target-head-initial-rtx0": {
+      "sha256": "7499896677d36228f178d2b439ff2515ab9df7efd44aabee9c5c0159be5327ca",
+      "tail": "PASS raw rows=1 two_waves_exact=true budget_bytes=4772880\nPASS raw rows=16 two_waves_exact=true budget_bytes=13451520\nPASS raw rows=80 two_waves_exact=true budget_bytes=50480384\nPASS layer=20 source=20 index=20 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=39 source=20 index=36 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\n"
+    },
+    "ds41-target-head-initial-rtx1": {
+      "sha256": "7499896677d36228f178d2b439ff2515ab9df7efd44aabee9c5c0159be5327ca",
+      "tail": "PASS raw rows=1 two_waves_exact=true budget_bytes=4772880\nPASS raw rows=16 two_waves_exact=true budget_bytes=13451520\nPASS raw rows=80 two_waves_exact=true budget_bytes=50480384\nPASS layer=20 source=20 index=20 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=39 source=20 index=36 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\n"
+    }
+  },
+  "rtx_native_sha256": "91e331290d62ba9365ab170a850bed903cc9f7dc788a166c84e6791f7d55edf2",
+  "remaining": [
+    "RTX owner and numerical checks with final pedantic native projection",
+    "dSpark projection regressions after shared native change",
+    "40-layer driver and scheduler/sampling integration",
+    "real full-model logits and throughput"
+  ]
+}

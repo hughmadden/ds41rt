@@ -115,10 +115,15 @@ static int32_t launch_head(void* opaque, const uint16_t* embedding,
   result = cublasSetWorkspace(handle->blas, handle->workspace, kMarkovWorkspace);
   if (result != CUBLAS_STATUS_SUCCESS) return blas_status(result);
   const float alpha = 1, beta = 0;
+  // Vocabulary logits follow the reference's FP32-promoted projection. The
+  // default BF16 tensor-op path exceeds its error bound on real head weights;
+  // require pedantic FP32 accumulation while retaining BF16 resident storage.
+  const auto compute = width == 5120 ? CUBLAS_COMPUTE_32F_PEDANTIC : CUBLAS_COMPUTE_32F;
+  const auto algorithm = width == 5120 ? CUBLAS_GEMM_DEFAULT : CUBLAS_GEMM_DEFAULT_TENSOR_OP;
   return blas_status(cublasGemmEx(handle->blas, CUBLAS_OP_T, CUBLAS_OP_N,
       129280, rows, width, &alpha, weight, CUDA_R_16BF, width,
       embedding, CUDA_R_16BF, width, &beta, logits, CUDA_R_32F, 129280,
-      CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+      compute, algorithm));
 }
 
 extern "C" int32_t ds41rt_v41_markov_launch(void* handle, const uint16_t* input,

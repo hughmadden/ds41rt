@@ -21,6 +21,7 @@ mod v41_backbone_shared;
 mod v41_backbone_router;
 mod v41_backbone_hc;
 mod v41_block;
+mod v41_target_head;
 mod v41_attention_output;
 mod v41_dspark_cache;
 mod v41_tensors;

@@ -8,7 +8,8 @@ Completion means a working, qualified release with measured performance, not com
 
 - [ ] Serve only the official DeepSeek-V4.1-Flash checkpoint on one RTX coordinator and four Spark TP4 backbone-expert workers.
 - [ ] Keep native vision, all three dSpark stages and their experts, shared experts, routing, attention, sampling and API execution on the RTX.
-- [x] Remove balanced/long/accuracy serving profiles and require FP8-style serving KV.
+- [x] Remove balanced/long/accuracy serving profiles and enforce FP8 target KV in launch settings.
+- [ ] Convert the remaining dSpark persistent window to FP8 storage and qualify it on RTX; FP8 is the only serving KV policy.
 - [ ] Preserve streaming, tools, structured constraints, cancellation, admission, error handling, prefix reuse and restart readiness.
 - [ ] Support concurrency 1 through 16 with request-safe state and qualified alternating-wave scheduling.
 - [ ] Measure at least 90 generated tokens/s for target-only decode with dSpark disabled under a documented workload.
@@ -63,6 +64,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
+- [ ] Qualify the bound final target head on RTX and wire selected prefill/decode/verification rows into sampling. The owner builds and its real-weight numerical checks pass on Spark; final RTX and dSpark projection requalification remain open after the cuBLAS accumulation correction.
 - [ ] Connect native FP4 backbone TP4 experts, FP32 route transport and correctly ordered reduction to the production AFD scheduler.
 - [x] Implement deterministic engram tokenizer compression, prime layouts, hashes, image barriers and request histories.
 - [ ] Wire mapped engram tables/scales, bounded asynchronous prefetch, deduplicated gathers, staging and cancellation into execution.

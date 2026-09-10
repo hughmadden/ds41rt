@@ -10,7 +10,7 @@ enum Phase {
     Idle,
     Attention(QueryBinding, usize),
     Ffn(QueryBinding, usize),
-    Ready(usize),
+    Ready(QueryBinding, usize),
 }
 pub(crate) struct FfnInput<'a> {
     pub residual: Ds41rtDeviceBuffer,
@@ -26,10 +26,16 @@ impl FfnInput<'_> {
     }
 }
 pub(crate) struct BlockOutput<'a> {
+    binding: QueryBinding,
     pub residual: Ds41rtDeviceBuffer,
     pub pre: Ds41rtDeviceBuffer,
     pub layer: usize,
     pub tokens: &'a [u64],
+}
+impl BlockOutput<'_> {
+    pub fn binding(&self) -> QueryBinding {
+        self.binding
+    }
 }
 pub(crate) struct BackboneBlockWave<'w, 'a> {
     library: &'a NativeLibrary,
@@ -185,7 +191,7 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
             unsafe {
                 self.ffn.finish()?;
             }
-            self.phase = Phase::Ready(rows);
+            self.phase = Phase::Ready(binding, rows);
             Ok(())
         })();
         if let Err(e) = completed {
@@ -195,13 +201,14 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         self.output()
     }
     pub fn output(&self) -> Result<BlockOutput<'_>> {
-        let rows = match self.phase {
-            Phase::Ready(rows) => rows,
+        let (binding, rows) = match self.phase {
+            Phase::Ready(binding, rows) => (binding, rows),
             _ => return Err(anyhow::anyhow!("block output unpublished")),
         };
         ensure!(self.tokens.len() == rows, "block token count differs");
         let [residual, pre] = self.ffn.output().context("block FFN output unavailable")?;
         Ok(BlockOutput {
+            binding,
             residual,
             pre,
             layer: self.layer,
