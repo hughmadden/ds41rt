@@ -194,6 +194,7 @@ if(DS41RT_ENABLE_CUDA)
     cuda/kernels/engram.cu
     cuda/kernels/v41_dspark.cu
     cuda/kernels/v41_hc.cu
+    cuda/kernels/v41_router.cu
     cuda/kernels/norm.cu
     cuda/kernels/mlp.cu
     cuda/kernels/residual.cu

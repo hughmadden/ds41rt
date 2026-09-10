@@ -1,0 +1,242 @@
+{
+  "scope": "Native synthetic numerical and five-step graph qualification; excludes Rust owner and serving integration",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+  "reference_kernel_sha256": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+  "native_library_sha256": "48c5b20068b7cb8889b5b564a49c10cf018e1e41ba66b7453118e1de1646d748",
+  "qualifier_sha256": "9a844432d99766eaec5896ffdc19f9344f332bc6ba21edbc2fbc5e45494eb014",
+  "results": [
+    {
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "router": [
+          {
+            "experts": 128,
+            "rows": 1,
+            "max_abs_error": {
+              "score": 2.384185791015625e-07,
+              "weight": 1.1920928955078125e-07
+            },
+            "changed_graph_error": {
+              "score": 1.1920928955078125e-07,
+              "weight": 0.0
+            }
+          },
+          {
+            "experts": 128,
+            "rows": 16,
+            "max_abs_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            },
+            "changed_graph_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            }
+          },
+          {
+            "experts": 128,
+            "rows": 80,
+            "max_abs_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            },
+            "changed_graph_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            }
+          },
+          {
+            "experts": 384,
+            "rows": 1,
+            "max_abs_error": {
+              "score": 2.384185791015625e-07,
+              "weight": 0.0
+            },
+            "changed_graph_error": {
+              "score": 2.384185791015625e-07,
+              "weight": 2.9802322387695312e-08
+            }
+          },
+          {
+            "experts": 384,
+            "rows": 16,
+            "max_abs_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            },
+            "changed_graph_error": {
+              "score": 4.76837158203125e-07,
+              "weight": 5.960464477539063e-08
+            }
+          },
+          {
+            "experts": 384,
+            "rows": 80,
+            "max_abs_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            },
+            "changed_graph_error": {
+              "score": 4.76837158203125e-07,
+              "weight": 8.940696716308594e-08
+            }
+          }
+        ],
+        "hc_coefficients_m1": 2.384185791015625e-07,
+        "hc_coefficients_m16": 3.5762786865234375e-07,
+        "hc_coefficients_m80": 4.76837158203125e-07,
+        "hc_coefficients_graph": 4.76837158203125e-07,
+        "hc_coefficients_zero_saturated": 2.9802322387695312e-08,
+        "confidence_m1": 2.384185791015625e-07,
+        "confidence_m16": 4.76837158203125e-07,
+        "confidence_m80": 4.76837158203125e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 4.76837158203125e-07,
+        "markov_m16": 7.152557373046875e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.1920928955078125e-06,
+        "head_combined_m1": 1.1920928955078125e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 4.76837158203125e-06,
+        "head_combined_m16": 4.76837158203125e-06,
+        "head_norm_m80": 0.0,
+        "head_projection_m80": 4.1961669921875e-05,
+        "head_combined_m80": 4.1961669921875e-05
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "router_text_vision_graph_ties_bias_extremes_guards": true,
+      "hc_pre_post_bitwise_rows": [
+        1,
+        16,
+        80
+      ],
+      "hc_changed_input_graph_bitwise": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    },
+    {
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "router": [
+          {
+            "experts": 128,
+            "rows": 1,
+            "max_abs_error": {
+              "score": 1.1920928955078125e-07,
+              "weight": 5.960464477539063e-08
+            },
+            "changed_graph_error": {
+              "score": 1.1920928955078125e-07,
+              "weight": 0.0
+            }
+          },
+          {
+            "experts": 128,
+            "rows": 16,
+            "max_abs_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            },
+            "changed_graph_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            }
+          },
+          {
+            "experts": 128,
+            "rows": 80,
+            "max_abs_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            },
+            "changed_graph_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 1.1920928955078125e-07
+            }
+          },
+          {
+            "experts": 384,
+            "rows": 1,
+            "max_abs_error": {
+              "score": 1.1920928955078125e-07,
+              "weight": 2.9802322387695312e-08
+            },
+            "changed_graph_error": {
+              "score": 1.1920928955078125e-07,
+              "weight": 0.0
+            }
+          },
+          {
+            "experts": 384,
+            "rows": 16,
+            "max_abs_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 5.960464477539063e-08
+            },
+            "changed_graph_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 5.960464477539063e-08
+            }
+          },
+          {
+            "experts": 384,
+            "rows": 80,
+            "max_abs_error": {
+              "score": 4.76837158203125e-07,
+              "weight": 8.940696716308594e-08
+            },
+            "changed_graph_error": {
+              "score": 3.5762786865234375e-07,
+              "weight": 8.940696716308594e-08
+            }
+          }
+        ],
+        "hc_coefficients_m1": 2.384185791015625e-07,
+        "hc_coefficients_m16": 4.76837158203125e-07,
+        "hc_coefficients_m80": 5.364418029785156e-07,
+        "hc_coefficients_graph": 4.76837158203125e-07,
+        "hc_coefficients_zero_saturated": 2.9802322387695312e-08,
+        "confidence_m1": 2.9802322387695312e-08,
+        "confidence_m16": 2.384185791015625e-07,
+        "confidence_m80": 3.5762786865234375e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 5.960464477539062e-07,
+        "markov_m16": 6.556510925292969e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.430511474609375e-06,
+        "head_combined_m1": 1.430511474609375e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 5.245208740234375e-06,
+        "head_combined_m16": 5.245208740234375e-06,
+        "head_norm_m80": 0.0009765625,
+        "head_projection_m80": 4.7206878662109375e-05,
+        "head_combined_m80": 0.0005441904067993164
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "router_text_vision_graph_ties_bias_extremes_guards": true,
+      "hc_pre_post_bitwise_rows": [
+        1,
+        16,
+        80
+      ],
+      "hc_changed_input_graph_bitwise": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    }
+  ],
+  "not_qualified": [
+    "Rust allocation/ownership and cancellation",
+    "Full distribution/tail quality",
+    "Alternating-wave overlap",
+    "Full model execution"
+  ]
+}

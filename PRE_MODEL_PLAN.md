@@ -110,3 +110,5 @@ mHC boundary progress: native four-stream collapse and residual expansion match 
 mHC coefficient progress: fused normalized projection and twenty-step Sinkhorn match the reference numerically on both RTX GPUs, and owned dSpark sublayer boundaries preserve shifted pre-mix with six-owner wave budgets while attention/FFN orchestration and Rust-owner qualification remain open.
 
 Four-Spark TP4 progress: fresh current native/Rust fixture builds pass two M16 requests across ostrich, dodo, emu and kiwi with RTX outputs bitwise equal to a freshly regenerated full-width reference, while production serving, streaming/RDMA and overlap remain open in `docs/ds41-four-spark-tp4-qualification.md`.
+
+Router progress: native official top-3/top-6 text/VL routing passes numerical and changed-input graph checks on both RTX GPUs, with stage-bound dSpark scratch and direct expert-buffer routing while stage orchestration and Rust-owner runtime qualification remain open in `docs/ds41-router-qualification.md`.

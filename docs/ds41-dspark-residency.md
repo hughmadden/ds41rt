@@ -49,3 +49,5 @@ The updated qualifier passed on both RTX GPUs: head normalization/projection at 
 The terminal now accepts residual streams and incoming FP32 pre-mix, enqueues native mHC collapse, and retains that collapsed state for confidence before normalizing the head input; updated ownership budgets and native bitwise evidence are in `ds41-hc-qualification.md`.
 
 Owned attention/FFN mHC boundaries now generate and retain coefficients around sublayer execution with shifted pre-mix handling; six capacity-80 owners add 54,120,960 bytes per wave, with detailed native evidence and remaining integration gaps in `ds41-hc-qualification.md`.
+
+Per-stage routing now writes directly into owned expert-wave inputs and adds 122,880 bytes per capacity-80 wave, raising the partial two-wave dSpark budget to 8,401,515,352 bytes; native numerical/graph evidence and remaining integration limits are recorded in ds41-router-qualification.md.

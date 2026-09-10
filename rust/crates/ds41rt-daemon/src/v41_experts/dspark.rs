@@ -3,9 +3,11 @@ mod confidence;
 mod hc;
 pub(crate) use hc::HcSublayer;
 mod markov;
+mod router;
 mod terminal;
 pub(crate) use confidence::DsparkConfidence;
 pub(crate) use markov::DsparkMarkov;
+pub(crate) use router::DsparkRouter;
 pub(crate) use terminal::DsparkTerminal;
 
 use super::{ExpertExecution, ExpertLayer, ExpertWeights};
@@ -21,6 +23,7 @@ pub(crate) struct DsparkBudget {
     pub load_staging_bytes: usize,
     pub execution_bytes_per_wave: usize,
     pub hc_bytes_per_wave: usize,
+    pub router_bytes_per_wave: usize,
     pub confidence_bytes_per_wave: usize,
     pub markov_bytes_per_wave: usize,
     pub terminal_additional_bytes_per_wave: usize,
@@ -39,6 +42,7 @@ impl DsparkBudget {
         let execution = self
             .execution_bytes_per_wave
             .checked_add(self.hc_bytes_per_wave)
+            .and_then(|bytes| bytes.checked_add(self.router_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.confidence_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.markov_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.terminal_additional_bytes_per_wave))
@@ -97,6 +101,7 @@ impl<'library> DsparkWeights<'library> {
             auxiliary_resident_bytes,
             load_staging_bytes,
             execution_bytes_per_wave,
+            router_bytes_per_wave: DsparkRouter::device_bytes(capacity as usize)? * 3,
             hc_bytes_per_wave: HcSublayer::device_bytes(capacity as usize)?
                 .checked_mul(6)
                 .context("mHC wave budget overflow")?,

@@ -34,6 +34,7 @@ def main():
             assert status == 0, (name, status)
         return checked, fn
 
+    router, raw_router = bind('ds41rt_v41_router', [P,P,P,P,P,P,P,P,I,I,P])
     hc_mixes, raw_hc_mixes = bind('ds41rt_v41_hc_mixes', [P,P,P,P,P,P,P,I,P])
     hc_pre, raw_hc_pre = bind('ds41rt_v41_hc_pre', [P,P,P,I,P])
     hc_post, raw_hc_post = bind('ds41rt_v41_hc_post', [P,P,P,P,P,I,P])
@@ -73,6 +74,68 @@ def main():
             graphs = []
             try:
                 errors = {}
+                router_errors = []
+                for experts in (128, 384):
+                    topk = 3 if experts == 128 else 6
+                    for rows in (1, 16, 80):
+                        rh, rw = bf((rows,H)), bf((experts,H))
+                        rb = torch.randn(experts, device='cuda')
+                        rv = torch.randn(experts, device='cuda')
+                        mask = (torch.arange(rows,device='cuda') % 2).to(torch.uint8)
+                        rs = torch.empty((rows,experts), device='cuda')
+                        ri = torch.empty((rows,topk), dtype=torch.int32, device='cuda')
+                        rr = torch.empty((rows,topk), device='cuda')
+                        def route():
+                            router(ptr(rh),ptr(rw),ptr(rb),ptr(rv),ptr(mask) if experts == 384 else None,
+                                   ptr(rs),ptr(ri),ptr(rr),rows,experts,stream.cuda_stream)
+                        def check_route():
+                            scores = torch.nn.functional.softplus(rh.float() @ rw.float().T).sqrt()
+                            correction = torch.where(mask[:,None].bool(),rv,rb) if experts == 384 else rb
+                            selected = (scores + correction).topk(topk,dim=-1).indices
+                            assert torch.equal(ri.long(),selected)
+                            weights = scores.gather(-1,selected)
+                            weights = weights / (weights.sum(-1,keepdim=True)+1e-20) * 1.5
+                            return {'score':close(rs,scores),'weight':close(rr,weights)}
+                        route()
+                        error = check_route()
+                        stream.synchronize()
+                        rg = torch.cuda.CUDAGraph()
+                        with torch.cuda.graph(rg,stream=stream): route()
+                        rh.copy_(bf((rows,H)))
+                        rb.normal_()
+                        rv.normal_()
+                        mask.bitwise_xor_(1)
+                        rg.replay()
+                        graph_error = check_route()
+                        stream.synchronize()
+                        rg.reset()
+                        # Exact ties: the native contract chooses lowest expert IDs.
+                        rh.zero_(); rw.zero_(); rb.zero_(); rv.zero_()
+                        route()
+                        assert torch.equal(ri.long(),torch.arange(topk,device='cuda').expand(rows,topk))
+                        close(rr,torch.full_like(rr,1.5/topk))
+                        # Bias changes selection only, even when it dominates the scores.
+                        rb.copy_(torch.arange(experts,device='cuda',dtype=torch.float32))
+                        rv.copy_(-rb)
+                        route()
+                        check_route()
+                        # Extreme finite logits exercise softplus's overflow/underflow branches.
+                        rh.fill_(1); rw.fill_(-1)
+                        route()
+                        assert torch.equal(rs,torch.zeros_like(rs))
+                        assert torch.equal(rr,torch.zeros_like(rr))
+                        rw.fill_(1)
+                        route()
+                        check_route()
+                        assert raw_router(ptr(rh),ptr(rw),ptr(rb),ptr(rv),None,
+                                          ptr(rh),ptr(ri),ptr(rr),rows,experts,stream.cuda_stream) != 0
+                        assert raw_router(ptr(rh),ptr(rw),ptr(rb),None,ptr(mask),
+                                          ptr(rs),ptr(ri),ptr(rr),rows,experts,stream.cuda_stream) != 0
+                        assert raw_router(ptr(rh),ptr(rw),ptr(rb),ptr(rv),None,
+                                          ptr(rs),ptr(ri),ptr(ri),rows,experts,stream.cuda_stream) != 0
+                        router_errors.append({'experts':experts,'rows':rows,
+                            'max_abs_error':error,'changed_graph_error':graph_error})
+                errors['router'] = router_errors
                 residual, sublayer = bf((80,4,H)), bf((80,H))
                 pre = torch.randn((80,4),device='cuda')
                 post = torch.randn((80,4),device='cuda')
@@ -259,6 +322,7 @@ def main():
                 results.append({'device':device,'name':torch.cuda.get_device_name(device),
                     'max_abs_errors':errors,'greedy_five_step_graph_mutated_replays':3,
                     'shared_head_norm_projection_graph':True,
+                    'router_text_vision_graph_ties_bias_extremes_guards':True,
                     'hc_pre_post_bitwise_rows':[1,16,80], 'hc_changed_input_graph_bitwise':True,
                     'rng_replay_and_request_reordering_exact':True,
                     'stochastic_five_step_graph_exact':True,

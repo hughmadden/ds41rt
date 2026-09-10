@@ -191,6 +191,29 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         unsafe { self.library.cuda_stream_synchronize(self.stream.raw) }
     }
 
+    /// Route the current hidden states through this exact dSpark stage's gate.
+    /// Drains the stream before returning so the router scratch can be reused.
+    /// # Safety
+    /// Hidden states must be initialized with finite router logits on this device;
+    /// external producers/readers must finish or be ordered on this stream.
+    pub unsafe fn route_draft(
+        &mut self,
+        router: &mut super::dspark::DsparkRouter<'_, '_>,
+        rows: u32,
+    ) -> Result<()> {
+        ensure!(
+            router.matches(self._weights),
+            "router and expert stage weights differ"
+        );
+        ensure!(
+            rows > 0 && rows <= self.kernel.info().capacity_rows,
+            "invalid router rows"
+        );
+        let launched = unsafe { router.enqueue(self.inputs(), rows as usize, self.stream.raw) };
+        let drained = self.synchronize();
+        launched.and(drained)
+    }
+
     /// # Safety
     /// Initialize valid BF16 hidden, in-range I32 expert IDs and finite nonnegative
     /// FP32 routing weights for `rows` before this operation, with stream ordering.
