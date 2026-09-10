@@ -1,0 +1,126 @@
+{
+  "source_sha256": {
+    "native/cuda/kernels/v41_expert_pack.cu": "777a41c5cc15ee46cde3697aa61d46484c1ca98769b061ee0a95b0e5241cd456",
+    "native/include/ds41rt_v41_experts.h": "df3f2d51eb9d32576f7d1284cac7f493977c29b9e8b695dbcd10e9488efb48f0",
+    "native/CMakeLists.txt": "0ebb20c741a74753645869bb870e41d6474cf2892625c9d17ee6884ccd6b331a",
+    "rust/crates/ds41rt-ffi/src/v41_experts.rs": "6cac35ebef85a41d4f0384a98039947d3f37cbeb1ec5c812dbbc4bca3465ef12",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "d055d9f857e113c0122c21fdb6ed180167f2dffcec2d4b512a2e066b0d1f24db"
+  },
+  "native_library_sha256": {
+    "rtx": "572e6615a781f9f162a5f430a48b0bbe53c42392b3a4ff2b567bccd4cc5a4c37",
+    "ostrich": "7ec1b0eea79da92726ddf84eeac9dd365c14d0761524c93e19580fe535c5a0d6"
+  },
+  "byte_layout_checks": {
+    "rtx": [
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "index": 0,
+        "intermediate": 576,
+        "packed_bytes": [
+          3276800,
+          204800,
+          1638400,
+          102400
+        ],
+        "exact_bytes_padding_graph_source_preservation_guards_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "index": 0,
+        "intermediate": 2304,
+        "packed_bytes": [
+          11796480,
+          737280,
+          5898240,
+          368640
+        ],
+        "exact_bytes_padding_graph_source_preservation_guards_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "index": 1,
+        "intermediate": 576,
+        "packed_bytes": [
+          3276800,
+          204800,
+          1638400,
+          102400
+        ],
+        "exact_bytes_padding_graph_source_preservation_guards_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "index": 1,
+        "intermediate": 2304,
+        "packed_bytes": [
+          11796480,
+          737280,
+          5898240,
+          368640
+        ],
+        "exact_bytes_padding_graph_source_preservation_guards_rejections": "passed"
+      }
+    ],
+    "ostrich": [
+      {
+        "device": "NVIDIA GB10",
+        "index": 0,
+        "intermediate": 576,
+        "packed_bytes": [
+          3276800,
+          204800,
+          1638400,
+          102400
+        ],
+        "exact_bytes_padding_graph_source_preservation_guards_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "index": 0,
+        "intermediate": 2304,
+        "packed_bytes": [
+          11796480,
+          737280,
+          5898240,
+          368640
+        ],
+        "exact_bytes_padding_graph_source_preservation_guards_rejections": "passed"
+      }
+    ]
+  },
+  "expert_execution": {
+    "rtx": {
+      "path": "Rust native weight packing and scratch -> AOT expert -> Rust CUDA reducer",
+      "case": [
+        16,
+        2304,
+        128
+      ],
+      "numeric_and_mutated_graph": "passed"
+    },
+    "ostrich": {
+      "path": "Rust native weight packing and scratch -> AOT expert -> Rust CUDA reducer",
+      "case": [
+        16,
+        576,
+        384
+      ],
+      "numeric_and_mutated_graph": "passed"
+    }
+  },
+  "memory": {
+    "per_spark_native_expert_bytes": 72194457600,
+    "per_spark_packed_expert_bytes": 80216064000,
+    "per_spark_padding_bytes": 8021606400,
+    "per_expert_staging_bytes": {
+      "spark": 4700160,
+      "dspark": 18800640
+    }
+  },
+  "fixture_sha256": {
+    "qualify_pack.py": "7ed560bc87bf2f77e9d0ec701eaa34525907f3495309565da1395cc5e2d36f2f",
+    "qualify_native_weights.py": "ee350194bce77e282b1623d0415fc38ccd8cbb8844f707d7f28a480786b29745"
+  },
+  "daemon_check": "passed, 427 existing warnings",
+  "scope": "Representation transform on both RTX GPUs and ostrich; M16 Rust packing/scratch/AOT/reduction on RTX 0 and ostrich, not checkpoint loader or scheduler integration."
+}

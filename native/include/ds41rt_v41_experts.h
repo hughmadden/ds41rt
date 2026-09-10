@@ -5,6 +5,16 @@ extern "C" {
 #endif
 
 #define DS41RT_V41_EXPERT_POINTERS 44
+/* Per-expert prepared sizes in bytes: W13, W13 scales, W2, W2 scales.
+ * Logical intermediate must be 2304 (RTX) or 576 (backbone TP4).
+ * Sources are contiguous official bytes: W1, W3, W2, S1, S3, S2.
+ * Destinations are distinct, 16-byte aligned device allocations with the sizes
+ * returned below; source and destination storage must not overlap.
+ * Representation-only transform preserves FP4/E8M0 bytes and zero-pads tails;
+ * caller owns all buffers and stream ordering through completion. */
+int32_t ds41rt_v41_expert_packed_sizes(uint32_t intermediate, uint64_t bytes[4]);
+int32_t ds41rt_v41_pack_expert_async(const uint8_t* const sources[6],
+    uint8_t* const destinations[4], uint32_t intermediate, void* stream);
 /* Pointer slots follow the exported dynamic W4A8 C ABI; see the manifest. */
 typedef struct ds41rt_v41_expert_launch_t {
   void* tensors[DS41RT_V41_EXPERT_POINTERS];

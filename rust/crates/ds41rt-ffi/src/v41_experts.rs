@@ -124,6 +124,51 @@ impl V41ExpertLaunchArgs {
 type InfoFn = unsafe extern "C" fn(i32, *mut V41ExpertInfo) -> i32;
 type InitializeFn = unsafe extern "C" fn(i32, *mut *mut c_void) -> i32;
 type LaunchFn = unsafe extern "C" fn(*mut c_void, *const V41ExpertLaunchArgs) -> i32;
+type PackedSizesFn = unsafe extern "C" fn(u32, *mut u64) -> i32;
+type PackFn = unsafe extern "C" fn(*const *const u8, *const *mut u8, u32, *mut c_void) -> i32;
+
+/// Per-expert checkpoint staging avoids a second full layer of logical weights.
+pub struct V41ExpertPacker<'a> {
+    _library: &'a NativeLibrary,
+    pack: PackFn,
+    intermediate: u32,
+    bytes: [u64; 4],
+}
+
+impl V41ExpertPacker<'_> {
+    /// Per-expert byte strides: W13, W13 scales, W2, W2 scales.
+    pub fn packed_bytes(&self) -> [u64; 4] {
+        self.bytes
+    }
+
+    /// # Safety
+    /// Sources must be contiguous native CUDA W1,W3,W2,S1,S3,S2 for one expert,
+    /// with hidden size 5120 and this packer's logical intermediate size.
+    /// Destinations must have the advertised byte sizes and 16-byte alignment,
+    /// be mutually disjoint and not overlap any source, on the same device.
+    /// All buffers must remain valid through stream completion; order input
+    /// copies before this operation and expert execution after it.
+    pub unsafe fn pack(
+        &self,
+        sources: [*const u8; 6],
+        destinations: [*mut u8; 4],
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let status = unsafe {
+            (self.pack)(
+                sources.as_ptr(),
+                destinations.as_ptr(),
+                self.intermediate,
+                stream,
+            )
+        };
+        ensure!(
+            status == 0,
+            "V4.1 expert packing failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+}
 type BindScratchFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut *mut c_void) -> i32;
 type InitScratchFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut c_void) -> i32;
 type ReduceFn = unsafe extern "C" fn(
@@ -181,6 +226,26 @@ pub struct V41ExpertKernel<'a> {
 }
 
 impl NativeLibrary {
+    pub fn v41_expert_packer(&self, intermediate: u32) -> Result<V41ExpertPacker<'_>> {
+        let sizes = unsafe {
+            self.lib
+                .get::<PackedSizesFn>(b"ds41rt_v41_expert_packed_sizes")?
+        };
+        let pack = unsafe { *self.lib.get::<PackFn>(b"ds41rt_v41_pack_expert_async")? };
+        let mut bytes = [0; 4];
+        let status = unsafe { sizes(intermediate, bytes.as_mut_ptr()) };
+        ensure!(
+            status == 0,
+            "V4.1 packed sizes failed with CUDA status {status}"
+        );
+        Ok(V41ExpertPacker {
+            _library: self,
+            pack,
+            intermediate,
+            bytes,
+        })
+    }
+
     pub fn v41_route_reducer(&self) -> Result<V41RouteReducer<'_>> {
         let reduce = unsafe {
             *self

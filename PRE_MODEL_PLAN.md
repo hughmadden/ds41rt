@@ -56,3 +56,5 @@ Native bridge progress: the Rust argument builder and checked C expert launch in
 Native reduction progress: CUDA/Rust expert route reduction now passes exact standalone checks on both RTX GPUs and ostrich and the M16 dSpark AOT graph path on RTX, while native preparation, per-route transport and serving integration remain open in `docs/ds41-native-route-reduction-qualification.md`.
 
 Native scratch progress: planner-derived C/Rust scratch binding and initialization now pass all six capacities and M16 expert/graph execution on RTX and ostrich, while native weight packing, engine allocation ownership and transport integration remain open in `docs/ds41-native-expert-scratch-qualification.md`.
+
+Native weight progress: per-expert official FP4/E8M0 CUDA packing and Rust bindings pass exact layout checks on both RTX GPUs and ostrich plus M16 expert/graph execution on RTX/ostrich, with padded Spark storage budgeted at 80,216,064,000 bytes while loader/ownership/transport integration remains open.

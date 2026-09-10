@@ -1,6 +1,6 @@
 mod v41_experts;
 pub use v41_experts::{
-    V41ExpertInfo, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPointer,
+    V41ExpertInfo, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPacker, V41ExpertPointer,
     V41RouteReducer, V41_EXPERT_POINTER_COUNT,
 };
 

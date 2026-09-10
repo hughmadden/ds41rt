@@ -154,3 +154,5 @@ The native expert AOT export path now distinguishes logical Spark width 576 from
 The checked Rust/C expert launch bridge and CUDA route reducer now cover native dSpark launch through final reduction, with an M16 numerical/graph fixture on RTX and exact standalone reduction on both RTX GPUs and ostrich; Python weight/scratch preparation and inherited transport/model execution remain to be replaced, as recorded in `ds41-native-route-reduction-qualification.md`.
 
 Native expert scratch views and initialization now derive directly from the exported b12x planner and execute through Rust on RTX/ostrich, including Spark width-640 padding; native checkpoint weight preparation and scheduler-owned GPU allocations remain open in `ds41-native-expert-scratch-qualification.md`.
+
+Native expert packing now preserves official FP4/E8M0 bytes through Rust/CUDA and M16 expert execution; prepared backbone weights require 80,216,064,000 bytes per Spark (8,021,606,400 bytes above checkpoint storage), plus reusable 4,700,160-byte per-expert input staging and separate runtime allocations, as recorded in `ds41-native-expert-packing-qualification.md`.
