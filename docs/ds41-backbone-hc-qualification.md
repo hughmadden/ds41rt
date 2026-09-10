@@ -1,0 +1,17 @@
+# Shared shifted mHC and real backbone weights
+
+The existing dSpark mHC owner is now shared in `v41_hc.rs`. The dSpark module only selects its stage tensor names and delegates to that owner. `BackboneHcWeights` loads the official attention and FFN mHC parameters and normalization weights for any of the 40 backbone layers, borrowing the same shared boundary implementation. The numerical kernel sequence and dSpark phase/capture interfaces are preserved.
+
+`begin` derives pre/post/combination coefficients from the current four-stream residual, collapses using the **incoming** pre-mix, and applies normalization with epsilon 1e-20. The newly generated pre-mix belongs to the following sublayer. `finish` uses the submitted attention/FFN result and the preserved residual/post/combination coefficients, then exposes the next residual and new pre-mix. Finishing before begin, finishing twice and reading incomplete output fail. Begin/finish errors invalidate publication and drain the owned stream. External enqueue/completion methods retain their explicit stream-drain contracts for containing graphs.
+
+Each backbone layer's two parameter sets occupy 3,952,856 bytes, shared across independent boundaries/waves. Exact layout and allocation budget are checked before payload reads. Each boundary retains the existing 112,752 bytes per capacity row: 9,020,160 bytes at80 and 461,832,192 bytes at4096. Attention and FFN execution between the boundary calls is still supplied by a containing owner.
+
+## Qualification
+
+The daemon and external fixtures build successfully. Both RTX PRO 6000 Blackwell GPUs pass **98 backbone owner cases**: attention and FFN at80 rows for all 40 layers, plus rows 1,16,4096 for layers 0,20,39. Every case uses two boundaries sharing real checkpoint weights and compares their outputs exactly before and after changed residual/incoming-pre input. Inputs include one-hot and signed asymmetric pre-mixes, exposing accidental substitution of the freshly generated pre. Exact/one-byte-short weight and boundary budgets, invalid rows, premature/duplicate finish and unpublished output are checked.
+
+`scripts/qualify-ds41-backbone-hc.py` checks **196 output sets per GPU** against the actual pinned `Block.hc_mixes`, `hc_pre`, `hc_post`, `RMSNorm` and TileLang Sinkhorn implementation. Returned FP32 pre coefficients pass `rtol=atol=2e-5`, with maximum absolute difference 6.556510925292969e-7. Normalized BF16 inputs and expanded BF16 residuals pass `rtol=0.008, atol=0.002`; maximum absolute differences are 0.00390625 and 0.0078125 respectively on both GPUs. Attention/FFN results supplied to `finish` are controlled fixture inputs, so these are boundary checks rather than complete model-layer results. No reference compiler overrides are used.
+
+The existing composed dSpark stage fixture was rebuilt against the extracted owner. All **18 cases per GPU** (three stages, 1/3/16 requests, two input/rotation executions) still match their expected output exactly and leave committed rings unchanged. This verifies the shared-owner refactor through its graph-containing dSpark callers.
+
+Adjacent JSON records source, fixture, build and numerical-result hashes. The reusable reference qualifier is tracked; small drivers and vectors remain outside Git. Backbone attention/FFN orchestration, engram placement, CED execution, four-Spark routing and scheduler integration remain open, along with full-model correctness and throughput.

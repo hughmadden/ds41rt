@@ -55,6 +55,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Produce real backbone low-rank attention queries in shared-weight captured waves and qualify all 40 layers.
 - [x] Produce real backbone inverse-rotary/grouped/FP8 attention output projections with shared weights across all 40 layers.
 - [x] Connect real query, index selection, sparse attention and output stages with checked execution identities and token handoffs.
+- [x] Share shifted mHC ownership between backbone and dSpark, qualify real attention/FFN parameters across all 40 layers, and retain exact dSpark stage regression.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -141,3 +142,5 @@ Real backbone query production is qualified in `docs/ds41-attention-query-qualif
 Real backbone output production is qualified in `docs/ds41-backbone-attention-output-qualification.md`; complete query/index/attention/output composition remains open.
 
 Real query/index/attention/output handoffs are qualified in `docs/ds41-attention-handoff-qualification.md`; backbone mHC/CED/engram/routing composition and scheduler integration remain open.
+
+Shared mHC ownership and real backbone boundary arithmetic are qualified in `docs/ds41-backbone-hc-qualification.md`; attention/FFN orchestration and scheduler integration remain open.
