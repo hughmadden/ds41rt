@@ -45,6 +45,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Qualify owned dSpark main projection, independent committed KV producers and draft attention with native rotary frequencies on both RTX GPUs.
 - [x] Implement and qualify allocation-free decoder stream-mean gathering directly into the owned dSpark main input on both RTX GPUs.
 - [ ] Gather dSpark taps from target-layer attention-input stream means after engram updates in layer order 37/38/39.
+- [x] Compose and qualify each complete dSpark attention/mHC/shared-and-routed-FFN stage in one captured graph on both RTX GPUs.
 - [ ] Compose the complete three-stage dSpark attention/mHC/FFN sequence with embedding, Markov, confidence and terminal sampling.
 - [ ] Wire proposal verification, acceptance, RNG ownership, cancellation and rollback across all caches and engram histories.
 - [ ] Complete concurrency-16 admission, mixed prefill/decode/verification scheduling, graph capacity management and alternating-wave overlap.
@@ -75,3 +76,5 @@ Fleet checkpoint evidence is recorded in `docs/ds41-checkpoint-inventory.json` a
 The tap gather and composed main-context evidence is in `docs/ds41-dspark-taps-qualification.md`; production target-layer call sites remain unwired.
 
 Checkpoint-backed staging and the remaining read-amplification bottleneck are recorded in `docs/ds41-expert-load-probe.md`; these host reads do not establish real-weight GPU numerical or startup qualification.
+
+Complete-stage composition and its remaining integration limits are recorded in `docs/ds41-dspark-stage-qualification.md`.

@@ -77,7 +77,7 @@ impl<'library> DsparkWeights<'library> {
     }
 }
 impl DsparkAttentionWave<'_, '_> {
-    fn projection_capacity(requests: u32) -> Result<u32> {
+    pub(super) fn projection_capacity(requests: u32) -> Result<u32> {
         ensure!(
             (1..=16).contains(&requests),
             "invalid attention request capacity"
@@ -115,7 +115,7 @@ impl DsparkAttentionWave<'_, '_> {
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
-    fn prepare(
+    pub(super) fn prepare(
         &mut self,
         window: &DsparkWindow<'_>,
         requests: &[(WindowLease, u64)],
@@ -127,7 +127,11 @@ impl DsparkAttentionWave<'_, '_> {
         );
         window.attention_read(requests)
     }
-    fn upload(&mut self, read: &WindowRead, requests: &[(WindowLease, u64)]) -> Result<()> {
+    pub(super) fn upload(
+        &mut self,
+        read: &WindowRead,
+        requests: &[(WindowLease, u64)],
+    ) -> Result<()> {
         let bytes =
             unsafe { std::slice::from_raw_parts(read.descriptors.as_ptr().cast::<u8>(), 128) };
         let staging = self.staging.bytes_mut();
@@ -147,9 +151,16 @@ impl DsparkAttentionWave<'_, '_> {
             .library
             .copy_h2d(self.positions.buffer, &staging[128..])
     }
-    unsafe fn enqueue(&mut self, read: &WindowRead, requests: u32) -> Result<()> {
+    pub(super) fn output_storage(&self) -> Ds41rtDeviceBuffer {
+        self.output.output_storage()
+    }
+    pub(super) unsafe fn enqueue_on(
+        &mut self,
+        read: &WindowRead,
+        requests: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
         let rows = requests * 5;
-        let stream = self.stream.raw;
         unsafe {
             self.ops.frequencies(
                 self.positions.buffer,
@@ -214,7 +225,7 @@ impl DsparkAttentionWave<'_, '_> {
     ) -> Result<Ds41rtDeviceBuffer> {
         let read = self.prepare(window, requests)?;
         self.upload(&read, requests)?;
-        let launched = unsafe { self.enqueue(&read, requests.len() as u32) };
+        let launched = unsafe { self.enqueue_on(&read, requests.len() as u32, self.stream.raw) };
         let drained = self.synchronize();
         launched.and(drained)?;
         self.ready = Some(requests.len() as u32);
@@ -238,7 +249,7 @@ impl DsparkAttentionWave<'_, '_> {
                 .library
                 .cuda_graph_begin_capture(self.stream.raw)?;
         }
-        let launched = unsafe { self.enqueue(&read, requests.len() as u32) };
+        let launched = unsafe { self.enqueue_on(&read, requests.len() as u32, self.stream.raw) };
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {

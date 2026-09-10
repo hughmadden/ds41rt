@@ -214,6 +214,10 @@ impl HcSublayer<'_, '_> {
         self.pending = Some(rows);
         unsafe { self.complete() }
     }
+    /// Raw destinations for a containing owner that serializes GPU consumers.
+    pub(super) fn output_storage(&self) -> [Ds41rtDeviceBuffer; 2] {
+        [self.output.buffer, self.next_pre.buffer]
+    }
     /// BF16 residual [rows,4,5120] and FP32 next_pre [rows,4], borrowed until reuse.
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {
         let rows = self.ready.context("mHC sublayer output is incomplete")?;

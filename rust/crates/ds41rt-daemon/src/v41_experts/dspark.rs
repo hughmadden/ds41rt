@@ -1,4 +1,6 @@
 //! RTX-only ownership for every native dSpark tensor and independent stage experts.
+mod stage;
+pub(crate) use stage::DsparkStage;
 mod main_context;
 pub(crate) use main_context::DsparkMainContext;
 mod attention_wave;

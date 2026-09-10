@@ -70,6 +70,20 @@ impl<'library> DsparkWeights<'library> {
     }
 }
 impl DsparkFfn<'_, '_> {
+    pub(super) fn stream(&self) -> *mut c_void {
+        self.experts.stream()
+    }
+    pub(super) fn synchronize(&self) -> Result<()> {
+        self.experts.synchronize()
+    }
+    pub(super) fn invalidate(&mut self) {
+        self.boundary.invalidate();
+    }
+    /// The containing stage has drained its complete graph successfully.
+    pub(super) unsafe fn complete_replay(&mut self, rows: u32) -> Result<[Ds41rtDeviceBuffer; 2]> {
+        unsafe { self.boundary.complete_replay(rows as usize) }
+    }
+
     pub fn device_bytes(&self) -> usize {
         self.device_bytes
     }
@@ -92,7 +106,7 @@ impl DsparkFfn<'_, '_> {
         unsafe { self.boundary.complete() }
     }
     /// Scratch owners and borrowed weights must live through stream completion.
-    unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
+    pub(super) unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
         self.boundary.invalidate();
         let stream = self.experts.stream();
         let normalized = self.experts.inputs()[0];
