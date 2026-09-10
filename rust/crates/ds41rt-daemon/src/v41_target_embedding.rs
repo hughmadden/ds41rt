@@ -1,0 +1,174 @@
+//! Text-token initialization using the coordinator table shared with dSpark.
+use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_tensors::NativeRtxTensors;
+use anyhow::{Context, Result, ensure};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps};
+use std::{ffi::c_void, marker::PhantomData};
+
+pub(crate) struct TargetEmbedding<'a> {
+    pub residual: Ds41rtDeviceBuffer,
+    pub pre: Ds41rtDeviceBuffer,
+    pub token_ids: &'a [u32],
+    pub positions: &'a [u64],
+    _owner: PhantomData<&'a ()>,
+}
+
+pub(crate) struct TargetEmbeddingWave<'w, 'a> {
+    stream: LoadStream<'a>,
+    ops: V41AttentionOps<'a>,
+    table: &'w NativeRtxTensors<'a>,
+    ids: DeviceAllocation<'a>,
+    residual: DeviceAllocation<'a>,
+    pre: DeviceAllocation<'a>,
+    capacity: usize,
+    graph: Option<(*mut c_void, usize)>,
+    tokens: Vec<u32>,
+    positions: Vec<u64>,
+    ready: bool,
+}
+impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
+    pub fn device_bytes(capacity: usize) -> Result<usize> {
+        ensure!(
+            (1..=4096).contains(&capacity),
+            "invalid target embedding capacity"
+        );
+        Ok(capacity * (4 + 40960 + 16))
+    }
+    pub fn new(
+        library: &'a NativeLibrary,
+        table: &'w NativeRtxTensors<'a>,
+        capacity: usize,
+        budget: usize,
+    ) -> Result<Self> {
+        ensure!(
+            Self::device_bytes(capacity)? <= budget,
+            "target embedding exceeds budget"
+        );
+        ensure!(
+            table.get("embed.weight")?.bytes == 129280 * 5120 * 2,
+            "invalid shared embedding extent"
+        );
+        let ids = DeviceAllocation::new(library, capacity * 4)?;
+        ensure!(
+            table.get("embed.weight")?.device_id == ids.buffer.device_id,
+            "target embedding table device differs"
+        );
+        Ok(Self {
+            stream: LoadStream {
+                library,
+                raw: library.cuda_stream_create()?,
+            },
+            ops: library.v41_attention_ops()?,
+            table,
+            ids,
+            residual: DeviceAllocation::new(library, capacity * 40960)?,
+            pre: DeviceAllocation::new(library, capacity * 16)?,
+            capacity,
+            graph: None,
+            tokens: Vec::with_capacity(capacity),
+            positions: Vec::with_capacity(capacity),
+            ready: false,
+        })
+    }
+    fn invalidate(&mut self) {
+        self.ready = false;
+        self.tokens.clear();
+        self.positions.clear();
+    }
+    fn synchronize(&self) -> Result<()> {
+        unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
+    }
+    unsafe fn enqueue(&self, rows: usize) -> Result<()> {
+        unsafe {
+            self.ops.target_embed(
+                self.table.get("embed.weight")?,
+                self.ids.buffer,
+                self.residual.buffer,
+                self.pre.buffer,
+                rows,
+                self.stream.raw,
+            )
+        }
+    }
+    /// Initializes text rows in caller order. Positions may repeat across
+    /// requests; request ownership remains the scheduler's responsibility.
+    /// Captures when the live shape changes, then reuses stable graph storage.
+    pub fn execute(&mut self, tokens: &[u32], positions: &[u64]) -> Result<TargetEmbedding<'_>> {
+        self.invalidate();
+        let rows = tokens.len();
+        ensure!(
+            rows > 0
+                && rows <= self.capacity
+                && rows == positions.len()
+                && tokens.iter().all(|&id| id < 129280)
+                && positions.iter().all(|&p| p < 1048576),
+            "invalid target embedding tokens or positions"
+        );
+        let bytes: Vec<u8> = tokens.iter().flat_map(|id| id.to_ne_bytes()).collect();
+        self.stream.library.copy_h2d(self.ids.buffer, &bytes)?;
+        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+            self.clear_graph()?;
+            let warmup = unsafe { self.enqueue(rows) };
+            warmup.and(self.synchronize())?;
+            unsafe {
+                self.stream
+                    .library
+                    .cuda_graph_begin_capture(self.stream.raw)?;
+            }
+            let launched = unsafe { self.enqueue(rows) };
+            let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+            match (launched, captured) {
+                (Ok(()), Ok(graph)) => self.graph = Some((graph, rows)),
+                (Err(e), Ok(graph)) => {
+                    unsafe {
+                        self.stream.library.cuda_graph_exec_destroy(graph)?;
+                    }
+                    return Err(e);
+                }
+                (Err(e), Err(_)) | (Ok(()), Err(e)) => return Err(e),
+            }
+        }
+        let graph = self.graph.context("target embedding graph missing")?.0;
+        let launched = unsafe {
+            self.stream
+                .library
+                .cuda_graph_launch(graph, self.stream.raw)
+        };
+        launched.and(self.synchronize())?;
+        self.tokens.extend_from_slice(tokens);
+        self.positions.extend_from_slice(positions);
+        self.ready = true;
+        self.output()
+    }
+    pub fn output(&self) -> Result<TargetEmbedding<'_>> {
+        ensure!(self.ready, "target embeddings unpublished");
+        let mut residual = self.residual.buffer;
+        let mut pre = self.pre.buffer;
+        residual.bytes = self.tokens.len() * 40960;
+        pre.bytes = self.tokens.len() * 16;
+        Ok(TargetEmbedding {
+            residual,
+            pre,
+            token_ids: &self.tokens,
+            positions: &self.positions,
+            _owner: PhantomData,
+        })
+    }
+    pub fn clear_graph(&mut self) -> Result<()> {
+        self.invalidate();
+        self.synchronize()?;
+        if let Some((graph, _)) = self.graph.take() {
+            unsafe {
+                self.stream.library.cuda_graph_exec_destroy(graph)?;
+            }
+        }
+        Ok(())
+    }
+}
+impl Drop for TargetEmbeddingWave<'_, '_> {
+    fn drop(&mut self) {
+        if let Err(e) = self.clear_graph() {
+            tracing::error!(%e, "draining target embedding");
+        }
+    }
+}

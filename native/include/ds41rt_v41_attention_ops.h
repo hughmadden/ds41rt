@@ -63,6 +63,11 @@ extern "C" {
 // Invalid device seed IDs zero that request's complete output; hosts validate IDs.
 int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t* tokens,
     uint16_t* residual, float* pre, int32_t requests, void* stream);
+// Target IDs [rows] -> four identical BF16 embedding copies and [1,0,0,0]
+// pre-mix per row. rows=1..4096. Invalid IDs zero that row; hosts validate IDs.
+// Inputs and outputs are disjoint on the stream device and live through replay.
+int32_t ds41rt_v41_target_embed(const uint16_t* table, const int32_t* tokens,
+    uint16_t* residual, float* pre, int32_t rows, void* stream);
 #ifdef __cplusplus
 }
 #endif

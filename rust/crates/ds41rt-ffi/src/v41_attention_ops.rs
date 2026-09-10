@@ -25,6 +25,7 @@ pub struct V41AttentionOps<'a> {
     _library: &'a NativeLibrary,
     norm: Norm,
     embed: Embed,
+    target_embed: Embed,
     terminal_layout: TerminalLayout,
     frequencies: Frequencies,
     backbone_frequencies: BackboneFrequencies,
@@ -45,6 +46,7 @@ impl NativeLibrary {
             _library: self,
             terminal_layout: unsafe { *self.lib.get(b"ds41rt_v41_dspark_terminal_layout")? },
             embed: unsafe { *self.lib.get(b"ds41rt_v41_dspark_embed")? },
+            target_embed: unsafe { *self.lib.get(b"ds41rt_v41_target_embed")? },
             tap: unsafe { *self.lib.get(b"ds41rt_v41_dspark_tap")? },
             backbone_frequencies: unsafe { *self.lib.get(b"ds41rt_v41_backbone_frequencies")? },
             frequencies: unsafe { *self.lib.get(b"ds41rt_v41_dspark_frequencies")? },
@@ -153,6 +155,36 @@ impl V41AttentionOps<'_> {
             )
         };
         ensure!(status == 0, "native embedding CUDA status {status}");
+        Ok(())
+    }
+
+    /// # Safety
+    /// Shared BF16 embedding table and I32 token IDs are initialized on the
+    /// stream device. Outputs are exclusive and disjoint from inputs. All
+    /// storage remains live until queued work and graph replays complete.
+    pub unsafe fn target_embed(
+        &self,
+        table: Ds41rtDeviceBuffer,
+        tokens: Ds41rtDeviceBuffer,
+        residual: Ds41rtDeviceBuffer,
+        pre: Ds41rtDeviceBuffer,
+        rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=4096).contains(&rows), "invalid target embedding rows");
+        buffer(table, 129280 * 5120 * 2)?;
+        buffer(tokens, rows * 4)?;
+        buffer(residual, rows * 40960)?;
+        buffer(pre, rows * 16)?;
+        ensure!(
+            [tokens, residual, pre].iter().all(|b| b.device_id == table.device_id),
+            "target embedding devices differ"
+        );
+        let status = unsafe {
+            (self.target_embed)(table.ptr.cast(), tokens.ptr.cast(), residual.ptr.cast(),
+                pre.ptr.cast(), rows as i32, stream)
+        };
+        ensure!(status == 0, "native target embedding CUDA status {status}");
         Ok(())
     }
 

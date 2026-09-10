@@ -78,6 +78,38 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         self.attention.invalidate();
         self.ffn.invalidate();
     }
+    /// Copy text embeddings into the first block's stable inputs. This leaves
+    /// output unpublished. Image replacement belongs to the separate vision path.
+    pub fn initialize_embedding(
+        &mut self,
+        embedding: &crate::v41_target_embedding::TargetEmbedding<'_>,
+    ) -> Result<()> {
+        self.reset();
+        let rows = embedding.positions.len();
+        ensure!(self.layer == 0 && rows > 0
+            && rows <= self.capacity && embedding.token_ids.len() == rows
+            && embedding.residual.bytes == rows * 40960 && embedding.pre.bytes == rows * 16,
+            "initial block embedding geometry differs");
+        for (destination, source) in self.inputs().into_iter()
+            .zip([embedding.residual, embedding.pre]) {
+            ensure!(destination.device_id == source.device_id, "initial block device differs");
+            self.library.copy_d2d(destination, source, source.bytes)?;
+        }
+        Ok(())
+    }
+    /// # Safety
+    /// Query and block storage have exclusive use on the embedding device.
+    /// Embeddings are finite text inputs; image replacement uses the vision path.
+    pub unsafe fn begin_embedded_attention<'q>(
+        &mut self,
+        query: &'q mut AttentionQueryWave<'_, '_>,
+        embedding: &crate::v41_target_embedding::TargetEmbedding<'_>,
+    ) -> Result<AttentionQueryOutput<'q>> {
+        self.reset();
+        ensure!(query.layer() == 0, "initial block query layer differs");
+        self.initialize_embedding(embedding)?;
+        unsafe { self.begin_attention(query, embedding.positions) }
+    }
     /// # Safety
     /// Inputs are finite in token order with all producer writes complete. Query
     /// storage and both boundary owners have exclusive use on this device.

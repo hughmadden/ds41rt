@@ -232,12 +232,13 @@ extern "C" int32_t ds41rt_v41_dspark_tap(const uint16_t* input,
 }
 
 namespace {
-__global__ void dspark_embed_kernel(const __nv_bfloat16* table, const int32_t* tokens,
+template<bool Draft>
+__global__ void embed_kernel(const __nv_bfloat16* table, const int32_t* tokens,
     __nv_bfloat16* residual, float* pre) {
-  const uint64_t row=blockIdx.x,request=row/5;
+  const uint64_t row=blockIdx.x,request=Draft?row/5:row;
   const int32_t seed=tokens[request];
   const bool ok=seed>=0 && seed<129280;
-  const int32_t token=row%5==0?seed:128799;
+  const int32_t token=Draft && row%5!=0?128799:seed;
   for(int col=threadIdx.x;col<5120;col+=256) {
     const auto value=ok?table[uint64_t(token)*5120+col]:__float2bfloat16_rn(0);
     #pragma unroll
@@ -255,7 +256,21 @@ extern "C" int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t*
       !disjoint(table,w,residual,r)||!disjoint(table,w,pre,p)||
       !disjoint(tokens,t,residual,r)||!disjoint(tokens,t,pre,p)||!disjoint(residual,r,pre,p))
     return cudaErrorInvalidValue;
-  dspark_embed_kernel<<<requests*5,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+  embed_kernel<true><<<requests*5,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(table),tokens,reinterpret_cast<__nv_bfloat16*>(residual),pre);
+  return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_target_embed(const uint16_t* table, const int32_t* tokens,
+    uint16_t* residual, float* pre, int32_t rows, void* stream) {
+  if(rows<1 || rows>4096)return cudaErrorInvalidValue;
+  const uint64_t w=uint64_t(129280)*5120*2,t=uint64_t(rows)*4,
+      r=uint64_t(rows)*40960,p=uint64_t(rows)*16;
+  if(!valid(table,w,2)||!valid(tokens,t,4)||!valid(residual,r,2)||!valid(pre,p,4)||
+      !disjoint(table,w,residual,r)||!disjoint(table,w,pre,p)||
+      !disjoint(tokens,t,residual,r)||!disjoint(tokens,t,pre,p)||!disjoint(residual,r,pre,p))
+    return cudaErrorInvalidValue;
+  embed_kernel<false><<<rows,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(table),tokens,reinterpret_cast<__nv_bfloat16*>(residual),pre);
   return cudaGetLastError();
 }

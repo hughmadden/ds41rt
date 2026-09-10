@@ -1,0 +1,212 @@
+{
+  "scope": "Real target and dSpark embeddings plus first-block input copy; Spark component qualification",
+  "source_sha256": {
+    "native/cuda/kernels/v41_attention_ops.cu": "47b4aa2de7abde64d19789ef4d71e0f4e9ce97155d5a1fc0e1d2675aa0546c24",
+    "native/include/ds41rt_v41_attention_ops.h": "8f1089d5d677e175236bc8823cc6d8012a6de50a229a5d77f95f3aec20741586",
+    "rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "b742cfd84a254cfea87ab0d9203795f473b4eef2607b437d703bb01d5dc24512",
+    "rust/crates/ds41rt-daemon/src/v41_target_embedding.rs": "a86a358baa961c998a706ac259c7d4f7820f4b07509dd4500d48b2c462796ee7",
+    "rust/crates/ds41rt-daemon/src/v41_block.rs": "d6bee4a82edcc8b9623408d136ab002ddcfa00cc3142d3e9ef5bd2196e139438",
+    "scripts/qualify-ds41-target-embedding.py": "987d47f191135af0eab192fda7c0857f83a8416cf1cd6588331cd0a6ce112cf2"
+  },
+  "artifacts": {
+    "final_payloads_match_numerical_run": true,
+    "sha256": {
+      "/tmp/ds41-real-tp4/audit/cmake/libds41rt_native.so": "b177f59d9baa79f87a8eb73f593b96dec3b7e4afb27c0fca5fbd1075d34c05a6",
+      "/tmp/ds41-tp4-four-host/audit/target/debug/ds41-target-embedding-fixture": "3fc09d6038e0f7d073627f020620b61a74dec75792ec73f0a1b0c957165478cc",
+      "/tmp/ds41-target-embedding/src/main.rs": "fcfe75f6443456326ae7951dae1ace28f0f86b03ee32f9a2cf10fc0768d009c4",
+      "/tmp/ds41-target-embedding/src/v41_target_embedding.rs": "a86a358baa961c998a706ac259c7d4f7820f4b07509dd4500d48b2c462796ee7",
+      "/tmp/ds41-target-embedding/src/v41_block.rs": "d6bee4a82edcc8b9623408d136ab002ddcfa00cc3142d3e9ef5bd2196e139438"
+    }
+  },
+  "numerical": {
+    "scope": "Real checkpoint embedding/initial pre-mix only; no block or model logits claim",
+    "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+    "embedding_sha256": "78adec772ae091c82dc7fed0d7ca6cd534751cd42cc612a7e4b71a83166e1655",
+    "qualifier_sha256": "987d47f191135af0eab192fda7c0857f83a8416cf1cd6588331cd0a6ce112cf2",
+    "cases": [
+      {
+        "prefix": "m1-c0",
+        "kind": "target",
+        "rows": 1,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "3f624a5b68a63e9ec65663567f07106d880558c33f065594873b38878bb667da",
+          "pre": "ccaf6f183579497e8bfcd71045c04286fd3c2e60f3641e3eea164b761a4494b7"
+        }
+      },
+      {
+        "prefix": "m1-c1",
+        "kind": "target",
+        "rows": 1,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "b42bce239f6ed85a7c195368388125c1e5f239658921856a2e0542de51442fb8",
+          "pre": "ccaf6f183579497e8bfcd71045c04286fd3c2e60f3641e3eea164b761a4494b7"
+        }
+      },
+      {
+        "prefix": "m16-c0",
+        "kind": "target",
+        "rows": 16,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "ae961a896e3e65a3167fcdbec4989884af09237518d8086ec29a0a7492a02491",
+          "pre": "7decdfcd9b447c27011bb3fcc076dba55f99f6ad294921464d388edcb5a9b211"
+        }
+      },
+      {
+        "prefix": "m16-c1",
+        "kind": "target",
+        "rows": 16,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "943ef08bb169e54a9a432a66199a640bc47128a10d19fed7056599db0a12e64c",
+          "pre": "7decdfcd9b447c27011bb3fcc076dba55f99f6ad294921464d388edcb5a9b211"
+        }
+      },
+      {
+        "prefix": "m80-c0",
+        "kind": "target",
+        "rows": 80,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "8505023578a89b2d8b1d17e5483958e94929c66bbb8b3df3ef1fac34dbc756b5",
+          "pre": "8d4c5a6c0699b8304fa5cbae11282b5b4080334eec868f4bf3779aabc22b3000"
+        }
+      },
+      {
+        "prefix": "m80-c1",
+        "kind": "target",
+        "rows": 80,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "71d7f937e9838bcdaa1d52e6e28f403f23ae4e15643b5751d306e0831963fdfb",
+          "pre": "8d4c5a6c0699b8304fa5cbae11282b5b4080334eec868f4bf3779aabc22b3000"
+        }
+      },
+      {
+        "prefix": "m256-c0",
+        "kind": "target",
+        "rows": 256,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "f34fd819dec4bb99245735693e617c06f8e261267db91ca99221f51aebdbdb4e",
+          "pre": "c2191fc829f0310d0477b3a96008bc80e93c43b1bc9e956e9901922753a3e4cb"
+        }
+      },
+      {
+        "prefix": "m256-c1",
+        "kind": "target",
+        "rows": 256,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "0db92a07c6c29155f4759e08e81c62619eac585b128b90da7e9eddb86df0ce9b",
+          "pre": "c2191fc829f0310d0477b3a96008bc80e93c43b1bc9e956e9901922753a3e4cb"
+        }
+      },
+      {
+        "prefix": "m1024-c0",
+        "kind": "target",
+        "rows": 1024,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "1b50f4572482049e66ebcdeddbf329be25e7315500ab20aec5ae21c123fe1d44",
+          "pre": "bcd097aea6a6e6bcd1105ad4407afd71bfad95678c08c3cf35a6b3ffc273f37b"
+        }
+      },
+      {
+        "prefix": "m1024-c1",
+        "kind": "target",
+        "rows": 1024,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "bfd627e87246bba8c985a8ff0faf059aede063ef1525db5d777bb6b73986865d",
+          "pre": "bcd097aea6a6e6bcd1105ad4407afd71bfad95678c08c3cf35a6b3ffc273f37b"
+        }
+      },
+      {
+        "prefix": "m4096-c0",
+        "kind": "target",
+        "rows": 4096,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "fdf2a396eed7a6032416080b5a193ebdae833484a3df0ced312f5811df8d94bb",
+          "pre": "2a8d9b8a005e07ea23e29629949ec64f27e746bd55856ebab504603642837fe1"
+        }
+      },
+      {
+        "prefix": "m4096-c1",
+        "kind": "target",
+        "rows": 4096,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "686968c1ed1ebad68fc65cdb98e4074007ea19f25fe21e3f166e14e8bb8375a0",
+          "pre": "2a8d9b8a005e07ea23e29629949ec64f27e746bd55856ebab504603642837fe1"
+        }
+      },
+      {
+        "prefix": "draft-m1",
+        "kind": "draft",
+        "rows": 5,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "a03d5b78de820b476e50b0c3f6990ec86bd469cccf8da57ef475f5b7d1224c05",
+          "pre": "ad42e7486ce777eb5e261f47f51fd7fedc3f9df70ad766b9d452cba7331bfc87"
+        }
+      },
+      {
+        "prefix": "draft-m16",
+        "kind": "draft",
+        "rows": 80,
+        "bit_exact": true,
+        "payloads_sha256": {
+          "residual": "f224df7435c637b274b97844af8f9c18f2fec32841de71736d5b71fdd05fb535",
+          "pre": "8d4c5a6c0699b8304fa5cbae11282b5b4080334eec868f4bf3779aabc22b3000"
+        }
+      }
+    ]
+  },
+  "logs": {
+    "native-build": {
+      "sha256": "d3ec776082410493d2c3f022f1856ff5c8d4b3c48766f1ee4d07f6ae1d878e3c",
+      "tail": "[  2%] Verifying pinned SparkInfer source\nverified SparkInfer revision=aeb1d8c18e99809797c76af6fbfaca1273c36ff6 source_tree_sha256=ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f source=/workspace/ds41rt/third_party/sparkinfer\n[  2%] Built target ds41rt_verify_sparkinfer_source\n[  5%] Built target ds41rt_v41_experts_export\n[  8%] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_attention_ops.cu.o\n[ 10%] Linking CXX shared library libds41rt_native.so\n[ 89%] Built target ds41rt_native\n[ 91%] Linking CXX executable ds41rt_native_selftest\n[ 94%] Linking CXX executable ds41rt_cuda_selftest\n[ 97%] Built target ds41rt_native_selftest\n[100%] Built target ds41rt_cuda_selftest\n"
+    },
+    "sm120-build": {
+      "sha256": "c31a776d01f96b7d59b1bb232ae0ba46d114e1a870b113cd52663d0fff8a326b",
+      "tail": "[0/2] Re-checking globbed directories...\n[1/6] Verifying pinned SparkInfer source\nverified SparkInfer revision=aeb1d8c18e99809797c76af6fbfaca1273c36ff6 source_tree_sha256=ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f source=/workspace/ds41rt/third_party/sparkinfer\n[2/6] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_attention_ops.cu.o\n[3/6] Linking CXX shared library libds41rt_native.so\n[4/6] Linking CXX executable ds41rt_native_selftest\n[5/6] Linking CXX executable ds41rt_cuda_selftest\n"
+    },
+    "daemon-final-build": {
+      "sha256": "553685d661ace90fb55f108ee6892f05a98aac5bbe22975136f0bb2d4a18d847",
+      "tail": " --> crates/ds41rt-daemon/src/v41_dspark_cache.rs:36:19\n   |\n36 | pub(crate) struct WindowRead {\n   |                   ^^^^^^^^^^\n\nwarning: struct `DsparkWindow` is never constructed\n  --> crates/ds41rt-daemon/src/v41_dspark_cache.rs:42:19\n   |\n42 | pub(crate) struct DsparkWindow<'a> {\n   |                   ^^^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_dspark_cache.rs:56:12\n    |\n 55 | impl<'a> DsparkWindow<'a> {\n    | ------------------------- associated items in this implementation\n 56 |     pub fn device_bytes(slots: usize, source_rows: u32) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n 63 |     pub fn new(\n    |            ^^^\n...\n115 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n118 |     unsafe fn enqueue(&self) -> Result<()> {\n    |               ^^^^^^^\n...\n130 |     pub fn begin_request(&mut self, slot: usize, request: u64) -> Result<WindowLease> {\n    |            ^^^^^^^^^^^^^\n...\n154 |     fn validate(&self, lease: WindowLease) -> Result<usize> {\n    |        ^^^^^^^^\n...\n167 |     pub fn request_id(&self, lease: WindowLease) -> Result<u64> {\n    |            ^^^^^^^^^^\n...\n171 |     pub fn release(&mut self, lease: WindowLease) -> Result<()> {\n    |            ^^^^^^^\n...\n178 |     pub fn source(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^^\n...\n181 |     fn prepare_write(&self, chunks: &[WindowChunk], source_rows: u32)\n    |        ^^^^^^^^^^^^^\n...\n229 |     pub fn validate_write(&self, chunks: &[WindowChunk], source_rows: u32) -> Result<()> {\n    |            ^^^^^^^^^^^^^^\n...\n236 |     pub unsafe fn write(&mut self, chunks: &[WindowChunk]) -> Result<()> {\n    |                   ^^^^^\n...\n268 |     pub fn attention_read(&self, requests: &[(WindowLease, u64)]) -> Result<WindowRead> {\n    |            ^^^^^^^^^^^^^^\n...\n303 |     pub fn view(&self, lease: WindowLease) -> Result<WindowView> {\n    |            ^^^^\n\nwarning: struct `NativeRtxTensors` is never constructed\n --> crates/ds41rt-daemon/src/v41_tensors.rs:8:19\n  |\n8 | pub(crate) struct NativeRtxTensors<'a> {\n  |                   ^^^^^^^^^^^^^^^^\n\nwarning: associated items `plan`, `load`, `get`, and `resident_bytes` are never used\n  --> crates/ds41rt-daemon/src/v41_tensors.rs:13:12\n   |\n12 | impl<'a> NativeRtxTensors<'a> {\n   | ----------------------------- associated items in this implementation\n13 |     pub fn plan(catalog: &OfficialV41Catalog, names: &[String]) -> Result<usize> {\n   |            ^^^^\n...\n30 |     pub fn load(\n   |            ^^^^\n...\n71 |     pub fn get(&self, name: &str) -> Result<Ds41rtDeviceBuffer> {\n   |            ^^^\n...\n78 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: struct `VocabularyHead` is never constructed\n  --> crates/ds41rt-daemon/src/v41_tensors.rs:85:19\n   |\n85 | pub(crate) struct VocabularyHead<'library> {\n   |                   ^^^^^^^^^^^^^^\n\nwarning: associated items `plan`, `load`, and `weight` are never used\n   --> crates/ds41rt-daemon/src/v41_tensors.rs:89:12\n    |\n 88 | impl<'library> VocabularyHead<'library> {\n    | --------------------------------------- associated items in this implementation\n 89 |     pub fn plan(catalog: &OfficialV41Catalog) -> Result<usize> {\n    |            ^^^^\n...\n 92 |     pub fn load(\n    |            ^^^^\n...\n108 |     pub fn weight(&self) -> Result<Ds41rtDeviceBuffer> {\n    |            ^^^^^^\n\nwarning: struct `EngramDeviceRows` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram.rs:10:19\n   |\n10 | pub(crate) struct EngramDeviceRows<'a> {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: struct `EngramDeviceView` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram.rs:21:19\n   |\n21 | pub(crate) struct EngramDeviceView {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: enum `EngramUploadPoll` is never used\n  --> crates/ds41rt-daemon/src/v41_engram.rs:27:17\n   |\n27 | pub(crate) enum EngramUploadPoll {\n   |                 ^^^^^^^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_engram.rs:34:12\n    |\n 32 | impl<'a> EngramDeviceRows<'a> {\n    | ----------------------------- associated items in this implementation\n 33 |     /// Validate current request generations before consuming an early gather.\n 34 |     pub fn poll_wave(\n    |            ^^^^^^^^^\n...\n 50 |     pub fn poll_upload(&mut self, ticket: &mut EngramGatherTicket) -> Result<EngramUploadPoll> {\n    |            ^^^^^^^^^^^\n...\n 62 |     pub fn device_bytes(capacity: usize) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n 71 |     pub fn new(\n    |            ^^^\n...\n 96 |     pub fn upload(&mut self, gathered: &EngramGatherView<'_>) -> Result<EngramDeviceView> {\n    |            ^^^^^^\n...\n129 |     pub fn view(&self) -> Result<EngramDeviceView> {\n    |            ^^^^\n...\n142 |     pub fn synchronize(&self) -> Result<()> {\n    |            ^^^^^^^^^^^\n\nwarning: struct `EngramLayerWeights` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:11:19\n   |\n11 | pub(crate) struct EngramLayerWeights<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^\n\nwarning: associated items `load` and `resident_bytes` are never used\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:19:12\n   |\n18 | impl<'a> EngramLayerWeights<'a> {\n   | ------------------------------- associated items in this implementation\n19 |     pub fn load(\n   |            ^^^^\n...\n64 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: struct `EngramGate` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:69:19\n   |\n69 | pub(crate) struct EngramGate<'weights, 'library> {\n   |                   ^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_engram/layer.rs:85:12\n    |\n 84 | impl<'weights, 'library> EngramGate<'weights, 'library> {\n    | ------------------------------------------------------- associated items in this implementation\n 85 |     pub fn new(\n    |            ^^^\n...\n143 |     pub unsafe fn execute(\n    |                   ^^^^^^^\n...\n159 |     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] {\n    |            ^^^^^^\n...\n166 |     unsafe fn stage_inputs(\n    |               ^^^^^^^^^^^^\n...\n228 |     unsafe fn enqueue(&self, rows: usize) -> Result<()> {\n    |               ^^^^^^^\n...\n256 |     pub unsafe fn capture(\n    |                   ^^^^^^^\n...\n291 |     pub unsafe fn replay(\n    |                   ^^^^^^\n...\n312 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n...\n323 |     pub fn output(&self) -> Result<Ds41rtDeviceBuffer> {\n    |            ^^^^^^\n...\n331 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n\nwarning: `ds41rt-daemon` (bin \"ds41rt\") generated 636 warnings (run `cargo fix --bin \"ds41rt\" -p ds41rt-daemon` to apply 89 suggestions)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.02s\n"
+    },
+    "fixture-handoff-build": {
+      "sha256": "abb4b71094142d8e3472344ebd06495ada9f9a3b71a78f0c40bf28db76af60ba",
+      "tail": "ronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n192 |     fn validate(&mut self, rows: u32) -> Result<()> {\n    |        ^^^^^^^^\n...\n202 |     unsafe fn enqueue(&self, rows: u32) -> Result<()> {\n    |               ^^^^^^^\n...\n245 |     pub unsafe fn execute(&mut self, rows: u32) -> Result<IndexQueryOutput<'_>> {\n    |                   ^^^^^^^\n...\n254 |     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {\n    |                   ^^^^^^^\n...\n288 |     pub unsafe fn replay(&mut self, rows: u32) -> Result<IndexQueryOutput<'_>> {\n    |                   ^^^^^^\n...\n303 |     pub unsafe fn execute_attention(\n    |                   ^^^^^^^^^^^^^^^^^\n...\n341 |     pub fn output(&self) -> Result<IndexQueryOutput<'_>> {\n    |            ^^^^^^\n...\n357 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n\nwarning: constant `WIDTH` is never used\n  --> src/v41_index_selection.rs:11:7\n   |\n11 | const WIDTH: usize = 16384;\n   |       ^^^^^\n\nwarning: constant `BLOCKS` is never used\n  --> src/v41_index_selection.rs:12:7\n   |\n12 | const BLOCKS: usize = WIDTH / 8;\n   |       ^^^^^^\n\nwarning: struct `SelectionRequest` is never constructed\n  --> src/v41_index_selection.rs:14:19\n   |\n14 | pub(crate) struct SelectionRequest<'a> {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: struct `IndexSelectionOutput` is never constructed\n  --> src/v41_index_selection.rs:19:19\n   |\n19 | pub(crate) struct IndexSelectionOutput<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^^^\n\nwarning: struct `Ready` is never constructed\n  --> src/v41_index_selection.rs:29:8\n   |\n29 | struct Ready {\n   |        ^^^^^\n\nwarning: methods `validate_query` and `validate_attention` are never used\n  --> src/v41_index_selection.rs:36:12\n   |\n35 | impl IndexSelectionOutput<'_> {\n   | ----------------------------- methods in this implementation\n36 |     pub fn validate_query(&self, query: QueryBinding) -> Result<()> {\n   |            ^^^^^^^^^^^^^^\n...\n47 |     pub fn validate_attention(&self, layer: usize, bindings: &[(IndexBinding, u64)]) -> Result<()> {\n   |            ^^^^^^^^^^^^^^^^^^\n\nwarning: struct `IndexSelectionWave` is never constructed\n  --> src/v41_index_selection.rs:62:19\n   |\n62 | pub(crate) struct IndexSelectionWave<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^\n\nwarning: function `slice` is never used\n  --> src/v41_index_selection.rs:73:4\n   |\n73 | fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {\n   |    ^^^^^\n\nwarning: multiple associated items are never used\n   --> src/v41_index_selection.rs:80:8\n    |\n 79 | impl<'a> IndexSelectionWave<'a> {\n    | ------------------------------- associated items in this implementation\n 80 |     fn sizes(capacity: usize) -> Result<[usize; 13]> {\n    |        ^^^^^\n...\n102 |     pub fn device_bytes(capacity: usize) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n105 |     pub fn new(library: &'a NativeLibrary, capacity: usize, budget: usize) -> Result<Self> {\n    |            ^^^\n...\n128 |     fn b(&self, i: usize) -> Ds41rtDeviceBuffer {\n    |        ^\n...\n131 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n134 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n...\n144 |     unsafe fn enqueue(\n    |               ^^^^^^^\n...\n251 |     pub unsafe fn execute<'s>(\n    |                   ^^^^^^^\n\nwarning: struct `AttentionRequest` is never constructed\n  --> src/v41_sparse_attention.rs:14:19\n   |\n14 | pub(crate) struct AttentionRequest<'a> {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: struct `SparseAttentionOutput` is never constructed\n  --> src/v41_sparse_attention.rs:19:19\n   |\n19 | pub(crate) struct SparseAttentionOutput<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: methods `binding` and `tokens` are never used\n  --> src/v41_sparse_attention.rs:28:12\n   |\n27 | impl SparseAttentionOutput<'_> {\n   | ------------------------------ methods in this implementation\n28 |     pub fn binding(&self) -> Result<QueryBinding> {\n   |            ^^^^^^^\n...\n33 |     pub fn tokens(&self) -> Result<&[u64]> {\n   |            ^^^^^^\n\nwarning: struct `SparseAttentionWave` is never constructed\n  --> src/v41_sparse_attention.rs:39:19\n   |\n39 | pub(crate) struct SparseAttentionWave<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^^\n\nwarning: struct `RequestLaunch` is never constructed\n  --> src/v41_sparse_attention.rs:49:8\n   |\n49 | struct RequestLaunch {\n   |        ^^^^^^^^^^^^^\n\nwarning: function `slice` is never used\n  --> src/v41_sparse_attention.rs:55:4\n   |\n55 | fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {\n   |    ^^^^^\n\nwarning: multiple associated items are never used\n   --> src/v41_sparse_attention.rs:62:12\n    |\n 61 | impl<'a> SparseAttentionWave<'a> {\n    | -------------------------------- associated items in this implementation\n 62 |     pub fn device_bytes(capacity: usize) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n 69 |     pub fn new(library: &'a NativeLibrary, capacity: usize, budget: usize) -> Result<Self> {\n    |            ^^^\n...\n 88 |     pub fn input(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^\n...\n 91 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n...\n 94 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n...\n103 |     unsafe fn enqueue(\n    |               ^^^^^^^\n...\n132 |     pub unsafe fn execute_query<'s>(\n    |                   ^^^^^^^^^^^^^\n...\n168 |     pub unsafe fn execute<'s>(\n    |                   ^^^^^^^\n\nwarning: field `resident_bytes` is never read\n  --> src/v41_tensors.rs:10:5\n   |\n 8 | pub(crate) struct NativeRtxTensors<'a> {\n   |                   ---------------- field in this struct\n 9 |     tensors: BTreeMap<String, DeviceAllocation<'a>>,\n10 |     resident_bytes: usize,\n   |     ^^^^^^^^^^^^^^\n\nwarning: method `resident_bytes` is never used\n  --> src/v41_tensors.rs:78:12\n   |\n12 | impl<'a> NativeRtxTensors<'a> {\n   | ----------------------------- method in this implementation\n...\n78 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: struct `VocabularyHead` is never constructed\n  --> src/v41_tensors.rs:85:19\n   |\n85 | pub(crate) struct VocabularyHead<'library> {\n   |                   ^^^^^^^^^^^^^^\n\nwarning: associated items `plan`, `load`, and `weight` are never used\n   --> src/v41_tensors.rs:89:12\n    |\n 88 | impl<'library> VocabularyHead<'library> {\n    | --------------------------------------- associated items in this implementation\n 89 |     pub fn plan(catalog: &OfficialV41Catalog) -> Result<usize> {\n    |            ^^^^\n...\n 92 |     pub fn load(\n    |            ^^^^\n...\n108 |     pub fn weight(&self) -> Result<Ds41rtDeviceBuffer> {\n    |            ^^^^^^\n\nwarning: `ds41-target-embedding-fixture` (bin \"ds41-target-embedding-fixture\") generated 99 warnings\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.32s\n"
+    },
+    "handoff": {
+      "sha256": "d706c5cc85036ba75d825bd8129ce9df1bc34be2a7ba7a332e6584e3481f21a5",
+      "tail": "PASS target rows=1 changed_inputs two_waves guards recapture budget_bytes=40980\nPASS target rows=16 changed_inputs two_waves guards recapture budget_bytes=655680\nPASS target rows=80 changed_inputs two_waves guards recapture budget_bytes=3278400\nPASS target rows=256 changed_inputs two_waves guards recapture budget_bytes=10490880\nPASS target rows=1024 changed_inputs two_waves guards recapture budget_bytes=41963520\nPASS target rows=4096 changed_inputs two_waves guards recapture budget_bytes=167854080\nPASS shared draft embedding requests=1\nPASS shared draft embedding requests=16\nPASS invalid device IDs zero output; overlap and row guards\nPASS layer-0 stable input handoff exact; capacity guard; output unpublished\nPASS wrong-layer initialization rejected\n"
+    },
+    "numerical": {
+      "sha256": "51dc08e60c31d9c5c9c52248b7ac8e2fd64fd54ff12f4fd1332ee3117e9def84",
+      "tail": "PASS m1-c0 rows=1 bit_exact=true\nPASS m1-c1 rows=1 bit_exact=true\nPASS m16-c0 rows=16 bit_exact=true\nPASS m16-c1 rows=16 bit_exact=true\nPASS m80-c0 rows=80 bit_exact=true\nPASS m80-c1 rows=80 bit_exact=true\nPASS m256-c0 rows=256 bit_exact=true\nPASS m256-c1 rows=256 bit_exact=true\nPASS m1024-c0 rows=1024 bit_exact=true\nPASS m1024-c1 rows=1024 bit_exact=true\nPASS m4096-c0 rows=4096 bit_exact=true\nPASS m4096-c1 rows=4096 bit_exact=true\nPASS draft-m1 rows=5 bit_exact=true\nPASS draft-m16 rows=80 bit_exact=true\n"
+    }
+  },
+  "sm120_native_sha256": "ac3cb9a81f744d28c783459840a42edb4313975c73a2ea06d26ccf7d516f306f",
+  "embedding_device_bytes": 1323827200,
+  "wave_device_bytes": {
+    "1": 40980,
+    "16": 655680,
+    "80": 3278400,
+    "256": 10490880,
+    "1024": 41963520,
+    "4096": 167854080
+  },
+  "remaining": [
+    "RTX qualification after NVIDIA driver repair",
+    "Execute typed embedding-to-attention handoff with real query projection",
+    "Vision embedding replacement before stream expansion",
+    "40-layer CED driver and scheduler integration",
+    "Full-model logits and performance"
+  ]
+}
