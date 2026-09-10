@@ -44,3 +44,5 @@ Container evidence: `./build.sh --spark-hosts ostrich,dodo` now completes from a
 Native loader progress: the 96,085-tensor checkpoint contract now validates physical storage and exposes bounded Spark TP4 staging, RTX-only dSpark staging, and host-only engram mapping/prefetch, with native storage budgets recorded and execution workspace budgeting/integration still pending.
 
 Native expert progress: `silu_v41` now preserves official projection rounding and intermediate router weighting with FP32 per-route accumulation, passing six native/graph cases on both RTX GPUs and ostrich/dodo, while TP-global rounding and runtime integration remain open in `docs/ds41-expert-qualification.md`.
+
+TP arithmetic progress: native scratch-backed FP32 route outputs and TP4-before-BF16 reduction now match full-width experts on both RTX GPUs and ostrich/dodo, while FP32 routing/payload transport and runtime wiring remain open in `docs/ds41-tp4-qualification.json`.

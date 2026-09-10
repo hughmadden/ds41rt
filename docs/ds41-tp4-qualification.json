@@ -1,0 +1,34 @@
+{
+  "sparkinfer_revision": "cc3a553431a5890ea4c32408e6a5eac0fe2ecd48",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "test": "tests/moe/test_v41_tp4.py",
+  "tokens": [
+    1,
+    16,
+    80
+  ],
+  "hidden_size": 5120,
+  "full_intermediate": 2304,
+  "shard_intermediate": 576,
+  "logical_ranks": 4,
+  "experts": 8,
+  "topk": 6,
+  "relative_l2_limit": 0.01,
+  "cosine_min": 0.9999,
+  "scope": "All four logical shards execute on each tested device; cross-machine transport is not exercised.",
+  "checks": [
+    "Native FP4/K32 shards against full-width independent reference",
+    "FP32 per-route TP summation before BF16 expert boundary",
+    "Shared expert addition after routed expert boundaries",
+    "Mutated hidden states, routing IDs and shared output under CUDA graph replay",
+    "Input remains unchanged by route-partial execution",
+    "No increase in allocated CUDA memory on replay"
+  ],
+  "device_results": {
+    "rtx0": "...                                                                      [100%]\n3 passed in 8.62s\n",
+    "rtx1": ".........                                                                [100%]\n9 passed in 15.63s\n",
+    "ostrich": "...                                                                      [100%]\n3 passed in 9.93s\n",
+    "dodo": "...                                                                      [100%]\n3 passed in 9.95s\n"
+  },
+  "source_note": "Implementation hunks were range-formatted after all GPU processes completed; no semantic changes followed qualification."
+}

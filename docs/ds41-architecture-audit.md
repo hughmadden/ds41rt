@@ -144,3 +144,5 @@ Run `cargo run --manifest-path rust/Cargo.toml -p ds41rt-loader --example v41_ca
 The official FP4 expert rounds FC1 projections to BF16 and applies routing weights to the clamped SwiGLU intermediate before BF16/FP8 quantization for FC2, so post-FC2 route weighting is numerically different.
 
 The new b12x `silu_v41` contract implements this sequence and accumulates all local FC2 slices in FP32 before each expert's BF16 output boundary; `docs/ds41-expert-qualification.md` records four-device native/graph checks and the still-open TP-global reduction requirement.
+
+The isolated TP-global expert boundary now has a native reducer and four-device graph qualification, but the inherited wire format uses ten-byte route entries with BF16-truncated weights and cannot carry FP32 partials, so model integration requires a wire-contract update before this path can serve V4.1.
