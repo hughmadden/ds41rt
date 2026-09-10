@@ -1,3 +1,5 @@
+mod v41_attention_ops;
+pub use v41_attention_ops::V41AttentionOps;
 mod v41_dspark_cache;
 pub use v41_dspark_cache::{V41DsparkCache, V41KvWrite};
 mod v41_router;

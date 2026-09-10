@@ -122,3 +122,5 @@ FFN-boundary progress: one-stream dSpark mHC/router/shared/routed execution and 
 Committed-cache progress: generation-checked dSpark KV windows, batched ring updates and captured FP8 quantize/dequantize writes pass Rust-owned bitwise tests on both RTX GPUs and are included in memory admission, while attention producers/consumers remain open in `docs/ds41-dspark-cache-qualification.md`.
 
 dSpark projection progress: all thirteen main/attention FP8 bindings and native split-K reduction pass owned and numerical graph checks on both RTX GPUs, with explicit memory admission while normalization/RoPE, attention and stage sequencing remain open in `docs/ds41-dspark-projection-qualification.md`.
+
+Attention-operation progress: native RMS normalization, fused KV normalization/rotation and forward/inverse query rotation pass reference and changed-input graph checks on both RTX GPUs, with Rust bindings while frequency ownership and attention composition remain open in `docs/ds41-attention-ops-qualification.md`.

@@ -1,0 +1,1388 @@
+{
+  "scope": "Native dSpark RMS normalization and forward/inverse rotary operations with Rust FFI; excludes owned attention execution",
+  "source_sha256": {
+    "native/CMakeLists.txt": "db843df4a3647a9e820d66ef2268c53545478003a6b4dda24a5a4b3a550a46b0",
+    "native/include/ds41rt_v41_attention_ops.h": "b04bb5a9aedc2fb4ca274c2b9d22d626ce6f1335d56a9989b5860c95582ab930",
+    "native/cuda/kernels/v41_attention_ops.cu": "e8204009f0d6c91e45970b0277c63f6dcab1f98629851a2d1f9cb5a048d0d863",
+    "rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "534ab47e8e732508ca0b9e4b072701410bacf8ea44171c45ed9f137c24fb0cbb",
+    "scripts/qualify-ds41-attention-ops.py": "dda4df887511cb3ebd6e0dad786f905f33e9e2ec87ce427d20b84beb81dbb1ec"
+  },
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "builds": {
+    "native": "passed",
+    "daemon": "passed, 490 warnings"
+  },
+  "gpu_results": [
+    {
+      "scope": "Native dSpark norm and rotary operations; excludes frequency ownership, full attention and serving",
+      "device": 0,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "native_library_sha256": "afff40f3567b620793461125b36156b2f0b58261787c307e4485331a7a13b5e6",
+      "qualifier_sha256": "dda4df887511cb3ebd6e0dad786f905f33e9e2ec87ce427d20b84beb81dbb1ec",
+      "results": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 6
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 7
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 20
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 20
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 7
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 7
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 6
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 12
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 25
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 53
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 74
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        }
+      ]
+    },
+    {
+      "scope": "Native dSpark norm and rotary operations; excludes frequency ownership, full attention and serving",
+      "device": 1,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "native_library_sha256": "afff40f3567b620793461125b36156b2f0b58261787c307e4485331a7a13b5e6",
+      "qualifier_sha256": "dda4df887511cb3ebd6e0dad786f905f33e9e2ec87ce427d20b84beb81dbb1ec",
+      "results": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 7
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 2
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 6
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 13
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 21
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 5
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 11
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 8
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 22
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 76
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 97
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        }
+      ]
+    }
+  ],
+  "not_qualified": [
+    "frequency construction/ownership in the runtime",
+    "Rust-owned producer/consumer composition",
+    "attention softmax/sink and grouped BF16 output projection",
+    "three-stage execution, verification and serving",
+    "performance"
+  ]
+}
