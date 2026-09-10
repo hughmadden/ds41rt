@@ -27,7 +27,7 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [ ] Commit and push engine changes and required SparkInfer/b12x changes to their fork main branches with matching dependency pins.
 - [ ] Audit every pre-model requirement and document exact bring-up commands, remaining checkpoint-dependent gates, and hardware evidence for handoff.
 
-Progress evidence: `docs/ds41-build-qualification.md` records the rename and partial-fleet build checks; complete container, GPU, and launch qualification remains open.
+Progress evidence: `docs/ds41-build-qualification.md` records the rename and partial-fleet build checks; full serving launch and integrated GPU qualification remain open, with successful partial-fleet container evidence recorded below.
 
 Engram progress: the loader now provides mapped native table/scale access, bounded cancellable background page advice, and eager-load rejection, with scheduler integration, device staging, and hardware performance qualification still pending.
 
@@ -40,3 +40,5 @@ FP8 progress: native 32x32 checkpoint packing, independent K32 scales, and exact
 Checkpoint contract progress: a strict typed reader validates every official nested text, vision, engram, dSpark, and quantization field against the pinned configuration, with 60 loader tests passing and integration into the replacement tensor catalog and execution path still pending.
 
 Container evidence: `./build.sh --spark-hosts ostrich,dodo` now completes from a dirty checkout with an automatic manifest, native coordinator/Spark builds, artifact exports, and distribution to both available Sparks, while full run/restart/stop qualification remains open.
+
+Native loader progress: the 96,085-tensor checkpoint contract now validates physical storage and exposes bounded Spark TP4 staging, RTX-only dSpark staging, and host-only engram mapping/prefetch, with native storage budgets recorded and execution workspace budgeting/integration still pending.

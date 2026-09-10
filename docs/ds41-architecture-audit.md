@@ -120,3 +120,21 @@ Unshared dSpark reference parameters occupy 7.5434 GiB including 6.7236 GiB of r
 The audit was run with the isolated reference environment using PyTorch 2.13.0+cu130, TileLang 0.1.8, and apache-tvm-ffi 0.1.6, because newer TVM-FFI versions 0.1.12/0.1.13 fail while importing this TileLang release.
 
 This inventory is metadata evidence only and does not establish native checkpoint dtype/shape agreement, numerical correctness, or serving performance.
+
+## Native storage contract and placement
+
+The new `OfficialV41Catalog` validates all 96,085 native tensors from 116 explicit shape/dtype templates, checks their index/header correspondence and non-overlapping complete byte ranges, and reads headers without allocating weight payloads.
+
+Header sources and pinned LFS identities are recorded in `ds41-native-catalog-qualification.json`; all 46 currently downloaded non-engram shards have cache filenames and lengths matching the pinned revision, and the local config/index hashes also match despite the local snapshot having a different revision label.
+
+Native WO-A weights remain FP8 with independent 32x32 scales, the output/Markov/confidence heads are stored as BF16, vision norms are BF16, and ratio-2 compressor weight/gate projections are BF16 even where the reference converts them to FP32.
+
+Native storage totals are 18,750,160,200 coordinator bytes including 7,932,874,632 dSpark bytes, 72,194,457,600 bytes per Spark, and 202,758,032,400 host-mapped engram bytes; runtime conversion, packing, caches, graph buffers, and scratch must be budgeted separately.
+
+Backbone experts are split four ways along intermediate rows for W1/W3 and packed intermediate columns for W2, while every dSpark tensor remains on the coordinator RTX and engram table weights/scales are exclusively host-mapped.
+
+The catalog exposes bounded caller-owned tensor staging, coalesced W2 column reads with caller-owned scratch, 64-bit file offsets, and direct engram mapping into the existing cancellable paired prefetcher.
+
+Qualification passes 63 loader tests, the full 48-shard sparse-header fixture, six adversarial catalog rejection cases, and nonzero mapped first/last-row prefetch/gather checks at the full native engram dimensions; this does not qualify checkpoint payload integrity or model execution.
+
+Run `cargo run --manifest-path rust/Cargo.toml -p ds41rt-loader --example v41_catalog -- SNAPSHOT` to inspect a complete official snapshot's native storage contract without loading its tensor payloads.

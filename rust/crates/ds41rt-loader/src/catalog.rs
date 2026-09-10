@@ -473,6 +473,7 @@ fn parse_safetensors_header(path: &Path) -> Result<BTreeMap<String, SafetensorsT
     let mut len_bytes = [0_u8; 8];
     file.read_exact(&mut len_bytes)?;
     let header_len = u64::from_le_bytes(len_bytes);
+    anyhow::ensure!(header_len <= 64 * 1024 * 1024, "safetensors header exceeds 64 MiB");
     let header_len_usize: usize = header_len
         .try_into()
         .context("safetensors header length does not fit in memory")?;

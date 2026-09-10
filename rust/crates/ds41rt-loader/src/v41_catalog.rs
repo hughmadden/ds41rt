@@ -1,0 +1,552 @@
+//! Official checkpoint storage and fixed RTX/Spark-TP4 placement contracts.
+use crate::{
+    read_official_v41_config, read_safetensors_metadata, OfficialV41Config,
+    SafetensorsTensorMetadata,
+};
+use anyhow::{ensure, Context, Result};
+use ds41rt_core::DType;
+use serde::Deserialize;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum V41TensorPlacement {
+    CoordinatorRtx,
+    HostMappedEngram,
+    /// Every Spark holds one intermediate-dimension quarter of every backbone expert.
+    BackboneExpertTp4 {
+        layer: usize,
+        expert: usize,
+        axis: usize,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct V41Tensor {
+    pub shard: String,
+    pub metadata: SafetensorsTensorMetadata,
+    pub placement: V41TensorPlacement,
+}
+
+#[derive(Debug)]
+pub struct OfficialV41Catalog {
+    config: OfficialV41Config,
+    snapshot: PathBuf,
+    tensors: Vec<V41Tensor>,
+}
+
+impl OfficialV41Catalog {
+    pub fn config(&self) -> &OfficialV41Config {
+        &self.config
+    }
+    pub fn snapshot(&self) -> &Path {
+        &self.snapshot
+    }
+    pub fn tensors(&self) -> &[V41Tensor] {
+        &self.tensors
+    }
+
+    pub fn tensor(&self, name: &str) -> Result<&V41Tensor> {
+        let index = self
+            .tensors
+            .binary_search_by(|tensor| tensor.metadata.name.as_str().cmp(name))
+            .map_err(|_| anyhow::anyhow!("unknown official tensor {name}"))?;
+        Ok(&self.tensors[index])
+    }
+
+    pub fn device_tensor_bytes(&self, name: &str, spark_rank: Option<usize>) -> Result<u64> {
+        let tensor = self.tensor(name)?;
+        match tensor.placement {
+            V41TensorPlacement::HostMappedEngram => {
+                anyhow::bail!("engram tables must be mapped, not eagerly loaded")
+            }
+            V41TensorPlacement::CoordinatorRtx => {
+                ensure!(
+                    spark_rank.is_none(),
+                    "RTX tensor {name} cannot be loaded as a Spark shard"
+                );
+                Ok(tensor.metadata.byte_length)
+            }
+            V41TensorPlacement::BackboneExpertTp4 { .. } => {
+                ensure!(
+                    spark_rank.is_some_and(|rank| rank < 4),
+                    "backbone expert {name} requires a Spark TP rank in 0..4"
+                );
+                Ok(tensor.metadata.byte_length / 4)
+            }
+        }
+    }
+
+    /// Read the selected physical tensor/shard into caller-owned staging memory.
+    /// Column-sharded W2 uses bounded scratch to coalesce file reads, then packs rows.
+    pub fn read_device_tensor_into(
+        &self,
+        name: &str,
+        spark_rank: Option<usize>,
+        dst: &mut [u8],
+        scratch: &mut [u8],
+    ) -> Result<usize> {
+        use std::os::unix::fs::FileExt;
+        let bytes = usize::try_from(self.device_tensor_bytes(name, spark_rank)?)?;
+        ensure!(
+            dst.len() >= bytes,
+            "tensor staging buffer for {name} needs {bytes} bytes"
+        );
+        let tensor = self.tensor(name)?;
+        let metadata = &tensor.metadata;
+        let file = File::open(self.snapshot.join(&tensor.shard))?;
+        match tensor.placement {
+            V41TensorPlacement::BackboneExpertTp4 { axis: 0, .. } => {
+                let offset = metadata
+                    .byte_offset
+                    .checked_add(
+                        (bytes as u64)
+                            .checked_mul(spark_rank.unwrap() as u64)
+                            .context("TP row offset overflow")?,
+                    )
+                    .context("TP file offset overflow")?;
+                file.read_exact_at(&mut dst[..bytes], offset)?;
+            }
+            V41TensorPlacement::BackboneExpertTp4 { axis: 1, .. } => {
+                let rows = metadata.shape[0];
+                let row_bytes = usize::try_from(metadata.byte_length / rows as u64)?;
+                ensure!(
+                    scratch.len() >= row_bytes,
+                    "W2 scratch needs at least {row_bytes} bytes"
+                );
+                let quarter = row_bytes / 4;
+                let column = spark_rank.unwrap() * quarter;
+                let rows_per_read = scratch.len() / row_bytes;
+                for start in (0..rows).step_by(rows_per_read) {
+                    let count = rows_per_read.min(rows - start);
+                    let offset = metadata
+                        .byte_offset
+                        .checked_add(
+                            (start as u64)
+                                .checked_mul(row_bytes as u64)
+                                .context("TP column row offset overflow")?,
+                        )
+                        .context("TP column file offset overflow")?;
+                    file.read_exact_at(&mut scratch[..count * row_bytes], offset)?;
+                    for row in 0..count {
+                        dst[(start + row) * quarter..(start + row + 1) * quarter].copy_from_slice(
+                            &scratch[row * row_bytes + column..row * row_bytes + column + quarter],
+                        );
+                    }
+                }
+            }
+            V41TensorPlacement::CoordinatorRtx => {
+                file.read_exact_at(&mut dst[..bytes], metadata.byte_offset)?
+            }
+            _ => anyhow::bail!("unsupported device tensor placement"),
+        }
+        Ok(bytes)
+    }
+
+    /// # Safety
+    /// Checkpoint files must remain immutable for the lifetime of the returned maps.
+    pub unsafe fn map_engram(&self, layer: usize) -> Result<crate::EngramTable> {
+        ensure!(
+            self.config.text().engram_layer_ids.contains(&layer),
+            "no engram table at layer {layer}"
+        );
+        let map = |suffix: &str| -> Result<crate::MappedRows> {
+            let tensor = self.tensor(&format!("layers.{layer}.engram.embed.{suffix}"))?;
+            let metadata = &tensor.metadata;
+            unsafe {
+                crate::MappedRows::open(
+                    &self.snapshot.join(&tensor.shard),
+                    metadata.byte_offset,
+                    metadata.shape[0] as u64,
+                    metadata.shape[1],
+                )
+            }
+        };
+        crate::EngramTable::new(map("weight")?, map("scale")?)
+    }
+
+    /// Physical checkpoint bytes only; packing, caches and execution scratch are additional.
+    pub fn storage_budget(&self) -> Result<V41StorageBudget> {
+        let mut budget = V41StorageBudget::default();
+        for tensor in &self.tensors {
+            let bytes = tensor.metadata.byte_length;
+            match tensor.placement {
+                V41TensorPlacement::CoordinatorRtx => {
+                    budget.coordinator_bytes = budget
+                        .coordinator_bytes
+                        .checked_add(bytes)
+                        .context("RTX weight byte overflow")?;
+                    if tensor.metadata.name.starts_with("mtp.") {
+                        budget.dspark_bytes = budget
+                            .dspark_bytes
+                            .checked_add(bytes)
+                            .context("dSpark weight byte overflow")?;
+                    }
+                }
+                V41TensorPlacement::HostMappedEngram => {
+                    budget.host_mapped_bytes = budget
+                        .host_mapped_bytes
+                        .checked_add(bytes)
+                        .context("engram byte overflow")?;
+                }
+                V41TensorPlacement::BackboneExpertTp4 { .. } => {
+                    ensure!(
+                        bytes % 4 == 0,
+                        "TP4 tensor byte count is not divisible by four"
+                    );
+                    budget.per_spark_bytes = budget
+                        .per_spark_bytes
+                        .checked_add(bytes / 4)
+                        .context("Spark weight byte overflow")?;
+                }
+            }
+        }
+        Ok(budget)
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct V41StorageBudget {
+    pub coordinator_bytes: u64,
+    /// Included in coordinator_bytes; shared embedding/output tensors are counted only once.
+    pub dspark_bytes: u64,
+    pub per_spark_bytes: u64,
+    pub host_mapped_bytes: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct Template {
+    pattern: String,
+    axes: Vec<Vec<usize>>,
+    dtype: String,
+    shape: Vec<usize>,
+}
+
+#[derive(Debug, Clone)]
+struct ExpectedTensor {
+    dtype: DType,
+    shape: Vec<usize>,
+    bytes: u64,
+}
+
+fn expected_tensors() -> Result<BTreeMap<String, ExpectedTensor>> {
+    let templates: Vec<Template> = serde_json::from_str(include_str!("official-v41-tensors.json"))?;
+    let mut expected = BTreeMap::new();
+    for template in templates {
+        let dtype = DType::from_safetensors(&template.dtype);
+        let width = match dtype {
+            DType::Bf16 => 2,
+            DType::F32 => 4,
+            DType::F8E4M3 | DType::F8E8M0 | DType::I8 => 1,
+            _ => anyhow::bail!("unsupported official tensor dtype {}", template.dtype),
+        };
+        let bytes = template
+            .shape
+            .iter()
+            .try_fold(width, |n: u64, &dim| n.checked_mul(dim as u64))
+            .context("tensor size overflow")?;
+        let mut names = vec![template.pattern];
+        for axis in template.axes {
+            names = names
+                .into_iter()
+                .flat_map(|name| {
+                    axis.iter()
+                        .map(move |i| name.replacen("{}", &i.to_string(), 1))
+                })
+                .collect();
+        }
+        for name in names {
+            ensure!(!name.contains("{}"), "incomplete tensor template {name}");
+            ensure!(
+                expected
+                    .insert(
+                        name.clone(),
+                        ExpectedTensor {
+                            dtype: dtype.clone(),
+                            shape: template.shape.clone(),
+                            bytes
+                        }
+                    )
+                    .is_none(),
+                "duplicate tensor template {name}"
+            );
+        }
+    }
+    ensure!(
+        expected.len() == 96085,
+        "incomplete official tensor contract"
+    );
+    Ok(expected)
+}
+
+fn placement(name: &str) -> V41TensorPlacement {
+    if name.contains(".engram.embed.") {
+        return V41TensorPlacement::HostMappedEngram;
+    }
+    let parts: Vec<_> = name.split('.').collect();
+    if parts.len() == 7 && parts[0] == "layers" && parts[2] == "ffn" && parts[3] == "experts" {
+        V41TensorPlacement::BackboneExpertTp4 {
+            layer: parts[1].parse().expect("validated official layer"),
+            expert: parts[4].parse().expect("validated official expert"),
+            axis: usize::from(parts[5] == "w2"),
+        }
+    } else {
+        V41TensorPlacement::CoordinatorRtx
+    }
+}
+
+/// Header-only inspection: never reads or eagerly allocates checkpoint tensor payloads.
+pub fn read_official_v41_catalog(model_id: &str, snapshot: &Path) -> Result<OfficialV41Catalog> {
+    let config = read_official_v41_config(model_id, snapshot)?;
+    #[derive(Deserialize)]
+    struct Index {
+        weight_map: BTreeMap<String, String>,
+    }
+    let mut bytes = Vec::new();
+    File::open(snapshot.join("model.safetensors.index.json"))?
+        .take(16 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() <= 16 * 1024 * 1024,
+        "checkpoint index exceeds sixteen MiB"
+    );
+    let index: Index = serde_json::from_slice(&bytes)?;
+    let expected = expected_tensors()?;
+    ensure!(
+        index.weight_map.len() == expected.len(),
+        "official tensor inventory count mismatch: expected {}, got {}",
+        expected.len(),
+        index.weight_map.len()
+    );
+    let allowed_shards: BTreeSet<_> = (1..=48)
+        .map(|i| format!("model-{i:05}-of-00048.safetensors"))
+        .collect();
+    let mut shards: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for (name, shard) in &index.weight_map {
+        ensure!(
+            expected.contains_key(name),
+            "unexpected checkpoint tensor {name}"
+        );
+        ensure!(
+            allowed_shards.contains(shard),
+            "unsupported checkpoint shard {shard}"
+        );
+        shards
+            .entry(shard.clone())
+            .or_default()
+            .insert(name.clone());
+    }
+    ensure!(
+        shards.len() == 48,
+        "official checkpoint requires all 48 shards"
+    );
+    let mut tensors = Vec::with_capacity(expected.len());
+    for (shard, names) in shards {
+        let path = snapshot.join(&shard);
+        let metadata =
+            read_safetensors_metadata(&path).with_context(|| format!("reading {shard}"))?;
+        ensure!(
+            metadata.len() == names.len(),
+            "index/header tensor count mismatch in {shard}"
+        );
+        let mut intervals = Vec::with_capacity(metadata.len());
+        for tensor in metadata {
+            ensure!(
+                names.contains(&tensor.name),
+                "tensor {} appears in unexpected shard {shard}",
+                tensor.name
+            );
+            let spec = &expected[&tensor.name];
+            validate_tensor(&tensor, spec)?;
+            let target = placement(&tensor.name);
+            if let V41TensorPlacement::BackboneExpertTp4 { axis, .. } = target {
+                ensure!(
+                    tensor.shape[axis] % 4 == 0,
+                    "TP4 axis cannot be divided for {}",
+                    tensor.name
+                );
+            }
+            intervals.push((
+                tensor.byte_offset,
+                tensor
+                    .byte_offset
+                    .checked_add(tensor.byte_length)
+                    .context("tensor end overflow")?,
+            ));
+            tensors.push(V41Tensor {
+                shard: shard.clone(),
+                metadata: tensor,
+                placement: target,
+            });
+        }
+        intervals.sort_unstable();
+        let mut header_len = [0u8; 8];
+        File::open(&path)?.read_exact(&mut header_len)?;
+        let mut cursor = u64::from_le_bytes(header_len)
+            .checked_add(8)
+            .context("header offset overflow")?;
+        for (start, end) in intervals {
+            ensure!(
+                start == cursor,
+                "overlap or gap in {shard} at byte {cursor}"
+            );
+            cursor = end;
+        }
+        ensure!(
+            cursor == path.metadata()?.len(),
+            "unindexed trailing bytes in {shard}"
+        );
+    }
+    tensors.sort_by(|a, b| a.metadata.name.cmp(&b.metadata.name));
+    Ok(OfficialV41Catalog {
+        config,
+        snapshot: snapshot.to_path_buf(),
+        tensors,
+    })
+}
+
+fn validate_tensor(tensor: &SafetensorsTensorMetadata, spec: &ExpectedTensor) -> Result<()> {
+    ensure!(
+        tensor.dtype == spec.dtype,
+        "{} dtype mismatch: expected {:?}, got {:?}",
+        tensor.name,
+        spec.dtype,
+        tensor.dtype
+    );
+    ensure!(
+        tensor.shape == spec.shape,
+        "{} shape mismatch: expected {:?}, got {:?}",
+        tensor.name,
+        spec.shape,
+        tensor.shape
+    );
+    ensure!(
+        tensor.byte_length == spec.bytes,
+        "{} storage length mismatch: expected {}, got {}",
+        tensor.name,
+        spec.bytes,
+        tensor.byte_length
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn checkpoint_contract_keeps_native_types_and_local_draft_experts() {
+        let tensors = expected_tensors().unwrap();
+        assert_eq!(tensors["head.weight"].dtype, DType::Bf16);
+        assert_eq!(tensors["layers.0.attn.wo_a.weight"].dtype, DType::F8E4M3);
+        assert_eq!(tensors["layers.0.attn.wo_a.scale"].shape, [256, 128]);
+        assert_eq!(
+            tensors["mtp.0.ffn.experts.127.w1.weight"].shape,
+            [2304, 2560]
+        );
+        assert!(!tensors.contains_key("mtp.0.ffn.experts.128.w1.weight"));
+        assert_eq!(
+            placement("mtp.0.ffn.experts.127.w1.weight"),
+            V41TensorPlacement::CoordinatorRtx
+        );
+        assert_eq!(
+            placement("layers.39.ffn.experts.383.w2.scale"),
+            V41TensorPlacement::BackboneExpertTp4 {
+                layer: 39,
+                expert: 383,
+                axis: 1
+            }
+        );
+        assert_eq!(
+            placement("layers.14.engram.embed.weight"),
+            V41TensorPlacement::HostMappedEngram
+        );
+    }
+    #[test]
+    fn rejects_same_byte_count_with_wrong_representation() {
+        let spec = ExpectedTensor {
+            dtype: DType::I8,
+            shape: vec![2304, 2560],
+            bytes: 5898240,
+        };
+        let mut tensor = SafetensorsTensorMetadata {
+            name: "expert".into(),
+            dtype: DType::I8,
+            shape: vec![2304, 2560],
+            byte_offset: 8,
+            byte_length: 5898240,
+        };
+        validate_tensor(&tensor, &spec).unwrap();
+        tensor.shape = vec![2560, 2304];
+        assert!(validate_tensor(&tensor, &spec).is_err());
+        tensor.shape = spec.shape.clone();
+        tensor.dtype = DType::F8E4M3;
+        assert!(validate_tensor(&tensor, &spec).is_err());
+        tensor.dtype = DType::I8;
+        tensor.byte_length -= 1;
+        assert!(validate_tensor(&tensor, &spec).is_err());
+    }
+    #[test]
+    fn tp4_staging_reads_columns_and_rows_beyond_two_gib() {
+        use std::os::unix::fs::FileExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture");
+        let offset = (1u64 << 31) + 64;
+        let file = File::create(&path).unwrap();
+        file.set_len(offset + 32).unwrap();
+        file.write_all_at(&(0u8..32).collect::<Vec<_>>(), offset)
+            .unwrap();
+        let name = "layers.0.ffn.experts.0.w2.weight";
+        let mut catalog = OfficialV41Catalog {
+            config: OfficialV41Config::from_json(
+                crate::OFFICIAL_V41_MODEL_ID,
+                include_bytes!("official-v41-config.json"),
+            )
+            .unwrap(),
+            snapshot: dir.path().into(),
+            tensors: vec![V41Tensor {
+                shard: "fixture".into(),
+                metadata: SafetensorsTensorMetadata {
+                    name: name.into(),
+                    dtype: DType::I8,
+                    shape: vec![4, 8],
+                    byte_offset: offset,
+                    byte_length: 32,
+                },
+                placement: V41TensorPlacement::BackboneExpertTp4 {
+                    layer: 0,
+                    expert: 0,
+                    axis: 1,
+                },
+            }],
+        };
+        for rank in 0..4 {
+            let mut out = [255u8; 8];
+            catalog
+                .read_device_tensor_into(name, Some(rank), &mut out, &mut [0; 16])
+                .unwrap();
+            let expected: Vec<_> = (0..4)
+                .flat_map(|r| [r * 8 + rank * 2, r * 8 + rank * 2 + 1])
+                .map(|v| v as u8)
+                .collect();
+            assert_eq!(out.as_slice(), expected);
+        }
+        assert!(catalog.device_tensor_bytes(name, None).is_err());
+        assert!(catalog.device_tensor_bytes(name, Some(4)).is_err());
+        catalog.tensors[0].placement = V41TensorPlacement::BackboneExpertTp4 {
+            layer: 0,
+            expert: 0,
+            axis: 0,
+        };
+        let mut out = [0; 8];
+        catalog
+            .read_device_tensor_into(name, Some(3), &mut out, &mut [])
+            .unwrap();
+        assert_eq!(out, [24, 25, 26, 27, 28, 29, 30, 31]);
+        catalog.tensors[0].placement = V41TensorPlacement::HostMappedEngram;
+        assert!(catalog.device_tensor_bytes(name, None).is_err());
+    }
+}
