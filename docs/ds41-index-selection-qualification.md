@@ -1,0 +1,30 @@
+# Owned index selection and candidate sharing
+
+`IndexSelectionWave` connects the real-weight query producer to borrowed compressor proposals, paged committed history, bounded top-512 reduction and hierarchical candidate sharing. It accepts up to 16 requests and 4096 query rows. Query token positions must increase within each request and follow the query producer's row order. Output contains ascending logical compressed-row IDs with trailing `-1`; it has no sliding-window offset, leaving physical attention addressing to the KV consumer.
+
+Layers 2, 8 and 14 score their own ratio-two sources. Layer 20 scores the ratio-one source, computes its own top-512 over the full reachable history, and separately retains top-2048 eight-row candidate blocks. Layers 24, 28, 32 and 36 require layer 20's candidates, then rescore them using their own learned queries and head weights. At histories up to 16,384 compressed positions, 2048 blocks cover every reachable position; later layers can use contiguous positions directly after validating the source binding. Longer histories expand the retained source blocks. The source's own row selection is not replaced with a later layer's masked selection.
+
+Every prepared compressor execution receives a unique checked U64 snapshot ID. `IndexBinding` combines it with the existing request lease. Candidate sharing checks the exact snapshot and token-row sequence, not merely matching committed lengths or addresses. It rejects a competing speculative wave with identical requests and positions. All requests must belong to the expected source layer and state owner, and duplicate requests are rejected. Borrowed output lifetime keeps proposal views live until consumers drain. Query-to-hidden numerical correspondence remains an explicit unsafe caller contract; the future backbone scheduler must supply the matching activations and completed producer writes.
+
+## Bounded execution
+
+`ds41rt_v41_candidate_tile` generates logical tile positions and per-query first positions on the GPU. Begins align to eight; positions past the official context limit become `UINT64_MAX`. Full-history position arrays are never staged from the host. Short histories use their actual width rounded to eight, while larger histories use tiles of at most 16,384 positions. The score/selection workspace is reused in stream order across tiles. Each request uses its borrowed single-request page-table view, so scoring launches once per request per tile; cross-request fusion and kernel performance tuning remain open.
+
+A selection owner admits its budget before allocation. It owns one stream, pinned metadata staging, scores/positions, row and block accumulators, scratch, results and a captured graph. Device allocation is 415,808 bytes per capacity row: 33,264,640 bytes at capacity 80 and 1,703,149,568 bytes at 4096. Pinned metadata staging is 56 bytes per capacity row. These allocations are independent of total history length; the graph has at most 64 full-history tiles at the official context limit. The current generic workspace reserves both row and block paths even when a layer does not produce blocks.
+
+Graph reuse checks the producer layer, live row count, tile width/count, request partitioning, buffer addresses and dimensions, and candidate source address. Causal metadata is uploaded before each launch. Changed layouts or buffer bindings cause recapture. Every execution starts fresh row/block accumulators, and failed calls unpublish prior output. Graph work is drained before returning borrowed results or destroying graph/storage. Captured raw pointers are never replayed without validating current borrowed inputs and matching the graph fingerprint.
+
+## Qualification
+
+The external fixture `/tmp/ds41-index-selection-owner` loads actual official compressor and query weights. On **each RTX PRO 6000 Blackwell**, it passes:
+
+- 15 source executions spanning layers 2/8/14/20 with changed/restored query inputs, 16-request batches and a 17,000-token history.
+- 24 later-layer cases across layers 24/28/32/36, each executed twice to exercise replay. Missing candidates, a competing source snapshot and changed request order are rejected.
+- Four 80-row to 1-row to 80-row graph-rebinding cases.
+- A 4096-row prefill batch over 16 requests, executed twice, including queries with no completed ratio-two group.
+
+The long scenario commits 17,000 real-weight source tokens in bounded chunks, then proposes five more. It requires two history tiles and more than 2048 candidate blocks, so candidate pruning is real. The comparison path constructs contiguous positions on the host, uses the separately reference-qualified scoring primitive directly, then performs full-history CPU ordering and block selection. It does not use the new GPU tile generator, native streaming top-k or candidate expansion to construct expected selections. Selected IDs match exactly, including the deterministic lowest-ID tie policy. This establishes composition and ownership; numerical scoring against the official BF16 expressions is established separately in the scoring/overlay qualifications. The wide prefill case has fewer than 512 reachable latents, so every reachable ID must appear and future/incomplete rows must be absent.
+
+`scripts/qualify-ds41-candidate-tiles.py` independently passes six cases per GPU, covering widths 1/8/9/16384, query counts through 4096, the last eight context positions, padded overflow positions, graph replay, sentinel bytes and invalid pointer/shape/alignment/overlap arguments. Native library, daemon and external fixture builds pass. The adjacent JSON records source, build, fixture and result hashes. The external owner fixture remains outside Git; the reusable coordinate qualifier is tracked.
+
+Intermediate-layer reuse in backbone execution, persistent FP8 serving KV, sparse attention, CED scheduling, complete model/API integration and full-model throughput qualification remain open. The existing deterministic top-k tie policy still does not claim PyTorch's exact choice among equal scores. No full-model readiness or speed claim is established here.

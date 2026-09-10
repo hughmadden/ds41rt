@@ -11,6 +11,7 @@ use std::{
 mod index_cache;
 use index_cache::IndexCache;
 pub(crate) use index_cache::IndexCacheView;
+static NEXT_PROPOSAL: AtomicU64 = AtomicU64::new(1);
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 fn ratio(layer: usize) -> Result<usize> {
     match layer {
@@ -260,6 +261,7 @@ impl<'a> CompressorWeights<'a> {
     }
 }
 struct Prepared {
+    snapshot: u64,
     owner: u64,
     chunks: Vec<CompressorChunk>,
     versions: Vec<u64>,
@@ -279,9 +281,25 @@ pub(crate) struct CompressorOutput<'a> {
     pub index_scales: Ds41rtDeviceBuffer,
     pub completed: &'a [CompressorLatentRow],
 }
+/// Exact producing execution and request lease for candidate sharing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct IndexBinding {
+    snapshot: u64,
+    lease: CompressorLease,
+}
+impl IndexBinding {
+    pub fn same_request(self, other: Self) -> bool {
+        self.lease == other.lease
+    }
+    pub fn same_pool(self, other: Self) -> bool {
+        self.lease.owner == other.lease.owner
+    }
+}
 /// Borrowed accepted-history and current-wave index view. Consumers must drain
 /// before releasing these borrows. No proposed rows are published to the cache.
 pub(crate) struct IndexProposal<'a> {
+    binding: IndexBinding,
+    pub source_layer: usize,
     pub cache: IndexCacheView<'a>,
     pub packed: Ds41rtDeviceBuffer,
     pub scales: Ds41rtDeviceBuffer,
@@ -295,6 +313,9 @@ pub(crate) struct IndexProposal<'a> {
     _wave: std::marker::PhantomData<&'a ()>,
 }
 impl IndexProposal<'_> {
+    pub fn binding(&self) -> IndexBinding {
+        self.binding
+    }
     /// Metadata uses slot zero because cache is a single-request page-table view.
     pub fn metadata(&self, position: u64) -> Result<[u64; 6]> {
         ensure!(
@@ -380,7 +401,11 @@ impl CompressorWave<'_, '_> {
                 "compressor state device differs"
             );
         }
+        let snapshot = NEXT_PROPOSAL
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+            .map_err(|_| anyhow::anyhow!("compressor proposal IDs exhausted"))?;
         let mut result = Prepared {
+            snapshot,
             owner: state.owner,
             chunks: chunks.to_vec(),
             versions: vec![],
@@ -688,6 +713,11 @@ impl CompressorWave<'_, '_> {
                 0
             };
         Ok(IndexProposal {
+            binding: IndexBinding {
+                snapshot: prepared.snapshot,
+                lease,
+            },
+            source_layer: self.weights.layer,
             cache: state.index_cache(lease)?,
             packed: output.index_packed,
             scales: output.index_scales,

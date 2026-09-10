@@ -15,6 +15,11 @@ int32_t ds41rt_v41_candidate_block_max(const float* scores,const uint64_t* first
 // U64 logical row candidates [queries,16384]. Unreachable/invalid rows use MAX.
 int32_t ds41rt_v41_candidate_expand(const int32_t* blocks,const uint64_t* lengths,
     uint64_t* positions,int32_t queries,void* stream);
+// Generate a contiguous tile of U64 positions [queries,width] and first
+// positions [queries] on-device. Begin must align to 8 and be below 1048576;
+// coordinates past the model context are MAX. Outputs must be disjoint.
+int32_t ds41rt_v41_candidate_tile(uint64_t* positions,uint64_t* first,
+    int32_t queries,int32_t width,uint64_t begin,void* stream);
 #ifdef __cplusplus
 }
 #endif

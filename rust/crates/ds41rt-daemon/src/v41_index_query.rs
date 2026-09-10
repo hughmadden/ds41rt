@@ -121,6 +121,7 @@ impl<'a> IndexQueryWeights<'a> {
     }
 }
 pub(crate) struct IndexQueryOutput<'a> {
+    pub layer: usize,
     pub packed: Ds41rtDeviceBuffer,
     pub scales: Ds41rtDeviceBuffer,
     pub head_weights: Ds41rtDeviceBuffer,
@@ -281,6 +282,7 @@ impl IndexQueryWave<'_, '_> {
             b
         };
         Ok(IndexQueryOutput {
+            layer: self.weights.layer,
             packed: sized(self.packed.buffer, 2048),
             scales: sized(self.scales.buffer, 128),
             head_weights: sized(self.head_weights.buffer, 64),

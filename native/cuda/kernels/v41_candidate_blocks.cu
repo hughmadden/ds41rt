@@ -10,6 +10,11 @@ bool disjoint(const void* a,uint64_t na,const void* b,uint64_t nb) {
   auto x=reinterpret_cast<uintptr_t>(a),y=reinterpret_cast<uintptr_t>(b);
   return x+na<=y || y+nb<=x;
 }
+__global__ void tile_positions(uint64_t* positions,uint64_t* first,int width,uint64_t begin) {
+  const uint64_t col=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x,row=blockIdx.y;
+  if(col==0)first[row]=begin;
+  if(col<uint64_t(width))positions[row*width+col]=begin+col<1048576?begin+col:UINT64_MAX;
+}
 __global__ void block_max(const float* scores,const uint64_t* first,const uint64_t* lengths,
     float* maxima,uint64_t* ids,int width,int blocks) {
   const uint64_t row=blockIdx.y,block=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
@@ -60,5 +65,17 @@ extern "C" int32_t ds41rt_v41_candidate_expand(const int32_t* blocks,const uint6
   if(!valid(blocks,q*8192,4)||!valid(lengths,q*8,8)||!valid(positions,q*131072,8)||
       !disjoint(positions,q*131072,blocks,q*8192)||!disjoint(positions,q*131072,lengths,q*8))return cudaErrorInvalidValue;
   expand<<<dim3(64,queries),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(blocks,lengths,positions);
+  return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_candidate_tile(uint64_t* positions,uint64_t* first,
+    int32_t queries,int32_t width,uint64_t begin,void* stream) {
+  if(queries<1 || queries>4096 || width<1 || width>16384 || begin>=1048576 || begin%8)
+    return cudaErrorInvalidValue;
+  const uint64_t bytes=uint64_t(queries)*width*8,starts=uint64_t(queries)*8;
+  if(!valid(positions,bytes,8) || !valid(first,starts,8) || !disjoint(positions,bytes,first,starts))
+    return cudaErrorInvalidValue;
+  tile_positions<<<dim3((width+255)/256,queries),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      positions,first,width,begin);
   return cudaGetLastError();
 }
