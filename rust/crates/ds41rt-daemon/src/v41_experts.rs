@@ -1,4 +1,7 @@
 //! Native V4.1 expert residency; one GPU worker owns each layer and its buffers.
+mod execution;
+pub(crate) use execution::{ExpertExecution, ExpertExecutionBudget};
+
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
     Ds41rtDeviceBuffer, Ds41rtHostBuffer, NativeLibrary, V41ExpertKernel, V41_EXPERT_POINTER_COUNT,

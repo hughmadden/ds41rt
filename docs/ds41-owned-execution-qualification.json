@@ -1,0 +1,181 @@
+{
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_experts.rs": "7c3f9817f58bfe9d788f0eff0487488809dd8d83daedba7c25f46eaacaa96770",
+    "rust/crates/ds41rt-daemon/src/v41_experts/execution.rs": "c6fd0743bac1c7e9ffeb0fb3d2f664aa07fe06a87451f2ebecdb0e514d3af10c"
+  },
+  "checks": {
+    "rtx": {
+      "run": "owned execution Dspark { stage: 0 }: two M16 waves, partial rows 1/7/15, direct and mutated alternating graph replay, no replay allocations, budget/row/capture guards and GPU teardown passed; buffer bytes per wave 7793544",
+      "reference": {
+        "role": "dspark",
+        "rows": 16,
+        "active_experts": [
+          0,
+          64,
+          127
+        ],
+        "reference": "independent K32 FP8/BF16 oracle plus shared output"
+      },
+      "numerics": [
+        {
+          "phase": "direct",
+          "wave": 0,
+          "relative_l2": 3.456504418863915e-05,
+          "cosine": 1.0000040531158447
+        },
+        {
+          "phase": "direct",
+          "wave": 1,
+          "relative_l2": 0.0,
+          "cosine": 1.0000042915344238
+        },
+        {
+          "phase": "replay",
+          "wave": 0,
+          "relative_l2": 0.0,
+          "cosine": 1.0000042915344238
+        },
+        {
+          "phase": "replay",
+          "wave": 1,
+          "relative_l2": 3.456504418863915e-05,
+          "cosine": 1.0000040531158447
+        },
+        {
+          "phase": "partial",
+          "wave": 0,
+          "rows": 1,
+          "relative_l2": 0.0,
+          "cosine": 1.0000019073486328
+        },
+        {
+          "phase": "partial",
+          "wave": 0,
+          "rows": 7,
+          "relative_l2": 0.0,
+          "cosine": 1.0000061988830566
+        },
+        {
+          "phase": "partial",
+          "wave": 0,
+          "rows": 15,
+          "relative_l2": 3.5056822525803e-05,
+          "cosine": 1.000004768371582
+        },
+        {
+          "phase": "partial",
+          "wave": 1,
+          "rows": 1,
+          "relative_l2": 0.0,
+          "cosine": 1.0000019073486328
+        },
+        {
+          "phase": "partial",
+          "wave": 1,
+          "rows": 7,
+          "relative_l2": 0.0,
+          "cosine": 1.0000050067901611
+        },
+        {
+          "phase": "partial",
+          "wave": 1,
+          "rows": 15,
+          "relative_l2": 0.0,
+          "cosine": 1.0000039339065552
+        }
+      ]
+    },
+    "ostrich": {
+      "run": "owned execution Backbone { layer: 0, rank: 3 }: two M16 waves, partial rows 1/7/15, direct and mutated alternating graph replay, no replay allocations, budget/row/capture guards and GPU teardown passed; buffer bytes per wave 12046356",
+      "reference": {
+        "role": "backbone",
+        "rows": 16,
+        "active_experts": [
+          0,
+          192,
+          383,
+          1,
+          2,
+          3
+        ],
+        "reference": "independent K32 FP8/BF16 oracle plus shared output"
+      },
+      "numerics": [
+        {
+          "phase": "direct",
+          "wave": 0,
+          "relative_l2": 0.0,
+          "cosine": 0.999992311000824
+        },
+        {
+          "phase": "direct",
+          "wave": 1,
+          "relative_l2": 0.00044188203173689544,
+          "cosine": 0.9999980330467224
+        },
+        {
+          "phase": "replay",
+          "wave": 0,
+          "relative_l2": 0.00044188203173689544,
+          "cosine": 0.9999980330467224
+        },
+        {
+          "phase": "replay",
+          "wave": 1,
+          "relative_l2": 0.0,
+          "cosine": 0.999992311000824
+        },
+        {
+          "phase": "partial",
+          "wave": 0,
+          "rows": 1,
+          "relative_l2": 0.0,
+          "cosine": 1.000003457069397
+        },
+        {
+          "phase": "partial",
+          "wave": 0,
+          "rows": 7,
+          "relative_l2": 0.0,
+          "cosine": 1.0000051259994507
+        },
+        {
+          "phase": "partial",
+          "wave": 0,
+          "rows": 15,
+          "relative_l2": 0.0,
+          "cosine": 0.9999930262565613
+        },
+        {
+          "phase": "partial",
+          "wave": 1,
+          "rows": 1,
+          "relative_l2": 0.0,
+          "cosine": 1.0000030994415283
+        },
+        {
+          "phase": "partial",
+          "wave": 1,
+          "rows": 7,
+          "relative_l2": 0.0,
+          "cosine": 1.0000028610229492
+        },
+        {
+          "phase": "partial",
+          "wave": 1,
+          "rows": 15,
+          "relative_l2": 0.00045062086428515613,
+          "cosine": 0.9999996423721313
+        }
+      ]
+    }
+  },
+  "fixture_sha256": {
+    "/tmp/ds41-owned-execution/src/main.rs": "ab3ba5b850af03ee7050ec000b5b29c117253dddeafe9c1128b55399a6b06f7c",
+    "/tmp/ds41-v41-aot/prepare_owned_execution.py": "60b6359a72d63032f81208c237e22f0841c72c98c492bf7f82ce0b9f3bf56d4a",
+    "/tmp/ds41-v41-aot/check_owned_execution.py": "49ccf394bd52ad14572e5e2c629a62a2dbf504b1b82b4054fe08ad7d3d88a84c",
+    "/tmp/ds41-v41-aot/allocation_audit.cc": "51c6e9b6a329ac11966450e24e1e927f27001d4bc7929ccb15624fc1d53d87e4"
+  },
+  "daemon_compile": "passed; 444 warnings including unused entry points awaiting serving integration",
+  "scope": "Owned native expert execution on RTX 0 and ostrich with two M16 instances, smaller direct batches, shared output, mutated alternating replay and device/pinned allocation checks; not network TP or service scheduling."
+}
