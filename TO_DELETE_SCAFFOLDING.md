@@ -89,3 +89,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-master-merge/` on ostrich, `master-merge-*.log` under `/tmp/ds41-v41-fp8-aot/`, and `/tmp/ds41-v41-aot/master-merge-projections-rtx*.json` during Goal 2 cleanup; retain the dependency pin, merged production/regression code and committed review/evidence.
 
 - Delete `/tmp/ds41-attention-wave/`, `rust/target/debug/ds41-attention-wave-fixture`, `/tmp/ds41-v41-aot/attention-wave-ops-rtx*.json` and `attention-wave-*.log` under `/tmp/ds41-v41-fp8-aot/`, including the initial live-row/capacity admission failure; retain production owners, fused KV kernels, the reusable primitive qualifier and committed evidence.
+
+- Profile-removal editing helpers `/tmp/remove-serve-profiles.py`, `/tmp/fix-kv-entry.py` and `/tmp/ds41-no-profiles-{tests,rust}.log` are disposable after review. No model data was loaded for this change.

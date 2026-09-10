@@ -6,7 +6,7 @@ source "$repo_root/scripts/release-common.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./build.sh [--profile FILE] [--spark-hosts HOST,...]
+Usage: ./build.sh [--config FILE] [--spark-hosts HOST,...]
 
 Builds the coordinator image locally and the Spark image natively over SSH on
 the first configured Spark. It exports both release artifact sets to dist/
@@ -26,7 +26,7 @@ config="$repo_root/ds41rt.config"
 build_hosts_csv=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --profile|--config)
+    --config)
       config="${2:?$1 requires a configuration file}"
       shift 2
       ;;

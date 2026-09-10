@@ -85,7 +85,7 @@ def test_wip_launcher_has_separate_expert_and_deployment_identities() -> None:
 def test_wip_launcher_rejects_a_stale_profile_resolver() -> None:
     launcher = (ROOT / "scripts" / "run-wip.sh").read_text(encoding="utf-8")
 
-    resolver = launcher.index("resolve_serve_profile.py")
+    resolver = launcher.index("resolve_serve_settings.py")
     policy_check = launcher.index("resolved_dspark_draft_policy", resolver)
     coordinator_dispatch = launcher.index("== starting coordinator process")
     assert resolver < policy_check < coordinator_dispatch

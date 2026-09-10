@@ -54,7 +54,7 @@ DEFAULT_SOURCE_PATHS = (
     "rust/crates/ds41rt-daemon/src/commands/real_full/coordinator_kernels/mlp.rs",
     "rust/crates/ds41rt-daemon/src/commands/real_full/coordinator_kernels/mod.rs",
     "rust/crates/ds41rt-daemon/src/commands/real_full/entry.rs",
-    "python/reference/ds41rt_reference/serve_profiles.py",
+    "python/reference/ds41rt_reference/serve_settings.py",
 )
 PROBE_KINDS = ("local", "cross", "action", "control")
 DEFAULT_PROBES = ("local", "cross", "action")

@@ -208,7 +208,7 @@ fn validate_real_full_request_token_limits(
     Ok(())
 }
 
-fn validate_real_full_request_profile_limits(
+fn validate_real_full_request_serving_limits(
     prompt_tokens: usize,
     max_tokens: usize,
 ) -> Result<(), ApiError> {
@@ -331,7 +331,7 @@ pub(crate) fn try_real_ds4_full_streaming_response(
         || prompt_token_count(&state, backend, &prompt),
         |ids| ids.len(),
     );
-    validate_real_full_request_profile_limits(prompt_tokens, max_tokens)?;
+    validate_real_full_request_serving_limits(prompt_tokens, max_tokens)?;
     let id = format!("chatcmpl-{}", Uuid::new_v4());
     let created = unix_timestamp();
     let model = request.model.clone();
@@ -880,7 +880,7 @@ pub(crate) async fn real_ds4_full_completion(
     allow_tool_calls: bool,
     constraint: Option<Arc<RealFullConstraint>>,
 ) -> Result<BackendCompletion, ApiError> {
-    validate_real_full_request_profile_limits(prompt_tokens, max_tokens)?;
+    validate_real_full_request_serving_limits(prompt_tokens, max_tokens)?;
     let full = state
         .config
         .real_full
@@ -2194,7 +2194,7 @@ mod token_limit_tests {
     use super::validate_real_full_request_token_limits;
 
     #[test]
-    fn profile_limits_allow_flexible_input_output_splits_within_context() {
+    fn serving_limits_allow_flexible_input_output_splits_within_context() {
         validate_real_full_request_token_limits(300_000, 100_000, Some(400_000), Some(100_000))
             .expect("boundary request should pass");
         validate_real_full_request_token_limits(350_000, 50_000, Some(400_000), Some(100_000))
@@ -2220,7 +2220,7 @@ mod token_limit_tests {
     }
 
     #[test]
-    fn absent_profile_limits_preserve_legacy_request_behavior() {
+    fn absent_serving_limits_preserve_legacy_request_behavior() {
         validate_real_full_request_token_limits(500_000, 200_000, None, None)
             .expect("unset limits should defer to sequence-capacity admission");
     }

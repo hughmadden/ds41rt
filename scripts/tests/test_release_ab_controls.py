@@ -11,7 +11,6 @@ RELEASE_COMMON = ROOT / "scripts" / "release-common.sh"
 PRO_MODEL_ID = "wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1"
 
 BASE_CONFIG = """\
-PROFILE=balanced
 MODEL_ID=deepseek-ai/DeepSeek-V4-Flash-0731
 MODEL_VARIANT=flash
 EXPERT_FORMAT=native
@@ -216,9 +215,9 @@ def test_developer_publish_smoke_passes_url_before_model() -> None:
     assert command.index("http://127.0.0.1:8000") < command.index(PRO_MODEL_ID)
 
 
-def test_release_profile_resolution_has_selected_gpu_access() -> None:
+def test_release_settings_resolution_has_selected_gpu_access() -> None:
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
-    resolver = release.split("resolve_profile() {", maxsplit=1)[1].split(
+    resolver = release.split("resolve_settings() {", maxsplit=1)[1].split(
         "\n}", maxsplit=1
     )[0]
 
@@ -500,7 +499,7 @@ def test_launchers_fingerprint_and_export_ds4_format_controls() -> None:
         'wip_allow_historical_exl3_control="${DS41RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL:-0}"'
         in phase0
     )
-    assert 'wip_allow_historical_exl3_control="${74:-0}"' in phase0
+    assert 'wip_allow_historical_exl3_control="${73:-0}"' in phase0
     assert (
         '-e DS41RT_WIP_ALLOW_HISTORICAL_EXL3_CONTROL='
         '"$wip_allow_historical_exl3_control"'

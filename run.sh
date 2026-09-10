@@ -6,12 +6,12 @@ source "$repo_root/scripts/release-common.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./run.sh [--profile FILE] [--restart] [--dry-run]
-       ./run.sh --wip [--wip-slot NAME] [--profile FILE] [--restart] [--dry-run]
+Usage: ./run.sh [--config FILE] [--restart] [--dry-run]
+       ./run.sh --wip [--wip-slot NAME] [--config FILE] [--restart] [--dry-run]
                 [--allow-development-unqualified-exl3]
 
-Uses ds41rt.config beside this script by default. Despite the option name,
---profile FILE selects an entire alternate configuration file.
+Uses ds41rt.config beside this script by default.
+--config FILE selects an entire alternate configuration file.
 
 --restart  gracefully restarts the selected serving stack; WIP launches retain
            exact fingerprint-matched resident experts when safe
@@ -33,7 +33,7 @@ restart=0
 dry_run=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --profile|--config)
+    --config)
       config="${2:?$1 requires a configuration file}"
       shift 2
       ;;
@@ -203,9 +203,8 @@ elif ((release_coordinator_running == 0 && stale_release_coordinator == 0)); the
   echo "  coordinator: image ready; no API process running"
 fi
 
-profile_args=(
+settings_args=(
   --repo-root "$repo_root"
-  --profile "$PROFILE"
   --model-id "$MODEL_ID"
   --model-variant "$MODEL_VARIANT"
   --expert-format "$EXPERT_FORMAT"
@@ -219,11 +218,11 @@ profile_args=(
   --spark-reduction-min-rows "$SPARK_REDUCTION_MIN_ROWS"
   --dry-run
 )
-[[ -z "$KV_POOL_TOKENS" ]] || profile_args+=(--kv-pool-tokens "$KV_POOL_TOKENS")
-[[ -z "$MAX_CONTEXT_TOKENS" ]] || profile_args+=(--max-context-tokens "$MAX_CONTEXT_TOKENS")
-[[ -z "$MAX_OUTPUT_TOKENS" ]] || profile_args+=(--max-output-tokens "$MAX_OUTPUT_TOKENS")
+[[ -z "$KV_POOL_TOKENS" ]] || settings_args+=(--kv-pool-tokens "$KV_POOL_TOKENS")
+[[ -z "$MAX_CONTEXT_TOKENS" ]] || settings_args+=(--max-context-tokens "$MAX_CONTEXT_TOKENS")
+[[ -z "$MAX_OUTPUT_TOKENS" ]] || settings_args+=(--max-output-tokens "$MAX_OUTPUT_TOKENS")
 
-resolve_profile() {
+resolve_settings() {
   docker run --rm \
     --gpus device="$RELEASE_COORDINATOR_GPU_UUID" \
     --net=host \
@@ -232,17 +231,17 @@ resolve_profile() {
     -v "$hf_home:/root/.cache/huggingface:ro" \
     -e HF_HOME="$hf_home" \
     "$COORDINATOR_DOCKER_INFERENCE" \
-    python3 /opt/ds41rt/python/tools/resolve_serve_profile.py "${profile_args[@]}"
+    python3 /opt/ds41rt/python/tools/resolve_serve_settings.py "${settings_args[@]}"
 }
 
-resolved_json="$state_dir/resolved-profile.json"
-resolve_profile >"$resolved_json"
-jq -e . "$resolved_json" >/dev/null || release_die "profile resolver returned invalid JSON"
+resolved_json="$state_dir/resolved-settings.json"
+resolve_settings >"$resolved_json"
+jq -e . "$resolved_json" >/dev/null || release_die "settings resolver returned invalid JSON"
 resolved_dspark_draft_policy="$(
   jq -er '.dspark_draft_policy | select(type == "string")' "$resolved_json"
-)" || release_die "profile resolver did not report its dSpark draft policy"
+)" || release_die "settings resolver did not report its dSpark draft policy"
 [[ "$resolved_dspark_draft_policy" == "$DSPARK_DRAFT_POLICY" ]] ||
-  release_die "profile resolver draft policy mismatch: requested $DSPARK_DRAFT_POLICY, resolved $resolved_dspark_draft_policy"
+  release_die "settings resolver draft policy mismatch: requested $DSPARK_DRAFT_POLICY, resolved $resolved_dspark_draft_policy"
 resolved_fixed_drafts="$(
   jq -r '.environment.DS41RT_REAL_FULL_DSPARK_FIXED_DRAFTS // ""' "$resolved_json"
 )"
@@ -255,7 +254,7 @@ else
 fi
 
 blockers="$(jq -r '.blockers[]?' "$resolved_json")"
-[[ -z "$blockers" ]] || release_die "profile blockers:\n$blockers"
+[[ -z "$blockers" ]] || release_die "launch blockers:\n$blockers"
 deployment_fingerprint="$(
   {
     jq -S . "$resolved_json"
@@ -587,7 +586,7 @@ done
 curl -fsS "http://127.0.0.1:${ADDR##*:}/v1/models" >"$state_dir/models.json"
 release_validate_model_list_file "$state_dir/models.json" "$RELEASE_MODEL_ID"
 echo "DS41RT release server is ready at http://127.0.0.1:${ADDR##*:}/v1/"
-echo "  profile:     $PROFILE"
+echo "  KV cache:    fp8"
 echo "  model:       $RELEASE_MODEL_ID"
 echo "  variant:     $MODEL_VARIANT"
 echo "  experts:     $EXPERT_FORMAT"

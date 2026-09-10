@@ -17,7 +17,6 @@ EXACT_EXPERT_ENVIRONMENT_KEYS = {
     "DS41RT_PROTOCOL_V2_TCP_TIMING",
     "DS41RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES",
     "DS41RT_REAL_FULL_CUDA_ROUTE_VALIDATE",
-    "DS41RT_SERVE_PROFILE",
     "DS41RT_SPARK_BUILD_PROFILE",
     "DS41RT_SPARK_EXPERT_REAL_LAYER",
     "DS41RT_SPARK_EXPERT_TRANSPORT",
@@ -50,19 +49,19 @@ def parse_settings(values: list[str]) -> dict[str, str]:
 
 
 def build_payload(
-    resolved_profile: dict[str, object],
+    resolved_settings: dict[str, object],
     expert_slot_fingerprint: str,
     settings: dict[str, str],
     ambient_environment: dict[str, str],
 ) -> dict[str, object]:
-    profile_environment = resolved_profile.get("environment")
-    if not isinstance(profile_environment, dict) or not all(
+    settings_environment = resolved_settings.get("environment")
+    if not isinstance(settings_environment, dict) or not all(
         isinstance(key, str) and isinstance(value, (str, int, float, bool))
-        for key, value in profile_environment.items()
+        for key, value in settings_environment.items()
     ):
-        raise ValueError("resolved profile has no scalar environment object")
+        raise ValueError("resolved settings has no scalar environment object")
 
-    # Profile resolution has the same last-writer-wins precedence used by the
+    # Settings resolution has the same last-writer-wins precedence used by the
     # launcher before phase0-spark-tcp-bench.sh is invoked.
     expert_environment = {
         key: value
@@ -72,7 +71,7 @@ def build_payload(
     expert_environment.update(
         {
             key: str(value)
-            for key, value in profile_environment.items()
+            for key, value in settings_environment.items()
             if is_expert_environment_key(key)
         }
     )
@@ -92,7 +91,7 @@ def canonical_bytes(payload: dict[str, object]) -> bytes:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--resolved-profile", type=Path, required=True)
+    parser.add_argument("--resolved-settings", type=Path, required=True)
     parser.add_argument("--expert-slot-fingerprint", required=True)
     parser.add_argument("--setting", action="append", default=[])
     parser.add_argument("--print-payload", action="store_true")
@@ -101,11 +100,11 @@ def main() -> int:
     if not SHA256_RE.fullmatch(args.expert_slot_fingerprint):
         parser.error("--expert-slot-fingerprint must be a lowercase SHA-256 value")
     try:
-        resolved_profile = json.loads(args.resolved_profile.read_text(encoding="utf-8"))
-        if not isinstance(resolved_profile, dict):
-            raise ValueError("resolved profile root is not an object")
+        resolved_settings = json.loads(args.resolved_settings.read_text(encoding="utf-8"))
+        if not isinstance(resolved_settings, dict):
+            raise ValueError("resolved settings root is not an object")
         payload = build_payload(
-            resolved_profile,
+            resolved_settings,
             args.expert_slot_fingerprint,
             parse_settings(args.setting),
             dict(os.environ),

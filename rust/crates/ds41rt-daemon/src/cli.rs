@@ -96,7 +96,7 @@ pub(crate) struct CoordinatorArgs {
     pub(crate) backend: String,
     #[arg(long, default_value = "inproc")]
     pub(crate) transport: String,
-    #[arg(long, default_value = "bf16")]
+    #[arg(long, default_value = "fp8")]
     pub(crate) kv_cache_dtype: String,
     #[arg(long, default_value_t = DEFAULT_REAL_FULL_MAX_CONTEXT_TOKENS)]
     pub(crate) max_context_tokens: usize,

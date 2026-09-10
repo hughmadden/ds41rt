@@ -17,13 +17,13 @@ report_wip_startup_phase() {
 
 usage() {
   cat <<'EOF'
-Usage: ./run.sh --wip [--wip-slot NAME] [--profile FILE] [--restart] [--dry-run]
+Usage: ./run.sh --wip [--wip-slot NAME] [--config FILE] [--restart] [--dry-run]
                     [--dspark-off | --dspark-shadow-trace]
                     [--execution-lanes N]
                     [--allow-development-unqualified-exl3]
 
 Runs a named slot inside the five persistent WIP development containers.
-Without --profile, the configuration frozen into the coordinator slot is used.
+Without --config, the configuration frozen into the coordinator slot is used.
 No source synchronization, compilation, image creation, or container
 recreation is performed here; use wip.sh for those operations.
 With --restart, exact fingerprint-matched resident Spark experts are retained;
@@ -33,7 +33,7 @@ launch; release launchers never accept it.
 The dSpark shadow trace disables active speculation for the coordinator and
 records all five proposal positions against the unchanged target trajectory.
 The dSpark-off override runs only the target model without changing the slot's
-frozen production profile.
+frozen production configuration.
 The execution-lane override narrows coordinator admission for lane-local
 correctness and performance diagnostics without changing Spark TP placement.
 EOF
@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
       slot="${2:?--wip-slot requires a name}"
       shift 2
       ;;
-    --profile|--config)
+    --config)
       config="${2:?$1 requires a configuration file}"
       config_explicit=1
       shift 2
@@ -333,9 +333,8 @@ coordinator_engine_commit="wip-${slot}-${coordinator_slot_fingerprint:0:12}-${ex
 coordinator_image_id="$(docker image inspect -f '{{.Id}}' "$COORDINATOR_DOCKER_DEV")"
 report_wip_startup_phase slot-validation
 
-profile_args=(
+settings_args=(
   --repo-root "$coordinator_workspace"
-  --profile "$PROFILE"
   --model-id "$MODEL_ID"
   --model-variant "$MODEL_VARIANT"
   --expert-format "$EXPERT_FORMAT"
@@ -349,23 +348,23 @@ profile_args=(
   --spark-reduction-min-rows "$SPARK_REDUCTION_MIN_ROWS"
   --dry-run
 )
-[[ -z "$KV_POOL_TOKENS" ]] || profile_args+=(--kv-pool-tokens "$KV_POOL_TOKENS")
-[[ -z "$MAX_CONTEXT_TOKENS" ]] || profile_args+=(--max-context-tokens "$MAX_CONTEXT_TOKENS")
-[[ -z "$MAX_OUTPUT_TOKENS" ]] || profile_args+=(--max-output-tokens "$MAX_OUTPUT_TOKENS")
+[[ -z "$KV_POOL_TOKENS" ]] || settings_args+=(--kv-pool-tokens "$KV_POOL_TOKENS")
+[[ -z "$MAX_CONTEXT_TOKENS" ]] || settings_args+=(--max-context-tokens "$MAX_CONTEXT_TOKENS")
+[[ -z "$MAX_OUTPUT_TOKENS" ]] || settings_args+=(--max-output-tokens "$MAX_OUTPUT_TOKENS")
 
-resolved_json="$state_dir/resolved-profile.json"
+resolved_json="$state_dir/resolved-settings.json"
 docker exec \
   -e PYTHONPATH="$coordinator_workspace/third_party/sparkinfer:$coordinator_workspace/python/reference/ds41rt_reference:$coordinator_workspace/python/reference:/opt/ds41rt/third_party/sparkinfer" \
   -w "$coordinator_workspace" \
   "$coordinator_container" \
-  python3 "$coordinator_workspace/python/tools/resolve_serve_profile.py" \
-  "${profile_args[@]}" >"$resolved_json"
-jq -e . "$resolved_json" >/dev/null || release_die "profile resolver returned invalid JSON"
+  python3 "$coordinator_workspace/python/tools/resolve_serve_settings.py" \
+  "${settings_args[@]}" >"$resolved_json"
+jq -e . "$resolved_json" >/dev/null || release_die "settings resolver returned invalid JSON"
 resolved_dspark_draft_policy="$(
   jq -er '.dspark_draft_policy | select(type == "string")' "$resolved_json"
-)" || release_die "WIP slot profile resolver did not report its dSpark draft policy; rebuild the slot"
+)" || release_die "WIP slot settings resolver did not report its dSpark draft policy; rebuild the slot"
 [[ "$resolved_dspark_draft_policy" == "$DSPARK_DRAFT_POLICY" ]] ||
-  release_die "WIP slot profile resolver draft policy mismatch: requested $DSPARK_DRAFT_POLICY, resolved $resolved_dspark_draft_policy"
+  release_die "WIP slot settings resolver draft policy mismatch: requested $DSPARK_DRAFT_POLICY, resolved $resolved_dspark_draft_policy"
 resolved_fixed_drafts="$(
   jq -r '.environment.DS41RT_REAL_FULL_DSPARK_FIXED_DRAFTS // ""' "$resolved_json"
 )"
@@ -377,12 +376,12 @@ else
     release_die "WIP slot disabled/adaptive dSpark unexpectedly resolved a fixed proposal width"
 fi
 blockers="$(jq -r '.blockers[]?' "$resolved_json")"
-[[ -z "$blockers" ]] || release_die "profile blockers:\n$blockers"
+[[ -z "$blockers" ]] || release_die "launch blockers:\n$blockers"
 
 config_sha256="$(sha256sum "$config" | awk '{print $1}')"
 expert_runtime_fingerprint="$(
   python3 "$repo_root/scripts/wip-expert-runtime-identity.py" \
-    --resolved-profile "$resolved_json" \
+    --resolved-settings "$resolved_json" \
     --expert-slot-fingerprint "$expert_slot_fingerprint" \
     --setting "model_id=$RELEASE_MODEL_ID" \
     --setting "model_revision=$expert_model_revision" \
@@ -406,7 +405,7 @@ deployment_fingerprint="$({
     "$config_sha256" "$coordinator_slot_fingerprint" \
     "$expert_runtime_fingerprint" "$ADDR" "$coordinator_engine_commit"
 } | sha256sum | awk '{print $1}')"
-report_wip_startup_phase profile-resolution
+report_wip_startup_phase settings-resolution
 
 process_status_local() {
   docker exec "$coordinator_container" \
@@ -720,7 +719,7 @@ if [[ -n "${DS41RT_REAL_FULL_GRAPH_CAPTURE_TRACE:-}" ]]; then
 fi
 
 # Coordinator-only kernel candidates are WIP launch controls. They do not
-# affect Spark identity, and remain absent from production profiles until the
+# affect Spark identity, and remain absent from production settings until the
 # corresponding hardware qualification promotes them.
 if [[ -n "${DS41RT_DS4_FLASH_ROUTER_SHORTLIST:-}" ]]; then
   echo "DS41RT_DS4_FLASH_ROUTER_SHORTLIST=$DS41RT_DS4_FLASH_ROUTER_SHORTLIST" \
@@ -733,7 +732,7 @@ if [[ -n "${DS41RT_REAL_FULL_BF16_HIDDEN_READBACK_OVERLAP:-}" ]]; then
 fi
 
 # Native activation and exact row-route capture are likewise explicit WIP
-# diagnostics. Keep them out of release profiles and expert identity: only the
+# diagnostics. Keep them out of release settings and expert identity: only the
 # coordinator writes them, and callers must request a restart when enabling or
 # disabling the capture environment.
 for diagnostic_name in \
@@ -823,7 +822,7 @@ release_validate_model_list_file "$state_dir/models.json" "$RELEASE_MODEL_ID"
 report_wip_startup_phase api-ready
 echo "DS41RT WIP server is ready at http://127.0.0.1:${ADDR##*:}/v1/"
 echo "  slot:        $slot"
-echo "  profile:     $PROFILE"
+echo "  KV cache:    fp8"
 echo "  model:       $RELEASE_MODEL_ID"
 echo "  variant:     $MODEL_VARIANT"
 echo "  experts:     $EXPERT_FORMAT"

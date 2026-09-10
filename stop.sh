@@ -6,14 +6,14 @@ source "$repo_root/scripts/release-common.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./stop.sh [--profile FILE]
+Usage: ./stop.sh [--config FILE]
 
 Gracefully stops release and WIP DS41RT processes on the coordinator and four
 Sparks selected by ds41rt.config. Release containers are removed; persistent
 WIP development containers are stopped but retained. WIP slots, build caches,
 images, model caches, and unrelated containers are left untouched.
 
-Despite the option name, --profile FILE selects an entire alternate
+--config FILE selects an entire alternate
 configuration file.
 EOF
 }
@@ -21,7 +21,7 @@ EOF
 config="$repo_root/ds41rt.config"
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --profile|--config)
+    --config)
       config="${2:?$1 requires a configuration file}"
       shift 2
       ;;

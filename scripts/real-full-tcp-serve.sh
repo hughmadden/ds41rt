@@ -44,7 +44,7 @@ Environment:
       set 1 to use one completion-queue polling thread per execution lane
       instead of one busy poller per Spark QP; default: 1.
   DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE
-      DeepSeek V4 target KV profile: bf16, fp8, or native nvfp4; default: bf16.
+      Target KV uses FP8 only.
   DS41RT_REAL_FULL_SERVE_MAX_CONTEXT_TOKENS
       maximum logical tokens in one target sequence; default: 131072.
   DS41RT_REAL_FULL_DSPARK
@@ -302,7 +302,7 @@ else
     *) protocol_v2_verbs_host_stripe_spark_reduction=0 ;;
   esac
 fi
-kv_cache_dtype="${DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE:-bf16}"
+kv_cache_dtype="${DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE:-fp8}"
 max_context_tokens="${DS41RT_REAL_FULL_SERVE_MAX_CONTEXT_TOKENS:-131072}"
 native_lib_explicit=0
 if [ -n "${DS41RT_NATIVE_LIB:-}" ]; then
@@ -743,9 +743,9 @@ case "$coordinator_transport" in
     ;;
 esac
 case "$kv_cache_dtype" in
-  bf16|fp8|nvfp4) ;;
+  fp8) ;;
   *)
-    echo "DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE must be bf16, fp8, or nvfp4" >&2
+    echo "DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE must be fp8" >&2
     exit 2
     ;;
 esac

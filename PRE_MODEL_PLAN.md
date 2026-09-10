@@ -132,3 +132,9 @@ dSpark attention-kernel progress: native tensor-core QK, 64-key online softmax, 
 b12x master progress: all seven V4.1 commits are merged into the fork's master with a fixed provenance pin, RTX/Spark regressions and fresh AOT projection checks, while reusable attention/mHC/loader candidates and incompatibilities are recorded in `docs/ds41-b12x-master-review.md`.
 
 Owned-attention progress: the complete query/KV-to-output wave and fused private KV producer pass changed-input graphs on both RTX GPUs for all three stages at up to sixteen requests, with generation-checked cache reads while frequency/main-cache producers and outer mHC sequencing remain open in `docs/ds41-attention-wave-qualification.md`.
+
+### Serving profile removal (2026-09-11)
+
+Removed balanced/long/accuracy presets, PROFILE configuration, profile selection and expert-environment propagation. Launch settings resolve through `serve_settings.py` / `resolve_serve_settings.py`; alternate configuration files use `--config`. Release, WIP and direct real-full serving now require FP8 target KV. BF16 transactional mirrors and dSpark FP8-quantized/dequantized BF16 windows retain their reference contracts. b12x device performance policies and timing instrumentation are separate from serving presets. Existing legacy model sizing/defaults still need the V4.1 serving migration; this does not qualify full-model serving.
+
+Validation: 63 targeted Python/launcher checks passed; shell syntax and build/run help checks passed; the daemon test binary compiled and its FP8-only serving entry test passed. Nine resolver tests also passed after the final naming cleanup. No real-model launch or container rebuild was performed for this change.

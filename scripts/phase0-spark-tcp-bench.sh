@@ -207,7 +207,6 @@ route_preload_cooperative="${DS41RT_REAL_FULL_NVFP4_ROUTE_PRELOAD_COOPERATIVE:-1
 weight_preload_nccl_port="${DS41RT_EXPERT_WEIGHT_PRELOAD_NCCL_PORT:-9350}"
 b12x_route_lanes="${DS41RT_B12X_SPARK_ROUTE_LANES:-4}"
 b12x_grouped_decode="${DS41RT_B12X_SPARK_GROUPED_DECODE:-1}"
-serve_profile="${DS41RT_SERVE_PROFILE:-}"
 b12x_w4a16_device_weights="${DS41RT_B12X_SPARK_W4A16_DEVICE_WEIGHTS:-1}"
 b12x_w4a16_decode_grid_x="${DS41RT_B12X_SPARK_W4A16_DECODE_GRID_X:-}"
 b12x_w4a16_small_m_mode="${DS41RT_B12X_SPARK_W4A16_SMALL_M_MODE:-wide}"
@@ -1031,15 +1030,14 @@ start_expertd() {
   local intermediate_owner_peers_arg="${intermediate_owner_peers:-__unset__}"
   local intermediate_rdma_additional_peers_arg="${intermediate_rdma_additional_peers:-__unset__}"
   local intermediate_rdma_devices_arg="${intermediate_rdma_devices:-__unset__}"
-  local serve_profile_arg="${serve_profile:-__unset__}"
   # ssh flattens its argument vector into a remote shell command. A quoted
   # empty argument is not preserved, so use sentinels for optional arguments
   # late in the vector or every following positional parameter shifts left.
   local existing_container_arg="${existing_container:-__unset__}"
   local runtime_cache_dir_arg="${runtime_cache_dir:-__unset__}"
-  echo "== starting $mode ProtocolV2 expertd on $host:$port transport=$expert_transport real_layer=${expert_real_layer:-all} intermediate_shard=${intermediate_shard_rank}/${intermediate_shards} intermediate_reduction=$intermediate_reduction reduction_dtype=$intermediate_reduction_dtype owner_reduction_dtype=$intermediate_owner_reduction_dtype fused_fp8_reduction=$fused_fp8_reduction protocol_v2_execution_lanes=$protocol_v2_verbs_host_execution_lanes packed_direct_max_rows=$protocol_v2_packed_direct_max_rows managed_route_projections=${managed_route_projections:-0} grouped_multirow=${grouped_multirow:-0} route_cuda_graphs=${route_cuda_graphs:-0} b12x_spark_aot=${b12x_spark_aot:-0} ds4_flash_spark_aot=${ds4_flash_spark_aot:-0} b12x_route_lanes=$b12x_route_lanes b12x_grouped_decode=$b12x_grouped_decode serve_profile=${serve_profile:-unset} b12x_w4a16_device_weights=$b12x_w4a16_device_weights b12x_w4a16_m1_fused_sum=$b12x_w4a16_m1_fused_sum b12x_w4a16_small_m_mode=$b12x_w4a16_small_m_mode nccl_ib_hca=$nccl_ib_hca nccl_cross_nic=$nccl_cross_nic nccl_netdevs_policy=$nccl_netdevs_policy nccl_ib_merge_nics=$nccl_ib_merge_nics nccl_p2p_net_chunksize=$nccl_p2p_net_chunksize nccl_launch_order_implicit=$nccl_launch_order_implicit route_cuda_event_timing=${route_cuda_event_timing:-0} route_timing=${route_timing:-0} build_profile=$build_profile gpu_runtime=$gpu_runtime =="
+  echo "== starting $mode ProtocolV2 expertd on $host:$port transport=$expert_transport real_layer=${expert_real_layer:-all} intermediate_shard=${intermediate_shard_rank}/${intermediate_shards} intermediate_reduction=$intermediate_reduction reduction_dtype=$intermediate_reduction_dtype owner_reduction_dtype=$intermediate_owner_reduction_dtype fused_fp8_reduction=$fused_fp8_reduction protocol_v2_execution_lanes=$protocol_v2_verbs_host_execution_lanes packed_direct_max_rows=$protocol_v2_packed_direct_max_rows managed_route_projections=${managed_route_projections:-0} grouped_multirow=${grouped_multirow:-0} route_cuda_graphs=${route_cuda_graphs:-0} b12x_spark_aot=${b12x_spark_aot:-0} ds4_flash_spark_aot=${ds4_flash_spark_aot:-0} b12x_route_lanes=$b12x_route_lanes b12x_grouped_decode=$b12x_grouped_decode b12x_w4a16_device_weights=$b12x_w4a16_device_weights b12x_w4a16_m1_fused_sum=$b12x_w4a16_m1_fused_sum b12x_w4a16_small_m_mode=$b12x_w4a16_small_m_mode nccl_ib_hca=$nccl_ib_hca nccl_cross_nic=$nccl_cross_nic nccl_netdevs_policy=$nccl_netdevs_policy nccl_ib_merge_nics=$nccl_ib_merge_nics nccl_p2p_net_chunksize=$nccl_p2p_net_chunksize nccl_launch_order_implicit=$nccl_launch_order_implicit route_cuda_event_timing=${route_cuda_event_timing:-0} route_timing=${route_timing:-0} build_profile=$build_profile gpu_runtime=$gpu_runtime =="
   ssh -o BatchMode=yes "$host" bash -s -- \
-    "$remote_dir" "$image" "$container" "$mode" "$port" "$catalog_arg" "$loadplan_arg" "$host" "$layer_id" "$expert_real_layer" "$managed_route_projections" "$build_profile" "$gpu_runtime" "${DS41RT_PROTOCOL_V2_TCP_TIMING:-0}" "${DS41RT_REAL_FULL_PROTOCOL_V2_EXECUTOR_TIMING:-0}" "$grouped_multirow" "$route_cuda_graphs" "$route_timing" "$expert_transport" "$verbs_ib_port_num_arg" "$route_cuda_event_timing" "$b12x_spark_aot" "$route_validate" "$b12x_route_lanes" "$intermediate_shards" "$intermediate_shard_rank" "$intermediate_reduction" "$intermediate_reduction_dtype" "$intermediate_reduction_root" "$intermediate_reduction_port" "$intermediate_reduction_min_rows" "$nccl_socket_ifname" "$nccl_ib_hca" "$nccl_debug" "$b12x_grouped_decode" "$intermediate_owner_max_rows" "$intermediate_owner_port" "$intermediate_owner_peers_arg" "$fused_fp8_reduction" "$nccl_bf16_reduce" "$b12x_w4a16_decode_grid_x_arg" "$b12x_w4a16_device_weights" "$intermediate_row_sharded_reduction" "$nccl_launch_order_implicit" "$protocol_v2_verbs_host_execution_lanes" "$intermediate_rdma_peers" "$intermediate_rdma_port" "$intermediate_rdma_slot_bytes" "$intermediate_rdma_ring_depth" "$intermediate_owner_reduction_dtype" "$nccl_cross_nic" "$intermediate_rdma_additional_peers_arg" "$intermediate_rdma_devices_arg" "$intermediate_rdma_stripe_min_bytes" "$nccl_netdevs_policy" "$nccl_ib_merge_nics" "$nccl_p2p_net_chunksize" "$protocol_v2_packed_direct_max_rows" "$b12x_w4a16_m1_fused_sum" "$b12x_w4a16_small_m_mode" "$model_id" "$release_config_sha256_arg" "$prebuilt" "$route_preload_io_workers" "$weight_preload_nccl_port" "$route_preload_cooperative" "$serve_profile_arg" "$existing_container_arg" "$prebuilt_bin" "$prebuilt_native_lib" "$runtime_cache_dir_arg" "$ds4_flash_spark_aot" "$model_revision" "$wip_allow_historical_exl3_control" <<'REMOTE'
+    "$remote_dir" "$image" "$container" "$mode" "$port" "$catalog_arg" "$loadplan_arg" "$host" "$layer_id" "$expert_real_layer" "$managed_route_projections" "$build_profile" "$gpu_runtime" "${DS41RT_PROTOCOL_V2_TCP_TIMING:-0}" "${DS41RT_REAL_FULL_PROTOCOL_V2_EXECUTOR_TIMING:-0}" "$grouped_multirow" "$route_cuda_graphs" "$route_timing" "$expert_transport" "$verbs_ib_port_num_arg" "$route_cuda_event_timing" "$b12x_spark_aot" "$route_validate" "$b12x_route_lanes" "$intermediate_shards" "$intermediate_shard_rank" "$intermediate_reduction" "$intermediate_reduction_dtype" "$intermediate_reduction_root" "$intermediate_reduction_port" "$intermediate_reduction_min_rows" "$nccl_socket_ifname" "$nccl_ib_hca" "$nccl_debug" "$b12x_grouped_decode" "$intermediate_owner_max_rows" "$intermediate_owner_port" "$intermediate_owner_peers_arg" "$fused_fp8_reduction" "$nccl_bf16_reduce" "$b12x_w4a16_decode_grid_x_arg" "$b12x_w4a16_device_weights" "$intermediate_row_sharded_reduction" "$nccl_launch_order_implicit" "$protocol_v2_verbs_host_execution_lanes" "$intermediate_rdma_peers" "$intermediate_rdma_port" "$intermediate_rdma_slot_bytes" "$intermediate_rdma_ring_depth" "$intermediate_owner_reduction_dtype" "$nccl_cross_nic" "$intermediate_rdma_additional_peers_arg" "$intermediate_rdma_devices_arg" "$intermediate_rdma_stripe_min_bytes" "$nccl_netdevs_policy" "$nccl_ib_merge_nics" "$nccl_p2p_net_chunksize" "$protocol_v2_packed_direct_max_rows" "$b12x_w4a16_m1_fused_sum" "$b12x_w4a16_small_m_mode" "$model_id" "$release_config_sha256_arg" "$prebuilt" "$route_preload_io_workers" "$weight_preload_nccl_port" "$route_preload_cooperative" "$existing_container_arg" "$prebuilt_bin" "$prebuilt_native_lib" "$runtime_cache_dir_arg" "$ds4_flash_spark_aot" "$model_revision" "$wip_allow_historical_exl3_control" <<'REMOTE'
 set -euo pipefail
 remote_dir="$1"
 image="$2"
@@ -1132,23 +1130,19 @@ prebuilt="${63:-0}"
 route_preload_io_workers="${64:-128}"
 weight_preload_nccl_port="${65:-9350}"
 route_preload_cooperative="${66:-1}"
-serve_profile="${67:-}"
-if [ "$serve_profile" = "__unset__" ]; then
-  serve_profile=""
-fi
-existing_container="${68:-}"
+existing_container="${67:-}"
 if [ "$existing_container" = "__unset__" ]; then
   existing_container=""
 fi
-prebuilt_bin="${69:-/opt/ds41rt/bin/ds41rt}"
-prebuilt_native_lib="${70:-/opt/ds41rt/lib/libds41rt_native.so}"
-runtime_cache_dir="${71:-}"
+prebuilt_bin="${68:-/opt/ds41rt/bin/ds41rt}"
+prebuilt_native_lib="${69:-/opt/ds41rt/lib/libds41rt_native.so}"
+runtime_cache_dir="${70:-}"
 if [ "$runtime_cache_dir" = "__unset__" ]; then
   runtime_cache_dir=""
 fi
-ds4_flash_spark_aot="${72:-1}"
-model_revision="${73:-}"
-wip_allow_historical_exl3_control="${74:-0}"
+ds4_flash_spark_aot="${71:-1}"
+model_revision="${72:-}"
+wip_allow_historical_exl3_control="${73:-0}"
 
 discover_rdma_device_map() {
   local entries=()
@@ -1280,9 +1274,6 @@ docker_args=(
 )
 if [ -z "$existing_container" ]; then
   docker_args+=(-v "$host_runtime_cache_dir:/var/cache/ds41rt")
-fi
-if [ -n "$serve_profile" ]; then
-  docker_args+=(-e DS41RT_SERVE_PROFILE="$serve_profile")
 fi
 if [ -n "$rdma_device_map" ]; then
   docker_args+=(-e DS41RT_PROTOCOL_V2_VERBS_HOST_DEVICE_MAP="$rdma_device_map")

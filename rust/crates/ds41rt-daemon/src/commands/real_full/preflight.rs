@@ -60,10 +60,7 @@ pub(super) fn real_ds4_full_preflight_report_with_coordinator_resident_preload(
     let coverage = tensor_coverage(catalog);
     let catalog_hash = catalog.content_hash();
     let kv_config = real_full_kv_cache_config_for_model(args, &catalog.facts)?;
-    let native_cache_format = match KvCacheDType::parse_cache_dtype(&args.kv_cache_dtype) {
-        Some(KvCacheDType::Nvfp4) => DeepseekV4KvCacheFormat::Nvfp4,
-        _ => DeepseekV4KvCacheFormat::Fp8Ue8m0,
-    };
+    let native_cache_format = DeepseekV4KvCacheFormat::Fp8Ue8m0;
     let native_physical_kv = if catalog.facts.model_type == "deepseek_v4" {
         Some(DeepseekV4PhysicalKvPlan::for_model_with_format(
             &catalog.facts,
@@ -420,29 +417,19 @@ pub(super) fn real_full_kv_cache_config_for_model(
         args.max_context_tokens > 0,
         "real-full --max-context-tokens must be a positive integer"
     );
-    let dtype = KvCacheDType::parse_cache_dtype(&args.kv_cache_dtype).ok_or_else(|| {
-        anyhow::anyhow!(
-            "unsupported real-full --kv-cache-dtype {}; expected bf16, fp8, or nvfp4",
-            args.kv_cache_dtype
-        )
-    })?;
+    anyhow::ensure!(
+        args.kv_cache_dtype == "fp8",
+        "real-full requires --kv-cache-dtype fp8; serving KV formats are fixed"
+    );
     anyhow::ensure!(
         facts.model_type == "deepseek_v4",
         "real-full requires model_type deepseek_v4, got {:?}",
         facts.model_type
     );
-    anyhow::ensure!(
-        matches!(
-            dtype,
-            KvCacheDType::Bf16 | KvCacheDType::Fp8 | KvCacheDType::Nvfp4
-        ),
-        "DeepSeek V4 native KV cache supports bf16, fp8, or nvfp4 profiles; {} is not implemented",
-        dtype.label()
-    );
     let attention = DeepseekV4AttentionPlan::from_model_facts(facts)?;
     attention.validate_sparkinfer_sm120_contract()?;
     // The active DeepSeek target owns SparkInfer-format 256-token physical
-    // pages and packs FP8/UE8M0 or NVFP4 directly in its captured producer. Keep the
+    // pages and packs FP8/UE8M0 directly in its captured producer. Keep the
     // generic transactional mirror BF16: its inherited FP8 codec is the
     // GLM 512+64 layout and must never be substituted for DeepSeek's
     // checkpoint-derived 448+64 physical ABI.

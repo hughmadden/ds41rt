@@ -1,4 +1,4 @@
-"""DeepSeek V4 launch-profile resolution without CUDA or model imports."""
+"""DeepSeek launch-settings resolution without CUDA or model imports."""
 
 from __future__ import annotations
 
@@ -17,9 +17,7 @@ DEFAULT_MODEL_ID = "deepseek-ai/DeepSeek-V4-Flash-0731"
 EXL3_RECIPE = "deepseek_v4_exl3_trellis_2bpw_v4_flash_natural_route"
 KV_BYTES_PER_SOURCE_PAGE = {
     ("flash", "fp8"): 7_437_888,
-    ("flash", "nvfp4"): 5_530_752,
     ("pro", "fp8"): 10_565_568,
-    ("pro", "nvfp4"): 7_855_776,
 }
 # Flash includes the measured C=4 large-prefill frontier in addition to four
 # execution lanes, resident native experts, and dSpark.  Pro's qualified K2
@@ -27,7 +25,7 @@ KV_BYTES_PER_SOURCE_PAGE = {
 # arena/dSpark state before physical KV. Connected CUDA graphs, the reusable
 # 65,536-row cuDNN MLA suffix workspace, and the qualified C4 long-prefill
 # frontier raise the measured fixed/working serving footprint to about 71 GiB.
-# Reserve 72 GiB: balanced still exposes its full 400k logical context contract
+# Reserve 72 GiB to expose the 400k logical context contract
 # with 5,504 physical rows to spare, while keeping the separate headroom budget
 # real during four concurrent 10k-token requests.
 FIXED_RESERVE_GIB = {
@@ -44,42 +42,7 @@ PCI_BUS_ID_RE = re.compile(
 
 
 @dataclass(frozen=True)
-class ProfileDefinition:
-    name: str
-    kv_dtype: str
-    context_cap: int
-    output_cap: int
-    note: str
-
-
-PROFILES = {
-    "balanced": ProfileDefinition(
-        name="balanced",
-        kv_dtype="fp8",
-        context_cap=400_000,
-        output_cap=100_000,
-        note="FP8 target KV with the normal throughput/quality gate.",
-    ),
-    "long": ProfileDefinition(
-        name="long",
-        kv_dtype="nvfp4",
-        context_cap=1_048_576,
-        output_cap=100_000,
-        note="Native DSV4 NVFP4 target KV with the checkpoint's full context contract.",
-    ),
-    "accuracy": ProfileDefinition(
-        name="accuracy",
-        kv_dtype="bf16",
-        context_cap=200_000,
-        output_cap=50_000,
-        note="BF16 target KV and BF16 expert exchange/reduction.",
-    ),
-}
-
-
-@dataclass(frozen=True)
-class ResolvedServeProfile:
-    profile: str
+class ResolvedServeSettings:
     model_id: str
     model_variant: str
     expert_format: str
@@ -155,10 +118,9 @@ def _round_pool_tokens(available_bytes: int, bytes_per_page: int) -> int:
     return (available_bytes // bytes_per_page) * SOURCE_PAGE_TOKENS
 
 
-def resolve_serve_profile(
+def resolve_serve_settings(
     *,
     repo_root: Path,
-    profile: str = "balanced",
     model_id: str = DEFAULT_MODEL_ID,
     model_variant: str = "flash",
     expert_format: str = "native",
@@ -175,11 +137,9 @@ def resolve_serve_profile(
     concurrency: int = 4,
     spark_reduction_min_rows: int = 16,
     inherited_environment: Mapping[str, str] | None = None,
-) -> ResolvedServeProfile:
+) -> ResolvedServeSettings:
     del repo_root
     del inherited_environment
-    if profile not in PROFILES:
-        raise ValueError(f"unknown profile {profile!r}")
     if not model_id.strip() or "/" not in model_id:
         raise ValueError("model_id must be a non-empty Hugging Face repository ID")
     if model_variant not in {"flash", "pro"}:
@@ -218,7 +178,6 @@ def resolve_serve_profile(
             f"{SOURCE_PAGE_TOKENS}"
         )
 
-    definition = PROFILES[profile]
     physical_gpu = coordinator_gpu_uuid or str(coordinator_gpu)
     total_mib = (
         gpu_total_mib
@@ -232,11 +191,10 @@ def resolve_serve_profile(
     total_bytes = total_mib * MIB
     if reserved_bytes >= total_bytes:
         raise ValueError(
-            f"profile reserves {reserved_bytes / GIB:.2f} GiB on a "
+            f"serving reserves {reserved_bytes / GIB:.2f} GiB on a "
             f"{total_bytes / GIB:.2f} GiB GPU"
         )
-    physical_kv_format = "nvfp4" if definition.kv_dtype == "nvfp4" else "fp8"
-    bytes_per_page = KV_BYTES_PER_SOURCE_PAGE[(model_variant, physical_kv_format)]
+    bytes_per_page = KV_BYTES_PER_SOURCE_PAGE[(model_variant, "fp8")]
     calculated_pool = _round_pool_tokens(
         total_bytes - reserved_bytes, bytes_per_page
     )
@@ -252,28 +210,28 @@ def resolve_serve_profile(
             f"calculated capacity {calculated_pool}"
         )
     context_tokens = (
-        min(pool_tokens, definition.context_cap)
+        min(pool_tokens, 400_000)
         if max_context_tokens is None
         else max_context_tokens
     )
     output_tokens = (
-        definition.output_cap if max_output_tokens is None else max_output_tokens
+        100_000 if max_output_tokens is None else max_output_tokens
     )
     if context_tokens <= 0:
         raise ValueError("max_context_tokens must be positive")
-    if context_tokens > definition.context_cap:
+    if context_tokens > 400_000:
         raise ValueError(
-            f"max_context_tokens exceeds the {profile} profile cap "
-            f"{definition.context_cap}"
+            "max_context_tokens exceeds the serving cap "
+            "400000"
         )
     if context_tokens > pool_tokens:
         raise ValueError("max_context_tokens cannot exceed kv_pool_tokens")
     if output_tokens <= 0:
         raise ValueError("max_output_tokens must be positive")
-    if output_tokens > definition.output_cap:
+    if output_tokens > 100_000:
         raise ValueError(
-            f"max_output_tokens exceeds the {profile} profile cap "
-            f"{definition.output_cap}"
+            "max_output_tokens exceeds the serving cap "
+            "100000"
         )
     if output_tokens >= context_tokens:
         raise ValueError("max_output_tokens must be smaller than max_context_tokens")
@@ -285,13 +243,12 @@ def resolve_serve_profile(
         "DS41RT_MODEL_ID": model_id,
         "DS41RT_MODEL_VARIANT": model_variant,
         "DS41RT_EXPERT_FORMAT": expert_format,
-        "DS41RT_SERVE_PROFILE": profile,
         "DS41RT_DSPARK_ENABLED": "1" if dspark else "0",
         "DS41RT_REAL_FULL_DSPARK": "1" if dspark else "0",
         "DS41RT_REAL_FULL_SERVE_TRANSPORT": "verbs-host",
         "DS41RT_PROTOCOL_V2_VERBS_HOST_EXECUTION_LANES": str(concurrency),
         "DS41RT_REAL_FULL_MAX_EXECUTION_LANES": str(concurrency),
-        "DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE": definition.kv_dtype,
+        "DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE": "fp8",
         "DS41RT_REAL_FULL_SERVE_MAX_CONTEXT_TOKENS": str(context_tokens),
         "DS41RT_REAL_FULL_SERVE_MAX_OUTPUT_TOKENS": str(output_tokens),
         "DS41RT_REAL_FULL_KV_POOL_TOKENS": str(pool_tokens),
@@ -319,14 +276,13 @@ def resolve_serve_profile(
     if dspark and dspark_draft_policy == "full":
         environment["DS41RT_REAL_FULL_DSPARK_FIXED_DRAFTS"] = "5"
     environment["DS41RT_EXPERT_INTERMEDIATE_REDUCTION_DTYPE"] = (
-        "bf16" if profile == "accuracy" else "fp8"
+        "fp8"
     )
     warnings = (
         "DeepSeek V4 serving remains a porting candidate until the native/EXL3 "
         "gates in benchmarking.md pass.",
     )
-    return ResolvedServeProfile(
-        profile=profile,
+    return ResolvedServeSettings(
         model_id=model_id,
         model_variant=model_variant,
         expert_format=expert_format,
@@ -338,7 +294,7 @@ def resolve_serve_profile(
         gpu_total_mib=total_mib,
         headroom_gib=headroom_gib,
         fixed_reserve_gib=fixed_reserve_gib,
-        kv_dtype=definition.kv_dtype,
+        kv_dtype="fp8",
         kv_bytes_per_source_page=bytes_per_page,
         kv_pool_tokens=pool_tokens,
         kv_pool_bytes=(pool_tokens // SOURCE_PAGE_TOKENS) * bytes_per_page,
@@ -347,7 +303,7 @@ def resolve_serve_profile(
         concurrency=concurrency,
         spark_reduction_min_rows=spark_reduction_min_rows,
         qualification="porting",
-        note=definition.note,
+        note="FP8 target KV.",
         environment=environment,
         blockers=(),
         warnings=warnings,

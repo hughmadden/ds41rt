@@ -338,7 +338,7 @@ def test_standalone_bootstrap_imports_verified_submodule() -> None:
         (ROOT / "third_party" / "sparkinfer").resolve()
     )
     assert re.fullmatch(r"[0-9a-f]{40}", revision)
-    assert Version(version) == Version("1.2.6")
+    assert Version(version) == Version("1.3.0")
 
 
 def test_live_launchers_override_stale_cmake_sparkinfer_cache_entries() -> None:
@@ -383,9 +383,6 @@ def test_launchers_use_only_the_packed_spark_moe_layout() -> None:
     )
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
 
-    assert 'docker_args+=(-e DS41RT_SERVE_PROFILE="$serve_profile")' in phase0
-    assert "serve_profile=${serve_profile:-unset}" in phase0
-    assert 'serve_profile="${67:-}"' in phase0
     assert "DS41RT_SPARK_MOE_MODE" not in phase0
     assert "DS41RT_SPARKINFER_SOURCE_W4A16" not in phase0
     assert "DS41RT_SPARKINFER_HYBRID_W4A4_W4A16" not in phase0
@@ -408,7 +405,7 @@ def test_launchers_use_only_the_packed_spark_moe_layout() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "DS41RT_SPARK_MOE_MODE" not in result.stdout
-    assert "DS41RT_SERVE_PROFILE=balanced" in result.stdout
+    assert "DS41RT_SERVE_PROFILE" not in result.stdout
 
 
 def test_phase0_image_only_staging_does_not_remove_live_experts() -> None:
@@ -435,7 +432,7 @@ def test_spark_launcher_defaults_to_runtime_tp4_placement() -> None:
     assert 'if [ "$use_diagnostic_placement" = "1" ]; then' in phase0
     assert 'catalog=""' in phase0
     assert 'ds4_flash_spark_aot="$DS41RT_DS4_FLASH_SPARK_AOT"' in phase0
-    assert 'ds4_flash_spark_aot="${72:-1}"' in phase0
+    assert 'ds4_flash_spark_aot="${71:-1}"' in phase0
     assert "DS41RT_SPARK_TRANSFORMER_TP" not in phase0
     assert "DS41RT_SPARK_LAYER_BLOCK" not in phase0
     assert '-DDS41RT_ENABLE_DS4_FLASH_AOT="$ds4_flash_aot"' in phase0
@@ -470,12 +467,12 @@ def test_phase0_remote_expertd_argument_vector_is_contiguous() -> None:
         )
     }
 
-    assert len(payload) == 74
-    assert assigned_positions == set(range(1, 75))
+    assert len(payload) == 73
+    assert assigned_positions == set(range(1, 74))
     assert payload[-2:] == ["$model_revision", "$wip_allow_historical_exl3_control"]
-    assert 'ds4_flash_spark_aot="${72:-1}"' in remote
-    assert 'model_revision="${73:-}"' in remote
-    assert 'wip_allow_historical_exl3_control="${74:-0}"' in remote
+    assert 'ds4_flash_spark_aot="${71:-1}"' in remote
+    assert 'model_revision="${72:-}"' in remote
+    assert 'wip_allow_historical_exl3_control="${73:-0}"' in remote
 
 
 def test_release_preflight_requires_matching_engine_revisions() -> None:
@@ -834,6 +831,6 @@ def test_deepseek_serving_has_no_legacy_cuda_reference_or_short_k_entry() -> Non
     )
     assert 'case "$kv_cache_dtype" in' in launcher
     assert (
-        "DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE must be bf16, fp8, or nvfp4"
+        "DS41RT_REAL_FULL_SERVE_KV_CACHE_DTYPE must be fp8"
         in launcher
     )

@@ -160,9 +160,6 @@ if [[ "$dry_run" == "1" ]]; then
     printf 'DS41RT_B12X_SPARK_AOT=0\n'
   fi
   printf 'DS41RT_B12X_SPARK_GROUPED_DECODE=%s\n' "${DS41RT_B12X_SPARK_GROUPED_DECODE:-1}"
-  if [[ "${DS41RT_SERVE_PROFILE+x}" ]]; then
-    printf 'DS41RT_SERVE_PROFILE=%s\n' "$DS41RT_SERVE_PROFILE"
-  fi
   if [[ "${DS41RT_B12X_SPARK_W4A16_M1_FUSED_SUM+x}" ]]; then
     printf 'DS41RT_B12X_SPARK_W4A16_M1_FUSED_SUM=%s\n' "$DS41RT_B12X_SPARK_W4A16_M1_FUSED_SUM"
   elif [[ "$mode" == "real" ]]; then

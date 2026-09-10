@@ -7,7 +7,7 @@ source "$repo_root/scripts/release-common.sh"
 usage() {
   cat <<'EOF'
 Usage: ./wip.sh [--slot NAME] [--role coordinator|expert|both]
-                [--from-slot NAME] [--profile FILE] [--recreate]
+                [--from-slot NAME] [--config FILE] [--recreate]
 
 Synchronizes the current checkout into persistent development containers and
 incrementally builds a named WIP slot. The coordinator container builds and
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
       from_slot="${2:?--from-slot requires a name}"
       shift 2
       ;;
-    --profile|--config)
+    --config)
       config="${2:?$1 requires a configuration file}"
       shift 2
       ;;

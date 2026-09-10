@@ -93,7 +93,7 @@ pub(super) fn coordinator_args() -> CoordinatorArgs {
     CoordinatorArgs {
         backend: "real-ds4-full".to_owned(),
         transport: "tcp".to_owned(),
-        kv_cache_dtype: "bf16".to_owned(),
+        kv_cache_dtype: "fp8".to_owned(),
         max_context_tokens: crate::cli::DEFAULT_REAL_FULL_MAX_CONTEXT_TOKENS,
         listen: "127.0.0.1:8000".to_owned(),
         model_id: DEFAULT_MODEL_ID.to_owned(),

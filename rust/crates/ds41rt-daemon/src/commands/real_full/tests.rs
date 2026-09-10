@@ -97,31 +97,17 @@ fn real_full_preflight_reports_missing_execution_components() {
 }
 
 #[test]
-fn deepseek_v4_balanced_profile_uses_native_fp8_physical_kv() {
+fn deepseek_v4_serving_requires_fp8_physical_kv() {
     let mut args = coordinator_args();
     args.kv_cache_dtype = "fp8".to_owned();
     let config = real_full_kv_cache_config_for_model(&args, &ModelFacts::default())
-        .expect("DeepSeek balanced profile should accept native FP8 physical KV");
-
-    assert_eq!(config.layout_label(), "deepseek-v4-hybrid-bf16");
+        .expect("FP8 physical KV should be accepted");
+    // The transactional mirror remains BF16; the physical cache is FP8.
     assert_eq!(config.dtype_label(), "bf16");
-
-    args.kv_cache_dtype = "nvfp4".to_owned();
-    let config = real_full_kv_cache_config_for_model(&args, &ModelFacts::default())
-        .expect("DeepSeek long profile should accept native NVFP4 physical KV");
-    assert_eq!(config.layout_label(), "deepseek-v4-hybrid-bf16");
-    assert_eq!(config.dtype_label(), "bf16");
-
-    let catalog = full_catalog();
-    let report = real_ds4_full_preflight_report(&args, "reports/model_catalog.json", &catalog)
-        .expect("DeepSeek long preflight should report native NVFP4 physical KV");
-    let native = report
-        .kv_plan
-        .native_physical
-        .expect("DeepSeek preflight should include the native physical plan");
-    assert_eq!(native.layout, "sparkinfer-dsv4-paged-nvfp4");
-    assert_eq!(native.boundary_copy_status, "row-major-active");
-    assert_eq!(native.persistent_bytes_per_logical_token, 21_604.5);
+    for dtype in ["bf16", "nvfp4"] {
+        args.kv_cache_dtype = dtype.to_owned();
+        assert!(real_full_kv_cache_config_for_model(&args, &ModelFacts::default()).is_err());
+    }
 }
 
 #[test]
@@ -169,7 +155,7 @@ fn real_full_kv_capacity_uses_configured_global_context_budget() {
     let mut args = coordinator_args();
     args.max_context_tokens = 256 * 1024;
 
-    for dtype in ["bf16", "fp8", "nvfp4"] {
+    for dtype in ["fp8"] {
         args.kv_cache_dtype = dtype.to_owned();
         let config = real_full_kv_cache_config_for_model(&args, &ModelFacts::default())
             .expect("configured DeepSeek V4 KV cache builds");

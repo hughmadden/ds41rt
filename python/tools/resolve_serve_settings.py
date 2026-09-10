@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve or launch one DS41RT production profile."""
+"""Resolve or launch one DS41RT production configuration."""
 
 from __future__ import annotations
 
@@ -9,19 +9,14 @@ import os
 from pathlib import Path
 import sys
 
-from ds41rt_reference.serve_profiles import (
-    resolve_serve_profile,
+from ds41rt_reference.serve_settings import (
+    resolve_serve_settings,
 )
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(
-        description="Resolve balanced/long/accuracy DS41RT launch settings."
-    )
-    parser.add_argument(
-        "--profile",
-        choices=("balanced", "long", "accuracy"),
-        default="balanced",
+        description="Resolve DS41RT launch settings with FP8 target KV."
     )
     parser.add_argument("--dspark", choices=("on", "off"), default="on")
     parser.add_argument(
@@ -74,7 +69,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument(
         "--allow-unqualified",
         action="store_true",
-        help="permit a diagnostic launch despite explicit profile blockers",
+        help="permit a diagnostic launch despite explicit launch blockers",
     )
     parser.add_argument(
         "--launcher",
@@ -87,7 +82,7 @@ def main() -> int:
     args, launcher_args = parse_args()
     if args.dry_run and launcher_args:
         print(
-            "unrecognized profile arguments: " + " ".join(launcher_args),
+            "unrecognized launch arguments: " + " ".join(launcher_args),
             file=sys.stderr,
         )
         return 2
@@ -96,9 +91,8 @@ def main() -> int:
         if args.repo_root is not None
         else Path(__file__).resolve().parents[2]
     )
-    resolved = resolve_serve_profile(
+    resolved = resolve_serve_settings(
         repo_root=repo_root,
-        profile=args.profile,
         model_id=args.model_id,
         model_variant=args.model_variant,
         expert_format=args.expert_format,
@@ -125,7 +119,7 @@ def main() -> int:
         print(
             json.dumps(
                 {
-                    "error": "profile has launch blockers",
+                    "error": "configuration has launch blockers",
                     "blockers": resolved.blockers,
                     "hint": "fix the blockers or use --allow-unqualified for diagnostics",
                 },

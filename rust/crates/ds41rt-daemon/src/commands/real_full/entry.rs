@@ -6555,16 +6555,7 @@ pub(crate) fn load_real_full_serving(
         kv_pool_tokens % DS4_KV_SOURCE_PAGE_TOKENS == 0,
         "{REAL_FULL_KV_POOL_TOKENS_ENV}={kv_pool_tokens} must be divisible by the native DeepSeek source-page width {DS4_KV_SOURCE_PAGE_TOKENS}"
     );
-    let native_kv_cache_format = match KvCacheDType::parse_cache_dtype(&args.kv_cache_dtype)
-        .context("parsing validated native DeepSeek V4 KV cache dtype")?
-    {
-        KvCacheDType::Nvfp4 => DeepseekV4KvCacheFormat::Nvfp4,
-        KvCacheDType::Bf16 | KvCacheDType::Fp8 => DeepseekV4KvCacheFormat::Fp8Ue8m0,
-        dtype => anyhow::bail!(
-            "unsupported validated DeepSeek V4 KV dtype {}",
-            dtype.label()
-        ),
-    };
+    let native_kv_cache_format = DeepseekV4KvCacheFormat::Fp8Ue8m0;
     // Draft KV is an execution lease, not queued-request or target-radix
     // residency. Size this pool for the lanes that can actually execute;
     // submitted requests beyond that limit must wait without owning pages.
@@ -9066,7 +9057,7 @@ mod tests {
         CoordinatorArgs {
             backend: "real-ds4-full".to_owned(),
             transport: transport.to_owned(),
-            kv_cache_dtype: "bf16".to_owned(),
+            kv_cache_dtype: "fp8".to_owned(),
             max_context_tokens: crate::cli::DEFAULT_REAL_FULL_MAX_CONTEXT_TOKENS,
             listen: "127.0.0.1:8000".to_owned(),
             model_id: DEFAULT_MODEL_ID.to_owned(),

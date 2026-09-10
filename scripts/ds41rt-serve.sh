@@ -7,4 +7,4 @@ if [ ! -x "$python" ]; then
   python="$(command -v python3)"
 fi
 export PYTHONPATH="$repo_root/python/reference${PYTHONPATH:+:$PYTHONPATH}"
-exec "$python" "$repo_root/python/tools/resolve_serve_profile.py" "$@"
+exec "$python" "$repo_root/python/tools/resolve_serve_settings.py" "$@"

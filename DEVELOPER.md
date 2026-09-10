@@ -38,7 +38,7 @@ routes, caches, transport, graph lifecycles, or admission.
 | `rust/crates/ds41rt-transport` | Protocol V2 and remote expert transport |
 | `rust/crates/ds41rt-ffi` | Native library loading and FFI boundary |
 | `native/` | CUDA/C++ kernels, AOT bindings, RDMA and XGrammar integration |
-| `python/reference/` | Reference operators, capture modules, profile resolver |
+| `python/reference/` | Reference operators, capture modules, settings resolver |
 | `python/tools/` | Inspection, validation, benchmarks and release probes |
 | `scripts/` | Build, deployment, smoke, provenance and operational helpers |
 | `quantization/` | Reproducible offline EXL3 conversion tooling |
@@ -171,7 +171,7 @@ of free build space locally and on the seed Spark.
 | Command | Use |
 | --- | --- |
 | `./build.sh` | Clean source build, artifact export, expert distribution. |
-| `./run.sh --dry-run` | Images, SSH, model snapshots, capacity, profiles and active-state audit. |
+| `./run.sh --dry-run` | Images, SSH, model snapshots, capacity, settings and active-state audit. |
 | `./run.sh` | Start a clean five-container deployment. |
 | `./run.sh --restart` | Replace a stale or configuration-mismatched deployment. |
 | `scripts/api-smoke.sh` | Basic OpenAI API contract probe. |
@@ -186,7 +186,7 @@ transport readiness, numerical probe, or API model list.
 ## Benchmarking
 
 Release performance must be end-to-end and correctness-qualified. Record the
-source revision, model revision, profile, dSpark policy, concurrency, prompt
+source revision, model revision, KV format, dSpark policy, concurrency, prompt
 shape, warmup/repeat count, and every sample. A timed request must report full
 attention, numeric progression, and zero request-time graph captures.
 
