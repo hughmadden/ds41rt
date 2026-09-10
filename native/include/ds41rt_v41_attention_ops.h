@@ -66,3 +66,14 @@ int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t* tokens,
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Transpose BF16 residual / FP32 pre-mix from [R,5,...] to [5,R,...].
+// Disjoint input/output storage, live R (no capacity padding), R=1..16.
+int32_t ds41rt_v41_dspark_terminal_layout(const uint16_t* residual,
+    const float* pre, uint16_t* output, float* output_pre, int32_t requests, void* stream);
+#ifdef __cplusplus
+}
+#endif

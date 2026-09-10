@@ -18,10 +18,13 @@ type Frequencies = unsafe extern "C" fn(*const u64, *mut f32, i32, *mut c_void) 
 type Tap = unsafe extern "C" fn(*const u16, *mut u16, i32, i32, *mut c_void) -> i32;
 type Embed =
     unsafe extern "C" fn(*const u16, *const i32, *mut u16, *mut f32, i32, *mut c_void) -> i32;
+type TerminalLayout =
+    unsafe extern "C" fn(*const u16, *const f32, *mut u16, *mut f32, i32, *mut c_void) -> i32;
 pub struct V41AttentionOps<'a> {
     _library: &'a NativeLibrary,
     norm: Norm,
     embed: Embed,
+    terminal_layout: TerminalLayout,
     frequencies: Frequencies,
     tap: Tap,
     kv: Kv,
@@ -38,6 +41,7 @@ impl NativeLibrary {
     pub fn v41_attention_ops(&self) -> Result<V41AttentionOps<'_>> {
         Ok(V41AttentionOps {
             _library: self,
+            terminal_layout: unsafe { *self.lib.get(b"ds41rt_v41_dspark_terminal_layout")? },
             embed: unsafe { *self.lib.get(b"ds41rt_v41_dspark_embed")? },
             tap: unsafe { *self.lib.get(b"ds41rt_v41_dspark_tap")? },
             frequencies: unsafe { *self.lib.get(b"ds41rt_v41_dspark_frequencies")? },
@@ -48,6 +52,42 @@ impl NativeLibrary {
     }
 }
 impl V41AttentionOps<'_> {
+    /// # Safety
+    /// Initialized request-major residual/pre inputs and disjoint position-major
+    /// outputs are on the stream device and live through completion.
+    pub unsafe fn terminal_layout(
+        &self,
+        residual: Ds41rtDeviceBuffer,
+        pre: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        output_pre: Ds41rtDeviceBuffer,
+        requests: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            (1..=16).contains(&requests),
+            "invalid terminal layout request count"
+        );
+        for b in [residual, output] {
+            buffer(b, requests as usize * 5 * 40960)?;
+        }
+        for b in [pre, output_pre] {
+            buffer(b, requests as usize * 5 * 16)?;
+        }
+        let status = unsafe {
+            (self.terminal_layout)(
+                residual.ptr.cast(),
+                pre.ptr.cast(),
+                output.ptr.cast(),
+                output_pre.ptr.cast(),
+                requests as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native terminal layout CUDA status {status}");
+        Ok(())
+    }
+
     /// # Safety
     /// Shared BF16 embedding weights and I32 seed IDs are initialized on the
     /// stream device; all input/output storage is live and outputs are disjoint.

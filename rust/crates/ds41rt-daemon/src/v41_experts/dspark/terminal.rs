@@ -163,7 +163,7 @@ impl DsparkTerminal<'_, '_> {
             ..buffer
         })
     }
-    unsafe fn enqueue(&self, requests: usize) -> Result<()> {
+    pub(super) fn validate_sampling(&self, requests: usize) -> Result<()> {
         ensure!(
             requests > 0 && requests <= self.capacity,
             "terminal requests exceed capacity"
@@ -172,6 +172,13 @@ impl DsparkTerminal<'_, '_> {
             self.sampling_requests == Some(requests),
             "sampling state does not match live requests"
         );
+        Ok(())
+    }
+    unsafe fn enqueue(&self, requests: usize) -> Result<()> {
+        unsafe { self.enqueue_on(requests, self.stream.raw) }
+    }
+    pub(super) unsafe fn enqueue_on(&self, requests: usize, stream: *mut c_void) -> Result<()> {
+        self.validate_sampling(requests)?;
         let library = self.stream.library;
         let row_bytes = requests * 129280 * 4;
         unsafe {
@@ -180,7 +187,7 @@ impl DsparkTerminal<'_, '_> {
                 self.pre_mix.buffer,
                 self.confidence.inputs()[0],
                 requests * 5,
-                self.stream.raw,
+                stream,
             )?;
             // This RNE variant matches the reference's one final BF16 rounding.
             library.cuda_ds4_rmsnorm_bf16_rne_async(
@@ -190,35 +197,30 @@ impl DsparkTerminal<'_, '_> {
                 (requests * 5) as i32,
                 5120,
                 1e-6,
-                self.stream.raw,
+                stream,
             )?;
             self.head_kernel.launch(
                 self.normalized.buffer,
                 self.head.weight()?,
                 self.shared_logits.buffer,
                 requests * 5,
-                self.stream.raw,
+                stream,
             )?;
             library.copy_d2d_async(
                 self.markov.tokens(),
                 self.tokens.buffer,
                 requests * 4,
-                self.stream.raw,
+                stream,
             )?;
             for position in 0..5 {
-                self.markov.enqueue_on(requests, self.stream.raw)?;
+                self.markov.enqueue_on(requests, stream)?;
                 let [embedding, bias] = self.markov.storage();
                 let confidence_embedding = Self::slice(
                     self.confidence.inputs()[1],
                     position * requests * 512,
                     requests * 512,
                 )?;
-                library.copy_d2d_async(
-                    confidence_embedding,
-                    embedding,
-                    requests * 512,
-                    self.stream.raw,
-                )?;
+                library.copy_d2d_async(confidence_embedding, embedding, requests * 512, stream)?;
                 let next = Self::slice(
                     self.tokens.buffer,
                     (position + 1) * requests * 4,
@@ -233,18 +235,13 @@ impl DsparkTerminal<'_, '_> {
                     next,
                     requests,
                     position,
-                    self.stream.raw,
+                    stream,
                 )?;
                 if position < 4 {
-                    library.copy_d2d_async(
-                        self.markov.tokens(),
-                        next,
-                        requests * 4,
-                        self.stream.raw,
-                    )?;
+                    library.copy_d2d_async(self.markov.tokens(), next, requests * 4, stream)?;
                 }
             }
-            self.confidence.enqueue_on(requests * 5, self.stream.raw)?;
+            self.confidence.enqueue_on(requests * 5, stream)?;
         }
         Ok(())
     }
@@ -334,6 +331,10 @@ impl DsparkTerminal<'_, '_> {
         let requests = self
             .ready_requests
             .context("terminal output is not complete")?;
+        self.output_storage(requests)
+    }
+    pub(super) fn output_storage(&self, requests: usize) -> Result<[Ds41rtDeviceBuffer; 3]> {
+        self.validate_sampling(requests)?;
         Ok([
             Self::slice(self.tokens.buffer, 0, requests * 6 * 4)?,
             Self::slice(self.adjusted_logits.buffer, 0, requests * 5 * 129280 * 4)?,

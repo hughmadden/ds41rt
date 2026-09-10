@@ -259,3 +259,25 @@ extern "C" int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t*
       reinterpret_cast<const __nv_bfloat16*>(table),tokens,reinterpret_cast<__nv_bfloat16*>(residual),pre);
   return cudaGetLastError();
 }
+
+namespace {
+__global__ void dspark_terminal_layout_kernel(const __nv_bfloat16* residual,
+    const float* pre, __nv_bfloat16* output, float* output_pre, int requests) {
+  const uint64_t row=blockIdx.x;
+  const uint64_t source=(row%requests)*5+row/requests;
+  for(int col=threadIdx.x;col<20480;col+=256)output[row*20480+col]=residual[source*20480+col];
+  if(threadIdx.x<4)output_pre[row*4+threadIdx.x]=pre[source*4+threadIdx.x];
+}
+}
+extern "C" int32_t ds41rt_v41_dspark_terminal_layout(const uint16_t* residual,
+    const float* pre, uint16_t* output, float* output_pre, int32_t requests, void* stream) {
+  if(requests<1 || requests>16)return cudaErrorInvalidValue;
+  const uint64_t r=uint64_t(requests)*5*40960,p=uint64_t(requests)*5*16;
+  if(!valid(residual,r,2)||!valid(pre,p,4)||!valid(output,r,2)||!valid(output_pre,p,4)||
+      !disjoint(residual,r,output,r)||!disjoint(residual,r,output_pre,p)||
+      !disjoint(pre,p,output,r)||!disjoint(pre,p,output_pre,p)||!disjoint(output,r,output_pre,p))
+    return cudaErrorInvalidValue;
+  dspark_terminal_layout_kernel<<<requests*5,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(residual),pre,reinterpret_cast<__nv_bfloat16*>(output),output_pre,requests);
+  return cudaGetLastError();
+}

@@ -1,9 +1,10 @@
-//! All three draft transformer stages on one graph-owned stream.
-use super::{DsparkStage, DsparkWeights};
+//! Draft transformer chain with optional shared embedding and terminal heads.
+use super::{DsparkStage, DsparkTerminal, DsparkWeights};
 use crate::v41_dspark_cache::{DsparkWindow, WindowLease, WindowRead};
 use crate::v41_memory::{DeviceAllocation, LoadStream};
-use crate::v41_tensors::NativeRtxTensors;
+use crate::v41_tensors::{NativeRtxTensors, VocabularyHead};
 use anyhow::{ensure, Context, Result};
+use ds41rt_core::DsparkRng;
 use ds41rt_ffi::{Ds41rtDeviceBuffer, V41AttentionOps};
 use std::ffi::c_void;
 
@@ -15,9 +16,37 @@ pub(crate) struct DsparkChain<'weights, 'library> {
     embedding: Option<&'weights NativeRtxTensors<'library>>,
     tokens: DeviceAllocation<'library>,
     token_count: Option<usize>,
+    terminal: Option<DsparkTerminal<'weights, 'library>>,
     ops: V41AttentionOps<'library>,
 }
 impl<'library> DsparkWeights<'library> {
+    pub fn draft_bytes(&self, requests: u32) -> Result<usize> {
+        self.chain_bytes(requests)?
+            .checked_add(DsparkTerminal::device_bytes(requests as usize)?)
+            .context("dSpark complete draft budget overflow")
+    }
+    /// Complete seed embedding, three-stage transformer and terminal proposal
+    /// graph. Shared coordinator embedding and vocabulary owners are borrowed.
+    pub fn draft<'weights>(
+        &'weights self,
+        embedding: &'weights NativeRtxTensors<'library>,
+        head: &'weights VocabularyHead<'library>,
+        requests: u32,
+        budget: usize,
+    ) -> Result<DsparkChain<'weights, 'library>> {
+        ensure!(
+            self.draft_bytes(requests)? <= budget,
+            "dSpark complete draft exceeds budget"
+        );
+        let mut chain = self.embedded_chain(embedding, requests, self.chain_bytes(requests)?)?;
+        chain.terminal = Some(self.terminal(
+            head,
+            requests as usize,
+            DsparkTerminal::device_bytes(requests as usize)?,
+        )?);
+        Ok(chain)
+    }
+
     /// Borrow the coordinator's existing shared embedding table, never duplicate it.
     pub fn embedded_chain<'weights>(
         &'weights self,
@@ -62,11 +91,35 @@ impl<'library> DsparkWeights<'library> {
             embedding: None,
             tokens: DeviceAllocation::new(library, requests as usize * 4)?,
             token_count: None,
+            terminal: None,
             ops: library.v41_attention_ops()?,
         })
     }
 }
 impl DsparkChain<'_, '_> {
+    /// Reserve a fresh attempt in packed seed/cache row order. Failed attempts
+    /// consume admitted ranges; replay reuses them until prepared again.
+    pub fn prepare_sampling(
+        &mut self,
+        rngs: &mut [&mut DsparkRng],
+        temperatures: &[f32],
+    ) -> Result<()> {
+        self.invalidate();
+        self.terminal
+            .as_mut()
+            .context("dSpark chain has no terminal")?
+            .prepare_sampling(rngs, temperatures)
+    }
+    /// Borrowed anchor + five tokens [6,R], corrected raw logits [5,R,V] and
+    /// raw confidence [5,R], live until reuse/drop. No target history is committed.
+    pub fn draft_output(&self) -> Result<[Ds41rtDeviceBuffer; 3]> {
+        let requests = self.ready.context("dSpark draft output incomplete")?;
+        self.terminal
+            .as_ref()
+            .context("dSpark chain has no terminal")?
+            .output_storage(requests)
+    }
+
     /// Seed IDs follow cache-binding row order; invalid input clears publication
     /// and token readiness so a subsequent execution cannot consume old IDs.
     pub fn set_tokens(&mut self, tokens: &[i32]) -> Result<()> {
@@ -119,6 +172,9 @@ impl DsparkChain<'_, '_> {
             self.embedding.is_none() || self.token_count == Some(bindings[0].len()),
             "dSpark seed count differs from cache bindings"
         );
+        if let Some(terminal) = &self.terminal {
+            terminal.validate_sampling(bindings[0].len())?;
+        }
         let reads = [
             self.stages[0].prepare(windows[0], bindings[0])?,
             self.stages[1].prepare(windows[1], bindings[1])?,
@@ -192,12 +248,34 @@ impl DsparkChain<'_, '_> {
                 self.stages[stage].enqueue_on(&reads[stage], requests, self.stream.raw)?;
             }
         }
+        if let Some(terminal) = &self.terminal {
+            let source = self.stages[2].output_storage();
+            let target = terminal.inputs();
+            unsafe {
+                self.ops.terminal_layout(
+                    source[0],
+                    source[1],
+                    target[0],
+                    target[1],
+                    requests as u32,
+                    self.stream.raw,
+                )?;
+                self.stream.library.copy_d2d_async(
+                    target[2],
+                    self.tokens.buffer,
+                    requests * 4,
+                    self.stream.raw,
+                )?;
+                terminal.enqueue_on(requests, self.stream.raw)?;
+            }
+        }
         Ok(())
     }
     /// # Safety
     /// For a plain chain, initialize finite BF16 residuals and FP32 pre-mix in
     /// input row order. An embedded chain initializes these from set_tokens.
     /// Cache bindings across stages describe the same requests, in seed order.
+    /// For a complete draft, prepare sampling in the same packed request order.
     /// All buffers are on this device and serialized through graph completion.
     pub unsafe fn execute(
         &mut self,

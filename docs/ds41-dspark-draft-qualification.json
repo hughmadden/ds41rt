@@ -1,0 +1,113 @@
+{
+  "scope": "Synthetic complete proposal graph composition, not real-model numerical or throughput qualification",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "sha256": {
+    "/home/tj/Developer/ds41rt/native/cuda/kernels/v41_attention_ops.cu": "452e368bc5ab238ea2cb4be007087ba2c82658ac4ab513c04f745136c810a54a",
+    "/home/tj/Developer/ds41rt/native/include/ds41rt_v41_attention_ops.h": "ac1ecfeb0c1f13be7aed5b72299874d1df75febaf860c224ece1fc01759ca905",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "30b467bb745a8eff61b4d330bcff4ce3501ee20dfd0c3f1a75120619553bb6b2",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-daemon/src/v41_experts/dspark/chain.rs": "903ff25a8b09e3d5977591931f63cd141bb2dc4499e121b6416c48b6ca1ddb63",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-daemon/src/v41_experts/dspark/terminal.rs": "80f7dd0335c8b0bd1bdf05519104bada738660e9b1341c666df94c7c1326fa39",
+    "/tmp/ds41-draft/setup.py": "19838456037e202c01a374f93c9b3e723f4e42c06e0f2ebd52a090eec3f889c8",
+    "/tmp/ds41-draft/layout.py": "08ece65449b284c56130f1ba9b972e29ae789fb8eaed94ae5c9499a08b21fb96",
+    "/tmp/ds41-draft/src/main.rs": "2a9e0bd88653a6c9513d7103e69a0065ecbd30182bdeb0ffb23fc53cdb3119ad",
+    "/tmp/ds41-draft-native-build.log": "1b832d4a840f1ecd405debfade7e59b46230b60feba7275540c10d347e539b81",
+    "/tmp/ds41-draft-daemon-build.log": "aee0411de135ce41ef1c46997723a85297f88959a6a8f6c5c8ce7517feff1f87",
+    "/tmp/ds41-draft-fixture-final-build.log": "0f51f8a0e34b56a9207c30819ccf24410147c568275a9a53c061a3c984f13cb9",
+    "/tmp/ds41-draft-layout-rtx0.log": "3429a9234072403ae6b1689e113b516aa4ad6700a273268af5d98a749fe76ad4",
+    "/tmp/ds41-draft-chain-rtx0-final.log": "db46c5dc695628a5af044683e7e286f974128e59f783993f35ee721af26f0a09",
+    "/tmp/ds41-draft-layout-rtx1.log": "3429a9234072403ae6b1689e113b516aa4ad6700a273268af5d98a749fe76ad4",
+    "/tmp/ds41-draft-chain-rtx1-final.log": "db46c5dc695628a5af044683e7e286f974128e59f783993f35ee721af26f0a09"
+  },
+  "gpus": {
+    "rtx0": {
+      "layout": {
+        "cases": [
+          {
+            "requests": 1,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 1,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 1,
+            "exact": true
+          }
+        ],
+        "guards": true
+      },
+      "complete_draft": [
+        "PASS requests=1 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+        "PASS requests=1 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+        "PASS requests=3 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+        "PASS requests=3 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+        "PASS requests=16 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980",
+        "PASS requests=16 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980"
+      ]
+    },
+    "rtx1": {
+      "layout": {
+        "cases": [
+          {
+            "requests": 1,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 1,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 1,
+            "exact": true
+          }
+        ],
+        "guards": true
+      },
+      "complete_draft": [
+        "PASS requests=1 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+        "PASS requests=1 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+        "PASS requests=3 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+        "PASS requests=3 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+        "PASS requests=16 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980",
+        "PASS requests=16 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980"
+      ]
+    }
+  }
+}
