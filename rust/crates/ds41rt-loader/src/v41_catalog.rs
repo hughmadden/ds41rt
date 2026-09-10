@@ -550,3 +550,140 @@ mod tests {
         assert!(catalog.device_tensor_bytes(name, None).is_err());
     }
 }
+
+#[cfg(test)]
+mod expert_staging_tests {
+    use super::*;
+    use crate::V41ExpertSelection;
+    use std::os::unix::fs::FileExt;
+
+    #[test]
+    fn native_expert_staging_covers_all_tp_ranks_and_full_dspark() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = File::create(dir.path().join("fixture")).unwrap();
+        let mut offset = (1u64 << 31) + 128;
+        let specs = expected_tensors().unwrap();
+        let mut tensors = Vec::new();
+        let suffixes = [
+            "w1.weight",
+            "w3.weight",
+            "w2.weight",
+            "w1.scale",
+            "w3.scale",
+            "w2.scale",
+        ];
+        let mut payloads = Vec::new();
+        for (slot, suffix) in suffixes.iter().enumerate() {
+            let name = format!("layers.39.ffn.experts.383.{suffix}");
+            let spec = &specs[&name];
+            let cols = spec.shape[1];
+            let payload: Vec<u8> = (0..spec.bytes as usize)
+                .map(|index| ((index / cols * 7 + index % cols * 13 + slot * 19) & 255) as u8)
+                .collect();
+            file.write_all_at(&payload, offset).unwrap();
+            for prefix in ["layers.39.ffn.experts.383", "mtp.2.ffn.experts.127"] {
+                let name = format!("{prefix}.{suffix}");
+                tensors.push(V41Tensor {
+                    shard: "fixture".into(),
+                    placement: placement(&name),
+                    metadata: SafetensorsTensorMetadata {
+                        name,
+                        dtype: spec.dtype.clone(),
+                        shape: spec.shape.clone(),
+                        byte_offset: offset,
+                        byte_length: spec.bytes,
+                    },
+                });
+            }
+            payloads.push(payload);
+            offset += spec.bytes;
+        }
+        tensors.sort_by(|a, b| a.metadata.name.cmp(&b.metadata.name));
+        let catalog = OfficialV41Catalog {
+            config: OfficialV41Config::from_json(
+                crate::OFFICIAL_V41_MODEL_ID,
+                include_bytes!("official-v41-config.json"),
+            )
+            .unwrap(),
+            snapshot: dir.path().into(),
+            tensors,
+        };
+        let select = |rank| V41ExpertSelection::Backbone {
+            layer: 39,
+            expert: 383,
+            rank,
+        };
+        for rank in 0..4 {
+            let plan = catalog.expert_staging(select(rank)).unwrap();
+            assert_eq!(plan.staging_bytes(), 4_700_160);
+            assert_eq!(plan.intermediate_size(), 576);
+            assert_eq!(plan.minimum_read_scratch_bytes(), 1152);
+            // An odd number of physical rows exercises the final partial read batch.
+            let mut scratch = vec![0; 1152 * 7 + 3];
+            let mut staging = vec![205; plan.staging_bytes() + 32];
+            assert!(plan
+                .read_into(&mut staging[..plan.staging_bytes() - 1], &mut scratch)
+                .is_err());
+            assert!(plan.read_into(&mut staging, &mut scratch[..1151]).is_err());
+            assert!(staging.iter().all(|&byte| byte == 205));
+            plan.read_into(&mut staging, &mut scratch).unwrap();
+            for (slot, range) in plan.tensor_ranges().iter().enumerate() {
+                assert_eq!(range.start % 16, 0);
+                let source = &payloads[slot];
+                let expected = if slot == 2 || slot == 5 {
+                    let row = source.len() / 5120;
+                    source
+                        .chunks_exact(row)
+                        .flat_map(|r| r[rank * row / 4..(rank + 1) * row / 4].iter().copied())
+                        .collect::<Vec<_>>()
+                } else {
+                    source[rank * source.len() / 4..(rank + 1) * source.len() / 4].to_vec()
+                };
+                assert_eq!(&staging[range.clone()], expected.as_slice());
+            }
+            assert!(staging[plan.staging_bytes()..]
+                .iter()
+                .all(|&byte| byte == 205));
+        }
+        let plan = catalog
+            .expert_staging(V41ExpertSelection::Dspark {
+                stage: 2,
+                expert: 127,
+            })
+            .unwrap();
+        assert_eq!(plan.staging_bytes(), 18_800_640);
+        assert_eq!(plan.minimum_read_scratch_bytes(), 0);
+        assert_eq!(plan.intermediate_size(), 2304);
+        let mut staging = vec![0; plan.staging_bytes()];
+        plan.read_into(&mut staging, &mut []).unwrap();
+        for (range, expected) in plan.tensor_ranges().iter().zip(&payloads) {
+            assert_eq!(&staging[range.clone()], expected.as_slice());
+        }
+        for selection in [
+            select(4),
+            V41ExpertSelection::Backbone {
+                layer: 40,
+                expert: 0,
+                rank: 0,
+            },
+            V41ExpertSelection::Backbone {
+                layer: 0,
+                expert: 384,
+                rank: 0,
+            },
+            V41ExpertSelection::Dspark {
+                stage: 3,
+                expert: 0,
+            },
+            V41ExpertSelection::Dspark {
+                stage: 0,
+                expert: 128,
+            },
+        ] {
+            assert!(catalog.expert_staging(selection).is_err());
+        }
+        // Catalog metadata alone is insufficient after a file changes: propagate I/O failure.
+        file.set_len(0).unwrap();
+        assert!(plan.read_into(&mut staging, &mut []).is_err());
+    }
+}

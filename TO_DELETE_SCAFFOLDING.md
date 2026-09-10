@@ -17,3 +17,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-scratch-abi.iaz5zkwn/`, `/tmp/ds41-v41-scratch-spark-abi/`, and `check_scratch_layout.py` / `qualify_native_scratch.py` in the local/ostrich AOT staging trees after checkpoint-backed expert execution replaces the native scratch fixtures; retain the production exporter, C/Rust APIs and evidence.
 
 - Delete `qualify_pack.py` / `qualify_native_weights.py` and their synthetic-data logs in the existing local/ostrich AOT staging directories after checkpoint-backed expert preparation replaces them; retain native packing APIs and recorded qualification evidence.
+
+- Delete `/tmp/ds41-staged-packer/`, its `ds41-staged-packer-fixture` binary in `rust/target/debug/`, and `staged-pack/`, `prepare_staged_fixture.py`, `check_staged_pack.py`, `staged-fixture.json` and related logs under `/tmp/ds41-v41-aot/` after checkpoint-backed expert loading replaces them; the existing sparse-header fixture now also contains selected synthetic expert payloads and remains scheduled for deletion.

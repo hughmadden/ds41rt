@@ -1,0 +1,43 @@
+{
+  "source_sha256": {
+    "rust/crates/ds41rt-loader/src/v41_expert_staging.rs": "58b470a60edf04f2a1404bb1967b526d44a1cc1feca3866c554d500cbeed7ff5",
+    "rust/crates/ds41rt-loader/src/v41_catalog.rs": "ce5928057ac78bf0cd4c3076c3199f4e278a69aeb6fe801ce7e6feb90b2861d3",
+    "rust/crates/ds41rt-loader/src/lib.rs": "4cd09bb48b91856e51fa8356634654fd15a42c38989bf337c7fed8fc7f06f9d2"
+  },
+  "loader_suite": "test exl3_format::tests::explicit_k3_rank_local_geometry_scales_only_trellis_storage ... ok\ntest exl3_format::tests::flash_and_pro_rank_local_residency_has_no_widened_weight_copy ... ok\ntest exl3_format::tests::exl3_catalog_rejects_mixed_publication_namespaces ... ok\ntest engram_prefetch::tests::official_size_catalog_maps_sparse_shard_and_rejects_eager_loading ... ok\ntest exl3_format::tests::flash_and_pro_experts_validate_with_equal_tp4_hadamard_slices ... ok\ntest exl3_format::tests::projection_mixed_expert_reports_each_integer_tier ... ok\ntest exl3_format::tests::legacy_recipe_ids_do_not_trigger_calibration_audits ... ok\ntest exl3_format::tests::exl3_catalog_rejects_trellis_misclassified_as_metadata ... ok\ntest exl3_format::tests::exl3_catalog_requires_all_integrated_dspark_routed_blocks ... ok\ntest tests::classifier_assigns_mtp_routed_experts_to_expert_placement ... ok\ntest tests::classifier_identifies_ds4_coordinator_tensor_families ... ok\ntest tests::classifier_identifies_native_ds4_expert_scale ... ok\ntest exl3_format::tests::legacy_schema_checks_only_the_k2_serving_layout ... ok\ntest exl3_format::tests::gptqmodel_publication_names_validate_for_base_and_dspark_blocks ... ok\ntest mapped_rows::tests::unaligned_payload_gather_preserves_order_and_rejects_bad_batches ... ok\ntest tests::classifier_keeps_mtp_non_expert_tensors_on_the_mtp_role ... ok\ntest tests::classifier_keeps_shared_expert_on_coordinator ... ok\ntest tests::classifier_treats_exl3_trellis_as_weight_and_rotations_as_metadata ... ok\ntest tests::classifier_maps_dspark_experts_and_envelope_separately ... ok\ntest mapped_rows::tests::sparse_checkpoint_rows_past_two_gib_use_wide_offsets ... ok\ntest tests::classifier_identifies_routed_expert_scale ... ok\ntest exl3_format::tests::gptqmodel_schema_accepts_uniform_k2_and_k3_serving_layouts ... ok\ntest engram_prefetch::tests::background_prefetch_owns_mapping_and_advises_both_tables ... ok\ntest tests::explicit_snapshot_revision_rejects_missing_or_traversing_selection ... ok\ntest tests::compact_exl3_config_rejects_missing_or_mismatched_external_config ... ok\ntest tests::explicit_snapshot_revision_wins_over_main_ref ... ok\ntest tests::load_tensor_rows_reads_exact_2d_window ... ok\ntest tests::compact_exl3_config_resolves_external_tensor_storage ... ok\ntest tests::load_tensor_rows_rejects_out_of_bounds_window ... ok\ntest tests::model_cache_path_uses_hf_layout ... ok\ntest tests::load_tensor_bytes_reads_exact_range ... ok\ntest tests::load_plan_places_mtp_experts_on_sparks_and_mtp_envelope_on_coordinator ... ok\ntest tests::native_fp4_contract_fails_closed_on_legacy_nvfp4_metadata ... ok\ntest tests::native_fp4_flash_tp4_windows_match_gpu_oracle_memory_geometry ... ok\ntest tests::native_fp4_contract_maps_checkpoint_w3_then_w1_to_sparkinfer_w13 ... ok\ntest tests::native_fp4_pro_tp4_windows_preserve_equal_rank_demand ... ok\ntest tests::flash_model_facts_are_read_from_deepseek_v4_config ... ok\ntest tests::read_tensor_bytes_into_rejects_small_destination ... ok\ntest tests::read_tensor_bytes_into_uses_caller_buffer_prefix ... ok\ntest tests::read_tensor_row_prefix_into_rejects_invalid_prefix_width ... ok\ntest tests::read_tensor_row_prefix_into_compacts_leading_columns ... ok\ntest tests::read_tensor_row_window_into_compacts_middle_columns ... ok\ntest tests::native_attention_specs_match_flash_projection_and_compression_contract ... ok\ntest tests::read_tensor_rows_into_rejects_small_destination ... ok\ntest tests::read_tensor_rows_into_uses_caller_buffer_prefix ... ok\ntest tests::snapshot_resolution_honors_main_ref_over_lexicographic_order ... ok\ntest tests::reads_single_file_safetensors_metadata_with_absolute_offsets ... ok\ntest v41_catalog::tests::rejects_same_byte_count_with_wrong_representation ... ok\ntest tests::snapshot_resolution_rejects_missing_or_traversing_main_ref ... ok\ntest tests::streaming_tokenizer_buffers_split_utf8_scalars ... ok\ntest tests::tokenizer_is_reused_after_the_snapshot_file_changes ... ok\ntest v41_config::tests::official_nested_architecture_has_distinct_dspark_and_ced_geometry ... ok\ntest v41_catalog::tests::tp4_staging_reads_columns_and_rows_beyond_two_gib ... ok\ntest engram_tokenizer::tests::compression_preserves_spaces_and_normalizes_accents ... ok\ntest tests::pro_model_facts_are_inferred_from_dimensions_not_repository_name ... ok\ntest dspark_format::tests::flash_contract_is_three_native_blocks_with_five_proposals ... ok\ntest tests::native_attention_catalog_validates_all_target_and_dspark_headers ... ok\ntest v41_config::tests::rejects_legacy_or_incomplete_architecture_instead_of_defaulting ... ok\ntest dspark_format::tests::contract_rejects_incomplete_exl3_routed_experts ... ok\ntest dspark_format::tests::flash_contract_accepts_exl3_routed_experts ... ok\ntest dspark_format::tests::contract_rejects_incomplete_or_unexpected_mtp_namespaces ... ok\ntest tests::native_attention_catalog_rejects_header_drift ... ok\ntest v41_catalog::tests::checkpoint_contract_keeps_native_types_and_local_draft_experts ... ok\ntest v41_catalog::expert_staging_tests::native_expert_staging_covers_all_tp_ranks_and_full_dspark ... ok\n\ntest result: ok. 64 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+  "file_to_gpu_checks": [
+    {
+      "selection": "backbone",
+      "rank": 0,
+      "catalog_staging_h2d_rust_native_packed_bytes": "exact"
+    },
+    {
+      "selection": "backbone",
+      "rank": 1,
+      "catalog_staging_h2d_rust_native_packed_bytes": "exact"
+    },
+    {
+      "selection": "backbone",
+      "rank": 2,
+      "catalog_staging_h2d_rust_native_packed_bytes": "exact"
+    },
+    {
+      "selection": "backbone",
+      "rank": 3,
+      "catalog_staging_h2d_rust_native_packed_bytes": "exact"
+    },
+    {
+      "selection": "dspark",
+      "rank": null,
+      "catalog_staging_h2d_rust_native_packed_bytes": "exact"
+    }
+  ],
+  "native_library_sha256": "572e6615a781f9f162a5f430a48b0bbe53c42392b3a4ff2b567bccd4cc5a4c37",
+  "fixture_sha256": {
+    "/tmp/ds41-staged-packer/src/main.rs": "cdaf288dcf3a8e6d29a0d857aebb15b8616b0d6e87e48bf601be17ded066fdf0",
+    "/tmp/ds41-v41-aot/prepare_staged_fixture.py": "82165eda28fb614bb75dfb11e8215470a48147fe53dd07980c6a656c3db3844b",
+    "/tmp/ds41-v41-aot/check_staged_pack.py": "bef740c8bcab02170d54adabf0587b011b16e26604aafa251e93ce799751d9ed",
+    "/tmp/ds41-v41-aot/staged-fixture.json": "316942bcb3c08a3c085458583fa0d8caba7b923f4c940fae4a54ec74817690de"
+  },
+  "scope": "Bounded native expert staging from validated official catalog; synthetic full-header fixture read and Rust/CUDA packing on RTX 0; production allocation ownership and model execution remain open."
+}

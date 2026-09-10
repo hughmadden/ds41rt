@@ -1,0 +1,11 @@
+# Official expert staging into native packing
+
+`OfficialV41Catalog::expert_staging` validates backbone layer/expert/TP-rank or dSpark stage/expert selection and produces aligned ranges in the native packer's W1/W3/W2/S1/S3/S2 source order. The plan borrows the already validated catalog and reads into reusable caller-owned storage. Backbone W1/W3 use intermediate row quarters and W2 uses packed intermediate column quarters, while every dSpark expert remains whole on RTX.
+
+A Spark expert requires 4,700,160 staging bytes and at least 1,152 bytes of physical-row read scratch; larger read scratch coalesces more W2 rows. dSpark requires 18,800,640 staging bytes and no column-selection scratch. Invalid selections and undersized staging/read buffers fail before payload reads. An I/O error propagates with tensor context; partially filled staging must not be packed. Files must remain unchanged after catalog validation.
+
+All 64 loader tests pass. The new staging test uses nonzero row/column/tensor-dependent payloads beyond the 2 GiB file boundary and checks all four TP ranks, the final backbone expert/layer, the final dSpark expert/stage, all six source buffers, partial physical read batches, untouched trailing guards, invalid indices, pre-read buffer rejection and truncated-file failure.
+
+A separate temporary Rust executable reads the complete validated 48-shard sparse-header fixture, stages one synthetic expert for each backbone rank and one full dSpark expert, copies staging to RTX 0 through the native FFI and invokes production Rust/CUDA packing. All twenty packed outputs match an independent physical row/column selection plus b12x reshape/permute reference byte-for-byte. The fixture uses nonzero synthetic payloads in the official tensor shapes, not downloaded model payloads. This closes the component path from validated file catalog through bounded reads to native packing; GPU expert arithmetic evidence remains in the preceding packing qualification.
+
+Production GPU buffer ownership, layer loading orchestration, per-route transport, scheduler/model execution and complete build/run qualification remain open. The native library used here is unchanged from the preceding packing commit; exact source/fixture hashes and results are in `ds41-expert-staging-qualification.json`.

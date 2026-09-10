@@ -58,3 +58,5 @@ Native reduction progress: CUDA/Rust expert route reduction now passes exact sta
 Native scratch progress: planner-derived C/Rust scratch binding and initialization now pass all six capacities and M16 expert/graph execution on RTX and ostrich, while native weight packing, engine allocation ownership and transport integration remain open in `docs/ds41-native-expert-scratch-qualification.md`.
 
 Native weight progress: per-expert official FP4/E8M0 CUDA packing and Rust bindings pass exact layout checks on both RTX GPUs and ostrich plus M16 expert/graph execution on RTX/ostrich, with padded Spark storage budgeted at 80,216,064,000 bytes while loader/ownership/transport integration remains open.
+
+Expert loader progress: validated per-expert staging now reads all six official tensors in native packer order with bounded TP4 column scratch and full RTX dSpark placement, passing 64 loader tests and full-header-fixture-to-GPU packing checks while layer allocation/transport/serving integration remains open.
