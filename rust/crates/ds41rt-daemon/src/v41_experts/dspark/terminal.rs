@@ -196,7 +196,7 @@ impl DsparkTerminal<'_, '_> {
                 self.normalized.buffer,
                 (requests * 5) as i32,
                 5120,
-                1e-6,
+                1e-20,
                 stream,
             )?;
             self.head_kernel.launch(

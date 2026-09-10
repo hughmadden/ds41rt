@@ -1,5 +1,7 @@
 # Complete dSpark proposal graph
 
+Normalization evidence in this historical record is superseded by [the official epsilon correction](ds41-normalization-correction.md), which fixes the inherited `1e-6` RMS epsilon to `1e-20` and reruns primitive, stage and complete-draft checks.
+
 `DsparkWeights::draft` owns the complete proposal sequence on one captured stream: shared embedding lookup, three independent attention/mHC/shared-and-routed-FFN stages, final mHC collapse and RMS normalization, shared vocabulary projection, five dependent Markov corrections and samples, then raw confidence. It borrows the coordinator's embedding and vocabulary owners. The committed main-context KV producer remains separate and must finish before proposal execution.
 
 A native allocation-free handoff transposes final residual and pre-mix from request-major `[R,5,...]` to the terminal's position-major `[5,R,...]` layout. The same seed buffer initializes the embedding and terminal anchors on every replay. Terminal suboperations now accept the containing stream; no host synchronization occurs between transformer stages and heads or between sampled positions. Existing standalone terminal execution retains its own stream.

@@ -1,5 +1,7 @@
 # Complete dSpark stage composition
 
+Normalization evidence in this historical record is superseded by [the official epsilon correction](ds41-normalization-correction.md), which fixes the inherited `1e-6` RMS epsilon to `1e-20` and reruns primitive, stage and complete-draft checks.
+
 `DsparkStage` owns one attention mHC boundary, draft attention and FFN boundary and executes them on the FFN expert stream in one CUDA graph. Attention normalization writes directly into the query-A input; attention output feeds mHC post, then ordered device copies carry residual streams and the generated pre-mix into the FFN boundary. The FFN composes normalization, router, shared/routed experts and final mHC post and publishes residual streams plus the next pre-mix only after the whole stage completes.
 
 All request leases and committed ends are validated before metadata upload. Captured graphs retain their request count and unique cache-owner identity; replay revalidates both while holding the window borrow through synchronous GPU completion. Error paths invalidate publication and drain submitted work before child storage is released. Capture warmup is not published. This stage replaces the separately budgeted attention/mHC/FFN owners and adds no persistent allocation; the two inter-boundary device copies remain optimization candidates.

@@ -1,0 +1,1809 @@
+{
+  "scope": "Official 1e-20 RMS epsilon correction; synthetic primitive/stage/draft regression, not real-model execution",
+  "norm_eps": 1e-20,
+  "hc_eps": 1e-06,
+  "attention": {
+    "0": {
+      "scope": "Native dSpark norm and rotary operations; excludes frequency ownership, full attention and serving",
+      "norm_eps": 1e-20,
+      "reference_config_sha256": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+      "device": 0,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "native_library_sha256": "081418b57c410f7dff6ac483b6214e99a8e36e8f47388f019145f7380086adb6",
+      "qualifier_sha256": "44cd79e4a61244dd538cf70989037fdc62208338d09776121c312bd4209e79e7",
+      "results": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 16,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 80,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 3
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 255,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 2
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1023,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 2
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 11
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 14
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 21
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 6
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 4095,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 13
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 21
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 60
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 97
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        }
+      ]
+    },
+    "1": {
+      "scope": "Native dSpark norm and rotary operations; excludes frequency ownership, full attention and serving",
+      "norm_eps": 1e-20,
+      "reference_config_sha256": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+      "device": 1,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "native_library_sha256": "081418b57c410f7dff6ac483b6214e99a8e36e8f47388f019145f7380086adb6",
+      "qualifier_sha256": "44cd79e4a61244dd538cf70989037fdc62208338d09776121c312bd4209e79e7",
+      "results": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 16,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 80,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 255,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 2
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 5
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1023,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 3
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 5
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 13
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 22
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 6
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 9
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 4095,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 15
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 22
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 77
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 72
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        }
+      ]
+    }
+  },
+  "dspark": {
+    "scope": "Native synthetic numerical and five-step graph qualification; excludes Rust owner and serving integration",
+    "norm_eps": 1e-20,
+    "hc_eps": 1e-06,
+    "reference_config_sha256": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+    "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+    "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+    "reference_kernel_sha256": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+    "native_library_sha256": "081418b57c410f7dff6ac483b6214e99a8e36e8f47388f019145f7380086adb6",
+    "qualifier_sha256": "9395398e1040b291bde2699af25e60453b3188b1d6d060141b1b478204512c1f",
+    "results": [
+      {
+        "device": 0,
+        "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "max_abs_errors": {
+          "router": [
+            {
+              "experts": 128,
+              "rows": 1,
+              "max_abs_error": {
+                "score": 2.384185791015625e-07,
+                "weight": 1.1920928955078125e-07
+              },
+              "changed_graph_error": {
+                "score": 1.1920928955078125e-07,
+                "weight": 0.0
+              }
+            },
+            {
+              "experts": 128,
+              "rows": 16,
+              "max_abs_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              },
+              "changed_graph_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              }
+            },
+            {
+              "experts": 128,
+              "rows": 80,
+              "max_abs_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              },
+              "changed_graph_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              }
+            },
+            {
+              "experts": 384,
+              "rows": 1,
+              "max_abs_error": {
+                "score": 2.384185791015625e-07,
+                "weight": 0.0
+              },
+              "changed_graph_error": {
+                "score": 2.384185791015625e-07,
+                "weight": 2.9802322387695312e-08
+              }
+            },
+            {
+              "experts": 384,
+              "rows": 16,
+              "max_abs_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              },
+              "changed_graph_error": {
+                "score": 4.76837158203125e-07,
+                "weight": 5.960464477539063e-08
+              }
+            },
+            {
+              "experts": 384,
+              "rows": 80,
+              "max_abs_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              },
+              "changed_graph_error": {
+                "score": 4.76837158203125e-07,
+                "weight": 8.940696716308594e-08
+              }
+            }
+          ],
+          "hc_coefficients_m1": 1.1920928955078125e-07,
+          "hc_coefficients_m16": 3.5762786865234375e-07,
+          "hc_coefficients_m80": 4.76837158203125e-07,
+          "hc_coefficients_graph": 4.76837158203125e-07,
+          "hc_coefficients_magnitude_1e-08": 4.172325134277344e-07,
+          "hc_coefficients_magnitude_1e-10": 1.1920928955078125e-07,
+          "hc_coefficients_magnitude_1e-12": 5.960464477539063e-08,
+          "hc_coefficients_zero_saturated": 2.9802322387695312e-08,
+          "confidence_m1": 2.384185791015625e-07,
+          "confidence_m16": 4.76837158203125e-07,
+          "confidence_m80": 4.76837158203125e-07,
+          "markov_m1": 4.172325134277344e-07,
+          "markov_m3": 4.76837158203125e-07,
+          "markov_m16": 7.152557373046875e-07,
+          "head_norm_m1": 0.0,
+          "head_projection_m1": 7.152557373046875e-07,
+          "head_combined_m1": 1.1920928955078125e-06,
+          "head_norm_m16": 1.52587890625e-05,
+          "head_projection_m16": 4.76837158203125e-06,
+          "head_combined_m16": 9.298324584960938e-06,
+          "head_norm_m80": 1.52587890625e-05,
+          "head_projection_m80": 4.1484832763671875e-05,
+          "head_combined_m80": 4.3392181396484375e-05
+        },
+        "greedy_five_step_graph_mutated_replays": 3,
+        "shared_head_norm_projection_graph": true,
+        "router_text_vision_graph_ties_bias_extremes_guards": true,
+        "hc_pre_post_bitwise_rows": [
+          1,
+          16,
+          80
+        ],
+        "hc_changed_input_graph_bitwise": true,
+        "rng_replay_and_request_reordering_exact": true,
+        "stochastic_five_step_graph_exact": true,
+        "two_category_samples": 4096,
+        "category_zero_frequency": 0.682861328125
+      },
+      {
+        "device": 1,
+        "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "max_abs_errors": {
+          "router": [
+            {
+              "experts": 128,
+              "rows": 1,
+              "max_abs_error": {
+                "score": 1.1920928955078125e-07,
+                "weight": 5.960464477539063e-08
+              },
+              "changed_graph_error": {
+                "score": 1.1920928955078125e-07,
+                "weight": 0.0
+              }
+            },
+            {
+              "experts": 128,
+              "rows": 16,
+              "max_abs_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              },
+              "changed_graph_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              }
+            },
+            {
+              "experts": 128,
+              "rows": 80,
+              "max_abs_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              },
+              "changed_graph_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 1.1920928955078125e-07
+              }
+            },
+            {
+              "experts": 384,
+              "rows": 1,
+              "max_abs_error": {
+                "score": 1.1920928955078125e-07,
+                "weight": 2.9802322387695312e-08
+              },
+              "changed_graph_error": {
+                "score": 1.1920928955078125e-07,
+                "weight": 0.0
+              }
+            },
+            {
+              "experts": 384,
+              "rows": 16,
+              "max_abs_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 5.960464477539063e-08
+              },
+              "changed_graph_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 5.960464477539063e-08
+              }
+            },
+            {
+              "experts": 384,
+              "rows": 80,
+              "max_abs_error": {
+                "score": 4.76837158203125e-07,
+                "weight": 8.940696716308594e-08
+              },
+              "changed_graph_error": {
+                "score": 3.5762786865234375e-07,
+                "weight": 8.940696716308594e-08
+              }
+            }
+          ],
+          "hc_coefficients_m1": 2.384185791015625e-07,
+          "hc_coefficients_m16": 4.76837158203125e-07,
+          "hc_coefficients_m80": 4.76837158203125e-07,
+          "hc_coefficients_graph": 4.76837158203125e-07,
+          "hc_coefficients_magnitude_1e-08": 4.76837158203125e-07,
+          "hc_coefficients_magnitude_1e-10": 1.1920928955078125e-07,
+          "hc_coefficients_magnitude_1e-12": 1.043081283569336e-07,
+          "hc_coefficients_zero_saturated": 2.9802322387695312e-08,
+          "confidence_m1": 2.9802322387695312e-08,
+          "confidence_m16": 2.384185791015625e-07,
+          "confidence_m80": 3.5762786865234375e-07,
+          "markov_m1": 4.172325134277344e-07,
+          "markov_m3": 5.960464477539062e-07,
+          "markov_m16": 6.556510925292969e-07,
+          "head_norm_m1": 0.0,
+          "head_projection_m1": 8.344650268554688e-07,
+          "head_combined_m1": 1.1920928955078125e-06,
+          "head_norm_m16": 0.0,
+          "head_projection_m16": 4.76837158203125e-06,
+          "head_combined_m16": 5.245208740234375e-06,
+          "head_norm_m80": 0.0009765625,
+          "head_projection_m80": 4.482269287109375e-05,
+          "head_combined_m80": 0.0005655288696289062
+        },
+        "greedy_five_step_graph_mutated_replays": 3,
+        "shared_head_norm_projection_graph": true,
+        "router_text_vision_graph_ties_bias_extremes_guards": true,
+        "hc_pre_post_bitwise_rows": [
+          1,
+          16,
+          80
+        ],
+        "hc_changed_input_graph_bitwise": true,
+        "rng_replay_and_request_reordering_exact": true,
+        "stochastic_five_step_graph_exact": true,
+        "two_category_samples": 4096,
+        "category_zero_frequency": 0.682861328125
+      }
+    ],
+    "not_qualified": [
+      "Rust allocation/ownership and cancellation",
+      "Full distribution/tail quality",
+      "Alternating-wave overlap",
+      "Full model execution"
+    ]
+  },
+  "stage": {
+    "0": [
+      "PASS stage=0 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true"
+    ],
+    "1": [
+      "PASS stage=0 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=0 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=1 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+      "PASS stage=2 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true"
+    ]
+  },
+  "draft": {
+    "0": [
+      "PASS requests=1 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+      "PASS requests=1 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+      "PASS requests=3 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+      "PASS requests=3 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+      "PASS requests=16 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980",
+      "PASS requests=16 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980"
+    ],
+    "1": [
+      "PASS requests=1 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+      "PASS requests=1 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=76544868",
+      "PASS requests=3 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+      "PASS requests=3 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=90539396",
+      "PASS requests=16 case=0 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980",
+      "PASS requests=16 case=1 exact_residual=true exact_pre=true exact_proposal=true guards=true rings_unchanged=true device_bytes=333274980"
+    ]
+  },
+  "sha256": {
+    "/home/tj/Developer/ds41rt/native/cuda/kernels/v41_attention_ops.cu": "b27657ad534d81b1c926b68e5117ffe069504adef8b798b523fbe398360f8eb0",
+    "/home/tj/Developer/ds41rt/native/cuda/kernels/v41_hc.cu": "8a63b24f931a37c98d97ac55e3d4a0efdcca375755907c50087399ef10f597ba",
+    "/home/tj/Developer/ds41rt/native/include/ds41rt_v41_attention_ops.h": "90e8f9034350c93f76034932256e08ec9c3760c000e8319d0b1fbce5ecdcf61b",
+    "/home/tj/Developer/ds41rt/native/include/ds41rt_v41_hc.h": "6024e2feba65a6acba54e7db62697e63d18f17c642cd0c6e8dc717460f7dedaa",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-daemon/src/v41_experts/dspark/hc.rs": "8fcea4f74f113d56b439465c3430fe94826b6db928774c1083282a6bb6804d19",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-daemon/src/v41_experts/dspark/terminal.rs": "92e07cc4e0f7819eafafd96985ecaa5028306ef9d1123a97a45ee10ca20b6294",
+    "/home/tj/Developer/ds41rt/scripts/qualify-ds41-attention-ops.py": "44cd79e4a61244dd538cf70989037fdc62208338d09776121c312bd4209e79e7",
+    "/home/tj/Developer/ds41rt/scripts/qualify-ds41-dspark.py": "9395398e1040b291bde2699af25e60453b3188b1d6d060141b1b478204512c1f",
+    "/tmp/ds41-norm-native-build.log": "5a3860a2dc7b43dcb2edd3ceaffb51e87ad625b0a915ca32dec7d9dd30d3e5f6",
+    "/tmp/ds41-norm-daemon-build.log": "ef13ba1a0be0cef2ddb126fe2a49721318f9aaf8cb9451d7d26ae3feb59e88ee",
+    "/tmp/ds41-norm-draft-build.log": "05d0ee4923008f76953e197cd1dd66ea935cafc2d22ca934d977ae275cbd01b4",
+    "/tmp/ds41-norm-stage-build.log": "79900a46925704de6ae74151fd51c5fd2956b7cf3e42da3de53511d93865efef",
+    "/tmp/ds41-norm-stage-generate.log": "87dfc439cacc33ce240ac704eca4fd5c3cfe1999b7300734e736885c0e1dc7cc",
+    "/tmp/ds41-norm-dspark-fp64.log": "f1ad1cbda7c6b0f35028eb9fb196bad5941e3e50eec4be94497b9c0b1f1e142d",
+    "/tmp/ds41-norm-diagnose-final.log": "6091811797fd14fc9a4af57e8c2b4c12c8599bf8877a1503db52ba6ba0d977bc",
+    "/tmp/ds41-norm/dspark.json": "f1ad1cbda7c6b0f35028eb9fb196bad5941e3e50eec4be94497b9c0b1f1e142d",
+    "/tmp/ds41-stage/generate.py": "6ebf6ea4b78bf52bdbb58b9b50de8a129d0de603fedfc87ee2337576bc3434fe",
+    "/tmp/ds41-stage/src/main.rs": "06e2ee693a7a99ba1ab4e4cdec88dd7b820690d2344eef8bc5ed068893f7cf7e",
+    "/tmp/ds41-draft/src/main.rs": "2a9e0bd88653a6c9513d7103e69a0065ecbd30182bdeb0ffb23fc53cdb3119ad",
+    "/tmp/ds41-norm/attention-rtx0.json": "aaac65bab95da46a236715f836403037879c1466dbc7677f0ac739550c4ab910",
+    "/tmp/ds41-norm-stage-rtx0.log": "83ffa993e8a35a8b025981e220556149bcedf794e7165bfd83fdd3c8abae0a4e",
+    "/tmp/ds41-norm-draft-rtx0.log": "db46c5dc695628a5af044683e7e286f974128e59f783993f35ee721af26f0a09",
+    "/tmp/ds41-norm/attention-rtx1.json": "85450572b51eaa912c6e17e7a3725956be9564060b7335091b1a504c0b5b4e42",
+    "/tmp/ds41-norm-stage-rtx1.log": "83ffa993e8a35a8b025981e220556149bcedf794e7165bfd83fdd3c8abae0a4e",
+    "/tmp/ds41-norm-draft-rtx1.log": "db46c5dc695628a5af044683e7e286f974128e59f783993f35ee721af26f0a09"
+  }
+}

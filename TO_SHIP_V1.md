@@ -36,6 +36,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Wire CED encoder/decoder execution, shared KV ownership, chunked prefill and exact replay with separately qualified bounded replay.
 - [ ] Implement CSA2 ratio-2 and ratio-1 production and source/reindex/reuse modes under the FP8-only serving KV contract.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
+- [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
 - [ ] Connect native FP4 backbone TP4 experts, FP32 route transport and correctly ordered reduction to the production AFD scheduler.
 - [x] Implement deterministic engram tokenizer compression, prime layouts, hashes, image barriers and request histories.
@@ -82,3 +83,5 @@ Checkpoint-backed staging and the remaining read-amplification bottleneck are re
 Complete-stage composition and its remaining integration limits are recorded in `docs/ds41-dspark-stage-qualification.md`.
 
 Three-stage composition is qualified in `docs/ds41-dspark-chain-qualification.md`; shared embedding integration is qualified in `docs/ds41-dspark-embedding-qualification.md`, and the complete proposal graph is qualified in `docs/ds41-dspark-draft-qualification.md`.
+
+The official normalization contract and corrected regression evidence are in `docs/ds41-normalization-correction.md`; earlier default-epsilon normalization evidence is superseded.

@@ -36,7 +36,7 @@ template<int D, bool Quantize=false> __global__ void norm_kernel(const __nv_bflo
   __syncthreads();
   if (t<32) {
     sum=sum_warp(t<8?partial[t]:0);
-    if (t==0) inverse=rsqrtf(__fadd_rn(sum/float(D),1e-6f));
+    if (t==0) inverse=rsqrtf(__fadd_rn(sum/float(D),1e-20f));
   }
   __syncthreads();
   // Each thread owns a pair; normalization rounds BEFORE optional rotation.

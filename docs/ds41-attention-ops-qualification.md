@@ -1,8 +1,10 @@
 # dSpark normalization and rotary operations
 
+Normalization evidence in this historical record is superseded by [the official epsilon correction](ds41-normalization-correction.md), which fixes the inherited `1e-6` RMS epsilon to `1e-20` and reruns primitive, stage and complete-draft checks.
+
 The native attention operations now provide RMS normalization for dimensions 512, 1280 and 5120, fused KV normalization/rotation at dimension 512, and forward/inverse rotation for one or sixty-four 512-wide heads. Rust bindings validate buffer lengths and geometry; the C ABI rejects malformed pointers, overflow and output overlap. Operations allocate no storage, launch asynchronously and support graph capture.
 
-Normalization promotes BF16 input and weight to FP32, applies epsilon 1e-6, and rounds to BF16 before any rotation. Fused KV normalization retains that intermediate rounding boundary and rounds the rotated pair again. RoPE rotates adjacent pairs in the final 64 dimensions and copies the preceding dimensions unchanged. Frequencies are supplied as per-row FP32 complex pairs, allowing mixed request positions without requiring a shared batch offset.
+Normalization promotes BF16 input and weight to FP32, originally applied epsilon 1e-6 (now corrected to the official 1e-20), and rounds to BF16 before any rotation. Fused KV normalization retains that intermediate rounding boundary and rounds the rotated pair again. RoPE rotates adjacent pairs in the final 64 dimensions and copies the preceding dimensions unchanged. Frequencies are supplied as per-row FP32 complex pairs, allowing mixed request positions without requiring a shared batch offset.
 
 Qualification extracts the unmodified RMSNorm, apply_rotary_emb and precompute_freqs_cis definitions from the hash-checked reference. dSpark uses the pure sliding-window branch, so tests disable YaRN and use base 10000 with independently selected positions below 262144. Frequency construction in the production runtime remains unfinished.
 

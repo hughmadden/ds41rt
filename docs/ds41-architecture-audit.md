@@ -16,6 +16,7 @@ The authoritative sources are the [official checkpoint](https://huggingface.co/d
 | Decoder candidates | Layer 20 selects 2048 blocks of 8 positions | Pin newest visible block and restrict later indexers to candidates |
 | Attention | 64 heads, 512 dimensions, 64 RoPE dimensions, 128-token window, top-512 global positions | Respect causal group completion and shared-source positions |
 | Cache formats | Window FP8; compressed FP4 with groups of 16 and E4M3 scales; indexer FP4 with groups of 32 and E8M0 scales | Separate quantization contracts rather than reuse one generic FP4 layout |
+| RMS normalization | `norm_eps=1e-20`; distinct from `hc_eps=1e-6` | Pass the model configuration instead of RMSNorm constructor defaults; see `ds41-normalization-correction.md` |
 | Single-pass mHC | Four streams, previous sublayer's input-mixing coefficients, 20 Sinkhorn iterations | Carry coefficients across attention/FFN/layer boundaries and fuse the correct dependency |
 | Backbone MoE | 384 routed experts, top-6, one shared expert, sqrtsoftplus scoring | Native FP4 expert AFD with text/image routing bias selection |
 | Engram | Layers 1 and 14, orders 2/3/4, eight heads per order, 256 dimensions per fetched row | Deterministic hashes and asynchronous mapped table access |

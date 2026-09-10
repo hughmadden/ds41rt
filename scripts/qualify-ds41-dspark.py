@@ -24,6 +24,12 @@ def main():
     assert reference_hash == lock['files']['inference/model.py']
     kernel_hash = hashlib.sha256((args.reference_dir/'inference/kernel.py').read_bytes()).hexdigest()
     assert kernel_hash == lock['files']['inference/kernel.py']
+    config_path=args.reference_dir/'inference/config.json'
+    config_hash=hashlib.sha256(config_path.read_bytes()).hexdigest()
+    assert config_hash == lock['files']['inference/config.json']
+    config=json.loads(config_path.read_text())
+    norm_eps,hc_eps=config['norm_eps'],config['hc_eps']
+    assert norm_eps == 1e-20 and hc_eps == 1e-6
     lib = C.CDLL(str(args.native_lib))
 
     def bind(name, types):
@@ -161,14 +167,14 @@ def main():
                         ptr(generated_pre),ptr(generated_post),ptr(generated_comb),rows,stream.cuda_stream)
                 def coefficient_oracle(rows=80):
                     x=residual[:rows].flatten(1).float()
-                    projected=(x @ mix_weight.T)*torch.rsqrt(x.square().mean(-1,keepdim=True)+1e-6)
-                    reference_pre=torch.sigmoid(projected[:,:4]*mix_scale[0]+mix_base[:4])+1e-6
+                    projected=(x @ mix_weight.T)*torch.rsqrt(x.square().mean(-1,keepdim=True)+norm_eps)
+                    reference_pre=torch.sigmoid(projected[:,:4]*mix_scale[0]+mix_base[:4])+hc_eps
                     reference_post=2*torch.sigmoid(projected[:,4:8]*mix_scale[1]+mix_base[4:8])
-                    reference_comb=(projected[:,8:]*mix_scale[2]+mix_base[8:]).reshape(rows,4,4).softmax(-1)+1e-6
-                    reference_comb=reference_comb/(reference_comb.sum(-2,keepdim=True)+1e-6)
+                    reference_comb=(projected[:,8:]*mix_scale[2]+mix_base[8:]).reshape(rows,4,4).softmax(-1)+hc_eps
+                    reference_comb=reference_comb/(reference_comb.sum(-2,keepdim=True)+hc_eps)
                     for _ in range(19):
-                        reference_comb=reference_comb/(reference_comb.sum(-1,keepdim=True)+1e-6)
-                        reference_comb=reference_comb/(reference_comb.sum(-2,keepdim=True)+1e-6)
+                        reference_comb=reference_comb/(reference_comb.sum(-1,keepdim=True)+hc_eps)
+                        reference_comb=reference_comb/(reference_comb.sum(-2,keepdim=True)+hc_eps)
                     return max(close(generated_pre[:rows],reference_pre),close(generated_post[:rows],reference_post),
                         close(generated_comb[:rows],reference_comb))
                 for rows in [1,16,80]:
@@ -181,6 +187,11 @@ def main():
                 residual.copy_(bf((80,4,H)))
                 coefficient_graph.replay()
                 errors['hc_coefficients_graph']=coefficient_oracle()
+                base_residual=residual.clone()
+                for magnitude in [1e-8,1e-10,1e-12]:
+                    residual.copy_(base_residual*magnitude)
+                    coefficient_graph.replay()
+                    errors[f'hc_coefficients_magnitude_{magnitude}']=coefficient_oracle()
                 residual.zero_()
                 mix_base.copy_(torch.linspace(-100,100,24,device='cuda'))
                 coefficient_graph.replay()
@@ -218,22 +229,24 @@ def main():
                 head_graph = None
                 try:
                     def project_head(rows=80):
-                        norm(ptr(hidden),ptr(norm_weight),ptr(normalized),rows,H,1e-6,stream.cuda_stream)
+                        norm(ptr(hidden),ptr(norm_weight),ptr(normalized),rows,H,norm_eps,stream.cuda_stream)
                         head_projection(head_handle,ptr(normalized),ptr(head_weight),ptr(head_output),rows,stream.cuda_stream)
                     for rows in [1,16,80]:
                         project_head(rows)
                         x = hidden[:rows].float()
-                        expected_norm = (x*torch.rsqrt(x.square().mean(-1,keepdim=True)+1e-6)*norm_weight.float()).bfloat16()
+                        expected_norm = (x*torch.rsqrt(x.square().mean(-1,keepdim=True)+norm_eps)*norm_weight.float()).bfloat16()
                         errors[f'head_norm_m{rows}'] = (normalized[:rows].float()-expected_norm.float()).abs().max().item()
                         torch.testing.assert_close(normalized[:rows],expected_norm,rtol=.008,atol=.002)
-                        errors[f'head_projection_m{rows}'] = close(head_output[:rows],normalized[:rows].float() @ head_weight.float().T)
+                        # FP64 isolates the native dot's error from the reference FP32
+                        # GEMM's different reduction order, especially near cancellation.
+                        errors[f'head_projection_m{rows}'] = close(head_output[:rows],(normalized[:rows].double() @ head_weight.double().T).float())
                         errors[f'head_combined_m{rows}'] = close(head_output[:rows],expected_norm.float() @ head_weight.float().T,atol=.002)
                     stream.synchronize()
                     head_graph = torch.cuda.CUDAGraph()
                     with torch.cuda.graph(head_graph,stream=stream): project_head()
                     hidden.copy_(bf((80,H)))
                     head_graph.replay()
-                    close(head_output,normalized.float() @ head_weight.float().T)
+                    close(head_output,(normalized.double() @ head_weight.double().T).float())
                 finally:
                     stream.synchronize()
                     if head_graph is not None: head_graph.reset()
@@ -332,6 +345,7 @@ def main():
                 for graph in graphs: graph.reset()
                 destroy(handle)
     record = {'scope':'Native synthetic numerical and five-step graph qualification; excludes Rust owner and serving integration',
+        'norm_eps':norm_eps,'hc_eps':hc_eps,'reference_config_sha256':config_hash,
         'reference_revision':lock['revision'],'reference_model_sha256':reference_hash,'reference_kernel_sha256':kernel_hash,
         'native_library_sha256':hashlib.sha256(args.native_lib.read_bytes()).hexdigest(),
         'qualifier_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'results':results,

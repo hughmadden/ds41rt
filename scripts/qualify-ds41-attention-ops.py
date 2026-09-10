@@ -27,6 +27,12 @@ def main():
     assert len(nodes) == 3
     ns = {'torch': torch, 'nn': torch.nn, 'math': math, 'lru_cache': lru_cache}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), 'exec'), ns)
+    config_path=args.reference_dir/'inference/config.json'
+    config_hash=hashlib.sha256(config_path.read_bytes()).hexdigest()
+    assert config_hash == lock['files']['inference/config.json']
+    config=json.loads(config_path.read_text())
+    norm_eps,hc_eps=config['norm_eps'],config['hc_eps']
+    assert norm_eps == 1e-20 and hc_eps == 1e-6
     lib = C.CDLL(str(args.native_lib))
     norm, rope = lib.ds41rt_v41_attention_norm, lib.ds41rt_v41_attention_rope
     P, I = C.c_void_p, C.c_int32
@@ -60,7 +66,7 @@ def main():
             for dim in (512,1280,5120):
                 x=(torch.randn((rows,dim),device='cuda')*.3).bfloat16()
                 w=(torch.randn(dim,device='cuda')*.2+1).bfloat16()
-                layer=ns['RMSNorm'](dim).cuda().bfloat16()
+                layer=ns['RMSNorm'](dim, eps=norm_eps).cuda().bfloat16()
                 layer.weight.copy_(w)
                 y=torch.empty_like(x)
                 for rotated in ([False,True] if dim==512 else [False]):
@@ -126,6 +132,7 @@ def main():
             print(f'PASS rows={rows}', flush=True)
         stream.synchronize()
     evidence={'scope':'Native dSpark norm and rotary operations; excludes frequency ownership, full attention and serving',
+              'norm_eps':norm_eps,'reference_config_sha256':config_hash,
               'device':args.device,'device_name':torch.cuda.get_device_name(args.device),
               'reference_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
               'native_library_sha256':hashlib.sha256(args.native_lib.read_bytes()).hexdigest(),

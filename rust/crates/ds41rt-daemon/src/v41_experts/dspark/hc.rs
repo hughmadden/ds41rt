@@ -153,7 +153,7 @@ impl HcSublayer<'_, '_> {
                 normalized,
                 rows as i32,
                 5120,
-                1e-6,
+                1e-20,
                 stream,
             )?;
         }

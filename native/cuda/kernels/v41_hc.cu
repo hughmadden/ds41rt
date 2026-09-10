@@ -81,7 +81,7 @@ __global__ void mixes_kernel(const __nv_bfloat16* residual, const float* fn,
   __shared__ float projected[24], inverse;
   if(warp==0) {
     square=warp_sum(square);
-    if(lane==0) inverse=rsqrtf(square/20480.0f+1e-6f);
+    if(lane==0) inverse=rsqrtf(square/20480.0f+1e-20f);
   }
 #pragma unroll
   for(int j=0;j<3;++j) {
