@@ -55,11 +55,11 @@ To restrict a build to the available Spark hosts:
 
 This restricts build and image distribution targets; it does not change the
 four-rank serving topology.
-Full container and launch qualification remains on the pre-model checklist.
+Full container and launch qualification remains in `TO_SHIP_V1.md`.
 Use `./build.sh --help`, `./wip.sh --help`, and `./run.sh --help` for script options.
 
-The model download is separate from builds; this development uses
-`HF_HOME=/mnt/scratch/hf_cache`.
+The model download is separate from builds. Set `HF_HOME` to the host checkpoint
+cache when using a location other than the Hugging Face default.
 No weights are bundled with the repository or containers.
 
 ## Serving scope

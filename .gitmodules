@@ -5,9 +5,3 @@
 [submodule "third_party/xgrammar"]
 	path = third_party/xgrammar
 	url = https://github.com/mlc-ai/xgrammar.git
-[submodule "third_party/exllamav3"]
-	path = third_party/exllamav3
-	url = https://github.com/turboderp-org/exllamav3.git
-[submodule "third_party/gptqmodel"]
-	path = third_party/gptqmodel
-	url = https://github.com/tpurtell/GPTQModel.git

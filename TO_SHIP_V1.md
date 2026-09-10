@@ -91,71 +91,24 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Compare alternating waves with alternatives on the complete four-Spark AFD topology.
 - [ ] Tune fusions, shapes, expert reduction, engram prefetch and memory budgets using measured full-stack bottlenecks.
 - [ ] Run sustained load, cancellation, recovery and restart tests before publishing release claims.
-- [ ] Remove obsolete V4 model execution, alternate formats, quantizers, dependencies, optimization notes and inapplicable benchmarks while preserving serving features.
+- [x] Remove the offline V4 quantization pipeline, converter images/operations, GPTQModel and exllamav3 source dependencies, and old Docker comparison benchmarks.
+- [ ] Remove the remaining inherited V4 execution and alternate-format runtime paths, model-specific tools and tests while preserving serving features.
 - [ ] Remove tracked temporary scaffolding once replacement coverage exists and retain useful small component fixtures during development.
 - [ ] Finalize release commands, images, dependency pins, correctness/performance evidence and pushed commits after every required gate passes.
 
-## Current evidence and next dependency
+## Current evidence and integration gaps
 
-The native component records in `docs/ds41-*-qualification.*` establish their stated local scopes; they do not establish full-model readiness or the throughput targets above.
-The latest dSpark work is recorded in `docs/ds41-dspark-draft-qualification.md`, and full-backbone attention, vision and serving integration remain incomplete.
-The next dSpark dependency is target-layer/scheduler wiring and target verification, while the now-complete checkpoint allows selected real-weight validation and loader measurements in parallel with that work.
-`TO_DELETE_SCAFFOLDING.md` tracks temporary files committed to the repository, not a requirement to delete useful external test data now.
+Component records establish their stated scopes, not full-model readiness or the performance targets above. Historical records remain under `docs/ds41-*`; use the checklist for current completion status.
 
-Fleet checkpoint evidence is recorded in `docs/ds41-checkpoint-inventory.json` and `docs/ds41-checkpoint-inventory.md`; all weights still require execution qualification, and payload hashes were not scanned.
+| Area | Evidence | Remaining integration or qualification |
+| --- | --- | --- |
+| Official checkpoint on all hosts | [Inventory](docs/ds41-checkpoint-inventory.md) | Complete runtime load and execution; inventory is not an all-payload hash audit |
+| b12x master and native TP4 | [Master review](docs/ds41-b12x-master-review.md), [real four-Spark FFNs](docs/ds41-real-tp4-qualification.md) | All-layer startup, cold I/O and full-model scheduling |
+| Engram | [Pipeline](docs/ds41-engram-pipeline.md), [CUDA record](docs/ds41-engram-cuda-qualification.json) | Early prefetch, request histories and residual updates in the model driver |
+| FP8 backbone cache and attention | [KV ownership](docs/ds41-kv-qualification.md), [window](docs/ds41-window-qualification.md), [attention handoffs](docs/ds41-attention-handoff-qualification.md) | CED execution/replay and accepted-prefix scheduling across layers |
+| Backbone mHC and FFNs | [Block sequencing](docs/ds41-block-qualification.md), [shared experts](docs/ds41-backbone-shared-qualification.md), [routing](docs/ds41-backbone-router-qualification.md), [real TP4](docs/ds41-real-tp4-qualification.md) | Full 40-layer driver and numerical qualification |
+| Final target head | [Partial qualification](docs/ds41-target-head-qualification.md) | Final RTX checks after accumulation correction; sampling integration |
+| dSpark | [Draft graph](docs/ds41-dspark-draft-qualification.md), [packed cache](docs/ds41-dspark-fp8-cache-qualification.md) | RTX requalification after cache/head changes, target taps, verification, acceptance and rollback |
+| Vision, serving and performance | Checklist above | Full native vision path, concurrency 16, API/restart gates and measured throughput |
 
-The tap gather and composed main-context evidence is in `docs/ds41-dspark-taps-qualification.md`; production target-layer call sites remain unwired.
-
-Checkpoint-backed staging and the remaining read-amplification bottleneck are recorded in `docs/ds41-expert-load-probe.md`; these host reads do not establish real-weight GPU numerical or startup qualification.
-
-Complete-stage composition and its remaining integration limits are recorded in `docs/ds41-dspark-stage-qualification.md`.
-
-Three-stage composition is qualified in `docs/ds41-dspark-chain-qualification.md`; shared embedding integration is qualified in `docs/ds41-dspark-embedding-qualification.md`, and the complete proposal graph is qualified in `docs/ds41-dspark-draft-qualification.md`.
-
-The official normalization contract and corrected regression evidence are in `docs/ds41-normalization-correction.md`; earlier default-epsilon normalization evidence is superseded.
-
-Native backbone compressor evidence is in `docs/ds41-compressor-qualification.md`; request-owned partial-group state and accepted-prefix commit are qualified in `docs/ds41-compressor-owner-qualification.md`, with index/cache producers next.
-
-Backbone rotary frequencies and their compressor handoff are qualified in `docs/ds41-backbone-frequencies-qualification.md`; index-key projection is qualified in `docs/ds41-index-key-qualification.md`, with packed cache producers next.
-
-Index proposal encoding is qualified in `docs/ds41-index-pack-qualification.md`; persistent index/KV cache writes and candidate selection remain next.
-
-Persistent index ownership and accepted writes are qualified in `docs/ds41-index-cache-qualification.md`; candidate selection and persistent FP8 KV remain open.
-
-Device index page-table publication is qualified in `docs/ds41-index-table-qualification.md`; sparse scoring/selection consumers remain unwired.
-
-Native paged index scoring is qualified in `docs/ds41-index-scores-qualification.md`; query production, proposal overlays and hierarchical/top-512 selection remain open.
-
-Bounded tiled top-512 selection is qualified in `docs/ds41-index-topk-qualification.md`; hierarchical candidate blocks and production selection ownership remain open.
-
-Hierarchical candidate selection is qualified in `docs/ds41-candidate-blocks-qualification.md`; learned query production, candidate sharing and proposal overlays remain open.
-
-Learned index queries are qualified in `docs/ds41-index-query-qualification.md`; request-owned selection composition, candidate sharing and proposal overlays remain open.
-
-Causal index proposals and borrowed compressor views are qualified in `docs/ds41-index-overlay-qualification.md`; complete query/selection ownership and shared candidate scheduling remain open.
-
-Owned query/selection composition and candidate sharing are qualified in `docs/ds41-index-selection-qualification.md`; persistent FP8 KV, sparse attention and backbone scheduling remain open.
-
-Fixed FP8 source KV and paired index/KV commit are qualified in `docs/ds41-kv-qualification.md`; window ownership and sparse attention consumption remain open.
-
-Fixed FP8 backbone windows are qualified in `docs/ds41-window-qualification.md`; sparse attention consumption, dSpark storage conversion and backbone/scheduler integration remain open.
-
-Native direct FP8 sparse attention is qualified in `docs/ds41-sparse-attention-qualification.md`; owned composition with selection/window/source views and backbone query/output production remain open.
-
-Owned cache/selection attention composition is qualified in `docs/ds41-attention-owner-qualification.md`; real backbone attention query and output production remain open.
-
-Real backbone query production is qualified in `docs/ds41-attention-query-qualification.md`; query/index/attention handoff and inverse rotary/grouped output production remain open.
-
-Real backbone output production is qualified in `docs/ds41-backbone-attention-output-qualification.md`; complete query/index/attention/output composition remains open.
-
-Real query/index/attention/output handoffs are qualified in `docs/ds41-attention-handoff-qualification.md`; backbone mHC/CED/engram/routing composition and scheduler integration remain open.
-
-Shared mHC ownership and real backbone boundary arithmetic are qualified in `docs/ds41-backbone-hc-qualification.md`; attention/FFN orchestration and scheduler integration remain open.
-
-Backbone phase sequencing is recorded in `docs/ds41-block-qualification.md`, including observed chained BF16 sensitivity; actual shared/routed FFN integration and full-model numerical qualification remain open.
-
-Backbone shared-expert ownership and real-weight qualification are recorded in `docs/ds41-backbone-shared-qualification.md`; the shared contribution carries block execution identity, while four-Spark routed contribution and complete FFN reduction remain to be connected.
-
-Backbone routing and the bound TP4/shared handoff are recorded in `docs/ds41-backbone-router-qualification.md`; local analytical rank peers qualify this composition, while executing these generated routes on real Spark expert weights remains open.
-
-Real four-Spark checkpoint execution is recorded in `docs/ds41-real-tp4-qualification.md`: six 80-row batches across layers 0/20/39, official FP4 expert comparisons, exact transport reduction and qualified mHC finishes. Cache-backed timings do not establish cold NVMe throughput; complete startup and full-model scheduling remain open.
+RTX validation currently requires resolving the host NVIDIA kernel/library version mismatch; Spark work and CPU/build checks can continue. The official checkpoint is available, so use the smallest relevant real-weight fixture or integration run for each change. `TO_DELETE_SCAFFOLDING.md` tracks temporary committed code, not a requirement to delete useful external test data.

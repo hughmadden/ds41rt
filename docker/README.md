@@ -1,73 +1,52 @@
 # DS41RT containers
 
-DS41RT publishes two inference images because the release roles have different
-host architectures and CUDA targets:
+The V4.1 topology needs two native development/build roles:
 
-| Image | Platform | CUDA target | Purpose |
+| Development image | Platform | CUDA target | Role |
 | --- | --- | --- | --- |
-| `ghcr.io/tpurtell/ds41rt-coordinator:v2` | `linux/amd64` | `sm_120` | API, scheduler, attention, cache, sampling |
-| `ghcr.io/tpurtell/ds41rt-spark-expert:v2` | `linux/arm64` | `sm_121` | TP4 routed-expert worker |
+| `ds41rt-coordinator-dev` | `linux/amd64` | `sm_120` | Attention, vision, engram projections, shared experts, all dSpark, API and sampling |
+| `ds41rt-spark-expert-dev` | `linux/arm64` | `sm_121` | Backbone routed-expert TP4 worker |
 
-Weights are mounted read-only from the host Hugging Face cache. They are never
-embedded in an image and the release image runs offline.
+`docker-bake.hcl` contains only these two targets. Build each on its native
+machine. There is no checkpoint conversion image: the V4.1 release uses the
+official checkpoint's native representations.
 
-## Native release build
+## Build and provenance
 
-Run `./build.sh` from the repository root. It:
+Run `./build.sh` from the repository root. The workflow validates configuration
+and source identity, builds coordinator artifacts locally, stages matching
+source on the first selected Spark, builds ARM64 artifacts there, and
+distributes the expert image. Exported artifacts live under ignored `dist/`.
 
-1. validates configuration, submodule locks, Docker, SSH, disk, and source
-   identity;
-2. builds the amd64 development image and release artifacts locally;
-3. assembles the coordinator inference image;
-4. synchronizes the identical source snapshot to the first configured Spark;
-5. builds the arm64 development and inference images natively on that Spark;
-6. verifies artifact provenance and distributes the expert image to the other
-   three Sparks; and
-7. exports binaries and hashes under ignored `dist/`.
+Dirty checkouts receive an automatic source manifest under `.ds41rt-release/`.
+The build checks local and staged source against that manifest, so keep source
+files unchanged until it finishes. An existing manifest can be supplied via
+`DS41RT_RELEASE_SOURCE_MANIFEST`; ordinary dirty-tree builds do not require
+creating one manually.
 
-The release build refuses an unrecorded dirty tree. Development iterations use
-`./wip.sh`; `./build.sh` automatically records a source manifest for a dirty checkout
-and checks it throughout the build, so keep source files unchanged until it finishes.
-
-## Image contract
-
-Both images record the same concrete engine revision and SparkInfer revision.
-They also include OCI source, description, and MIT license labels. `run.sh`
-rejects missing or mismatched labels.
-
-Release images contain the `ds41rt` binary, native library, Python capture
-modules required at startup, pinned SparkInfer source, XGrammar/SparkInfer
-license and provenance records, and the runtime entrypoint. Development
-toolchains and quantization utilities are not part of the serving contract.
-
-## Publish v2
-
-After a clean build and five-host runtime qualification:
+For a subset of available build hosts:
 
 ```bash
-./push-containers.sh v2
+./build.sh --spark-hosts ostrich,dodo
 ```
 
-The script verifies that the local coordinator and first-Spark expert images
-carry the same engine revision, pushes `v2`, and updates `latest` for both
-packages. It never builds an image; publication therefore cannot bypass the
-normal build and runtime gates.
+This changes build/distribution targets only; serving still requires four
+Spark ranks. `./wip.sh --slot NAME` provides the fingerprinted incremental
+workflow. Use each script's `--help` for its current options.
 
-Authenticate the local host and the first Spark to GHCR before publishing.
-The publisher needs `write:packages`. The images carry
-`org.opencontainers.image.source=https://github.com/tpurtell/ds41rt`,
-which records the intended source association. After the first push, use each
-package's settings to connect this repository and set visibility to public,
-then verify both `v2` manifests from a Docker client with no registry login.
+## Runtime and release status
 
-## Quantization images
+The full V4.1 execution path, inherited deployment defaults and release gates
+are still being migrated. The current `ds41rt.config` Pro EXL3 checkpoint and
+`v2` release tags are legacy configuration, not a qualified V4.1 deployment.
+[TO_SHIP_V1.md](../TO_SHIP_V1.md) tracks the remaining build/run work.
 
-`Dockerfile.quantization` and the `quant-coordinator`/`quant-expert` bake
-targets preserve the reproducible conversion environment used to create the
-published checkpoint. They are developer tools, not required for v2 serving.
-The public quick-deploy path starts from the already quantized Pro artifact.
+Weights are mounted read-only from the host Hugging Face cache; containers do
+not bundle them. Preserve the cache's blob/snapshot symlink layout when
+mounting a checkpoint. Engram tables are mapped from host storage.
 
-For development with only part of the Spark fleet available, use
-`./build.sh --spark-hosts ostrich,dodo`; the first selected host builds the
-ARM image, and only selected hosts are checked and receive it.
-Serving still requires the configured four Spark ranks.
+Release artifacts must identify the same engine revision, verified b12x and
+XGrammar source, native architecture and checkpoint revision across all five
+hosts. Startup, model execution, API behavior, restart and performance must
+pass on those artifacts before container publication. An image build or a
+component fixture alone does not satisfy those gates.

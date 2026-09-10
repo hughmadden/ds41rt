@@ -207,14 +207,6 @@ def test_release_facing_helpers_default_to_public_calibrated_pro_k2() -> None:
     assert "{{model_id}}" not in rendered
 
 
-def test_developer_publish_smoke_passes_url_before_model() -> None:
-    developer = (ROOT / "DEVELOPER.md").read_text(encoding="utf-8")
-    command = developer.split("scripts/api-smoke.sh \\\n", maxsplit=1)[1].split(
-        "\n./push-containers.sh", maxsplit=1
-    )[0]
-    assert command.index("http://127.0.0.1:8000") < command.index(PRO_MODEL_ID)
-
-
 def test_release_settings_resolution_has_selected_gpu_access() -> None:
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
     resolver = release.split("resolve_settings() {", maxsplit=1)[1].split(
