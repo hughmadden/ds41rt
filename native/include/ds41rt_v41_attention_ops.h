@@ -14,6 +14,17 @@ int32_t ds41rt_v41_attention_norm(const uint16_t* input, const uint16_t* weight,
 // Adjacent pairs in the final64 dimensions; inverse=0 or1 (conjugate frequencies).
 int32_t ds41rt_v41_attention_rope(const uint16_t* input, const float* frequencies,
     uint16_t* output, int32_t rows, int32_t heads, int32_t inverse, void* stream);
+// Grouped BF16 wo_a: [rows,8,4096] x [8,1024,4096] -> [rows,8,1024].
+// Caller owns a distinct 256-byte-aligned workspace of at least 4 MiB, which
+// stays live through handle destruction. One handle per exclusively used stream.
+// Warm launch before capture; drain launches/graphs before destroy/free.
+int32_t ds41rt_v41_grouped_output_create(void* workspace, uint64_t bytes, void** handle);
+int32_t ds41rt_v41_grouped_output_destroy(void* handle);
+int32_t ds41rt_v41_grouped_output_launch(void* handle, const uint16_t* input,
+    const uint16_t* weight, uint16_t* output, int32_t rows, void* stream);
+// Official FP8 [8192,4096] and UE8 [256,128] -> resident BF16 [8192,4096].
+int32_t ds41rt_v41_grouped_output_dequant(const uint8_t* weight,
+    const uint8_t* scales, uint16_t* output, void* stream);
 #ifdef __cplusplus
 }
 #endif

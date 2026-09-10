@@ -1,4 +1,6 @@
 //! RTX-only ownership for every native dSpark tensor and independent stage experts.
+mod attention_output;
+pub(crate) use attention_output::DsparkAttentionOutput;
 mod confidence;
 mod projection;
 pub(crate) use projection::{DsparkProjection, ProjectionKind};
@@ -29,7 +31,9 @@ pub(crate) struct DsparkBudget {
     pub auxiliary_resident_bytes: usize,
     pub shared_packed_scale_bytes: usize,
     pub projection_packed_scale_bytes: usize,
+    pub grouped_output_resident_bytes: usize,
     pub projection_bytes_per_wave: usize,
+    pub attention_output_additional_bytes_per_wave: usize,
     pub shared_execution_bytes_per_wave: usize,
     pub load_staging_bytes: usize,
     pub window_cache_bytes: usize,
@@ -46,11 +50,12 @@ impl DsparkBudget {
             .checked_add(self.auxiliary_resident_bytes)
             .and_then(|bytes| bytes.checked_add(self.shared_packed_scale_bytes))
             .and_then(|bytes| bytes.checked_add(self.projection_packed_scale_bytes))
+            .and_then(|bytes| bytes.checked_add(self.grouped_output_resident_bytes))
             .context("dSpark residency overflow")
     }
     /// Experts load serially, then native auxiliary tensors, then execution waves.
     /// Committed dSpark windows are shared across waves and counted once below.
-    /// Draft-attention/norm/RoPE scratch, grouped BF16 output projection, shared head,
+    /// Remaining draft-attention/norm scratch, shared head,
     /// driver and graph allocations must be budgeted separately by the coordinator.
     pub fn peak_device_bytes(self, waves: usize) -> Result<usize> {
         ensure!((1..=2).contains(&waves), "dSpark needs one or two waves");
@@ -58,6 +63,7 @@ impl DsparkBudget {
             .execution_bytes_per_wave
             .checked_add(self.shared_execution_bytes_per_wave)
             .and_then(|bytes| bytes.checked_add(self.projection_bytes_per_wave))
+            .and_then(|bytes| bytes.checked_add(self.attention_output_additional_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.hc_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.router_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.confidence_bytes_per_wave))
@@ -84,6 +90,7 @@ pub(crate) struct DsparkWeights<'library> {
     auxiliary: NativeRtxTensors<'library>,
     budget: DsparkBudget,
     shared_scales: [crate::v41_memory::DeviceAllocation<'library>; 9],
+    grouped_output_weights: [crate::v41_memory::DeviceAllocation<'library>; 3],
     projection_scales: [crate::v41_memory::DeviceAllocation<'library>; 13],
 }
 impl<'library> DsparkWeights<'library> {
@@ -121,7 +128,9 @@ impl<'library> DsparkWeights<'library> {
             auxiliary_resident_bytes,
             shared_packed_scale_bytes: shared::packed_scale_bytes(library)?,
             projection_packed_scale_bytes: projection::packed_bytes(library)?,
+            grouped_output_resident_bytes: 3 * 67108864,
             projection_bytes_per_wave: projection::wave_bytes(library, capacity)?,
+            attention_output_additional_bytes_per_wave: DsparkAttentionOutput::additional_bytes(capacity)? * 3,
             shared_execution_bytes_per_wave: DsparkSharedFfn::device_bytes(library, capacity)? * 3,
             load_staging_bytes,
             window_cache_bytes: DsparkWindow::device_bytes(16, 4096)? * 3,
@@ -185,7 +194,9 @@ impl<'library> DsparkWeights<'library> {
             .context("dSpark requires three expert stages")?;
         let shared_scales = shared::pack_scales(library, &auxiliary)?;
         let projection_scales = projection::pack_scales(library, &auxiliary)?;
+        let grouped_output_weights = attention_output::dequant_weights(library, &auxiliary)?;
         Ok(Self {
+            grouped_output_weights,
             shared_scales,
             projection_scales,
             experts,

@@ -1,0 +1,231 @@
+{
+  "scope": "Official wo_a dequantization, native grouped BF16 projection, and owned inverse-RoPE/wo_a/FP8-wo_b chain",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "source_sha256": {
+    "native/cuda/kernels/v41_attention_ops.cu": "1a0e36b3c8c83d15df515190ce997beb037c194c19dc653a9c90dca3d1514aba",
+    "native/include/ds41rt_v41_attention_ops.h": "6b18f311791078b9845db074a92d8b07462a7b315e31ef68557bba6dfb13c2b5",
+    "rust/crates/ds41rt-ffi/src/v41_grouped_output.rs": "1234654d997e05a35923b98702c23c2de8e1c243dc7b04e52be155173064d7da",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/attention_output.rs": "15ef450339069d0e83deeddc882d158e4be6dcd4f8a1a5f997f011da6c2e42cb",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/projection.rs": "52f24ea61fc96e327dab76472681316cc07f0ac0346140ed4bde9e1fe031b09a",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "86c7e081ae6336ab584bf5906bec7453eb65d9b593961ea2241f2a6053e7f280",
+    "scripts/qualify-ds41-grouped-output.py": "2a9166f83dc3fc1145b3919985b600f0934aa0db65a321f6282cdac3e2bff872"
+  },
+  "fixture_sha256": {
+    "src/main.rs": "7845d9485db0331ea5e41a16672241b858c47ff7227a5a617b47880103ee533f",
+    "generate_expected.py": "b513944e869ed0c961000d0f6a831af7be318f5154c3a9f8d6846cc35fbf28c2",
+    "expected.bin": "47c53c80fe371be815f95fc296040a62388a0f32b48a15e1e4b738347c8612c3"
+  },
+  "fixture_binary_sha256": "9c8387b003925fe92d9e7bd484edd8bd93b3d236b90bcb40d49f2fc5df430784",
+  "grouped_bf16_resident_bytes": 201326592,
+  "workspace_per_owner": 4194304,
+  "owner_device_bytes": {
+    "1": 4435204,
+    "16": 6889476,
+    "80": 17539076
+  },
+  "additional_three_stage_bytes_per_wave80": 44101632,
+  "partial_two_wave80_bytes": 8811384920,
+  "native_gpu_results": [
+    {
+      "reference_convert_sha256": "035028340479145594a81d6084a8424e57363adf83c0d5983914783d95614d76",
+      "weight_dequant_exact": true,
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "native_library_sha256": "5cff03194d4d80a0a122e34e6d921ba8c43f668d279545a4eff38d744365d395",
+      "qualifier_sha256": "2a9166f83dc3fc1145b3919985b600f0934aa0db65a321f6282cdac3e2bff872",
+      "results": [
+        {
+          "rows": 1,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 12
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 14
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 16,
+          "initial": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 77
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 95
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 80,
+          "initial": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 1101
+          },
+          "changed_graph": {
+            "max_abs_error": 0.125,
+            "different_bf16_elements": 1003
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 255,
+          "initial": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 3297
+          },
+          "changed_graph": {
+            "max_abs_error": 0.125,
+            "different_bf16_elements": 3353
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 1023,
+          "initial": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 6323
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 6459
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 4095,
+          "initial": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 53144
+          },
+          "changed_graph": {
+            "max_abs_error": 0.125,
+            "different_bf16_elements": 53734
+          },
+          "zero_exact": true,
+          "guards": true
+        }
+      ]
+    },
+    {
+      "reference_convert_sha256": "035028340479145594a81d6084a8424e57363adf83c0d5983914783d95614d76",
+      "weight_dequant_exact": true,
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "native_library_sha256": "5cff03194d4d80a0a122e34e6d921ba8c43f668d279545a4eff38d744365d395",
+      "qualifier_sha256": "2a9166f83dc3fc1145b3919985b600f0934aa0db65a321f6282cdac3e2bff872",
+      "results": [
+        {
+          "rows": 1,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 18
+          },
+          "changed_graph": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 21
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 16,
+          "initial": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 80
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 78
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 80,
+          "initial": {
+            "max_abs_error": 0.03125,
+            "different_bf16_elements": 1027
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 1020
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 255,
+          "initial": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 3236
+          },
+          "changed_graph": {
+            "max_abs_error": 0.125,
+            "different_bf16_elements": 3167
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 1023,
+          "initial": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 6490
+          },
+          "changed_graph": {
+            "max_abs_error": 0.125,
+            "different_bf16_elements": 6511
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "rows": 4095,
+          "initial": {
+            "max_abs_error": 0.0625,
+            "different_bf16_elements": 52759
+          },
+          "changed_graph": {
+            "max_abs_error": 0.125,
+            "different_bf16_elements": 52717
+          },
+          "zero_exact": true,
+          "guards": true
+        }
+      ]
+    }
+  ],
+  "owned_gpu_results": [
+    {
+      "device": 0,
+      "passed": true,
+      "log_sha256": "f5e23d52ce3a4035c0980565611ffbb136d09ec6aba96b3ce64dd1bccce3b8fc",
+      "log": "PASS stage=0 capacity=1 bytes=4435204 changed_graph=true\nPASS stage=1 capacity=1 bytes=4435204 changed_graph=true\nPASS stage=2 capacity=1 bytes=4435204 changed_graph=true\nPASS stage=0 capacity=16 bytes=6889476 changed_graph=true\nPASS stage=1 capacity=16 bytes=6889476 changed_graph=true\nPASS stage=2 capacity=16 bytes=6889476 changed_graph=true\nPASS stage=0 capacity=80 bytes=17539076 changed_graph=true\nPASS stage=1 capacity=80 bytes=17539076 changed_graph=true\nPASS stage=2 capacity=80 bytes=17539076 changed_graph=true\nDONE extra_wave80=44101632 total_two_wave80=8811384920\n"
+    },
+    {
+      "device": 1,
+      "passed": true,
+      "log_sha256": "f5e23d52ce3a4035c0980565611ffbb136d09ec6aba96b3ce64dd1bccce3b8fc",
+      "log": "PASS stage=0 capacity=1 bytes=4435204 changed_graph=true\nPASS stage=1 capacity=1 bytes=4435204 changed_graph=true\nPASS stage=2 capacity=1 bytes=4435204 changed_graph=true\nPASS stage=0 capacity=16 bytes=6889476 changed_graph=true\nPASS stage=1 capacity=16 bytes=6889476 changed_graph=true\nPASS stage=2 capacity=16 bytes=6889476 changed_graph=true\nPASS stage=0 capacity=80 bytes=17539076 changed_graph=true\nPASS stage=1 capacity=80 bytes=17539076 changed_graph=true\nPASS stage=2 capacity=80 bytes=17539076 changed_graph=true\nDONE extra_wave80=44101632 total_two_wave80=8811384920\n"
+    }
+  ],
+  "builds": {
+    "native": "passed",
+    "daemon": "passed, 493 warnings"
+  },
+  "not_qualified": [
+    "attention QK, online softmax and sink",
+    "private draft KV and frequency ownership",
+    "full three-stage dSpark execution",
+    "verification and serving integration",
+    "full-model quality or performance"
+  ]
+}

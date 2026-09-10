@@ -166,6 +166,10 @@ impl DsparkProjection<'_, '_> {
         )
         .context("dSpark projection workspace overflow")
     }
+    // Storage access for an exclusive containing owner that tracks completion itself.
+    pub(super) fn output_storage(&self) -> Ds41rtDeviceBuffer {
+        self.output.buffer
+    }
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.input.buffer
     }

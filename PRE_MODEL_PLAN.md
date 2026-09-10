@@ -124,3 +124,5 @@ Committed-cache progress: generation-checked dSpark KV windows, batched ring upd
 dSpark projection progress: all thirteen main/attention FP8 bindings and native split-K reduction pass owned and numerical graph checks on both RTX GPUs, with explicit memory admission while normalization/RoPE, attention and stage sequencing remain open in `docs/ds41-dspark-projection-qualification.md`.
 
 Attention-operation progress: native RMS normalization, fused KV normalization/rotation and forward/inverse query rotation pass reference and changed-input graph checks on both RTX GPUs, with Rust bindings while frequency ownership and attention composition remain open in `docs/ds41-attention-ops-qualification.md`.
+
+Attention-output progress: official FP8-to-BF16 output-A loading and the owned inverse-RoPE/grouped-BF16/FP8-output chain pass numerical and complete graph checks on both RTX GPUs for all three stages, while QK/softmax/sink and stage sequencing remain open in `docs/ds41-attention-output-qualification.md`.

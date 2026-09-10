@@ -1,3 +1,5 @@
+mod v41_grouped_output;
+pub use v41_grouped_output::{V41GroupedOutput, V41_GROUPED_OUTPUT_WORKSPACE};
 mod v41_attention_ops;
 pub use v41_attention_ops::V41AttentionOps;
 mod v41_dspark_cache;

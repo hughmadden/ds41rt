@@ -82,3 +82,78 @@ extern "C" int32_t ds41rt_v41_attention_rope(const uint16_t* input, const float*
       reinterpret_cast<const __nv_bfloat16*>(input),freq,reinterpret_cast<__nv_bfloat16*>(output),heads,inverse);
   return cudaGetLastError();
 }
+
+#include <cublas_v2.h>
+#include <new>
+namespace {
+constexpr uint64_t kGroupedWorkspace = 4*1024*1024;
+struct GroupedHandle { cublasHandle_t blas; void* workspace; int device; };
+int32_t blas_status(cublasStatus_t s) { return s==CUBLAS_STATUS_SUCCESS ? 0 : -int32_t(s); }
+}
+extern "C" int32_t ds41rt_v41_grouped_output_create(void* workspace, uint64_t bytes, void** out) {
+  if (!out) return cudaErrorInvalidValue;
+  *out=nullptr;
+  if (bytes<kGroupedWorkspace || !valid(workspace,kGroupedWorkspace,256)) return cudaErrorInvalidValue;
+  auto* h=new(std::nothrow) GroupedHandle{};
+  if (!h) return cudaErrorMemoryAllocation;
+  auto status=cudaGetDevice(&h->device);
+  if(status!=cudaSuccess) {delete h;return status;}
+  auto result=cublasCreate(&h->blas);
+  if(result!=CUBLAS_STATUS_SUCCESS) {delete h;return blas_status(result);}
+  // Prevent reduced-precision intermediate reductions before the final BF16 output.
+  result=cublasSetMathMode(h->blas,CUBLAS_MATH_DISALLOW_REDUCED_PRECISION_REDUCTION);
+  if(result!=CUBLAS_STATUS_SUCCESS) {cublasDestroy(h->blas);delete h;return blas_status(result);}
+  h->workspace=workspace;*out=h;return 0;
+}
+extern "C" int32_t ds41rt_v41_grouped_output_destroy(void* opaque) {
+  if(!opaque) return cudaErrorInvalidValue;
+  auto* h=static_cast<GroupedHandle*>(opaque);
+  auto status=cublasDestroy(h->blas);delete h;return blas_status(status);
+}
+extern "C" int32_t ds41rt_v41_grouped_output_launch(void* opaque, const uint16_t* input,
+    const uint16_t* weight, uint16_t* output, int32_t rows, void* stream) {
+  if(!opaque || rows<1 || rows>4096) return cudaErrorInvalidValue;
+  auto* h=static_cast<GroupedHandle*>(opaque);
+  int device; auto status=cudaGetDevice(&device);
+  if(status!=cudaSuccess) return status;
+  if(device!=h->device) return cudaErrorInvalidDevice;
+  const uint64_t a=uint64_t(rows)*8*4096*2,w=uint64_t(8)*1024*4096*2,c=uint64_t(rows)*8*1024*2;
+  if(!valid(input,a,2) || !valid(weight,w,2) || !valid(output,c,2) ||
+      !disjoint(input,a,output,c) || !disjoint(weight,w,output,c) ||
+      !disjoint(h->workspace,kGroupedWorkspace,input,a) ||
+      !disjoint(h->workspace,kGroupedWorkspace,weight,w) ||
+      !disjoint(h->workspace,kGroupedWorkspace,output,c)) return cudaErrorInvalidValue;
+  auto result=cublasSetStream(h->blas,reinterpret_cast<cudaStream_t>(stream));
+  if(result!=CUBLAS_STATUS_SUCCESS) return blas_status(result);
+  // SetStream resets the workspace; restore caller-owned storage for every launch.
+  result=cublasSetWorkspace(h->blas,h->workspace,kGroupedWorkspace);
+  if(result!=CUBLAS_STATUS_SUCCESS) return blas_status(result);
+  const float alpha=1,beta=0;
+  // Column-major W^T [1024,4096] times strided token columns; group slices
+  // interleave within each row but share no elements. No transpose/copy kernels.
+  return blas_status(cublasGemmStridedBatchedEx(h->blas,CUBLAS_OP_T,CUBLAS_OP_N,
+      1024,rows,4096,&alpha,weight,CUDA_R_16BF,4096,1024LL*4096,
+      input,CUDA_R_16BF,8*4096,4096,&beta,output,CUDA_R_16BF,8*1024,1024,
+      8,CUBLAS_COMPUTE_32F,CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+}
+
+#include <cuda_fp8.h>
+namespace {
+__global__ void grouped_dequant_kernel(const uint8_t* input, const uint8_t* scales,
+    __nv_bfloat16* output) {
+  const uint64_t i=uint64_t(blockIdx.x)*256+threadIdx.x;
+  if(i>=uint64_t(8192)*4096) return;
+  __nv_fp8_e4m3 value;value.__x=input[i];
+  const auto scale=scales[(i/4096/32)*128+(i%4096)/32];
+  output[i]=__float2bfloat16_rn(float(value)*exp2f(int(scale)-127));
+}
+}
+extern "C" int32_t ds41rt_v41_grouped_output_dequant(const uint8_t* input,
+    const uint8_t* scales, uint16_t* output, void* stream) {
+  constexpr uint64_t w=uint64_t(8192)*4096,s=w/1024,o=w*2;
+  if(!valid(input,w,1)||!valid(scales,s,1)||!valid(output,o,2)||
+      !disjoint(input,w,output,o)||!disjoint(scales,s,output,o)) return cudaErrorInvalidValue;
+  grouped_dequant_kernel<<<w/256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      input,scales,reinterpret_cast<__nv_bfloat16*>(output));
+  return cudaGetLastError();
+}
