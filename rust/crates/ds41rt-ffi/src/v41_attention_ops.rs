@@ -16,9 +16,12 @@ type Rope =
     unsafe extern "C" fn(*const u16, *const f32, *mut u16, i32, i32, i32, *mut c_void) -> i32;
 type Frequencies = unsafe extern "C" fn(*const u64, *mut f32, i32, *mut c_void) -> i32;
 type Tap = unsafe extern "C" fn(*const u16, *mut u16, i32, i32, *mut c_void) -> i32;
+type Embed =
+    unsafe extern "C" fn(*const u16, *const i32, *mut u16, *mut f32, i32, *mut c_void) -> i32;
 pub struct V41AttentionOps<'a> {
     _library: &'a NativeLibrary,
     norm: Norm,
+    embed: Embed,
     frequencies: Frequencies,
     tap: Tap,
     kv: Kv,
@@ -35,6 +38,7 @@ impl NativeLibrary {
     pub fn v41_attention_ops(&self) -> Result<V41AttentionOps<'_>> {
         Ok(V41AttentionOps {
             _library: self,
+            embed: unsafe { *self.lib.get(b"ds41rt_v41_dspark_embed")? },
             tap: unsafe { *self.lib.get(b"ds41rt_v41_dspark_tap")? },
             frequencies: unsafe { *self.lib.get(b"ds41rt_v41_dspark_frequencies")? },
             kv: unsafe { *self.lib.get(b"ds41rt_v41_attention_kv")? },
@@ -44,6 +48,40 @@ impl NativeLibrary {
     }
 }
 impl V41AttentionOps<'_> {
+    /// # Safety
+    /// Shared BF16 embedding weights and I32 seed IDs are initialized on the
+    /// stream device; all input/output storage is live and outputs are disjoint.
+    pub unsafe fn embed(
+        &self,
+        table: Ds41rtDeviceBuffer,
+        tokens: Ds41rtDeviceBuffer,
+        residual: Ds41rtDeviceBuffer,
+        pre: Ds41rtDeviceBuffer,
+        requests: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            (1..=16).contains(&requests),
+            "invalid embedding request count"
+        );
+        buffer(table, 129280 * 5120 * 2)?;
+        buffer(tokens, requests as usize * 4)?;
+        buffer(residual, requests as usize * 5 * 40960)?;
+        buffer(pre, requests as usize * 5 * 16)?;
+        let status = unsafe {
+            (self.embed)(
+                table.ptr.cast(),
+                tokens.ptr.cast(),
+                residual.ptr.cast(),
+                pre.ptr.cast(),
+                requests as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native embedding CUDA status {status}");
+        Ok(())
+    }
+
     /// # Safety
     /// Input is initialized finite BF16 [rows,4,5120] after the target layer's
     /// engram update and before attention; output is disjoint [rows,15360].

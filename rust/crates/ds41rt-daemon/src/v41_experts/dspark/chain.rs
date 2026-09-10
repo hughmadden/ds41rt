@@ -1,9 +1,10 @@
 //! All three draft transformer stages on one graph-owned stream.
 use super::{DsparkStage, DsparkWeights};
 use crate::v41_dspark_cache::{DsparkWindow, WindowLease, WindowRead};
-use crate::v41_memory::LoadStream;
+use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::Ds41rtDeviceBuffer;
+use ds41rt_ffi::{Ds41rtDeviceBuffer, V41AttentionOps};
 use std::ffi::c_void;
 
 pub(crate) struct DsparkChain<'weights, 'library> {
@@ -11,11 +12,32 @@ pub(crate) struct DsparkChain<'weights, 'library> {
     stages: [DsparkStage<'weights, 'library>; 3],
     graph: Option<(*mut c_void, usize, [u64; 3])>,
     ready: Option<usize>,
+    embedding: Option<&'weights NativeRtxTensors<'library>>,
+    tokens: DeviceAllocation<'library>,
+    token_count: Option<usize>,
+    ops: V41AttentionOps<'library>,
 }
 impl<'library> DsparkWeights<'library> {
+    /// Borrow the coordinator's existing shared embedding table, never duplicate it.
+    pub fn embedded_chain<'weights>(
+        &'weights self,
+        embedding: &'weights NativeRtxTensors<'library>,
+        requests: u32,
+        budget: usize,
+    ) -> Result<DsparkChain<'weights, 'library>> {
+        ensure!(
+            embedding.get("embed.weight")?.bytes == 129280 * 5120 * 2,
+            "invalid shared embedding extent"
+        );
+        let mut chain = self.chain(requests, budget)?;
+        chain.embedding = Some(embedding);
+        Ok(chain)
+    }
+
     pub fn chain_bytes(&self, requests: u32) -> Result<usize> {
         self.stage_bytes(requests)?
             .checked_mul(3)
+            .and_then(|bytes| bytes.checked_add(requests as usize * 4))
             .context("dSpark chain budget overflow")
     }
     pub fn chain(&self, requests: u32, budget: usize) -> Result<DsparkChain<'_, 'library>> {
@@ -37,10 +59,44 @@ impl<'library> DsparkWeights<'library> {
             ],
             graph: None,
             ready: None,
+            embedding: None,
+            tokens: DeviceAllocation::new(library, requests as usize * 4)?,
+            token_count: None,
+            ops: library.v41_attention_ops()?,
         })
     }
 }
 impl DsparkChain<'_, '_> {
+    /// Seed IDs follow cache-binding row order; invalid input clears publication
+    /// and token readiness so a subsequent execution cannot consume old IDs.
+    pub fn set_tokens(&mut self, tokens: &[i32]) -> Result<()> {
+        self.invalidate();
+        self.token_count = None;
+        ensure!(
+            self.embedding.is_some(),
+            "dSpark chain has no shared embedding binding"
+        );
+        ensure!(
+            !tokens.is_empty()
+                && tokens.len() <= 16
+                && tokens.len() <= self.tokens.buffer.bytes / 4,
+            "invalid dSpark seed count"
+        );
+        ensure!(
+            tokens.iter().all(|&id| (0..129280).contains(&id)),
+            "invalid dSpark seed token"
+        );
+        let mut bytes = [0u8; 64];
+        for (i, id) in tokens.iter().enumerate() {
+            bytes[i * 4..i * 4 + 4].copy_from_slice(&id.to_ne_bytes());
+        }
+        self.stream
+            .library
+            .copy_h2d(self.tokens.buffer, &bytes[..tokens.len() * 4])?;
+        self.token_count = Some(tokens.len());
+        Ok(())
+    }
+
     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 2] {
         self.stages[0].inputs()
     }
@@ -59,6 +115,10 @@ impl DsparkChain<'_, '_> {
         bindings: [&[(WindowLease, u64)]; 3],
     ) -> Result<[WindowRead; 3]> {
         self.invalidate();
+        ensure!(
+            self.embedding.is_none() || self.token_count == Some(bindings[0].len()),
+            "dSpark seed count differs from cache bindings"
+        );
         let reads = [
             self.stages[0].prepare(windows[0], bindings[0])?,
             self.stages[1].prepare(windows[1], bindings[1])?,
@@ -96,6 +156,19 @@ impl DsparkChain<'_, '_> {
         Ok(())
     }
     unsafe fn enqueue(&mut self, reads: &[WindowRead; 3], requests: usize) -> Result<()> {
+        if let Some(embedding) = self.embedding {
+            let output = self.inputs();
+            unsafe {
+                self.ops.embed(
+                    embedding.get("embed.weight")?,
+                    self.tokens.buffer,
+                    output[0],
+                    output[1],
+                    requests as u32,
+                    self.stream.raw,
+                )?;
+            }
+        }
         for stage in 0..3 {
             if stage > 0 {
                 let source = self.stages[stage - 1].output_storage();
@@ -122,8 +195,9 @@ impl DsparkChain<'_, '_> {
         Ok(())
     }
     /// # Safety
-    /// Initialize finite embedded BF16 residuals and incoming FP32 pre-mix in
-    /// input row order; cache bindings across stages describe the same requests.
+    /// For a plain chain, initialize finite BF16 residuals and FP32 pre-mix in
+    /// input row order. An embedded chain initializes these from set_tokens.
+    /// Cache bindings across stages describe the same requests, in seed order.
     /// All buffers are on this device and serialized through graph completion.
     pub unsafe fn execute(
         &mut self,

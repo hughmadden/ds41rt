@@ -47,6 +47,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Gather dSpark taps from target-layer attention-input stream means after engram updates in layer order 37/38/39.
 - [x] Compose and qualify each complete dSpark attention/mHC/shared-and-routed-FFN stage in one captured graph on both RTX GPUs.
 - [x] Chain all three dSpark transformer stages in one graph with validated cross-stage cache bindings and exact residual/pre-mix handoff.
+- [x] Initialize dSpark seed/noise embeddings from the shared coordinator table inside the three-stage graph; qualify changed-token replay on both RTX GPUs.
 - [ ] Compose the complete three-stage dSpark attention/mHC/FFN sequence with embedding, Markov, confidence and terminal sampling.
 - [ ] Wire proposal verification, acceptance, RNG ownership, cancellation and rollback across all caches and engram histories.
 - [ ] Complete concurrency-16 admission, mixed prefill/decode/verification scheduling, graph capacity management and alternating-wave overlap.
@@ -68,8 +69,8 @@ Completion means a working, qualified release with measured performance, not com
 ## Current evidence and next dependency
 
 The native component records in `docs/ds41-*-qualification.*` establish their stated local scopes; they do not establish full-model readiness or the throughput targets above.
-The latest dSpark work is recorded in `docs/ds41-dspark-frequencies-qualification.md`, and full-backbone attention, vision and serving integration remain incomplete.
-The next dSpark dependency is target-layer tap gathering followed by complete stage and verification wiring, while the now-complete checkpoint allows selected real-weight validation and loader measurements in parallel with that work.
+The latest dSpark work is recorded in `docs/ds41-dspark-embedding-qualification.md`, and full-backbone attention, vision and serving integration remain incomplete.
+The next dSpark dependency is terminal-head composition followed by target-layer and verification wiring, while the now-complete checkpoint allows selected real-weight validation and loader measurements in parallel with that work.
 `TO_DELETE_SCAFFOLDING.md` tracks temporary files committed to the repository, not a requirement to delete useful external test data now.
 
 Fleet checkpoint evidence is recorded in `docs/ds41-checkpoint-inventory.json` and `docs/ds41-checkpoint-inventory.md`; all weights still require execution qualification, and payload hashes were not scanned.
@@ -80,4 +81,4 @@ Checkpoint-backed staging and the remaining read-amplification bottleneck are re
 
 Complete-stage composition and its remaining integration limits are recorded in `docs/ds41-dspark-stage-qualification.md`.
 
-Three-stage composition is qualified in `docs/ds41-dspark-chain-qualification.md`; embedding and terminal-head integration are the next dSpark producer/consumer connections.
+Three-stage composition is qualified in `docs/ds41-dspark-chain-qualification.md`; shared embedding integration is qualified in `docs/ds41-dspark-embedding-qualification.md`, with terminal-head integration next.

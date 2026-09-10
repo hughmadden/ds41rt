@@ -54,3 +54,15 @@ int32_t ds41rt_v41_dspark_tap(const uint16_t* input, uint16_t* output,
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Shared BF16 [129280,5120] table and I32 [requests] seeds -> BF16
+// [requests,5,4,5120] residual and FP32 [requests,5,4] one-hot pre-mix.
+// Invalid device seed IDs zero that request's complete output; hosts validate IDs.
+int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t* tokens,
+    uint16_t* residual, float* pre, int32_t requests, void* stream);
+#ifdef __cplusplus
+}
+#endif

@@ -1,0 +1,145 @@
+{
+  "scope": "Synthetic native embedding and embedded three-stage graph composition, not full-model qualification",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "sha256": {
+    "/home/tj/Developer/ds41rt/native/cuda/kernels/v41_attention_ops.cu": "434d17ba7590392edd938e9a5af06152020d2fdc6033811756ff6cfb9ce6dfd2",
+    "/home/tj/Developer/ds41rt/native/include/ds41rt_v41_attention_ops.h": "6525129f770979d5594c16bf1df16eb78c0b87392df0babd1aa6670700df54dc",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "fbed8d8ab8eb6c497557480901abe1a906c207bb32b29da1673c097aeeb0e671",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-daemon/src/v41_experts/dspark/chain.rs": "b7e0615229fa93c343596739c26b5ac8feb8dc2574dc5e104f7b3657d89ecf70",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "b012954bb5008ddc3793291fe91c8cee1e62850c490b4dac83fea98deeb0c3bd",
+    "/tmp/ds41-embed/setup.py": "7989bacd81348c90bf4690905ff17baaad7314ee94c8ab99c95761d609aca9e8",
+    "/tmp/ds41-embed/qualify.py": "dc22526e513ddff4f44324a79d660d298f1ecfedd3eeb16bfa059ea3b03e6c81",
+    "/tmp/ds41-embed/src/main.rs": "88675144ed723385413e0fa6392b62d93e45935f3e18025ee0ce041ce3abed3f",
+    "/tmp/ds41-embed-native-build.log": "1b832d4a840f1ecd405debfade7e59b46230b60feba7275540c10d347e539b81",
+    "/tmp/ds41-embed-daemon-build.log": "ac0ce65892bf9b0dbc92ece3bd290f5684ac9cf284e3b26fd5e84f01516e85b0",
+    "/tmp/ds41-embed-fixture-build.log": "e0936548c82dd390d9192adc4306ee3bfb0dfd53d5ececb0b6351f60261bdf02",
+    "/tmp/ds41-embed-native-rtx0.log": "3809d9333ba0597181da930e8bb36bcb75ff6b770b93eb940848a99de3f5c399",
+    "/tmp/ds41-embed-chain-rtx0.log": "d0cae1df11900026d577775ad436bf0e92f77a9b63fe4cbee02a5d476e0d870b",
+    "/tmp/ds41-embed-native-rtx1.log": "3809d9333ba0597181da930e8bb36bcb75ff6b770b93eb940848a99de3f5c399",
+    "/tmp/ds41-embed-chain-rtx1.log": "d0cae1df11900026d577775ad436bf0e92f77a9b63fe4cbee02a5d476e0d870b"
+  },
+  "gpus": {
+    "rtx0": {
+      "native": {
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "cases": [
+          {
+            "requests": 1,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 1,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 1,
+            "case": 2,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 2,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 2,
+            "exact": true
+          }
+        ],
+        "guards": true
+      },
+      "chain": [
+        "PASS requests=1 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157520",
+        "PASS requests=1 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157520",
+        "PASS requests=3 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154568",
+        "PASS requests=3 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154568",
+        "PASS requests=16 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906532",
+        "PASS requests=16 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906532"
+      ]
+    },
+    "rtx1": {
+      "native": {
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "cases": [
+          {
+            "requests": 1,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 1,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 1,
+            "case": 2,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 3,
+            "case": 2,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 0,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 1,
+            "exact": true
+          },
+          {
+            "requests": 16,
+            "case": 2,
+            "exact": true
+          }
+        ],
+        "guards": true
+      },
+      "chain": [
+        "PASS requests=1 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157520",
+        "PASS requests=1 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157520",
+        "PASS requests=3 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154568",
+        "PASS requests=3 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154568",
+        "PASS requests=16 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906532",
+        "PASS requests=16 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906532"
+      ]
+    }
+  }
+}
