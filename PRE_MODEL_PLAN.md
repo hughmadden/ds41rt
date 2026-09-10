@@ -27,3 +27,5 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [ ] Audit every pre-model requirement and document exact bring-up commands, remaining checkpoint-dependent gates, and hardware evidence for handoff.
 
 Progress evidence: `docs/ds41-build-qualification.md` records the rename and partial-fleet build checks; complete container, GPU, and launch qualification remains open.
+
+Engram progress: the loader now provides mapped native table/scale access, bounded cancellable background page advice, and eager-load rejection, with scheduler integration, device staging, and hardware performance qualification still pending.

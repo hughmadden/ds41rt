@@ -85,6 +85,7 @@ pub fn load_tensor_bytes_with_options(
     tensor_name: &str,
     options: TensorLoadOptions,
 ) -> Result<LoadedTensor> {
+    reject_eager_engram_load(tensor_name)?;
     let info = find_catalog_tensor(catalog, tensor_name)
         .with_context(|| format!("tensor {tensor_name} not found in catalog"))?
         .clone();
@@ -126,6 +127,7 @@ pub fn read_tensor_bytes_into_with_options(
     dst: &mut [u8],
     options: TensorLoadOptions,
 ) -> Result<LoadedTensorSummary> {
+    reject_eager_engram_load(tensor_name)?;
     let info = find_catalog_tensor(catalog, tensor_name)
         .with_context(|| format!("tensor {tensor_name} not found in catalog"))?
         .clone();
@@ -627,4 +629,12 @@ impl LoadedTensorRows {
             sha256: self.sha256.clone(),
         }
     }
+}
+
+fn reject_eager_engram_load(name: &str) -> Result<()> {
+    anyhow::ensure!(
+        !name.contains(".engram.embed."),
+        "engram embedding tables must use EngramTable::from_catalog, not whole-tensor loading"
+    );
+    Ok(())
 }

@@ -1,3 +1,7 @@
+mod engram_prefetch;
+pub use engram_prefetch::{EngramPrefetcher, EngramTable, PrefetchOutcome, PrefetchTicket};
+mod mapped_rows;
+pub use mapped_rows::MappedRows;
 mod attention_format;
 mod catalog;
 mod dspark_format;

@@ -56,3 +56,15 @@ The routed expert payload lower bound is `3 stages × 128 experts × 3 projectio
 Shared token embedding and vocabulary head storage need not be duplicated on the same GPU, but memory planning must account for their execution workspaces and contention with target attention at concurrency 16.
 
 No placement comparison gate is required; target verification still uses backbone AFD and proposal acceptance remains checkpoint-dependent.
+
+## Native engram storage implementation
+
+The official index and range-read shard headers identify `layers.1.engram.embed.{weight,scale}` in shard 47 and `layers.14.engram.embed.{weight,scale}` in shard 48, with no `model.` prefix; the reviewed headers are recorded in `ds41-engram-shard-headers.json`.
+
+`EngramTable::from_catalog` validates the official row counts, FP8/UE8M0 representations, payload lengths, and relative shard paths before mapping both tensors read-only without prefaulting them.
+
+`MappedRows` gathers into caller-provided buffers using checked wide offsets and performs page-budgeted deduplicated/coalesced advice, while `EngramPrefetcher` moves advice to a bounded I/O queue with request-owned cancellation tickets and nonblocking backpressure.
+
+Advice is an OS prefetch hint and does not guarantee residency; cancellation skips queued work but does not undo page advice already issued, and the mapping contract requires immutable checkpoint files.
+
+Loader tests include an official-size sparse shard with nonzero final rows beyond 98 GB and eager-load rejection, but decode/prefill/verification scheduling, device staging, and hardware performance qualification remain open.
