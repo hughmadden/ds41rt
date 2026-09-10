@@ -57,3 +57,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Include `dspark-terminal-rust-build.log`, `dspark-terminal-native-build.log` and `dspark-terminal-native-final-build.log` under `/tmp/ds41-v41-fp8-aot/` in staging cleanup; retain production terminal composition and sampling bindings.
 
 - Include `dspark-rng-rust-build.log` and `dspark-rng-native-build.log` under `/tmp/ds41-v41-fp8-aot/` in staging cleanup; retain production RNG reservation and fused sampling.
+
+- Delete `/tmp/ds41-v41-aot/dspark-qualification.json` and `dspark-qualification.log`, `dspark-qualification-final.log`, `dspark-qualification-complete.log`, and `dspark-rng-core-tests.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain the reusable qualifier, production RNG tests and committed evidence.

@@ -1,0 +1,58 @@
+{
+  "scope": "Native synthetic numerical and five-step graph qualification; excludes Rust owner and serving integration",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+  "native_library_sha256": "8d7f13c6108fb3ef5017c9a2a5ea5237390db9db884e9a840fcf60954a1bc97b",
+  "qualifier_sha256": "df4f4def4c935bd8d2996b65d34a2bb9d078a647ceac891bc154dd5da2e24482",
+  "results": [
+    {
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "confidence_m1": 2.384185791015625e-07,
+        "confidence_m16": 4.76837158203125e-07,
+        "confidence_m80": 4.76837158203125e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 4.76837158203125e-07,
+        "markov_m16": 7.152557373046875e-07
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    },
+    {
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "confidence_m1": 2.9802322387695312e-08,
+        "confidence_m16": 2.384185791015625e-07,
+        "confidence_m80": 3.5762786865234375e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 5.960464477539062e-07,
+        "markov_m16": 6.556510925292969e-07
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    }
+  ],
+  "not_qualified": [
+    "Rust allocation/ownership and cancellation",
+    "Full distribution/tail quality",
+    "Alternating-wave overlap",
+    "Full model execution"
+  ],
+  "core_rng_tests": {
+    "passed": 3,
+    "scope": [
+      "Cancellation consumes reservation",
+      "Counter exhaustion cannot wrap or advance",
+      "Reservation state follows request order"
+    ],
+    "log": "/tmp/ds41-v41-fp8-aot/dspark-rng-core-tests.log"
+  }
+}

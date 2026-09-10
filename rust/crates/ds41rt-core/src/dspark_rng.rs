@@ -39,3 +39,43 @@ impl DsparkRng {
         Some(reservation)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn cancellation_does_not_recycle_reserved_draws() {
+        let mut request = DsparkRng::new(41);
+        let cancelled = request.reserve().unwrap();
+        let retry = request.reserve().unwrap();
+        assert_eq!(cancelled.seed, retry.seed);
+        assert!(
+            retry.first_subsequence
+                >= cancelled.first_subsequence + DsparkRng::SUBSEQUENCES_PER_DRAFT
+        );
+    }
+    #[test]
+    fn exhausted_range_cannot_wrap_or_advance() {
+        let mut request = DsparkRng {
+            seed: 99,
+            next_subsequence: u64::MAX - 1279,
+        };
+        let before = request.next_subsequence;
+        assert!(!request.can_reserve());
+        assert_eq!(request.reserve(), None);
+        assert_eq!(request.next_subsequence, before);
+    }
+    #[test]
+    fn reservations_follow_requests_across_batch_order() {
+        let mut first = DsparkRng::new(7);
+        let mut second = DsparkRng::new(9);
+        let a = first.reserve().unwrap();
+        let b = second.reserve().unwrap();
+        let d = second.reserve().unwrap();
+        let c = first.reserve().unwrap();
+        assert_eq!((a.seed, c.seed), (7, 7));
+        assert_eq!((b.seed, d.seed), (9, 9));
+        assert_eq!(c.first_subsequence, d.first_subsequence);
+        assert_ne!(a.first_subsequence, c.first_subsequence);
+    }
+}

@@ -200,3 +200,5 @@ The Markov head now has owned BF16 embedding gather and FP32 projection output u
 The V4.1 terminal sequence now preserves sequential Markov conditioning and confidence embeddings across five proposals, with greedy and log-space exponential-race sampling over all vocabulary entries; its position-major layout and external shared-head/RNG contracts are explicit, and build evidence does not establish numerical or sampling equivalence.
 
 Terminal stochastic sampling now uses request-owned Philox subsequences independent of compact batch order and reserves fresh ranges per attempt; the CUDA kernel generates finite exponential noise inline, with finite-precision distribution and replay qualification still pending.
+
+Native dSpark synthetic qualification on both RTX GPUs now records sub-7.2e-7 confidence/Markov absolute errors, exact greedy tokens, stochastic graph replay and request-order RNG reproducibility; this evidence is scoped to native paths and does not establish Rust owner, allocation-stability or full-stack readiness.

@@ -98,3 +98,5 @@ dSpark Markov progress: per-wave token gathering and BF16-to-FP32 projection now
 dSpark terminal progress: one graph-owned stream now composes five Markov/sample positions and raw confidence for 16 requests with corrected-logit and embedding retention, while upstream shared-head/RNG production, verification, scheduler integration and runtime qualification remain open.
 
 dSpark RNG progress: request-owned Philox ranges now feed fused terminal sampling with cancellation-consuming reservations and bounded metadata uploads, removing full noise buffers while serving request wiring, distribution/replay qualification and verification remain open.
+
+dSpark native qualification progress: confidence/Markov numerics, composed five-position greedy/stochastic graphs and request-order RNG checks pass on both RTX GPUs, with three core RNG lifecycle tests passing while Rust GPU ownership, overlap and serving qualification remain open in `docs/ds41-dspark-qualification.md`.
