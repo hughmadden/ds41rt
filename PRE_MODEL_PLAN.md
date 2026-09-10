@@ -1,6 +1,6 @@
 # Pre-model implementation and qualification
 
-Goal 1 ends when the official checkpoint can be loaded and executed by the qualified full stack, without requiring the ongoing model download or access to emu and kiwi.
+Goal 1 ends when the official checkpoint can be loaded and executed by the qualified full stack, without requiring the ongoing model download; all four Sparks are now authorized for development and qualification.
 
 - [x] Locate and pin the official configuration, reference implementation, and technical report at revision `df42c109f1defefcbfcedbe7d905718a12266e40`.
 - [ ] Complete the architecture and tensor-layout audit with explicit reference-to-production mappings.
@@ -21,7 +21,7 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [ ] Place all dSpark stages and experts on the coordinator RTX and include their native weights, caches, and concurrency-16 workspace in its memory budget.
 - [ ] Implement all three dSpark stages, Markov and confidence heads, proposal verification, sampling, acceptance, and state rollback.
 - [ ] Extend admission, scheduling, graph shapes, cache ownership, and cancellation to 16 concurrent requests with alternating waves.
-- [ ] Qualify native numerical paths and CUDA graph replay on both local RTX GPUs and on ostrich and dodo without using emu or kiwi.
+- [ ] Qualify native numerical paths and CUDA graph replay on both local RTX GPUs and on ostrich, dodo, emu and kiwi.
 - [ ] Qualify the integrated modelless stack with deterministic nonzero fixtures, transport, serving regressions, and allocation/capacity checks.
 - [ ] Record required temporary fixtures in TO_DELETE_SCAFFOLDING.md and preserve reusable qualification tooling.
 - [ ] Commit and push engine changes and required SparkInfer/b12x changes to their fork main branches with matching dependency pins.
@@ -100,3 +100,7 @@ dSpark terminal progress: one graph-owned stream now composes five Markov/sample
 dSpark RNG progress: request-owned Philox ranges now feed fused terminal sampling with cancellation-consuming reservations and bounded metadata uploads, removing full noise buffers while serving request wiring, distribution/replay qualification and verification remain open.
 
 dSpark native qualification progress: confidence/Markov numerics, composed five-position greedy/stochastic graphs and request-order RNG checks pass on both RTX GPUs, with three core RNG lifecycle tests passing while Rust GPU ownership, overlap and serving qualification remain open in `docs/ds41-dspark-qualification.md`.
+
+Fleet availability update: the user released emu and kiwi for this goal, and read-only SSH/GPU inventory checks reached both hosts and identified NVIDIA GB10 devices.
+
+dSpark shared-head progress: terminal execution now normalizes collapsed states and projects through one borrowed coordinator vocabulary weight before sampling, with native K5120 numerical/graph checks passing on both RTX GPUs while Rust-owned execution and upstream stage integration remain open.

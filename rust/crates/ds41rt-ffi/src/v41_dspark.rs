@@ -66,11 +66,13 @@ type MarkovCreate = unsafe extern "C" fn(*mut c_void, u64, *mut *mut c_void) -> 
 type MarkovDestroy = unsafe extern "C" fn(*mut c_void) -> i32;
 type MarkovLaunch =
     unsafe extern "C" fn(*mut c_void, *const u16, *const u16, *mut f32, i32, *mut c_void) -> i32;
-pub struct V41DsparkMarkov<'a> {
+pub struct V41VocabularyProjection<'a> {
     _library: &'a NativeLibrary,
     handle: *mut c_void,
     launch: MarkovLaunch,
     destroy: MarkovDestroy,
+    width: usize,
+    max_rows: usize,
 }
 impl NativeLibrary {
     /// # Safety
@@ -79,9 +81,34 @@ impl NativeLibrary {
     pub unsafe fn v41_dspark_markov(
         &self,
         workspace: Ds41rtDeviceBuffer,
-    ) -> Result<V41DsparkMarkov<'_>> {
-        let create = unsafe { *self.lib.get::<MarkovCreate>(b"ds41rt_v41_markov_create")? };
-        let launch = unsafe { *self.lib.get::<MarkovLaunch>(b"ds41rt_v41_markov_launch")? };
+    ) -> Result<V41VocabularyProjection<'_>> {
+        unsafe { self.v41_head_projection(workspace, false) }
+    }
+    /// # Safety
+    /// Same workspace/device/graph lifetime contract as v41_dspark_markov.
+    pub unsafe fn v41_vocabulary_head(
+        &self,
+        workspace: Ds41rtDeviceBuffer,
+    ) -> Result<V41VocabularyProjection<'_>> {
+        unsafe { self.v41_head_projection(workspace, true) }
+    }
+    unsafe fn v41_head_projection(
+        &self,
+        workspace: Ds41rtDeviceBuffer,
+        full: bool,
+    ) -> Result<V41VocabularyProjection<'_>> {
+        let create_name: &[u8] = if full {
+            b"ds41rt_v41_vocabulary_head_create"
+        } else {
+            b"ds41rt_v41_markov_create"
+        };
+        let launch_name: &[u8] = if full {
+            b"ds41rt_v41_vocabulary_head_launch"
+        } else {
+            b"ds41rt_v41_markov_launch"
+        };
+        let create = unsafe { *self.lib.get::<MarkovCreate>(create_name)? };
+        let launch = unsafe { *self.lib.get::<MarkovLaunch>(launch_name)? };
         let destroy = unsafe {
             *self
                 .lib
@@ -93,15 +120,17 @@ impl NativeLibrary {
             status == 0 && !handle.is_null(),
             "Markov initialization status {status}"
         );
-        Ok(V41DsparkMarkov {
+        Ok(V41VocabularyProjection {
             _library: self,
             handle,
             launch,
             destroy,
+            width: if full { 5120 } else { 256 },
+            max_rows: if full { 80 } else { 16 },
         })
     }
 }
-impl V41DsparkMarkov<'_> {
+impl V41VocabularyProjection<'_> {
     pub const WORKSPACE_BYTES: usize = 4 * 1024 * 1024;
     /// # Safety
     /// Initialized inputs and disjoint output must remain valid on the handle's
@@ -114,10 +143,13 @@ impl V41DsparkMarkov<'_> {
         rows: usize,
         stream: *mut c_void,
     ) -> Result<()> {
-        ensure!((1..=16).contains(&rows), "invalid Markov rows");
+        ensure!(
+            (1..=self.max_rows).contains(&rows),
+            "invalid vocabulary projection rows"
+        );
         for (buffer, bytes) in [
-            (embedding, rows * 512),
-            (weight, 129280 * 512),
+            (embedding, rows * self.width * 2),
+            (weight, 129280 * self.width * 2),
             (logits, rows * 129280 * 4),
         ] {
             ensure!(
@@ -139,7 +171,7 @@ impl V41DsparkMarkov<'_> {
         Ok(())
     }
 }
-impl Drop for V41DsparkMarkov<'_> {
+impl Drop for V41VocabularyProjection<'_> {
     fn drop(&mut self) {
         let status = unsafe { (self.destroy)(self.handle) };
         if status != 0 {

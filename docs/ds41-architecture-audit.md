@@ -202,3 +202,5 @@ The V4.1 terminal sequence now preserves sequential Markov conditioning and conf
 Terminal stochastic sampling now uses request-owned Philox subsequences independent of compact batch order and reserves fresh ranges per attempt; the CUDA kernel generates finite exponential noise inline, with finite-precision distribution and replay qualification still pending.
 
 Native dSpark synthetic qualification on both RTX GPUs now records sub-7.2e-7 confidence/Markov absolute errors, exact greedy tokens, stochastic graph replay and request-order RNG reproducibility; this evidence is scoped to native paths and does not establish Rust owner, allocation-stability or full-stack readiness.
+
+The terminal now uses final-stage RMS normalization and the coordinator-shared BF16 vocabulary weight, retaining pre-norm hidden states for confidence; native head checks pass within recorded tolerances, and an inherited 4096-only normalization entry was replaced with the general RNE implementation.

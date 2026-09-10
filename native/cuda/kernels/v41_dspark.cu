@@ -60,11 +60,11 @@ extern "C" int32_t ds41rt_v41_dspark_confidence(const uint16_t* hidden,
 #include <cublas_v2.h>
 #include <new>
 namespace {
-struct MarkovHandle { cublasHandle_t blas; int device; void* workspace; };
+struct MarkovHandle { cublasHandle_t blas; int device; void* workspace; int width; int max_rows; };
 constexpr uint64_t kMarkovWorkspace = 4 * 1024 * 1024;
 int32_t blas_status(cublasStatus_t status) { return status == CUBLAS_STATUS_SUCCESS ? 0 : -int32_t(status); }
 }
-extern "C" int32_t ds41rt_v41_markov_create(void* workspace, uint64_t bytes, void** output) {
+static int32_t create_head(void* workspace, uint64_t bytes, void** output, int width, int max_rows) {
   if (!output) return cudaErrorInvalidValue;
   *output = nullptr;
   if (bytes < kMarkovWorkspace || !span(workspace, kMarkovWorkspace, 256)) return cudaErrorInvalidValue;
@@ -75,8 +75,16 @@ extern "C" int32_t ds41rt_v41_markov_create(void* workspace, uint64_t bytes, voi
   auto created = cublasCreate(&handle->blas);
   if (created != CUBLAS_STATUS_SUCCESS) { delete handle; return blas_status(created); }
   handle->workspace = workspace;
+  handle->width = width;
+  handle->max_rows = max_rows;
   *output = handle;
   return 0;
+}
+extern "C" int32_t ds41rt_v41_markov_create(void* workspace, uint64_t bytes, void** output) {
+  return create_head(workspace, bytes, output, 256, 16);
+}
+extern "C" int32_t ds41rt_v41_vocabulary_head_create(void* workspace, uint64_t bytes, void** output) {
+  return create_head(workspace, bytes, output, 5120, 80);
 }
 extern "C" int32_t ds41rt_v41_markov_destroy(void* opaque) {
   if (!opaque) return cudaErrorInvalidValue;
@@ -85,15 +93,16 @@ extern "C" int32_t ds41rt_v41_markov_destroy(void* opaque) {
   delete handle;
   return blas_status(status);
 }
-extern "C" int32_t ds41rt_v41_markov_launch(void* opaque, const uint16_t* embedding,
-    const uint16_t* weight, float* logits, int32_t rows, void* stream) {
-  if (!opaque || rows < 1 || rows > 16) return cudaErrorInvalidValue;
+static int32_t launch_head(void* opaque, const uint16_t* embedding,
+    const uint16_t* weight, float* logits, int32_t rows, void* stream, int width) {
+  if (!opaque || rows < 1) return cudaErrorInvalidValue;
   auto* handle = static_cast<MarkovHandle*>(opaque);
+  if (handle->width != width || rows > handle->max_rows) return cudaErrorInvalidValue;
   int device;
   auto status = cudaGetDevice(&device);
   if (status != cudaSuccess) return status;
   if (device != handle->device) return cudaErrorInvalidDevice;
-  const uint64_t e = uint64_t(rows) * 512, w = uint64_t(129280) * 512;
+  const uint64_t e = uint64_t(rows) * width * 2, w = uint64_t(129280) * width * 2;
   const uint64_t o = uint64_t(rows) * 129280 * 4;
   if (!span(embedding, e, 2) || !span(weight, w, 2) || !span(logits, o, 4) ||
       !disjoint(logits, o, embedding, e) || !disjoint(logits, o, weight, w) ||
@@ -107,9 +116,18 @@ extern "C" int32_t ds41rt_v41_markov_launch(void* opaque, const uint16_t* embedd
   if (result != CUBLAS_STATUS_SUCCESS) return blas_status(result);
   const float alpha = 1, beta = 0;
   return blas_status(cublasGemmEx(handle->blas, CUBLAS_OP_T, CUBLAS_OP_N,
-      129280, rows, 256, &alpha, weight, CUDA_R_16BF, 256,
-      embedding, CUDA_R_16BF, 256, &beta, logits, CUDA_R_32F, 129280,
+      129280, rows, width, &alpha, weight, CUDA_R_16BF, width,
+      embedding, CUDA_R_16BF, width, &beta, logits, CUDA_R_32F, 129280,
       CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+}
+
+extern "C" int32_t ds41rt_v41_markov_launch(void* handle, const uint16_t* input,
+    const uint16_t* weight, float* output, int32_t rows, void* stream) {
+  return launch_head(handle, input, weight, output, rows, stream, 256);
+}
+extern "C" int32_t ds41rt_v41_vocabulary_head_launch(void* handle, const uint16_t* input,
+    const uint16_t* weight, float* output, int32_t rows, void* stream) {
+  return launch_head(handle, input, weight, output, rows, stream, 5120);
 }
 
 namespace {

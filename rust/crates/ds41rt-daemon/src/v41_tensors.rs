@@ -79,3 +79,33 @@ impl<'a> NativeRtxTensors<'a> {
         self.resident_bytes
     }
 }
+
+/// One coordinator copy of the official BF16 vocabulary weight, shared by the
+/// backbone and dSpark; each execution owns its own handle and workspace.
+pub(crate) struct VocabularyHead<'library> {
+    tensors: NativeRtxTensors<'library>,
+}
+impl<'library> VocabularyHead<'library> {
+    pub fn plan(catalog: &OfficialV41Catalog) -> Result<usize> {
+        NativeRtxTensors::plan(catalog, &["head.weight".into()])
+    }
+    pub fn load(
+        library: &'library NativeLibrary,
+        catalog: &OfficialV41Catalog,
+        budget: usize,
+        staging_bytes: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            tensors: NativeRtxTensors::load(
+                library,
+                catalog,
+                &["head.weight".into()],
+                budget,
+                staging_bytes,
+            )?,
+        })
+    }
+    pub fn weight(&self) -> Result<Ds41rtDeviceBuffer> {
+        self.tensors.get("head.weight")
+    }
+}

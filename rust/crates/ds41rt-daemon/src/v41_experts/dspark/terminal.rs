@@ -1,8 +1,9 @@
 use super::{DsparkConfidence, DsparkMarkov, DsparkWeights};
 use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_tensors::VocabularyHead;
 use anyhow::{ensure, Context, Result};
 use ds41rt_core::DsparkRng;
-use ds41rt_ffi::{Ds41rtDeviceBuffer, V41DraftStep};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, V41DraftStep, V41VocabularyProjection};
 use std::ffi::c_void;
 
 /// Five dependent Markov/sample positions followed by raw confidence, on one
@@ -12,6 +13,11 @@ pub(crate) struct DsparkTerminal<'weights, 'library> {
     markov: DsparkMarkov<'weights, 'library>,
     confidence: DsparkConfidence<'weights, 'library>,
     sample: V41DraftStep<'library>,
+    head_kernel: V41VocabularyProjection<'library>,
+    _head_workspace: DeviceAllocation<'library>,
+    normalized: DeviceAllocation<'library>,
+    head: &'weights VocabularyHead<'library>,
+    weights: &'weights DsparkWeights<'library>,
     shared_logits: DeviceAllocation<'library>,
     adjusted_logits: DeviceAllocation<'library>,
     rng: DeviceAllocation<'library>,
@@ -23,15 +29,30 @@ pub(crate) struct DsparkTerminal<'weights, 'library> {
     ready_requests: Option<usize>,
 }
 impl<'library> DsparkWeights<'library> {
-    /// Shared-head projection is produced upstream; this owner handles its
-    /// Markov correction, sequential sampling and final confidence projection.
-    pub fn terminal(&self, capacity: usize, budget: usize) -> Result<DsparkTerminal<'_, 'library>> {
+    /// Normalize collapsed hidden states, project through the borrowed shared
+    /// head, then apply Markov correction, sampling and confidence.
+    pub fn terminal<'weights>(
+        &'weights self,
+        head: &'weights VocabularyHead<'library>,
+        capacity: usize,
+        budget: usize,
+    ) -> Result<DsparkTerminal<'weights, 'library>> {
         ensure!(
             DsparkTerminal::device_bytes(capacity)? <= budget,
             "dSpark terminal exceeds budget"
         );
         let library = self.experts[0].buffers[0].library;
+        head.weight()?;
+        self.tensor("mtp.2.norm.weight")?;
+        let head_workspace =
+            DeviceAllocation::new(library, V41VocabularyProjection::WORKSPACE_BYTES)?;
+        let head_kernel = unsafe { library.v41_vocabulary_head(head_workspace.buffer)? };
         Ok(DsparkTerminal {
+            head_kernel,
+            _head_workspace: head_workspace,
+            normalized: DeviceAllocation::new(library, capacity * 5 * 10240)?,
+            head,
+            weights: self,
             stream: LoadStream {
                 library,
                 raw: library.cuda_stream_create()?,
@@ -58,25 +79,22 @@ impl DsparkTerminal<'_, '_> {
             (1..=16).contains(&capacity),
             "terminal request capacity must be 1 through 16"
         );
-        Ok(capacity * (5 * 129280 * 4 * 2 + 7 * 4 + 16))
+        Ok(capacity * (5 * 129280 * 4 * 2 + 7 * 4 + 16 + 5 * 10240)
+            + V41VocabularyProjection::WORKSPACE_BYTES)
     }
     pub fn device_bytes(capacity: usize) -> Result<usize> {
         Ok(Self::additional_bytes(capacity)?
             + DsparkMarkov::device_bytes(capacity)?
             + DsparkConfidence::device_bytes(capacity * 5)?)
     }
-    /// Stable inputs: raw shared-head logits [5,R,V], collapsed pre-final-norm
-    /// hidden [5,R,5120], anchor IDs [R]. Sampling is set via `prepare_sampling`.
+    /// Stable inputs: collapsed pre-final-norm hidden [5,R,5120] and anchor IDs
+    /// [R]. Sampling is set via `prepare_sampling`.
     /// Use live R densely, without capacity padding between positions. Never free
     /// or retain after drop; finish all producer writes before execute/replay.
-    pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] {
+    pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 2] {
         let mut anchors = self.tokens.buffer;
         anchors.bytes = self.capacity * 4;
-        [
-            self.shared_logits.buffer,
-            self.confidence.inputs()[0],
-            anchors,
-        ]
+        [self.confidence.inputs()[0], anchors]
     }
     /// Atomically admit a batch's RNG ranges before reserving any. Once reserved,
     /// failures/cancellation consume them; replay intentionally retains the same
@@ -149,6 +167,23 @@ impl DsparkTerminal<'_, '_> {
         let library = self.stream.library;
         let row_bytes = requests * 129280 * 4;
         unsafe {
+            // This RNE variant matches the reference's one final BF16 rounding.
+            library.cuda_ds4_rmsnorm_bf16_rne_async(
+                self.confidence.inputs()[0],
+                self.weights.tensor("mtp.2.norm.weight")?,
+                self.normalized.buffer,
+                (requests * 5) as i32,
+                5120,
+                1e-6,
+                self.stream.raw,
+            )?;
+            self.head_kernel.launch(
+                self.normalized.buffer,
+                self.head.weight()?,
+                self.shared_logits.buffer,
+                requests * 5,
+                self.stream.raw,
+            )?;
             library.copy_d2d_async(
                 self.markov.tokens(),
                 self.tokens.buffer,

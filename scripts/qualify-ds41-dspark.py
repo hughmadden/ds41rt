@@ -35,6 +35,9 @@ def main():
     confidence, raw_confidence = bind('ds41rt_v41_dspark_confidence', [P,P,P,P,I,P])
     create, _ = bind('ds41rt_v41_markov_create', [P,C.c_uint64,C.POINTER(P)])
     destroy, _ = bind('ds41rt_v41_markov_destroy', [P])
+    create_head, _ = bind('ds41rt_v41_vocabulary_head_create', [P,C.c_uint64,C.POINTER(P)])
+    head_projection, _ = bind('ds41rt_v41_vocabulary_head_launch', [P,P,P,P,I,P])
+    norm, _ = bind('ds41rt_cuda_ds4_rmsnorm_bf16_rne_async', [P,P,P,I,I,C.c_float,P])
     markov, raw_markov = bind('ds41rt_v41_markov_launch', [P,P,P,P,I,P])
     sample, raw_sample = bind('ds41rt_v41_draft_step_rng', [P,P,P,P,P,P,I,I,P])
     gather, _ = bind('ds41rt_cuda_embedding_lookup_bf16_async', [P,P,P,Z,Z,Z,P])
@@ -72,6 +75,37 @@ def main():
                 for rows in [1,3,16]:
                     markov(handle,ptr(embedding),ptr(weight),ptr(logits),rows,stream.cuda_stream)
                     errors[f'markov_m{rows}'] = close(logits[:rows],embedding[:rows].float() @ weight.float().T)
+                # The shared vocabulary weight remains BF16, shared with the backbone.
+                head_weight, norm_weight = bf((V,H)), bf((H,))
+                normalized = torch.empty_like(hidden)
+                head_output = torch.empty((80,V),device='cuda')
+                head_workspace = torch.empty(4*1024*1024,dtype=torch.uint8,device='cuda')
+                head_handle = P()
+                create_head(ptr(head_workspace),head_workspace.numel(),C.byref(head_handle))
+                head_graph = None
+                try:
+                    def project_head(rows=80):
+                        norm(ptr(hidden),ptr(norm_weight),ptr(normalized),rows,H,1e-6,stream.cuda_stream)
+                        head_projection(head_handle,ptr(normalized),ptr(head_weight),ptr(head_output),rows,stream.cuda_stream)
+                    for rows in [1,16,80]:
+                        project_head(rows)
+                        x = hidden[:rows].float()
+                        expected_norm = (x*torch.rsqrt(x.square().mean(-1,keepdim=True)+1e-6)*norm_weight.float()).bfloat16()
+                        errors[f'head_norm_m{rows}'] = (normalized[:rows].float()-expected_norm.float()).abs().max().item()
+                        torch.testing.assert_close(normalized[:rows],expected_norm,rtol=.008,atol=.002)
+                        errors[f'head_projection_m{rows}'] = close(head_output[:rows],normalized[:rows].float() @ head_weight.float().T)
+                        errors[f'head_combined_m{rows}'] = close(head_output[:rows],expected_norm.float() @ head_weight.float().T,atol=.002)
+                    stream.synchronize()
+                    head_graph = torch.cuda.CUDAGraph()
+                    with torch.cuda.graph(head_graph,stream=stream): project_head()
+                    hidden.copy_(bf((80,H)))
+                    head_graph.replay()
+                    close(head_output,normalized.float() @ head_weight.float().T)
+                finally:
+                    stream.synchronize()
+                    if head_graph is not None: head_graph.reset()
+                    destroy(head_handle)
+                del head_weight, head_output, head_workspace, normalized
                 assert raw_confidence(ptr(hidden),ptr(all_embedding),ptr(cw),ptr(hidden),16,stream.cuda_stream) != 0
                 assert raw_markov(handle,ptr(embedding),ptr(weight),ptr(logits),17,stream.cuda_stream) != 0
                 shared = torch.randn((5,R,V),device='cuda')
@@ -154,6 +188,7 @@ def main():
                 stream.synchronize()
                 results.append({'device':device,'name':torch.cuda.get_device_name(device),
                     'max_abs_errors':errors,'greedy_five_step_graph_mutated_replays':3,
+                    'shared_head_norm_projection_graph':True,
                     'rng_replay_and_request_reordering_exact':True,
                     'stochastic_five_step_graph_exact':True,
                     'two_category_samples':samples.numel(),'category_zero_frequency':frequency})

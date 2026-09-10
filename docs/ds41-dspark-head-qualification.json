@@ -1,0 +1,78 @@
+{
+  "scope": "Native shared-head normalization/projection plus prior dSpark numerical and graph checks; Rust terminal integration is build-only",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+  "native_library_sha256": "c2aa6ca10637ccbdc05d6dbfdbbc037aa18ecd2dfd9a4403ae742ce2e5153be6",
+  "qualifier_sha256": "c3eb4738a1dd2ff6d64ee8d5fc2738a9a66501bac27a1d6c47d771715a9cc300",
+  "results": [
+    {
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "confidence_m1": 2.384185791015625e-07,
+        "confidence_m16": 4.76837158203125e-07,
+        "confidence_m80": 4.76837158203125e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 4.76837158203125e-07,
+        "markov_m16": 7.152557373046875e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.430511474609375e-06,
+        "head_combined_m1": 1.430511474609375e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 5.7220458984375e-06,
+        "head_combined_m16": 5.7220458984375e-06,
+        "head_norm_m80": 6.103515625e-05,
+        "head_projection_m80": 4.2438507080078125e-05,
+        "head_combined_m80": 4.649162292480469e-05
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    },
+    {
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "confidence_m1": 2.9802322387695312e-08,
+        "confidence_m16": 2.384185791015625e-07,
+        "confidence_m80": 3.5762786865234375e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 5.960464477539062e-07,
+        "markov_m16": 6.556510925292969e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.430511474609375e-06,
+        "head_combined_m1": 1.430511474609375e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 5.245208740234375e-06,
+        "head_combined_m16": 5.245208740234375e-06,
+        "head_norm_m80": 0.000244140625,
+        "head_projection_m80": 4.1961669921875e-05,
+        "head_combined_m80": 0.00013206899166107178
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    }
+  ],
+  "not_qualified": [
+    "Rust allocation/ownership and cancellation",
+    "Full distribution/tail quality",
+    "Alternating-wave overlap",
+    "Full model execution"
+  ],
+  "head_weight_bytes": 1323827200,
+  "terminal_owner_bytes_at_16_requests": 101090368,
+  "two_wave_partial_dspark_bytes_excluding_shared_head_weight": 8286471512,
+  "source_sha256": {
+    "native/cuda/kernels/v41_dspark.cu": "4104f04a7d454d98692965bc97e4e58bb75a41bf503dbc23e190202ceae4080f",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/terminal.rs": "203cc7b016dc5312db547073d20ef98f6526e2ec3167f109701e1544b29aab7d",
+    "rust/crates/ds41rt-daemon/src/v41_tensors.rs": "a54889f4213d5c7d791c0507ebc1a820b5ade49e02455f0efd8ad93c8bb62c03",
+    "rust/crates/ds41rt-ffi/src/v41_dspark.rs": "af117a04062802fc15bd74d47cde8aa1624d036b0ddbf7839cde93ad52a063b2"
+  }
+}

@@ -1,7 +1,7 @@
 use super::DsparkWeights;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, V41DsparkMarkov};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, V41VocabularyProjection};
 use std::ffi::c_void;
 
 /// One sequential draft position's stable token, embedding and logits buffers.
@@ -9,7 +9,7 @@ use std::ffi::c_void;
 /// the final confidence projection before advancing to the next draft position.
 pub(crate) struct DsparkMarkov<'weights, 'library> {
     stream: LoadStream<'library>,
-    kernel: V41DsparkMarkov<'library>,
+    kernel: V41VocabularyProjection<'library>,
     _workspace: DeviceAllocation<'library>,
     tokens: DeviceAllocation<'library>,
     embedding: DeviceAllocation<'library>,
@@ -33,7 +33,7 @@ impl<'library> DsparkWeights<'library> {
         let library = self.experts[0].buffers[0].library;
         self.tensor("mtp.2.markov_head.embed.weight")?;
         self.tensor("mtp.2.markov_head.head.weight")?;
-        let workspace = DeviceAllocation::new(library, V41DsparkMarkov::WORKSPACE_BYTES)?;
+        let workspace = DeviceAllocation::new(library, V41VocabularyProjection::WORKSPACE_BYTES)?;
         let kernel = unsafe { library.v41_dspark_markov(workspace.buffer)? };
         Ok(DsparkMarkov {
             kernel,
@@ -58,7 +58,7 @@ impl DsparkMarkov<'_, '_> {
             (1..=16).contains(&capacity),
             "Markov request capacity must be 1 through 16"
         );
-        Ok(capacity * (4 + 512 + 129280 * 4) + V41DsparkMarkov::WORKSPACE_BYTES)
+        Ok(capacity * (4 + 512 + 129280 * 4) + V41VocabularyProjection::WORKSPACE_BYTES)
     }
     /// Preceding token IDs [capacity], u32, each less than 129280. Never free or
     /// retain after drop; finish producer writes before execute/replay.

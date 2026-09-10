@@ -17,6 +17,12 @@ int32_t ds41rt_v41_markov_create(void* workspace, uint64_t bytes, void** handle)
 int32_t ds41rt_v41_markov_destroy(void* handle);
 int32_t ds41rt_v41_markov_launch(void* handle, const uint16_t* embedding,
     const uint16_t* weight, float* logits, int32_t rows, void* stream);
+// Shared vocabulary head: same ownership/status contract as Markov, but
+// BF16 input [rows,5120], weight [129280,5120], FP32 output [rows,129280], rows 1..80.
+// Release with ds41rt_v41_markov_destroy after destroying captured graphs.
+int32_t ds41rt_v41_vocabulary_head_create(void* workspace, uint64_t bytes, void** handle);
+int32_t ds41rt_v41_vocabulary_head_launch(void* handle, const uint16_t* input,
+    const uint16_t* weight, float* output, int32_t rows, void* stream);
 // One draft position: FP32 shared/bias/adjusted [rows,129280], temperatures
 // [rows], u64 RNG [rows,2] (seed, first Philox subsequence), u32 tokens [rows].
 // Temperature must be finite/nonnegative; shared+bias finite. RNG base must leave

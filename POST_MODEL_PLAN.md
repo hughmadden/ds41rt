@@ -1,6 +1,6 @@
 # Full-checkpoint bring-up
 
-Goal 2 begins after Goal 1 qualification, when the checkpoint is complete and all four Sparks are available.
+Goal 2 begins after Goal 1 qualification, when the checkpoint is complete; all four Sparks are already available for Goal 1 qualification.
 
 - [ ] Delete the temporary artifacts listed in TO_DELETE_SCAFFOLDING.md and retain reusable tests and qualification tools.
 - [ ] Verify the completed official checkpoint revision, shard inventory, tensor representations, tokenizer, and image-processing assets.
