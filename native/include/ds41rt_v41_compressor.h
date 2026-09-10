@@ -38,6 +38,15 @@ int32_t ds41rt_v41_index_store(const uint8_t* packed,const uint8_t* scales,
 int32_t ds41rt_v41_compressor_pool(const float* kv, const float* scores,
     const float* pending_kv, const float* pending_scores, const uint64_t* predecessors,
     const uint16_t* norm_weight, uint16_t* output, int32_t rows, int32_t slots, void* stream);
+// BF16 hidden [rows,5120] x BF16 [32,5120] -> BF16 [rows,32], before scaling.
+int32_t ds41rt_v41_index_weights_project(void* handle,const uint16_t* input,
+    const uint16_t* weight,uint16_t* output,int32_t rows,void* stream);
+// BF16 queries [rows,32,128], FP32 frequencies [rows,32,2], BF16 head weights
+// [rows,32] -> FP4/E8M0 [rows,32,64/4], BF16 scaled weights [rows,32].
+// Rotate final 64 query dimensions, round to BF16 then quantize group-32 FP4.
+// Weight scaling is exactly 1/64 AFTER projection's BF16 round. Outputs disjoint.
+int32_t ds41rt_v41_index_query_prepare(const uint16_t* input,const float* frequencies,
+    const uint16_t* weights,uint8_t* packed,uint8_t* scales,uint16_t* scaled_weights,int32_t rows,void* stream);
 #ifdef __cplusplus
 }
 #endif

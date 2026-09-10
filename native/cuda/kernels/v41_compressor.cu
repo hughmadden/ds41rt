@@ -25,13 +25,7 @@ __global__ void index_store_kernel(const uint8_t* packed,const uint8_t* scales,
   if(t<64)cache[dst*64+t]=packed[row*64+t];
   if(t<4)cache_scales[dst*4+t]=scales[row*4+t];
 }
-__global__ void index_pack_kernel(const __nv_bfloat16* input,uint8_t* packed,
-    uint8_t* scales,uint64_t groups) {
-  const uint64_t pair=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
-  const uint64_t group=pair/16;
-  if(group>=groups)return;
-  const float a=__bfloat162float(input[pair*2]);
-  const float b=__bfloat162float(input[pair*2+1]);
+__device__ void index_pack_pair(float a,float b,uint64_t pair,uint8_t* packed,uint8_t* scales) {
   float maximum=fmaxf(fabsf(a),fabsf(b));
   const unsigned mask=__activemask();
   #pragma unroll
@@ -41,10 +35,32 @@ __global__ void index_pack_kernel(const __nv_bfloat16* input,uint8_t* packed,
   const uint32_t bits=__float_as_uint(__fmul_rn(maximum,1.0f/6.0f));
   const uint32_t exponent=(bits>>23)+((bits&0x7fffffu)!=0);
   const float scale=__uint_as_float(exponent<<23);
-  if(threadIdx.x%16==0)scales[group]=uint8_t(exponent);
+  if(pair%16==0)scales[pair/16]=uint8_t(exponent);
   // Division by an exact power of two; the native conversion is saturating RNE.
   packed[pair]=__nv_cvt_float2_to_fp4x2(
       make_float2(__fdiv_rn(a,scale),__fdiv_rn(b,scale)),__NV_E2M1,cudaRoundNearest);
+}
+__global__ void index_pack_kernel(const __nv_bfloat16* input,uint8_t* packed,
+    uint8_t* scales,uint64_t groups) {
+  const uint64_t pair=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
+  if(pair/16>=groups)return;
+  index_pack_pair(__bfloat162float(input[pair*2]),__bfloat162float(input[pair*2+1]),pair,packed,scales);
+}
+__global__ void index_query_prepare_kernel(const __nv_bfloat16* input,const float* frequencies,
+    const __nv_bfloat16* weights,uint8_t* packed,uint8_t* scales,__nv_bfloat16* scaled_weights) {
+  const uint64_t pair=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
+  const uint64_t head=pair/64,row=head/32;
+  const int col=(pair%64)*2;
+  float a=__bfloat162float(input[pair*2]),b=__bfloat162float(input[pair*2+1]);
+  if(col>=64) {
+    const uint64_t f=row*64+col-64;
+    const float c=frequencies[f],s=frequencies[f+1];
+    const float x=__bfloat162float(__float2bfloat16_rn(fmaf(a,c,-__fmul_rn(b,s))));
+    const float y=__bfloat162float(__float2bfloat16_rn(fmaf(b,c,__fmul_rn(a,s))));
+    a=x;b=y;
+  }
+  index_pack_pair(a,b,pair,packed,scales);
+  if(col==0)scaled_weights[head]=__float2bfloat16_rn(__fmul_rn(__bfloat162float(weights[head]),0.015625f));
 }
 __device__ float sum_warp(float x) {
   for(int step=16;step;step>>=1)x=__fadd_rn(x,__shfl_down_sync(0xffffffffu,x,step));
@@ -174,5 +190,26 @@ extern "C" int32_t ds41rt_v41_compressor_pool(const float* kv,const float* score
   for(int i=0;i<6;++i)if(!valid(inputs[i],sizes[i],i==4?8:(i==5?2:4))||!disjoint(inputs[i],sizes[i],output,o))return cudaErrorInvalidValue;
   pool_kernel<<<rows,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(kv,scores,pending_kv,pending_scores,
       predecessors,reinterpret_cast<const __nv_bfloat16*>(norm_weight),reinterpret_cast<__nv_bfloat16*>(output),slots);
+  return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_index_weights_project(void* handle,const uint16_t* input,
+    const uint16_t* weight,uint16_t* output,int32_t rows,void* stream) {
+  return project(handle,input,weight,output,rows,1,stream,32,5120);
+}
+extern "C" int32_t ds41rt_v41_index_query_prepare(const uint16_t* input,const float* frequencies,
+    const uint16_t* weights,uint8_t* packed,uint8_t* scales,uint16_t* scaled_weights,int32_t rows,void* stream) {
+  if(rows<1 || rows>4096)return cudaErrorInvalidValue;
+  const uint64_t r=rows;
+  const void* ptrs[]={input,frequencies,weights,packed,scales,scaled_weights};
+  const uint64_t bytes[]={r*8192,r*256,r*64,r*2048,r*128,r*64};
+  const int alignment[]={2,4,2,1,1,2};
+  for(int i=0;i<6;++i) {
+    if(!valid(ptrs[i],bytes[i],alignment[i]))return cudaErrorInvalidValue;
+    if(i>=3)for(int j=0;j<i;++j)if(!disjoint(ptrs[i],bytes[i],ptrs[j],bytes[j]))return cudaErrorInvalidValue;
+  }
+  index_query_prepare_kernel<<<rows*8,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(input),frequencies,reinterpret_cast<const __nv_bfloat16*>(weights),
+      packed,scales,reinterpret_cast<__nv_bfloat16*>(scaled_weights));
   return cudaGetLastError();
 }

@@ -13,7 +13,7 @@ import _pinned_sparkinfer  # noqa: F401
 PROJECTIONS = (
     ('engram', 25600, 6144), ('ffn_up', 2304, 5120), ('ffn_down', 5120, 2304),
     ('main', 5120, 15360), ('q_a', 1280, 5120), ('q_b', 32768, 1280),
-    ('kv', 512, 5120), ('o_b', 5120, 8192),
+    ('kv', 512, 5120), ('o_b', 5120, 8192), ('index_q', 4096, 1280),
 )
 
 def validate_abi(path: Path, label: str, kind: str) -> dict:

@@ -15,6 +15,16 @@ type Project = unsafe extern "C" fn(
 ) -> i32;
 type IndexProject =
     unsafe extern "C" fn(*mut c_void, *const u16, *const u16, *mut u16, i32, *mut c_void) -> i32;
+type QueryPrepare = unsafe extern "C" fn(
+    *const u16,
+    *const f32,
+    *const u16,
+    *mut u8,
+    *mut u8,
+    *mut u16,
+    i32,
+    *mut c_void,
+) -> i32;
 type IndexPack = unsafe extern "C" fn(*const u16, *mut u8, *mut u8, i32, *mut c_void) -> i32;
 type IndexStore = unsafe extern "C" fn(
     *const u8,
@@ -44,6 +54,8 @@ pub struct V41Compressor<'a> {
     destroy: Destroy,
     project: Project,
     index_project: IndexProject,
+    weights_project: IndexProject,
+    query_prepare: QueryPrepare,
     index_pack: IndexPack,
     index_store: IndexStore,
     pool: Pool,
@@ -71,6 +83,10 @@ impl NativeLibrary {
             unsafe { *self.lib.get(b"ds41rt_v41_index_key_project")? };
         let index_pack: IndexPack = unsafe { *self.lib.get(b"ds41rt_v41_index_pack")? };
         let index_store: IndexStore = unsafe { *self.lib.get(b"ds41rt_v41_index_store")? };
+        let weights_project: IndexProject =
+            unsafe { *self.lib.get(b"ds41rt_v41_index_weights_project")? };
+        let query_prepare: QueryPrepare =
+            unsafe { *self.lib.get(b"ds41rt_v41_index_query_prepare")? };
         let pool: Pool = unsafe { *self.lib.get(b"ds41rt_v41_compressor_pool")? };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { create(workspace.ptr, workspace.bytes as u64, &mut handle) };
@@ -81,6 +97,8 @@ impl NativeLibrary {
             destroy,
             project,
             index_project,
+            weights_project,
+            query_prepare,
             index_pack,
             index_store,
             pool,
@@ -88,6 +106,83 @@ impl NativeLibrary {
     }
 }
 impl V41Compressor<'_> {
+    /// # Safety
+    /// BF16 hidden [rows,5120], weight [32,5120], disjoint BF16 [rows,32] output
+    /// live on the handle device. Serialize use of the handle/workspace.
+    pub unsafe fn weights_project(
+        &self,
+        input: Ds41rtDeviceBuffer,
+        weight: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            (1..=4096).contains(&rows),
+            "invalid index weight projection rows"
+        );
+        buffer(input, rows * 10240)?;
+        buffer(weight, 32 * 5120 * 2)?;
+        buffer(output, rows * 64)?;
+        let status = unsafe {
+            (self.weights_project)(
+                self.handle,
+                input.ptr.cast(),
+                weight.ptr.cast(),
+                output.ptr.cast(),
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(
+            status == 0,
+            "native index weight projection status {status}"
+        );
+        Ok(())
+    }
+    /// # Safety
+    /// BF16 queries [rows,32,128], FP32 frequencies [rows,32,2], BF16 head
+    /// weights [rows,32], disjoint FP4/E8M0 [rows,32,64/4] and BF16 [rows,32]
+    /// outputs live on the stream device. Inputs are finite. No normalization
+    /// is applied here: queries come from the model's normalized query-rank input.
+    pub unsafe fn query_prepare(
+        &self,
+        input: Ds41rtDeviceBuffer,
+        frequencies: Ds41rtDeviceBuffer,
+        weights: Ds41rtDeviceBuffer,
+        packed: Ds41rtDeviceBuffer,
+        scales: Ds41rtDeviceBuffer,
+        scaled_weights: Ds41rtDeviceBuffer,
+        rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=4096).contains(&rows), "invalid index query rows");
+        for (b, n) in [
+            (input, 8192),
+            (frequencies, 256),
+            (weights, 64),
+            (packed, 2048),
+            (scales, 128),
+            (scaled_weights, 64),
+        ] {
+            buffer(b, rows * n)?;
+        }
+        let status = unsafe {
+            (self.query_prepare)(
+                input.ptr.cast(),
+                frequencies.ptr.cast(),
+                weights.ptr.cast(),
+                packed.ptr.cast(),
+                scales.ptr.cast(),
+                scaled_weights.ptr.cast(),
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native index query prepare status {status}");
+        Ok(())
+    }
+
     /// # Safety
     /// All disjoint spans are live on the stream device. Each in-range U64
     /// destination is unique and owned by the committing request; other values
