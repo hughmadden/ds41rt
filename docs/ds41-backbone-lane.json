@@ -1,0 +1,84 @@
+{
+  "date": "2026-09-11",
+  "checkpoint_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "scope": "Production backbone lane composition builds. CPU-only budget qualification with official checkpoint headers and SM120 AOT metadata; no assembled-lane GPU execution.",
+  "weights": {
+    "groups": [
+      "mhc",
+      "query",
+      "attention_output",
+      "shared_ffn"
+    ],
+    "layers": 40,
+    "conservative_device_bytes": 8037937600
+  },
+  "workspace_cases": [
+    {
+      "capacity": 1,
+      "group_bytes": [
+        225504,
+        181516,
+        4435212,
+        74244,
+        131152
+      ],
+      "total_bytes": 5047628
+    },
+    {
+      "capacity": 80,
+      "group_bytes": [
+        18040320,
+        12290692,
+        17539716,
+        3387396,
+        10492160
+      ],
+      "total_bytes": 61750284
+    },
+    {
+      "capacity": 4096,
+      "group_bytes": [
+        923664384,
+        628719620,
+        686850052,
+        172818436,
+        537198592
+      ],
+      "total_bytes": 2949251084
+    }
+  ],
+  "validation": {
+    "daemon_build": "pass",
+    "test": "official_lane_budget_rejects_before_device_allocation",
+    "test_exit": 0,
+    "gpu_device_access": false,
+    "undersized_weight_budget": "pass",
+    "undersized_lane_budgets": "pass",
+    "missing_layers": "pass",
+    "invalid_capacities": [
+      0,
+      4097,
+      4294967295
+    ],
+    "assembled_lane_gpu_execution": "not run; RTX driver/userspace mismatch"
+  },
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs": "9a687a22aaf2679587d57ab7313ebc4a45783bcacc68ec680a68e17da3c02a6b"
+  },
+  "fixture_binary_sha256": "2946d2ec84303b1a3ccd498d7424ff00947a764019d46801be6a925f21fdff67",
+  "artifacts": [
+    "/tmp/ds41-backbone-lane",
+    "/tmp/ds41-backbone-lane-final-build.log",
+    "/tmp/ds41-backbone-lane-plan-final-build.log",
+    "/tmp/ds41-backbone-lane-plan-final.log"
+  ],
+  "excludes": [
+    "other weight families",
+    "request caches and index selection",
+    "engram and vision",
+    "dSpark",
+    "transport buffers",
+    "CUDA graph/runtime memory",
+    "full scheduler and API execution"
+  ]
+}
