@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 #include <cuda_bf16.h>
+#include <cuda_fp4.h>
 #include <cublas_v2.h>
 #include <stdint.h>
 #include <new>
@@ -16,6 +17,27 @@ bool disjoint(const void* a,uint64_t na,const void* b,uint64_t nb) {
 }
 int32_t bs(cublasStatus_t s){return s==CUBLAS_STATUS_SUCCESS?0:-int32_t(s);}
 struct Handle {cublasHandle_t blas;void* workspace;int device;};
+__global__ void index_pack_kernel(const __nv_bfloat16* input,uint8_t* packed,
+    uint8_t* scales,uint64_t groups) {
+  const uint64_t pair=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
+  const uint64_t group=pair/16;
+  if(group>=groups)return;
+  const float a=__bfloat162float(input[pair*2]);
+  const float b=__bfloat162float(input[pair*2+1]);
+  float maximum=fmaxf(fabsf(a),fabsf(b));
+  const unsigned mask=__activemask();
+  #pragma unroll
+  for(int delta=8;delta;delta>>=1)
+    maximum=fmaxf(maximum,__shfl_xor_sync(mask,maximum,delta,16));
+  maximum=fmaxf(maximum,6.0f*0x1p-126f);
+  const uint32_t bits=__float_as_uint(__fmul_rn(maximum,1.0f/6.0f));
+  const uint32_t exponent=(bits>>23)+((bits&0x7fffffu)!=0);
+  const float scale=__uint_as_float(exponent<<23);
+  if(threadIdx.x%16==0)scales[group]=uint8_t(exponent);
+  // Division by an exact power of two; the native conversion is saturating RNE.
+  packed[pair]=__nv_cvt_float2_to_fp4x2(
+      make_float2(__fdiv_rn(a,scale),__fdiv_rn(b,scale)),__NV_E2M1,cudaRoundNearest);
+}
 __device__ float sum_warp(float x) {
   for(int step=16;step;step>>=1)x=__fadd_rn(x,__shfl_down_sync(0xffffffffu,x,step));
   return x;
@@ -106,6 +128,17 @@ extern "C" int32_t ds41rt_v41_compressor_project(void* handle,const uint16_t* in
 extern "C" int32_t ds41rt_v41_index_key_project(void* handle,const uint16_t* input,
     const uint16_t* weight,uint16_t* output,int32_t rows,void* stream) {
   return project(handle,input,weight,output,rows,1,stream,128,512);
+}
+extern "C" int32_t ds41rt_v41_index_pack(const uint16_t* input,uint8_t* packed,
+    uint8_t* scales,int32_t rows,void* stream) {
+  if(rows<1 || rows>131072)return cudaErrorInvalidValue;
+  const uint64_t x=uint64_t(rows)*256,p=uint64_t(rows)*64,s=uint64_t(rows)*4;
+  if(!valid(input,x,2)||!valid(packed,p,1)||!valid(scales,s,1)||
+      !disjoint(input,x,packed,p)||!disjoint(input,x,scales,s)||
+      !disjoint(packed,p,scales,s))return cudaErrorInvalidValue;
+  index_pack_kernel<<<(p+255)/256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(input),packed,scales,uint64_t(rows)*4);
+  return cudaGetLastError();
 }
 extern "C" int32_t ds41rt_v41_compressor_pool(const float* kv,const float* scores,
     const float* pending_kv,const float* pending_scores,const uint64_t* predecessors,

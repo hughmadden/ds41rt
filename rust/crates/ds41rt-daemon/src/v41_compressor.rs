@@ -231,6 +231,8 @@ impl<'a> CompressorWeights<'a> {
             frequencies: DeviceAllocation::new(self.library, rows * 256)?,
             index_projected: DeviceAllocation::new(self.library, rows * 256)?,
             index_key: DeviceAllocation::new(self.library, rows * 256)?,
+            index_packed: DeviceAllocation::new(self.library, rows * 64)?,
+            index_scales: DeviceAllocation::new(self.library, rows * 4)?,
             output: DeviceAllocation::new(self.library, rows * 1024)?,
             capacity: rows,
             graph: None,
@@ -252,6 +254,10 @@ pub(crate) struct CompressorOutput<'a> {
     pub frequencies: Ds41rtDeviceBuffer,
     /// Normalized, rotated index key before FP4 cache encoding.
     pub index_key: Ds41rtDeviceBuffer,
+    /// E2M1 [rows,64] and E8M0 [rows,4] proposals. Only completed, accepted
+    /// rows may enter persistent index storage; rejected suffixes stay private.
+    pub index_packed: Ds41rtDeviceBuffer,
+    pub index_scales: Ds41rtDeviceBuffer,
     pub completed: &'a [CompressorLatentRow],
 }
 pub(crate) struct CompressorWave<'w, 'a> {
@@ -269,6 +275,8 @@ pub(crate) struct CompressorWave<'w, 'a> {
     frequencies: DeviceAllocation<'a>,
     index_projected: DeviceAllocation<'a>,
     index_key: DeviceAllocation<'a>,
+    index_packed: DeviceAllocation<'a>,
+    index_scales: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
@@ -283,9 +291,9 @@ impl CompressorWave<'_, '_> {
         Ok(V41Compressor::WORKSPACE_BYTES
             + rows
                 * if ratio(layer)? == 2 {
-                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512
+                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68
                 } else {
-                    10240 + 1024 + 1024 + 264 + 512
+                    10240 + 1024 + 1024 + 264 + 512 + 68
                 })
     }
     /// Packed BF16 [sum(chunk.tokens),5120], in chunk order. Finish all producer
@@ -471,6 +479,13 @@ impl CompressorWave<'_, '_> {
                 128,
                 self.stream.raw,
             )?;
+            self.kernel.index_pack(
+                self.index_key.buffer,
+                self.index_packed.buffer,
+                self.index_scales.buffer,
+                rows,
+                self.stream.raw,
+            )?;
         }
         Ok(())
     }
@@ -571,9 +586,15 @@ impl CompressorWave<'_, '_> {
         frequencies.bytes = prepared.rows * 256;
         let mut index_key = self.index_key.buffer;
         index_key.bytes = prepared.rows * 256;
+        let mut index_packed = self.index_packed.buffer;
+        index_packed.bytes = prepared.rows * 64;
+        let mut index_scales = self.index_scales.buffer;
+        index_scales.bytes = prepared.rows * 4;
         Ok(CompressorOutput {
             buffer,
             index_key,
+            index_packed,
+            index_scales,
             frequencies,
             completed: &prepared.completed,
         })

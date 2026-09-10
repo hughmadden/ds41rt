@@ -15,6 +15,12 @@ int32_t ds41rt_v41_compressor_project(void* handle, const uint16_t* input,
 // BF16 unrotated latent [rows,512] x BF16 index weight [128,512] -> BF16 [rows,128].
 int32_t ds41rt_v41_index_key_project(void* handle,const uint16_t* input,
     const uint16_t* weight,uint16_t* output,int32_t rows,void* stream);
+// Finite BF16 index vectors [rows,128] -> E2M1 packed bytes [rows,64] and
+// E8M0 scale bytes [rows,4], group size 32. Adjacent even column is low nibble.
+// All three spans must be disjoint. No allocation or persistent cache mutation.
+// rows <= 131072 also supports flattening 4096 queries with 32 index heads.
+int32_t ds41rt_v41_index_pack(const uint16_t* input,uint8_t* packed,
+    uint8_t* scales,int32_t rows,void* stream);
 // FP32 projected KV/scores [rows,512], committed pending KV/scores [slots,512],
 // U64 predecessor descriptors [rows], BF16 norm weight [512] -> BF16 [rows,512].
 // UINT64_MAX: incomplete group, emit zero. Otherwise [0,slots) reads committed

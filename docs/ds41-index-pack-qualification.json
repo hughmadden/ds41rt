@@ -1,0 +1,226 @@
+{
+  "scope": "Native FP4 index encoding and compressor proposal graph integration; no persistent cache writes or full-model qualification",
+  "sources_sha256": {
+    "native/cuda/kernels/v41_compressor.cu": "50295e4c848f1423135ad29e35994ddf66a2dda4f7a11b20f32805f6d1a8ba24",
+    "native/include/ds41rt_v41_compressor.h": "3c5e486678210de878876c2157f46c5682727fd81d1d0405b04f111e14c65ce9",
+    "rust/crates/ds41rt-ffi/src/v41_compressor.rs": "7e7acefafe1fea09972e42c6a82cf1ae5790ccce8f8aaca0cc3e970feebcf502",
+    "rust/crates/ds41rt-daemon/src/v41_compressor.rs": "fa118a833544fb0b56020b7bd5c7325279030eebeb5ad6fb35f3d5b641778b2f",
+    "scripts/qualify-ds41-index-pack.py": "05eca33131e3df149235dba67705d01bfbbaaa31502a10bd98e881dc680aabad"
+  },
+  "build_logs_sha256": {
+    "/tmp/ds41-index-pack-native-build.log": "bb29ef6d0e8ae6a103063357aeca337b440d6d0b641049dd7f6aed34fdb6a089",
+    "/tmp/ds41-index-pack-rust-build.log": "e0a4f29adcdede074d8d1517742a90420202cc2f9d53a3fe2f5777366a6f5f75",
+    "/tmp/ds41-index-pack-owner-build.log": "879383e8d659e3ac0fe3453ed8649eca271adc721db1c475f64b7a6a1e1666f2"
+  },
+  "oracle_dependencies": {
+    "tilelang": "0.1.8",
+    "apache-tvm-ffi": "0.1.2",
+    "z3-solver": "4.15.4.0"
+  },
+  "gpus": {
+    "0": {
+      "primitive": {
+        "scope": "FP4 E2M1 / E8M0 index encoding only",
+        "device": 0,
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "torch": "2.13.0+cu130",
+        "tilelang": "0.1.8",
+        "reference_kernel_sha256": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+        "native_library_sha256": "ea0f2b4f5b8fa7fb0c8e8a32238225622719a5724edce324c5aa04e6f4c59056",
+        "cases": [
+          {
+            "name": "random",
+            "rows": 1,
+            "packed_bytes": 64,
+            "scale_bytes": 4,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 3,
+            "packed_bytes": 192,
+            "scale_bytes": 12,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 16,
+            "packed_bytes": 1024,
+            "scale_bytes": 64,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 80,
+            "packed_bytes": 5120,
+            "scale_bytes": 320,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 255,
+            "packed_bytes": 16320,
+            "scale_bytes": 1020,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 4096,
+            "packed_bytes": 262144,
+            "scale_bytes": 16384,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 131072,
+            "packed_bytes": 8388608,
+            "scale_bytes": 524288,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "all_finite_bf16",
+            "rows": 510,
+            "packed_bytes": 32640,
+            "scale_bytes": 2040,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "rounding_midpoints_and_neighbors",
+            "rows": 11,
+            "packed_bytes": 704,
+            "scale_bytes": 44,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          }
+        ]
+      },
+      "owner_cases": 50,
+      "owner_log_sha256": "ce0fffcd8f82817e941155b45dbbbd8221cd605186042fbe333f31b111b04b91",
+      "primitive_log_sha256": "35e7f5ffe821f5d99cec36c6c30fdbf130d990d2b35833057bdf2eed32649df3"
+    },
+    "1": {
+      "primitive": {
+        "scope": "FP4 E2M1 / E8M0 index encoding only",
+        "device": 1,
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "torch": "2.13.0+cu130",
+        "tilelang": "0.1.8",
+        "reference_kernel_sha256": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+        "native_library_sha256": "ea0f2b4f5b8fa7fb0c8e8a32238225622719a5724edce324c5aa04e6f4c59056",
+        "cases": [
+          {
+            "name": "random",
+            "rows": 1,
+            "packed_bytes": 64,
+            "scale_bytes": 4,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 3,
+            "packed_bytes": 192,
+            "scale_bytes": 12,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 16,
+            "packed_bytes": 1024,
+            "scale_bytes": 64,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 80,
+            "packed_bytes": 5120,
+            "scale_bytes": 320,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 255,
+            "packed_bytes": 16320,
+            "scale_bytes": 1020,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 4096,
+            "packed_bytes": 262144,
+            "scale_bytes": 16384,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "random",
+            "rows": 131072,
+            "packed_bytes": 8388608,
+            "scale_bytes": 524288,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "all_finite_bf16",
+            "rows": 510,
+            "packed_bytes": 32640,
+            "scale_bytes": 2040,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          },
+          {
+            "name": "rounding_midpoints_and_neighbors",
+            "rows": 11,
+            "packed_bytes": 704,
+            "scale_bytes": 44,
+            "reference_bytes_exact": true,
+            "changed_graph_and_recovery_exact": true,
+            "guards": true
+          }
+        ]
+      },
+      "owner_cases": 50,
+      "owner_log_sha256": "ce0fffcd8f82817e941155b45dbbbd8221cd605186042fbe333f31b111b04b91",
+      "primitive_log_sha256": "35e7f5ffe821f5d99cec36c6c30fdbf130d990d2b35833057bdf2eed32649df3"
+    }
+  },
+  "owner_fixture_sha256": {
+    "/tmp/ds41-compressor-owner/src/main.rs": "54aa785eaf8f8f566a69008f1494c9b8dd5faead0a93e03f5952783fd854ad83",
+    "/tmp/ds41-compressor-owner/src/v41_compressor.rs": "fa118a833544fb0b56020b7bd5c7325279030eebeb5ad6fb35f3d5b641778b2f"
+  },
+  "wave_device_bytes": {
+    "ratio2_80": 5491264,
+    "ratio2_4096": 70598656,
+    "ratio1_80": 5244864,
+    "ratio1_4096": 57982976
+  }
+}

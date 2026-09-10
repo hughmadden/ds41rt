@@ -15,6 +15,7 @@ type Project = unsafe extern "C" fn(
 ) -> i32;
 type IndexProject =
     unsafe extern "C" fn(*mut c_void, *const u16, *const u16, *mut u16, i32, *mut c_void) -> i32;
+type IndexPack = unsafe extern "C" fn(*const u16, *mut u8, *mut u8, i32, *mut c_void) -> i32;
 type Pool = unsafe extern "C" fn(
     *const f32,
     *const f32,
@@ -33,6 +34,7 @@ pub struct V41Compressor<'a> {
     destroy: Destroy,
     project: Project,
     index_project: IndexProject,
+    index_pack: IndexPack,
     pool: Pool,
 }
 fn buffer(b: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
@@ -56,6 +58,7 @@ impl NativeLibrary {
         let project: Project = unsafe { *self.lib.get(b"ds41rt_v41_compressor_project")? };
         let index_project: IndexProject =
             unsafe { *self.lib.get(b"ds41rt_v41_index_key_project")? };
+        let index_pack: IndexPack = unsafe { *self.lib.get(b"ds41rt_v41_index_pack")? };
         let pool: Pool = unsafe { *self.lib.get(b"ds41rt_v41_compressor_pool")? };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { create(workspace.ptr, workspace.bytes as u64, &mut handle) };
@@ -66,11 +69,40 @@ impl NativeLibrary {
             destroy,
             project,
             index_project,
+            index_pack,
             pool,
         })
     }
 }
 impl V41Compressor<'_> {
+    /// # Safety
+    /// Finite BF16 vectors [rows,128] and disjoint packed [rows,64] / scale
+    /// [rows,4] byte outputs are live on the stream device. Flatten query heads
+    /// into rows when needed. This produces proposals, not committed cache rows.
+    pub unsafe fn index_pack(
+        &self,
+        input: Ds41rtDeviceBuffer,
+        packed: Ds41rtDeviceBuffer,
+        scales: Ds41rtDeviceBuffer,
+        rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=131072).contains(&rows), "invalid index packing rows");
+        buffer(input, rows * 256)?;
+        buffer(packed, rows * 64)?;
+        buffer(scales, rows * 4)?;
+        let status = unsafe {
+            (self.index_pack)(
+                input.ptr.cast(),
+                packed.ptr.cast(),
+                scales.ptr.cast(),
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native index packing status {status}");
+        Ok(())
+    }
     /// # Safety
     /// Initialized unrotated BF16 latents [rows,512], weight [128,512] and
     /// disjoint output [rows,128] are live on the handle's device. Serialize use
