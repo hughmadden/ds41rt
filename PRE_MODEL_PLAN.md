@@ -92,3 +92,5 @@ Engram graph progress: stable owned inputs now support capture and replay of nat
 dSpark RTX residency progress: a combined owner now loads three independent expert sets and all native auxiliary tensors with pre-admitted one/two-wave expert workspace budgets, while attention caches, dense execution, sampling/verification and scheduler integration remain open in `docs/ds41-dspark-residency.md`.
 
 dSpark confidence progress: a native raw-FP32 confidence projection now has library-borrowing Rust bindings, owned stable wave buffers and graph capture/replay, with confidence storage included in RTX admission while Markov execution, sampling/verification and numerical qualification remain open.
+
+dSpark Markov progress: per-wave token gathering and BF16-to-FP32 projection now own a dedicated cuBLAS handle/workspace and graph lifetime for 16 requests, with combined residency admission updated while the sequential draft loop, sampling and runtime qualification remain open.

@@ -194,3 +194,5 @@ Engram execution now owns stable residual/embedding/mask inputs and a fixed-row 
 All dSpark stage experts and native auxiliary tensors now have combined RTX ownership and capacity-dependent expert wave admission; separate stage workspaces preserve graph weight lifetimes, while complete dSpark execution and total coordinator memory budgeting remain pending.
 
 The pinned V4.1 confidence head returns raw FP32 projection scores, whereas the inherited terminal helper applies sigmoid; the new native path preserves raw scores and fuses concatenation/promotion with a parallel FP32 reduction, with build-only evidence and runtime numerical qualification pending.
+
+The Markov head now has owned BF16 embedding gather and FP32 projection output using a dedicated native cuBLAS handle with an explicit 4 MiB workspace; this matches the reference input/weight values and output precision but numerical reduction equivalence and full terminal-head integration remain unqualified.

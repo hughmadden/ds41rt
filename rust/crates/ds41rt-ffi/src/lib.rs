@@ -1,5 +1,5 @@
 mod v41_dspark;
-pub use v41_dspark::V41DsparkConfidence;
+pub use v41_dspark::{V41DsparkConfidence, V41DsparkMarkov};
 mod v41_fp8;
 pub use v41_fp8::{V41Fp8Info, V41Fp8Kernel};
 mod v41_experts;

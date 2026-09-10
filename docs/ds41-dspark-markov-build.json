@@ -1,0 +1,27 @@
+{
+  "scope": "Native library build, symbol inspection and daemon build only",
+  "runtime_qualified": false,
+  "request_capacity": 16,
+  "markov_owner_bytes": 12476480,
+  "explicit_cublas_workspace_bytes": 4194304,
+  "two_waves_partial_residency_bytes": 8110964696,
+  "excluded": [
+    "Attention caches",
+    "Dense scratch and packed scales",
+    "Shared backbone embedding/head",
+    "Full draft logits and sampling storage",
+    "Library, driver and graph overhead"
+  ],
+  "source_sha256": {
+    "native/include/ds41rt_v41_dspark.h": "e5fa53e476680156898b47b94784467b6cb5a7cd94638f78805fbf5a9266be52",
+    "native/cuda/kernels/v41_dspark.cu": "1c968ad8005d0e2ba7ea13fdda070f5017c0c9cd6b07b1f7759a8769f29e239d",
+    "rust/crates/ds41rt-ffi/src/v41_dspark.rs": "e96f919ade84e6de8ae7018ad63923b026bcc11945f9783419cf1d23bb14bc49",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/markov.rs": "f96a65530b10c1df8ff475c09b3d609674ca70d658f94799f46e73f518a635c8",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "67173e9900b79079ca47633e4975ffdfa653f0ca19787886401e13929ea15266"
+  },
+  "library_sha256": "3e41489160c585b9f3df2eb0fcf56a3cc5b6287f49e936097d97787e9d086416",
+  "build_logs": [
+    "/tmp/ds41-v41-fp8-aot/dspark-markov-owned-build.log",
+    "/tmp/ds41-v41-fp8-aot/dspark-markov-native-build.log"
+  ]
+}

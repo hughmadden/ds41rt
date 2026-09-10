@@ -51,3 +51,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Include `/tmp/ds41-v41-fp8-aot/dspark-residency-build.log` in the FP8 staging cleanup; retain production dSpark residency and static budget evidence.
 
 - Include `dspark-confidence-native-build.log`, `dspark-confidence-rust-build.log` and `dspark-confidence-final-build.log` under `/tmp/ds41-v41-fp8-aot/` in staging cleanup; retain the production confidence kernel, bindings and owned execution.
+
+- Include `dspark-markov-build.log`, `dspark-markov-owned-build.log` and `dspark-markov-native-build.log` under `/tmp/ds41-v41-fp8-aot/` in staging cleanup; retain production Markov ownership and native handle bindings.
