@@ -1,0 +1,1062 @@
+{
+  "scope": "Native CSA2 real-weight projection/pooling/norm with synthetic activations; no production cache owner or scheduler",
+  "gpus": {
+    "0": {
+      "scope": "Real checkpoint compressor weights with synthetic activations; native primitives, no Rust request state or serving",
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "norm_eps": 1e-20,
+      "checkpoint_payload_sha256": {
+        "layers.2.attn.compressor.wkv.weight": "c4c6702055bfe1f8e95edc306eb9a796fdad8d894b59ff329e2d5325a719d044",
+        "layers.2.attn.compressor.wgate.weight": "01826cbe5db945df69b3456c884cf1eccbe47840d91aacf7583640d06a25a36e",
+        "layers.2.attn.compressor.norm.weight": "eb621bdf71aabf21771eec38dffcddf29969f93053d9a3cd786c9857438f3e0e",
+        "layers.8.attn.compressor.wkv.weight": "5aed6a12c207bf39296d1ad3596fdf2d43dd193b422c6d8f6fdf9ec040710c9a",
+        "layers.8.attn.compressor.wgate.weight": "98161d6a0d2de998a43dfe4464f38b60f907e9b60b56b62a5634ae774731ed31",
+        "layers.8.attn.compressor.norm.weight": "e6f7851c74351837bd5ec4e721ad770932292228ab44dd0ff1e11c1b64a4dc78",
+        "layers.14.attn.compressor.wkv.weight": "42318c7477d6948b6ee6b9f9fa4c2b0377344fbcf11a9f3832dc26d3f5ab5888",
+        "layers.14.attn.compressor.wgate.weight": "e695b2dccb645780f961a8afe0bb78fd1b20b8de59ee5f9eb2e6148da900f67c",
+        "layers.14.attn.compressor.norm.weight": "8ff422216da2a23a33f0320547da005a4d7a50fb77fd3dd22188bfc0c42cbde1",
+        "layers.20.attn.compressor.wkv.weight": "13a422c885486ec6c02f7b97af92ba2d918037ce2a7fd5601b9d3e606e2da74b",
+        "layers.20.attn.compressor.norm.weight": "016790941ac54700f833a766568895cd768dd32a6702de7785f1859fa831f2f9"
+      },
+      "native_library_sha256": "e20ccdd684397559a6bc69609d16a3bd0ced1af04c0daf6fdd9b01e0f54bbbe8",
+      "qualifier_sha256": "3153a30bb573cbb42ad7db913b4be9083f8bd7f2baa5830b8f782ed4d2562b1c",
+      "pool_results": [
+        {
+          "rows": 1,
+          "extreme_equal_tiny_zero_errors": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        },
+        {
+          "rows": 16,
+          "extreme_equal_tiny_zero_errors": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        },
+        {
+          "rows": 80,
+          "extreme_equal_tiny_zero_errors": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        },
+        {
+          "rows": 4096,
+          "extreme_equal_tiny_zero_errors": [
+            0.015625,
+            0.0009765625,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        }
+      ],
+      "results": [
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.001953125,
+          "different_bf16_elements": 18,
+          "projection_fp64_max_abs_error": 7.152557373046875e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 3.814697265625e-06,
+          "different_bf16_elements": 2,
+          "projection_fp64_max_abs_error": 1.1920928955078125e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.00390625,
+          "different_bf16_elements": 113,
+          "projection_fp64_max_abs_error": 1.6689300537109375e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0009765625,
+          "different_bf16_elements": 6,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.01171875,
+          "different_bf16_elements": 2242,
+          "projection_fp64_max_abs_error": 6.794929504394531e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 1.1920928955078125e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 29,
+          "projection_fp64_max_abs_error": 8.344650268554688e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 9.5367431640625e-07,
+          "different_bf16_elements": 1,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 126,
+          "projection_fp64_max_abs_error": 1.6689300537109375e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.000244140625,
+          "different_bf16_elements": 7,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 2373,
+          "projection_fp64_max_abs_error": 1.0251998901367188e-05,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 29,
+          "projection_fp64_max_abs_error": 9.5367431640625e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 1.1920928955078125e-07,
+          "different_bf16_elements": 1,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 139,
+          "projection_fp64_max_abs_error": 2.1457672119140625e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 21,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 2341,
+          "projection_fp64_max_abs_error": 9.5367431640625e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 26,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 3.0517578125e-05,
+          "different_bf16_elements": 4,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 148,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 42,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 3027,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        }
+      ]
+    },
+    "1": {
+      "scope": "Real checkpoint compressor weights with synthetic activations; native primitives, no Rust request state or serving",
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "norm_eps": 1e-20,
+      "checkpoint_payload_sha256": {
+        "layers.2.attn.compressor.wkv.weight": "c4c6702055bfe1f8e95edc306eb9a796fdad8d894b59ff329e2d5325a719d044",
+        "layers.2.attn.compressor.wgate.weight": "01826cbe5db945df69b3456c884cf1eccbe47840d91aacf7583640d06a25a36e",
+        "layers.2.attn.compressor.norm.weight": "eb621bdf71aabf21771eec38dffcddf29969f93053d9a3cd786c9857438f3e0e",
+        "layers.8.attn.compressor.wkv.weight": "5aed6a12c207bf39296d1ad3596fdf2d43dd193b422c6d8f6fdf9ec040710c9a",
+        "layers.8.attn.compressor.wgate.weight": "98161d6a0d2de998a43dfe4464f38b60f907e9b60b56b62a5634ae774731ed31",
+        "layers.8.attn.compressor.norm.weight": "e6f7851c74351837bd5ec4e721ad770932292228ab44dd0ff1e11c1b64a4dc78",
+        "layers.14.attn.compressor.wkv.weight": "42318c7477d6948b6ee6b9f9fa4c2b0377344fbcf11a9f3832dc26d3f5ab5888",
+        "layers.14.attn.compressor.wgate.weight": "e695b2dccb645780f961a8afe0bb78fd1b20b8de59ee5f9eb2e6148da900f67c",
+        "layers.14.attn.compressor.norm.weight": "8ff422216da2a23a33f0320547da005a4d7a50fb77fd3dd22188bfc0c42cbde1",
+        "layers.20.attn.compressor.wkv.weight": "13a422c885486ec6c02f7b97af92ba2d918037ce2a7fd5601b9d3e606e2da74b",
+        "layers.20.attn.compressor.norm.weight": "016790941ac54700f833a766568895cd768dd32a6702de7785f1859fa831f2f9"
+      },
+      "native_library_sha256": "e20ccdd684397559a6bc69609d16a3bd0ced1af04c0daf6fdd9b01e0f54bbbe8",
+      "qualifier_sha256": "3153a30bb573cbb42ad7db913b4be9083f8bd7f2baa5830b8f782ed4d2562b1c",
+      "pool_results": [
+        {
+          "rows": 1,
+          "extreme_equal_tiny_zero_errors": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        },
+        {
+          "rows": 16,
+          "extreme_equal_tiny_zero_errors": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        },
+        {
+          "rows": 80,
+          "extreme_equal_tiny_zero_errors": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        },
+        {
+          "rows": 4096,
+          "extreme_equal_tiny_zero_errors": [
+            0.015625,
+            0.0009765625,
+            0.0
+          ],
+          "invalid_descriptors_zero": true,
+          "overlap_and_slot_guards": true
+        }
+      ],
+      "results": [
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.001953125,
+          "different_bf16_elements": 18,
+          "projection_fp64_max_abs_error": 7.152557373046875e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 3.814697265625e-06,
+          "different_bf16_elements": 2,
+          "projection_fp64_max_abs_error": 1.1920928955078125e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.00390625,
+          "different_bf16_elements": 113,
+          "projection_fp64_max_abs_error": 1.6689300537109375e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0009765625,
+          "different_bf16_elements": 6,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 2,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.01171875,
+          "different_bf16_elements": 2242,
+          "projection_fp64_max_abs_error": 6.794929504394531e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 1.1920928955078125e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 29,
+          "projection_fp64_max_abs_error": 8.344650268554688e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 9.5367431640625e-07,
+          "different_bf16_elements": 1,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 126,
+          "projection_fp64_max_abs_error": 1.6689300537109375e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.000244140625,
+          "different_bf16_elements": 7,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 8,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 2373,
+          "projection_fp64_max_abs_error": 1.0251998901367188e-05,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 29,
+          "projection_fp64_max_abs_error": 9.5367431640625e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 1.1920928955078125e-07,
+          "different_bf16_elements": 1,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 139,
+          "projection_fp64_max_abs_error": 2.1457672119140625e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 21,
+          "projection_fp64_max_abs_error": 1.7881393432617188e-07,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 14,
+          "ratio": 2,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 2341,
+          "projection_fp64_max_abs_error": 9.5367431640625e-06,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 1,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.0,
+          "different_bf16_elements": 0,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 1,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.0078125,
+          "different_bf16_elements": 26,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 3,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 3.0517578125e-05,
+          "different_bf16_elements": 4,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 3,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 148,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 16,
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 42,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        },
+        {
+          "layer": 20,
+          "ratio": 1,
+          "requests": 16,
+          "chunks": [
+            1,
+            2,
+            5,
+            64,
+            127
+          ],
+          "reference_max_abs_error": 0.015625,
+          "different_bf16_elements": 3027,
+          "projection_fp64_max_abs_error": 0.0,
+          "state_unchanged_until_commit": true,
+          "graph_replay_exact": true
+        }
+      ]
+    }
+  },
+  "sha256": {
+    "/home/tj/Developer/ds41rt/native/CMakeLists.txt": "c4b06f68e07d71b0d89955c1c542ac0a06b08ff5118c615909ed6302301fcf54",
+    "/home/tj/Developer/ds41rt/native/cuda/kernels/v41_compressor.cu": "b2e60fc35f74298f68cd76f44fcbf8e2f7b136b19847db1383b1d90617576a56",
+    "/home/tj/Developer/ds41rt/native/include/ds41rt_v41_compressor.h": "20aec5af1ac95372333f7903443af0de6e002701a88afd6dc8fb3663e25dfe75",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-ffi/src/v41_compressor.rs": "165e207eab51a06553a274e49eceb0286c6cb110783f976460569d2a25119713",
+    "/home/tj/Developer/ds41rt/scripts/qualify-ds41-compressor.py": "3153a30bb573cbb42ad7db913b4be9083f8bd7f2baa5830b8f782ed4d2562b1c",
+    "/tmp/ds41-compressor-native-build.log": "165204f87bbed75f9fc35ea5525d62ba7e622cfc7709535ca6dd85f694461e47",
+    "/tmp/ds41-compressor-daemon-final-build.log": "c110e04762fa3bf00fd3c22ee543d2c0f32b205039fdb9bf1204c6889af0e9d5",
+    "/tmp/ds41-compressor/rtx0-qualified.json": "2778cd504f3345058a4aec3bf23ddfd89a4b7666d2a735ee29b528bb0502d755",
+    "/tmp/ds41-compressor-rtx0-qualified.log": "ded892dfd6ea8ded58bdb8184eb372593dcee08aaeda34695db47aab3439a3e6",
+    "/tmp/ds41-compressor/rtx1-qualified.json": "7e0ce7eec96f318b54c361a2a21f53e049263c951bf2722deb2769a45fc0e2a1",
+    "/tmp/ds41-compressor-rtx1-qualified.log": "ded892dfd6ea8ded58bdb8184eb372593dcee08aaeda34695db47aab3439a3e6"
+  }
+}

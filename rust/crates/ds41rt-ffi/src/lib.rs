@@ -1,3 +1,5 @@
+mod v41_compressor;
+pub use v41_compressor::V41Compressor;
 mod v41_dspark_attention;
 pub use v41_dspark_attention::{V41DsparkAttention,V41AttentionWindow};
 mod v41_grouped_output;
