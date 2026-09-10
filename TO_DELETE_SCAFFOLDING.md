@@ -37,3 +37,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/engram-staging-check.log` and `engram-staging-build.log` with the temporary AOT staging tree; retain reusable mapped-row staging and native memory owners.
 
 - Delete `/tmp/ds41-v41-aot/engram-gather-worker-check.log`, `engram-gather-worker-build.log` and `engram-gather-worker-final-build.log` with the temporary AOT staging tree; retain the production cancellable gather worker and completion polling.
+
+- Delete `/tmp/ds41-v41-aot/engram-pipeline-check.log` and `engram-pipeline-build.log` with the temporary AOT staging tree; retain the request-owned pipeline and history transaction APIs.

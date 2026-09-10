@@ -78,3 +78,5 @@ Coordinator TP progress: concurrent four-peer dispatch now feeds an owned RTX wa
 Engram staging progress: reusable 16-request gathers deduplicate and address-sort mapped row reads before restoring token/head order, and an owned RTX upload/dequantization path produces BF16 embeddings and image masks while background gather scheduling, projection/gate wiring and runtime qualification remain open.
 
 Engram I/O progress: a budgeted staging pool now backs cancellable background gathers and nonblocking CUDA-side completion/upload polling, while scheduler submission, rollback cancellation, projection/gate integration and runtime qualification remain open.
+
+Engram transaction progress: the request-owned pipeline now starts both layers' prefetch/gathers from token IDs, validates current history generations before upload and commits accepted prefixes only after whole-wave validation, while model scheduler call sites and projection/gate execution remain open in `docs/ds41-engram-pipeline.md`.

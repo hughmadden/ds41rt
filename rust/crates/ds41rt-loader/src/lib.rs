@@ -1,3 +1,5 @@
+mod engram_pipeline;
+pub use engram_pipeline::{EngramPipeline, EngramRequestTokens, EngramWave};
 mod engram_gather;
 pub use engram_gather::{EngramGatherer, EngramGatherLease, EngramGatherPoll, EngramGatherTicket};
 mod engram_staging;

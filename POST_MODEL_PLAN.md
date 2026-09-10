@@ -6,6 +6,7 @@ Goal 2 begins after Goal 1 qualification, when the checkpoint is complete and al
 - [ ] Verify the completed official checkpoint revision, shard inventory, tensor representations, tokenizer, and image-processing assets.
 - [ ] Build and deploy matching ds41 images and dependency pins to the coordinator and ostrich, dodo, emu, and kiwi.
 - [ ] Load the native checkpoint with memory-mapped engram tables and measure resident memory, page faults, and startup time.
+- [ ] Validate early engram gathers, image barriers, staging backpressure, stale-wave cancellation, and accepted-prefix history updates under mixed 16-request traffic.
 - [ ] Validate full-checkpoint text logits and generation against the official reference before enabling speculative execution.
 - [ ] Validate native vision with single-image, multiple-image, interleaved text, and multi-turn requests.
 - [ ] Validate dSpark proposal distributions, confidence policy, acceptance, rollback, and drafted versus full-generation correctness.

@@ -2,7 +2,9 @@
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
-use ds41rt_loader::{EngramGatherPoll, EngramGatherTicket, EngramGatherView};
+use ds41rt_loader::{
+    EngramGatherPoll, EngramGatherTicket, EngramGatherView, EngramPipeline, EngramWave,
+};
 
 pub(crate) struct EngramDeviceRows<'a> {
     stream: LoadStream<'a>,
@@ -27,6 +29,21 @@ pub(crate) enum EngramUploadPoll {
     Ready(EngramDeviceView),
 }
 impl<'a> EngramDeviceRows<'a> {
+    /// Validate current request generations before consuming an early gather.
+    pub fn poll_wave(
+        &mut self,
+        pipeline: &EngramPipeline,
+        wave: &mut EngramWave,
+        histories: &[&ds41rt_core::EngramHistory],
+        layer: usize,
+    ) -> Result<EngramUploadPoll> {
+        self.ready = None;
+        Ok(match pipeline.poll(wave, histories, layer)? {
+            EngramGatherPoll::Pending => EngramUploadPoll::Pending,
+            EngramGatherPoll::Cancelled => EngramUploadPoll::Cancelled,
+            EngramGatherPoll::Ready(lease) => EngramUploadPoll::Ready(self.upload(&lease.view()?)?),
+        })
+    }
     /// Poll on the CUDA-owning thread and recycle ready staging after upload.
     /// The scheduler must cancel tickets whose request history has been invalidated.
     pub fn poll_upload(&mut self, ticket: &mut EngramGatherTicket) -> Result<EngramUploadPoll> {

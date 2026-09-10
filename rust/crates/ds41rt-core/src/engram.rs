@@ -199,6 +199,17 @@ impl EngramHistory {
 
     /// Commit only the accepted prefix; rejected rows leave no history behind.
     pub fn commit(&mut self, batch: &EngramBatch, accepted: usize) -> Result<()> {
+        self.validate_commit(batch, accepted)?;
+        for &token in &batch.tokens[..accepted] {
+            self.recent = [token, self.recent[0], self.recent[1]];
+        }
+        self.position += accepted as u64;
+        self.generation += 1;
+        Ok(())
+    }
+
+    /// Validate every request in a physical wave before mutating any history.
+    pub fn validate_commit(&self, batch: &EngramBatch, accepted: usize) -> Result<()> {
         ensure!(
             batch.owner == self.owner && batch.generation == self.generation,
             "stale or foreign engram batch"
@@ -207,15 +218,12 @@ impl EngramHistory {
             accepted <= batch.tokens.len(),
             "engram acceptance exceeds batch length"
         );
-        let next_generation = self
-            .generation
+        self.generation
             .checked_add(1)
             .ok_or_else(|| EngramError("engram generation overflow"))?;
-        for &token in &batch.tokens[..accepted] {
-            self.recent = [token, self.recent[0], self.recent[1]];
-        }
-        self.position += accepted as u64;
-        self.generation = next_generation;
+        self.position
+            .checked_add(accepted as u64)
+            .ok_or_else(|| EngramError("engram position overflow"))?;
         Ok(())
     }
 }
