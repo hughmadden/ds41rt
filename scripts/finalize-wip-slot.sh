@@ -39,6 +39,9 @@ install -m 0755 \
   "$build_output/libds41rt_native.so" \
   "$incoming/workspace/.ds41rt-wip/libds41rt_native.so"
 install -m 0644 \
+  "$build_output/V41_EXPERT_AOT.json" \
+  "$incoming/workspace/.ds41rt-wip/V41_EXPERT_AOT.json"
+install -m 0644 \
   "$build_output/ARTIFACT_SHA256SUMS" \
   "$incoming/workspace/.ds41rt-wip/ARTIFACT_SHA256SUMS"
 

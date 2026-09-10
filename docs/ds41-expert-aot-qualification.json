@@ -1,0 +1,335 @@
+{
+  "sparkinfer_revision": "cc3a553431a5890ea4c32408e6a5eac0fe2ecd48",
+  "source_sha256": {
+    "python/tools/export_b12x_v41_experts_aot.py": "fc29d228869bff135d5b10f7e2837afbf920f4e18538c973be9d185611156b53",
+    "native/cmake/v41_experts.cmake": "e81cf6d2d68f9847bb6da1a53ba88b1a7c16d2e86a32d43c7b5757777cd2da7b",
+    "native/CMakeLists.txt": "6981674fe0281e69090c24db0f4ccf4d401f308a8aa6b83f08c49b340b97259e",
+    "scripts/build-release-artifacts.sh": "d611609950f770fbd46ffb34394ee860145640af244f7569882206a0afa7b8e2",
+    "scripts/build-wip-artifacts.sh": "ebf30e5e650a79465df9f9db655232234d534fdf6111fecec28d06f3b45dc749",
+    "scripts/finalize-wip-slot.sh": "8d8957864d9dd0279738de96ee26800fc7e4626bece733a41c17f80db038eea6",
+    "docker/Dockerfile.release": "5ee8d109a85d7f3c42dc992f6abf4a3362561304dd9661b257fe4b22d6d4a8a6",
+    "build.sh": "83139ccff0929c173e1c001a2162533dff8dd53484801ddd6d8d7225a47c9c50"
+  },
+  "builds": {
+    "coordinator": {
+      "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "capability": [
+        12,
+        0
+      ],
+      "physical_sms": 188,
+      "geometry": {
+        "experts": 128,
+        "hidden": 5120,
+        "intermediate": 2304,
+        "kernel_intermediate": 2304,
+        "topk": 3
+      },
+      "manifest_sha256": "daab0d94af682cde447b8b432fe89bc1627a19a855568a4bd8284b59850e9d31",
+      "variants": [
+        {
+          "name": "v41_coordinator_m1",
+          "requested_rows": 1,
+          "capacity_rows": 1,
+          "max_rows": 16,
+          "max_active_clusters": 188,
+          "physical_tiles": 3,
+          "task_capacity": 54,
+          "core_scratch_nbytes": 475468,
+          "files": {
+            ".h": {
+              "name": "v41_coordinator_m1.h",
+              "sha256": "d41e09a2eddc6c9d7312a5651f2bf78a6382e5ed1b710952a9ab8ba005687175"
+            },
+            ".o": {
+              "name": "v41_coordinator_m1.o",
+              "sha256": "c2b13231760c2a9c26078eb44b8a3805eed3460a6c574244ae21e8246333bcf4"
+            }
+          }
+        },
+        {
+          "name": "v41_coordinator_m16",
+          "requested_rows": 16,
+          "capacity_rows": 16,
+          "max_rows": 48,
+          "max_active_clusters": 188,
+          "physical_tiles": 50,
+          "task_capacity": 900,
+          "core_scratch_nbytes": 7301640,
+          "files": {
+            ".h": {
+              "name": "v41_coordinator_m16.h",
+              "sha256": "1fea7bb5110fffe36741bd242e15d7253344437d05673c4fa409b78da04e4ac4"
+            },
+            ".o": {
+              "name": "v41_coordinator_m16.o",
+              "sha256": "3d6abbbbc2a12433110319968cb2b0cafc3ed19b67805b457f9ae7be9dce6a2f"
+            }
+          }
+        },
+        {
+          "name": "v41_coordinator_m80",
+          "requested_rows": 80,
+          "capacity_rows": 80,
+          "max_rows": 240,
+          "max_active_clusters": 188,
+          "physical_tiles": 142,
+          "task_capacity": 2556,
+          "core_scratch_nbytes": 22776504,
+          "files": {
+            ".h": {
+              "name": "v41_coordinator_m80.h",
+              "sha256": "a87016013a4356d186dd0d61a2c080d47fdfe0faea84f6a1404f5354dfe5b23e"
+            },
+            ".o": {
+              "name": "v41_coordinator_m80.o",
+              "sha256": "d327f451909e93a55e6624746663c849d342ff9063ac3c695eba56089e45e621"
+            }
+          }
+        },
+        {
+          "name": "v41_coordinator_m256",
+          "requested_rows": 256,
+          "capacity_rows": 256,
+          "max_rows": 768,
+          "max_active_clusters": 188,
+          "physical_tiles": 175,
+          "task_capacity": 3150,
+          "core_scratch_nbytes": 37729308,
+          "files": {
+            ".h": {
+              "name": "v41_coordinator_m256.h",
+              "sha256": "d62775514464bc567b6a2b3796fc2ff30f08771628b17a27eb77fbefac7989dd"
+            },
+            ".o": {
+              "name": "v41_coordinator_m256.o",
+              "sha256": "32f5583ce7d889dc9c8c5480c8cfac9f68ac674f6ae9fa97c326e3a9337c5d07"
+            }
+          }
+        },
+        {
+          "name": "v41_coordinator_m1024",
+          "requested_rows": 1024,
+          "capacity_rows": 1024,
+          "max_rows": 3072,
+          "max_active_clusters": 188,
+          "physical_tiles": 223,
+          "task_capacity": 4014,
+          "core_scratch_nbytes": 118883676,
+          "files": {
+            ".h": {
+              "name": "v41_coordinator_m1024.h",
+              "sha256": "aabdb6d4e95917da82bc9e668073ece0866357d744abb32030ca0215f27ebad4"
+            },
+            ".o": {
+              "name": "v41_coordinator_m1024.o",
+              "sha256": "37ca5324a352411a0337852380ccea600ffaea85dfb3e1d12de382b214174d8a"
+            }
+          }
+        },
+        {
+          "name": "v41_coordinator_m4096",
+          "requested_rows": 4096,
+          "capacity_rows": 4096,
+          "max_rows": 12288,
+          "max_active_clusters": 188,
+          "physical_tiles": 511,
+          "task_capacity": 9198,
+          "core_scratch_nbytes": 379938780,
+          "files": {
+            ".h": {
+              "name": "v41_coordinator_m4096.h",
+              "sha256": "5ef16a046d5f768240bc25469529cdeb7272e1df0385ace3077af3af96bd2bbd"
+            },
+            ".o": {
+              "name": "v41_coordinator_m4096.o",
+              "sha256": "db6a258087a4de3188203b92984e0162f022814e79debb1628053020690dc942"
+            }
+          }
+        }
+      ],
+      "build_log_tail": [
+        "  ds41rt_status_t triton_driver_kernel_data(const char* cache_key,",
+        "                  ^",
+        "",
+        "Remark: The warnings can be suppressed with \"-diag-suppress <warning-number>\"",
+        "",
+        "[20/23] Linking CXX shared library libds41rt_native.so",
+        "[21/23] Linking CXX executable ds41rt_native_selftest",
+        "[22/23] Linking CXX executable ds41rt_cuda_selftest"
+      ],
+      "native_library_sha256": "e6a310d80434a383ca50976e03499957a7c566e9ecbffcc4a0a2d7c2b56a6b03"
+    },
+    "spark": {
+      "device": "NVIDIA GB10",
+      "capability": [
+        12,
+        1
+      ],
+      "physical_sms": 48,
+      "geometry": {
+        "experts": 384,
+        "hidden": 5120,
+        "intermediate": 576,
+        "kernel_intermediate": 640,
+        "topk": 6
+      },
+      "manifest_sha256": "f430e12b2d9211f74d119fc01256f63f8c0876c683168645f67ab3bfcc54d8b7",
+      "variants": [
+        {
+          "name": "v41_spark_m1",
+          "requested_rows": 1,
+          "capacity_rows": 1,
+          "max_rows": 16,
+          "max_active_clusters": 48,
+          "physical_tiles": 6,
+          "task_capacity": 30,
+          "core_scratch_nbytes": 736440,
+          "files": {
+            ".h": {
+              "name": "v41_spark_m1.h",
+              "sha256": "e7f20f8ae4459c428a883e6a40c0b75cd8a2b5e730b20f93c3b1dd2c2bafd771"
+            },
+            ".o": {
+              "name": "v41_spark_m1.o",
+              "sha256": "4ff7663703f91e21b029ec8efbfb7040e06fdd4743401a9e7e0d2b258ae7356d"
+            }
+          }
+        },
+        {
+          "name": "v41_spark_m16",
+          "requested_rows": 16,
+          "capacity_rows": 16,
+          "max_rows": 96,
+          "max_active_clusters": 48,
+          "physical_tiles": 101,
+          "task_capacity": 505,
+          "core_scratch_nbytes": 11881748,
+          "files": {
+            ".h": {
+              "name": "v41_spark_m16.h",
+              "sha256": "9457fec8a3535130f435ed97a2a0ea29f80f3be5d2bbab3e3f6ea1b483018557"
+            },
+            ".o": {
+              "name": "v41_spark_m16.o",
+              "sha256": "1eb1db4df972f6e783656036e4d136a904fdf9111f368f37c7cd671a092247a1"
+            }
+          }
+        },
+        {
+          "name": "v41_spark_m80",
+          "requested_rows": 80,
+          "capacity_rows": 80,
+          "max_rows": 480,
+          "max_active_clusters": 48,
+          "physical_tiles": 413,
+          "task_capacity": 2065,
+          "core_scratch_nbytes": 50271284,
+          "files": {
+            ".h": {
+              "name": "v41_spark_m80.h",
+              "sha256": "b73df44e1d6802d9472b7d86146be11b1256f748f97a70c9545bf085de9f7c88"
+            },
+            ".o": {
+              "name": "v41_spark_m80.o",
+              "sha256": "bb3454fe0beb3b14f793e9d1a4429406dcc54365f80ee0e0dce5b9e5e00455c5"
+            }
+          }
+        },
+        {
+          "name": "v41_spark_m256",
+          "requested_rows": 256,
+          "capacity_rows": 256,
+          "max_rows": 1536,
+          "max_active_clusters": 48,
+          "physical_tiles": 479,
+          "task_capacity": 2395,
+          "core_scratch_nbytes": 78353916,
+          "files": {
+            ".h": {
+              "name": "v41_spark_m256.h",
+              "sha256": "f74dd95adf9658b253c2b187c0c2b7828bac81e6bd54e357a863eb93537292a5"
+            },
+            ".o": {
+              "name": "v41_spark_m256.o",
+              "sha256": "f4535d196e942883b483293ea87d403ce8c97aecf66652c2bb285033068cec73"
+            }
+          }
+        },
+        {
+          "name": "v41_spark_m1024",
+          "requested_rows": 1024,
+          "capacity_rows": 1024,
+          "max_rows": 6144,
+          "max_active_clusters": 48,
+          "physical_tiles": 767,
+          "task_capacity": 3835,
+          "core_scratch_nbytes": 200943996,
+          "files": {
+            ".h": {
+              "name": "v41_spark_m1024.h",
+              "sha256": "4f1dde4c3d588112d576613f1b7efa2a353a52852975495153688c03820290d4"
+            },
+            ".o": {
+              "name": "v41_spark_m1024.o",
+              "sha256": "ec68a7c434919ba1db3f1d54f750ea2c97c49197f26ad52796ab7b116010a8aa"
+            }
+          }
+        },
+        {
+          "name": "v41_spark_m4096",
+          "requested_rows": 4096,
+          "capacity_rows": 4096,
+          "max_rows": 24576,
+          "max_active_clusters": 48,
+          "physical_tiles": 1151,
+          "task_capacity": 5755,
+          "core_scratch_nbytes": 728644348,
+          "files": {
+            ".h": {
+              "name": "v41_spark_m4096.h",
+              "sha256": "ecad2b5bf2e0a0cf0b73467114780e403f62716d9ccfc1bb7a490e170e4c19a5"
+            },
+            ".o": {
+              "name": "v41_spark_m4096.o",
+              "sha256": "8aa111010109a7fa9f168517a62d4a853105b697d91d573ebdb0c3700c68063b"
+            }
+          }
+        }
+      ],
+      "build_log_tail": [
+        "  ds41rt_status_t triton_driver_kernel_data(const char* cache_key,",
+        "                  ^",
+        "",
+        "Remark: The warnings can be suppressed with \"-diag-suppress <warning-number>\"",
+        "",
+        "[20/23] Linking CXX shared library libds41rt_native.so",
+        "[21/23] Linking CXX executable ds41rt_native_selftest",
+        "[22/23] Linking CXX executable ds41rt_cuda_selftest"
+      ],
+      "native_library_sha256": "6b4a185e3245ab40355d49b8b24609cf39231767ca198dbbb59f77798508aa56"
+    }
+  },
+  "native_c_checks": {
+    "coordinator": {
+      "native_c_entry": "_mlir_ds41rt_v41_coordinator_m16__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+      "case": [
+        16,
+        2304,
+        128
+      ],
+      "numeric_and_mutated_graph": "passed"
+    },
+    "spark": {
+      "native_c_entry": "_mlir_ds41rt_v41_spark_m16__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+      "case": [
+        16,
+        576,
+        384
+      ],
+      "numeric_and_mutated_graph": "passed"
+    }
+  },
+  "script_tests": ".................................                                        [100%]\n33 passed in 1.06s\n",
+  "scope": "AOT export/link and M16 C-entry arithmetic/graph replay; Rust binding, native weight preparation, reduction export and transport integration remain open."
+}

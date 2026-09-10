@@ -48,3 +48,5 @@ Native expert progress: `silu_v41` now preserves official projection rounding an
 TP arithmetic progress: native scratch-backed FP32 route outputs and TP4-before-BF16 reduction now match full-width experts on both RTX GPUs and ostrich/dodo, while FP32 routing/payload transport and runtime wiring remain open in `docs/ds41-tp4-qualification.json`.
 
 Wire precision progress: revision-3 frames preserve FP32 routing weights and FP32 output payloads with owned/borrowed and persistent-TCP checks, while native executor, per-route collective, and RDMA integration remain open in `docs/ds41-wire-qualification.md`.
+
+AOT progress: role-specific native expert exports and b12x-owned scratch manifests now build into coordinator/Spark libraries and release/WIP artifacts, with M16 C-entry numerical/graph checks passing on RTX and ostrich while Rust binding and native preparation/reduction remain open.

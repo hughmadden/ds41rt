@@ -103,6 +103,7 @@ cmake \
   -B "$build_root/native" \
   -G Ninja \
   -DDS41RT_ENABLE_CUDA=ON \
+  -DDS41RT_ENABLE_V41_EXPERT_AOT=ON \
   -DDS41RT_ENABLE_RDMA=ON \
   -DDS41RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
   -DDS41RT_ENABLE_SPARKINFER_COORDINATOR_AOT="$coordinator_aot" \
@@ -121,6 +122,7 @@ cmake --build "$build_root/native"
 install -d "$output_dir"
 install -m 0755 "$build_root/source/rust/target/release/ds41rt" "$output_dir/ds41rt"
 install -m 0755 "$build_root/native/libds41rt_native.so" "$output_dir/libds41rt_native.so"
+install -m 0644 "$build_root/native/v41_experts/v41_experts.json" "$output_dir/V41_EXPERT_AOT.json"
 install -m 0644 \
   "$build_root/source/THIRD_PARTY_NOTICES.md" \
   "$output_dir/THIRD_PARTY_NOTICES.md"

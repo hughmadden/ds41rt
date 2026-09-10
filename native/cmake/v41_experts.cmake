@@ -1,0 +1,39 @@
+# The export executes on the target architecture and consumes b12x's own planner.
+if(NOT DS41RT_ENABLE_CUDA)
+  message(FATAL_ERROR "V4.1 expert AOT requires CUDA")
+endif()
+if(DS41RT_CUDA_ARCHITECTURES STREQUAL "120" OR DS41RT_CUDA_ARCHITECTURES STREQUAL "120f")
+  set(DS41RT_V41_EXPERT_ROLE coordinator)
+elseif(DS41RT_CUDA_ARCHITECTURES STREQUAL "121")
+  set(DS41RT_V41_EXPERT_ROLE spark)
+else()
+  message(FATAL_ERROR "V4.1 expert AOT requires one native SM120 or SM121 target")
+endif()
+set(DS41RT_V41_EXPERT_DIR "${CMAKE_CURRENT_BINARY_DIR}/v41_experts")
+set(DS41RT_V41_EXPERT_OBJECTS)
+set(DS41RT_V41_EXPERT_HEADERS)
+foreach(rows IN ITEMS 1 16 80 256 1024 4096)
+  set(stem "${DS41RT_V41_EXPERT_DIR}/v41_${DS41RT_V41_EXPERT_ROLE}_m${rows}")
+  list(APPEND DS41RT_V41_EXPERT_OBJECTS "${stem}.o")
+  list(APPEND DS41RT_V41_EXPERT_HEADERS "${stem}.h")
+endforeach()
+add_custom_command(
+  OUTPUT "${DS41RT_V41_EXPERT_DIR}/v41_experts.json"
+    ${DS41RT_V41_EXPERT_OBJECTS} ${DS41RT_V41_EXPERT_HEADERS}
+  COMMAND ${DS41RT_SPARKINFER_VERIFY_COMMAND}
+  COMMAND "${CMAKE_COMMAND}" -E env ${DS41RT_SPARKINFER_PYTHON_ENV}
+    "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_experts_aot.py"
+    --output-dir "${DS41RT_V41_EXPERT_DIR}" --role "${DS41RT_V41_EXPERT_ROLE}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_experts_aot.py"
+    ${DS41RT_SPARKINFER_PROVENANCE_INPUTS} ${DS41RT_SPARKINFER_EXPORT_INPUTS}
+  COMMENT "Exporting native V4.1 expert kernels and scratch layouts"
+  VERBATIM
+)
+add_custom_target(ds41rt_v41_experts_export DEPENDS
+  "${DS41RT_V41_EXPERT_DIR}/v41_experts.json"
+  ${DS41RT_V41_EXPERT_OBJECTS} ${DS41RT_V41_EXPERT_HEADERS})
+add_dependencies(ds41rt_v41_experts_export ds41rt_verify_sparkinfer_source)
+set_source_files_properties(${DS41RT_V41_EXPERT_OBJECTS} PROPERTIES
+  EXTERNAL_OBJECT TRUE GENERATED TRUE)
+list(APPEND DS41RT_NATIVE_SOURCES ${DS41RT_V41_EXPERT_OBJECTS})

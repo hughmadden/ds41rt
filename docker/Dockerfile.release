@@ -91,6 +91,7 @@ RUN python3 /opt/ds41rt/scripts/verify-sparkinfer-source.py \
 
 COPY .ds41rt-release-image/ds41rt /opt/ds41rt/bin/ds41rt
 COPY .ds41rt-release-image/libds41rt_native.so /opt/ds41rt/lib/libds41rt_native.so
+COPY .ds41rt-release-image/V41_EXPERT_AOT.json /opt/ds41rt/share/V41_EXPERT_AOT.json
 COPY .ds41rt-release-image/THIRD_PARTY_NOTICES.md /opt/ds41rt/share/THIRD_PARTY_NOTICES.md
 COPY .ds41rt-release-image/SPARKINFER_PROVENANCE.json /opt/ds41rt/share/SPARKINFER_PROVENANCE.json
 COPY .ds41rt-release-image/SPARKINFER_LICENSE /opt/ds41rt/share/SPARKINFER_LICENSE
