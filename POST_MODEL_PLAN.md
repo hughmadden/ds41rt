@@ -17,3 +17,5 @@ Goal 2 begins after Goal 1 qualification, when the checkpoint is complete; all f
 - [ ] Tune fusions, batch shapes, expert reduction, engram prefetch, and memory budgets using measured full-model bottlenecks.
 - [ ] Run sustained full-stack load and recovery tests and publish reproducible correctness and performance evidence.
 - [ ] Finalize release documentation, images, commits, and dependency pins after all checkpoint-dependent gates pass.
+
+Pre-model fleet evidence: four physical Sparks now pass synthetic native TP4 arithmetic and persistent TCP transport, but full-checkpoint deployment and complete serving qualification remain Goal 2 gates.

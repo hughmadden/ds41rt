@@ -208,3 +208,5 @@ The terminal now uses final-stage RMS normalization and the coordinator-shared B
 Native mHC pre/post now preserve FP32 product/sum ordering, source-major combination orientation and final BF16 rounding, with bitwise synthetic/graph checks on both RTX GPUs; the dSpark terminal consumes incoming shifted pre-mix but its stage coefficient producer remains unfinished.
 
 The new mHC coefficient kernel preserves official projection/RMS scaling, sigmoid offsets and Sinkhorn order, while the dSpark boundary owner consumes incoming pre and returns newly generated pre to the following sublayer; numerical/graph cases pass on both RTX GPUs, with full stage scheduling still pending.
+
+Four physical GB10 hosts now pass current native expert ownership/execution and complete-plane TP4 TCP arithmetic to an RTX reducer with bitwise full-width-reference results; this removes the two-physical-host limitation of the earlier fixture without establishing production service or full-model readiness.

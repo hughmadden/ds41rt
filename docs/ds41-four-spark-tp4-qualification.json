@@ -1,0 +1,252 @@
+{
+  "scope": "Four physical Spark native layer-0 TP4 workers and RTX complete-plane TCP fixture; production listener/scheduler, chunking, RDMA and performance not qualified",
+  "root_revision": "c242c487f13e3b8e4a4e333b73b55f499854ed00",
+  "fixture_source": {
+    "root_revision": "c242c487f13e3b8e4a4e333b73b55f499854ed00",
+    "fixture_scope": "Production expert owner/execution/memory with unused service/coordinator/dSpark module declarations omitted; custom TCP harness",
+    "source_sha256": {
+      "v41_experts.rs": "58df18d64dd25f62037de35a8512074076141234eb5b4fc4d704e2b804653520",
+      "v41_experts/execution.rs": "6e08d36b7bb38603b126215adbc753b6763defeada7bbc4f072b30d1376d580f",
+      "v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e"
+    }
+  },
+  "workers": [
+    {
+      "rank": 0,
+      "host": "ostrich",
+      "endpoint": "172.22.2.1:41870",
+      "state": {
+        "Status": "exited",
+        "Running": false,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 0,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "2026-09-10T13:39:07.983754792Z",
+        "FinishedAt": "2026-09-10T13:39:58.297986318Z"
+      },
+      "image_id": "sha256:a641a14143728cefc9989807c92b6aff59858adb64d835c7033183148894152d",
+      "log": "READY rank=0 port=41870\nDONE rank=0\n{\"Status\":\"exited\",\"Running\":false,\"Paused\":false,\"Restarting\":false,\"OOMKilled\":false,\"Dead\":false,\"Pid\":0,\"ExitCode\":0,\"Error\":\"\",\"StartedAt\":\"2026-09-10T13:39:07.983754792Z\",\"FinishedAt\":\"2026-09-10T13:39:58.297986318Z\"} sha256:a641a14143728cefc9989807c92b6aff59858adb64d835c7033183148894152d\neaceaff522016c642bafd24f36477550d6013229297071d5923a1350a6a4b0fc  /tmp/ds41-tp4-four-host/audit/ds41-native-tp4-fixture\nfe8ad45eaf817e6aae555d25926d97f3cf4d581e78906ab7944d5b29099a3d7a  /tmp/ds41-tp4-four-host/audit/cmake/libds41rt_native.so\nState Recv-Q Send-Q Local Address:Port Peer Address:PortProcess\n"
+    },
+    {
+      "rank": 1,
+      "host": "dodo",
+      "endpoint": "172.22.2.2:41871",
+      "state": {
+        "Status": "exited",
+        "Running": false,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 0,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "2026-09-10T13:39:29.079100239Z",
+        "FinishedAt": "2026-09-10T13:39:58.494721523Z",
+        "Health": {
+          "Status": "unhealthy",
+          "FailingStreak": 0,
+          "Log": [
+            {
+              "Start": "2026-09-10T21:39:34.32325699+08:00",
+              "End": "2026-09-10T21:39:34.427092589+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:39.427585157+08:00",
+              "End": "2026-09-10T21:39:39.497902134+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:44.499099946+08:00",
+              "End": "2026-09-10T21:39:44.594215597+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:49.594824016+08:00",
+              "End": "2026-09-10T21:39:49.660967262+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:54.661701617+08:00",
+              "End": "2026-09-10T21:39:54.753496888+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            }
+          ]
+        }
+      },
+      "image_id": "sha256:7bc894f9453b04b4244044133586e0a012cc9c74178a2f4b507e2c7c606f3cc1",
+      "log": "READY rank=1 port=41871\nDONE rank=1\n{\"Status\":\"exited\",\"Running\":false,\"Paused\":false,\"Restarting\":false,\"OOMKilled\":false,\"Dead\":false,\"Pid\":0,\"ExitCode\":0,\"Error\":\"\",\"StartedAt\":\"2026-09-10T13:39:29.079100239Z\",\"FinishedAt\":\"2026-09-10T13:39:58.494721523Z\",\"Health\":{\"Status\":\"unhealthy\",\"FailingStreak\":0,\"Log\":[{\"Start\":\"2026-09-10T21:39:34.32325699+08:00\",\"End\":\"2026-09-10T21:39:34.427092589+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:39.427585157+08:00\",\"End\":\"2026-09-10T21:39:39.497902134+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:44.499099946+08:00\",\"End\":\"2026-09-10T21:39:44.594215597+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:49.594824016+08:00\",\"End\":\"2026-09-10T21:39:49.660967262+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:54.661701617+08:00\",\"End\":\"2026-09-10T21:39:54.753496888+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"}]}} sha256:7bc894f9453b04b4244044133586e0a012cc9c74178a2f4b507e2c7c606f3cc1\neaceaff522016c642bafd24f36477550d6013229297071d5923a1350a6a4b0fc  /tmp/ds41-tp4-four-host/audit/ds41-native-tp4-fixture\nfe8ad45eaf817e6aae555d25926d97f3cf4d581e78906ab7944d5b29099a3d7a  /tmp/ds41-tp4-four-host/audit/cmake/libds41rt_native.so\nState Recv-Q Send-Q Local Address:Port Peer Address:PortProcess\n"
+    },
+    {
+      "rank": 2,
+      "host": "emu",
+      "endpoint": "172.22.2.3:41872",
+      "state": {
+        "Status": "exited",
+        "Running": false,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 0,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "2026-09-10T13:39:07.88865039Z",
+        "FinishedAt": "2026-09-10T13:39:58.492026303Z",
+        "Health": {
+          "Status": "unhealthy",
+          "FailingStreak": 0,
+          "Log": [
+            {
+              "Start": "2026-09-10T21:39:33.672868815+08:00",
+              "End": "2026-09-10T21:39:33.743465903+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:38.744801571+08:00",
+              "End": "2026-09-10T21:39:38.81300768+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:43.814297089+08:00",
+              "End": "2026-09-10T21:39:43.903062252+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:48.904174796+08:00",
+              "End": "2026-09-10T21:39:48.969570461+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:53.97003921+08:00",
+              "End": "2026-09-10T21:39:54.099649167+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            }
+          ]
+        }
+      },
+      "image_id": "sha256:dcc6559be3f1f6f23a30042e46ee529aa08cdcaaf4f20161f29ca99840dfd3d0",
+      "log": "READY rank=2 port=41872\nDONE rank=2\n{\"Status\":\"exited\",\"Running\":false,\"Paused\":false,\"Restarting\":false,\"OOMKilled\":false,\"Dead\":false,\"Pid\":0,\"ExitCode\":0,\"Error\":\"\",\"StartedAt\":\"2026-09-10T13:39:07.88865039Z\",\"FinishedAt\":\"2026-09-10T13:39:58.492026303Z\",\"Health\":{\"Status\":\"unhealthy\",\"FailingStreak\":0,\"Log\":[{\"Start\":\"2026-09-10T21:39:33.672868815+08:00\",\"End\":\"2026-09-10T21:39:33.743465903+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:38.744801571+08:00\",\"End\":\"2026-09-10T21:39:38.81300768+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:43.814297089+08:00\",\"End\":\"2026-09-10T21:39:43.903062252+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:48.904174796+08:00\",\"End\":\"2026-09-10T21:39:48.969570461+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:53.97003921+08:00\",\"End\":\"2026-09-10T21:39:54.099649167+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"}]}} sha256:dcc6559be3f1f6f23a30042e46ee529aa08cdcaaf4f20161f29ca99840dfd3d0\neaceaff522016c642bafd24f36477550d6013229297071d5923a1350a6a4b0fc  /tmp/ds41-tp4-four-host/audit/ds41-native-tp4-fixture\nfe8ad45eaf817e6aae555d25926d97f3cf4d581e78906ab7944d5b29099a3d7a  /tmp/ds41-tp4-four-host/audit/cmake/libds41rt_native.so\nState Recv-Q Send-Q Local Address:Port Peer Address:PortProcess\n"
+    },
+    {
+      "rank": 3,
+      "host": "kiwi",
+      "endpoint": "172.22.2.4:41873",
+      "state": {
+        "Status": "exited",
+        "Running": false,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 0,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "2026-09-10T13:39:07.907244658Z",
+        "FinishedAt": "2026-09-10T13:39:58.481814698Z",
+        "Health": {
+          "Status": "unhealthy",
+          "FailingStreak": 0,
+          "Log": [
+            {
+              "Start": "2026-09-10T21:39:33.846402566+08:00",
+              "End": "2026-09-10T21:39:33.956163082+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:38.95719634+08:00",
+              "End": "2026-09-10T21:39:39.049697529+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:44.051392795+08:00",
+              "End": "2026-09-10T21:39:44.113644313+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:49.114707617+08:00",
+              "End": "2026-09-10T21:39:49.203847472+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            },
+            {
+              "Start": "2026-09-10T21:39:54.204805166+08:00",
+              "End": "2026-09-10T21:39:54.3337865+08:00",
+              "ExitCode": 1,
+              "Output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+            }
+          ]
+        }
+      },
+      "image_id": "sha256:dcc6559be3f1f6f23a30042e46ee529aa08cdcaaf4f20161f29ca99840dfd3d0",
+      "log": "READY rank=3 port=41873\nDONE rank=3\n{\"Status\":\"exited\",\"Running\":false,\"Paused\":false,\"Restarting\":false,\"OOMKilled\":false,\"Dead\":false,\"Pid\":0,\"ExitCode\":0,\"Error\":\"\",\"StartedAt\":\"2026-09-10T13:39:07.907244658Z\",\"FinishedAt\":\"2026-09-10T13:39:58.481814698Z\",\"Health\":{\"Status\":\"unhealthy\",\"FailingStreak\":0,\"Log\":[{\"Start\":\"2026-09-10T21:39:33.846402566+08:00\",\"End\":\"2026-09-10T21:39:33.956163082+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:38.95719634+08:00\",\"End\":\"2026-09-10T21:39:39.049697529+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:44.051392795+08:00\",\"End\":\"2026-09-10T21:39:44.113644313+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:49.114707617+08:00\",\"End\":\"2026-09-10T21:39:49.203847472+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"},{\"Start\":\"2026-09-10T21:39:54.204805166+08:00\",\"End\":\"2026-09-10T21:39:54.3337865+08:00\",\"ExitCode\":1,\"Output\":\"Traceback (most recent call last):\\n  File \\\"<string>\\\", line 1, in <module>\\nAssertionError\\n\"}]}} sha256:dcc6559be3f1f6f23a30042e46ee529aa08cdcaaf4f20161f29ca99840dfd3d0\neaceaff522016c642bafd24f36477550d6013229297071d5923a1350a6a4b0fc  /tmp/ds41-tp4-four-host/audit/ds41-native-tp4-fixture\nfe8ad45eaf817e6aae555d25926d97f3cf4d581e78906ab7944d5b29099a3d7a  /tmp/ds41-tp4-four-host/audit/cmake/libds41rt_native.so\nState Recv-Q Send-Q Local Address:Port Peer Address:PortProcess\n"
+    }
+  ],
+  "cases": [
+    {
+      "case": 0,
+      "rows": 16,
+      "bitwise_equal": true,
+      "output_bytes": 163840,
+      "actual_sha256": "64c847d8c23d8c2de45ab2dba766da5fa53e732fa1812c6adf234c9dc7f57a57",
+      "expected_sha256": "64c847d8c23d8c2de45ab2dba766da5fa53e732fa1812c6adf234c9dc7f57a57",
+      "input_sha256": {
+        "hidden": "8f432e6a407c087211683ef269b466d6a5a67ec14253508674ee2402f94128d6",
+        "ids": "c706f74ec747dae652390e808a8b0575ba81267a444c51bc92b8bd7536c49150",
+        "routing": "1ca2282e8dbb0d1fdb34a829abbd24731522e6ee2ecb7d946282050a368314c3",
+        "shared": "24b1fb035e7a805331ebed80546dbbeab93cfd72139c352c1ad2dd9f5fb2fcb3"
+      }
+    },
+    {
+      "case": 1,
+      "rows": 16,
+      "bitwise_equal": true,
+      "output_bytes": 163840,
+      "actual_sha256": "6a5cf7930c48e93cd80a8f4cacf965dc0311e9cb2ba8183cfd2364fee4eca849",
+      "expected_sha256": "6a5cf7930c48e93cd80a8f4cacf965dc0311e9cb2ba8183cfd2364fee4eca849",
+      "input_sha256": {
+        "hidden": "e31de377a22d9bf1eb817bcf6f4eff55519eb1dbb706a5823b70e82b85fc41b4",
+        "ids": "a0d56369fdec886dd24a49c91254fb000452d29cff048523bc351e14902ecf31",
+        "routing": "1ca2282e8dbb0d1fdb34a829abbd24731522e6ee2ecb7d946282050a368314c3",
+        "shared": "6780cfaa3004c0935359ec1da84b22c12d983d2bc3b77514756dd5768ee1143d"
+      }
+    }
+  ],
+  "client_log": "TP4 case=0: four native network planes validated, ordered and reduced on RTX\nTP4 case=1: four native network planes validated, ordered and reduced on RTX\n",
+  "native_spark_manifest": "02fea5c504f75f80fe3ec5e4e22ff20338e66803",
+  "artifacts_sha256": {
+    "snapshot_archive": "f5b2bac9358b4f906bb1bb29d239f1abffa8e7610ba91fe8e55c343c82dcc817",
+    "source_archive": "a75c6b9a5b6a7dccc5d1af2065e7be1f399349508c47a14309317f169679ec1e",
+    "arm_fixture": "eaceaff522016c642bafd24f36477550d6013229297071d5923a1350a6a4b0fc",
+    "spark_native_library": "fe8ad45eaf817e6aae555d25926d97f3cf4d581e78906ab7944d5b29099a3d7a",
+    "coordinator_native_library": "eccefb93b6e1612c5dabb9590146e82b9ed3b70e986d90b7d4ca9bce450b3b71",
+    "x86_fixture": "3cb31660bdc3ac489345adff904245eb25eff07b5352c398e2d8a99367f384a9",
+    "fixture_main": "26a5d7c2f8f810d6feedbe636cd3a2ced3495d05f9d1e4260107cfdaa2c5f0be",
+    "reference_generator": "6fec7f85361d8440d82e3655d8917f39c0065b6f656f5c12507f444ceb46a4d3",
+    "reference_math": "3caf507e4156c37f299497aa4e1735809a743c27aeb32c45b2c143ecc8a2aacd"
+  },
+  "all_worker_exit_codes_zero": true,
+  "temporary_containers_removed": true,
+  "fresh_reference_regeneration": {
+    "matched_all_inputs_and_expected_outputs": true,
+    "log": "{\"role\": \"backbone\", \"rows\": 16, \"active_experts\": [0, 192, 383, 1, 2, 3], \"reference\": \"independent K32 FP8/BF16 oracle plus shared output\"}\n"
+  }
+}
