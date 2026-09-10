@@ -2,7 +2,7 @@
 
 The engine now uses `ds41rt`, `DS41RT_*`, `Ds41rt*`, `ds41rt.config`, and ds41 container/image names across first-party code, Rust crates, native ABI, Python packages, scripts, and documentation.
 
-V4 algorithm names remain until their implementations are replaced, and third-party sources and provenance hashes are unchanged.
+V4 algorithm names remain until their implementations are replaced, and dependency provenance is updated separately when native V4.1 support is added.
 
 Protocol V2 uses the eight-byte `DS41RTE2` signature consistently in Rust and native validation, correcting the inherited native validator's stale GLM signature; debug frames use `DS41RF01`.
 

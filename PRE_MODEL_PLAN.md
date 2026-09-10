@@ -34,3 +34,5 @@ Engram progress: the loader now provides mapped native table/scale access, bound
 Addressing evidence: `scripts/qualify-ds41-engram.py` matches the pinned official token map and 128 hash/acceptance batches across 16 request histories, while 119 core and 58 loader tests pass.
 
 Cleanup progress: obsolete Pro benchmark data, plots, deployment claims, and architecture diagrams were removed, while alternate-format execution and quantization tooling still await replacement/removal.
+
+FP8 progress: native 32x32 checkpoint packing, independent K32 scales, and exact two/four-way FP32 reduction pass on both RTX GPUs and ostrich/dodo, with variable-M Spark prefill and preplanned split workspace still open as recorded in `docs/ds41-fp8-qualification.md`.
