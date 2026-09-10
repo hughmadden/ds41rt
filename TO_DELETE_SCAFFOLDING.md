@@ -47,3 +47,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Include `bridge-build.log`, `rust-bridge-build.log`, `owned-projection-build.log` and `final-owned-build.log` in the preceding FP8 staging cleanup; these record builds, not numerical qualification.
 
 - Include `/tmp/ds41-v41-fp8-aot/engram-graph-build.log` in the FP8 staging cleanup; retain production graph ownership and its build evidence.
+
+- Include `/tmp/ds41-v41-fp8-aot/dspark-residency-build.log` in the FP8 staging cleanup; retain production dSpark residency and static budget evidence.

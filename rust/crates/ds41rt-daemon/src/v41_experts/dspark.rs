@@ -1,0 +1,169 @@
+//! RTX-only ownership for every native dSpark tensor and independent stage experts.
+use super::{ExpertExecution, ExpertLayer, ExpertWeights};
+use crate::v41_tensors::NativeRtxTensors;
+use anyhow::{ensure, Context, Result};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
+use ds41rt_loader::OfficialV41Catalog;
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DsparkBudget {
+    pub expert_resident_bytes: usize,
+    pub auxiliary_resident_bytes: usize,
+    pub load_staging_bytes: usize,
+    pub execution_bytes_per_wave: usize,
+}
+impl DsparkBudget {
+    pub fn resident_bytes(self) -> Result<usize> {
+        self.expert_resident_bytes
+            .checked_add(self.auxiliary_resident_bytes)
+            .context("dSpark residency overflow")
+    }
+    /// Experts load serially, then native auxiliary tensors, then execution waves.
+    /// Attention caches, dense scratch, shared backbone embedding/head, driver and
+    /// graph allocations must be budgeted separately by the coordinator.
+    pub fn peak_device_bytes(self, waves: usize) -> Result<usize> {
+        ensure!((1..=2).contains(&waves), "dSpark needs one or two waves");
+        let execution = self
+            .execution_bytes_per_wave
+            .checked_mul(waves)
+            .context("dSpark wave budget overflow")?;
+        let loading = self
+            .expert_resident_bytes
+            .checked_add(self.load_staging_bytes)
+            .context("dSpark load peak overflow")?;
+        let serving = self
+            .resident_bytes()?
+            .checked_add(execution)
+            .context("dSpark serving peak overflow")?;
+        Ok(loading.max(serving))
+    }
+}
+
+pub(crate) struct DsparkWeights<'library> {
+    experts: [ExpertWeights<'library>; 3],
+    auxiliary: NativeRtxTensors<'library>,
+    budget: DsparkBudget,
+}
+impl<'library> DsparkWeights<'library> {
+    fn auxiliary_names(catalog: &OfficialV41Catalog) -> Vec<String> {
+        catalog
+            .tensors()
+            .iter()
+            .map(|tensor| &tensor.metadata.name)
+            .filter(|name| name.starts_with("mtp.") && !name.contains(".ffn.experts."))
+            .cloned()
+            .collect()
+    }
+    pub fn plan(
+        library: &NativeLibrary,
+        catalog: &OfficialV41Catalog,
+        capacity: u32,
+    ) -> Result<DsparkBudget> {
+        let mut expert_resident_bytes = 0usize;
+        let mut load_staging_bytes = 0usize;
+        for stage in 0..3 {
+            let budget = ExpertWeights::plan(library, catalog, ExpertLayer::Dspark { stage })?;
+            expert_resident_bytes = expert_resident_bytes
+                .checked_add(budget.resident_bytes)
+                .context("dSpark expert residency overflow")?;
+            load_staging_bytes = load_staging_bytes.max(budget.device_staging_bytes);
+        }
+        let auxiliary_resident_bytes =
+            NativeRtxTensors::plan(catalog, &Self::auxiliary_names(catalog))?;
+        let execution_bytes_per_wave = ExpertWeights::plan_execution(library, capacity)?
+            .total()?
+            .checked_mul(3)
+            .context("dSpark stage workspace overflow")?;
+        Ok(DsparkBudget {
+            expert_resident_bytes,
+            auxiliary_resident_bytes,
+            load_staging_bytes,
+            execution_bytes_per_wave,
+        })
+    }
+    /// Admit all three stages and the requested expert wave workspaces before
+    /// reading payloads; this does not allocate the wave workspaces themselves.
+    pub fn load(
+        library: &'library NativeLibrary,
+        catalog: &OfficialV41Catalog,
+        capacity: u32,
+        waves: usize,
+        device_budget: usize,
+        pinned_staging_bytes: usize,
+    ) -> Result<Self> {
+        let budget = Self::plan(library, catalog, capacity)?;
+        ensure!(
+            budget.peak_device_bytes(waves)? <= device_budget,
+            "dSpark RTX residency and expert waves exceed device budget"
+        );
+        ensure!(
+            (1..=64 * 1024 * 1024).contains(&pinned_staging_bytes),
+            "dSpark auxiliary pinned staging must be 1 byte through 64 MiB"
+        );
+        let mut experts = Vec::with_capacity(3);
+        let mut resident = 0usize;
+        for stage in 0..3 {
+            let weights = ExpertWeights::load(
+                library,
+                catalog,
+                ExpertLayer::Dspark { stage },
+                device_budget
+                    .checked_sub(resident)
+                    .context("dSpark remaining budget underflow")?,
+            )?;
+            resident = resident
+                .checked_add(weights.budget().resident_bytes)
+                .context("dSpark loaded residency overflow")?;
+            experts.push(weights);
+        }
+        let auxiliary = NativeRtxTensors::load(
+            library,
+            catalog,
+            &Self::auxiliary_names(catalog),
+            device_budget
+                .checked_sub(resident)
+                .context("dSpark auxiliary budget underflow")?,
+            pinned_staging_bytes,
+        )?;
+        let experts = experts
+            .try_into()
+            .ok()
+            .context("dSpark requires three expert stages")?;
+        Ok(Self {
+            experts,
+            auxiliary,
+            budget,
+        })
+    }
+    pub fn budget(&self) -> DsparkBudget {
+        self.budget
+    }
+
+    /// Includes stage-zero target projection, all attention/shared FFN/router/mHC
+    /// tensors and the final Markov/confidence heads in native representations.
+    pub fn tensor(&self, name: &str) -> Result<Ds41rtDeviceBuffer> {
+        self.auxiliary.get(name)
+    }
+
+    /// Each stage gets stable independent buffers so its graph retains its own
+    /// weights. The caller budgets each live wave and destroys it before weights.
+    pub fn execution_wave(
+        &self,
+        capacity: u32,
+        available_device_bytes: usize,
+    ) -> Result<[ExpertExecution<'_, 'library>; 3]> {
+        let per_stage = self.experts[0].execution_budget(capacity)?.total()?;
+        let total = per_stage
+            .checked_mul(3)
+            .context("dSpark execution budget overflow")?;
+        ensure!(
+            total <= available_device_bytes,
+            "dSpark expert wave exceeds device budget"
+        );
+        Ok([
+            self.experts[0].execution(capacity, per_stage)?,
+            self.experts[1].execution(capacity, per_stage)?,
+            self.experts[2].execution(capacity, per_stage)?,
+        ])
+    }
+}

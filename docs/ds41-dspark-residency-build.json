@@ -1,0 +1,22 @@
+{
+  "scope": "Daemon build and static tensor/AOT budget accounting only",
+  "runtime_qualified": false,
+  "expert_resident_bytes": 7219445760,
+  "auxiliary_resident_bytes": 713428872,
+  "resident_bytes": 7932874632,
+  "m80_expert_execution_bytes_per_stage": 25236024,
+  "m80_expert_execution_bytes_per_wave": 75708072,
+  "two_m80_expert_waves_plus_residency_bytes": 8084290776,
+  "excluded": [
+    "Attention caches",
+    "Dense projection scratch and packed scales",
+    "Shared backbone embedding and output head",
+    "CUDA graph and driver allocations"
+  ],
+  "source_sha256": {
+    "rust/crates/ds41rt-loader/src/official-v41-tensors.json": "e1acac15b7501b0db4a7cdfca12bb07e7d018fe56bde7fd86fd644e05a6a318c",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "785f0d14dc255c36236b0c22757a5f28168a0d18906be5374a8feb97838ed9cd"
+  },
+  "aot_manifest_sha256": "daafc56d57f263f38d763058bb91650baf4b073022e2b36cd65167906b96c6c9",
+  "build_log": "/tmp/ds41-v41-fp8-aot/dspark-residency-build.log"
+}
