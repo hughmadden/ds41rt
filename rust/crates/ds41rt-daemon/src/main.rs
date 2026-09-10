@@ -6,6 +6,7 @@ use std::process::Command;
 mod cli;
 mod commands;
 mod python_graph_capture;
+mod v41_compressor;
 mod v41_experts;
 mod v41_memory;
 mod v41_dspark_cache;
