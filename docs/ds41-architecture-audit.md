@@ -108,3 +108,15 @@ These results qualify the two CUDA primitives; engram projection GEMM, pinned ho
 The reader rejects missing or unknown fields and altered architecture/quantization values, preserves separate backbone and dSpark expert geometry, and exposes target and dSpark compression schedules separately; only the informational Transformers version may vary.
 
 This new contract is not yet selected by the legacy `read_model_facts`/execution path, so passing its 60 loader tests does not mean the official model can already be loaded or served.
+
+## Reference parameter inventory
+
+`scripts/audit-ds41-reference-parameters.py` constructs the pinned reference on PyTorch's metadata device and checks all parameter names against the official index without allocating checkpoint weights.
+
+The reference has 96,042 distinct parameters and the checkpoint has 96,085 tensors, with the only additional checkpoint entries being the 43 WO-A scale tensors that the reference converter dequantizes into BF16 weights.
+
+Unshared dSpark reference parameters occupy 7.5434 GiB including 6.7236 GiB of routed experts, vision/aligner parameters occupy 0.9040 GiB, and mapped engram tables/scales occupy 188.8331 GiB; these are reference representations and exclude runtime caches, scratch, packing, and shared dSpark embedding/output weights.
+
+The audit was run with the isolated reference environment using PyTorch 2.13.0+cu130, TileLang 0.1.8, and apache-tvm-ffi 0.1.6, because newer TVM-FFI versions 0.1.12/0.1.13 fail while importing this TileLang release.
+
+This inventory is metadata evidence only and does not establish native checkpoint dtype/shape agreement, numerical correctness, or serving performance.
