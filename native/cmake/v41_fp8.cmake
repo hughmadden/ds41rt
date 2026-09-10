@@ -1,0 +1,33 @@
+# Coordinator-only native K32 activation and block-FP8 engram projection artifacts.
+if(NOT DS41RT_ENABLE_CUDA OR NOT
+   (DS41RT_CUDA_ARCHITECTURES STREQUAL "120" OR DS41RT_CUDA_ARCHITECTURES STREQUAL "120f"))
+  message(FATAL_ERROR "V4.1 coordinator FP8 AOT requires a native SM120 CUDA target")
+endif()
+set(DS41RT_V41_FP8_DIR "${CMAKE_CURRENT_BINARY_DIR}/v41_fp8")
+set(DS41RT_V41_FP8_OBJECTS)
+set(DS41RT_V41_FP8_HEADERS)
+foreach(rows IN ITEMS 1 16 80 256 1024 4096)
+  foreach(kind IN ITEMS quant gemm)
+    set(stem "${DS41RT_V41_FP8_DIR}/v41_engram_fp8_m${rows}_${kind}")
+    list(APPEND DS41RT_V41_FP8_OBJECTS "${stem}.o")
+    list(APPEND DS41RT_V41_FP8_HEADERS "${stem}.h")
+  endforeach()
+endforeach()
+add_custom_command(
+  OUTPUT "${DS41RT_V41_FP8_DIR}/v41_fp8.json"
+    ${DS41RT_V41_FP8_OBJECTS} ${DS41RT_V41_FP8_HEADERS}
+  COMMAND ${DS41RT_SPARKINFER_VERIFY_COMMAND}
+  COMMAND "${CMAKE_COMMAND}" -E env ${DS41RT_SPARKINFER_PYTHON_ENV}
+    "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_fp8_aot.py"
+    --output-dir "${DS41RT_V41_FP8_DIR}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_fp8_aot.py"
+    ${DS41RT_SPARKINFER_PROVENANCE_INPUTS} ${DS41RT_SPARKINFER_EXPORT_INPUTS}
+  COMMENT "Exporting native V4.1 K32 quantization and FP8 projections"
+  VERBATIM
+)
+add_custom_target(ds41rt_v41_fp8_export DEPENDS "${DS41RT_V41_FP8_DIR}/v41_fp8.json"
+  ${DS41RT_V41_FP8_OBJECTS} ${DS41RT_V41_FP8_HEADERS})
+add_dependencies(ds41rt_v41_fp8_export ds41rt_verify_sparkinfer_source)
+set_source_files_properties(${DS41RT_V41_FP8_OBJECTS} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+list(APPEND DS41RT_NATIVE_SOURCES ${DS41RT_V41_FP8_OBJECTS})

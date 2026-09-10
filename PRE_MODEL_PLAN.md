@@ -82,3 +82,5 @@ Engram I/O progress: a budgeted staging pool now backs cancellable background ga
 Engram transaction progress: the request-owned pipeline now starts both layers' prefetch/gathers from token IDs, validates current history generations before upload and commits accepted prefixes only after whole-wave validation, while model scheduler call sites and projection/gate execution remain open in `docs/ds41-engram-pipeline.md`.
 
 Engram residency progress: bounded coordinator range reads now load native projection/scales and BF16 gate weights into owned RTX storage, and a completion-gated residual owner calls the fused gate while native FP8 projection export, scheduler integration and runtime qualification remain open.
+
+FP8 export progress: native K32 activation and engram 32x32-scale GEMM artifacts now build and link at all six capacities with ABI/scratch manifests, while native launch bindings, scale packing and runtime qualification remain open in `docs/ds41-native-fp8-aot-build.md`.

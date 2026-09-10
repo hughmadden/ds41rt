@@ -41,3 +41,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/engram-pipeline-check.log` and `engram-pipeline-build.log` with the temporary AOT staging tree; retain the request-owned pipeline and history transaction APIs.
 
 - Delete `/tmp/ds41-v41-aot/engram-resident-check.log` and `engram-resident-build.log` with the temporary AOT staging tree; retain bounded coordinator tensor reads, RTX residency and gate ownership.
+
+- Delete `/tmp/ds41-v41-fp8-aot/` and the `v41_fp8/` build artifacts under `/tmp/ds41-v41-aot/cmake/` with the temporary AOT staging trees; retain the production exporter, CMake integration and recorded build evidence.

@@ -1,0 +1,378 @@
+{
+  "schema": 1,
+  "role": "coordinator",
+  "capability": [
+    12,
+    0
+  ],
+  "physical_sms": 188,
+  "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+  "projection": {
+    "name": "engram_wkv",
+    "n": 25600,
+    "k": 6144,
+    "weight_block": [
+      32,
+      32
+    ],
+    "activation_block": 32
+  },
+  "sparkinfer_revision": "cc3a553431a5890ea4c32408e6a5eac0fe2ecd48",
+  "variants": [
+    {
+      "capacity": 1,
+      "label": "v41_engram_fp8_m1",
+      "activation_scratch_bytes": 31744,
+      "activation_values_offset": 0,
+      "activation_row_scales_offset": 6144,
+      "activation_mma_scales_offset": 7168,
+      "activation_mma_scale_shape": [
+        1,
+        1,
+        48,
+        32,
+        4,
+        4
+      ],
+      "split_k_slices": 1,
+      "output_dtype": "BF16",
+      "output_bytes": 51200,
+      "quant_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m1_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+        "pointers": [
+          "source_ptr",
+          "values_ptr",
+          "scale_rows_ptr",
+          "scale_mma_ptr"
+        ],
+        "i32": [
+          "m",
+          "grid_x"
+        ],
+        "stream": "stream",
+        "argument_count": 8
+      },
+      "gemm_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m1_gemm__mlir_ciface_cutlass___call___b12x_libdense_gemm_DenseGemmLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_CUstream0x0",
+        "pointers": [
+          "a_ptr",
+          "b_ptr",
+          "sfa_ptr",
+          "sfb_ptr",
+          "c_ptr",
+          "quant_c_values_ptr",
+          "quant_c_scale_rows_ptr",
+          "quant_c_scale_mma_ptr",
+          "alpha_ptr"
+        ],
+        "i32": [
+          "m"
+        ],
+        "stream": "current_stream",
+        "argument_count": 12
+      }
+    },
+    {
+      "capacity": 16,
+      "label": "v41_engram_fp8_m16",
+      "activation_scratch_bytes": 125952,
+      "activation_values_offset": 0,
+      "activation_row_scales_offset": 98304,
+      "activation_mma_scales_offset": 101376,
+      "activation_mma_scale_shape": [
+        1,
+        1,
+        48,
+        32,
+        4,
+        4
+      ],
+      "split_k_slices": 1,
+      "output_dtype": "BF16",
+      "output_bytes": 819200,
+      "quant_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m16_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+        "pointers": [
+          "source_ptr",
+          "values_ptr",
+          "scale_rows_ptr",
+          "scale_mma_ptr"
+        ],
+        "i32": [
+          "m",
+          "grid_x"
+        ],
+        "stream": "stream",
+        "argument_count": 8
+      },
+      "gemm_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m16_gemm__mlir_ciface_cutlass___call___b12x_libdense_gemm_DenseGemmLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_CUstream0x0",
+        "pointers": [
+          "a_ptr",
+          "b_ptr",
+          "sfa_ptr",
+          "sfb_ptr",
+          "c_ptr",
+          "quant_c_values_ptr",
+          "quant_c_scale_rows_ptr",
+          "quant_c_scale_mma_ptr",
+          "alpha_ptr"
+        ],
+        "i32": [
+          "m"
+        ],
+        "stream": "current_stream",
+        "argument_count": 12
+      }
+    },
+    {
+      "capacity": 80,
+      "label": "v41_engram_fp8_m80",
+      "activation_scratch_bytes": 531456,
+      "activation_values_offset": 0,
+      "activation_row_scales_offset": 491520,
+      "activation_mma_scales_offset": 506880,
+      "activation_mma_scale_shape": [
+        1,
+        1,
+        48,
+        32,
+        4,
+        4
+      ],
+      "split_k_slices": 1,
+      "output_dtype": "BF16",
+      "output_bytes": 4096000,
+      "quant_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m80_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+        "pointers": [
+          "source_ptr",
+          "values_ptr",
+          "scale_rows_ptr",
+          "scale_mma_ptr"
+        ],
+        "i32": [
+          "m",
+          "grid_x"
+        ],
+        "stream": "stream",
+        "argument_count": 8
+      },
+      "gemm_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m80_gemm__mlir_ciface_cutlass___call___b12x_libdense_gemm_DenseGemmLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_CUstream0x0",
+        "pointers": [
+          "a_ptr",
+          "b_ptr",
+          "sfa_ptr",
+          "sfb_ptr",
+          "c_ptr",
+          "quant_c_values_ptr",
+          "quant_c_scale_rows_ptr",
+          "quant_c_scale_mma_ptr",
+          "alpha_ptr"
+        ],
+        "i32": [
+          "m"
+        ],
+        "stream": "current_stream",
+        "argument_count": 12
+      }
+    },
+    {
+      "capacity": 256,
+      "label": "v41_engram_fp8_m256",
+      "activation_scratch_bytes": 1671168,
+      "activation_values_offset": 0,
+      "activation_row_scales_offset": 1572864,
+      "activation_mma_scales_offset": 1622016,
+      "activation_mma_scale_shape": [
+        1,
+        2,
+        48,
+        32,
+        4,
+        4
+      ],
+      "split_k_slices": 1,
+      "output_dtype": "BF16",
+      "output_bytes": 13107200,
+      "quant_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m256_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+        "pointers": [
+          "source_ptr",
+          "values_ptr",
+          "scale_rows_ptr",
+          "scale_mma_ptr"
+        ],
+        "i32": [
+          "m",
+          "grid_x"
+        ],
+        "stream": "stream",
+        "argument_count": 8
+      },
+      "gemm_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m256_gemm__mlir_ciface_cutlass___call___b12x_libdense_gemm_DenseGemmLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_CUstream0x0",
+        "pointers": [
+          "a_ptr",
+          "b_ptr",
+          "sfa_ptr",
+          "sfb_ptr",
+          "c_ptr",
+          "quant_c_values_ptr",
+          "quant_c_scale_rows_ptr",
+          "quant_c_scale_mma_ptr",
+          "alpha_ptr"
+        ],
+        "i32": [
+          "m"
+        ],
+        "stream": "current_stream",
+        "argument_count": 12
+      }
+    },
+    {
+      "capacity": 1024,
+      "label": "v41_engram_fp8_m1024",
+      "activation_scratch_bytes": 6684672,
+      "activation_values_offset": 0,
+      "activation_row_scales_offset": 6291456,
+      "activation_mma_scales_offset": 6488064,
+      "activation_mma_scale_shape": [
+        1,
+        8,
+        48,
+        32,
+        4,
+        4
+      ],
+      "split_k_slices": 1,
+      "output_dtype": "BF16",
+      "output_bytes": 52428800,
+      "quant_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m1024_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+        "pointers": [
+          "source_ptr",
+          "values_ptr",
+          "scale_rows_ptr",
+          "scale_mma_ptr"
+        ],
+        "i32": [
+          "m",
+          "grid_x"
+        ],
+        "stream": "stream",
+        "argument_count": 8
+      },
+      "gemm_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m1024_gemm__mlir_ciface_cutlass___call___b12x_libdense_gemm_DenseGemmLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_CUstream0x0",
+        "pointers": [
+          "a_ptr",
+          "b_ptr",
+          "sfa_ptr",
+          "sfb_ptr",
+          "c_ptr",
+          "quant_c_values_ptr",
+          "quant_c_scale_rows_ptr",
+          "quant_c_scale_mma_ptr",
+          "alpha_ptr"
+        ],
+        "i32": [
+          "m"
+        ],
+        "stream": "current_stream",
+        "argument_count": 12
+      }
+    },
+    {
+      "capacity": 4096,
+      "label": "v41_engram_fp8_m4096",
+      "activation_scratch_bytes": 26738688,
+      "activation_values_offset": 0,
+      "activation_row_scales_offset": 25165824,
+      "activation_mma_scales_offset": 25952256,
+      "activation_mma_scale_shape": [
+        1,
+        32,
+        48,
+        32,
+        4,
+        4
+      ],
+      "split_k_slices": 1,
+      "output_dtype": "BF16",
+      "output_bytes": 209715200,
+      "quant_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m4096_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+        "pointers": [
+          "source_ptr",
+          "values_ptr",
+          "scale_rows_ptr",
+          "scale_mma_ptr"
+        ],
+        "i32": [
+          "m",
+          "grid_x"
+        ],
+        "stream": "stream",
+        "argument_count": 8
+      },
+      "gemm_abi": {
+        "symbol": "_mlir_ds41rt_v41_engram_fp8_m4096_gemm__mlir_ciface_cutlass___call___b12x_libdense_gemm_DenseGemmLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_CUstream0x0",
+        "pointers": [
+          "a_ptr",
+          "b_ptr",
+          "sfa_ptr",
+          "sfb_ptr",
+          "c_ptr",
+          "quant_c_values_ptr",
+          "quant_c_scale_rows_ptr",
+          "quant_c_scale_mma_ptr",
+          "alpha_ptr"
+        ],
+        "i32": [
+          "m"
+        ],
+        "stream": "current_stream",
+        "argument_count": 12
+      }
+    }
+  ],
+  "artifacts": {
+    "v41_engram_fp8_m1_quant.h": "fa1f5ab8e32f24137266ad401a9f00a91b35387adaa9020f3cf3e35386dd8add",
+    "v41_engram_fp8_m1_quant.o": "3111645d902fff3635a69be0b9b4377ac945af2e306f17f1601ef536e287521a",
+    "v41_engram_fp8_m1_gemm.h": "89cf32c7d676b68b5a706751b87f7fd9c5c0f809e6f856a5962f2ffd43b55aee",
+    "v41_engram_fp8_m1_gemm.o": "eaca868e51739f306445208576ee1678f920c13730d636dbabb93aa84d2fb324",
+    "v41_engram_fp8_m16_quant.h": "f1c6c399ec8242de0e94f977290dac10a2780595df0d1d12bc388cd56f4141ee",
+    "v41_engram_fp8_m16_quant.o": "9003644b05d9242dad69a54dcf19f6e76fb4b7134db95bb25961dacda265f60b",
+    "v41_engram_fp8_m16_gemm.h": "825a1ed87793dccb2fb857063f3f3bbfa6f28430dbd57e9e9f2fb93dc8245232",
+    "v41_engram_fp8_m16_gemm.o": "58904824db9289494b0199f4c02e346616bcea0761ff7a9de8af743fecf5a6c1",
+    "v41_engram_fp8_m80_quant.h": "7e81d53120783e1c111aa41704241ec77fcb25b040116e97bcbc8c092154f89d",
+    "v41_engram_fp8_m80_quant.o": "6b6b3caf0bff7f2e67acd5cf4a2e358280aad7f6c5433da10c3683af290a364b",
+    "v41_engram_fp8_m80_gemm.h": "e81d2c0ceefee8d8bc437452aafa25e122dd0e5c5a4532789ec0d66f50184d1b",
+    "v41_engram_fp8_m80_gemm.o": "3218813ecf35bf3452d8c2f0d58de9bfbd8c505775781b71c59af83c249f5f83",
+    "v41_engram_fp8_m256_quant.h": "1dbf937be1e7d1ec19208754eaa6d14c8d356faf45e55a0eaf79d7fd6aa222dd",
+    "v41_engram_fp8_m256_quant.o": "f368411b98f0149d0d3e8b22d38044e3a566af9179a1cc35f3e6cb6351f6de5f",
+    "v41_engram_fp8_m256_gemm.h": "111720046e5ed5766b32f3a3bb003a4f933ec80ff55442da4e9586692c40577a",
+    "v41_engram_fp8_m256_gemm.o": "180b4385eefc9bb66108b7b268edce9cd625f95296cbc6866dc2847eb05eb341",
+    "v41_engram_fp8_m1024_quant.h": "bc5d30578d7455a31794cb439f311938ade25aa8705f13e28be612ac44cffc61",
+    "v41_engram_fp8_m1024_quant.o": "f7e3e3426b17b084a4b30fd893e9010a6297f772691533ea2c0564cfe603178f",
+    "v41_engram_fp8_m1024_gemm.h": "94bf307eb66da8dd6cd5cd042c6ea5a83c224cda34f2c0f63f23dab1d7d162d0",
+    "v41_engram_fp8_m1024_gemm.o": "f672ddc0b3f73c745050efe330404b52c7e47a26a4c757615a2ded868db92373",
+    "v41_engram_fp8_m4096_quant.h": "a056351f0a925ec904ab81db3eb2a8d21d587ef9367828a041c7c8d6bbe82cf6",
+    "v41_engram_fp8_m4096_quant.o": "4a4824fbc68cba61eec67a18bc530482446bf935f246f70c18869356bfb252e7",
+    "v41_engram_fp8_m4096_gemm.h": "f6ce750b889aaa87e1e74932d7995de4e01f5b2fc58583b0d7e49967eb4d1e8c",
+    "v41_engram_fp8_m4096_gemm.o": "71bf66b2db17dd3ddd1e52f0be7d82f7cc873ccdddefe939a694f3e8a5f32acd"
+  },
+  "build_evidence": {
+    "scope": "AOT export and native shared-library link only; no numerical execution",
+    "gpu_uuid": "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+    "image_id": "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+    "native_library_sha256": "94abf1667bfc82775721a43cc4ed7bdec7a5a23c221ba2af0f799c13e2c07a4c",
+    "source_sha256": {
+      "python/tools/export_b12x_v41_fp8_aot.py": "3754f66ebcf048456521898338ac6e490f3c761b0cfb0f3e12c7b65fb58d0467",
+      "native/cmake/v41_fp8.cmake": "a7d6defc3160e793de572275733bc313dadc2eba0845ccb4e5ea71f31f315919",
+      "native/CMakeLists.txt": "f93d46d117fee14ace8942b7b0c55e64c2748c0776a5685dbd3c9cfeba0a361d"
+    }
+  }
+}
