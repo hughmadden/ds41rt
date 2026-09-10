@@ -71,3 +71,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/router-qualification.json` and `router-rust-build.log`, `router-native-build.log`, and `router-qualification.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain the native router, Rust ownership and reusable qualifier.
 
 - Delete `/tmp/ds41-v41-aot/shared-fp8-rtx0.json`, `shared-fp8-rtx1.json`, and all `shared-fp8-*.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup, including failed diagnostic runs; retain the reusable shared-FP8 qualifier, b12x floor regression tests and committed evidence.
+
+- Delete `/tmp/ds41-expert-floor/` on this host and ostrich, including before-fix/input-only source mounts, transferred sources and Spark AOT artifacts, plus `expert-floor-*.log` under `/tmp/ds41-v41-fp8-aot/`; retain production expert regression tests and committed qualification evidence.

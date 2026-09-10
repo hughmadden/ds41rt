@@ -247,6 +247,12 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
             "kernel_intermediate": kernel_intermediate,
             "topk": topk,
         },
+        "activation_quantization": {
+            "format": "FP8 E4M3 with UE8M0 K32 scales",
+            "input_amax_floor": 1e-4,
+            "intermediate_amax_floor": 1e-4,
+            "intermediate_boundary": "routing-weighted FP32 SwiGLU rounded to BF16",
+        },
         "output": "FP32 token-major route planes; reduction is a separate launch",
         "variants": [],
     }

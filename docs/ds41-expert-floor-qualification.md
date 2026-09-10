@@ -1,0 +1,13 @@
+# Routed-expert tiny activation correctness
+
+The official reference clamps each activation group's absolute maximum to at least 1e-4 before computing its power-of-two K32 scale, both before FC1 and after the routing-weighted BF16 SwiGLU intermediate. The fused b12x V4.1 expert kernel previously used the native MXFP8 helper without that floor. This changes tiny nonzero activation values, not just the encoded scale for zero groups.
+
+The V4.1 fused dynamic kernel now routes all input and intermediate MXFP8 quantization sites through one helper that applies the reference floor when activation is silu_v41. Other activation modes preserve their existing quantization. The separate materialized W4A8 phase-1 kernel is not the V4.1 path: construction explicitly rejects materialize_intermediate for V4.1, correcting the tentative source location noted during the shared-FFN audit.
+
+Six new graph tests cover rows 1/16/80 and intermediate widths 576 (padded by the weight planner) and 2304, with six and three routes respectively. Constant nonzero native FP4 weights isolate tiny input values, tiny routing-weighted intermediates, values that must round to zero, and tiny values that must remain nonzero. Changed inputs, weights on routes and expert IDs reuse the graph; every new case is bitwise equal to the BF16 reference result.
+
+RTX 0 passes the six new tests. RTX 1 and ostrich each pass all twelve tests in tests/moe/test_v41_expert_numerics.py, including the prior randomized normal-range numerical/graph cases. A frozen pre-fix kernel fails the first tiny-input case with maximum absolute output error 8.046627e-6; a counterfactual that fixes input scaling but omits intermediate scaling fails the second case with error 5.500624e-9. Both counterfactuals run from isolated temporary source mounts with compile caches disabled and leave the production source unchanged.
+
+SparkInfer commit dfdb8043564b6857a339f9b3d12c9855def37b9f is pushed and pinned with its source-tree digest. The coordinator native library rebuild passes, and fresh Spark AOT export on ostrich passes capacities 1/16/80/256/1024/4096. The expert AOT manifests now record both activation floors and the BF16 intermediate boundary. This turn does not rebuild the complete Spark shared library or fleet images.
+
+Machine-readable evidence is in ds41-expert-floor-qualification.json. GPU numerical checks exercise production b12x kernels through their tensor binding; the fresh C AOT artifacts were built/exported but were not independently executed through the Rust owner or repeated across the four-host transport in this turn. Full dSpark stage execution, attention/cache ownership, vision, scheduling and end-to-end serving remain incomplete.
