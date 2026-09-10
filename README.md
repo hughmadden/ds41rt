@@ -26,12 +26,15 @@ See [architecture.md](architecture.md) for ownership and execution contracts and
 
 ## Implementation and qualification
 
-[PRE_MODEL_PLAN.md](PRE_MODEL_PLAN.md) tracks modelless implementation and
-qualification using this host, ostrich, and dodo.
-[POST_MODEL_PLAN.md](POST_MODEL_PLAN.md) tracks the later full-checkpoint bring-up
-with emu and kiwi available.
-[TO_DELETE_SCAFFOLDING.md](TO_DELETE_SCAFFOLDING.md) records temporary artifacts
-to remove at that handoff.
+[TO_SHIP_V1.md](TO_SHIP_V1.md) tracks implementation, full-checkpoint bring-up,
+correctness, performance and release on this host and all four Sparks.
+The checkpoint is available on every host; there is no separate modelless phase.
+[TO_DELETE_SCAFFOLDING.md](TO_DELETE_SCAFFOLDING.md) tracks temporary committed
+code to remove when replacement coverage exists.
+
+Performance targets are 90 tokens/s target-only decode, approximately 270 tokens/s
+with optimized dSpark, and 8,000 tokens/s prefill for prompts of 8K tokens or more;
+these are unqualified targets, not current performance claims.
 
 Implemented engram pieces include exact tokenizer compression and hashes,
 transactional request history, mapped tables, bounded page prefetch, native FP8

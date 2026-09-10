@@ -1,7 +1,7 @@
 # DS41RT architecture
 
 This document describes the V4.1 target architecture; implementation and qualification
-status is tracked in PRE_MODEL_PLAN.md rather than inferred from these contracts.
+status is tracked in TO_SHIP_V1.md rather than inferred from these contracts.
 
 ## Ownership
 
