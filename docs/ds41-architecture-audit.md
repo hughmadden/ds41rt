@@ -162,3 +162,5 @@ The official catalog now supplies aligned per-expert staging plans directly to n
 The daemon now owns four packed buffers per expert layer and releases bounded loading staging before returning, with complete synthetic RTX dSpark and ostrich TP-rank-3 layer loads and allocation-failure cleanup qualified in `ds41-owned-expert-qualification.md`; graph lifetime and serving integration remain open.
 
 Owned native expert execution now borrows resident layers and manages stable per-wave buffers, streams and graphs, passing changed-input alternating M16 replay and smaller direct batches on RTX/ostrich; network TP and service scheduling remain open in `ds41-owned-execution-qualification.md`.
+
+Complete native backbone wire batches now carry six FP32 route vectors per token with strict request/placement/layer/executor matching; four logical TP ranks on ostrich/dodo match the full-width expert oracle after persistent TCP and RTX reduction, while production service orchestration, RDMA and large-batch chunking remain open in `ds41-native-tp4-network-qualification.md`.

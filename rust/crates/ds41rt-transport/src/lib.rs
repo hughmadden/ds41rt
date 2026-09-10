@@ -7,6 +7,7 @@ mod capabilities;
 mod debug_json;
 mod host_batch_set;
 pub mod protocol_v2;
+pub mod v41_expert;
 mod protocol_v2_tcp;
 mod synthetic;
 mod verbs;

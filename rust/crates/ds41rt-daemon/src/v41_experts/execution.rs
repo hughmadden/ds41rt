@@ -259,3 +259,79 @@ impl Drop for ExpertExecution<'_, '_> {
         }
     }
 }
+
+/// Reusable host exchange for the TCP fallback; RDMA can consume device route views.
+pub(crate) struct HostExpertExchange {
+    ids: Vec<i32>,
+    routing: Vec<f32>,
+    partials: Vec<u8>,
+}
+impl HostExpertExchange {
+    pub fn new(capacity: u32) -> Result<Self> {
+        ensure!(
+            capacity > 0 && capacity <= 4096,
+            "unsupported native host exchange capacity"
+        );
+        let routes = capacity as usize * 6;
+        Ok(Self {
+            ids: vec![0; routes],
+            routing: vec![0.0; routes],
+            partials: vec![0; routes * 5120 * 4],
+        })
+    }
+}
+impl ExpertExecution<'_, '_> {
+    /// Host fallback from a validated wire request to ordered FP32 route response.
+    /// The borrowed response prevents reuse of exchange storage until encoding/send ends.
+    pub fn execute_host_request<'a>(
+        &mut self,
+        request: &ds41rt_transport::v41_expert::V41BackboneRequest<'_>,
+        executor_id: u64,
+        exchange: &'a mut HostExpertExchange,
+    ) -> Result<ds41rt_transport::ExpertProtocolV2ResponseRef<'a>> {
+        let super::ExpertLayer::Backbone { layer, .. } = self._weights.layer else {
+            anyhow::bail!("backbone requests cannot execute on RTX dSpark weights");
+        };
+        ensure!(
+            request.layer() as usize == layer,
+            "request does not match resident expert layer"
+        );
+        ensure!(executor_id != 0, "native response needs executor identity");
+        ensure!(
+            request.rows() <= self.kernel.info().capacity_rows,
+            "request exceeds native execution capacity"
+        );
+        let routes = request.rows() as usize * 6;
+        let bytes = request.plane_bytes()?;
+        ensure!(
+            exchange.partials.len() >= bytes,
+            "host exchange is too small"
+        );
+        request.copy_routes_into(&mut exchange.ids, &mut exchange.routing)?;
+        self.synchronize()?;
+        self.library
+            .copy_h2d(self.hidden.buffer, request.hidden())?;
+        // Supported hosts and CUDA use the checkpoint/wire little-endian byte order.
+        ensure!(
+            cfg!(target_endian = "little"),
+            "native host exchange requires little-endian storage"
+        );
+        unsafe {
+            self.library.copy_h2d(
+                self.ids.buffer,
+                std::slice::from_raw_parts(exchange.ids.as_ptr().cast::<u8>(), routes * 4),
+            )?;
+            self.library.copy_h2d(
+                self.routing.buffer,
+                std::slice::from_raw_parts(exchange.routing.as_ptr().cast::<u8>(), routes * 4),
+            )?;
+            self.launch(request.rows(), false)?;
+        }
+        self.synchronize()?;
+        self.library.copy_d2h(
+            &mut exchange.partials[..bytes],
+            self.route_partials(request.rows())?,
+        )?;
+        request.response(executor_id, &exchange.partials[..bytes])
+    }
+}

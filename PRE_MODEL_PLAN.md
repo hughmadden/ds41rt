@@ -64,3 +64,5 @@ Expert loader progress: validated per-expert staging now reads all six official 
 Expert ownership progress: the daemon now plans, loads, owns and binds complete native expert layers with bounded staging and failure cleanup, qualified on RTX/ostrich with exact packed samples and process allocation tracking while owned graph execution and serving/transport integration remain open.
 
 Owned execution progress: resident weights now feed per-wave native scratch/I/O/graph owners with direct 1/7/15/16-row and alternating M16 replay checks on RTX/ostrich, including shared output and allocation guards while scheduler and per-route transport integration remain open.
+
+Native TP transport progress: strict canonical requests, borrowed FP32 route responses and rank-ordered assembly now connect to owned execution, with four logical native TP ranks across ostrich/dodo and RTX reduction matching a full-width oracle over persistent TCP while production service/RDMA/streaming integration remains open.

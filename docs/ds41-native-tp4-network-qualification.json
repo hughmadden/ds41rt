@@ -1,0 +1,54 @@
+{
+  "source_sha256": {
+    "rust/crates/ds41rt-transport/src/v41_expert.rs": "e0044b591e8cfe32985ee813c7ea34cdf2391ad9c12ad3cd7eb0e1cb368a515b",
+    "rust/crates/ds41rt-transport/src/lib.rs": "d192fdde9a707d39a1ccd89d085754f147aa2d170a989d53ae2afe16856a7fa2",
+    "rust/crates/ds41rt-daemon/src/v41_experts.rs": "558edd2b612b01be7d31dbfae8479c7111b04f7de6f21045b6e260e7dc1b9572",
+    "rust/crates/ds41rt-daemon/src/v41_experts/execution.rs": "2850c1d1bf5238d0f4ce6bb916af660ed4d713a508525a4e8ca5bf763a5ff30d"
+  },
+  "workers": {
+    "0": {
+      "host": "ostrich",
+      "log": "READY rank=0 port=41870\nDONE rank=0"
+    },
+    "1": {
+      "host": "ostrich",
+      "log": "READY rank=1 port=41871\nDONE rank=1"
+    },
+    "2": {
+      "host": "dodo",
+      "log": "READY rank=2 port=41872\nDONE rank=2"
+    },
+    "3": {
+      "host": "dodo",
+      "log": "READY rank=3 port=41873\nDONE rank=3"
+    }
+  },
+  "client_log": "TP4 case=0: four native network planes validated, ordered and reduced on RTX\nTP4 case=1: four native network planes validated, ordered and reduced on RTX",
+  "numerics": [
+    {
+      "case": 0,
+      "relative_l2": 0.0,
+      "cosine": 1.0000032186508179,
+      "bitwise_equal": true,
+      "path": "four native TP ranks on ostrich/dodo -> persistent TCP -> validated FP32 planes -> RTX reduction"
+    },
+    {
+      "case": 1,
+      "relative_l2": 0.0,
+      "cosine": 1.0000029802322388,
+      "bitwise_equal": true,
+      "path": "four native TP ranks on ostrich/dodo -> persistent TCP -> validated FP32 planes -> RTX reduction"
+    }
+  ],
+  "transport_tests": [
+    "test result: ok. 143 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.91s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "daemon_compile": "passed, 447 warnings including unused service integration entry points",
+  "fixture_sha256": {
+    "/tmp/ds41-native-tp4/src/main.rs": "a7d8a109616617bd77db4ae4e2dddca666e5b38582226087cd19aa4a54bc2eb4",
+    "/tmp/ds41-v41-aot/prepare_tp4_execution.py": "6fec7f85361d8440d82e3655d8917f39c0065b6f656f5c12507f444ceb46a4d3",
+    "/tmp/ds41-v41-aot/check_tp4_execution.py": "9c9607a328d28c32255ab9fb433a8e154c7da18d287d3c0892f3daa6920684d3"
+  },
+  "scope": "Four native logical TP ranks on two physical GB10s, two persistent-TCP M16 requests, RTX FP32 route reduction vs full-width reference; no emu/kiwi, no production service bootstrap/RDMA/performance qualification."
+}
