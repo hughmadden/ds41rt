@@ -210,7 +210,7 @@ Maintained harnesses include:
 
 Keep raw generated runs under ignored cache/output directories. Commit a
 compact measurement contract and summary only after the run passes its gates;
-the v1 public format is demonstrated in [`benchmarks/pro-v1.json`](benchmarks/pro-v1.json).
+V4.1 evidence must identify the official checkpoint and the qualified engine revision.
 
 ## Publishing containers
 

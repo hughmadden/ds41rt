@@ -32,3 +32,5 @@ Progress evidence: `docs/ds41-build-qualification.md` records the rename and par
 Engram progress: the loader now provides mapped native table/scale access, bounded cancellable background page advice, and eager-load rejection, with scheduler integration, device staging, and hardware performance qualification still pending.
 
 Addressing evidence: `scripts/qualify-ds41-engram.py` matches the pinned official token map and 128 hash/acceptance batches across 16 request histories, while 119 core and 58 loader tests pass.
+
+Cleanup progress: obsolete Pro benchmark data, plots, deployment claims, and architecture diagrams were removed, while alternate-format execution and quantization tooling still await replacement/removal.

@@ -1,99 +1,69 @@
 # DS41RT architecture
 
-DS41RT is an attention–FFN-disaggregated DeepSeek V4 Pro engine for one RTX PRO
-6000 Blackwell coordinator and four DGX Spark workers. This document defines
-the stable v2 ownership and execution contract. Model dimensions are validated
-from the selected snapshot rather than inferred from these prose values.
+This document describes the V4.1 target architecture; implementation and qualification
+status is tracked in PRE_MODEL_PLAN.md rather than inferred from these contracts.
 
-## Topology and ownership
+## Ownership
 
-| Component | Release owner |
+| Component | Owner |
 | --- | --- |
-| OpenAI-compatible API, tokenizer, scheduler, admission | Coordinator |
-| Embedding, residual stream, mHC mixing, norms, LM head | Coordinator |
-| MLA/C4/C128 attention, compressors, indexers, RoPE, KV | Coordinator |
-| Routers, shared experts, dSpark envelope and sampling | Coordinator |
-| Routed `w1`, `w2`, `w3` EXL3 projections | Four Spark TP ranks |
-| Route dispatch and expert reduction | Coordinator plus all four Sparks |
+| API, tokenizer, admission, scheduling, sampling, request history | RTX coordinator |
+| Text embeddings, single-pass mHC, normalization, output head | RTX coordinator |
+| CED encoder/decoder attention, compression, indexers, cache | RTX coordinator |
+| Native vision encoder, spatial aligner, image embeddings | RTX coordinator |
+| Engram mapped weights/scales and background page prefetch | Host storage and I/O workers |
+| Gathered engram dequantization, projection, gate/residual update | RTX coordinator |
+| Backbone routers and shared experts | RTX coordinator |
+| Backbone routed experts | Four Spark intermediate-dimension TP ranks |
+| Entire three-stage dSpark drafter, including routed experts | RTX coordinator |
 
-The model has 61 target layers, 384 routed experts per sparse layer, top-6
-routing, hidden width 7,168, and expert intermediate width 3,072. It also has
-three integrated dSpark blocks. The release snapshot stores 73,728 routed
-projections in calibrated EXL3 K2 form; coordinator-owned tensors retain their
-published representation.
+## Backbone and cache
 
-## Routed expert tensor parallelism
+The official backbone has 40 layers and width 5120, arranged as a 20-layer causal
+encoder followed by a 20-layer decoder; routed experts use intermediate width 2304,
+384 experts per layer, and top-6 routing.
 
-DS41RT does not assign whole experts to workers. Every Spark stores one quarter
-of the intermediate dimension of every routed expert. The coordinator computes
-one global route list and sends identical hidden rows and route weights to all
-four ranks. Each rank computes its quarter-intermediate `w1`/`w3` activation
-and `w2` projection, producing one hidden-width partial. Those four partials
-must be reduced before the residual stream advances.
+Every layer has a 128-token local window; layers 2–19 add ratio-2 compressed global
+attention, and layers 20–39 share ratio-1 global KV produced at the encoder/decoder
+boundary.
+Global KV source layers are 2, 8, 14, and 20, and index-selection sources are
+2, 8, 14, 20, 24, 28, 32, and 36.
+The first decoder indexer selects candidate blocks for later decoder indexers.
 
-This distinction is fundamental:
+Window KV, compressed KV, and indexer keys have distinct native quantization
+contracts; their layouts and scales must not be treated interchangeably.
+Each request owns its cache references, source selections, candidate blocks,
+compression tail, and speculative transaction state.
 
-- expert placement is fixed 4-way tensor parallelism;
-- all ranks see the same global top-6 routes;
-- rank names are `spark-0` through `spark-3`, independent of SSH host names;
-- a load plan may choose a source reader, but never changes serving ownership.
+Exact prefill establishes the baseline for CED decoder SWA replay, while bounded
+replay is an explicitly approximate execution policy requiring separate qualification.
 
-Small expert batches return four BF16 partials for deterministic coordinator
-accumulation. Wider batches use row-sharded Spark reduction. The crossover is
-configured by `SPARK_REDUCTION_MIN_ROWS` and is 16 in the qualified release.
+## Engram and speculative execution
 
-## One target block
+Engram modules at layers 1 and 14 hash 2-, 3-, and 4-grams with eight heads per order.
+Normalized token IDs determine table addresses before hidden-state computation,
+allowing both modules' page prefetch to start as soon as the input IDs are known.
+Image spans break n-gram history and receive no engram residual contribution.
 
-The coordinator executes model-specific multi-head latent attention with
-partial RoPE, the checkpoint's C0/C4/C128 compression schedule, and mHC
-residual mixing. After attention it computes the router and shared expert,
-dispatches the routed expert boundary, waits for the reduced result, and
-finishes the next mHC boundary.
+Mapped table pages are advised by bounded background workers and gathered into
+bounded staging buffers, then dequantized and projected on the GPU.
+Prefill and verification batches must preserve row order, image masks, and request
+identity; rejecting speculative tokens must not advance committed history.
 
-Two coordinator CUDA-graph segments surround the remote expert barrier:
+The dSpark drafter has three stages with 128 routed experts and top-3 routing per
+stage, uses the backbone's embedding and output head, and conditions on incoming
+residual-stream means at target layers 37, 38, and 39.
+It runs entirely on the RTX, while target verification still traverses backbone AFD.
 
-1. attention, attention-post/FFN-pre mHC, routing, and shared expert;
-2. reduced routed delta, FFN-post/next-attention-pre mHC.
+## Serving and qualification
 
-CUDA graph bindings and layer workspaces are prepared at startup. A qualified
-request performs no graph capture and no Python execution on its timed path.
+The target topology is four expert TP ranks and one coordinator, with 16-request
+admission and alternating execution waves around remote expert boundaries.
+Production graph shapes and workspaces must be prepared before readiness and
+reused without request-time capture or allocation.
+Readiness must verify checkpoint/dependency identity, weight residency, mapped
+table access, transport, numerical startup probes, and prepared graph shapes.
 
-## dSpark
-
-DeepSeek V4 Pro's dSpark head is a three-block semi-autoregressive drafter.
-DS41RT runs its routed experts through the same TP4 boundary as target layers.
-The adaptive controller selects a proposal width from one through five using
-checkpoint confidence outputs, then the target verifies the proposal. The
-`-full` API model alias disables drafting without changing the target model.
-
-## Cache and profiles
-
-The coordinator owns physical attention state. The `balanced` release profile
-uses FP8 target KV and exposes a 400,000-token logical context with 405,504
-physical rows on the measured 96-GB coordinator. `long` uses native DSV4
-NVFP4 KV and increases Pro capacity to 545,536 tokens. `accuracy` uses BF16 KV
-and BF16 wide Spark reduction with a 200,000-token logical context.
-
-Admission is capacity-shaped: the sum of active context plus configured output
-reservations must fit the shared pool. Excess requests wait; they are not
-partially admitted.
-
-## Transport and readiness
-
-Release serving uses host networking, Protocol V2, and native verbs transport
-over the configured dedicated addresses. A secondary Spark-to-Spark rail is
-enabled only when all four `SPARK_N_LANE_B` values are configured. Every role
-uses unlimited memlock and explicit RDMA device access.
-
-Health remains false until:
-
-1. all five hosts resolve the same immutable model revision;
-2. all four Spark images match the coordinator engine and SparkInfer pins;
-3. routed expert weights are resident;
-4. transport negotiation and the numerical startup probe pass;
-5. production graph shapes are prepared; and
-6. the API advertises both the drafted and `-full` model identities.
-
-See [`docs/architecture.svg`](docs/architecture.svg) and
-[`docs/request-path.svg`](docs/request-path.svg) for the corresponding system
-and request-flow views.
+The official checkpoint is the only release weight source; EXL3, GPTQ, alternate
+model variants, and old Pro optimization settings are being removed.
+See docs/ds41-architecture-audit.md for pinned source evidence and outstanding work.
