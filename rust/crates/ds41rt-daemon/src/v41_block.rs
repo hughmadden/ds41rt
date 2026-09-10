@@ -8,9 +8,21 @@ use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 #[derive(Clone, Copy)]
 enum Phase {
     Idle,
+    Prepared(QueryBinding, usize, bool),
     Attention(QueryBinding, usize),
     Ffn(QueryBinding, usize),
     Ready(QueryBinding, usize),
+}
+/// Next-layer input after required engram work, before attention or dSpark taps.
+pub(crate) struct PreparedBlockInput<'a> {
+    pub residual: Ds41rtDeviceBuffer,
+    pub pre: Ds41rtDeviceBuffer,
+    pub layer: usize,
+    pub tokens: &'a [u64],
+    previous: QueryBinding,
+}
+impl PreparedBlockInput<'_> {
+    pub fn previous_binding(&self) -> QueryBinding { self.previous }
 }
 pub(crate) struct FfnInput<'a> {
     pub residual: Ds41rtDeviceBuffer,
@@ -77,6 +89,76 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         self.tokens.clear();
         self.attention.invalidate();
         self.ffn.invalidate();
+    }
+    /// Copy a completed adjacent layer into stable next-block input storage.
+    /// Layers 1 and 14 remain unavailable until their engram update completes.
+    pub fn initialize_previous(&mut self, previous: &BlockOutput<'_>) -> Result<()> {
+        self.reset();
+        let rows = previous.tokens.len();
+        ensure!(previous.layer < 39 && self.layer == previous.layer + 1
+            && previous.binding.layer() == previous.layer
+            && rows > 0 && rows <= self.capacity
+            && previous.tokens.iter().all(|&p| p < 1048576)
+            && previous.residual.bytes == rows * 40960 && previous.pre.bytes == rows * 16,
+            "previous block layer, tokens or extents differ");
+        let sources = [previous.residual, previous.pre];
+        let destinations = self.inputs();
+        ensure!(sources.iter().zip(destinations).all(|(s,d)| s.device_id == d.device_id),
+            "previous block device differs");
+        for (source, destination) in sources.into_iter().zip(destinations) {
+            self.library.copy_d2d(destination, source, source.bytes)?;
+        }
+        self.tokens.extend_from_slice(previous.tokens);
+        self.phase = Phase::Prepared(previous.binding, rows, ![1,14].contains(&self.layer));
+        Ok(())
+    }
+    /// # Safety
+    /// Gathered engram rows/masks correspond to this block's exact request and
+    /// token order, with current history leases and completed producer writes.
+    /// Gather and gate storage remain live and exclusive until the call drains.
+    pub unsafe fn apply_engram(
+        &mut self,
+        gate: &mut crate::v41_engram::layer::EngramGate<'_, '_>,
+        gathered: &crate::v41_engram::EngramDeviceView,
+    ) -> Result<()> {
+        let result = (|| -> Result<()> {
+            let (binding, rows) = match self.phase {
+                Phase::Prepared(binding, rows, false) => (binding, rows),
+                _ => anyhow::bail!("block is not awaiting engram"),
+            };
+            ensure!(gate.layer() == self.layer && gathered.rows == rows,
+                "block engram layer or rows differ");
+            let output = unsafe { gate.execute_captured(self.inputs()[0], gathered) }?;
+            self.library.copy_d2d(self.inputs()[0], output, output.bytes)?;
+            self.phase = Phase::Prepared(binding, rows, true);
+            Ok(())
+        })();
+        if result.is_err() { self.reset(); }
+        result
+    }
+    pub fn prepared_input(&self) -> Result<PreparedBlockInput<'_>> {
+        let (previous, rows) = match self.phase {
+            Phase::Prepared(binding, rows, true) => (binding, rows),
+            _ => anyhow::bail!("block input is not prepared; engram may be pending"),
+        };
+        let [mut residual, mut pre] = self.inputs();
+        residual.bytes = rows * 40960;
+        pre.bytes = rows * 16;
+        Ok(PreparedBlockInput { residual, pre, layer: self.layer,
+            tokens: &self.tokens, previous })
+    }
+    /// # Safety
+    /// Query and block storage have exclusive use on the same device. Required
+    /// dSpark tap reads must finish before this call overwrites any input.
+    pub unsafe fn begin_prepared_attention<'q>(
+        &mut self,
+        query: &'q mut AttentionQueryWave<'_, '_>,
+    ) -> Result<AttentionQueryOutput<'q>> {
+        let tokens = match self.prepared_input() {
+            Ok(input) => input.tokens.to_vec(),
+            Err(e) => { self.reset(); return Err(e); }
+        };
+        unsafe { self.begin_attention(query, &tokens) }
     }
     /// Copy text embeddings into the first block's stable inputs. This leaves
     /// output unpublished. Image replacement belongs to the separate vision path.

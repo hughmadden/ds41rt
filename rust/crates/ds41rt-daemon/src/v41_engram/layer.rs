@@ -82,6 +82,24 @@ pub(crate) struct EngramGate<'weights, 'library> {
     ready_rows: Option<usize>,
 }
 impl<'weights, 'library> EngramGate<'weights, 'library> {
+    pub fn layer(&self) -> usize {
+        ds41rt_core::ENGRAM_LAYERS[self.weights.layer_index] as usize
+    }
+    /// # Safety
+    /// Same input ownership and row-order contract as execute. Captures only
+    /// this gate's owned buffers and recaptures when the live shape changes.
+    pub unsafe fn execute_captured(
+        &mut self,
+        residual: Ds41rtDeviceBuffer,
+        gathered: &EngramDeviceView,
+    ) -> Result<Ds41rtDeviceBuffer> {
+        self.ready_rows = None;
+        if self.graph.as_ref().is_none_or(|(_, rows)| *rows != gathered.rows) {
+            self.clear_graph()?;
+            unsafe { self.capture(residual, gathered)?; }
+        }
+        unsafe { self.replay(residual, gathered) }
+    }
     pub fn new(
         weights: &'weights EngramLayerWeights<'library>,
         capacity: usize,
@@ -146,11 +164,11 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
         gathered: &EngramDeviceView,
     ) -> Result<Ds41rtDeviceBuffer> {
         self.ready_rows = None;
-        unsafe {
+        let launched = unsafe {
             self.stage_inputs(residual, gathered)?;
-            self.enqueue(gathered.rows)?;
-        }
-        self.synchronize()?;
+            self.enqueue(gathered.rows)
+        };
+        launched.and(self.synchronize())?;
         self.ready_rows = Some(gathered.rows);
         self.output()
     }
@@ -299,13 +317,13 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
             rows == gathered.rows,
             "engram replay row count differs from capture"
         );
-        unsafe {
+        let launched = unsafe {
             self.stage_inputs(residual, gathered)?;
             self.weights
                 .library
-                .cuda_graph_launch(graph, self.stream.raw)?;
-        }
-        self.synchronize()?;
+                .cuda_graph_launch(graph, self.stream.raw)
+        };
+        launched.and(self.synchronize())?;
         self.ready_rows = Some(rows);
         self.output()
     }

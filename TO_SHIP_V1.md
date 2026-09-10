@@ -65,6 +65,8 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
+- [x] Add adjacent-block preparation with predecessor identity, engram ordering guards and prepared dSpark tap inputs; all 39 transition guards/copies and distinct decoder tap placement pass on Spark with controlled producer values.
+- [ ] Execute the chained block/engram/prepared-query and owned dSpark tap paths on RTX, then connect them to scheduler-owned gather histories.
 - [x] Initialize target text residuals and identity pre-mix from the embedding table shared with dSpark, retaining token/position metadata and copying into layer-0 inputs; exact checkpoint comparisons and owner guards pass on Spark.
 - [ ] Qualify embedding-to-attention execution on RTX and integrate image embedding replacement before residual expansion.
 - [ ] Qualify the bound final target head on RTX and wire selected prefill/decode/verification rows into sampling. The owner builds and its real-weight numerical checks pass on Spark; final RTX and dSpark projection requalification remain open after the cuBLAS accumulation correction.
@@ -109,6 +111,7 @@ Component records establish their stated scopes, not full-model readiness or the
 | Engram | [Pipeline](docs/ds41-engram-pipeline.md), [CUDA record](docs/ds41-engram-cuda-qualification.json) | Early prefetch, request histories and residual updates in the model driver |
 | FP8 backbone cache and attention | [KV ownership](docs/ds41-kv-qualification.md), [window](docs/ds41-window-qualification.md), [attention handoffs](docs/ds41-attention-handoff-qualification.md) | CED execution/replay and accepted-prefix scheduling across layers |
 | Backbone mHC and FFNs | [Block sequencing](docs/ds41-block-qualification.md), [shared experts](docs/ds41-backbone-shared-qualification.md), [routing](docs/ds41-backbone-router-qualification.md), [real TP4](docs/ds41-real-tp4-qualification.md) | Full 40-layer driver and numerical qualification |
+| Between-block preparation | [Transition checks](docs/ds41-block-transition-qualification.md) | Chained engram/query execution and owned dSpark tap validation on RTX; scheduler gather association |
 | Target initialization | [Embedding and input handoff](docs/ds41-target-embedding-qualification.md) | RTX embedding-to-attention execution and vision replacement |
 | Final target head | [Partial qualification](docs/ds41-target-head-qualification.md) | Final RTX checks after accumulation correction; sampling integration |
 | dSpark | [Draft graph](docs/ds41-dspark-draft-qualification.md), [packed cache](docs/ds41-dspark-fp8-cache-qualification.md) | RTX requalification after cache/head changes, target taps, verification, acceptance and rollback |

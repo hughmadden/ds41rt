@@ -95,6 +95,22 @@ impl DsparkMainContext<'_, '_> {
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.main.input()
     }
+    /// # Safety
+    /// Same packed requests/row order must be used for all three decoder taps.
+    /// The prepared block and this owner remain live until the stream drains.
+    pub unsafe fn enqueue_block_tap(
+        &mut self,
+        input: &crate::v41_block::PreparedBlockInput<'_>,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        self.ready = None;
+        ensure!(input.previous_binding().layer() + 1 == input.layer
+            && input.residual.bytes == input.tokens.len() * 40960
+            && input.residual.device_id == self.input().device_id,
+            "prepared dSpark tap binding or extent differs");
+        unsafe { self.enqueue_tap(input.residual, input.layer as u32,
+            u32::try_from(input.tokens.len())?, stream) }
+    }
     /// Enqueue a decoder attention-input tap directly into the stable main input.
     /// No intermediate allocation or copy; can be part of the backbone graph.
     /// # Safety
