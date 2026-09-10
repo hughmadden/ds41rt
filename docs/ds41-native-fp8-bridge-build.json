@@ -1,0 +1,32 @@
+{
+  "scope": "Native shared-library link, exported-symbol inspection, daemon build and shell syntax only",
+  "runtime_qualified": false,
+  "sparkinfer_revision": "02fea5c504f75f80fe3ec5e4e22ff20338e66803",
+  "capability": [
+    12,
+    0
+  ],
+  "physical_sms": 188,
+  "capacities": [
+    1,
+    16,
+    80,
+    256,
+    1024,
+    4096
+  ],
+  "packed_scale_bytes": 4915200,
+  "resident_bytes_per_engram_layer": 162437120,
+  "m16_execution_bytes": 1600516,
+  "library_sha256": "87370c8f64c71bdbce29cef7330373d4df8650191ff925f21c79bed9d551705a",
+  "manifest_sha256": "708ffdb4b4e6176ae13e173de191b7a9a86d919e2709c8a1022939ebd0d85acc",
+  "source_sha256": {
+    "native/include/ds41rt_v41_fp8.h": "b43bf0c75b904f4afabeab72e766de67c8f2abd19d9aa246abe2bc976626e5e6",
+    "native/src/v41_fp8.cc": "76cdcc096fb83e64c994bdf37e364df0d3e75bc22f5f5861b0b8594c6b867aff",
+    "native/cuda/kernels/v41_fp8.cu": "fcea089a948ff7ba8d7a3351b1b090a0f9d264dcdc5ffe18ee2d385b54614fd3",
+    "native/cmake/v41_fp8.cmake": "1b7af4757faa6a165df1252b228076daa1e1371e8a06cd97ee1907e5ac20917a",
+    "python/tools/export_b12x_v41_fp8_aot.py": "8c50e54ef4bcfeba9fbf3a339c46a649acabc281c5e95142e1e4c2c24c7e61de",
+    "rust/crates/ds41rt-ffi/src/v41_fp8.rs": "01c20dc45a00b33127184b83c29b50cd9135515eb534d670ca99dc38f3365791",
+    "rust/crates/ds41rt-daemon/src/v41_engram/layer.rs": "d8880ca1692ba5e0fea76c2c634c67d6f4e5cd18bb7953c31837a1b460463168"
+  }
+}

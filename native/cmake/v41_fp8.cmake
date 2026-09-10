@@ -14,7 +14,7 @@ foreach(rows IN ITEMS 1 16 80 256 1024 4096)
   endforeach()
 endforeach()
 add_custom_command(
-  OUTPUT "${DS41RT_V41_FP8_DIR}/v41_fp8.json"
+  OUTPUT "${DS41RT_V41_FP8_DIR}/v41_fp8.json" "${DS41RT_V41_FP8_DIR}/v41_fp8_variants.h"
     ${DS41RT_V41_FP8_OBJECTS} ${DS41RT_V41_FP8_HEADERS}
   COMMAND ${DS41RT_SPARKINFER_VERIFY_COMMAND}
   COMMAND "${CMAKE_COMMAND}" -E env ${DS41RT_SPARKINFER_PYTHON_ENV}
@@ -26,8 +26,8 @@ add_custom_command(
   COMMENT "Exporting native V4.1 K32 quantization and FP8 projections"
   VERBATIM
 )
-add_custom_target(ds41rt_v41_fp8_export DEPENDS "${DS41RT_V41_FP8_DIR}/v41_fp8.json"
+add_custom_target(ds41rt_v41_fp8_export DEPENDS "${DS41RT_V41_FP8_DIR}/v41_fp8.json" "${DS41RT_V41_FP8_DIR}/v41_fp8_variants.h"
   ${DS41RT_V41_FP8_OBJECTS} ${DS41RT_V41_FP8_HEADERS})
 add_dependencies(ds41rt_v41_fp8_export ds41rt_verify_sparkinfer_source)
 set_source_files_properties(${DS41RT_V41_FP8_OBJECTS} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
-list(APPEND DS41RT_NATIVE_SOURCES ${DS41RT_V41_FP8_OBJECTS})
+list(APPEND DS41RT_NATIVE_SOURCES ${DS41RT_V41_FP8_OBJECTS} src/v41_fp8.cc cuda/kernels/v41_fp8.cu)

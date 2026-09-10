@@ -372,6 +372,7 @@ trap 'docker rm -f "$coordinator_container" >/dev/null 2>&1 || true' EXIT
 docker cp "$coordinator_container:/opt/ds41rt/bin/ds41rt" "$repo_root/dist/coordinator/ds41rt"
 docker cp "$coordinator_container:/opt/ds41rt/lib/libds41rt_native.so" "$repo_root/dist/coordinator/libds41rt_native.so"
 docker cp "$coordinator_container:/opt/ds41rt/share/V41_EXPERT_AOT.json" "$repo_root/dist/coordinator/V41_EXPERT_AOT.json"
+docker cp "$coordinator_container:/opt/ds41rt/share/V41_FP8_AOT.json" "$repo_root/dist/coordinator/V41_FP8_AOT.json"
 docker cp \
   "$coordinator_container:/opt/ds41rt/share/THIRD_PARTY_NOTICES.md" \
   "$repo_root/dist/coordinator/THIRD_PARTY_NOTICES.md"
@@ -408,6 +409,7 @@ trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
 docker cp "$container:/opt/ds41rt/bin/ds41rt" "$destination/ds41rt"
 docker cp "$container:/opt/ds41rt/lib/libds41rt_native.so" "$destination/libds41rt_native.so"
 docker cp "$container:/opt/ds41rt/share/V41_EXPERT_AOT.json" "$destination/V41_EXPERT_AOT.json"
+docker cp "$container:/opt/ds41rt/share/V41_FP8_AOT.json" "$destination/V41_FP8_AOT.json"
 docker cp \
   "$container:/opt/ds41rt/share/THIRD_PARTY_NOTICES.md" \
   "$destination/THIRD_PARTY_NOTICES.md"
@@ -456,7 +458,7 @@ done
 (
   cd "$repo_root/dist"
   sha256sum \
-    coordinator/ds41rt coordinator/libds41rt_native.so coordinator/V41_EXPERT_AOT.json \
+    coordinator/ds41rt coordinator/libds41rt_native.so coordinator/V41_EXPERT_AOT.json coordinator/V41_FP8_AOT.json \
     coordinator/THIRD_PARTY_NOTICES.md \
     coordinator/SPARKINFER_PROVENANCE.json \
     coordinator/SPARKINFER_LICENSE \
@@ -464,7 +466,7 @@ done
     coordinator/XGRAMMAR_PROVENANCE.json \
     coordinator/XGRAMMAR_LICENSE \
     coordinator/XGRAMMAR_SHA256SUMS \
-    spark-expert/ds41rt spark-expert/libds41rt_native.so spark-expert/V41_EXPERT_AOT.json \
+    spark-expert/ds41rt spark-expert/libds41rt_native.so spark-expert/V41_EXPERT_AOT.json spark-expert/V41_FP8_AOT.json \
     spark-expert/THIRD_PARTY_NOTICES.md \
     spark-expert/SPARKINFER_PROVENANCE.json \
     spark-expert/SPARKINFER_LICENSE \

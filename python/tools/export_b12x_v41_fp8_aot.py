@@ -34,6 +34,31 @@ def validate_abi(path: Path, label: str, kind: str) -> dict:
     return {'symbol': symbols[0], 'pointers': pointers, 'i32': scalars, 'stream': stream, 'argument_count': count}
 
 
+def dispatch_header(output: Path, manifest: dict) -> None:
+    from b12x._lib.quant.mxfp8_rows import mxfp8_rows_quant_aot_grid
+    lines = ['#pragma once', '#include <stdint.h>',
+             f"#define DS41RT_V41_FP8_SMS {manifest['physical_sms']}"]
+    variants = []
+    for variant in manifest['variants']:
+        label, capacity = variant['label'], variant['capacity']
+        for kind in ('quant', 'gemm'):
+            lines.append(f'#include "{label}_{kind}.h"')
+        grids = [mxfp8_rows_quant_aot_grid(size_k=6144, rows=rows, expected_m=capacity,
+                                         sm_count=manifest['physical_sms']) for rows in range(1, capacity + 1)]
+        lines.append('static const uint32_t ' + label + '_grids[] = {' + ','.join(map(str, grids)) + '};')
+        info = [1, capacity, 6144, 25600, variant['activation_scratch_bytes'],
+                variant['activation_values_offset'], variant['activation_row_scales_offset'],
+                variant['activation_mma_scales_offset'], 4915200]
+        modules = []
+        for kind in ('quant', 'gemm'):
+            prefix = '_mlir_ds41rt_' + label + '_' + kind
+            modules.append('{' + ','.join((prefix + '_cuda_init', prefix + '_cuda_load_to_device',
+                                           variant[kind + '_abi']['symbol'])) + '}')
+        variants.append('{{' + ','.join(map(str, info)) + '},' + ','.join(modules) + ',' + label + '_grids}')
+    lines.append('#define DS41RT_V41_FP8_VARIANTS ' + ','.join(variants))
+    (output / 'v41_fp8_variants.h').write_text('\n'.join(lines) + '\n')
+
+
 def export(output: Path, rows: tuple[int, ...]) -> None:
     os.environ['SPARKINFER_COMPILE_DISK_CACHE'] = '0'
     os.environ['SPARKINFER_COMPILE_MEMORY_CACHE'] = '0'
@@ -74,7 +99,8 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
             'quant_abi': validate_abi(output / (label + '_quant.h'), label + '_quant', 'quant'),
             'gemm_abi': validate_abi(output / (label + '_gemm.h'), label + '_gemm', 'gemm')})
         print(f'exported {label}', flush=True)
-    artifacts = {}
+    dispatch_header(output, manifest)
+    artifacts = {"v41_fp8_variants.h": hashlib.sha256((output / "v41_fp8_variants.h").read_bytes()).hexdigest()}
     for variant in manifest['variants']:
         for kind in ('quant', 'gemm'):
             for suffix in ('.h', '.o'):

@@ -1,0 +1,204 @@
+//! Library-borrowing native V4.1 engram FP8 launch handle.
+use crate::{Ds41rtDeviceBuffer, NativeLibrary};
+use anyhow::{ensure, Result};
+use std::{ffi::c_void, ptr::NonNull};
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct V41Fp8Info {
+    pub abi_version: u32,
+    pub capacity_rows: u32,
+    pub input_dim: u32,
+    pub output_dim: u32,
+    pub scratch_bytes: u64,
+    pub values_offset: u64,
+    pub row_scales_offset: u64,
+    pub mma_scales_offset: u64,
+    pub packed_weight_scale_bytes: u64,
+}
+const _: [(); 56] = [(); std::mem::size_of::<V41Fp8Info>()];
+
+type InfoFn = unsafe extern "C" fn(i32, *mut V41Fp8Info) -> i32;
+type InitFn = unsafe extern "C" fn(i32, *mut *mut c_void) -> i32;
+type ScratchFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut f32, *mut c_void) -> i32;
+type PackFn = unsafe extern "C" fn(*const u8, *mut u8, *mut c_void) -> i32;
+type LaunchFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const u16,
+    *const u8,
+    *const u8,
+    *mut c_void,
+    u64,
+    *const f32,
+    *mut u16,
+    i32,
+    *mut c_void,
+) -> i32;
+pub struct V41Fp8Kernel<'a> {
+    _library: &'a NativeLibrary,
+    handle: NonNull<c_void>,
+    info: V41Fp8Info,
+    scratch: ScratchFn,
+    pack: PackFn,
+    launch: LaunchFn,
+}
+impl NativeLibrary {
+    pub fn v41_fp8_info(&self, capacity: u32) -> Result<V41Fp8Info> {
+        let capacity = i32::try_from(capacity)?;
+        let function: InfoFn = unsafe { *self.lib.get(b"ds41rt_v41_fp8_info")? };
+        let mut info = V41Fp8Info::default();
+        let status = unsafe { function(capacity, &mut info) };
+        ensure!(
+            status == 0,
+            "native V4.1 FP8 info failed with CUDA status {status}"
+        );
+        ensure!(
+            info.abi_version == 1
+                && info.capacity_rows == capacity as u32
+                && info.input_dim == 6144
+                && info.output_dim == 25600
+                && info.packed_weight_scale_bytes == 4915200,
+            "unsupported native V4.1 FP8 geometry/ABI"
+        );
+        ensure!(
+            info.values_offset < info.scratch_bytes
+                && info.row_scales_offset < info.scratch_bytes
+                && info.mma_scales_offset < info.scratch_bytes,
+            "invalid native FP8 scratch offsets"
+        );
+        Ok(info)
+    }
+    pub fn v41_fp8_kernel(&self, capacity: u32) -> Result<V41Fp8Kernel<'_>> {
+        let info = self.v41_fp8_info(capacity)?;
+        unsafe {
+            let initialize: InitFn = *self.lib.get(b"ds41rt_v41_fp8_initialize")?;
+            let scratch = *self.lib.get(b"ds41rt_v41_fp8_initialize_scratch")?;
+            let pack = *self.lib.get(b"ds41rt_v41_fp8_pack_scales")?;
+            let launch = *self.lib.get(b"ds41rt_v41_fp8_launch")?;
+            let mut handle = std::ptr::null_mut();
+            let status = initialize(i32::try_from(capacity)?, &mut handle);
+            ensure!(
+                status == 0,
+                "native V4.1 FP8 initialization failed with CUDA status {status}"
+            );
+            let handle = NonNull::new(handle)
+                .ok_or_else(|| anyhow::anyhow!("native FP8 returned null handle"))?;
+            Ok(V41Fp8Kernel {
+                _library: self,
+                handle,
+                info,
+                scratch,
+                pack,
+                launch,
+            })
+        }
+    }
+}
+fn require(buffer: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
+    ensure!(
+        !buffer.ptr.is_null() && buffer.bytes >= bytes,
+        "native FP8 buffer is null or too small"
+    );
+    Ok(())
+}
+impl V41Fp8Kernel<'_> {
+    pub fn info(&self) -> V41Fp8Info {
+        self.info
+    }
+    /// # Safety
+    /// Scratch and alpha are distinct current-device allocations that remain live
+    /// until completion; initialize outside capture before executing/replaying.
+    pub unsafe fn initialize_scratch(
+        &self,
+        scratch: Ds41rtDeviceBuffer,
+        alpha: Ds41rtDeviceBuffer,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        require(scratch, usize::try_from(self.info.scratch_bytes)?)?;
+        require(alpha, 4)?;
+        let status = unsafe {
+            (self.scratch)(
+                self.handle.as_ptr(),
+                scratch.ptr,
+                scratch.bytes as u64,
+                alpha.ptr.cast(),
+                stream,
+            )
+        };
+        ensure!(
+            status == 0,
+            "native FP8 scratch initialization failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+    /// # Safety
+    /// Source is native UE8M0 [800,192]; destination is distinct current-device
+    /// storage, with both allocations live and correctly ordered through completion.
+    pub unsafe fn pack_scales(
+        &self,
+        source: Ds41rtDeviceBuffer,
+        destination: Ds41rtDeviceBuffer,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        require(source, 153600)?;
+        require(
+            destination,
+            usize::try_from(self.info.packed_weight_scale_bytes)?,
+        )?;
+        let status = unsafe { (self.pack)(source.ptr.cast(), destination.ptr.cast(), stream) };
+        ensure!(
+            status == 0,
+            "native FP8 scale packing failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+    /// # Safety
+    /// Source/output are BF16, weights native row-major FP8, scales packed by this
+    /// kernel and alpha initialized to one. All buffers are distinct on the current
+    /// device, correctly ordered on stream, and remain live through completion and
+    /// any graph replay; scratch is exclusively owned by this in-flight wave.
+    pub unsafe fn launch(
+        &self,
+        source: Ds41rtDeviceBuffer,
+        weight: Ds41rtDeviceBuffer,
+        scales: Ds41rtDeviceBuffer,
+        scratch: Ds41rtDeviceBuffer,
+        alpha: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            rows > 0 && rows <= self.info.capacity_rows,
+            "native FP8 rows exceed capacity"
+        );
+        require(source, rows as usize * 6144 * 2)?;
+        require(weight, 157286400)?;
+        require(
+            scales,
+            usize::try_from(self.info.packed_weight_scale_bytes)?,
+        )?;
+        require(scratch, usize::try_from(self.info.scratch_bytes)?)?;
+        require(alpha, 4)?;
+        require(output, rows as usize * 25600 * 2)?;
+        let status = unsafe {
+            (self.launch)(
+                self.handle.as_ptr(),
+                source.ptr.cast(),
+                weight.ptr.cast(),
+                scales.ptr.cast(),
+                scratch.ptr,
+                scratch.bytes as u64,
+                alpha.ptr.cast(),
+                output.ptr.cast(),
+                i32::try_from(rows)?,
+                stream,
+            )
+        };
+        ensure!(
+            status == 0,
+            "native FP8 projection failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+}

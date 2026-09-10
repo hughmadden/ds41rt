@@ -68,6 +68,7 @@ cmake \
   -G Ninja \
   -DDS41RT_ENABLE_CUDA=ON \
   -DDS41RT_ENABLE_V41_EXPERT_AOT=ON \
+  -DDS41RT_ENABLE_V41_FP8_AOT="$coordinator_aot" \
   -DDS41RT_ENABLE_RDMA=ON \
   -DDS41RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
   -DDS41RT_ENABLE_SPARKINFER_COORDINATOR_AOT="$coordinator_aot" \
@@ -86,8 +87,13 @@ cmake --build "$build_dir/native"
 install -m 0755 "$CARGO_TARGET_DIR/release/ds41rt" "$output_dir/ds41rt"
 install -m 0755 "$build_dir/native/libds41rt_native.so" "$output_dir/libds41rt_native.so"
 install -m 0644 "$build_dir/native/v41_experts/v41_experts.json" "$output_dir/V41_EXPERT_AOT.json"
+if [[ "$coordinator_aot" == ON ]]; then
+  install -m 0644 "$build_dir/native/v41_fp8/v41_fp8.json" "$output_dir/V41_FP8_AOT.json"
+else
+  printf '%s\n' '{"schema":1,"role":"expert","enabled":false}' >"$output_dir/V41_FP8_AOT.json"
+fi
 (
   cd "$output_dir"
-  sha256sum ds41rt libds41rt_native.so V41_EXPERT_AOT.json >ARTIFACT_SHA256SUMS
+  sha256sum ds41rt libds41rt_native.so V41_EXPERT_AOT.json V41_FP8_AOT.json >ARTIFACT_SHA256SUMS
   sha256sum -c ARTIFACT_SHA256SUMS
 )

@@ -1,3 +1,5 @@
+mod v41_fp8;
+pub use v41_fp8::{V41Fp8Info, V41Fp8Kernel};
 mod v41_experts;
 pub use v41_experts::{
     V41ExpertInfo, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPacker, V41ExpertPointer,
