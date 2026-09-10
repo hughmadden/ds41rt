@@ -158,3 +158,5 @@ Native expert scratch views and initialization now derive directly from the expo
 Native expert packing now preserves official FP4/E8M0 bytes through Rust/CUDA and M16 expert execution; prepared backbone weights require 80,216,064,000 bytes per Spark (8,021,606,400 bytes above checkpoint storage), plus reusable 4,700,160-byte per-expert input staging and separate runtime allocations, as recorded in `ds41-native-expert-packing-qualification.md`.
 
 The official catalog now supplies aligned per-expert staging plans directly to native packing, with exact full-header-fixture-to-GPU checks for all four TP ranks and full dSpark on RTX; production layer ownership and execution orchestration remain open in `ds41-expert-staging-qualification.md`.
+
+The daemon now owns four packed buffers per expert layer and releases bounded loading staging before returning, with complete synthetic RTX dSpark and ostrich TP-rank-3 layer loads and allocation-failure cleanup qualified in `ds41-owned-expert-qualification.md`; graph lifetime and serving integration remain open.

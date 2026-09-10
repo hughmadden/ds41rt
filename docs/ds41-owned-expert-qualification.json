@@ -1,0 +1,57 @@
+{
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_experts.rs": "a111920132a22bbece0f95458d0d5e7cff2ff1a8cd0bc342f52ef385956fea0f",
+    "rust/crates/ds41rt-daemon/src/main.rs": "22f0f26e07a9ec4957866323f27def115076fc3aa475da6f50dafcd0fad1b69e"
+  },
+  "owned_layer_checks": {
+    "rtx": {
+      "allocation_audit": "owned layer Dspark { stage: 0 }: resident=2406481920 pinned=18800640 staging=18800640 scratch=0, budget rejection, allocation injection, I/O cleanup, resident allocation counts and free passed",
+      "packed_bytes": [
+        {
+          "role": "dspark",
+          "expert": 0,
+          "engine_owned_packed_bytes": "exact"
+        },
+        {
+          "role": "dspark",
+          "expert": 64,
+          "engine_owned_packed_bytes": "exact"
+        },
+        {
+          "role": "dspark",
+          "expert": 127,
+          "engine_owned_packed_bytes": "exact"
+        }
+      ]
+    },
+    "ostrich": {
+      "allocation_audit": "owned layer Backbone { layer: 0, rank: 3 }: resident=2005401600 pinned=4700160 staging=4700160 scratch=73728, budget rejection, allocation injection, I/O cleanup, resident allocation counts and free passed",
+      "packed_bytes": [
+        {
+          "role": "backbone",
+          "expert": 0,
+          "engine_owned_packed_bytes": "exact"
+        },
+        {
+          "role": "backbone",
+          "expert": 192,
+          "engine_owned_packed_bytes": "exact"
+        },
+        {
+          "role": "backbone",
+          "expert": 383,
+          "engine_owned_packed_bytes": "exact"
+        }
+      ]
+    }
+  },
+  "fixture_sha256": {
+    "/tmp/ds41-owned-weights/src/main.rs": "66d70a8c6d3547edba2a696e3e4613fcfd53ff2ced30f77b214193e7133b7be4",
+    "/tmp/ds41-v41-aot/allocation_audit.cc": "51c6e9b6a329ac11966450e24e1e927f27001d4bc7929ccb15624fc1d53d87e4",
+    "/tmp/ds41-v41-aot/prepare_owned_fixture.py": "19b539e41a2f34f23e3116711e1eba6a6227bb033b7990fcf5e29ec2489b6546",
+    "/tmp/ds41-v41-aot/check_owned_weights.py": "a27cd673cf3080f1dc9c671fcdf2b97bd9799b33ea803725820e019dd16f0501",
+    "/tmp/ds41-v41-aot/owned-fixture.json": "d09a8ba0254363128189740abda3656145da758ad6504fc7a210f0ad7d689870"
+  },
+  "daemon_compile": "passed, 438 warnings including the new module awaiting serving integration",
+  "scope": "Production engine owner loaded complete synthetic dSpark layer on RTX 0 and backbone TP rank-3 layer on ostrich; exact samples, allocation admission and cleanup, not serving execution."
+}
