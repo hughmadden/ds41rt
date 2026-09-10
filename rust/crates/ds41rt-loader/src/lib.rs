@@ -1,3 +1,5 @@
+mod engram_gather;
+pub use engram_gather::{EngramGatherer, EngramGatherLease, EngramGatherPoll, EngramGatherTicket};
 mod engram_staging;
 pub use engram_staging::{EngramBatchStaging, EngramGatherView};
 mod v41_expert_staging;

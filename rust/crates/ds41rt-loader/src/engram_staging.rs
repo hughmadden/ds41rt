@@ -21,6 +21,16 @@ pub struct EngramGatherView<'a> {
     pub layer_index: usize,
 }
 impl EngramBatchStaging {
+    /// Vec payload budget, excluding allocator metadata and request-owned batches.
+    pub fn storage_bytes(capacity: usize) -> Result<usize> {
+        ensure!(
+            capacity > 0 && capacity <= 4096,
+            "invalid engram staging capacity"
+        );
+        capacity
+            .checked_mul(24 * (256 + 8 + std::mem::size_of::<(u64, usize)>()) + 1)
+            .context("engram staging budget overflow")
+    }
     pub fn new(capacity: usize) -> Result<Self> {
         ensure!(
             capacity > 0 && capacity <= 4096,

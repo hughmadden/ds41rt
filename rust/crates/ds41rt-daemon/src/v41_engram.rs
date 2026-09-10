@@ -2,7 +2,7 @@
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
-use ds41rt_loader::EngramGatherView;
+use ds41rt_loader::{EngramGatherPoll, EngramGatherTicket, EngramGatherView};
 
 pub(crate) struct EngramDeviceRows<'a> {
     stream: LoadStream<'a>,
@@ -21,7 +21,26 @@ pub(crate) struct EngramDeviceView {
     pub rows: usize,
     pub layer_index: usize,
 }
+pub(crate) enum EngramUploadPoll {
+    Pending,
+    Cancelled,
+    Ready(EngramDeviceView),
+}
 impl<'a> EngramDeviceRows<'a> {
+    /// Poll on the CUDA-owning thread and recycle ready staging after upload.
+    /// The scheduler must cancel tickets whose request history has been invalidated.
+    pub fn poll_upload(&mut self, ticket: &mut EngramGatherTicket) -> Result<EngramUploadPoll> {
+        self.ready = None;
+        Ok(match ticket.poll()? {
+            EngramGatherPoll::Pending => EngramUploadPoll::Pending,
+            EngramGatherPoll::Cancelled => EngramUploadPoll::Cancelled,
+            EngramGatherPoll::Ready(lease) => {
+                let output = self.upload(&lease.view()?)?;
+                // upload synchronizes before the lease returns its storage to the pool.
+                EngramUploadPoll::Ready(output)
+            }
+        })
+    }
     pub fn device_bytes(capacity: usize) -> Result<usize> {
         ensure!(
             capacity > 0 && capacity <= 4096,
