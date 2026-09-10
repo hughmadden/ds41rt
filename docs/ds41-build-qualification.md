@@ -44,3 +44,5 @@ The coordinator image and both deployed Spark images launch `ds41rt --help` succ
 `ds41-container-build-qualification.json` records the image IDs, architectures, revision labels, and source identity.
 
 This successful build precedes the new strict configuration reader, and the default model configuration/execution path still needs migration from V4; full run/restart/stop and official checkpoint execution remain open.
+
+The later native-expert precision migration uses signature `DS41RTE3` and wire revision 3, so the earlier container build recorded here must be replaced before deploying the updated transport.

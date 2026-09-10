@@ -135,9 +135,9 @@ void write_le64(std::vector<unsigned char>& bytes, size_t offset, uint64_t value
 std::vector<unsigned char> protocol_v2_frame(uint16_t kind, size_t payload_bytes) {
   constexpr size_t kHeaderBytes = 96;
   std::vector<unsigned char> frame(kHeaderBytes + payload_bytes, 0);
-  const unsigned char magic[8] = {'D', 'S', '4', '1', 'R', 'T', 'E', '2'};
+  const unsigned char magic[8] = {'D', 'S', '4', '1', 'R', 'T', 'E', '3'};
   std::memcpy(frame.data(), magic, sizeof(magic));
-  write_le16(frame, 8, 2);
+  write_le16(frame, 8, 3);
   write_le16(frame, 10, kind);
   write_le32(frame, 12, static_cast<uint32_t>(kHeaderBytes));
   write_le64(frame, kind == 1 ? 76 : 60, static_cast<uint64_t>(frame.size()));

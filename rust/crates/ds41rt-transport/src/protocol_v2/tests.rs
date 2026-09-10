@@ -415,7 +415,7 @@ fn streamed_ingress_completion_plan_roundtrips_and_matches_request_routes() -> R
 }
 
 #[test]
-fn route_entries_carry_gate_weights_as_bf16_on_wire() -> Result<()> {
+fn route_entries_preserve_fp32_gate_weights_on_wire() -> Result<()> {
     let hidden_dim = 2;
     let hidden_payload = vec![0_u8; hidden_dim * ExpertV2Dtype::Bf16.bytes_per_element()];
     let request = ExpertProtocolV2Request::new(
@@ -439,22 +439,22 @@ fn route_entries_carry_gate_weights_as_bf16_on_wire() -> Result<()> {
         }],
         hidden_payload,
     )?;
-    let expected_gate_bits = (0.1_f32.to_bits() >> 16) as u16;
-    let expected_gate = f32::from_bits((expected_gate_bits as u32) << 16);
+    let expected_gate_bits = 0.1_f32.to_bits();
+    let expected_gate = f32::from_bits(expected_gate_bits);
     let encoded = request.encode()?;
     let route_offset =
         EXPERT_PROTOCOL_V2_REQUEST_HEADER_LEN + EXPERT_PROTOCOL_V2_ROW_DESCRIPTOR_LEN;
     let decoded = ExpertProtocolV2Request::decode(&encoded)?;
     let view = ExpertProtocolV2RequestView::parse(&encoded)?;
 
-    assert_eq!(EXPERT_PROTOCOL_V2_ROUTE_ENTRY_LEN, 10);
-    assert_eq!(request.header.route_bytes, 10);
+    assert_eq!(EXPERT_PROTOCOL_V2_ROUTE_ENTRY_LEN, 12);
+    assert_eq!(request.header.route_bytes, 12);
     assert_eq!(
         request.routes[0].gate_weight.to_bits(),
         expected_gate.to_bits()
     );
     assert_eq!(
-        &encoded[route_offset + 8..route_offset + 10],
+        &encoded[route_offset + 8..route_offset + 12],
         &expected_gate_bits.to_le_bytes()
     );
     assert_eq!(
@@ -1550,4 +1550,75 @@ fn request_payload_offset(request: &ExpertProtocolV2Request) -> usize {
 
 fn request_payload_ptr<'a>(encoded: &'a [u8], request: &ExpertProtocolV2Request) -> *const u8 {
     encoded[request_payload_offset(request)..].as_ptr()
+}
+
+#[test]
+fn native_v41_fp32_weights_survive_owned_and_borrowed_frames() -> Result<()> {
+    for bits in [
+        0x3dcc_cccd,
+        0x3f80_0001,
+        0x0000_0001,
+        0x0080_0001,
+        0x7f7f_ffff,
+    ] {
+        let mut frame = request(1, ExpertV2SourceKind::MtpVerify)?;
+        frame.routes[0].gate_weight = f32::from_bits(bits);
+        let wire = frame.with_debug_checksum().encode()?;
+        assert_eq!(
+            ExpertProtocolV2Request::decode(&wire)?.routes[0]
+                .gate_weight
+                .to_bits(),
+            bits
+        );
+        assert_eq!(
+            ExpertProtocolV2RequestView::parse(&wire)?
+                .route(0)?
+                .gate_weight
+                .to_bits(),
+            bits
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn native_v41_route_planes_roundtrip_as_fp32_without_payload_conversion() -> Result<()> {
+    let rows = 16;
+    let output_dim = 6 * 5120;
+    let payload = (0..rows * output_dim)
+        .flat_map(|i| ((i as f32 - 1000.25) / 17.0).to_le_bytes())
+        .collect::<Vec<_>>();
+    let response = ExpertProtocolV2Response::new(
+        42,
+        7,
+        13,
+        rows,
+        output_dim,
+        ExpertV2Dtype::F32,
+        ExpertProtocolV2Status::Ok,
+        payload.clone(),
+    )?
+    .with_debug_checksum();
+    let wire = response.encode()?;
+    let owned = ExpertProtocolV2Response::decode(&wire)?;
+    assert_eq!(owned.header.output_dtype, ExpertV2Dtype::F32);
+    assert_eq!(owned.header.output_row_stride_bytes, 6 * 5120 * 4);
+    assert_eq!(owned.partial_output_payload, payload);
+    let view = ExpertProtocolV2ResponseView::parse(&wire)?;
+    assert_eq!(view.header.output_payload_bytes, 16 * 6 * 5120 * 4);
+    assert!(ExpertV2Dtype::F32.row_bytes(usize::MAX).is_err());
+    Ok(())
+}
+
+#[test]
+fn native_v41_wire_rejects_previous_signature_and_version() -> Result<()> {
+    let mut wire = request(1, ExpertV2SourceKind::Decode)?.encode()?;
+    wire[8..10].copy_from_slice(&2_u16.to_le_bytes());
+    assert!(ExpertProtocolV2Request::decode(&wire).is_err());
+    assert!(ExpertProtocolV2RequestView::parse(&wire).is_err());
+    wire[8..10].copy_from_slice(&3_u16.to_le_bytes());
+    wire[..8].copy_from_slice(b"DS41RTE2");
+    assert!(ExpertProtocolV2Request::decode(&wire).is_err());
+    assert!(ExpertProtocolV2RequestView::parse(&wire).is_err());
+    Ok(())
 }

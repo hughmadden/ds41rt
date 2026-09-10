@@ -3,8 +3,8 @@ use bytes::Bytes;
 use ds41rt_ffi::Ds41rtDeviceBuffer;
 use sha2::{Digest, Sha256};
 
-const MAGIC: &[u8; 8] = b"DS41RTE2";
-const VERSION: u16 = 2;
+const MAGIC: &[u8; 8] = b"DS41RTE3";
+const VERSION: u16 = 3;
 const REQUEST_KIND: u16 = 1;
 const RESPONSE_KIND: u16 = 2;
 pub const EXPERT_PROTOCOL_V2_FRAME_PROTOCOL: &str = "ExpertProtocolV2";
@@ -13,7 +13,7 @@ pub const EXPERT_PROTOCOL_V2_RESPONSE_HEADER_LEN: usize = 96;
 pub const EXPERT_PROTOCOL_V2_REQUEST_DEBUG_HEADER_LEN: usize = 128;
 pub const EXPERT_PROTOCOL_V2_RESPONSE_DEBUG_HEADER_LEN: usize = 128;
 pub const EXPERT_PROTOCOL_V2_ROW_DESCRIPTOR_LEN: usize = 40;
-pub const EXPERT_PROTOCOL_V2_ROUTE_ENTRY_LEN: usize = 10;
+pub const EXPERT_PROTOCOL_V2_ROUTE_ENTRY_LEN: usize = 12;
 pub const EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM: u32 = 1 << 0;
 pub const EXPERT_PROTOCOL_V2_FLAG_PRECOMPILE_WARMUP: u32 = 1 << 1;
 pub const EXPERT_PROTOCOL_V2_FLAG_RESPONSE_ROW_INDICES: u32 = 1 << 2;
@@ -48,11 +48,14 @@ pub enum ExpertV2Dtype {
     Nvfp4E2m1Fp8E4m3 = 4,
     /// E4M3 values followed by one little-endian FP32 dequantization scale per row.
     Fp8E4m3RowScaled = 5,
+    /// Unrounded native expert partial sums.
+    F32 = 6,
 }
 
 impl ExpertV2Dtype {
     pub fn bytes_per_element(self) -> usize {
         match self {
+            Self::F32 => 4,
             Self::Bf16 | Self::F16 => 2,
             Self::Fp8Debug | Self::Nvfp4E2m1Fp8E4m3 | Self::Fp8E4m3RowScaled => 1,
         }
@@ -60,6 +63,9 @@ impl ExpertV2Dtype {
 
     pub fn row_bytes(self, elements: usize) -> Result<usize> {
         match self {
+            Self::F32 => elements
+                .checked_mul(4)
+                .context("FP32 row byte count overflow"),
             Self::Bf16 | Self::F16 => elements
                 .checked_mul(2)
                 .context("16-bit row byte count overflow"),
@@ -88,6 +94,7 @@ impl ExpertV2Dtype {
             3 => Ok(Self::Fp8Debug),
             4 => Ok(Self::Nvfp4E2m1Fp8E4m3),
             5 => Ok(Self::Fp8E4m3RowScaled),
+            6 => Ok(Self::F32),
             other => bail!("unknown ExpertProtocolV2 dtype {other}"),
         }
     }
@@ -552,36 +559,21 @@ fn decode_row_descriptor(bytes: &[u8], offset: usize) -> Result<ExpertProtocolV2
 fn encode_route_entry(out: &mut Vec<u8>, route: &ExpertProtocolV2RouteEntry) {
     push_u32(out, route.row_index);
     push_u32(out, route.expert_id);
-    out.extend_from_slice(&f32_to_bf16_bits(route.gate_weight).to_le_bytes());
+    out.extend_from_slice(&route.gate_weight.to_le_bytes());
 }
 
 fn decode_route_entry(bytes: &[u8], offset: usize) -> Result<ExpertProtocolV2RouteEntry> {
     Ok(ExpertProtocolV2RouteEntry {
         row_index: read_u32(bytes, offset, "row_index")?,
         expert_id: read_u32(bytes, offset + 4, "expert_id")?,
-        gate_weight: bf16_bits_to_f32(u16::from_le_bytes(
+        gate_weight: f32::from_le_bytes(
             bytes
-                .get(offset + 8..offset + 10)
-                .context("reading gate_weight")?
+                .get(offset + 8..offset + 12)
+                .context("reading FP32 gate_weight")?
                 .try_into()
                 .unwrap(),
-        )),
+        ),
     })
-}
-
-fn canonical_route_entry(route: ExpertProtocolV2RouteEntry) -> ExpertProtocolV2RouteEntry {
-    ExpertProtocolV2RouteEntry {
-        gate_weight: bf16_bits_to_f32(f32_to_bf16_bits(route.gate_weight)),
-        ..route
-    }
-}
-
-fn f32_to_bf16_bits(value: f32) -> u16 {
-    (value.to_bits() >> 16) as u16
-}
-
-fn bf16_bits_to_f32(bits: u16) -> f32 {
-    f32::from_bits((bits as u32) << 16)
 }
 
 fn payload_checksum(

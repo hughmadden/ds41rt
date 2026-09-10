@@ -46,3 +46,5 @@ Native loader progress: the 96,085-tensor checkpoint contract now validates phys
 Native expert progress: `silu_v41` now preserves official projection rounding and intermediate router weighting with FP32 per-route accumulation, passing six native/graph cases on both RTX GPUs and ostrich/dodo, while TP-global rounding and runtime integration remain open in `docs/ds41-expert-qualification.md`.
 
 TP arithmetic progress: native scratch-backed FP32 route outputs and TP4-before-BF16 reduction now match full-width experts on both RTX GPUs and ostrich/dodo, while FP32 routing/payload transport and runtime wiring remain open in `docs/ds41-tp4-qualification.json`.
+
+Wire precision progress: revision-3 frames preserve FP32 routing weights and FP32 output payloads with owned/borrowed and persistent-TCP checks, while native executor, per-route collective, and RDMA integration remain open in `docs/ds41-wire-qualification.md`.

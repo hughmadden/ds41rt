@@ -119,8 +119,8 @@ uint64_t read_le64(const unsigned char* bytes) {
 ds41rt_status_t validate_protocol_v2_frame(const void* frame, size_t frame_bytes,
                                           uint16_t expected_kind,
                                           const char* label) {
-  constexpr unsigned char kMagic[8] = {'D', 'S', '4', '1', 'R', 'T', 'E', '2'};
-  constexpr uint16_t kVersion = 2;
+  constexpr unsigned char kMagic[8] = {'D', 'S', '4', '1', 'R', 'T', 'E', '3'};
+  constexpr uint16_t kVersion = 3;
   constexpr uint32_t kHotHeaderBytes = 96;
   constexpr uint32_t kDebugHeaderBytes = 128;
   constexpr uint32_t kDebugChecksumFlag = 1u;

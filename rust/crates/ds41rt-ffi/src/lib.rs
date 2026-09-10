@@ -17875,8 +17875,8 @@ mod tests {
     fn protocol_v2_frame(kind: u16, payload_bytes: usize) -> Vec<u8> {
         const HEADER_BYTES: usize = 96;
         let mut frame = vec![0_u8; HEADER_BYTES + payload_bytes];
-        frame[..8].copy_from_slice(b"DS41RTE2");
-        frame[8..10].copy_from_slice(&2_u16.to_le_bytes());
+        frame[..8].copy_from_slice(b"DS41RTE3");
+        frame[8..10].copy_from_slice(&3_u16.to_le_bytes());
         frame[10..12].copy_from_slice(&kind.to_le_bytes());
         frame[12..16].copy_from_slice(&(HEADER_BYTES as u32).to_le_bytes());
         let frame_len = frame.len() as u64;

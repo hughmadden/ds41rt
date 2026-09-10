@@ -146,3 +146,5 @@ The official FP4 expert rounds FC1 projections to BF16 and applies routing weigh
 The new b12x `silu_v41` contract implements this sequence and accumulates all local FC2 slices in FP32 before each expert's BF16 output boundary; `docs/ds41-expert-qualification.md` records four-device native/graph checks and the still-open TP-global reduction requirement.
 
 The isolated TP-global expert boundary now has a native reducer and four-device graph qualification, but the inherited wire format uses ten-byte route entries with BF16-truncated weights and cannot carry FP32 partials, so model integration requires a wire-contract update before this path can serve V4.1.
+
+Wire revision 3 now preserves FP32 gate weights in twelve-byte entries and provides FP32 output dtype 6, with Rust/native signature agreement and persistent-TCP qualification recorded in `docs/ds41-wire-qualification.md`; existing per-token collectives and model executors still need migration to per-route planes.

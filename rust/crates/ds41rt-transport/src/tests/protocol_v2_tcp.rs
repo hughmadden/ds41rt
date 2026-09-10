@@ -1107,3 +1107,86 @@ async fn protocol_v2_tcp_truncated_response_is_rejected() -> Result<()> {
     assert!(err.contains("ProtocolV2 response header"));
     Ok(())
 }
+
+#[tokio::test]
+async fn native_v41_fp32_routes_and_partial_planes_survive_persistent_tcp() -> Result<()> {
+    struct RoutePlaneFixture;
+    impl crate::ProtocolV2ExpertExecutor for RoutePlaneFixture {
+        fn name(&self) -> &'static str {
+            "v41-fp32-wire-fixture"
+        }
+        fn execute(
+            &self,
+            request: &crate::ExpertProtocolV2RequestView<'_>,
+        ) -> Result<crate::ExpertProtocolV2Response> {
+            let mut payload = Vec::new();
+            for route in 0..request.header.route_count as usize {
+                let weight = request.route(route)?.gate_weight;
+                for _ in 0..5120 {
+                    payload.extend_from_slice(&weight.to_le_bytes());
+                }
+            }
+            crate::ExpertProtocolV2Response::new(
+                request.header.request_id,
+                request.header.placement_version,
+                request.header.layer_id,
+                request.header.row_count,
+                6 * 5120,
+                ExpertV2Dtype::F32,
+                crate::ExpertProtocolV2Status::Ok,
+                payload,
+            )
+        }
+    }
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?;
+    let server = tokio::spawn(serve_protocol_v2_tcp_listener_with_executor(
+        listener,
+        Arc::new(RoutePlaneFixture),
+    ));
+    let mut client = TcpProtocolV2PersistentClient::new(address, TcpTransportConfig::default());
+    for iteration in 0..2_u32 {
+        let rows = (0..16)
+            .map(|row| crate::ExpertProtocolV2RowDescriptor {
+                row_id: row as u64,
+                source_kind: ExpertV2SourceKind::MtpVerify,
+                source_request_id: 1000 + row as u64,
+                token_position: 91,
+                route_offset: row * 6,
+                route_count: 6,
+            })
+            .collect();
+        let routes = (0..96)
+            .map(|route| crate::ExpertProtocolV2RouteEntry {
+                row_index: route / 6,
+                expert_id: (route * 7) % 384,
+                gate_weight: f32::from_bits(0x3e80_0001 + iteration * 1000 + route),
+            })
+            .collect();
+        let request = ExpertProtocolV2Request::new(
+            9100 + iteration as u64,
+            41,
+            13,
+            5120,
+            ExpertV2Dtype::Bf16,
+            rows,
+            routes,
+            vec![0; 16 * 5120 * 2],
+        )?
+        .with_debug_checksum();
+        let response = client.roundtrip(&request).await?;
+        assert_eq!(response.header.output_dtype, ExpertV2Dtype::F32);
+        assert_eq!(response.partial_output_payload.len(), 16 * 6 * 5120 * 4);
+        for (route, plane) in response
+            .partial_output_payload
+            .chunks_exact(5120 * 4)
+            .enumerate()
+        {
+            for word in plane.chunks_exact(4) {
+                assert_eq!(word, request.routes[route].gate_weight.to_le_bytes());
+            }
+        }
+    }
+    server.abort();
+    Ok(())
+}
