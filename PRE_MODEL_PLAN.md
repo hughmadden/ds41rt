@@ -66,3 +66,5 @@ Expert ownership progress: the daemon now plans, loads, owns and binds complete 
 Owned execution progress: resident weights now feed per-wave native scratch/I/O/graph owners with direct 1/7/15/16-row and alternating M16 replay checks on RTX/ostrich, including shared output and allocation guards while scheduler and per-route transport integration remain open.
 
 Native TP transport progress: strict canonical requests, borrowed FP32 route responses and rank-ordered assembly now connect to owned execution, with four logical native TP ranks across ostrich/dodo and RTX reduction matching a full-width oracle over persistent TCP while production service/RDMA/streaming integration remains open.
+
+Bounded TP response progress: row-indexed frame production, incremental four-rank validation and an owned-execution chunk callback compile in the daemon, while service wiring and runtime qualification remain pending with no new tests or benchmarks run.

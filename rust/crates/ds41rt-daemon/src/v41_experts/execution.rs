@@ -281,6 +281,44 @@ impl HostExpertExchange {
     }
 }
 impl ExpertExecution<'_, '_> {
+    /// Execute once and deliver bounded frames using caller-owned index scratch.
+    /// The sink must finish consuming each borrowed chunk before returning.
+    /// A send failure aborts the wave; callers must not retry it on the same
+    /// partially delivered response stream without resetting receiver state.
+    pub fn execute_host_chunks<F>(
+        &mut self,
+        request: &ds41rt_transport::v41_expert::V41BackboneRequest<'_>,
+        executor_id: u64,
+        exchange: &mut HostExpertExchange,
+        row_indices: &mut [u32],
+        max_frame_bytes: usize,
+        mut sink: F,
+    ) -> Result<()>
+    where
+        F: FnMut(ds41rt_transport::ExpertProtocolV2ResponseRef<'_>) -> Result<()>,
+    {
+        let chunk_rows = request.response_chunk_rows(max_frame_bytes)?;
+        ensure!(
+            row_indices.len() >= chunk_rows as usize,
+            "response row-index scratch is too short"
+        );
+        let response = self.execute_host_request(request, executor_id, exchange)?;
+        let stride = ds41rt_transport::v41_expert::V41_ROUTE_ROW_BYTES as usize;
+        for start in (0..request.rows()).step_by(chunk_rows as usize) {
+            let end = start.saturating_add(chunk_rows).min(request.rows());
+            let payload =
+                &response.partial_output_payload[start as usize * stride..end as usize * stride];
+            sink(request.response_chunk(
+                executor_id,
+                start,
+                payload,
+                row_indices,
+                max_frame_bytes,
+            )?)?;
+        }
+        Ok(())
+    }
+
     /// Host fallback from a validated wire request to ordered FP32 route response.
     /// The borrowed response prevents reuse of exchange storage until encoding/send ends.
     pub fn execute_host_request<'a>(

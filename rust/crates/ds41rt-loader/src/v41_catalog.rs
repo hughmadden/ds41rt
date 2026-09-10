@@ -284,6 +284,11 @@ fn expected_tensors() -> Result<BTreeMap<String, ExpectedTensor>> {
 }
 
 fn placement(name: &str) -> V41TensorPlacement {
+    // Keep the complete draft model local, including its distinct routed
+    // experts. Decide this before applying any backbone offload rules.
+    if name.starts_with("mtp.") {
+        return V41TensorPlacement::CoordinatorRtx;
+    }
     if name.contains(".engram.embed.") {
         return V41TensorPlacement::HostMappedEngram;
     }

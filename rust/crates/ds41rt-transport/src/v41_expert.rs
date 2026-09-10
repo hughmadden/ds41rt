@@ -7,6 +7,9 @@ use crate::{
 };
 use anyhow::{ensure, Context, Result};
 
+mod chunks;
+pub use chunks::V41Tp4ChunkReceiver;
+
 pub const V41_HIDDEN: u32 = 5120;
 pub const V41_BACKBONE_TOPK: u32 = 6;
 pub const V41_ROUTE_ROW_BYTES: u32 = V41_HIDDEN * V41_BACKBONE_TOPK * 4;
@@ -165,6 +168,20 @@ impl<'a> V41Tp4Planes<'a> {
     pub fn insert(&mut self, frame: &'a [u8]) -> Result<usize> {
         let response = ExpertProtocolV2ResponseView::parse(frame)?;
         let h = &response.header;
+        let rank = self.response_rank(h)?;
+        ensure!(
+            h.flags & !EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM == 0,
+            "native route planes must be complete and unindexed"
+        );
+        ensure!(
+            h.row_count == self.rows,
+            "native TP route plane row count mismatch"
+        );
+        ensure!(self.planes[rank].is_none(), "duplicate native TP response");
+        self.planes[rank] = Some(response.partial_output_payload());
+        Ok(rank)
+    }
+    fn response_rank(&self, h: &ExpertProtocolV2ResponseHeader) -> Result<usize> {
         ensure!(
             h.request_id == self.request_id
                 && h.placement_version == self.placement_version
@@ -176,24 +193,15 @@ impl<'a> V41Tp4Planes<'a> {
             "native expert execution failed"
         );
         ensure!(
-            h.flags & !EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM == 0,
-            "native route planes must be complete and unindexed"
-        );
-        ensure!(
-            h.row_count == self.rows
-                && h.output_dim == V41_HIDDEN * 6
+            h.output_dim == V41_HIDDEN * 6
                 && h.output_dtype == ExpertV2Dtype::F32
                 && h.output_row_stride_bytes == V41_ROUTE_ROW_BYTES,
             "native TP route plane geometry mismatch"
         );
-        let rank = self
-            .executors
+        self.executors
             .iter()
             .position(|id| *id == h.executor_id)
-            .context("unknown native TP executor")?;
-        ensure!(self.planes[rank].is_none(), "duplicate native TP response");
-        self.planes[rank] = Some(response.partial_output_payload());
-        Ok(rank)
+            .context("unknown native TP executor")
     }
     pub fn complete(&self) -> bool {
         self.planes.iter().all(Option::is_some)

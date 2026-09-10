@@ -51,6 +51,8 @@ No access to emu or kiwi has been attempted, and no full-model execution or GPU 
 
 Place all dSpark execution on the coordinator RTX, as requested, eliminating its three remote expert boundaries before target verification.
 
+The tensor placement function explicitly assigns the entire `mtp.*` namespace to the RTX before considering backbone offload rules. This is the default implementation decision; no placement benchmark is required before proceeding. Full serving integration remains pending.
+
 The routed expert payload lower bound is `3 stages × 128 experts × 3 projections × 5120 × 2304 × 0.5 bytes = 6.328125 GiB`, excluding scales, shared experts, attention, special heads, cache, workspace, and allocator overhead.
 
 Shared token embedding and vocabulary head storage need not be duplicated on the same GPU, but memory planning must account for their execution workspaces and contention with target attention at concurrency 16.
@@ -164,3 +166,5 @@ The daemon now owns four packed buffers per expert layer and releases bounded lo
 Owned native expert execution now borrows resident layers and manages stable per-wave buffers, streams and graphs, passing changed-input alternating M16 replay and smaller direct batches on RTX/ostrich; network TP and service scheduling remain open in `ds41-owned-execution-qualification.md`.
 
 Complete native backbone wire batches now carry six FP32 route vectors per token with strict request/placement/layer/executor matching; four logical TP ranks on ostrich/dodo match the full-width expert oracle after persistent TCP and RTX reduction, while production service orchestration, RDMA and large-batch chunking remain open in `ds41-native-tp4-network-qualification.md`.
+
+Bounded response implementation now splits route planes into indexed contiguous token rows, accounting for header and index bytes within the configured frame limit; a 64 MiB frame admits 546 rows, so a 4,096-row response requires eight frames per rank. The incremental receiver validates identities, geometry, ordered coverage and final markers before invoking a destination-copy callback, and advances only after callback success. The daemon adapter executes once and emits borrowed chunks using caller-owned index scratch; worker host storage still contains the full route plane. Daemon compilation passes, but service listener integration, runtime chunk qualification and asynchronous destination-copy lifetime management remain open; no tests or benchmarks were run for this change.

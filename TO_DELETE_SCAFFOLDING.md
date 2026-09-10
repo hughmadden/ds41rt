@@ -25,3 +25,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-owned-execution/`, its binary in `rust/target/debug/`, `owned-execution/`, `prepare_owned_execution.py`, `check_owned_execution.py` and related logs under `/tmp/ds41-v41-aot/`, plus corresponding `owned-execution-src/` and fixture artifacts in ostrich's AOT staging tree after checkpoint-backed scheduled execution replaces these two-wave synthetic checks; retain production execution ownership and qualification evidence.
 
 - Delete `/tmp/ds41-native-tp4/`, its binary in `rust/target/debug/`, `tp4-execution/`, `prepare_tp4_execution.py`, `check_tp4_execution.py` and related logs under `/tmp/ds41-v41-aot/`, ostrich's `native-tp4-src/` and temporary worker binary, and dodo's `/tmp/ds41-native-tp4/` after checkpoint-backed TP serving replaces the synthetic network workers; retain production request/response contracts and host adapter.
+
+- Delete `/tmp/ds41-v41-aot/chunk-check.log` and `chunk-daemon-check.log` with the temporary AOT staging tree; these are compilation logs, not runtime qualification evidence.
