@@ -11,6 +11,11 @@ int32_t ds41rt_v41_hc_pre(const uint16_t* residual, const float* pre,
     uint16_t* collapsed, int32_t rows, void* stream);
 int32_t ds41rt_v41_hc_post(const uint16_t* sublayer, const uint16_t* residual,
     const float* post, const float* comb, uint16_t* output, int32_t rows, void* stream);
+// FP32 fn [24,20480], scale [3], base [24]; produces pre/post [rows,4],
+// comb [rows,4,4]. Official eps=1e-6 and 20 Sinkhorn iterations are fixed.
+int32_t ds41rt_v41_hc_mixes(const uint16_t* residual, const float* fn,
+    const float* scale, const float* base, float* pre, float* post, float* comb,
+    int32_t rows, void* stream);
 #ifdef __cplusplus
 }
 #endif

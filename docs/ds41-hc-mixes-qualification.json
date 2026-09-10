@@ -1,0 +1,102 @@
+{
+  "scope": "Native fused mHC projection/Sinkhorn numerical and graph checks plus prior dSpark primitive qualification; Rust sublayer ownership is build-only",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+  "reference_kernel_sha256": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+  "native_library_sha256": "eccefb93b6e1612c5dabb9590146e82b9ed3b70e986d90b7d4ca9bce450b3b71",
+  "qualifier_sha256": "450801bb7f0eb02f9793c7164dedb07c9249973034b3a9b23fceaa8cb768a95d",
+  "results": [
+    {
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "hc_coefficients_m1": 2.384185791015625e-07,
+        "hc_coefficients_m16": 4.172325134277344e-07,
+        "hc_coefficients_m80": 4.76837158203125e-07,
+        "hc_coefficients_graph": 3.5762786865234375e-07,
+        "hc_coefficients_zero_saturated": 2.9802322387695312e-08,
+        "confidence_m1": 2.384185791015625e-07,
+        "confidence_m16": 4.76837158203125e-07,
+        "confidence_m80": 4.76837158203125e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 4.76837158203125e-07,
+        "markov_m16": 7.152557373046875e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.430511474609375e-06,
+        "head_combined_m1": 1.430511474609375e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 5.0067901611328125e-06,
+        "head_combined_m16": 5.0067901611328125e-06,
+        "head_norm_m80": 0.000244140625,
+        "head_projection_m80": 4.00543212890625e-05,
+        "head_combined_m80": 0.00014913082122802734
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "hc_pre_post_bitwise_rows": [
+        1,
+        16,
+        80
+      ],
+      "hc_changed_input_graph_bitwise": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    },
+    {
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "hc_coefficients_m1": 2.980232238769531e-07,
+        "hc_coefficients_m16": 4.76837158203125e-07,
+        "hc_coefficients_m80": 7.152557373046875e-07,
+        "hc_coefficients_graph": 4.76837158203125e-07,
+        "hc_coefficients_zero_saturated": 2.9802322387695312e-08,
+        "confidence_m1": 2.9802322387695312e-08,
+        "confidence_m16": 2.384185791015625e-07,
+        "confidence_m80": 3.5762786865234375e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 5.960464477539062e-07,
+        "markov_m16": 6.556510925292969e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.2814998626708984e-06,
+        "head_combined_m1": 1.2814998626708984e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 5.245208740234375e-06,
+        "head_combined_m16": 5.245208740234375e-06,
+        "head_norm_m80": 0.0,
+        "head_projection_m80": 4.00543212890625e-05,
+        "head_combined_m80": 4.00543212890625e-05
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "hc_pre_post_bitwise_rows": [
+        1,
+        16,
+        80
+      ],
+      "hc_changed_input_graph_bitwise": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    }
+  ],
+  "not_qualified": [
+    "Rust allocation/ownership and cancellation",
+    "Full distribution/tail quality",
+    "Alternating-wave overlap",
+    "Full model execution"
+  ],
+  "m80_hc_sublayer_bytes": 9020160,
+  "six_hc_sublayers_per_wave_bytes": 54120960,
+  "two_wave_partial_dspark_bytes_excluding_shared_head_weight": 8401269592,
+  "source_sha256": {
+    "native/cuda/kernels/v41_hc.cu": "a4e4332d7128af0e6787a120bab6e50e893cd750da17fcb2239057423747b766",
+    "native/include/ds41rt_v41_hc.h": "189f2ba08188e6d4a1cfe8f60434551f76d14f714ca8a50db11eff06d6d9ed0f",
+    "rust/crates/ds41rt-ffi/src/v41_hc.rs": "d02d78362055e1a10be0d7cbb567122d24f973d96c2b98aa62d4a3630d99833c",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/hc.rs": "021bf85787ca4495ebfbc3a0cbd8c5e8ed890fbd62e3f3a255dbe4e11ae1f271",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "54f8870b0e9ae20f327d65884d5c3d3296f6881ae95a9b0c920c5845e8d4a4db"
+  }
+}

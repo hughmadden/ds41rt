@@ -22,6 +22,8 @@ def main():
     lock = json.loads((root/'docs/ds41-reference-lock.json').read_text())
     reference_hash = hashlib.sha256((args.reference_dir/'inference/model.py').read_bytes()).hexdigest()
     assert reference_hash == lock['files']['inference/model.py']
+    kernel_hash = hashlib.sha256((args.reference_dir/'inference/kernel.py').read_bytes()).hexdigest()
+    assert kernel_hash == lock['files']['inference/kernel.py']
     lib = C.CDLL(str(args.native_lib))
 
     def bind(name, types):
@@ -32,6 +34,7 @@ def main():
             assert status == 0, (name, status)
         return checked, fn
 
+    hc_mixes, raw_hc_mixes = bind('ds41rt_v41_hc_mixes', [P,P,P,P,P,P,P,I,P])
     hc_pre, raw_hc_pre = bind('ds41rt_v41_hc_pre', [P,P,P,I,P])
     hc_post, raw_hc_post = bind('ds41rt_v41_hc_post', [P,P,P,P,P,I,P])
     confidence, raw_confidence = bind('ds41rt_v41_dspark_confidence', [P,P,P,P,I,P])
@@ -84,6 +87,44 @@ def main():
                         +(comb[:rows,:,:,None]*residual[:rows,:,None,:].float()).sum(1)).bfloat16()
                     assert torch.equal(collapsed[:rows],reference_pre), 'mHC pre mismatch'
                     assert torch.equal(expanded[:rows],reference_post), 'mHC post mismatch'
+                mix_weight = torch.randn((24,20480),device='cuda')*.01
+                mix_scale = torch.tensor([.2,.3,.4],device='cuda')
+                mix_base = torch.randn(24,device='cuda')*.1
+                generated_pre = torch.empty((80,4),device='cuda')
+                generated_post = torch.empty((80,4),device='cuda')
+                generated_comb = torch.empty((80,4,4),device='cuda')
+                def coefficients(rows=80):
+                    hc_mixes(ptr(residual),ptr(mix_weight),ptr(mix_scale),ptr(mix_base),
+                        ptr(generated_pre),ptr(generated_post),ptr(generated_comb),rows,stream.cuda_stream)
+                def coefficient_oracle(rows=80):
+                    x=residual[:rows].flatten(1).float()
+                    projected=(x @ mix_weight.T)*torch.rsqrt(x.square().mean(-1,keepdim=True)+1e-6)
+                    reference_pre=torch.sigmoid(projected[:,:4]*mix_scale[0]+mix_base[:4])+1e-6
+                    reference_post=2*torch.sigmoid(projected[:,4:8]*mix_scale[1]+mix_base[4:8])
+                    reference_comb=(projected[:,8:]*mix_scale[2]+mix_base[8:]).reshape(rows,4,4).softmax(-1)+1e-6
+                    reference_comb=reference_comb/(reference_comb.sum(-2,keepdim=True)+1e-6)
+                    for _ in range(19):
+                        reference_comb=reference_comb/(reference_comb.sum(-1,keepdim=True)+1e-6)
+                        reference_comb=reference_comb/(reference_comb.sum(-2,keepdim=True)+1e-6)
+                    return max(close(generated_pre[:rows],reference_pre),close(generated_post[:rows],reference_post),
+                        close(generated_comb[:rows],reference_comb))
+                for rows in [1,16,80]:
+                    coefficients(rows)
+                    errors[f'hc_coefficients_m{rows}']=coefficient_oracle(rows)
+                stream.synchronize()
+                coefficient_graph=torch.cuda.CUDAGraph()
+                with torch.cuda.graph(coefficient_graph,stream=stream): coefficients()
+                graphs.append(coefficient_graph)
+                residual.copy_(bf((80,4,H)))
+                coefficient_graph.replay()
+                errors['hc_coefficients_graph']=coefficient_oracle()
+                residual.zero_()
+                mix_base.copy_(torch.linspace(-100,100,24,device='cuda'))
+                coefficient_graph.replay()
+                errors['hc_coefficients_zero_saturated']=coefficient_oracle()
+                residual.copy_(bf((80,4,H)))
+                assert raw_hc_mixes(ptr(residual),ptr(mix_weight),ptr(mix_scale),ptr(mix_base),
+                    ptr(generated_pre),ptr(generated_pre),ptr(generated_comb),80,stream.cuda_stream) != 0
                 for rows in [1,16,80]:
                     hc_sequence(rows)
                     hc_oracle(rows)
@@ -227,7 +268,7 @@ def main():
                 for graph in graphs: graph.reset()
                 destroy(handle)
     record = {'scope':'Native synthetic numerical and five-step graph qualification; excludes Rust owner and serving integration',
-        'reference_revision':lock['revision'],'reference_model_sha256':reference_hash,
+        'reference_revision':lock['revision'],'reference_model_sha256':reference_hash,'reference_kernel_sha256':kernel_hash,
         'native_library_sha256':hashlib.sha256(args.native_lib.read_bytes()).hexdigest(),
         'qualifier_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'results':results,
         'not_qualified':['Rust allocation/ownership and cancellation','Full distribution/tail quality','Alternating-wave overlap','Full model execution']}

@@ -63,3 +63,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/dspark-head-qualification.json` and `dspark-head-rust-build.log`, `dspark-head-rust-final-build.log`, `dspark-head-rust-qualified-build.log`, `dspark-head-native-build.log`, `dspark-head-qualification.log`, and `dspark-head-qualification-final.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain shared-head ownership and qualification tools.
 
 - Delete `/tmp/ds41-v41-aot/dspark-hc-qualification.json` and `dspark-hc-rust-build.log`, `dspark-hc-rust-final-build.log`, `dspark-hc-native-build.log`, and `dspark-hc-qualification.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain native mHC kernels, Rust bindings and the reusable qualifier.
+
+- Delete `/tmp/ds41-v41-aot/hc-mixes-qualification.json` and `hc-mixes-rust-build.log`, `hc-mixes-native-build.log`, and `hc-mixes-qualification.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain native coefficient generation, owned sublayer boundaries and reusable qualification.
