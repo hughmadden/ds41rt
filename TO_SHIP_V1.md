@@ -58,6 +58,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Share shifted mHC ownership between backbone and dSpark, qualify real attention/FFN parameters across all 40 layers, and retain exact dSpark stage regression.
 - [x] Sequence backbone attention and FFN mHC phases with exact query-result binding; qualify real attention composition and explicitly bounded identity-FFN fixtures.
 - [x] Share native FP8 shared-expert execution with dSpark, load all 40 backbone shared experts and qualify captured waves plus block-bound normalized-input handoffs.
+- [x] Own real backbone text/vision routing, bind canonical TP4 requests and shared results to block execution, and qualify analytical transport/reduction handoffs.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -150,3 +151,5 @@ Shared mHC ownership and real backbone boundary arithmetic are qualified in `doc
 Backbone phase sequencing is recorded in `docs/ds41-block-qualification.md`, including observed chained BF16 sensitivity; actual shared/routed FFN integration and full-model numerical qualification remain open.
 
 Backbone shared-expert ownership and real-weight qualification are recorded in `docs/ds41-backbone-shared-qualification.md`; the shared contribution carries block execution identity, while four-Spark routed contribution and complete FFN reduction remain to be connected.
+
+Backbone routing and the bound TP4/shared handoff are recorded in `docs/ds41-backbone-router-qualification.md`; local analytical rank peers qualify this composition, while executing these generated routes on real Spark expert weights remains open.

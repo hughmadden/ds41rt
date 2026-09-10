@@ -1,0 +1,382 @@
+//! Official backbone routing with block-bound inputs and canonical TP4 requests.
+use crate::v41_attention_binding::QueryBinding;
+use crate::v41_block::FfnInput;
+use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_tensors::NativeRtxTensors;
+use anyhow::{ensure, Context, Result};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Router};
+use ds41rt_loader::OfficialV41Catalog;
+use std::{ffi::c_void, marker::PhantomData};
+pub(crate) struct BackboneRouterWeights<'a> {
+    library: &'a NativeLibrary,
+    layer: usize,
+    tensors: NativeRtxTensors<'a>,
+}
+impl<'a> BackboneRouterWeights<'a> {
+    fn names(layer: usize) -> Result<Vec<String>> {
+        ensure!(layer < 40, "invalid backbone router layer");
+        Ok(["weight", "bias", "bias_vl"]
+            .map(|n| format!("layers.{layer}.ffn.gate.{n}"))
+            .to_vec())
+    }
+    pub fn device_bytes(catalog: &OfficialV41Catalog, layer: usize) -> Result<usize> {
+        let bytes = NativeRtxTensors::plan(catalog, &Self::names(layer)?)?;
+        ensure!(
+            bytes == 3_935_232,
+            "unexpected backbone router weight geometry"
+        );
+        Ok(bytes)
+    }
+    pub fn load(
+        library: &'a NativeLibrary,
+        catalog: &OfficialV41Catalog,
+        layer: usize,
+        budget: usize,
+        staging: usize,
+    ) -> Result<Self> {
+        ensure!(
+            Self::device_bytes(catalog, layer)? <= budget,
+            "backbone router weights exceed budget"
+        );
+        Ok(Self {
+            library,
+            layer,
+            tensors: NativeRtxTensors::load(
+                library,
+                catalog,
+                &Self::names(layer)?,
+                budget,
+                staging,
+            )?,
+        })
+    }
+
+    pub fn wave(&self, capacity: u32, budget: usize) -> Result<BackboneRouterWave<'_, 'a>> {
+        ensure!(
+            BackboneRouterWave::device_bytes(capacity)? <= budget,
+            "backbone router wave exceeds budget"
+        );
+        Ok(BackboneRouterWave {
+            stream: LoadStream {
+                library: self.library,
+                raw: self.library.cuda_stream_create()?,
+            },
+            kernel: self.library.v41_router()?,
+            buffers: [10240, 1, 1536, 24, 24]
+                .into_iter()
+                .map(|n| DeviceAllocation::new(self.library, n * capacity as usize))
+                .collect::<Result<Vec<_>>>()?,
+            weights: self,
+            tokens: Vec::new(),
+            layer: self.layer,
+            capacity,
+            graph: None,
+            ready: None,
+            origin: None,
+        })
+    }
+}
+pub(crate) struct RouterOutput<'a> {
+    pub layer: usize,
+    pub rows: u32,
+    pub input: Ds41rtDeviceBuffer,
+    pub mask: Ds41rtDeviceBuffer,
+    pub scores: Ds41rtDeviceBuffer,
+    pub ids: Ds41rtDeviceBuffer,
+    pub routing: Ds41rtDeviceBuffer,
+    pub tokens: &'a [u64],
+    origin: Option<QueryBinding>,
+    _owner: PhantomData<&'a ()>,
+}
+impl RouterOutput<'_> {
+    pub fn binding(&self) -> Result<QueryBinding> {
+        self.origin
+            .context("backbone router output has no block origin")
+    }
+}
+pub(crate) struct BackboneRouterWave<'w, 'a> {
+    stream: LoadStream<'a>,
+    kernel: V41Router<'a>,
+    weights: &'w BackboneRouterWeights<'a>,
+    buffers: Vec<DeviceAllocation<'a>>,
+    tokens: Vec<u64>,
+    layer: usize,
+    capacity: u32,
+    graph: Option<(*mut c_void, u32)>,
+    ready: Option<u32>,
+    origin: Option<QueryBinding>,
+}
+impl BackboneRouterWave<'_, '_> {
+    pub fn device_bytes(capacity: u32) -> Result<usize> {
+        ensure!(
+            (1..=4096).contains(&capacity),
+            "invalid backbone router capacity"
+        );
+        Ok(capacity as usize * 11825)
+    }
+    fn b(&self, i: usize) -> Ds41rtDeviceBuffer {
+        self.buffers[i].buffer
+    }
+    pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 2] {
+        [self.b(0), self.b(1)]
+    }
+    fn synchronize(&self) -> Result<()> {
+        unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
+    }
+    fn invalidate(&mut self) {
+        self.ready = None;
+        self.origin = None;
+        self.tokens.clear();
+    }
+    fn validate(&mut self, rows: u32) -> Result<()> {
+        self.invalidate();
+        ensure!(
+            rows > 0 && rows <= self.capacity,
+            "backbone router rows exceed capacity"
+        );
+        Ok(())
+    }
+    unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
+        let names = BackboneRouterWeights::names(self.layer)?;
+        unsafe {
+            self.kernel.launch(
+                self.b(0),
+                self.weights.tensors.get(&names[0])?,
+                self.weights.tensors.get(&names[1])?,
+                self.weights.tensors.get(&names[2])?,
+                Some(self.b(1)),
+                self.b(2),
+                self.b(3),
+                self.b(4),
+                rows as usize,
+                384,
+                self.stream.raw,
+            )
+        }
+    }
+    /// # Safety
+    /// Hidden input is finite and initialized; mask bytes are 0 or 1 in the same
+    /// row order. Both inputs are exclusively owned until the call drains.
+    pub unsafe fn execute(&mut self, rows: u32) -> Result<RouterOutput<'_>> {
+        self.validate(rows)?;
+        let launched = unsafe { self.enqueue(rows) };
+        launched.and(self.synchronize())?;
+        self.ready = Some(rows);
+        self.output()
+    }
+    /// # Safety
+    /// Same contract as execute. Warmup is drained before capture.
+    pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
+        self.invalidate();
+        ensure!(
+            self.graph.is_none(),
+            "backbone router graph already captured"
+        );
+        unsafe {
+            self.execute(rows)?;
+        }
+        self.invalidate();
+        unsafe {
+            self.stream
+                .library
+                .cuda_graph_begin_capture(self.stream.raw)?;
+        }
+        let launched = unsafe { self.enqueue(rows) };
+        let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+        match (launched, captured) {
+            (Ok(()), Ok(graph)) => {
+                self.graph = Some((graph, rows));
+                Ok(())
+            }
+            (Err(e), Ok(graph)) => {
+                unsafe {
+                    self.stream.library.cuda_graph_exec_destroy(graph)?;
+                }
+                Err(e)
+            }
+            (Err(e), Err(_)) | (Ok(()), Err(e)) => Err(e),
+        }
+    }
+    /// # Safety
+    /// Same contract as execute; graph live row count must match.
+    pub unsafe fn replay(&mut self, rows: u32) -> Result<RouterOutput<'_>> {
+        self.validate(rows)?;
+        let (graph, count) = self.graph.context("backbone router graph missing")?;
+        ensure!(count == rows, "backbone router captured rows differ");
+        let launched = unsafe {
+            self.stream
+                .library
+                .cuda_graph_launch(graph, self.stream.raw)
+        };
+        launched.and(self.synchronize())?;
+        self.ready = Some(rows);
+        self.output()
+    }
+    /// # Safety
+    /// The completed block input stays immutable through the copy. This wave has
+    /// exclusive storage; image mask matches those tokens (0=text, 1=image).
+    pub unsafe fn execute_ffn(
+        &mut self,
+        input: &FfnInput<'_>,
+        image_mask: &[u8],
+    ) -> Result<RouterOutput<'_>> {
+        self.invalidate();
+        ensure!(
+            input.layer == self.layer
+                && input.binding().layer() == self.layer
+                && !input.tokens.is_empty()
+                && input.tokens.len() <= self.capacity as usize
+                && input.values.bytes == input.tokens.len() * 10240
+                && input.values.device_id == self.b(0).device_id
+                && image_mask.len() == input.tokens.len()
+                && image_mask.iter().all(|&v| v <= 1),
+            "backbone router block input differs"
+        );
+        self.stream
+            .library
+            .copy_d2d(self.b(0), input.values, input.values.bytes)?;
+        self.stream.library.copy_h2d(self.b(1), image_mask)?;
+        let rows = input.tokens.len() as u32;
+        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+            self.clear_graph()?;
+            unsafe {
+                self.capture(rows)?;
+            }
+        }
+        unsafe {
+            self.replay(rows)?;
+        }
+        self.origin = Some(input.binding());
+        self.tokens.extend_from_slice(input.tokens);
+        self.output()
+    }
+    pub fn output(&self) -> Result<RouterOutput<'_>> {
+        let rows = self.ready.context("backbone router output unpublished")?;
+        let b = |i: usize, n: usize| {
+            let mut b = self.b(i);
+            b.bytes = rows as usize * n;
+            b
+        };
+        Ok(RouterOutput {
+            layer: self.layer,
+            rows,
+            input: b(0, 10240),
+            mask: b(1, 1),
+            scores: b(2, 1536),
+            ids: b(3, 24),
+            routing: b(4, 24),
+            tokens: &self.tokens,
+            origin: self.origin,
+            _owner: PhantomData,
+        })
+    }
+    pub fn clear_graph(&mut self) -> Result<()> {
+        self.invalidate();
+        self.synchronize()?;
+        if let Some((graph, _)) = self.graph.take() {
+            unsafe {
+                self.stream.library.cuda_graph_exec_destroy(graph)?;
+            }
+        }
+        Ok(())
+    }
+}
+impl Drop for BackboneRouterWave<'_, '_> {
+    fn drop(&mut self) {
+        if let Err(e) = self.clear_graph() {
+            tracing::error!(%e,"draining backbone router");
+        }
+    }
+}
+
+/// Scheduler metadata in exactly the block's token order.
+pub(crate) struct ExpertRow {
+    pub request_id: u64,
+    pub position: u64,
+    pub kind: ds41rt_transport::ExpertV2SourceKind,
+}
+/// An immutable host request owns its BF16 input and router result after D2H.
+/// The private binding survives asynchronous transport and router-wave reuse.
+pub(crate) struct BoundExpertRequest {
+    request: ds41rt_transport::ExpertProtocolV2Request,
+    binding: QueryBinding,
+}
+impl BoundExpertRequest {
+    pub fn request(&self) -> &ds41rt_transport::ExpertProtocolV2Request {
+        &self.request
+    }
+    pub fn binding(&self) -> QueryBinding {
+        self.binding
+    }
+}
+impl RouterOutput<'_> {
+    /// # Safety
+    /// Device views still hold this completed router execution with no external
+    /// writes. Metadata identifies the actual requests represented by the block.
+    pub unsafe fn expert_request(
+        &self,
+        library: &NativeLibrary,
+        placement: u64,
+        rows: &[ExpertRow],
+    ) -> Result<BoundExpertRequest> {
+        use ds41rt_transport::{
+            ExpertProtocolV2Request, ExpertProtocolV2RouteEntry, ExpertProtocolV2RowDescriptor,
+            ExpertV2Dtype,
+        };
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        let binding = self.binding()?;
+        ensure!(
+            binding.layer() == self.layer
+                && rows.len() == self.rows as usize
+                && self.tokens.len() == rows.len()
+                && rows.iter().zip(self.tokens).all(|(r, &p)| r.position == p),
+            "router request rows differ from block"
+        );
+        let request_id = NEXT
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .ok()
+            .context("native expert request IDs exhausted")?;
+        let mut hidden = vec![0; rows.len() * 10240];
+        let mut ids = vec![0; rows.len() * 24];
+        let mut weights = vec![0; rows.len() * 24];
+        library.copy_d2h(&mut hidden, self.input)?;
+        library.copy_d2h(&mut ids, self.ids)?;
+        library.copy_d2h(&mut weights, self.routing)?;
+        let descriptors = rows
+            .iter()
+            .enumerate()
+            .map(|(i, r)| ExpertProtocolV2RowDescriptor {
+                row_id: i as u64,
+                source_kind: r.kind,
+                source_request_id: r.request_id,
+                token_position: r.position,
+                route_offset: i as u32 * 6,
+                route_count: 6,
+            })
+            .collect();
+        let routes = ids
+            .chunks_exact(4)
+            .zip(weights.chunks_exact(4))
+            .enumerate()
+            .map(|(i, (id, w))| ExpertProtocolV2RouteEntry {
+                row_index: (i / 6) as u32,
+                expert_id: u32::from_ne_bytes(id.try_into().unwrap()),
+                gate_weight: f32::from_ne_bytes(w.try_into().unwrap()),
+            })
+            .collect();
+        let request = ExpertProtocolV2Request::new(
+            request_id,
+            placement,
+            self.layer as u32,
+            5120,
+            ExpertV2Dtype::Bf16,
+            descriptors,
+            routes,
+            hidden,
+        )?;
+        // Prove the same complete-batch contract used by every Spark receiver.
+        ds41rt_transport::v41_expert::V41BackboneRequest::parse(&request.encode()?, self.rows)?;
+        Ok(BoundExpertRequest { request, binding })
+    }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backbone attention block sequencing with an explicit identity FFN fixture against pinned projection/norm/rotary/FP8 code."""
+"""Backbone attention block sequencing with an explicit identity or separately qualified FFN result."""
 import argparse,ast,hashlib,importlib.util,json,math,struct
 from types import SimpleNamespace
 from functools import lru_cache
@@ -12,6 +12,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--reference-dir',type=Path,required=True);p.add_argument('--snapshot',type=Path,required=True)
     p.add_argument('--vectors-dir',type=Path,required=True);p.add_argument('--device',type=int,required=True)
+    p.add_argument('--ffn-result',action='store_true',help='Read block-ffn_result.bin; its producer must be qualified independently')
     p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     root=Path(__file__).resolve().parents[1];lock=json.loads((root/'docs/ds41-reference-lock.json').read_text())
     for name in ('model.py','kernel.py'):
@@ -65,7 +66,9 @@ def main():
             torch.testing.assert_close(t['ffn_pre'],apre,rtol=2e-5,atol=2e-5)
             pre,post,comb=ns['hc_mixes'](obj,t['ffn_residual'],ffn,fscale,fbase)
             ffn_input=fnorm(ns['hc_pre'](obj,t['ffn_residual'],t['ffn_pre']))
-            output=ns['hc_post'](obj,t['ffn_input'],t['ffn_residual'],post,comb)
+            if a.ffn_result:
+                t['ffn_result'],payloads['ffn_result']=load(prefix,'ffn_result',torch.bfloat16,(1,rows,5120))
+            output=ns['hc_post'](obj,t['ffn_result'] if a.ffn_result else t['ffn_input'],t['ffn_residual'],post,comb)
             for name,expected in [('attn_input',attn_input),('ffn_input',ffn_input),('output',output)]:
                 torch.testing.assert_close(t[name],expected,rtol=.008,atol=.002)
             torch.testing.assert_close(t['next_pre'],pre,rtol=2e-5,atol=2e-5)
@@ -76,10 +79,10 @@ def main():
                 chained_pre_max_abs=(t['next_pre']-chained_pre).abs().max().item(),
                 chained_pre_outside_stage_tolerance=int((~torch.isclose(t['next_pre'],chained_pre,rtol=2e-5,atol=2e-5)).sum().item()),
                 ffn_input_max_abs=(t['ffn_input'].float()-ffn_input.float()).abs().max().item(),
-                output_max_abs=(t['output'].float()-output.float()).abs().max().item(),identity_ffn_fixture=True,payloads_sha256=payloads))
-            print(f'PASS layer={layer} rows=80 shifted_block_close=true identity_ffn_fixture=true',flush=True)
+                output_max_abs=(t['output'].float()-output.float()).abs().max().item(),identity_ffn_fixture=not a.ffn_result,payloads_sha256=payloads))
+            print(f'PASS layer={layer} rows=80 shifted_block_close=true identity_ffn_fixture={not a.ffn_result}',flush=True)
         stream.synchronize()
-    a.output.write_text(json.dumps(dict(device=a.device,scope='Real mHC sequencing around produced attention output; FFN result is explicitly the identity fixture, not routed/shared MoE',
+    a.output.write_text(json.dumps(dict(device=a.device,scope=('Real mHC sequencing with supplied FFN result; the FFN producer requires independent qualification' if a.ffn_result else 'Real mHC sequencing around produced attention output; FFN result is explicitly the identity fixture, not routed/shared MoE'),
         reference_compiler_overrides={},weight_payloads_sha256=hashes,cases=results),indent=2)+'\n')
 
 

@@ -18,6 +18,7 @@ mod v41_attention_binding;
 mod v41_hc;
 mod v41_shared_ffn;
 mod v41_backbone_shared;
+mod v41_backbone_router;
 mod v41_backbone_hc;
 mod v41_block;
 mod v41_attention_output;

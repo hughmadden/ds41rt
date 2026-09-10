@@ -84,6 +84,44 @@ impl<'a> NativeTp4Wave<'a> {
             );
             self.library.copy_h2d(self.shared.buffer, shared)?;
         }
+        self.execute_prepared(request, shared.is_some()).await
+    }
+    /// # Safety
+    /// Shared device values are complete and immutable through the copy. The
+    /// request and shared result must derive from the same actual block input.
+    pub async unsafe fn execute_ffn<'w>(
+        &'w mut self,
+        request: &crate::v41_backbone_router::BoundExpertRequest,
+        shared: &crate::v41_backbone_shared::SharedOutput<'_>,
+    ) -> Result<NativeFfnOutput<'w>> {
+        self.ready_rows = None;
+        self.synchronize()?;
+        let header = &request.request().header;
+        ensure!(
+            request.binding() == shared.binding()?
+                && header.layer_id as usize == shared.layer
+                && header.row_count == shared.rows
+                && header.row_count > 0
+                && header.row_count <= self.transport.capacity()
+                && shared.values.bytes == header.row_count as usize * 10240
+                && shared.values.device_id == self.shared.buffer.device_id,
+            "native TP shared contribution differs from routed request"
+        );
+        self.library
+            .copy_d2d(self.shared.buffer, shared.values, shared.values.bytes)?;
+        let values = self.execute_prepared(request.request(), true).await?;
+        Ok(NativeFfnOutput {
+            values,
+            binding: request.binding(),
+            _owner: std::marker::PhantomData,
+        })
+    }
+    async fn execute_prepared(
+        &mut self,
+        request: &ExpertProtocolV2Request,
+        has_shared: bool,
+    ) -> Result<Ds41rtDeviceBuffer> {
+        let rows = request.header.row_count;
         let library = self.library;
         let planes = &self.planes;
         self.transport
@@ -109,7 +147,7 @@ impl<'a> NativeTp4Wave<'a> {
         unsafe {
             self.reducer.launch(
                 std::array::from_fn(|rank| self.planes[rank].buffer.ptr.cast::<f32>().cast_const()),
-                if shared.is_some() {
+                if has_shared {
                     self.shared.buffer.ptr.cast()
                 } else {
                     std::ptr::null()
@@ -143,5 +181,17 @@ impl Drop for NativeTp4Wave<'_> {
         if let Err(error) = self.synchronize() {
             tracing::error!(%error, "draining native coordinator TP wave");
         }
+    }
+}
+
+/// Complete ordered TP4 reduction plus the shared expert, borrowed until consumed.
+pub(crate) struct NativeFfnOutput<'a> {
+    pub values: Ds41rtDeviceBuffer,
+    binding: crate::v41_attention_binding::QueryBinding,
+    _owner: std::marker::PhantomData<&'a ()>,
+}
+impl NativeFfnOutput<'_> {
+    pub fn binding(&self) -> crate::v41_attention_binding::QueryBinding {
+        self.binding
     }
 }
