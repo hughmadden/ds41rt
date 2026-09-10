@@ -1,5 +1,7 @@
 //! RTX-only ownership for every native dSpark tensor and independent stage experts.
 mod confidence;
+mod ffn;
+pub(crate) use ffn::DsparkFfn;
 mod hc;
 pub(crate) use hc::HcSublayer;
 mod markov;

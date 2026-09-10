@@ -3,6 +3,7 @@ use super::DsparkWeights;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, V41Hc};
+use std::ffi::c_void;
 
 pub(crate) struct HcSublayer<'weights, 'library> {
     stream: LoadStream<'library>,
@@ -21,6 +22,7 @@ pub(crate) struct HcSublayer<'weights, 'library> {
     capacity: usize,
     begun: Option<usize>,
     ready: Option<usize>,
+    pending: Option<usize>,
 }
 impl<'library> DsparkWeights<'library> {
     pub fn hc_sublayer(
@@ -66,6 +68,7 @@ impl<'library> DsparkWeights<'library> {
             capacity,
             begun: None,
             ready: None,
+            pending: None,
         })
     }
 }
@@ -91,8 +94,35 @@ impl HcSublayer<'_, '_> {
     /// Both inputs must be initialized on this device with completed producer
     /// writes. Serialize use; do not overwrite residual/coefficient storage until finish.
     pub unsafe fn begin(&mut self, rows: usize) -> Result<Ds41rtDeviceBuffer> {
+        let launched = unsafe { self.enqueue_begin(rows, None, self.stream.raw) };
+        let drained = self.synchronize();
+        match launched.and_then(|output| drained.map(|()| output)) {
+            Ok(output) => Ok(output),
+            Err(error) => {
+                self.invalidate();
+                Err(error)
+            }
+        }
+    }
+    pub(super) fn invalidate(&mut self) {
         self.begun = None;
         self.ready = None;
+        self.pending = None;
+    }
+    /// Caller owns the external stream and must drain it before releasing this
+    /// borrow, including on error; an external normalized output must be distinct.
+    pub(super) unsafe fn enqueue_begin(
+        &mut self,
+        rows: usize,
+        normalized: Option<Ds41rtDeviceBuffer>,
+        stream: *mut c_void,
+    ) -> Result<Ds41rtDeviceBuffer> {
+        self.invalidate();
+        let normalized = normalized.unwrap_or(self.normalized.buffer);
+        ensure!(
+            !normalized.ptr.is_null() && normalized.bytes >= rows.saturating_mul(10240),
+            "mHC normalized output is too small"
+        );
         ensure!(
             rows > 0 && rows <= self.capacity,
             "mHC rows exceed capacity"
@@ -107,7 +137,7 @@ impl HcSublayer<'_, '_> {
                 self.post.buffer,
                 self.comb.buffer,
                 rows,
-                self.stream.raw,
+                stream,
             )?;
             // The newly generated pre belongs to the NEXT sublayer.
             self.kernel.pre(
@@ -115,21 +145,20 @@ impl HcSublayer<'_, '_> {
                 self.incoming_pre.buffer,
                 self.collapsed.buffer,
                 rows,
-                self.stream.raw,
+                stream,
             )?;
             self.stream.library.cuda_ds4_rmsnorm_bf16_rne_async(
                 self.collapsed.buffer,
                 self.weights.tensor(&self.names[3])?,
-                self.normalized.buffer,
+                normalized,
                 rows as i32,
                 5120,
                 1e-6,
-                self.stream.raw,
+                stream,
             )?;
         }
-        self.synchronize()?;
         self.begun = Some(rows);
-        let mut result = self.normalized.buffer;
+        let mut result = normalized;
         result.bytes = rows * 10240;
         Ok(result)
     }
@@ -137,22 +166,53 @@ impl HcSublayer<'_, '_> {
     /// The BF16 sublayer result must be initialized for the rows returned by begin
     /// and all producer writes complete. Residual/coefficients must remain unchanged.
     pub unsafe fn finish(&mut self) -> Result<[Ds41rtDeviceBuffer; 2]> {
+        let launched = unsafe { self.enqueue_finish(None, self.stream.raw) };
+        let drained = self.synchronize();
+        if let Err(error) = launched.and(drained) {
+            self.invalidate();
+            return Err(error);
+        }
+        unsafe { self.complete() }
+    }
+    /// External result producer must be ordered on stream; drain before release.
+    pub(super) unsafe fn enqueue_finish(
+        &mut self,
+        result: Option<Ds41rtDeviceBuffer>,
+        stream: *mut c_void,
+    ) -> Result<()> {
         self.ready = None;
+        self.pending = None;
         let rows = self.begun.take().context("mHC sublayer was not begun")?;
+        let result = result.unwrap_or(self.sublayer.buffer);
         unsafe {
             self.kernel.post(
-                self.sublayer.buffer,
+                result,
                 self.residual.buffer,
                 self.post.buffer,
                 self.comb.buffer,
                 self.output.buffer,
                 rows,
-                self.stream.raw,
+                stream,
             )?;
         }
-        self.synchronize()?;
-        self.ready = Some(rows);
+        self.pending = Some(rows);
+        Ok(())
+    }
+    /// # Safety
+    /// The stream used by enqueue_finish must have completed successfully.
+    pub(super) unsafe fn complete(&mut self) -> Result<[Ds41rtDeviceBuffer; 2]> {
+        self.ready = Some(self.pending.take().context("mHC post was not submitted")?);
         self.output()
+    }
+    /// # Safety
+    /// A graph containing this boundary's post for exactly rows has completed.
+    pub(super) unsafe fn complete_replay(
+        &mut self,
+        rows: usize,
+    ) -> Result<[Ds41rtDeviceBuffer; 2]> {
+        ensure!(rows > 0 && rows <= self.capacity, "invalid mHC replay rows");
+        self.pending = Some(rows);
+        unsafe { self.complete() }
     }
     /// BF16 residual [rows,4,5120] and FP32 next_pre [rows,4], borrowed until reuse.
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {

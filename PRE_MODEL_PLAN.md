@@ -116,3 +116,5 @@ Router progress: native official top-3/top-6 text/VL routing passes numerical an
 Shared-FFN progress: native dense FP8 shapes, packed-scale residency and single-stream dSpark FFN composition now build and pass native numerical/graph checks on both RTX GPUs, with exact zero/tiny activation scaling fixed in b12x while Rust-owned composition and routed-expert tiny-activation semantics remain open in `docs/ds41-shared-fp8-qualification.md`.
 
 Expert-floor progress: both fused routed-expert K32 quantizers now apply the official 1e-4 activation floor, with bitwise tiny-value graph tests on RTX and Spark, counterfactual failures and fresh pinned AOT builds recorded in `docs/ds41-expert-floor-qualification.md`.
+
+FFN-boundary progress: one-stream dSpark mHC/router/shared/routed execution and complete graph replay now pass Rust-owned nonzero stage-zero fixtures on both RTX GPUs, including shifted pre-mix and error recovery, while attention and three-stage sequencing remain open in `docs/ds41-ffn-boundary-qualification.md`.

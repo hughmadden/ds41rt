@@ -1,0 +1,81 @@
+{
+  "scope": "Rust-owned stage-zero dSpark FFN boundary and graph; synthetic native checkpoint",
+  "rows": 16,
+  "cases": 2,
+  "devices": [
+    "RTX PRO 6000 host GPU 0",
+    "RTX PRO 6000 host GPU 1"
+  ],
+  "source_hashes": {
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/ffn.rs": "2123fc5b3ad3f63b111d6c3bd853e5df6a9cc0bff757a0117de0681b0c7297f8",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/hc.rs": "b26854c6f8bcc15f061fc4ac94519a49126f5ba4c74b5b7fda96723b439d3cd8",
+    "rust/crates/ds41rt-daemon/src/v41_experts/execution.rs": "e8181df3727edc4fd648783a91e938db3bae1650bfdc267a9048bbce86f4af92"
+  },
+  "fixture_main_sha256": "caae2249a5a3f1a35b09c62c9387804df6f8bf798f4301b623fc06b7c94e949d",
+  "fixture_binary_sha256": "ec41690634a9bacacd4170d4f08c3e6b5201b6f454f9a6939c60f72842812c0b",
+  "native_library_sha256": "faad47b5739e5256ff2c069dac5799f0ad3dd8fefcdda62872856dd850b0e4d1",
+  "logs": {
+    "dspark-ffn-boundary-final-build.log": "c920e2b60490100da9954dea6a0d998b625ae3fb307d38a9960d3ffca5d31453",
+    "dspark-ffn-owned-nonzero-build.log": "401e5a6075b93dd85ceeffcb9d5d91490e63246675b1c3b2575602826dac2b6a",
+    "dspark-ffn-owned-rtx0-nonzero.log": "015c08ab0e36e568e9ea75f485b66210d9a09ec1b47b9f121d4add138549dcc4",
+    "dspark-ffn-owned-rtx1-nonzero.log": "015c08ab0e36e568e9ea75f485b66210d9a09ec1b47b9f121d4add138549dcc4"
+  },
+  "owner_device_bytes": 9980556,
+  "whole_dspark_partial_admission_bytes": 8075914604,
+  "fixture": {
+    "expert_zero_codes": "0x22 (FP4 +1 for both nibbles)",
+    "shared_weight_codes": "0x38 (FP8 +1)",
+    "up_and_gate_scale_byte": 114,
+    "down_scale_byte": 121,
+    "router_weights_biases": "zero: ties select experts 0/1/2, weights 0.5 each",
+    "norm_weights": 1,
+    "hc_fn_scale_base": "zero",
+    "other_expert_weights": "zero",
+    "case0_residual_streams": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "case0_incoming_pre": [
+      1,
+      0,
+      0,
+      0
+    ],
+    "case0_shared_output": 9,
+    "case0_routed_output": 4.5,
+    "case0_expected_residual": 17.25,
+    "case1_residual_stream2": "first half +4, second half -4; other streams unchanged",
+    "case1_incoming_pre": [
+      0,
+      0,
+      1,
+      0
+    ],
+    "case1_expected_residual_halves": [
+      3.75,
+      1.75
+    ],
+    "expected_next_pre": 0.500001
+  },
+  "checks": [
+    "bitwise BF16 residual",
+    "FP32 next pre within 1e-7",
+    "changed-input graph",
+    "capture does not publish warmup output",
+    "duplicate capture rejection",
+    "wrong replay shape rejection",
+    "zero/over-capacity execute rejection",
+    "stale output hidden after errors",
+    "recovery with graph retained",
+    "under-budget and invalid-stage construction rejection"
+  ],
+  "not_qualified": [
+    "full dSpark attention/stages",
+    "allocation instrumentation and alternating-wave overlap",
+    "checkpoint-quality numerics",
+    "serving integration",
+    "other FFN capacities in Rust owner"
+  ]
+}

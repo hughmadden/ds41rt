@@ -1,0 +1,15 @@
+# Owned dSpark FFN boundary
+
+DsparkWeights::ffn now constructs one complete FFN sublayer: shifted mHC coefficient generation/collapse, normalization, router, shared FP8 expert, routed FP4 experts, reduction and residual expansion. All operations enqueue on the expert wave's stream. Normalization writes directly into expert input storage, and residual expansion reads the reduced output directly, avoiding intermediate device copies.
+
+The owner borrows stage weights, owns all per-wave scratch and captures the complete boundary as one CUDA graph after warmup. Replay requires the captured row count. A single stream drain completes execute/replay before publishing residuals and next pre-mix; failed calls invalidate output readiness, and destruction drains and destroys the graph before freeing any sibling storage. Standalone mHC begin/finish also now drain submitted work on error.
+
+The combined owner replaces that stage's separately budgeted expert/router/shared-FFN/mHC workspaces; it adds no duplicate wave reservation. Capacity 16 uses 9,980,556 device bytes, excluding CUDA graph/driver allocations. Capacity 80 uses 36,046,140 bytes. Existing DsparkBudget still counts the attention boundary separately and retains its prior partial-wave totals.
+
+A temporary Rust fixture compiles the current production owners, omitting only unrelated service/coordinator module declarations. It loads all dSpark residency from an isolated sparse native-header checkpoint and runs stage zero at sixteen rows on both RTX GPUs. The real checkpoint cache was not used or modified.
+
+The fixture supplies nonzero native shared weights and expert-zero FP4 weights, with gate/up scales 2^-13 and down scales 2^-6. Zero router weights/biases select experts 0/1/2 with routing weight 0.5 each; other expert payloads are zero. Unit normalization weights and zero mHC parameters make expected results tractable without bypassing native execution. One-hot incoming pre-mix and four constant residual streams produce shared output 9, routed output 4.5 and final BF16 residual 17.25. A changed input selects a balanced positive/negative residual stream, cancelling both FFN projections and yielding residual halves 3.75 and 1.75. Using the freshly generated pre instead of the incoming pre would fail this second case.
+
+Both GPUs pass direct execution and changed-input replay of the owned graph; all 655,360 residual output bytes per case match expected BF16 values, and the 256-byte next-pre output matches 0.500001 within 1e-7. The harness also rejects undersized budgets, invalid stages, duplicate capture, mismatched replay rows, and zero/over-capacity execution, confirms stale outputs are hidden after errors, and recovers with the graph retained. Rust daemon and fixture builds pass.
+
+Evidence and exact source/binary/log hashes are in ds41-ffn-boundary-qualification.json. These are structured synthetic cases at one Rust-owner capacity, not a full-model quality or performance qualification. Attention/cache execution, all-three-stage sequencing, verification, request scheduling and serving integration remain unfinished.

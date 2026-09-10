@@ -202,6 +202,18 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         shared: &mut super::dspark::DsparkSharedFfn<'_, '_>,
         rows: u32,
     ) -> Result<()> {
+        let launched = unsafe { self.enqueue_draft_ffn(router, shared, rows) };
+        let drained = self.synchronize();
+        launched.and(drained)
+    }
+
+    /// Caller must drain this wave's stream before releasing router/shared scratch.
+    pub(super) unsafe fn enqueue_draft_ffn(
+        &mut self,
+        router: &mut super::dspark::DsparkRouter<'_, '_>,
+        shared: &mut super::dspark::DsparkSharedFfn<'_, '_>,
+        rows: u32,
+    ) -> Result<()> {
         ensure!(
             router.matches(self._weights) && shared.matches(self._weights),
             "dSpark FFN stage owners differ"
@@ -215,14 +227,11 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
             .as_ref()
             .context("dSpark FFN requires coordinator output")?
             .buffer;
-        let launched = (|| unsafe {
+        unsafe {
             router.enqueue(self.inputs(), rows as usize, self.stream.raw)?;
             shared.enqueue(self.hidden.buffer, output, rows, self.stream.raw)?;
             self.launch(rows, true)
-        })();
-        // Either router/projection may have submitted work before a later error.
-        let drained = self.synchronize();
-        launched.and(drained)
+        }
     }
 
     /// Compute the dSpark shared expert directly into this wave's shared output.
