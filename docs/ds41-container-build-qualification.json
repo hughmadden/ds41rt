@@ -1,0 +1,70 @@
+{
+  "date": "2026-09-10",
+  "command": "./build.sh --spark-hosts ostrich,dodo",
+  "exit_code": 0,
+  "engine_revision": "575a9df2d47631371d7c766ba55dfd975b1b7ebd-dirty-981dd404ee3f",
+  "source_manifest_sha256": "981dd404ee3f7e6653324f37e2307d75f5251ac86709160ae2b37879a2f5deb4",
+  "sparkinfer_revision": "09b39aa62b3ea36b8b6397bf58fed0f63ff19db3",
+  "source_files": 1494,
+  "images": [
+    {
+      "host": "local",
+      "image": "ghcr.io/tpurtell/ds41rt-coordinator:v2",
+      "id": "sha256:e776c388db6df644dcb21a4d3de10affec04472c72690c73bba00fea3c21b713",
+      "architecture": "amd64",
+      "labels": {
+        "io.ds41rt.cuda_arch": "120",
+        "io.ds41rt.role": "coordinator",
+        "io.ds41rt.source-manifest.sha256": "981dd404ee3f7e6653324f37e2307d75f5251ac86709160ae2b37879a2f5deb4",
+        "io.ds41rt.sparkinfer.revision": "09b39aa62b3ea36b8b6397bf58fed0f63ff19db3",
+        "org.opencontainers.image.description": "DeepSeek V4 Pro inference for one RTX PRO 6000 and four DGX Spark expert workers",
+        "org.opencontainers.image.licenses": "MIT",
+        "org.opencontainers.image.revision": "575a9df2d47631371d7c766ba55dfd975b1b7ebd-dirty-981dd404ee3f",
+        "org.opencontainers.image.source": "https://github.com/tpurtell/ds41rt",
+        "org.opencontainers.image.title": "DS41RT inference",
+        "org.opencontainers.image.version": "v2"
+      }
+    },
+    {
+      "host": "ostrich",
+      "image": "ghcr.io/tpurtell/ds41rt-spark-expert:v2",
+      "id": "sha256:546455fa23540166c8b01de2218e7c54d79ef601e2aa7cb7d56d2edce5ce91aa",
+      "architecture": "arm64",
+      "labels": {
+        "io.ds41rt.cuda_arch": "121",
+        "io.ds41rt.role": "expert",
+        "io.ds41rt.source-manifest.sha256": "981dd404ee3f7e6653324f37e2307d75f5251ac86709160ae2b37879a2f5deb4",
+        "io.ds41rt.sparkinfer.revision": "09b39aa62b3ea36b8b6397bf58fed0f63ff19db3",
+        "org.opencontainers.image.description": "DeepSeek V4 Pro inference for one RTX PRO 6000 and four DGX Spark expert workers",
+        "org.opencontainers.image.licenses": "MIT",
+        "org.opencontainers.image.revision": "575a9df2d47631371d7c766ba55dfd975b1b7ebd-dirty-981dd404ee3f",
+        "org.opencontainers.image.source": "https://github.com/tpurtell/ds41rt",
+        "org.opencontainers.image.title": "DS41RT inference",
+        "org.opencontainers.image.version": "v2"
+      }
+    },
+    {
+      "host": "dodo",
+      "image": "ghcr.io/tpurtell/ds41rt-spark-expert:v2",
+      "id": "sha256:546455fa23540166c8b01de2218e7c54d79ef601e2aa7cb7d56d2edce5ce91aa",
+      "architecture": "arm64",
+      "labels": {
+        "io.ds41rt.cuda_arch": "121",
+        "io.ds41rt.role": "expert",
+        "io.ds41rt.source-manifest.sha256": "981dd404ee3f7e6653324f37e2307d75f5251ac86709160ae2b37879a2f5deb4",
+        "io.ds41rt.sparkinfer.revision": "09b39aa62b3ea36b8b6397bf58fed0f63ff19db3",
+        "org.opencontainers.image.description": "DeepSeek V4 Pro inference for one RTX PRO 6000 and four DGX Spark expert workers",
+        "org.opencontainers.image.licenses": "MIT",
+        "org.opencontainers.image.revision": "575a9df2d47631371d7c766ba55dfd975b1b7ebd-dirty-981dd404ee3f",
+        "org.opencontainers.image.source": "https://github.com/tpurtell/ds41rt",
+        "org.opencontainers.image.title": "DS41RT inference",
+        "org.opencontainers.image.version": "v2"
+      }
+    }
+  ],
+  "limitations": [
+    "Build qualification predates the new strict V4.1 configuration reader.",
+    "Default configuration and execution still require V4.1 migration.",
+    "No full serving or model execution qualification."
+  ]
+}

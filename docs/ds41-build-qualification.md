@@ -19,7 +19,7 @@ Protocol V2 uses the eight-byte `DS41RTE2` signature consistently in Rust and na
 
 ## Remaining gates
 
-Container builds, GPU/native CUDA execution, the five CUTLASS-dependent tests, and full run/restart/stop checks remain pending and are not covered by the CPU results above.
+The CPU results above do not cover container or GPU execution; subsequent successful build/CUDA evidence is recorded below, while the five CUTLASS-dependent tests and full run/restart/stop remain open.
 
 The host default Python 3.14 exceeds the pinned PyO3 version's supported range; select Python 3.12 using `DS41RT_PYTHON="$(uv python find 3.12)" scripts/run-with-python-env.sh COMMAND` for current Rust qualification.
 
@@ -30,3 +30,17 @@ An attempted unfiltered daemon run against the CPU native library correctly reje
 A native CUDA build using `/usr/local/cuda-13.3/bin/nvcc` and architecture 120 now succeeds, with all three native/CUDA/XGrammar self-tests passing; the CPU build also still passes both self-tests.
 
 The new engram CUDA primitives are qualified on both local RTX GPUs as recorded in `ds41-engram-cuda-qualification.json`, while container, Spark, and full serving qualification remains open.
+
+## Successful native container build, 2026-09-10
+
+`./build.sh --spark-hosts ostrich,dodo` completed with exit status zero, automatically generating source manifest `981dd404ee3f7e6653324f37e2307d75f5251ac86709160ae2b37879a2f5deb4` for the dirty checkout at `575a9df2d47631371d7c766ba55dfd975b1b7ebd`.
+
+Both coordinator and Spark development/inference images compiled successfully, including Rust and CUDA/AOT binaries, and release artifacts with source/provenance checksums were exported to `dist/`.
+
+The Spark inference image was built natively on ostrich and distributed to dodo over RDMA; no emu or kiwi access was used.
+
+The coordinator image and both deployed Spark images launch `ds41rt --help` successfully, and coordinator `doctor` sees the RTX and CUDA driver; its absent Rust compiler and unresolved default placeholder Spark hostnames are not full-stack qualification.
+
+`ds41-container-build-qualification.json` records the image IDs, architectures, revision labels, and source identity.
+
+This successful build precedes the new strict configuration reader, and the default model configuration/execution path still needs migration from V4; full run/restart/stop and official checkpoint execution remain open.
