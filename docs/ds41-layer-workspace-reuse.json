@@ -1,0 +1,134 @@
+{
+  "date": "2026-09-11",
+  "scope": "Production query/output/shared-FFN buffer rebinding builds; shared graph cache qualified separately using actual CUDA copies. Rebound FP8 arithmetic has not been run.",
+  "gpu_test": {
+    "host": "ostrich",
+    "gpu": "GB10 SM121",
+    "test": "v41_layer_graphs::tests::cuda_layer_graphs_reuse_storage_and_retain_exact_weight_bindings",
+    "lanes": 2,
+    "layers": 40,
+    "shapes": [
+      1,
+      80,
+      4096
+    ],
+    "changed_payload_passes_per_shape": 2,
+    "captures": 240,
+    "replays": 480,
+    "additional_owner_replacement_replays": 1,
+    "max_graph_entries_per_lane": 40,
+    "invalid_binding_guards": "pass",
+    "clear_and_repeated_clear": "pass",
+    "exit_code": 0,
+    "log": "/tmp/ds41-layer-graphs-test.log",
+    "fixture": "/tmp/ds41-layer-graphs",
+    "native_sha256": "acea0f3bf08a25f92dea120bb2dd627a5a094af22468fce8c2a2436e955b67af"
+  },
+  "build": {
+    "daemon": "pass",
+    "log": "/tmp/ds41-attention-reuse-final-build.log"
+  },
+  "memory_accounting": [
+    {
+      "rows": 1,
+      "per_layer_device_bytes": {
+        "mhc": 225504,
+        "query": 181516,
+        "attention_output": 4435212,
+        "shared_ffn": 74244,
+        "sparse_attention": 131152
+      },
+      "forty_layers_device_bytes": 201905120,
+      "query_output_shared_savings_per_lane": 182947908,
+      "five_groups_once_per_lane": 5047628
+    },
+    {
+      "rows": 16,
+      "per_layer_device_bytes": {
+        "mhc": 3608064,
+        "query": 2479236,
+        "attention_output": 6889604,
+        "shared_ffn": 702468,
+        "sparse_attention": 2098432
+      },
+      "forty_layers_device_bytes": 631112160,
+      "query_output_shared_savings_per_lane": 392781012,
+      "five_groups_once_per_lane": 15777804
+    },
+    {
+      "rows": 80,
+      "per_layer_device_bytes": {
+        "mhc": 18040320,
+        "query": 12290692,
+        "attention_output": 17539716,
+        "shared_ffn": 3387396,
+        "sparse_attention": 10492160
+      },
+      "forty_layers_device_bytes": 2470011360,
+      "query_output_shared_savings_per_lane": 1295494356,
+      "five_groups_once_per_lane": 61750284
+    },
+    {
+      "rows": 256,
+      "per_layer_device_bytes": {
+        "mhc": 57729024,
+        "query": 39294980,
+        "attention_output": 46860292,
+        "shared_ffn": 10801156,
+        "sparse_attention": 33574912
+      },
+      "forty_layers_device_bytes": 7530414560,
+      "query_output_shared_savings_per_lane": 3781300692,
+      "five_groups_once_per_lane": 188260364
+    },
+    {
+      "rows": 1024,
+      "per_layer_device_bytes": {
+        "mhc": 230916096,
+        "query": 157179908,
+        "attention_output": 174858244,
+        "shared_ffn": 43204612,
+        "sparse_attention": 134299648
+      },
+      "forty_layers_device_bytes": 29618340320,
+      "query_output_shared_savings_per_lane": 14634467796,
+      "five_groups_once_per_lane": 740458508
+    },
+    {
+      "rows": 4096,
+      "per_layer_device_bytes": {
+        "mhc": 923664384,
+        "query": 628719620,
+        "attention_output": 686850052,
+        "shared_ffn": 172818436,
+        "sparse_attention": 537198592
+      },
+      "forty_layers_device_bytes": 117970043360,
+      "query_output_shared_savings_per_lane": 58047136212,
+      "five_groups_once_per_lane": 2949251084
+    }
+  ],
+  "memory_exclusions": [
+    "weights",
+    "KV and index caches",
+    "window and compressor staging",
+    "router and index-query/selection workspaces",
+    "dSpark",
+    "vision",
+    "CUDA graph/runtime allocations",
+    "scheduler and transport buffers"
+  ],
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_layer_graphs.rs": "d1d74322ecfdf2767e46b5b404b4cdb3dc3d4d56d2b054b7c3a8ebb7304a772b",
+    "rust/crates/ds41rt-daemon/src/v41_attention_query.rs": "0face676f45ca585ab4e80f9e9451e9ee379dfd2cbe7397d3beb8b3a6bd9a7ae",
+    "rust/crates/ds41rt-daemon/src/v41_attention_output.rs": "6f99eefe7c2736ecebe424e39e5afa065f1560d18a2e4bc0b8aecc0aa3c0a2bd",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_shared.rs": "b187fc08fdee5d95b2ff471c59bd057f6428daa32a43b9e6e2be93e8ddd9ad5e",
+    "rust/crates/ds41rt-daemon/src/v41_shared_ffn.rs": "7b623b637ac5f6d46eb22aba528eb013f65a02cca834ca3578013ec7de0b2dec"
+  },
+  "remaining": [
+    "RTX rebound query/output/shared numerical checks with real weights and changed shapes/owners",
+    "assemble actual alternating execution lanes including sparse/index reuse",
+    "full memory accounting and peak measurement",
+    "full model execution and performance qualification"
+  ]
+}

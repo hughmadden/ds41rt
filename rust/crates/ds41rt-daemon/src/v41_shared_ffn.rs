@@ -21,6 +21,35 @@ pub(crate) struct SharedFfn<'weights, 'library> {
     capacity: u32,
 }
 impl<'weights, 'library> SharedFfn<'weights, 'library> {
+    /// # Safety
+    /// All consumers of this workspace are drained. Any cached external graphs
+    /// retain their original weights/scales and are selected by that binding.
+    pub(crate) unsafe fn rebind(
+        &mut self,
+        weights: &'weights NativeRtxTensors<'library>,
+        prefix: &str,
+        scales: &'weights [DeviceAllocation<'library>],
+    ) -> Result<()> {
+        ensure!(scales.len() == 3, "shared FFN requires three packed scales");
+        let tensors = [
+            weights.get(&format!("{prefix}.w1.weight"))?,
+            weights.get(&format!("{prefix}.w3.weight"))?,
+            weights.get(&format!("{prefix}.w2.weight"))?,
+        ];
+        for i in 0..3 {
+            ensure!(
+                tensors[i].bytes == self.tensors[i].bytes
+                    && tensors[i].device_id == self.gate.buffer.device_id
+                    && scales[i].buffer.bytes == self.scales[i].buffer.bytes
+                    && scales[i].buffer.device_id == self.gate.buffer.device_id,
+                "shared FFN rebound weight extent or device differs"
+            );
+        }
+        self._weights = weights;
+        self.scales = scales;
+        self.tensors = tensors;
+        Ok(())
+    }
     pub fn new(
         library: &'library NativeLibrary,
         weights: &'weights NativeRtxTensors<'library>,

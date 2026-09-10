@@ -14,6 +14,7 @@ mod v41_memory;
 mod v41_window;
 mod v41_sparse_attention;
 mod v41_attention_query;
+mod v41_layer_graphs;
 mod v41_attention_binding;
 mod v41_hc;
 mod v41_shared_ffn;

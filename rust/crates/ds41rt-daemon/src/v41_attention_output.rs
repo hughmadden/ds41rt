@@ -1,5 +1,6 @@
 //! Backbone inverse rotary, grouped BF16 wo_a and native FP8 wo_b.
 use crate::v41_attention_binding::QueryBinding;
+use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_sparse_attention::SparseAttentionOutput;
 use crate::v41_tensors::NativeRtxTensors;
@@ -9,7 +10,7 @@ use ds41rt_ffi::{
     V41_GROUPED_OUTPUT_WORKSPACE,
 };
 use ds41rt_loader::OfficialV41Catalog;
-use std::{ffi::c_void, marker::PhantomData};
+use std::marker::PhantomData;
 const ROW_BYTES: [usize; 6] = [65536, 65536, 16384, 10240, 8, 256];
 const GROUPED_WEIGHT: usize = 67108864;
 pub(crate) struct AttentionOutputWeights<'a> {
@@ -129,7 +130,7 @@ impl<'a> AttentionOutputWeights<'a> {
                 .collect::<Result<Vec<_>>>()?,
             weights: self,
             capacity,
-            graph: None,
+            graphs: LayerGraphs::new(self.library),
             ready: None,
             origin: None,
         };
@@ -183,9 +184,25 @@ pub(crate) struct AttentionOutputWave<'w, 'a> {
     buffers: Vec<DeviceAllocation<'a>>,
     weights: &'w AttentionOutputWeights<'a>,
     capacity: u32,
-    graph: Option<(*mut c_void, u32)>,
+    graphs: LayerGraphs<'w, 'a, AttentionOutputWeights<'a>>,
     ready: Option<u32>,
     origin: Option<QueryBinding>,
+}
+impl<'w, 'a> AttentionOutputWave<'w, 'a> {
+    /// Reuse this lane's storage with another layer's weights. Existing output
+    /// borrows must end first. Cached graphs retain their original weight owners.
+    pub fn rebind(&mut self, weights: &'w AttentionOutputWeights<'a>) -> Result<()> {
+        self.ready = None;
+        self.origin = None;
+        ensure!(
+            std::ptr::eq(self.stream.library, weights.library)
+                && weights.grouped.buffer.device_id == self.b(0).device_id,
+            "attention rebound weight library or device differs"
+        );
+        self.synchronize()?;
+        self.weights = weights;
+        Ok(())
+    }
 }
 impl AttentionOutputWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -272,7 +289,7 @@ impl AttentionOutputWave<'_, '_> {
         self.ready = None;
         self.origin = None;
         ensure!(
-            self.graph.is_none(),
+            self.graphs.get(self.weights.layer, self.weights).is_none(),
             "attention output graph already captured"
         );
         unsafe {
@@ -289,7 +306,15 @@ impl AttentionOutputWave<'_, '_> {
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graph = Some((graph, rows));
+                if let Err(error) = unsafe {
+                    self.graphs
+                        .insert(self.weights.layer, self.weights, rows, graph)
+                } {
+                    unsafe {
+                        self.stream.library.cuda_graph_exec_destroy(graph)?;
+                    }
+                    return Err(error);
+                }
                 Ok(())
             }
             (Err(e), Ok(graph)) => {
@@ -305,7 +330,10 @@ impl AttentionOutputWave<'_, '_> {
     /// Same matching initialized inputs as execute. Captured live row count is fixed.
     pub unsafe fn replay(&mut self, rows: u32) -> Result<AttentionOutput<'_>> {
         self.validate(rows)?;
-        let (graph, count) = self.graph.context("attention output graph missing")?;
+        let (graph, count) = self
+            .graphs
+            .get(self.weights.layer, self.weights)
+            .context("attention output graph missing")?;
         ensure!(count == rows, "attention output capture row count differs");
         let launched = unsafe {
             self.stream
@@ -343,7 +371,11 @@ impl AttentionOutputWave<'_, '_> {
                 .collect::<Vec<_>>(),
         )?;
         let rows = attention.rows as u32;
-        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+        if self
+            .graphs
+            .get(self.weights.layer, self.weights)
+            .is_none_or(|(_, n)| n != rows)
+        {
             self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
@@ -375,21 +407,23 @@ impl AttentionOutputWave<'_, '_> {
             _owner: PhantomData,
         })
     }
+    /// Evict only the current layer; other layers retain one captured shape each.
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready = None;
         self.origin = None;
         self.synchronize()?;
-        if let Some((graph, _)) = self.graph.take() {
-            unsafe {
-                self.stream.library.cuda_graph_exec_destroy(graph)?;
-            }
+        unsafe {
+            self.graphs.remove(self.weights.layer)?;
         }
         Ok(())
     }
 }
 impl Drop for AttentionOutputWave<'_, '_> {
     fn drop(&mut self) {
-        if let Err(error) = self.clear_graph() {
+        if let Err(error) = self
+            .synchronize()
+            .and_then(|()| unsafe { self.graphs.clear() })
+        {
             tracing::error!(%error,"draining attention output graph");
         }
     }

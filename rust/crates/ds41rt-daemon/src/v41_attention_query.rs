@@ -1,11 +1,12 @@
 //! Real backbone low-rank query projection, normalization and rotary graphs.
 use crate::v41_attention_binding::QueryBinding;
+use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel};
 use ds41rt_loader::OfficialV41Catalog;
-use std::{ffi::c_void, marker::PhantomData};
+use std::marker::PhantomData;
 const MATRICES: [(u32, u32); 2] = [(5120, 1280), (1280, 32768)];
 const ROW_BYTES: [usize; 7] = [10240, 2560, 2560, 65536, 65536, 8, 256];
 fn part(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {
@@ -110,7 +111,7 @@ impl<'a> AttentionQueryWeights<'a> {
             norm: self.library.v41_attention_ops()?,
             weights: self,
             capacity,
-            graph: None,
+            graphs: LayerGraphs::new(self.library),
             ready: None,
             binding: None,
             tokens: Vec::new(),
@@ -164,10 +165,27 @@ pub(crate) struct AttentionQueryWave<'w, 'a> {
     norm: V41AttentionOps<'a>,
     weights: &'w AttentionQueryWeights<'a>,
     capacity: u32,
-    graph: Option<(*mut c_void, u32)>,
+    graphs: LayerGraphs<'w, 'a, AttentionQueryWeights<'a>>,
     ready: Option<u32>,
     binding: Option<QueryBinding>,
     tokens: Vec<u64>,
+}
+impl<'w, 'a> AttentionQueryWave<'w, 'a> {
+    /// Reuse this lane's storage with another layer's weights. Existing output
+    /// borrows must end first. Cached graphs retain their original weight owners.
+    pub fn rebind(&mut self, weights: &'w AttentionQueryWeights<'a>) -> Result<()> {
+        self.ready = None;
+        self.binding = None;
+        self.tokens.clear();
+        ensure!(
+            std::ptr::eq(self.stream.library, weights.library)
+                && weights.tensors.get(&weights.names[0])?.device_id == self.b(0).device_id,
+            "attention rebound weight library or device differs"
+        );
+        self.synchronize()?;
+        self.weights = weights;
+        Ok(())
+    }
 }
 impl AttentionQueryWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -270,7 +288,7 @@ impl AttentionQueryWave<'_, '_> {
         self.binding = None;
         self.tokens.clear();
         ensure!(
-            self.graph.is_none(),
+            self.graphs.get(self.weights.layer, self.weights).is_none(),
             "attention query graph already captured"
         );
         unsafe {
@@ -288,7 +306,15 @@ impl AttentionQueryWave<'_, '_> {
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graph = Some((graph, rows));
+                if let Err(error) = unsafe {
+                    self.graphs
+                        .insert(self.weights.layer, self.weights, rows, graph)
+                } {
+                    unsafe {
+                        self.stream.library.cuda_graph_exec_destroy(graph)?;
+                    }
+                    return Err(error);
+                }
                 Ok(())
             }
             (Err(e), Ok(graph)) => {
@@ -304,7 +330,10 @@ impl AttentionQueryWave<'_, '_> {
     /// Same matching initialized inputs as execute. Captured live row count is fixed.
     pub unsafe fn replay(&mut self, rows: u32) -> Result<AttentionQueryOutput<'_>> {
         self.validate(rows)?;
-        let (graph, count) = self.graph.context("attention query graph missing")?;
+        let (graph, count) = self
+            .graphs
+            .get(self.weights.layer, self.weights)
+            .context("attention query graph missing")?;
         ensure!(count == rows, "attention query capture row count differs");
         let launched = unsafe {
             self.stream
@@ -337,7 +366,11 @@ impl AttentionQueryWave<'_, '_> {
                 .collect::<Vec<_>>(),
         )?;
         let rows = tokens.len() as u32;
-        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+        if self
+            .graphs
+            .get(self.weights.layer, self.weights)
+            .is_none_or(|(_, n)| n != rows)
+        {
             self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
@@ -368,22 +401,24 @@ impl AttentionQueryWave<'_, '_> {
             _owner: PhantomData,
         })
     }
+    /// Evict only the current layer; other layers retain one captured shape each.
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready = None;
         self.binding = None;
         self.tokens.clear();
         self.synchronize()?;
-        if let Some((graph, _)) = self.graph.take() {
-            unsafe {
-                self.stream.library.cuda_graph_exec_destroy(graph)?;
-            }
+        unsafe {
+            self.graphs.remove(self.weights.layer)?;
         }
         Ok(())
     }
 }
 impl Drop for AttentionQueryWave<'_, '_> {
     fn drop(&mut self) {
-        if let Err(error) = self.clear_graph() {
+        if let Err(error) = self
+            .synchronize()
+            .and_then(|()| unsafe { self.graphs.clear() })
+        {
             tracing::error!(%error,"draining attention query graph");
         }
     }

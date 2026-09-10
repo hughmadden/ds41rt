@@ -1,13 +1,14 @@
 //! Real backbone shared experts, with immutable weights and exclusive captured waves.
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_block::FfnInput;
+use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_shared_ffn::SharedFfn;
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 use ds41rt_loader::OfficialV41Catalog;
-use std::{ffi::c_void, marker::PhantomData};
+use std::marker::PhantomData;
 pub(crate) struct BackboneSharedWeights<'a> {
     library: &'a NativeLibrary,
     layer: usize,
@@ -104,7 +105,8 @@ impl<'a> BackboneSharedWeights<'a> {
             result: DeviceAllocation::new(self.library, capacity as usize * 10240)?,
             layer: self.layer,
             capacity,
-            graph: None,
+            graphs: LayerGraphs::new(self.library),
+            weights: self,
             ready: None,
             origin: None,
         })
@@ -131,9 +133,33 @@ pub(crate) struct BackboneSharedWave<'w, 'a> {
     result: DeviceAllocation<'a>,
     layer: usize,
     capacity: u32,
-    graph: Option<(*mut c_void, u32)>,
+    graphs: LayerGraphs<'w, 'a, BackboneSharedWeights<'a>>,
+    weights: &'w BackboneSharedWeights<'a>,
     ready: Option<u32>,
     origin: Option<QueryBinding>,
+}
+impl<'w, 'a> BackboneSharedWave<'w, 'a> {
+    /// Reuse this lane's shared-expert storage with another backbone layer.
+    pub fn rebind(&mut self, weights: &'w BackboneSharedWeights<'a>) -> Result<()> {
+        self.invalidate();
+        ensure!(
+            std::ptr::eq(self.stream.library, weights.library),
+            "shared FFN rebound weight library differs"
+        );
+        self.synchronize()?;
+        // LayerGraphs retains the full owner, including packed scales, for
+        // every cached graph. Only this drained stream consumes the workspace.
+        unsafe {
+            self.inner.rebind(
+                &weights.tensors,
+                &format!("layers.{}.ffn.shared_experts", weights.layer),
+                &weights.scales,
+            )?;
+        }
+        self.weights = weights;
+        self.layer = weights.layer;
+        Ok(())
+    }
 }
 impl BackboneSharedWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -176,7 +202,10 @@ impl BackboneSharedWave<'_, '_> {
     /// Same contract as execute. Warmup is drained before capture.
     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
         self.invalidate();
-        ensure!(self.graph.is_none(), "shared FFN graph already captured");
+        ensure!(
+            self.graphs.get(self.layer, self.weights).is_none(),
+            "shared FFN graph already captured"
+        );
         unsafe {
             self.execute(rows)?;
         }
@@ -190,7 +219,14 @@ impl BackboneSharedWave<'_, '_> {
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graph = Some((graph, rows));
+                if let Err(error) =
+                    unsafe { self.graphs.insert(self.layer, self.weights, rows, graph) }
+                {
+                    unsafe {
+                        self.stream.library.cuda_graph_exec_destroy(graph)?;
+                    }
+                    return Err(error);
+                }
                 Ok(())
             }
             (Err(e), Ok(graph)) => {
@@ -206,7 +242,10 @@ impl BackboneSharedWave<'_, '_> {
     /// Same contract as execute; graph live row count must match.
     pub unsafe fn replay(&mut self, rows: u32) -> Result<SharedOutput<'_>> {
         self.validate(rows)?;
-        let (graph, count) = self.graph.context("shared FFN graph missing")?;
+        let (graph, count) = self
+            .graphs
+            .get(self.layer, self.weights)
+            .context("shared FFN graph missing")?;
         ensure!(count == rows, "shared FFN captured rows differ");
         let launched = unsafe {
             self.stream
@@ -235,7 +274,11 @@ impl BackboneSharedWave<'_, '_> {
             .library
             .copy_d2d(self.input.buffer, input.values, input.values.bytes)?;
         let rows = input.tokens.len() as u32;
-        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+        if self
+            .graphs
+            .get(self.layer, self.weights)
+            .is_none_or(|(_, n)| n != rows)
+        {
             self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
@@ -267,20 +310,22 @@ impl BackboneSharedWave<'_, '_> {
             _owner: PhantomData,
         })
     }
+    /// Evict only the current layer; other layers retain one captured shape each.
     pub fn clear_graph(&mut self) -> Result<()> {
         self.invalidate();
         self.synchronize()?;
-        if let Some((graph, _)) = self.graph.take() {
-            unsafe {
-                self.stream.library.cuda_graph_exec_destroy(graph)?;
-            }
+        unsafe {
+            self.graphs.remove(self.layer)?;
         }
         Ok(())
     }
 }
 impl Drop for BackboneSharedWave<'_, '_> {
     fn drop(&mut self) {
-        if let Err(e) = self.clear_graph() {
+        if let Err(e) = self
+            .synchronize()
+            .and_then(|()| unsafe { self.graphs.clear() })
+        {
             tracing::error!(%e,"draining backbone shared FFN");
         }
     }
