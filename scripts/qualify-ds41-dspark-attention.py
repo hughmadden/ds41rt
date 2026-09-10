@@ -44,13 +44,14 @@ def main():
     torch.backends.cuda.matmul.allow_tf32=False
     lib=C.CDLL(str(args.native_lib));P=C.c_void_p;I=C.c_int32
     init=lib.ds41rt_v41_dspark_attention_initialize;init.argtypes=[];init.restype=I;assert init()==0
-    launch=lib.ds41rt_v41_dspark_attention;launch.argtypes=[P,P,P,P,P,P,I,I,P];launch.restype=I
+    launch=lib.ds41rt_v41_dspark_attention_fp8;launch.argtypes=[P,P,P,P,P,P,I,I,P];launch.restype=I
     stream=torch.cuda.Stream();results=[]
     lengths=[2,58,59,60,63,64,65,122,123,124,127,128,3,31,96,128]
     with torch.cuda.stream(stream),torch.no_grad():
         for requests in (1,3,16):
             q=torch.empty((requests,5,64,512),device='cuda',dtype=torch.bfloat16)
             ring=torch.empty((16,128,512),device='cuda',dtype=torch.bfloat16)
+            packed=torch.empty((16,128,528),device='cuda',dtype=torch.uint8)
             draft=torch.empty((requests,5,512),device='cuda',dtype=torch.bfloat16)
             sink=torch.empty(64,device='cuda')
             windows=torch.empty((requests,2),device='cuda',dtype=torch.int32)
@@ -59,12 +60,19 @@ def main():
                 q.copy_((torch.randn_like(q.float())*(.3 if case==0 else 1.2)).bfloat16())
                 draft.copy_((torch.randn_like(draft.float())*.4).bfloat16())
                 sink.copy_(torch.linspace(-4,4,64,device='cuda')+case)
-                ring.fill_(float('nan'))
+                ring.fill_(float('nan'));packed.fill_(255)
                 descriptors=[((r*7+case*3)%16,lengths[(r+case*5)%16]) for r in range(requests)]
-                for slot,valid in descriptors:ring[slot,:valid].copy_((torch.randn((valid,512),device='cuda')*.4).bfloat16())
+                for slot,valid in descriptors:
+                    values=(torch.randn((valid,16,32),device='cuda')*.4).bfloat16().float()
+                    exponent=torch.ceil(torch.log2(values.abs().amax(-1).clamp_min(1e-4)/448))
+                    scale=torch.exp2(exponent)
+                    quantized=(values/scale[...,None]).to(torch.float8_e4m3fn)
+                    packed[slot,:valid,:512].copy_(quantized.view(torch.uint8).reshape(valid,512))
+                    packed[slot,:valid,512:].copy_((exponent+127).to(torch.uint8))
+                    ring[slot,:valid].copy_((quantized.float()*scale[...,None]).reshape(valid,512).bfloat16())
                 windows.copy_(torch.tensor(descriptors,device='cuda',dtype=torch.int32))
                 return descriptors
-            def run():assert launch(q.data_ptr(),ring.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),output.data_ptr(),requests,16,stream.cuda_stream)==0
+            def run():assert launch(q.data_ptr(),packed.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),output.data_ptr(),requests,16,stream.cuda_stream)==0
             def compare(descriptors):
                 expected=oracle(q,ring,draft,sink,descriptors)
                 assert torch.isfinite(output).all().item()
@@ -78,7 +86,7 @@ def main():
             sink.fill_(1000);graph.replay();assert torch.count_nonzero(output).item()==0
             # Uniform scores, zero committed values and five distinct nonzero drafts:
             # every query must see ALL five, independent of its position.
-            q.zero_();ring.zero_();sink.zero_()
+            q.zero_();ring.zero_();packed.zero_();sink.zero_()
             for k in range(5):draft[:,k].fill_(k+1)
             descriptors=[(r,128) for r in range(requests)]
             windows.copy_(torch.tensor(descriptors,device='cuda',dtype=torch.int32));graph.replay()
@@ -102,11 +110,11 @@ def main():
             assert torch.all(output[...,1]!=unrounded).item()
             windows[0,0]=16;graph.replay();assert torch.count_nonzero(output[0]).item()==0
             windows[0,0]=0;windows[0,1]=129;graph.replay();assert torch.count_nonzero(output[0]).item()==0
-            assert launch(q.data_ptr(),ring.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),q.data_ptr(),requests,16,stream.cuda_stream)!=0
-            assert launch(q.data_ptr(),ring.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),output.data_ptr(),0,16,stream.cuda_stream)!=0
-            assert launch(q.data_ptr(),ring.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),output.data_ptr(),requests,17,stream.cuda_stream)!=0
+            assert launch(q.data_ptr(),packed.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),q.data_ptr(),requests,16,stream.cuda_stream)!=0
+            assert launch(q.data_ptr(),packed.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),output.data_ptr(),0,16,stream.cuda_stream)!=0
+            assert launch(q.data_ptr(),packed.data_ptr(),draft.data_ptr(),sink.data_ptr(),windows.data_ptr(),output.data_ptr(),requests,17,stream.cuda_stream)!=0
             stream.synchronize();del graph
             results.append({'requests':requests,'initial':initial,'changed_graph':changed,'poison_unused_ring':True,'all_five_drafts_exact':True,'private_only_exact':True,'probability_rounding_exact_counterfactual':True,'large_sink_zero':True,'invalid_descriptors_zero':True,'host_guards':True})
             print(f'PASS requests={requests}',flush=True)
-    args.output.write_text(json.dumps({'scope':'Native BF16 dSpark QK/64-key online softmax/BF16 probability PV/sink; excludes owned stage integration','reference_hashes':hashes,'device':args.device,'name':torch.cuda.get_device_name(args.device),'native_library_sha256':hashlib.sha256(args.native_lib.read_bytes()).hexdigest(),'qualifier_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'results':results},indent=2)+'\n')
+    args.output.write_text(json.dumps({'scope':'Native packed E4M3/E8M0 dSpark committed KV with BF16 QK/64-key online softmax/BF16 probability PV/sink; excludes owned stage integration','reference_hashes':hashes,'device':args.device,'name':torch.cuda.get_device_name(args.device),'native_library_sha256':hashlib.sha256(args.native_lib.read_bytes()).hexdigest(),'qualifier_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'results':results},indent=2)+'\n')
 if __name__=='__main__':main()

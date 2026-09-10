@@ -9,7 +9,8 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Serve only the official DeepSeek-V4.1-Flash checkpoint on one RTX coordinator and four Spark TP4 backbone-expert workers.
 - [ ] Keep native vision, all three dSpark stages and their experts, shared experts, routing, attention, sampling and API execution on the RTX.
 - [x] Remove balanced/long/accuracy serving profiles and enforce FP8 target KV in launch settings.
-- [ ] Convert the remaining dSpark persistent window to FP8 storage and qualify it on RTX; FP8 is the only serving KV policy.
+- [x] Store dSpark committed windows as packed E4M3/E8M0 K32, completing the fixed FP8 persistent-cache representation in the V4.1 components.
+- [ ] Requalify the packed dSpark windows and complete draft graphs on RTX. Spark cache-byte/ownership and attention checks pass; RTX driver repair is still required.
 - [ ] Preserve streaming, tools, structured constraints, cancellation, admission, error handling, prefix reuse and restart readiness.
 - [ ] Support concurrency 1 through 16 with request-safe state and qualified alternating-wave scheduling.
 - [ ] Measure at least 90 generated tokens/s for target-only decode with dSpark disabled under a documented workload.

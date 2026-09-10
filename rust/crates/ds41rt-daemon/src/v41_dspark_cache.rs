@@ -1,4 +1,4 @@
-//! Committed dSpark KV rings with generation-checked request slots.
+//! Packed FP8 committed dSpark KV rings with generation-checked request slots.
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
@@ -58,7 +58,7 @@ impl<'a> DsparkWindow<'a> {
             (1..=16).contains(&slots) && (1..=4096).contains(&source_rows),
             "invalid dSpark window capacity"
         );
-        Ok(slots * 131072 + source_rows as usize * 1024 + 384)
+        Ok(slots * V41DsparkCache::SLOT_BYTES + source_rows as usize * 1024 + 384)
     }
     pub fn new(
         library: &'a NativeLibrary,
@@ -80,7 +80,7 @@ impl<'a> DsparkWindow<'a> {
             },
             kernel: library.v41_dspark_cache()?,
             source: DeviceAllocation::new(library, source_rows as usize * 1024)?,
-            ring: DeviceAllocation::new(library, slots * 131072)?,
+            ring: DeviceAllocation::new(library, slots * V41DsparkCache::SLOT_BYTES)?,
             descriptors: DeviceAllocation::new(library, 384)?,
             staging: HostAllocation::new(library, 384)?,
             graph: None,
@@ -297,6 +297,7 @@ impl<'a> DsparkWindow<'a> {
             descriptors,
         })
     }
+    /// Packed [128,528] bytes: E4M3 values and E8M0 K32 scales per row.
     /// Physical ring order: attention reads 0..valid_rows, then its five private
     /// draft positions. No chronological reordering of this buffer is necessary.
     pub fn view(&self, lease: WindowLease) -> Result<WindowView> {
@@ -305,8 +306,8 @@ impl<'a> DsparkWindow<'a> {
             .end
             .context("dSpark window has not been seeded")?;
         let mut buffer = self.ring.buffer;
-        buffer.ptr = unsafe { buffer.ptr.cast::<u8>().add(slot * 131072).cast() };
-        buffer.bytes = 131072;
+        buffer.ptr = unsafe { buffer.ptr.cast::<u8>().add(slot * V41DsparkCache::SLOT_BYTES).cast() };
+        buffer.bytes = V41DsparkCache::SLOT_BYTES;
         Ok(WindowView {
             buffer,
             valid_rows: end.min(128) as usize,

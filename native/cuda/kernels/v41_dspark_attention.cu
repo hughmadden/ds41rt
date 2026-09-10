@@ -1,6 +1,8 @@
 #include "ds41rt_v41_dspark_attention.h"
 #include <cuda_runtime.h>
 #include <cuda_bf16.h>
+#include <cuda_fp8.h>
+#include "ds41rt_v41_dspark_cache.h"
 #include <mma.h>
 #include <stdint.h>
 #include <math_constants.h>
@@ -16,7 +18,7 @@ __device__ float warp_sum(float x) {
   for(int n=16;n;n>>=1)x=__fadd_rn(x,__shfl_xor_sync(0xffffffffu,x,n));
   return x;
 }
-__global__ void attend(const __nv_bfloat16* query, const __nv_bfloat16* ring,
+__global__ void attend(const __nv_bfloat16* query, const uint8_t* ring,
     const __nv_bfloat16* draft, const float* sink,
     const ds41rt_v41_attention_window_t* windows, __nv_bfloat16* output,int slots) {
   const int row=blockIdx.x, group=blockIdx.y, request=row/5;
@@ -43,7 +45,11 @@ __global__ void attend(const __nv_bfloat16* query, const __nv_bfloat16* ring,
     for(int i=tid;i<64*512;i+=128) {
       const int key=start+i/512,col=i%512;
       __nv_bfloat16 value=__float2bfloat16(0);
-      if(key<int(window.valid_rows))value=ring[(uint64_t(window.slot)*128+key)*512+col];
+      if(key<int(window.valid_rows)) {
+        const uint64_t offset=(uint64_t(window.slot)*128+key)*DS41RT_V41_DSPARK_KV_ROW_BYTES;
+        __nv_fp8_e4m3 packed; packed.__x=ring[offset+col];
+        value=__float2bfloat16_rn(ldexpf(float(packed),int(ring[offset+512+col/32])-127));
+      }
       else if(key<count)value=draft[(uint64_t(request)*5+key-window.valid_rows)*512+col];
       kv[i]=value;
     }
@@ -114,17 +120,17 @@ bool disjoint(const void* a,uint64_t n,const void* b,uint64_t m) {
 extern "C" int32_t ds41rt_v41_dspark_attention_initialize(void) {
   return cudaFuncSetAttribute(attend,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
 }
-extern "C" int32_t ds41rt_v41_dspark_attention(const uint16_t* query,const uint16_t* ring,
+extern "C" int32_t ds41rt_v41_dspark_attention_fp8(const uint16_t* query,const uint8_t* ring,
     const uint16_t* draft,const float* sink,const ds41rt_v41_attention_window_t* windows,
     uint16_t* output,int32_t requests,int32_t slots,void* stream) {
   if(requests<1||requests>16||slots<1||slots>16)return cudaErrorInvalidValue;
-  const uint64_t q=uint64_t(requests)*5*64*512*2,r=uint64_t(slots)*128*512*2,d=uint64_t(requests)*5*512*2;
+  const uint64_t q=uint64_t(requests)*5*64*512*2,r=uint64_t(slots)*128*DS41RT_V41_DSPARK_KV_ROW_BYTES,d=uint64_t(requests)*5*512*2;
   if(!span(output,q,32))return cudaErrorInvalidValue;
   const void* inputs[]={query,ring,draft,sink,windows};const uint64_t sizes[]={q,r,d,256,uint64_t(requests)*8};
-  const uint32_t align[]={32,2,2,4,4};
+  const uint32_t align[]={32,1,2,4,4};
   for(int i=0;i<5;++i)if(!span(inputs[i],sizes[i],align[i])||!disjoint(inputs[i],sizes[i],output,q))return cudaErrorInvalidValue;
   attend<<<dim3(requests*5,4),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
-      reinterpret_cast<const __nv_bfloat16*>(query),reinterpret_cast<const __nv_bfloat16*>(ring),
+      reinterpret_cast<const __nv_bfloat16*>(query),ring,
       reinterpret_cast<const __nv_bfloat16*>(draft),sink,windows,reinterpret_cast<__nv_bfloat16*>(output),slots);
   return cudaGetLastError();
 }

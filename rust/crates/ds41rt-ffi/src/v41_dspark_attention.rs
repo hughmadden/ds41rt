@@ -1,4 +1,4 @@
-use crate::{Ds41rtDeviceBuffer, NativeLibrary};
+use crate::{Ds41rtDeviceBuffer, NativeLibrary, V41DsparkCache};
 use anyhow::{ensure, Result};
 use std::ffi::c_void;
 #[repr(C)]
@@ -10,7 +10,7 @@ pub struct V41AttentionWindow {
 const _: [(); 8] = [(); std::mem::size_of::<V41AttentionWindow>()];
 type Launch = unsafe extern "C" fn(
     *const u16,
-    *const u16,
+    *const u8,
     *const u16,
     *const f32,
     *const V41AttentionWindow,
@@ -37,14 +37,15 @@ impl NativeLibrary {
         );
         Ok(V41DsparkAttention {
             _library: self,
-            launch: unsafe { *self.lib.get(b"ds41rt_v41_dspark_attention")? },
+            launch: unsafe { *self.lib.get(b"ds41rt_v41_dspark_attention_fp8")? },
         })
     }
 }
 impl V41DsparkAttention<'_> {
     /// # Safety
-    /// BF16 queries are rotated; attended BF16 KV has completed normalization,
-    /// rotation and FP8 quantize/dequantize. Per-request descriptors select valid
+    /// BF16 queries are rotated; committed KV is packed E4M3/E8M0 K32.
+    /// Private BF16 KV has completed normalization, rotation and FP8
+    /// quantize/dequantize. Per-request descriptors select valid
     /// initialized committed ring prefixes; all five private draft entries are
     /// initialized. Inputs/sinks are finite where read. Output is disjoint from
     /// inputs; buffers live on the initialized stream device through completion
@@ -67,7 +68,7 @@ impl V41DsparkAttention<'_> {
         );
         for (value, bytes) in [
             (query, requests as usize * 327680),
-            (ring, slots as usize * 131072),
+            (ring, slots as usize * V41DsparkCache::SLOT_BYTES),
             (draft, requests as usize * 5120),
             (sink, 256),
             (windows, requests as usize * 8),

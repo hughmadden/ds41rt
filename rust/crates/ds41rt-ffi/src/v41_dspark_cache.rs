@@ -12,7 +12,7 @@ pub struct V41KvWrite {
 }
 const _: [(); 24] = [(); std::mem::size_of::<V41KvWrite>()];
 type Launch =
-    unsafe extern "C" fn(*const u16, *const V41KvWrite, *mut u16, i32, i32, *mut c_void) -> i32;
+    unsafe extern "C" fn(*const u16, *const V41KvWrite, *mut u8, i32, i32, *mut c_void) -> i32;
 pub struct V41DsparkCache<'a> {
     _library: &'a NativeLibrary,
     launch: Launch,
@@ -21,11 +21,14 @@ impl NativeLibrary {
     pub fn v41_dspark_cache(&self) -> Result<V41DsparkCache<'_>> {
         Ok(V41DsparkCache {
             _library: self,
-            launch: unsafe { *self.lib.get(b"ds41rt_v41_dspark_cache_write")? },
+            launch: unsafe { *self.lib.get(b"ds41rt_v41_dspark_cache_write_fp8")? },
         })
     }
 }
 impl V41DsparkCache<'_> {
+    /// E4M3 values followed by one E8M0 scale per 32 coordinates.
+    pub const ROW_BYTES: usize = 528;
+    pub const SLOT_BYTES: usize = 128 * Self::ROW_BYTES;
     /// # Safety
     /// Source is normalized and rotated finite BF16 KV. Sixteen initialized
     /// descriptors have valid source spans, unique active slots, and positions
@@ -47,7 +50,7 @@ impl V41DsparkCache<'_> {
         for (buffer, bytes) in [
             (source, source_rows as usize * 1024),
             (writes, 384),
-            (ring, slots as usize * 131072),
+            (ring, slots as usize * Self::SLOT_BYTES),
         ] {
             ensure!(
                 !buffer.ptr.is_null() && buffer.bytes >= bytes,

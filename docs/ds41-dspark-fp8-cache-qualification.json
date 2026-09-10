@@ -1,0 +1,204 @@
+{
+  "scope": "Packed committed dSpark KV; Spark component qualification only",
+  "source_sha256": {
+    "native/cuda/kernels/v41_dspark_cache.cu": "6ad0db08ace607c56583c69bca2045f4340aa73c596538e685797e1dd79f7fd6",
+    "native/cuda/kernels/v41_dspark_attention.cu": "9e0074c053fca900412a9e84ecb121ff9a67d676848209bb66f416b65842021c",
+    "native/include/ds41rt_v41_dspark_cache.h": "b930664f9db7e3dc079540713eaa4785ca05a0d2e16c5191b72c2ef0917c76a8",
+    "native/include/ds41rt_v41_dspark_attention.h": "ad23f2bd4c95670adeb8f362ceb4eeeca861339884a6b47ded2aabf837a36b47",
+    "rust/crates/ds41rt-ffi/src/v41_dspark_cache.rs": "da4c4a387e6db7bd3edcb39a2d033a49342fae22369bc629132f174ac7dceac4",
+    "rust/crates/ds41rt-ffi/src/v41_dspark_attention.rs": "cdd297bc73ab3f574f0ef4ecc2908c9a9377520d180adc0db7151f3680ca6e8d",
+    "rust/crates/ds41rt-daemon/src/v41_dspark_cache.rs": "6b29ef9762782f47290045bbe43606f0850a9f596d8a0c8d70e641c89d0cc353",
+    "scripts/qualify-ds41-dspark-attention.py": "143775917feb2ce255459575930a84999e139b93d8248c4cc6fb0a6cfe9f6b65"
+  },
+  "row_bytes": 528,
+  "slot_bytes": 67584,
+  "max_owner_device_bytes": 5276032,
+  "max_owner_pinned_bytes": 384,
+  "saved_device_bytes_three_stages_c16": 3047424,
+  "fixture_sha256": {
+    "src/main.rs": "cb90df4af9b8313b6721a6e3d22e30917c0b3104d0327f6d327f744bb0d7c7cf",
+    "src/v41_dspark_cache.rs": "6b29ef9762782f47290045bbe43606f0850a9f596d8a0c8d70e641c89d0cc353",
+    "src/v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e",
+    "source.bin": "8da6efe0f5cc3045c9d021ec9b8ba6eb2d7cf056ca172bd86f1be3dc86d8c482",
+    "expected.bin": "b97fdc99753e026debecc6801e6bbebed4ce83008f78530faad396380a49080e",
+    "compare-bf16.py": "be1882ec4015e45207051c9d8096a33afa17ab5f82c24176de211d8c9bc3449c"
+  },
+  "attention": {
+    "scope": "Native packed E4M3/E8M0 dSpark committed KV with BF16 QK/64-key online softmax/BF16 probability PV/sink; excludes owned stage integration",
+    "reference_hashes": {
+      "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455"
+    },
+    "device": 0,
+    "name": "NVIDIA GB10",
+    "native_library_sha256": "24998e1e672d68ed7566f6306bf02b106949eb8a7e4161649679cee6ea6d17f9",
+    "qualifier_sha256": "143775917feb2ce255459575930a84999e139b93d8248c4cc6fb0a6cfe9f6b65",
+    "results": [
+      {
+        "requests": 1,
+        "initial": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 4
+        },
+        "changed_graph": {
+          "max_abs_error": 0.000244140625,
+          "different_bf16_elements": 4
+        },
+        "poison_unused_ring": true,
+        "all_five_drafts_exact": true,
+        "private_only_exact": true,
+        "probability_rounding_exact_counterfactual": true,
+        "large_sink_zero": true,
+        "invalid_descriptors_zero": true,
+        "host_guards": true
+      },
+      {
+        "requests": 3,
+        "initial": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 4
+        },
+        "changed_graph": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 360
+        },
+        "poison_unused_ring": true,
+        "all_five_drafts_exact": true,
+        "private_only_exact": true,
+        "probability_rounding_exact_counterfactual": true,
+        "large_sink_zero": true,
+        "invalid_descriptors_zero": true,
+        "host_guards": true
+      },
+      {
+        "requests": 16,
+        "initial": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 42
+        },
+        "changed_graph": {
+          "max_abs_error": 0.0009765625,
+          "different_bf16_elements": 1305
+        },
+        "poison_unused_ring": true,
+        "all_five_drafts_exact": true,
+        "private_only_exact": true,
+        "probability_rounding_exact_counterfactual": true,
+        "large_sink_zero": true,
+        "invalid_descriptors_zero": true,
+        "host_guards": true
+      }
+    ]
+  },
+  "bf16_transition": {
+    "scope": "Native packed E4M3/E8M0 dSpark committed KV with BF16 QK/64-key online softmax/BF16 probability PV/sink; excludes owned stage integration",
+    "reference_hashes": {
+      "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455"
+    },
+    "device": 0,
+    "name": "NVIDIA GB10",
+    "native_library_sha256": "24998e1e672d68ed7566f6306bf02b106949eb8a7e4161649679cee6ea6d17f9",
+    "qualifier_sha256": "be1882ec4015e45207051c9d8096a33afa17ab5f82c24176de211d8c9bc3449c",
+    "results": [
+      {
+        "requests": 1,
+        "initial": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 4
+        },
+        "changed_graph": {
+          "max_abs_error": 0.000244140625,
+          "different_bf16_elements": 4
+        },
+        "poison_unused_ring": true,
+        "all_five_drafts_exact": true,
+        "private_only_exact": true,
+        "probability_rounding_exact_counterfactual": true,
+        "large_sink_zero": true,
+        "invalid_descriptors_zero": true,
+        "host_guards": true
+      },
+      {
+        "requests": 3,
+        "initial": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 4
+        },
+        "changed_graph": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 360
+        },
+        "poison_unused_ring": true,
+        "all_five_drafts_exact": true,
+        "private_only_exact": true,
+        "probability_rounding_exact_counterfactual": true,
+        "large_sink_zero": true,
+        "invalid_descriptors_zero": true,
+        "host_guards": true
+      },
+      {
+        "requests": 16,
+        "initial": {
+          "max_abs_error": 0.00048828125,
+          "different_bf16_elements": 42
+        },
+        "changed_graph": {
+          "max_abs_error": 0.0009765625,
+          "different_bf16_elements": 1305
+        },
+        "poison_unused_ring": true,
+        "all_five_drafts_exact": true,
+        "private_only_exact": true,
+        "probability_rounding_exact_counterfactual": true,
+        "large_sink_zero": true,
+        "invalid_descriptors_zero": true,
+        "host_guards": true
+      }
+    ]
+  },
+  "logs": {
+    "native-build": {
+      "sha256": "8cf9d2e34bb4b032afe7abe5367bc072b43dfde589ecc89a99c36bc3c7c96b87",
+      "tail": "[  2%] Verifying pinned SparkInfer source\nverified SparkInfer revision=aeb1d8c18e99809797c76af6fbfaca1273c36ff6 source_tree_sha256=ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f source=/workspace/ds41rt/third_party/sparkinfer\n[  2%] Built target ds41rt_verify_sparkinfer_source\n[  5%] Built target ds41rt_v41_experts_export\n[  8%] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark_cache.cu.o\n[ 10%] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark_attention.cu.o\n[ 13%] Linking CXX shared library libds41rt_native.so\n[ 89%] Built target ds41rt_native\n[ 91%] Linking CXX executable ds41rt_native_selftest\n[ 94%] Linking CXX executable ds41rt_cuda_selftest\n[ 97%] Built target ds41rt_native_selftest\n[100%] Built target ds41rt_cuda_selftest\n"
+    },
+    "sm120-build": {
+      "sha256": "a151c5726da83e1c9d47eb3f57a13bd82614656b982e6e95286c103b068684d2",
+      "tail": "[0/2] Re-checking globbed directories...\n[1/7] Verifying pinned SparkInfer source\nverified SparkInfer revision=aeb1d8c18e99809797c76af6fbfaca1273c36ff6 source_tree_sha256=ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f source=/workspace/ds41rt/third_party/sparkinfer\n[2/7] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark_cache.cu.o\n[3/7] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark_attention.cu.o\n[4/7] Linking CXX shared library libds41rt_native.so\n[5/7] Linking CXX executable ds41rt_native_selftest\n[6/7] Linking CXX executable ds41rt_cuda_selftest\n"
+    },
+    "daemon-build": {
+      "sha256": "78becc68f32989508dbd0db5cd8ce0e85720812c67db9467c8d33318f61ee465",
+      "tail": "     fn validate(&self, lease: WindowLease) -> Result<usize> {\n    |        ^^^^^^^^\n...\n167 |     pub fn request_id(&self, lease: WindowLease) -> Result<u64> {\n    |            ^^^^^^^^^^\n...\n171 |     pub fn release(&mut self, lease: WindowLease) -> Result<()> {\n    |            ^^^^^^^\n...\n178 |     pub fn source(&self) -> Ds41rtDeviceBuffer {\n    |            ^^^^^^\n...\n181 |     fn prepare_write(&self, chunks: &[WindowChunk], source_rows: u32)\n    |        ^^^^^^^^^^^^^\n...\n229 |     pub fn validate_write(&self, chunks: &[WindowChunk], source_rows: u32) -> Result<()> {\n    |            ^^^^^^^^^^^^^^\n...\n236 |     pub unsafe fn write(&mut self, chunks: &[WindowChunk]) -> Result<()> {\n    |                   ^^^^^\n...\n268 |     pub fn attention_read(&self, requests: &[(WindowLease, u64)]) -> Result<WindowRead> {\n    |            ^^^^^^^^^^^^^^\n...\n303 |     pub fn view(&self, lease: WindowLease) -> Result<WindowView> {\n    |            ^^^^\n\nwarning: struct `NativeRtxTensors` is never constructed\n --> crates/ds41rt-daemon/src/v41_tensors.rs:8:19\n  |\n8 | pub(crate) struct NativeRtxTensors<'a> {\n  |                   ^^^^^^^^^^^^^^^^\n\nwarning: associated items `plan`, `load`, `get`, and `resident_bytes` are never used\n  --> crates/ds41rt-daemon/src/v41_tensors.rs:13:12\n   |\n12 | impl<'a> NativeRtxTensors<'a> {\n   | ----------------------------- associated items in this implementation\n13 |     pub fn plan(catalog: &OfficialV41Catalog, names: &[String]) -> Result<usize> {\n   |            ^^^^\n...\n30 |     pub fn load(\n   |            ^^^^\n...\n71 |     pub fn get(&self, name: &str) -> Result<Ds41rtDeviceBuffer> {\n   |            ^^^\n...\n78 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: struct `VocabularyHead` is never constructed\n  --> crates/ds41rt-daemon/src/v41_tensors.rs:85:19\n   |\n85 | pub(crate) struct VocabularyHead<'library> {\n   |                   ^^^^^^^^^^^^^^\n\nwarning: associated items `plan`, `load`, and `weight` are never used\n   --> crates/ds41rt-daemon/src/v41_tensors.rs:89:12\n    |\n 88 | impl<'library> VocabularyHead<'library> {\n    | --------------------------------------- associated items in this implementation\n 89 |     pub fn plan(catalog: &OfficialV41Catalog) -> Result<usize> {\n    |            ^^^^\n...\n 92 |     pub fn load(\n    |            ^^^^\n...\n108 |     pub fn weight(&self) -> Result<Ds41rtDeviceBuffer> {\n    |            ^^^^^^\n\nwarning: struct `EngramDeviceRows` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram.rs:10:19\n   |\n10 | pub(crate) struct EngramDeviceRows<'a> {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: struct `EngramDeviceView` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram.rs:21:19\n   |\n21 | pub(crate) struct EngramDeviceView {\n   |                   ^^^^^^^^^^^^^^^^\n\nwarning: enum `EngramUploadPoll` is never used\n  --> crates/ds41rt-daemon/src/v41_engram.rs:27:17\n   |\n27 | pub(crate) enum EngramUploadPoll {\n   |                 ^^^^^^^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_engram.rs:34:12\n    |\n 32 | impl<'a> EngramDeviceRows<'a> {\n    | ----------------------------- associated items in this implementation\n 33 |     /// Validate current request generations before consuming an early gather.\n 34 |     pub fn poll_wave(\n    |            ^^^^^^^^^\n...\n 50 |     pub fn poll_upload(&mut self, ticket: &mut EngramGatherTicket) -> Result<EngramUploadPoll> {\n    |            ^^^^^^^^^^^\n...\n 62 |     pub fn device_bytes(capacity: usize) -> Result<usize> {\n    |            ^^^^^^^^^^^^\n...\n 71 |     pub fn new(\n    |            ^^^\n...\n 96 |     pub fn upload(&mut self, gathered: &EngramGatherView<'_>) -> Result<EngramDeviceView> {\n    |            ^^^^^^\n...\n129 |     pub fn view(&self) -> Result<EngramDeviceView> {\n    |            ^^^^\n...\n142 |     pub fn synchronize(&self) -> Result<()> {\n    |            ^^^^^^^^^^^\n\nwarning: struct `EngramLayerWeights` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:11:19\n   |\n11 | pub(crate) struct EngramLayerWeights<'a> {\n   |                   ^^^^^^^^^^^^^^^^^^\n\nwarning: associated items `load` and `resident_bytes` are never used\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:19:12\n   |\n18 | impl<'a> EngramLayerWeights<'a> {\n   | ------------------------------- associated items in this implementation\n19 |     pub fn load(\n   |            ^^^^\n...\n64 |     pub fn resident_bytes(&self) -> usize {\n   |            ^^^^^^^^^^^^^^\n\nwarning: struct `EngramGate` is never constructed\n  --> crates/ds41rt-daemon/src/v41_engram/layer.rs:69:19\n   |\n69 | pub(crate) struct EngramGate<'weights, 'library> {\n   |                   ^^^^^^^^^^\n\nwarning: multiple associated items are never used\n   --> crates/ds41rt-daemon/src/v41_engram/layer.rs:85:12\n    |\n 84 | impl<'weights, 'library> EngramGate<'weights, 'library> {\n    | ------------------------------------------------------- associated items in this implementation\n 85 |     pub fn new(\n    |            ^^^\n...\n143 |     pub unsafe fn execute(\n    |                   ^^^^^^^\n...\n159 |     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] {\n    |            ^^^^^^\n...\n166 |     unsafe fn stage_inputs(\n    |               ^^^^^^^^^^^^\n...\n228 |     unsafe fn enqueue(&self, rows: usize) -> Result<()> {\n    |               ^^^^^^^\n...\n256 |     pub unsafe fn capture(\n    |                   ^^^^^^^\n...\n291 |     pub unsafe fn replay(\n    |                   ^^^^^^\n...\n312 |     pub fn clear_graph(&mut self) -> Result<()> {\n    |            ^^^^^^^^^^^\n...\n323 |     pub fn output(&self) -> Result<Ds41rtDeviceBuffer> {\n    |            ^^^^^^\n...\n331 |     fn synchronize(&self) -> Result<()> {\n    |        ^^^^^^^^^^^\n\nwarning: `ds41rt-daemon` (bin \"ds41rt\") generated 633 warnings (run `cargo fix --bin \"ds41rt\" -p ds41rt-daemon` to apply 89 suggestions)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.03s\n"
+    },
+    "fixture-final-build": {
+      "sha256": "4c19888cebf13d418927f1c8f337cb240ee989e02264e618258fee6997d44169",
+      "tail": "    Updating crates.io index\n Downloading crates ...\n  Downloaded anyhow v1.0.104\n  Downloaded cfg-if v1.0.4\n  Downloaded once_cell v1.21.4\n  Downloaded pin-project-lite v0.2.17\n  Downloaded libloading v0.8.9\n  Downloaded tracing-attributes v0.1.31\n  Downloaded quote v1.0.47\n  Downloaded tracing-core v0.1.36\n  Downloaded unicode-ident v1.0.24\n  Downloaded proc-macro2 v1.0.107\n  Downloaded syn v2.0.119\n  Downloaded tracing v0.1.44\n   Compiling ds41-dspark-fp8-fixture v0.1.0 (/fixture)\nwarning: struct `WindowRead` is never constructed\n  --> src/v41_dspark_cache.rs:36:19\n   |\n36 | pub(crate) struct WindowRead {\n   |                   ^^^^^^^^^^\n   |\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: methods `request_id`, `validate_write`, and `attention_read` are never used\n   --> src/v41_dspark_cache.rs:167:12\n    |\n 55 | impl<'a> DsparkWindow<'a> {\n    | ------------------------- methods in this implementation\n...\n167 |     pub fn request_id(&self, lease: WindowLease) -> Result<u64> {\n    |            ^^^^^^^^^^\n...\n229 |     pub fn validate_write(&self, chunks: &[WindowChunk], source_rows: u32) -> Result<()> {\n    |            ^^^^^^^^^^^^^^\n...\n268 |     pub fn attention_read(&self, requests: &[(WindowLease, u64)]) -> Result<WindowRead> {\n    |            ^^^^^^^^^^^^^^\n\nwarning: `ds41-dspark-fp8-fixture` (bin \"ds41-dspark-fp8-fixture\") generated 2 warnings\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.17s\n"
+    },
+    "owner-final": {
+      "sha256": "25f282481de147b9bfee828107a58bc06efdea2388ad13c3fd105b727754a1ed",
+      "tail": "PASS mixed prefill, long-chunk suffix and 64-bit seed\nPASS changed batches, wraparound and atomic admission rejection\nPASS release, generation reuse and foreign owner rejection\nPASS all 4096 packed source rows including finite extremes and signed zero\nDONE device_bytes=5276032 pinned_bytes=384\n"
+    },
+    "attention": {
+      "sha256": "1f1ac062b16bcc851091a03c2af1e16792bed655684ca7a80765520dd6eec816",
+      "tail": "PASS requests=1\nPASS requests=3\nPASS requests=16\n"
+    },
+    "baseline": {
+      "sha256": "27867387a6160d19e431dee745a4dfd145efacee371977157b1d77976fae65ee",
+      "tail": "BASELINE exact requests=1\nBASELINE exact requests=1\nPASS requests=1\nBASELINE exact requests=3\nBASELINE exact requests=3\nPASS requests=3\nBASELINE exact requests=16\nBASELINE exact requests=16\nPASS requests=16\n"
+    },
+    "artifacts": {
+      "sha256": "82cceae96e2b5a67209881afb68e0e9c12fdd9cf979b7f58f35a0ff9c2f27c5d",
+      "tail": "24998e1e672d68ed7566f6306bf02b106949eb8a7e4161649679cee6ea6d17f9  /tmp/ds41-real-tp4/audit/cmake/libds41rt_native.so\n565fa554ec934de9f7a8ea4d05dc43989291096e6b9b8cd610542e78b9a5f362  /tmp/ds41-real-tp4/artifacts/cmake/libds41rt_native.so\nda9c2af1914048b9acaddae4ebb4ffb69e0ff1ba079ec3a2bc7f0c8167905611  /tmp/ds41-tp4-four-host/audit/target/debug/ds41-dspark-fp8-fixture\n"
+    },
+    "symbols": {
+      "sha256": "80801bfe9752f9b5babda88423b2035e9da3734b0f8a0d7845e1c93e182eb498",
+      "tail": "000000000005980e T ds41rt_v41_dspark_attention_fp8\n00000000000597eb T ds41rt_v41_dspark_attention_initialize\n00000000000590da T ds41rt_v41_dspark_cache_write_fp8\n"
+    }
+  },
+  "rtx_native_sha256": "35d27935789130f0730a964abf0c684bb6b433c6021efd91d1da864ee85f3531",
+  "remaining": [
+    "RTX cache-owner and numerical validation",
+    "Complete dSpark graph requalification including vocabulary accumulation change",
+    "Full-model scheduler integration and performance"
+  ]
+}
