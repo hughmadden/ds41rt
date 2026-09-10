@@ -15,11 +15,11 @@ Protocol V2 uses the eight-byte `DS41RTE2` signature consistently in Rust and na
 - All eight build-host selection cases pass, including partial fleets, duplicates, unknown hosts, and empty entries.
 - CPU native library compilation succeeds and both native ABI and XGrammar self-tests pass.
 - Rust API, core, FFI, loader, and transport suites pass 497 tests with one ignored test using Python 3.12 and native auto-discovery disabled.
-- The existing daemon host-test profile passes 608 tests but six V4 planner/capture tests fail because the selected Python 3.12 lacks Torch, with 17 ignored and 113 filtered tests.
+- After installing cached PyTorch 2.13.0+cu130 into the Python 3.12 environment, the daemon host-test profile passes 609 tests but five V4 planner tests still require the pinned CUTLASS package, with 17 ignored and 113 filtered tests.
 
 ## Remaining gates
 
-Container builds, GPU/native CUDA execution, the six Torch-dependent tests, and full run/restart/stop checks remain pending and are not covered by the CPU results above.
+Container builds, GPU/native CUDA execution, the five CUTLASS-dependent tests, and full run/restart/stop checks remain pending and are not covered by the CPU results above.
 
 The host default Python 3.14 exceeds the pinned PyO3 version's supported range; select Python 3.12 using `DS41RT_PYTHON="$(uv python find 3.12)" scripts/run-with-python-env.sh COMMAND` for current Rust qualification.
 

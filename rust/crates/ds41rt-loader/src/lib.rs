@@ -1,3 +1,5 @@
+mod engram_tokenizer;
+pub use engram_tokenizer::EngramTokenMap;
 mod engram_prefetch;
 pub use engram_prefetch::{EngramPrefetcher, EngramTable, PrefetchOutcome, PrefetchTicket};
 mod mapped_rows;

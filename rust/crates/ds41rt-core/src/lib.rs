@@ -1,3 +1,5 @@
+mod engram;
+pub use engram::{EngramBatch, EngramError, EngramHashes, EngramHistory, ENGRAM_LAYERS, ENGRAM_ROWS, ENGRAM_COMPRESSED_VOCAB};
 mod attention_geometry;
 mod constants;
 mod coordinator_graphs;

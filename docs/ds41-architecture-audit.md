@@ -68,3 +68,19 @@ The official index and range-read shard headers identify `layers.1.engram.embed.
 Advice is an OS prefetch hint and does not guarantee residency; cancellation skips queued work but does not undo page advice already issued, and the mapping contract requires immutable checkpoint files.
 
 Loader tests include an official-size sparse shard with nonzero final rows beyond 98 GB and eager-load rejection, but decode/prefill/verification scheduling, device staging, and hardware performance qualification remain open.
+
+## Engram addressing qualification
+
+`EngramTokenMap` uses the upstream Rust tokenizer normalization sequence, including whitespace preservation, accent stripping, and raw forms for partial UTF-8 tokens; all 129280 token IDs match the official Python reference and collapse to 99092 compressed IDs.
+
+`EngramHistory` retains only the preceding three compressed IDs or image barriers, uses the official layer-seeded multipliers and distinct prime ranges, and prepares hash batches without mutating committed state.
+
+Prefix acceptance commits only accepted tokens and invalidates older batches, including zero-acceptance commits, while request identities reject batches from other histories.
+
+`EngramTokenMap::prepare_batch` and `EngramPrefetcher::try_submit_batch` connect token IDs to mapped table page advice, omit image rows, check table identity, and bound batch storage; the serving scheduler still needs to own these objects and coordinate GPU staging.
+
+Qualification command: `.venv/bin/python scripts/qualify-ds41-engram.py --reference-dir /tmp/ds41-reference` with Python 3.12 and PyTorch 2.13.0+cu130.
+
+The pinned official `NgramHashState` agrees exactly across 128 interleaved batches on 16 request histories, covering image barriers, chunked input, and partial or zero acceptance; this proves host addressing equivalence rather than full serving concurrency or GPU execution.
+
+The complete core and loader test suites pass 119 and 58 tests respectively, and the qualification tools create their transient inputs in automatically removed temporary directories.

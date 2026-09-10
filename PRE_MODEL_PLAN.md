@@ -12,7 +12,7 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [ ] Implement CSA2 ratio-2 and ratio-1 cache production, FP8 window KV, FP4 compressed KV, and source/reindex/reuse modes.
 - [ ] Implement hierarchical candidate-block selection and sparse top-512 attention with causal visibility and large-pool addressing checks.
 - [ ] Implement and fuse single-pass mHC, normalization, RoPE, projections, and modality-aware routing against the official numerical reference.
-- [ ] Implement deterministic engram tokenizer compression, prime layouts, hashes, image barriers, and per-request history.
+- [x] Implement deterministic engram tokenizer compression, prime layouts, hashes, image barriers, and per-request history.
 - [ ] Memory-map native engram weights and scales with bounded asynchronous prefetch, deduplication, staging, and request-safe cancellation.
 - [ ] Wire early engram prefetch for decode, speculative verification, and batched prefill with rollback-safe history.
 - [ ] Implement native FP4 backbone expert tensor parallelism through the AFD transport with appropriate SparkInfer/b12x kernels.
@@ -29,3 +29,5 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 Progress evidence: `docs/ds41-build-qualification.md` records the rename and partial-fleet build checks; complete container, GPU, and launch qualification remains open.
 
 Engram progress: the loader now provides mapped native table/scale access, bounded cancellable background page advice, and eager-load rejection, with scheduler integration, device staging, and hardware performance qualification still pending.
+
+Addressing evidence: `scripts/qualify-ds41-engram.py` matches the pinned official token map and 128 hash/acceptance batches across 16 request histories, while 119 core and 58 loader tests pass.

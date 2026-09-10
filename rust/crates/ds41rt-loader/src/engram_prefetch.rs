@@ -166,6 +166,31 @@ impl EngramPrefetcher {
         })
     }
 
+    /// Submit the address batch prepared from decode, prefill, or verification IDs.
+    /// Image rows are omitted, and the layer's official table identity is checked.
+    pub fn try_submit_batch(
+        &self,
+        table: Arc<EngramTable>,
+        batch: &ds41rt_core::EngramBatch,
+        layer_index: usize,
+    ) -> Result<Option<PrefetchTicket>> {
+        let expected_rows = ds41rt_core::ENGRAM_ROWS
+            .get(layer_index)
+            .context("invalid engram layer index")?;
+        ensure!(
+            table.weights.rows() == *expected_rows,
+            "prefetch table belongs to another engram layer"
+        );
+        let text_rows = (0..batch.hashes().len())
+            .filter(|&row| batch.is_image(row) == Some(false))
+            .count();
+        ensure!(
+            text_rows <= self.max_rows / 24,
+            "engram hash batch exceeds prefetch row capacity"
+        );
+        self.try_submit(table, &batch.prefetch_rows(layer_index)?)
+    }
+
     /// None means backpressure: the caller may gather on demand or retry later.
     pub fn try_submit(
         &self,
