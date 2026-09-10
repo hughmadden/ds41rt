@@ -52,3 +52,5 @@ Wire precision progress: revision-3 frames preserve FP32 routing weights and FP3
 AOT progress: role-specific native expert exports and b12x-owned scratch manifests now build into coordinator/Spark libraries and release/WIP artifacts, with M16 C-entry numerical/graph checks passing on RTX and ostrich while Rust binding and native preparation/reduction remain open.
 
 Native bridge progress: the Rust argument builder and checked C expert launch interface pass M16 numerical/graph checks on RTX and ostrich, with generated ABI validation and device/SM guards; native preparation, reduction and serving integration remain open in `docs/ds41-native-expert-bridge-qualification.md`.
+
+Native reduction progress: CUDA/Rust expert route reduction now passes exact standalone checks on both RTX GPUs and ostrich and the M16 dSpark AOT graph path on RTX, while native preparation, per-route transport and serving integration remain open in `docs/ds41-native-route-reduction-qualification.md`.

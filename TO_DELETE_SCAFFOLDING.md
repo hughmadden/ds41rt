@@ -11,3 +11,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/` and ostrich's `/tmp/ds41-v41-aot-src.odALRiKi/`, including the temporary C-entry qualification shim, after the production Rust expert binding replaces that fixture; retain the AOT exporter, CMake integration, and recorded qualification evidence.
 
 - Delete `/tmp/ds41-v41-rust-bridge/` and `/tmp/ds41-v41-abi-mutations.ggwbi658/`, plus the Rust cdylib and Python bridge fixtures inside the existing local/ostrich AOT staging directories, after production native weight/scratch preparation replaces them; retain the C/Rust bridge and recorded evidence.
+
+- Delete `qualify_reduce.py`, `debug_reduce.py`, `qualify_full_expert.py`, their logs/graph dumps under `/tmp/ds41-v41-aot/`, and the copied ostrich reduction fixture with the existing AOT scaffolding after checkpoint-backed execution replaces these synthetic checks.

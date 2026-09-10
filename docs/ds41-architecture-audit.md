@@ -150,3 +150,5 @@ The isolated TP-global expert boundary now has a native reducer and four-device 
 Wire revision 3 now preserves FP32 gate weights in twelve-byte entries and provides FP32 output dtype 6, with Rust/native signature agreement and persistent-TCP qualification recorded in `docs/ds41-wire-qualification.md`; existing per-token collectives and model executors still need migration to per-route planes.
 
 The native expert AOT export path now distinguishes logical Spark width 576 from b12x's prepared width 640, records planner-owned scratch layouts, and passes M16 C-entry arithmetic/graph checks in linked RTX and GB10 libraries; runtime weight budgets must include this padding and Rust execution integration remains open.
+
+The checked Rust/C expert launch bridge and CUDA route reducer now cover native dSpark launch through final reduction, with an M16 numerical/graph fixture on RTX and exact standalone reduction on both RTX GPUs and ostrich; Python weight/scratch preparation and inherited transport/model execution remain to be replaced, as recorded in `ds41-native-route-reduction-qualification.md`.

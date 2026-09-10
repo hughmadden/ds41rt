@@ -1,0 +1,226 @@
+{
+  "source_sha256": {
+    "native/cuda/kernels/v41_route_reduce.cu": "3e37f49c295bdcb148eacbd1c7e3b8a2f29c3c1ad5cd6fa617b045569491f86c",
+    "native/include/ds41rt_v41_experts.h": "7dda9394c48847679abddfc3f7a76f3b37802a94e04384b64ec38050cccfadc2",
+    "native/CMakeLists.txt": "3bb0fb81f28b0a96a6559dac0cd183d38729c617bcf96b7af1a20495677ddb64",
+    "rust/crates/ds41rt-ffi/src/v41_experts.rs": "c1e6bdd5adf5766ab5954635780c6461ef67e7b32d2a0e2541197c85478cc51e",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "b10ff3eb4ca343cc483c715e516937ecb83433017995796c806f0c60118065c2"
+  },
+  "native_library_sha256": {
+    "rtx": "8a46e650535adade4de6c9238f13ac71963145eeb94f2f56b72c4f329f2c2e02",
+    "ostrich": "a076b2bd58f7d4f6abdc47f70ed4887db6a2ef6a304179c5b29e2bc5e20e3137"
+  },
+  "standalone": {
+    "rtx": [
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 1,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 16,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 80,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 4096,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 1,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 16,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 80,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 0,
+        "rows": 4096,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 1,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 16,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 80,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 4096,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 1,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 16,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 80,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device_index": 1,
+        "rows": 4096,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      }
+    ],
+    "ostrich": [
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 1,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 16,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 80,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 4096,
+        "ranks": 1,
+        "topk": 3,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 1,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 16,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 80,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      },
+      {
+        "device": "NVIDIA GB10",
+        "device_index": 0,
+        "rows": 4096,
+        "ranks": 4,
+        "topk": 6,
+        "exact_numeric_graph_shared_alias_and_rejections": "passed"
+      }
+    ]
+  },
+  "expert_with_rust_reducer": {
+    "path": "Rust expert builder -> native AOT -> Rust reducer -> CUDA reduction",
+    "case": [
+      16,
+      2304,
+      128
+    ],
+    "numeric_and_mutated_graph": "passed"
+  },
+  "fixture_sha256": {
+    "qualify_reduce.py": "4bdd614eafb609dcc0fac3617e25201b8dd91af53cfd44e6fab119284341c7a5",
+    "qualify_full_expert.py": "2f05eb1951c36cae53f3f02f1bdd62b2e72c93ea96357751675c79f7efb7a33b"
+  },
+  "daemon_check": "passed; existing 427 warnings",
+  "scope": "Exact standalone reduction and graph qualification on both RTX and ostrich; M16 dSpark AOT plus Rust reducer on RTX 0; production weight preparation and transport integration remain open."
+}

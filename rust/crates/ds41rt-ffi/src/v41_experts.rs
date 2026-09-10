@@ -124,6 +124,49 @@ impl V41ExpertLaunchArgs {
 type InfoFn = unsafe extern "C" fn(i32, *mut V41ExpertInfo) -> i32;
 type InitializeFn = unsafe extern "C" fn(i32, *mut *mut c_void) -> i32;
 type LaunchFn = unsafe extern "C" fn(*mut c_void, *const V41ExpertLaunchArgs) -> i32;
+type ReduceFn = unsafe extern "C" fn(
+    *const *const f32,
+    *const u16,
+    *mut u16,
+    u32,
+    u32,
+    u32,
+    *mut c_void,
+) -> i32;
+
+/// Preloaded, allocation-free reduction entry point for native expert outputs.
+pub struct V41RouteReducer<'a> {
+    _library: &'a NativeLibrary,
+    reduce: ReduceFn,
+}
+
+impl V41RouteReducer<'_> {
+    /// # Safety
+    /// Active planes must be contiguous CUDA FP32 [rows,topk,5120] in identical
+    /// route order; output and optional shared must be CUDA BF16 [rows,5120].
+    /// All storage must be on the current device and remain valid through stream
+    /// completion and graph replays, with writes ordered before this operation.
+    /// Output must not overlap planes; shared may alias output only exactly.
+    /// Unused plane slots must be null. The library must outlive captured graphs.
+    pub unsafe fn launch(
+        &self,
+        planes: [*const f32; 4],
+        shared: *const u16,
+        output: *mut u16,
+        rows: u32,
+        ranks: u32,
+        topk: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let status =
+            unsafe { (self.reduce)(planes.as_ptr(), shared, output, rows, ranks, topk, stream) };
+        ensure!(
+            status == 0,
+            "V4.1 route reduction failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+}
 
 pub struct V41ExpertKernel<'a> {
     // Keep all exported code and its CUDA modules loaded until this handle drops.
@@ -134,6 +177,18 @@ pub struct V41ExpertKernel<'a> {
 }
 
 impl NativeLibrary {
+    pub fn v41_route_reducer(&self) -> Result<V41RouteReducer<'_>> {
+        let reduce = unsafe {
+            *self
+                .lib
+                .get::<ReduceFn>(b"ds41rt_v41_reduce_routes_async")?
+        };
+        Ok(V41RouteReducer {
+            _library: self,
+            reduce,
+        })
+    }
+
     pub fn v41_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
         let function = unsafe { self.lib.get::<InfoFn>(b"ds41rt_v41_expert_info") }
             .context("native library must be built with DS41RT_ENABLE_V41_EXPERT_AOT=ON")?;
