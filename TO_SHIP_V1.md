@@ -53,6 +53,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Implement direct FP8 window/paged-source sparse attention with private overlays, reference arithmetic and maximum-pool addressing qualification.
 - [x] Compose owned sparse attention with request/window/source views and exact selection snapshots across source, reuse and later index layers.
 - [x] Produce real backbone low-rank attention queries in shared-weight captured waves and qualify all 40 layers.
+- [x] Produce real backbone inverse-rotary/grouped/FP8 attention output projections with shared weights across all 40 layers.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -135,3 +136,5 @@ Native direct FP8 sparse attention is qualified in `docs/ds41-sparse-attention-q
 Owned cache/selection attention composition is qualified in `docs/ds41-attention-owner-qualification.md`; real backbone attention query and output production remain open.
 
 Real backbone query production is qualified in `docs/ds41-attention-query-qualification.md`; query/index/attention handoff and inverse rotary/grouped output production remain open.
+
+Real backbone output production is qualified in `docs/ds41-attention-output-qualification.md`; complete query/index/attention/output composition remains open.
