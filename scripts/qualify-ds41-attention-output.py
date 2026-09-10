@@ -11,7 +11,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--reference-dir',type=Path,required=True);p.add_argument('--snapshot',type=Path,required=True)
     p.add_argument('--vectors-dir',type=Path,required=True);p.add_argument('--device',type=int,required=True)
-    p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--layers',type=int,nargs='+');p.add_argument('--capacities',type=int,nargs='+');a=p.parse_args()
     root=Path(__file__).resolve().parents[1];lock=json.loads((root/'docs/ds41-reference-lock.json').read_text())
     for name in ('model.py','kernel.py'):
         assert hashlib.sha256((a.reference_dir/'inference'/name).read_bytes()).hexdigest()==lock['files']['inference/'+name]
@@ -36,13 +37,13 @@ def main():
     with torch.device('cuda'),torch.cuda.stream(stream),tvm_ffi.use_torch_stream(),torch.no_grad():
         plain=ns['precompute_freqs_cis'](64,1048576,0,10000,16,32,1)
         compressed=ns['precompute_freqs_cis'](64,1048576,65536,160000,16,32,1)
-        for layer in range(40):
+        for layer in (a.layers if a.layers is not None else range(40)):
             wa=weight(f'layers.{layer}.attn.wo_a.weight',torch.float8_e4m3fn)
             sa=weight(f'layers.{layer}.attn.wo_a.scale',torch.float8_e8m0fnu)
             wb=weight(f'layers.{layer}.attn.wo_b.weight',torch.float8_e4m3fn)
             sb=weight(f'layers.{layer}.attn.wo_b.scale',torch.float8_e8m0fnu)
             grouped_weight=(wa.float()*sa.float().repeat_interleave(32,0).repeat_interleave(32,1)).bfloat16().reshape(8,1024,4096)
-            for rows in ((1,16,80,256,1024,4096) if layer in (0,1,20,39) else (80,)):
+            for rows in (a.capacities if a.capacities is not None else ((1,16,80,256,1024,4096) if layer in (0,1,20,39) else (80,))):
                 for case in (0,1):
                     prefix=f'l{layer}-m{rows}-c{case}';payloads={};tensors={}
                     for name,dtype,shape in [('input',torch.bfloat16,(rows,64,512)),('positions',torch.int64,(rows,)),

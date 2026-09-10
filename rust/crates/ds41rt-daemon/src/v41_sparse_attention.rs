@@ -1,4 +1,6 @@
 //! Captured sparse attention bound to live window/source/selection proposals.
+use crate::v41_attention_binding::QueryBinding;
+use crate::v41_attention_query::AttentionQueryOutput;
 use crate::v41_compressor::IndexProposal;
 use crate::v41_index_selection::IndexSelectionOutput;
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
@@ -15,10 +17,19 @@ pub(crate) struct AttentionRequest<'a> {
     pub positions: &'a [u64],
 }
 pub(crate) struct SparseAttentionOutput<'a> {
+    query: Option<QueryBinding>,
+    tokens: Option<&'a [u64]>,
     pub values: Ds41rtDeviceBuffer,
     pub layer: usize,
     pub rows: usize,
     _inputs: PhantomData<&'a ()>,
+}
+impl SparseAttentionOutput<'_> {
+    pub fn tokens(&self) -> Result<&[u64]> {
+        let query = self.query.context("attention has no query origin")?;
+        ensure!(query.layer() == self.layer, "attention query layer differs");
+        self.tokens.context("attention tokens missing")
+    }
 }
 pub(crate) struct SparseAttentionWave<'a> {
     stream: LoadStream<'a>,
@@ -109,6 +120,39 @@ impl<'a> SparseAttentionWave<'a> {
             offset += l.rows;
         }
         Ok(())
+    }
+    /// # Safety
+    /// No external writes race query, cache/selection views or this wave. Sink
+    /// is the matching layer's finite checkpoint sink on this device.
+    pub unsafe fn execute_query<'s>(
+        &'s mut self,
+        query: &'s AttentionQueryOutput<'s>,
+        sink: Ds41rtDeviceBuffer,
+        requests: &'s [AttentionRequest<'s>],
+        selection: Option<&'s IndexSelectionOutput<'s>>,
+    ) -> Result<SparseAttentionOutput<'s>> {
+        let binding = query.binding()?;
+        let tokens = query.tokens()?;
+        ensure!(
+            query.rows == tokens.len()
+                && query.rows <= self.capacity
+                && query.rotated.device_id == self.query.buffer.device_id
+                && requests
+                    .iter()
+                    .flat_map(|r| r.positions.iter().copied())
+                    .eq(tokens.iter().copied()),
+            "attention query token order or device differs"
+        );
+        if let Some(s) = selection {
+            s.validate_query(binding)?;
+        }
+        self.stream
+            .library
+            .copy_d2d(self.query.buffer, query.rotated, query.rotated.bytes)?;
+        let mut out = unsafe { self.execute(query.layer, sink, requests, selection)? };
+        out.query = Some(binding);
+        out.tokens = Some(tokens);
+        Ok(out)
     }
     /// # Safety
     /// Input contains finite, rotated BF16 attention queries in request/token
@@ -295,6 +339,8 @@ impl<'a> SparseAttentionWave<'a> {
         };
         launched.and(self.synchronize())?;
         Ok(SparseAttentionOutput {
+            query: None,
+            tokens: None,
             values: slice(self.output.buffer, 0, rows * 65536),
             layer,
             rows,

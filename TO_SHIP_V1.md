@@ -54,6 +54,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Compose owned sparse attention with request/window/source views and exact selection snapshots across source, reuse and later index layers.
 - [x] Produce real backbone low-rank attention queries in shared-weight captured waves and qualify all 40 layers.
 - [x] Produce real backbone inverse-rotary/grouped/FP8 attention output projections with shared weights across all 40 layers.
+- [x] Connect real query, index selection, sparse attention and output stages with checked execution identities and token handoffs.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -138,3 +139,5 @@ Owned cache/selection attention composition is qualified in `docs/ds41-attention
 Real backbone query production is qualified in `docs/ds41-attention-query-qualification.md`; query/index/attention handoff and inverse rotary/grouped output production remain open.
 
 Real backbone output production is qualified in `docs/ds41-backbone-attention-output-qualification.md`; complete query/index/attention/output composition remains open.
+
+Real query/index/attention/output handoffs are qualified in `docs/ds41-attention-handoff-qualification.md`; backbone mHC/CED/engram/routing composition and scheduler integration remain open.

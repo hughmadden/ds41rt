@@ -1,4 +1,5 @@
 //! Real backbone low-rank query projection, normalization and rotary graphs.
+use crate::v41_attention_binding::QueryBinding;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
@@ -111,6 +112,8 @@ impl<'a> AttentionQueryWeights<'a> {
             capacity,
             graph: None,
             ready: None,
+            binding: None,
+            tokens: Vec::new(),
         };
         ensure!(
             value.b(0).device_id == self.tensors.get(&self.names[0])?.device_id,
@@ -130,6 +133,8 @@ impl<'a> AttentionQueryWeights<'a> {
     }
 }
 pub(crate) struct AttentionQueryOutput<'a> {
+    binding: Option<QueryBinding>,
+    tokens: &'a [u64],
     pub layer: usize,
     pub rows: usize,
     pub hidden: Ds41rtDeviceBuffer,
@@ -140,6 +145,15 @@ pub(crate) struct AttentionQueryOutput<'a> {
     pub positions: Ds41rtDeviceBuffer,
     pub frequencies: Ds41rtDeviceBuffer,
     _owner: PhantomData<&'a ()>,
+}
+impl AttentionQueryOutput<'_> {
+    pub fn binding(&self) -> Result<QueryBinding> {
+        self.binding.context("query has no token binding")
+    }
+    pub fn tokens(&self) -> Result<&[u64]> {
+        self.binding()?;
+        Ok(self.tokens)
+    }
 }
 pub(crate) struct AttentionQueryWave<'w, 'a> {
     stream: LoadStream<'a>,
@@ -152,6 +166,8 @@ pub(crate) struct AttentionQueryWave<'w, 'a> {
     capacity: u32,
     graph: Option<(*mut c_void, u32)>,
     ready: Option<u32>,
+    binding: Option<QueryBinding>,
+    tokens: Vec<u64>,
 }
 impl AttentionQueryWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -175,6 +191,8 @@ impl AttentionQueryWave<'_, '_> {
     }
     fn validate(&mut self, rows: u32) -> Result<()> {
         self.ready = None;
+        self.binding = None;
+        self.tokens.clear();
         ensure!(
             rows > 0 && rows <= self.capacity,
             "query rows exceed capacity"
@@ -246,6 +264,8 @@ impl AttentionQueryWave<'_, '_> {
     /// Same inputs as execute. Warmup is drained but not published after capture.
     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
         self.ready = None;
+        self.binding = None;
+        self.tokens.clear();
         ensure!(
             self.graph.is_none(),
             "attention query graph already captured"
@@ -254,6 +274,8 @@ impl AttentionQueryWave<'_, '_> {
             self.execute(rows)?;
         }
         self.ready = None;
+        self.binding = None;
+        self.tokens.clear();
         unsafe {
             self.stream
                 .library
@@ -290,10 +312,47 @@ impl AttentionQueryWave<'_, '_> {
         self.ready = Some(rows);
         self.output()
     }
+    /// # Safety
+    /// Hidden rows are finite attention inputs in the supplied token order, with
+    /// producer writes drained. No external writes race this wave.
+    pub unsafe fn execute_tokens(&mut self, tokens: &[u64]) -> Result<AttentionQueryOutput<'_>> {
+        self.ready = None;
+        self.binding = None;
+        self.tokens.clear();
+        ensure!(
+            !tokens.is_empty()
+                && tokens.len() <= self.capacity as usize
+                && tokens.iter().all(|&p| p < 1048576),
+            "invalid query tokens"
+        );
+        let binding = QueryBinding::new(self.weights.layer)?;
+        self.stream.library.copy_h2d(
+            self.positions(),
+            &tokens
+                .iter()
+                .flat_map(|p| p.to_ne_bytes())
+                .collect::<Vec<_>>(),
+        )?;
+        let rows = tokens.len() as u32;
+        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+            self.clear_graph()?;
+            unsafe {
+                self.capture(rows)?;
+            }
+        }
+        unsafe {
+            self.replay(rows)?;
+        }
+        self.tokens.extend_from_slice(tokens);
+        self.binding = Some(binding);
+        self.output()
+    }
     pub fn output(&self) -> Result<AttentionQueryOutput<'_>> {
         let rows = self.ready.context("attention query output unpublished")? as usize;
         let b = |i| part(self.b(i), 0, rows * ROW_BYTES[i]);
         Ok(AttentionQueryOutput {
+            binding: self.binding,
+            tokens: &self.tokens,
             layer: self.weights.layer,
             rows,
             hidden: b(0),
@@ -308,6 +367,8 @@ impl AttentionQueryWave<'_, '_> {
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready = None;
+        self.binding = None;
+        self.tokens.clear();
         self.synchronize()?;
         if let Some((graph, _)) = self.graph.take() {
             unsafe {

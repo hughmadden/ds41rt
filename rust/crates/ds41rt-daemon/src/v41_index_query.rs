@@ -1,4 +1,6 @@
 //! Learned index-query projections and fused rotary/FP4 preparation on the RTX.
+use crate::v41_attention_binding::QueryBinding;
+use crate::v41_attention_query::AttentionQueryOutput;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
@@ -110,6 +112,8 @@ impl<'a> IndexQueryWeights<'a> {
             capacity,
             graph: None,
             ready: None,
+            origin: None,
+            tokens: Vec::new(),
         };
         let launched = unsafe {
             value
@@ -121,11 +125,22 @@ impl<'a> IndexQueryWeights<'a> {
     }
 }
 pub(crate) struct IndexQueryOutput<'a> {
+    origin: Option<QueryBinding>,
+    tokens: &'a [u64],
     pub layer: usize,
     pub packed: Ds41rtDeviceBuffer,
     pub scales: Ds41rtDeviceBuffer,
     pub head_weights: Ds41rtDeviceBuffer,
     _owner: PhantomData<&'a ()>,
+}
+impl IndexQueryOutput<'_> {
+    pub fn origin(&self) -> Option<QueryBinding> {
+        self.origin
+    }
+    pub fn bound_tokens(&self) -> Result<&[u64]> {
+        ensure!(self.origin.is_some(), "index query has no origin");
+        Ok(self.tokens)
+    }
 }
 pub(crate) struct IndexQueryWave<'w, 'a> {
     stream: LoadStream<'a>,
@@ -148,6 +163,8 @@ pub(crate) struct IndexQueryWave<'w, 'a> {
     capacity: u32,
     graph: Option<(*mut c_void, u32)>,
     ready: Option<u32>,
+    origin: Option<QueryBinding>,
+    tokens: Vec<u64>,
 }
 impl IndexQueryWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -174,6 +191,8 @@ impl IndexQueryWave<'_, '_> {
     }
     fn validate(&mut self, rows: u32) -> Result<()> {
         self.ready = None;
+        self.origin = None;
+        self.tokens.clear();
         ensure!(
             rows > 0 && rows <= self.capacity,
             "index query rows exceed capacity"
@@ -234,11 +253,15 @@ impl IndexQueryWave<'_, '_> {
     /// Same inputs as execute. Warmup is drained but not published after capture.
     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
         self.ready = None;
+        self.origin = None;
+        self.tokens.clear();
         ensure!(self.graph.is_none(), "index query graph already captured");
         unsafe {
             self.execute(rows)?;
         }
         self.ready = None;
+        self.origin = None;
+        self.tokens.clear();
         unsafe {
             self.stream
                 .library
@@ -275,6 +298,46 @@ impl IndexQueryWave<'_, '_> {
         self.ready = Some(rows);
         self.output()
     }
+    /// # Safety
+    /// No external writes race the completed query or this index wave.
+    pub unsafe fn execute_attention(
+        &mut self,
+        query: &AttentionQueryOutput<'_>,
+    ) -> Result<IndexQueryOutput<'_>> {
+        self.ready = None;
+        self.origin = None;
+        self.tokens.clear();
+        let binding = query.binding()?;
+        let tokens = query.tokens()?;
+        ensure!(
+            binding.layer() == self.weights.layer
+                && query.layer == self.weights.layer
+                && query.rows == tokens.len()
+                && query.rows <= self.capacity as usize
+                && query.hidden.device_id == self.hidden.buffer.device_id,
+            "index query origin differs"
+        );
+        for (dst, src) in [
+            (self.qr.buffer, query.normalized_rank),
+            (self.hidden.buffer, query.hidden),
+            (self.positions.buffer, query.positions),
+        ] {
+            self.stream.library.copy_d2d(dst, src, src.bytes)?;
+        }
+        let rows = query.rows as u32;
+        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+            self.clear_graph()?;
+            unsafe {
+                self.capture(rows)?;
+            }
+        }
+        unsafe {
+            self.replay(rows)?;
+        }
+        self.origin = Some(binding);
+        self.tokens.extend_from_slice(tokens);
+        self.output()
+    }
     pub fn output(&self) -> Result<IndexQueryOutput<'_>> {
         let rows = self.ready.context("index query output unpublished")? as usize;
         let sized = |mut b: Ds41rtDeviceBuffer, n: usize| {
@@ -282,6 +345,8 @@ impl IndexQueryWave<'_, '_> {
             b
         };
         Ok(IndexQueryOutput {
+            origin: self.origin,
+            tokens: &self.tokens,
             layer: self.weights.layer,
             packed: sized(self.packed.buffer, 2048),
             scales: sized(self.scales.buffer, 128),
@@ -291,6 +356,8 @@ impl IndexQueryWave<'_, '_> {
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready = None;
+        self.origin = None;
+        self.tokens.clear();
         self.synchronize()?;
         if let Some((graph, _)) = self.graph.take() {
             unsafe {

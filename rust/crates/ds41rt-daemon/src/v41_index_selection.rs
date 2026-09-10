@@ -1,4 +1,5 @@
 //! Bounded, captured index selection and snapshot-checked candidate sharing.
+use crate::v41_attention_binding::QueryBinding;
 use crate::v41_compressor::{IndexBinding, IndexProposal};
 use crate::v41_index_query::IndexQueryOutput;
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
@@ -16,6 +17,7 @@ pub(crate) struct SelectionRequest<'a> {
     pub positions: &'a [u64],
 }
 pub(crate) struct IndexSelectionOutput<'a> {
+    origin: Option<QueryBinding>,
     /// Logical compressed row IDs, sorted ascending, padded with -1. No window offset.
     pub selected: Ds41rtDeviceBuffer,
     pub rows: usize,
@@ -25,11 +27,21 @@ pub(crate) struct IndexSelectionOutput<'a> {
     _sources: PhantomData<&'a ()>,
 }
 struct Ready {
+    origin: Option<QueryBinding>,
     layer: usize,
     rows: usize,
     bindings: Vec<(IndexBinding, u64)>,
 }
 impl IndexSelectionOutput<'_> {
+    pub fn validate_query(&self, query: QueryBinding) -> Result<()> {
+        let origin = self.origin.context("selection has no query origin")?;
+        ensure!(
+            origin.layer() == self.layer && (query.layer() != self.layer || origin == query),
+            "selection query snapshot differs"
+        );
+        Ok(())
+    }
+
     /// Bind an attention row to the exact source execution and token used by
     /// selection. Intermediate layers reuse their nearest index producer.
     pub fn validate_attention(&self, layer: usize, bindings: &[(IndexBinding, u64)]) -> Result<()> {
@@ -319,6 +331,15 @@ impl<'a> IndexSelectionWave<'a> {
                 bindings.push((p.binding(), position));
             }
         }
+        if query.origin().is_some() {
+            ensure!(
+                bindings
+                    .iter()
+                    .map(|(_, p)| *p)
+                    .eq(query.bound_tokens()?.iter().copied()),
+                "selection token order differs from query producer"
+            );
+        }
         if query.layer > 20 {
             let s = shared.context("later index layer requires source candidates")?;
             ensure!(
@@ -376,12 +397,14 @@ impl<'a> IndexSelectionWave<'a> {
         let launched = unsafe { self.stream.library.cuda_graph_launch(g, self.stream.raw) };
         launched.and(self.synchronize())?;
         self.ready = Some(Ready {
+            origin: query.origin(),
             layer: query.layer,
             rows,
             bindings,
         });
         let r = self.ready.as_ref().unwrap();
         Ok(IndexSelectionOutput {
+            origin: r.origin,
             selected: slice(self.b(9), 0, rows * 2048),
             rows: r.rows,
             layer: r.layer,

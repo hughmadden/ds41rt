@@ -1,5 +1,6 @@
 //! Backbone inverse rotary, grouped BF16 wo_a and native FP8 wo_b.
 use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_sparse_attention::SparseAttentionOutput;
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
@@ -295,6 +296,40 @@ impl AttentionOutputWave<'_, '_> {
         launched.and(self.synchronize())?;
         self.ready = Some(rows);
         self.output()
+    }
+    /// # Safety
+    /// No external writes race this wave or the completed attention output.
+    pub unsafe fn execute_attention(
+        &mut self,
+        attention: &SparseAttentionOutput<'_>,
+    ) -> Result<AttentionOutput<'_>> {
+        self.ready = None;
+        let tokens = attention.tokens()?;
+        ensure!(
+            attention.layer == self.weights.layer
+                && attention.rows == tokens.len()
+                && attention.rows <= self.capacity as usize
+                && attention.values.device_id == self.b(0).device_id,
+            "attention output origin differs"
+        );
+        self.stream
+            .library
+            .copy_d2d(self.b(0), attention.values, attention.values.bytes)?;
+        self.stream.library.copy_h2d(
+            self.positions(),
+            &tokens
+                .iter()
+                .flat_map(|p| p.to_ne_bytes())
+                .collect::<Vec<_>>(),
+        )?;
+        let rows = attention.rows as u32;
+        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+            self.clear_graph()?;
+            unsafe {
+                self.capture(rows)?;
+            }
+        }
+        unsafe { self.replay(rows) }
     }
     pub fn output(&self) -> Result<AttentionOutput<'_>> {
         let rows = self.ready.context("attention output unpublished")? as usize;
