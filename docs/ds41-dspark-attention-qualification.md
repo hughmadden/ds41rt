@@ -1,0 +1,15 @@
+# dSpark attention kernel qualification
+
+The native kernel now implements 64-head, 512-wide dSpark attention for five queries per request and up to sixteen requests. It reads committed ring storage and private five-position draft KV separately using per-request slot/prefix descriptors; all five draft positions are visible to every query, with no triangular mask. Inputs must already have completed normalization, rotation and FP8 quantization/dequantization to BF16.
+
+QK and probability/value products use BF16 tensor cores with FP32 accumulators. Keys are processed in the reference's logical concatenation order in chunks of 64, with running FP32 maximum/sum and BF16 probability rounding before PV. The attention sink contributes exponential mass only to the final denominator. BF16 output rounds once after normalization. Sixteen heads per block fit RTX shared-memory limits; accumulator rescaling uses shared storage instead of assuming an undocumented WMMA fragment mapping.
+
+The Rust FFI initializes dynamic-shared-memory attributes before capture and validates geometry and buffer sizes. Native launch guards reject pointer/alignment/overlap and host geometry errors, and malformed device descriptors produce zero rows defensively. The future owning caller must validate request leases and descriptor semantics before launch; the raw kernel does not replace that ownership contract. Launch allocates no global scratch or persistent storage.
+
+Both RTX PRO 6000 GPUs passed numerical and changed-input/slot/length graph replay at one, three and sixteen requests. The oracle transcribes the pinned reference's 64-key blockwise math into PyTorch FP32 products and BF16 probability/output conversions; it does not execute the TileLang kernel. Window lengths cover 2, 3, 31, 58, 59, 60, 63, 64, 65, 96, 122, 123, 124, 127 and 128, including chunk-boundary transitions after adding five drafts. Maximum absolute error was 0.001953125 under 0.008 relative/0.002 absolute tolerance, so general outputs are not claimed bitwise equivalent.
+
+Unused ring entries are poisoned with NaNs. Exact structured tests check that all five queries see all five draft values, the private-only edge, zero outputs with a dominant sink, and malformed descriptors. A targeted single-value case matches the blockwise oracle's BF16 answer exactly and differs from the counterfactual that skips the BF16 probability cast. Host overlap and invalid request/slot counts are rejected.
+
+Native and daemon builds passed. cuobjdump reports 128 registers per thread, zero stack/local bytes, 1024 static shared bytes and the launch uses 100544 dynamic shared bytes. These are resource observations, not timing or performance claims. Exact sources, binary hashes, per-GPU errors and resource output are in `ds41-dspark-attention-qualification.json`.
+
+Rust-owned query/KV production, private-draft lifetime and frequency ownership, composition with the qualified output chain, stage sequencing, verification and serving integration remain open.

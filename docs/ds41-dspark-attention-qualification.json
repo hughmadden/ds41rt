@@ -1,0 +1,177 @@
+{
+  "scope": "Native dSpark tensor-core QK, 64-key online softmax, BF16 probability PV and sink, with Rust FFI",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "source_sha256": {
+    "native/CMakeLists.txt": "deacdf796771355042e63313a0920f98956cceba8e07f1271f065ed101fd814b",
+    "native/cuda/kernels/v41_dspark_attention.cu": "b58930d0a8a193a01170bd8dfee734e272f41e2d4cbd7ba4b9b5dbd4af2ae372",
+    "native/include/ds41rt_v41_dspark_attention.h": "fa7c3a2983406e4d44ad07ce1323b49583d3d032e193ebdd98b83d0d95195068",
+    "rust/crates/ds41rt-ffi/src/v41_dspark_attention.rs": "0f964a321798374e3df350e3accc8e6355a7aa989662674e509ea944d2938fda",
+    "scripts/qualify-ds41-dspark-attention.py": "b590784de2f8f5f62e1929881a7791999d720272f421afe559734f62cf4fd27a"
+  },
+  "oracle": "PyTorch transcription of the pinned sparse_attn_kernel blockwise math; TileLang kernel execution is not claimed",
+  "geometry": {
+    "heads": 64,
+    "head_dim": 512,
+    "queries_per_request": 5,
+    "max_requests": 16,
+    "window_rows": 128,
+    "heads_per_block": 16,
+    "keys_per_chunk": 64,
+    "threads_per_block": 128
+  },
+  "resource_usage": {
+    "registers_per_thread": 128,
+    "stack_bytes": 0,
+    "local_bytes": 0,
+    "static_shared_bytes": 1024,
+    "dynamic_shared_bytes": 100544,
+    "cuobjdump_log": "\nFatbin ptx code:\n================\narch = sm_120\ncode version = [9,2]\nhost = linux\ncompile_size = 64bit\ncompressed\nptxasOptions = \n\nFatbin elf code:\n================\narch = sm_120\ncode version = [1,8]\nhost = linux\ncompile_size = 64bit\n\nResource usage:\n Common:\n  GLOBAL:0\n Function _ZN56_GLOBAL__N__d58af957_23_v41_dspark_attention_cu_c0e9be186attendEPK13__nv_bfloat16S2_S2_PKfPK27ds41rt_v41_attention_windowPS0_i:\n  REG:128 STACK:0 SHARED:1024 LOCAL:0 CONSTANT[0]:948 TEXTURE:0 SURFACE:0 SAMPLER:0\n"
+  },
+  "builds": {
+    "native": "passed",
+    "daemon": "passed, 493 warnings"
+  },
+  "gpu_results": [
+    {
+      "scope": "Native BF16 dSpark QK/64-key online softmax/BF16 probability PV/sink; excludes owned stage integration",
+      "reference_hashes": {
+        "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455"
+      },
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "native_library_sha256": "36e9f98493e4a215a269e74dcaa2ebf1b39238086cc684b49ea5bd50356e5228",
+      "qualifier_sha256": "b590784de2f8f5f62e1929881a7791999d720272f421afe559734f62cf4fd27a",
+      "results": [
+        {
+          "requests": 1,
+          "initial": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 2
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 198
+          },
+          "poison_unused_ring": true,
+          "all_five_drafts_exact": true,
+          "private_only_exact": true,
+          "probability_rounding_exact_counterfactual": true,
+          "large_sink_zero": true,
+          "invalid_descriptors_zero": true,
+          "host_guards": true
+        },
+        {
+          "requests": 3,
+          "initial": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 265
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 1048
+          },
+          "poison_unused_ring": true,
+          "all_five_drafts_exact": true,
+          "private_only_exact": true,
+          "probability_rounding_exact_counterfactual": true,
+          "large_sink_zero": true,
+          "invalid_descriptors_zero": true,
+          "host_guards": true
+        },
+        {
+          "requests": 16,
+          "initial": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1315
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 3857
+          },
+          "poison_unused_ring": true,
+          "all_five_drafts_exact": true,
+          "private_only_exact": true,
+          "probability_rounding_exact_counterfactual": true,
+          "large_sink_zero": true,
+          "invalid_descriptors_zero": true,
+          "host_guards": true
+        }
+      ]
+    },
+    {
+      "scope": "Native BF16 dSpark QK/64-key online softmax/BF16 probability PV/sink; excludes owned stage integration",
+      "reference_hashes": {
+        "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455"
+      },
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "native_library_sha256": "36e9f98493e4a215a269e74dcaa2ebf1b39238086cc684b49ea5bd50356e5228",
+      "qualifier_sha256": "b590784de2f8f5f62e1929881a7791999d720272f421afe559734f62cf4fd27a",
+      "results": [
+        {
+          "requests": 1,
+          "initial": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 84
+          },
+          "poison_unused_ring": true,
+          "all_five_drafts_exact": true,
+          "private_only_exact": true,
+          "probability_rounding_exact_counterfactual": true,
+          "large_sink_zero": true,
+          "invalid_descriptors_zero": true,
+          "host_guards": true
+        },
+        {
+          "requests": 3,
+          "initial": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 15
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 535
+          },
+          "poison_unused_ring": true,
+          "all_five_drafts_exact": true,
+          "private_only_exact": true,
+          "probability_rounding_exact_counterfactual": true,
+          "large_sink_zero": true,
+          "invalid_descriptors_zero": true,
+          "host_guards": true
+        },
+        {
+          "requests": 16,
+          "initial": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 1398
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 3384
+          },
+          "poison_unused_ring": true,
+          "all_five_drafts_exact": true,
+          "private_only_exact": true,
+          "probability_rounding_exact_counterfactual": true,
+          "large_sink_zero": true,
+          "invalid_descriptors_zero": true,
+          "host_guards": true
+        }
+      ]
+    }
+  ],
+  "not_qualified": [
+    "Rust-owned attention composition",
+    "query/KV producer and frequency ownership",
+    "full-stage sequencing",
+    "serving integration and verification",
+    "performance and full-model quality"
+  ]
+}

@@ -196,6 +196,7 @@ if(DS41RT_ENABLE_CUDA)
     cuda/kernels/v41_hc.cu
     cuda/kernels/v41_router.cu
     cuda/kernels/v41_dspark_cache.cu
+    cuda/kernels/v41_dspark_attention.cu
     cuda/kernels/v41_attention_ops.cu
     cuda/kernels/norm.cu
     cuda/kernels/mlp.cu

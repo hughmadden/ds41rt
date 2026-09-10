@@ -83,3 +83,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/attention-ops-rtx*.json` and `attention-ops-*.log` under `/tmp/ds41-v41-fp8-aot/`, including initial failed decorator and multiply-contraction diagnostics; retain production kernels/bindings, the reusable pinned-reference qualifier and committed evidence.
 
 - Delete `/tmp/ds41-attention-output-owner/`, `rust/target/debug/ds41-attention-output-owner-fixture`, `/tmp/ds41-v41-aot/grouped-output-rtx*.json` and `grouped-output-*.log` under `/tmp/ds41-v41-fp8-aot/`, including initial module-doc and unconverted synthetic-weight diagnostics; retain production code, the reusable qualifier and committed evidence.
+
+- Delete `/tmp/ds41-v41-aot/dspark-attention-rtx*.json` and `dspark-attention-*.log` under `/tmp/ds41-v41-fp8-aot/` with Goal 2 staging cleanup; retain native kernels/bindings, the reusable blockwise reference qualifier and committed evidence.
