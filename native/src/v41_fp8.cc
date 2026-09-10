@@ -21,7 +21,7 @@ struct Variant {
 };
 Variant variants[] = {DS41RT_V41_FP8_VARIANTS};
 std::mutex mutex;
-Variant* capacity(int rows) { for (auto& v : variants) if (int(v.info.capacity_rows) == rows) return &v; return nullptr; }
+Variant* capacity(int rows, int k, int n) { for (auto& v : variants) if (int(v.info.capacity_rows) == rows && int(v.info.input_dim) == k && int(v.info.output_dim) == n) return &v; return nullptr; }
 Variant* handle(void* p) { for (auto& v : variants) if (&v == p) return &v; return nullptr; }
 int load(Module& m, int device) {
   auto* ptr = &m.library;
@@ -43,13 +43,13 @@ int device_matches(Variant* v) {
 }
 }
 extern "C" int32_t ds41rt_v41_fp8_initialize_storage(void*, uint64_t, float*, void*);
-extern "C" int32_t ds41rt_v41_fp8_info(int32_t rows, ds41rt_v41_fp8_info_t* out) {
-  auto* v = capacity(rows); if (!v || !out) return cudaErrorInvalidValue;
+extern "C" int32_t ds41rt_v41_fp8_matrix_info(int32_t rows, int32_t k, int32_t n, ds41rt_v41_fp8_info_t* out) {
+  auto* v = capacity(rows, k, n); if (!v || !out) return cudaErrorInvalidValue;
   *out = v->info; return 0;
 }
-extern "C" int32_t ds41rt_v41_fp8_initialize(int32_t rows, void** out) {
+extern "C" int32_t ds41rt_v41_fp8_matrix_initialize(int32_t rows, int32_t k, int32_t n, void** out) {
   if (!out) return cudaErrorInvalidValue; *out = nullptr;
-  auto* v = capacity(rows); if (!v) return cudaErrorInvalidValue;
+  auto* v = capacity(rows, k, n); if (!v) return cudaErrorInvalidValue;
   int device, major, minor, sms;
   auto status = cudaGetDevice(&device); if (status) return status;
   status = cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device); if (status) return status;
@@ -80,7 +80,7 @@ extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, c
   auto* v = handle(kernel); int status = device_matches(v); if (status) return status;
   if (rows <= 0 || uint32_t(rows) > v->info.capacity_rows || bytes < v->info.scratch_bytes) return cudaErrorInvalidValue;
   const void* buffers[] = {source,weight,packed_scales,scratch,alpha,output};
-  uint64_t sizes[] = {uint64_t(rows)*6144*2,157286400,4915200,v->info.scratch_bytes,4,uint64_t(rows)*25600*2};
+  uint64_t sizes[] = {uint64_t(rows)*v->info.input_dim*2,uint64_t(v->info.output_dim)*v->info.input_dim,v->info.packed_weight_scale_bytes,v->info.scratch_bytes,4,uint64_t(rows)*v->info.output_dim*2};
   uintptr_t starts[6], ends[6];
   for (int i=0;i<6;++i) {
     if (!span(buffers[i],sizes[i],starts[i],ends[i])) return cudaErrorInvalidValue;
@@ -97,4 +97,12 @@ extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, c
   // Quantized-output slots are compile-time inactive for this BF16 projection.
   void* gemm_args[] = {&a,&w,&sm,&s,&c,&c,&c,&c,&one,&rows,&stream,&status};
   v->gemm.launch(gemm_args,12); return status;
+}
+
+// Existing engram entry points retain their explicit geometry.
+extern "C" int32_t ds41rt_v41_fp8_info(int32_t rows, ds41rt_v41_fp8_info_t* out) {
+  return ds41rt_v41_fp8_matrix_info(rows, 6144, 25600, out);
+}
+extern "C" int32_t ds41rt_v41_fp8_initialize(int32_t rows, void** out) {
+  return ds41rt_v41_fp8_matrix_initialize(rows, 6144, 25600, out);
 }

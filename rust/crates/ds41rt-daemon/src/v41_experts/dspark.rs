@@ -4,6 +4,8 @@ mod hc;
 pub(crate) use hc::HcSublayer;
 mod markov;
 mod router;
+mod shared;
+pub(crate) use shared::DsparkSharedFfn;
 mod terminal;
 pub(crate) use confidence::DsparkConfidence;
 pub(crate) use markov::DsparkMarkov;
@@ -20,6 +22,8 @@ use ds41rt_loader::OfficialV41Catalog;
 pub(crate) struct DsparkBudget {
     pub expert_resident_bytes: usize,
     pub auxiliary_resident_bytes: usize,
+    pub shared_packed_scale_bytes: usize,
+    pub shared_execution_bytes_per_wave: usize,
     pub load_staging_bytes: usize,
     pub execution_bytes_per_wave: usize,
     pub hc_bytes_per_wave: usize,
@@ -32,6 +36,7 @@ impl DsparkBudget {
     pub fn resident_bytes(self) -> Result<usize> {
         self.expert_resident_bytes
             .checked_add(self.auxiliary_resident_bytes)
+            .and_then(|bytes| bytes.checked_add(self.shared_packed_scale_bytes))
             .context("dSpark residency overflow")
     }
     /// Experts load serially, then native auxiliary tensors, then execution waves.
@@ -41,7 +46,8 @@ impl DsparkBudget {
         ensure!((1..=2).contains(&waves), "dSpark needs one or two waves");
         let execution = self
             .execution_bytes_per_wave
-            .checked_add(self.hc_bytes_per_wave)
+            .checked_add(self.shared_execution_bytes_per_wave)
+            .and_then(|bytes| bytes.checked_add(self.hc_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.router_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.confidence_bytes_per_wave))
             .and_then(|bytes| bytes.checked_add(self.markov_bytes_per_wave))
@@ -65,6 +71,7 @@ pub(crate) struct DsparkWeights<'library> {
     experts: [ExpertWeights<'library>; 3],
     auxiliary: NativeRtxTensors<'library>,
     budget: DsparkBudget,
+    shared_scales: [crate::v41_memory::DeviceAllocation<'library>; 9],
 }
 impl<'library> DsparkWeights<'library> {
     fn auxiliary_names(catalog: &OfficialV41Catalog) -> Vec<String> {
@@ -99,6 +106,8 @@ impl<'library> DsparkWeights<'library> {
         Ok(DsparkBudget {
             expert_resident_bytes,
             auxiliary_resident_bytes,
+            shared_packed_scale_bytes: shared::packed_scale_bytes(library)?,
+            shared_execution_bytes_per_wave: DsparkSharedFfn::device_bytes(library, capacity)? * 3,
             load_staging_bytes,
             execution_bytes_per_wave,
             router_bytes_per_wave: DsparkRouter::device_bytes(capacity as usize)? * 3,
@@ -158,7 +167,9 @@ impl<'library> DsparkWeights<'library> {
             .try_into()
             .ok()
             .context("dSpark requires three expert stages")?;
+        let shared_scales = shared::pack_scales(library, &auxiliary)?;
         Ok(Self {
+            shared_scales,
             experts,
             auxiliary,
             budget,

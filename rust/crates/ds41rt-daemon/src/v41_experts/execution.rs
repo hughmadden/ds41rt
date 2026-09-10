@@ -191,6 +191,67 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         unsafe { self.library.cuda_stream_synchronize(self.stream.raw) }
     }
 
+    /// Run routing, shared FFN and the three routed experts on one wave stream.
+    /// The existing reducer adds shared BF16 output after expert accumulation.
+    /// # Safety
+    /// Hidden states must be finite and initialized with producer writes ordered
+    /// on this stream; serialize wave use and finish external readers before reuse.
+    pub unsafe fn ffn_draft(
+        &mut self,
+        router: &mut super::dspark::DsparkRouter<'_, '_>,
+        shared: &mut super::dspark::DsparkSharedFfn<'_, '_>,
+        rows: u32,
+    ) -> Result<()> {
+        ensure!(
+            router.matches(self._weights) && shared.matches(self._weights),
+            "dSpark FFN stage owners differ"
+        );
+        ensure!(
+            rows > 0 && rows <= self.kernel.info().capacity_rows,
+            "invalid dSpark FFN rows"
+        );
+        let output = self
+            .shared
+            .as_ref()
+            .context("dSpark FFN requires coordinator output")?
+            .buffer;
+        let launched = (|| unsafe {
+            router.enqueue(self.inputs(), rows as usize, self.stream.raw)?;
+            shared.enqueue(self.hidden.buffer, output, rows, self.stream.raw)?;
+            self.launch(rows, true)
+        })();
+        // Either router/projection may have submitted work before a later error.
+        let drained = self.synchronize();
+        launched.and(drained)
+    }
+
+    /// Compute the dSpark shared expert directly into this wave's shared output.
+    /// # Safety
+    /// Hidden states must be finite and initialized, with producer writes ordered
+    /// on this stream; external consumers must finish before output reuse.
+    pub unsafe fn shared_draft(
+        &mut self,
+        shared: &mut super::dspark::DsparkSharedFfn<'_, '_>,
+        rows: u32,
+    ) -> Result<()> {
+        ensure!(
+            shared.matches(self._weights),
+            "shared FFN and expert stage weights differ"
+        );
+        ensure!(
+            rows > 0 && rows <= self.kernel.info().capacity_rows,
+            "invalid shared FFN rows"
+        );
+        let output = self
+            .shared
+            .as_ref()
+            .context("shared FFN requires coordinator output")?
+            .buffer;
+        let launched = unsafe { shared.enqueue(self.hidden.buffer, output, rows, self.stream.raw) };
+        let drained = self.synchronize();
+        launched.and(drained)
+    }
+
     /// Route the current hidden states through this exact dSpark stage's gate.
     /// Drains the stream before returning so the router scratch can be reused.
     /// # Safety

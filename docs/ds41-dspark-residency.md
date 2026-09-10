@@ -51,3 +51,5 @@ The terminal now accepts residual streams and incoming FP32 pre-mix, enqueues na
 Owned attention/FFN mHC boundaries now generate and retain coefficients around sublayer execution with shifted pre-mix handling; six capacity-80 owners add 54,120,960 bytes per wave, with detailed native evidence and remaining integration gaps in `ds41-hc-qualification.md`.
 
 Per-stage routing now writes directly into owned expert-wave inputs and adds 122,880 bytes per capacity-80 wave, raising the partial two-wave dSpark budget to 8,401,515,352 bytes; native numerical/graph evidence and remaining integration limits are recorded in ds41-router-qualification.md.
+
+Shared-FFN packing adds 3,317,760 resident bytes, and three capacity-80 shared execution owners add 5,246,988 bytes per wave, raising the partial two-wave budget to 8,415,327,088 bytes; ownership, qualification and remaining exclusions are detailed in ds41-shared-fp8-qualification.md.

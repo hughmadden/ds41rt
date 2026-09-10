@@ -112,3 +112,5 @@ mHC coefficient progress: fused normalized projection and twenty-step Sinkhorn m
 Four-Spark TP4 progress: fresh current native/Rust fixture builds pass two M16 requests across ostrich, dodo, emu and kiwi with RTX outputs bitwise equal to a freshly regenerated full-width reference, while production serving, streaming/RDMA and overlap remain open in `docs/ds41-four-spark-tp4-qualification.md`.
 
 Router progress: native official top-3/top-6 text/VL routing passes numerical and changed-input graph checks on both RTX GPUs, with stage-bound dSpark scratch and direct expert-buffer routing while stage orchestration and Rust-owner runtime qualification remain open in `docs/ds41-router-qualification.md`.
+
+Shared-FFN progress: native dense FP8 shapes, packed-scale residency and single-stream dSpark FFN composition now build and pass native numerical/graph checks on both RTX GPUs, with exact zero/tiny activation scaling fixed in b12x while Rust-owned composition and routed-expert tiny-activation semantics remain open in `docs/ds41-shared-fp8-qualification.md`.

@@ -10,6 +10,15 @@ typedef struct {
   uint64_t scratch_bytes, values_offset, row_scales_offset, mma_scales_offset;
   uint64_t packed_weight_scale_bytes;
 } ds41rt_v41_fp8_info_t;
+/* Matrix entry points additionally cover shared FFN [2304,5120] and [5120,2304].
+ * Shapes are explicit (K input, N output); only compiled capacities are admitted. */
+int32_t ds41rt_v41_fp8_matrix_info(int32_t capacity, int32_t k, int32_t n, ds41rt_v41_fp8_info_t* out);
+int32_t ds41rt_v41_fp8_matrix_initialize(int32_t capacity, int32_t k, int32_t n, void** out);
+int32_t ds41rt_v41_fp8_matrix_pack_scales(const uint8_t* source, uint8_t* destination,
+    int32_t k, int32_t n, void* stream);
+/* BF16 [rows,2304] inputs/output; FP32 asymmetric limit-10 SwiGLU, BF16 RNE output. */
+int32_t ds41rt_v41_shared_swiglu(const uint16_t* gate, const uint16_t* up,
+    uint16_t* output, int32_t rows, void* stream);
 int32_t ds41rt_v41_fp8_info(int32_t capacity, ds41rt_v41_fp8_info_t* out);
 int32_t ds41rt_v41_fp8_initialize(int32_t capacity, void** out);
 /* Scratch is initialized once before capture/replay; alpha is a separate float. */

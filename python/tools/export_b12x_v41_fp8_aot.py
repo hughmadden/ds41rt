@@ -10,6 +10,8 @@ from pathlib import Path
 import _pinned_sparkinfer  # noqa: F401
 
 
+PROJECTIONS = (('engram', 25600, 6144), ('ffn_up', 2304, 5120), ('ffn_down', 5120, 2304))
+
 def validate_abi(path: Path, label: str, kind: str) -> dict:
     header = path.read_text()
     pointers = ('source_ptr', 'values_ptr', 'scale_rows_ptr', 'scale_mma_ptr') if kind == 'quant' else (
@@ -41,14 +43,15 @@ def dispatch_header(output: Path, manifest: dict) -> None:
     variants = []
     for variant in manifest['variants']:
         label, capacity = variant['label'], variant['capacity']
+        n, k = variant['output_dim'], variant['input_dim']
         for kind in ('quant', 'gemm'):
             lines.append(f'#include "{label}_{kind}.h"')
-        grids = [mxfp8_rows_quant_aot_grid(size_k=6144, rows=rows, expected_m=capacity,
+        grids = [mxfp8_rows_quant_aot_grid(size_k=k, rows=rows, expected_m=capacity,
                                          sm_count=manifest['physical_sms']) for rows in range(1, capacity + 1)]
         lines.append('static const uint32_t ' + label + '_grids[] = {' + ','.join(map(str, grids)) + '};')
-        info = [1, capacity, 6144, 25600, variant['activation_scratch_bytes'],
+        info = [1, capacity, k, n, variant['activation_scratch_bytes'],
                 variant['activation_values_offset'], variant['activation_row_scales_offset'],
-                variant['activation_mma_scales_offset'], 4915200]
+                variant['activation_mma_scales_offset'], n * k // 32]
         modules = []
         for kind in ('quant', 'gemm'):
             prefix = '_mlir_ds41rt_' + label + '_' + kind
@@ -74,31 +77,32 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
         raise ValueError('coordinator FP8 export requires native SM120')
     output.mkdir(parents=True, exist_ok=True)
     (output / 'v41_fp8.json').unlink(missing_ok=True)
-    manifest = {'schema': 1, 'role': 'coordinator', 'capability': [props.major, props.minor],
+    manifest = {'schema': 2, 'role': 'coordinator', 'capability': [props.major, props.minor],
                 'physical_sms': props.multi_processor_count, 'device': props.name,
-                'projection': {'name': 'engram_wkv', 'n': 25600, 'k': 6144,
-                               'weight_block': [32, 32], 'activation_block': 32},
+                'projections': [{'name': name, 'n': n, 'k': k, 'weight_block': [32,32],
+                                 'activation_block': 32, 'activation_amax_floor': 1e-4} for name,n,k in PROJECTIONS],
                 'sparkinfer_revision': json.loads((Path(__file__).resolve().parents[2] / 'third_party/sparkinfer.lock.json').read_text())['revision'],
                 'variants': []}
-    for capacity in rows:
-        label = f'v41_engram_fp8_m{capacity}'
-        quant = compile_mxfp8_rows_quant_aot(size_k=6144, scale_block_size=32, expected_m=capacity)
-        quant.export_to_c(str(output), label + '_quant', 'ds41rt_' + label + '_quant')
-        gemm = compile_dense_gemm_mxfp8_aot(size_m=capacity, size_n=25600, size_k=6144,
-                                          expected_m=capacity, sfb_k_replicated=False, device=device)
-        gemm.export_to_c(str(output), label + '_gemm', 'ds41rt_' + label + '_gemm')
-        layout = _block_fp8_linear_scratch_layout(tokens=capacity, in_features=6144,
-                                                out_features=25600, output_dtype=torch.bfloat16)
-        manifest['variants'].append({'capacity': capacity, 'label': label,
-            'activation_scratch_bytes': layout.nbytes,
-            'activation_values_offset': layout.x_values_offset_bytes,
-            'activation_row_scales_offset': layout.x_scale_rows_offset_bytes,
-            'activation_mma_scales_offset': layout.x_scale_mma_offset_bytes,
-            'activation_mma_scale_shape': list(layout.x_scale_mma_physical_shape),
-            'split_k_slices': 1, 'output_dtype': 'BF16', 'output_bytes': capacity * 25600 * 2,
-            'quant_abi': validate_abi(output / (label + '_quant.h'), label + '_quant', 'quant'),
-            'gemm_abi': validate_abi(output / (label + '_gemm.h'), label + '_gemm', 'gemm')})
-        print(f'exported {label}', flush=True)
+    for name, n, k in PROJECTIONS:
+        for capacity in rows:
+            label = f'v41_{name}_fp8_m{capacity}'
+            quant = compile_mxfp8_rows_quant_aot(size_k=k, scale_block_size=32, expected_m=capacity, amax_floor=1e-4)
+            quant.export_to_c(str(output), label + '_quant', 'ds41rt_' + label + '_quant')
+            gemm = compile_dense_gemm_mxfp8_aot(size_m=capacity, size_n=n, size_k=k,
+                                              expected_m=capacity, sfb_k_replicated=False, device=device)
+            gemm.export_to_c(str(output), label + '_gemm', 'ds41rt_' + label + '_gemm')
+            layout = _block_fp8_linear_scratch_layout(tokens=capacity, in_features=k,
+                                                    out_features=n, output_dtype=torch.bfloat16)
+            manifest['variants'].append({'capacity': capacity, 'label': label, 'input_dim': k, 'output_dim': n,
+                'activation_scratch_bytes': layout.nbytes,
+                'activation_values_offset': layout.x_values_offset_bytes,
+                'activation_row_scales_offset': layout.x_scale_rows_offset_bytes,
+                'activation_mma_scales_offset': layout.x_scale_mma_offset_bytes,
+                'activation_mma_scale_shape': list(layout.x_scale_mma_physical_shape),
+                'split_k_slices': 1, 'output_dtype': 'BF16', 'output_bytes': capacity * n * 2,
+                'quant_abi': validate_abi(output / (label + '_quant.h'), label + '_quant', 'quant'),
+                'gemm_abi': validate_abi(output / (label + '_gemm.h'), label + '_gemm', 'gemm')})
+            print(f'exported {label}', flush=True)
     dispatch_header(output, manifest)
     artifacts = {"v41_fp8_variants.h": hashlib.sha256((output / "v41_fp8_variants.h").read_bytes()).hexdigest()}
     for variant in manifest['variants']:

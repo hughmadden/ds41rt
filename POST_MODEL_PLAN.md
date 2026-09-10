@@ -19,3 +19,5 @@ Goal 2 begins after Goal 1 qualification, when the checkpoint is complete; all f
 - [ ] Finalize release documentation, images, commits, and dependency pins after all checkpoint-dependent gates pass.
 
 Pre-model fleet evidence: four physical Sparks now pass synthetic native TP4 arithmetic and persistent TCP transport, but full-checkpoint deployment and complete serving qualification remain Goal 2 gates.
+
+Numerical handoff note: checkpoint-backed shared-FFN and full-logit checks must assess BF16-to-FP8 rounding propagation observed in synthetic native qualification; current per-operation and propagation-bound checks do not establish full-model quality.

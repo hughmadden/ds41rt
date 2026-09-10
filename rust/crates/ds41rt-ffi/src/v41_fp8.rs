@@ -1,4 +1,4 @@
-//! Library-borrowing native V4.1 engram FP8 launch handle.
+//! Library-borrowing native V4.1 block FP8 launch handle.
 use crate::{Ds41rtDeviceBuffer, NativeLibrary};
 use anyhow::{ensure, Result};
 use std::{ffi::c_void, ptr::NonNull};
@@ -18,10 +18,10 @@ pub struct V41Fp8Info {
 }
 const _: [(); 56] = [(); std::mem::size_of::<V41Fp8Info>()];
 
-type InfoFn = unsafe extern "C" fn(i32, *mut V41Fp8Info) -> i32;
-type InitFn = unsafe extern "C" fn(i32, *mut *mut c_void) -> i32;
+type InfoFn = unsafe extern "C" fn(i32, i32, i32, *mut V41Fp8Info) -> i32;
+type InitFn = unsafe extern "C" fn(i32, i32, i32, *mut *mut c_void) -> i32;
 type ScratchFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, *mut f32, *mut c_void) -> i32;
-type PackFn = unsafe extern "C" fn(*const u8, *mut u8, *mut c_void) -> i32;
+type PackFn = unsafe extern "C" fn(*const u8, *mut u8, i32, i32, *mut c_void) -> i32;
 type LaunchFn = unsafe extern "C" fn(
     *mut c_void,
     *const u16,
@@ -44,10 +44,25 @@ pub struct V41Fp8Kernel<'a> {
 }
 impl NativeLibrary {
     pub fn v41_fp8_info(&self, capacity: u32) -> Result<V41Fp8Info> {
+        self.v41_fp8_matrix_info(capacity, 6144, 25600)
+    }
+    pub fn v41_fp8_matrix_info(
+        &self,
+        capacity: u32,
+        input_dim: u32,
+        output_dim: u32,
+    ) -> Result<V41Fp8Info> {
+        ensure!(
+            matches!(
+                (input_dim, output_dim),
+                (6144, 25600) | (5120, 2304) | (2304, 5120)
+            ),
+            "unsupported native FP8 matrix"
+        );
         let capacity = i32::try_from(capacity)?;
-        let function: InfoFn = unsafe { *self.lib.get(b"ds41rt_v41_fp8_info")? };
+        let function: InfoFn = unsafe { *self.lib.get(b"ds41rt_v41_fp8_matrix_info")? };
         let mut info = V41Fp8Info::default();
-        let status = unsafe { function(capacity, &mut info) };
+        let status = unsafe { function(capacity, input_dim as i32, output_dim as i32, &mut info) };
         ensure!(
             status == 0,
             "native V4.1 FP8 info failed with CUDA status {status}"
@@ -55,9 +70,10 @@ impl NativeLibrary {
         ensure!(
             info.abi_version == 1
                 && info.capacity_rows == capacity as u32
-                && info.input_dim == 6144
-                && info.output_dim == 25600
-                && info.packed_weight_scale_bytes == 4915200,
+                && info.input_dim == input_dim
+                && info.output_dim == output_dim
+                && info.packed_weight_scale_bytes
+                    == u64::from(input_dim) * u64::from(output_dim) / 32,
             "unsupported native V4.1 FP8 geometry/ABI"
         );
         ensure!(
@@ -69,14 +85,27 @@ impl NativeLibrary {
         Ok(info)
     }
     pub fn v41_fp8_kernel(&self, capacity: u32) -> Result<V41Fp8Kernel<'_>> {
-        let info = self.v41_fp8_info(capacity)?;
+        self.v41_fp8_matrix_kernel(capacity, 6144, 25600)
+    }
+    pub fn v41_fp8_matrix_kernel(
+        &self,
+        capacity: u32,
+        input_dim: u32,
+        output_dim: u32,
+    ) -> Result<V41Fp8Kernel<'_>> {
+        let info = self.v41_fp8_matrix_info(capacity, input_dim, output_dim)?;
         unsafe {
-            let initialize: InitFn = *self.lib.get(b"ds41rt_v41_fp8_initialize")?;
+            let initialize: InitFn = *self.lib.get(b"ds41rt_v41_fp8_matrix_initialize")?;
             let scratch = *self.lib.get(b"ds41rt_v41_fp8_initialize_scratch")?;
-            let pack = *self.lib.get(b"ds41rt_v41_fp8_pack_scales")?;
+            let pack = *self.lib.get(b"ds41rt_v41_fp8_matrix_pack_scales")?;
             let launch = *self.lib.get(b"ds41rt_v41_fp8_launch")?;
             let mut handle = std::ptr::null_mut();
-            let status = initialize(i32::try_from(capacity)?, &mut handle);
+            let status = initialize(
+                i32::try_from(capacity)?,
+                input_dim as i32,
+                output_dim as i32,
+                &mut handle,
+            );
             ensure!(
                 status == 0,
                 "native V4.1 FP8 initialization failed with CUDA status {status}"
@@ -132,7 +161,7 @@ impl V41Fp8Kernel<'_> {
         Ok(())
     }
     /// # Safety
-    /// Source is native UE8M0 [800,192]; destination is distinct current-device
+    /// Source is native UE8M0 [output_dim/32,input_dim/32]; destination is distinct current-device
     /// storage, with both allocations live and correctly ordered through completion.
     pub unsafe fn pack_scales(
         &self,
@@ -140,12 +169,23 @@ impl V41Fp8Kernel<'_> {
         destination: Ds41rtDeviceBuffer,
         stream: *mut c_void,
     ) -> Result<()> {
-        require(source, 153600)?;
+        require(
+            source,
+            self.info.input_dim as usize * self.info.output_dim as usize / 1024,
+        )?;
         require(
             destination,
             usize::try_from(self.info.packed_weight_scale_bytes)?,
         )?;
-        let status = unsafe { (self.pack)(source.ptr.cast(), destination.ptr.cast(), stream) };
+        let status = unsafe {
+            (self.pack)(
+                source.ptr.cast(),
+                destination.ptr.cast(),
+                self.info.input_dim as i32,
+                self.info.output_dim as i32,
+                stream,
+            )
+        };
         ensure!(
             status == 0,
             "native FP8 scale packing failed with CUDA status {status}"
@@ -172,15 +212,18 @@ impl V41Fp8Kernel<'_> {
             rows > 0 && rows <= self.info.capacity_rows,
             "native FP8 rows exceed capacity"
         );
-        require(source, rows as usize * 6144 * 2)?;
-        require(weight, 157286400)?;
+        require(source, rows as usize * self.info.input_dim as usize * 2)?;
+        require(
+            weight,
+            self.info.input_dim as usize * self.info.output_dim as usize,
+        )?;
         require(
             scales,
             usize::try_from(self.info.packed_weight_scale_bytes)?,
         )?;
         require(scratch, usize::try_from(self.info.scratch_bytes)?)?;
         require(alpha, 4)?;
-        require(output, rows as usize * 25600 * 2)?;
+        require(output, rows as usize * self.info.output_dim as usize * 2)?;
         let status = unsafe {
             (self.launch)(
                 self.handle.as_ptr(),
@@ -199,6 +242,49 @@ impl V41Fp8Kernel<'_> {
             status == 0,
             "native FP8 projection failed with CUDA status {status}"
         );
+        Ok(())
+    }
+}
+
+type SwiGluFn = unsafe extern "C" fn(*const u16, *const u16, *mut u16, i32, *mut c_void) -> i32;
+pub struct V41SharedSwiGlu<'a> {
+    _library: &'a NativeLibrary,
+    launch: SwiGluFn,
+}
+impl NativeLibrary {
+    pub fn v41_shared_swiglu(&self) -> Result<V41SharedSwiGlu<'_>> {
+        Ok(V41SharedSwiGlu {
+            _library: self,
+            launch: unsafe { *self.lib.get(b"ds41rt_v41_shared_swiglu")? },
+        })
+    }
+}
+impl V41SharedSwiGlu<'_> {
+    /// # Safety
+    /// Inputs are initialized finite BF16 [rows,2304] on the stream device.
+    /// Output is distinct; all storage remains live and ordered through completion.
+    pub unsafe fn launch(
+        &self,
+        gate: Ds41rtDeviceBuffer,
+        up: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=4096).contains(&rows), "invalid shared SwiGLU rows");
+        for buffer in [gate, up, output] {
+            require(buffer, rows as usize * 2304 * 2)?;
+        }
+        let status = unsafe {
+            (self.launch)(
+                gate.ptr.cast(),
+                up.ptr.cast(),
+                output.ptr.cast(),
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native shared SwiGLU CUDA status {status}");
         Ok(())
     }
 }

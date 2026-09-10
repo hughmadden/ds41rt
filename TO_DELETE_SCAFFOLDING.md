@@ -69,3 +69,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-tp4-four-host/` on this host, ostrich, dodo, emu and kiwi during Goal 2 cleanup, including sparse snapshot/source archives, current standalone fixture copies, fresh ARM/CUDA build outputs and regenerated oracle artifacts; the four `ds41-tp4-physical-r*` containers were already removed after successful exit.
 
 - Delete `/tmp/ds41-v41-aot/router-qualification.json` and `router-rust-build.log`, `router-native-build.log`, and `router-qualification.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain the native router, Rust ownership and reusable qualifier.
+
+- Delete `/tmp/ds41-v41-aot/shared-fp8-rtx0.json`, `shared-fp8-rtx1.json`, and all `shared-fp8-*.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup, including failed diagnostic runs; retain the reusable shared-FP8 qualifier, b12x floor regression tests and committed evidence.
