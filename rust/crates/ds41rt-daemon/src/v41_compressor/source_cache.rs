@@ -1,13 +1,15 @@
-//! Physical index pages owned by compressor request leases.
+//! Paired index/FP8 KV pages owned by compressor request leases.
 use crate::v41_memory::{DeviceAllocation, HostAllocation};
 use anyhow::{ensure, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 use std::ffi::c_void;
 
 pub(super) const PAGE_ROWS: usize = 256;
-pub(super) struct IndexCache<'a> {
+pub(super) struct SourceCache<'a> {
     pub packed: DeviceAllocation<'a>,
     pub scales: DeviceAllocation<'a>,
+    pub kv_values: DeviceAllocation<'a>,
+    pub kv_scales: DeviceAllocation<'a>,
     pub capacity: usize,
     page_table: DeviceAllocation<'a>,
     lengths: DeviceAllocation<'a>,
@@ -34,14 +36,23 @@ pub(crate) struct IndexCacheView<'a> {
     /// U64 committed row count, published after accepted value/scale writes.
     pub device_rows: Ds41rtDeviceBuffer,
 }
-impl<'a> IndexCache<'a> {
+/// FP8 K32 serving KV shares physical pages and publication with index keys.
+pub(crate) struct KvCacheView<'a> {
+    pub values: Ds41rtDeviceBuffer,
+    pub scales: Ds41rtDeviceBuffer,
+    pub pages: &'a [u32],
+    pub rows: usize,
+    pub device_pages: Ds41rtDeviceBuffer,
+    pub device_rows: Ds41rtDeviceBuffer,
+}
+impl<'a> SourceCache<'a> {
     pub fn device_bytes(pages: usize, slots: usize) -> Result<usize> {
         ensure!(
             (1..=65536).contains(&pages),
             "invalid index pool page count"
         );
         ensure!((1..=16).contains(&slots), "invalid index slot count");
-        Ok(pages * PAGE_ROWS * 68 + slots * (pages.min(4096) * 4 + 8))
+        Ok(pages * PAGE_ROWS * (68 + 528) + slots * (pages.min(4096) * 4 + 8))
     }
     pub fn new(library: &'a NativeLibrary, pages: usize, slots: usize) -> Result<Self> {
         Self::device_bytes(pages, slots)?;
@@ -54,6 +65,8 @@ impl<'a> IndexCache<'a> {
             stride: pages.min(4096),
             packed: DeviceAllocation::new(library, pages * PAGE_ROWS * 64)?,
             scales: DeviceAllocation::new(library, pages * PAGE_ROWS * 4)?,
+            kv_values: DeviceAllocation::new(library, pages * PAGE_ROWS * 512)?,
+            kv_scales: DeviceAllocation::new(library, pages * PAGE_ROWS * 16)?,
             capacity: pages * PAGE_ROWS,
             pages: std::array::from_fn(|_| vec![]),
             free: (0..pages as u32).rev().collect(),
@@ -71,6 +84,17 @@ impl<'a> IndexCache<'a> {
                 self.stride * 4,
             ),
             device_rows: slice(self.lengths.buffer, slot * 8, 8),
+        }
+    }
+    pub fn kv_view(&self, slot: usize, rows: usize) -> KvCacheView<'_> {
+        let index = self.view(slot, rows);
+        KvCacheView {
+            values: self.kv_values.buffer,
+            scales: self.kv_scales.buffer,
+            pages: index.pages,
+            rows: index.rows,
+            device_pages: index.device_pages,
+            device_rows: index.device_rows,
         }
     }
     pub fn release(&mut self, slot: usize) -> Result<()> {

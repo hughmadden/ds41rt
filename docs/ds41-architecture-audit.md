@@ -1,6 +1,8 @@
 # DeepSeek V4.1 Flash architecture audit
 
-Status: initial source review; implementation and numerical qualification remain pending.
+Status: reference audit and implementation notes. Current completion status is tracked in `TO_SHIP_V1.md`.
+
+Serving KV follows the user's fixed K32 FP8 policy. This matches reference window quantization but replaces reference compressed FP4; index quantization remains architectural FP4. See `ds41-kv-qualification.md` for the implemented storage contract, component evidence and pending full-model validation.
 
 The authoritative sources are the [official checkpoint](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/tree/df42c109f1defefcbfcedbe7d905718a12266e40), its `config.json`, `inference/` reference, and `DeepSeek_V41_Tech_Report.pdf`; `ds41-reference-lock.json` records the reviewed file hashes.
 

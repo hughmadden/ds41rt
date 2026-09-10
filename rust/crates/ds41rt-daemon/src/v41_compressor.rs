@@ -2,15 +2,15 @@
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Compressor};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Compressor, V41Kv};
 use ds41rt_loader::OfficialV41Catalog;
 use std::{
     ffi::c_void,
     sync::atomic::{AtomicU64, Ordering},
 };
-mod index_cache;
-use index_cache::IndexCache;
-pub(crate) use index_cache::IndexCacheView;
+mod source_cache;
+use source_cache::SourceCache;
+pub(crate) use source_cache::{IndexCacheView, KvCacheView};
 static NEXT_PROPOSAL: AtomicU64 = AtomicU64::new(1);
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 fn ratio(layer: usize) -> Result<usize> {
@@ -47,7 +47,7 @@ struct Slot {
     end: u64,
 }
 pub(crate) struct CompressorState<'a> {
-    index: IndexCache<'a>,
+    index: SourceCache<'a>,
     pending: Option<[DeviceAllocation<'a>; 2]>,
     slots: [Slot; 16],
     slot_count: usize,
@@ -57,7 +57,7 @@ pub(crate) struct CompressorState<'a> {
 impl<'a> CompressorState<'a> {
     pub fn device_bytes(layer: usize, slots: usize, index_pages: usize) -> Result<usize> {
         ensure!((1..=16).contains(&slots), "invalid compressor slot count");
-        Ok(IndexCache::device_bytes(index_pages, slots)?
+        Ok(SourceCache::device_bytes(index_pages, slots)?
             + if ratio(layer)? == 2 { slots * 4096 } else { 0 })
     }
     pub fn new(
@@ -75,7 +75,7 @@ impl<'a> CompressorState<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| anyhow::anyhow!("compressor owner IDs exhausted"))?;
         Ok(Self {
-            index: IndexCache::new(library, index_pages, slots)?,
+            index: SourceCache::new(library, index_pages, slots)?,
             pending: if ratio(layer)? == 2 {
                 Some([
                     DeviceAllocation::new(library, slots * 2048)?,
@@ -141,6 +141,12 @@ impl<'a> CompressorState<'a> {
         Ok(self
             .index
             .view(slot, self.slots[slot].end as usize / ratio(self.layer)?))
+    }
+    pub fn kv_cache(&self, lease: CompressorLease) -> Result<KvCacheView<'_>> {
+        let slot = self.validate(lease)?;
+        Ok(self
+            .index
+            .kv_view(slot, self.slots[slot].end as usize / ratio(self.layer)?))
     }
     /// All device consumers of this request's cache must have finished.
     pub fn release(&mut self, lease: CompressorLease) -> Result<()> {
@@ -224,6 +230,7 @@ impl<'a> CompressorWeights<'a> {
                 raw: self.library.cuda_stream_create()?,
             },
             kernel,
+            kv: self.library.v41_kv()?,
             _workspace: workspace,
             norm: self.library.v41_attention_ops()?,
             weights: self,
@@ -252,6 +259,8 @@ impl<'a> CompressorWeights<'a> {
             index_key: DeviceAllocation::new(self.library, rows * 256)?,
             index_packed: DeviceAllocation::new(self.library, rows * 64)?,
             index_scales: DeviceAllocation::new(self.library, rows * 4)?,
+            kv_values: DeviceAllocation::new(self.library, rows * 512)?,
+            kv_scales: DeviceAllocation::new(self.library, rows * 16)?,
             cache_destinations: DeviceAllocation::new(self.library, rows * 8)?,
             output: DeviceAllocation::new(self.library, rows * 1024)?,
             capacity: rows,
@@ -279,6 +288,8 @@ pub(crate) struct CompressorOutput<'a> {
     /// rows may enter persistent index storage; rejected suffixes stay private.
     pub index_packed: Ds41rtDeviceBuffer,
     pub index_scales: Ds41rtDeviceBuffer,
+    pub kv_values: Ds41rtDeviceBuffer,
+    pub kv_scales: Ds41rtDeviceBuffer,
     pub completed: &'a [CompressorLatentRow],
 }
 /// Exact producing execution and request lease for candidate sharing.
@@ -301,6 +312,9 @@ pub(crate) struct IndexProposal<'a> {
     binding: IndexBinding,
     pub source_layer: usize,
     pub cache: IndexCacheView<'a>,
+    pub kv_cache: KvCacheView<'a>,
+    pub kv_values: Ds41rtDeviceBuffer,
+    pub kv_scales: Ds41rtDeviceBuffer,
     pub packed: Ds41rtDeviceBuffer,
     pub scales: Ds41rtDeviceBuffer,
     pub capacity: usize,
@@ -335,6 +349,7 @@ impl IndexProposal<'_> {
 pub(crate) struct CompressorWave<'w, 'a> {
     stream: LoadStream<'a>,
     kernel: V41Compressor<'a>,
+    kv: V41Kv<'a>,
     _workspace: DeviceAllocation<'a>,
     norm: V41AttentionOps<'a>,
     weights: &'w CompressorWeights<'a>,
@@ -349,6 +364,8 @@ pub(crate) struct CompressorWave<'w, 'a> {
     index_key: DeviceAllocation<'a>,
     index_packed: DeviceAllocation<'a>,
     index_scales: DeviceAllocation<'a>,
+    kv_values: DeviceAllocation<'a>,
+    kv_scales: DeviceAllocation<'a>,
     cache_destinations: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     capacity: usize,
@@ -364,9 +381,9 @@ impl CompressorWave<'_, '_> {
         Ok(V41Compressor::WORKSPACE_BYTES
             + rows
                 * if ratio(layer)? == 2 {
-                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68 + 8
+                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68 + 8 + 528
                 } else {
-                    10240 + 1024 + 1024 + 264 + 512 + 68 + 8
+                    10240 + 1024 + 1024 + 264 + 512 + 68 + 8 + 528
                 })
     }
     /// Packed BF16 [sum(chunk.tokens),5120], in chunk order. Finish all producer
@@ -571,6 +588,14 @@ impl CompressorWave<'_, '_> {
                 rows,
                 self.stream.raw,
             )?;
+            self.kv.pack(
+                self.output.buffer,
+                Some(self.frequencies.buffer),
+                self.kv_values.buffer,
+                self.kv_scales.buffer,
+                rows,
+                self.stream.raw,
+            )?;
         }
         Ok(())
     }
@@ -675,7 +700,13 @@ impl CompressorWave<'_, '_> {
         index_packed.bytes = prepared.rows * 64;
         let mut index_scales = self.index_scales.buffer;
         index_scales.bytes = prepared.rows * 4;
+        let mut kv_values = self.kv_values.buffer;
+        kv_values.bytes = prepared.rows * 512;
+        let mut kv_scales = self.kv_scales.buffer;
+        kv_scales.bytes = prepared.rows * 16;
         Ok(CompressorOutput {
+            kv_values,
+            kv_scales,
             buffer,
             index_key,
             index_packed,
@@ -719,6 +750,9 @@ impl CompressorWave<'_, '_> {
             },
             source_layer: self.weights.layer,
             cache: state.index_cache(lease)?,
+            kv_cache: state.kv_cache(lease)?,
+            kv_values: output.kv_values,
+            kv_scales: output.kv_scales,
             packed: output.index_packed,
             scales: output.index_scales,
             capacity: prepared.rows,
@@ -733,7 +767,7 @@ impl CompressorWave<'_, '_> {
     }
     /// Consume this proposal once. Validate all requests before any GPU write;
     /// zero acceptance also invalidates competing proposals via version advance.
-    /// Reserve all index pages before writes, drain index/pending writes before
+    /// Reserve paired index/KV pages before writes, drain all source writes before
     /// publishing history, and return accepted complete latents for KV commit.
     pub fn commit(
         &mut self,
@@ -820,6 +854,16 @@ impl CompressorWave<'_, '_> {
                         self.cache_destinations.buffer,
                         state.index.packed.buffer,
                         state.index.scales.buffer,
+                        prepared.rows,
+                        state.index.capacity,
+                        self.stream.raw,
+                    )?;
+                    self.kv.store(
+                        self.kv_values.buffer,
+                        self.kv_scales.buffer,
+                        self.cache_destinations.buffer,
+                        state.index.kv_values.buffer,
+                        state.index.kv_scales.buffer,
                         prepared.rows,
                         state.index.capacity,
                         self.stream.raw,
