@@ -3,7 +3,7 @@ use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::VocabularyHead;
 use anyhow::{ensure, Context, Result};
 use ds41rt_core::DsparkRng;
-use ds41rt_ffi::{Ds41rtDeviceBuffer, V41DraftStep, V41VocabularyProjection};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, V41DraftStep, V41Hc, V41VocabularyProjection};
 use std::ffi::c_void;
 
 /// Five dependent Markov/sample positions followed by raw confidence, on one
@@ -13,6 +13,9 @@ pub(crate) struct DsparkTerminal<'weights, 'library> {
     markov: DsparkMarkov<'weights, 'library>,
     confidence: DsparkConfidence<'weights, 'library>,
     sample: V41DraftStep<'library>,
+    hc: V41Hc<'library>,
+    residual: DeviceAllocation<'library>,
+    pre_mix: DeviceAllocation<'library>,
     head_kernel: V41VocabularyProjection<'library>,
     _head_workspace: DeviceAllocation<'library>,
     normalized: DeviceAllocation<'library>,
@@ -29,7 +32,7 @@ pub(crate) struct DsparkTerminal<'weights, 'library> {
     ready_requests: Option<usize>,
 }
 impl<'library> DsparkWeights<'library> {
-    /// Normalize collapsed hidden states, project through the borrowed shared
+    /// Collapse residual streams, normalize and project through the borrowed shared
     /// head, then apply Markov correction, sampling and confidence.
     pub fn terminal<'weights>(
         &'weights self,
@@ -61,6 +64,9 @@ impl<'library> DsparkWeights<'library> {
             confidence: self
                 .confidence(capacity * 5, DsparkConfidence::device_bytes(capacity * 5)?)?,
             sample: library.v41_draft_step()?,
+            hc: library.v41_hc()?,
+            residual: DeviceAllocation::new(library, capacity * 5 * 40960)?,
+            pre_mix: DeviceAllocation::new(library, capacity * 5 * 16)?,
             shared_logits: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
             adjusted_logits: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
             rng: DeviceAllocation::new(library, capacity * 16)?,
@@ -79,22 +85,24 @@ impl DsparkTerminal<'_, '_> {
             (1..=16).contains(&capacity),
             "terminal request capacity must be 1 through 16"
         );
-        Ok(capacity * (5 * 129280 * 4 * 2 + 7 * 4 + 16 + 5 * 10240)
-            + V41VocabularyProjection::WORKSPACE_BYTES)
+        Ok(
+            capacity * (5 * 129280 * 4 * 2 + 7 * 4 + 16 + 5 * 10240 + 5 * (40960 + 16))
+                + V41VocabularyProjection::WORKSPACE_BYTES,
+        )
     }
     pub fn device_bytes(capacity: usize) -> Result<usize> {
         Ok(Self::additional_bytes(capacity)?
             + DsparkMarkov::device_bytes(capacity)?
             + DsparkConfidence::device_bytes(capacity * 5)?)
     }
-    /// Stable inputs: collapsed pre-final-norm hidden [5,R,5120] and anchor IDs
-    /// [R]. Sampling is set via `prepare_sampling`.
+    /// Stable inputs: BF16 residual [5,R,4,5120], FP32 incoming pre-mix [5,R,4]
+    /// and anchor IDs [R]. Sampling is set via `prepare_sampling`.
     /// Use live R densely, without capacity padding between positions. Never free
     /// or retain after drop; finish all producer writes before execute/replay.
-    pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 2] {
+    pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] {
         let mut anchors = self.tokens.buffer;
         anchors.bytes = self.capacity * 4;
-        [self.confidence.inputs()[0], anchors]
+        [self.residual.buffer, self.pre_mix.buffer, anchors]
     }
     /// Atomically admit a batch's RNG ranges before reserving any. Once reserved,
     /// failures/cancellation consume them; replay intentionally retains the same
@@ -167,6 +175,13 @@ impl DsparkTerminal<'_, '_> {
         let library = self.stream.library;
         let row_bytes = requests * 129280 * 4;
         unsafe {
+            self.hc.pre(
+                self.residual.buffer,
+                self.pre_mix.buffer,
+                self.confidence.inputs()[0],
+                requests * 5,
+                self.stream.raw,
+            )?;
             // This RNE variant matches the reference's one final BF16 rounding.
             library.cuda_ds4_rmsnorm_bf16_rne_async(
                 self.confidence.inputs()[0],
@@ -237,7 +252,8 @@ impl DsparkTerminal<'_, '_> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
     /// # Safety
-    /// Inputs must satisfy `inputs()` layout with initialized BF16 hidden states,
+    /// Inputs must satisfy `inputs()` layout with initialized BF16 residuals and
+    /// FP32 incoming pre-mix coefficients,
     /// valid anchors <129280, finite shared+Markov logits and
     /// sampling state prepared for these requests. Producers must be complete;
     /// no input writes may race execution.

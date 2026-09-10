@@ -1,3 +1,5 @@
+mod v41_hc;
+pub use v41_hc::V41Hc;
 mod v41_dspark;
 pub use v41_dspark::{V41DraftStep, V41DsparkConfidence, V41VocabularyProjection};
 mod v41_fp8;

@@ -61,3 +61,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/dspark-qualification.json` and `dspark-qualification.log`, `dspark-qualification-final.log`, `dspark-qualification-complete.log`, and `dspark-rng-core-tests.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain the reusable qualifier, production RNG tests and committed evidence.
 
 - Delete `/tmp/ds41-v41-aot/dspark-head-qualification.json` and `dspark-head-rust-build.log`, `dspark-head-rust-final-build.log`, `dspark-head-rust-qualified-build.log`, `dspark-head-native-build.log`, `dspark-head-qualification.log`, and `dspark-head-qualification-final.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain shared-head ownership and qualification tools.
+
+- Delete `/tmp/ds41-v41-aot/dspark-hc-qualification.json` and `dspark-hc-rust-build.log`, `dspark-hc-rust-final-build.log`, `dspark-hc-native-build.log`, and `dspark-hc-qualification.log` under `/tmp/ds41-v41-fp8-aot/` with staging cleanup; retain native mHC kernels, Rust bindings and the reusable qualifier.

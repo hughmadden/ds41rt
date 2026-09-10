@@ -32,6 +32,8 @@ def main():
             assert status == 0, (name, status)
         return checked, fn
 
+    hc_pre, raw_hc_pre = bind('ds41rt_v41_hc_pre', [P,P,P,I,P])
+    hc_post, raw_hc_post = bind('ds41rt_v41_hc_post', [P,P,P,P,P,I,P])
     confidence, raw_confidence = bind('ds41rt_v41_dspark_confidence', [P,P,P,P,I,P])
     create, _ = bind('ds41rt_v41_markov_create', [P,C.c_uint64,C.POINTER(P)])
     destroy, _ = bind('ds41rt_v41_markov_destroy', [P])
@@ -68,6 +70,33 @@ def main():
             graphs = []
             try:
                 errors = {}
+                residual, sublayer = bf((80,4,H)), bf((80,H))
+                pre = torch.randn((80,4),device='cuda')
+                post = torch.randn((80,4),device='cuda')
+                comb = torch.randn((80,4,4),device='cuda')
+                collapsed, expanded = torch.empty_like(sublayer), torch.empty_like(residual)
+                def hc_sequence(rows=80):
+                    hc_pre(ptr(residual),ptr(pre),ptr(collapsed),rows,stream.cuda_stream)
+                    hc_post(ptr(sublayer),ptr(residual),ptr(post),ptr(comb),ptr(expanded),rows,stream.cuda_stream)
+                def hc_oracle(rows=80):
+                    reference_pre = (pre[:rows,:,None]*residual[:rows].float()).sum(1).bfloat16()
+                    reference_post = (post[:rows,:,None]*sublayer[:rows,None,:].float()
+                        +(comb[:rows,:,:,None]*residual[:rows,:,None,:].float()).sum(1)).bfloat16()
+                    assert torch.equal(collapsed[:rows],reference_pre), 'mHC pre mismatch'
+                    assert torch.equal(expanded[:rows],reference_post), 'mHC post mismatch'
+                for rows in [1,16,80]:
+                    hc_sequence(rows)
+                    hc_oracle(rows)
+                stream.synchronize()
+                hc_graph = torch.cuda.CUDAGraph()
+                with torch.cuda.graph(hc_graph,stream=stream): hc_sequence()
+                graphs.append(hc_graph)
+                residual.copy_(bf((80,4,H)))
+                pre.normal_(); comb.normal_()
+                hc_graph.replay()
+                hc_oracle()
+                assert raw_hc_pre(ptr(residual),ptr(pre),ptr(residual),80,stream.cuda_stream) != 0
+                assert raw_hc_post(ptr(sublayer),ptr(residual),ptr(post),ptr(comb),ptr(residual),80,stream.cuda_stream) != 0
                 for rows in [1,16,80]:
                     confidence(ptr(hidden),ptr(all_embedding),ptr(cw),ptr(conf),rows,stream.cuda_stream)
                     expected = torch.cat([hidden[:rows],all_embedding[:rows]],-1).float() @ cw.float()
@@ -189,6 +218,7 @@ def main():
                 results.append({'device':device,'name':torch.cuda.get_device_name(device),
                     'max_abs_errors':errors,'greedy_five_step_graph_mutated_replays':3,
                     'shared_head_norm_projection_graph':True,
+                    'hc_pre_post_bitwise_rows':[1,16,80], 'hc_changed_input_graph_bitwise':True,
                     'rng_replay_and_request_reordering_exact':True,
                     'stochastic_five_step_graph_exact':True,
                     'two_category_samples':samples.numel(),'category_zero_frequency':frequency})

@@ -104,3 +104,5 @@ dSpark native qualification progress: confidence/Markov numerics, composed five-
 Fleet availability update: the user released emu and kiwi for this goal, and read-only SSH/GPU inventory checks reached both hosts and identified NVIDIA GB10 devices.
 
 dSpark shared-head progress: terminal execution now normalizes collapsed states and projects through one borrowed coordinator vocabulary weight before sampling, with native K5120 numerical/graph checks passing on both RTX GPUs while Rust-owned execution and upstream stage integration remain open.
+
+mHC boundary progress: native four-stream collapse and residual expansion match the reference bitwise on both RTX GPUs, and final dSpark collapse is wired before normalization/head execution while coefficient generation, stage orchestration and Rust-owner qualification remain open.

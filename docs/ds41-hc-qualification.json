@@ -1,0 +1,89 @@
+{
+  "scope": "Native mHC pre/post numerical and graph qualification plus prior dSpark primitive checks; Rust terminal integration build-only",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+  "native_library_sha256": "0ece8f2fd1d53468d62c5a54ec139f1cadbea0d043cd4a7e448f37219099418f",
+  "qualifier_sha256": "8f816cc8d7d736ef4147e1f478ca2968e2f5cd339f3b5fd8140ece96de105369",
+  "results": [
+    {
+      "device": 0,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "confidence_m1": 2.384185791015625e-07,
+        "confidence_m16": 4.76837158203125e-07,
+        "confidence_m80": 4.76837158203125e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 4.76837158203125e-07,
+        "markov_m16": 7.152557373046875e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.1920928955078125e-06,
+        "head_combined_m1": 1.1920928955078125e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 5.245208740234375e-06,
+        "head_combined_m16": 5.245208740234375e-06,
+        "head_norm_m80": 0.001953125,
+        "head_projection_m80": 4.673004150390625e-05,
+        "head_combined_m80": 0.001059889793395996
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "hc_pre_post_bitwise_rows": [
+        1,
+        16,
+        80
+      ],
+      "hc_changed_input_graph_bitwise": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    },
+    {
+      "device": 1,
+      "name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "max_abs_errors": {
+        "confidence_m1": 2.9802322387695312e-08,
+        "confidence_m16": 2.384185791015625e-07,
+        "confidence_m80": 3.5762786865234375e-07,
+        "markov_m1": 4.172325134277344e-07,
+        "markov_m3": 5.960464477539062e-07,
+        "markov_m16": 6.556510925292969e-07,
+        "head_norm_m1": 0.0,
+        "head_projection_m1": 1.2516975402832031e-06,
+        "head_combined_m1": 1.2516975402832031e-06,
+        "head_norm_m16": 0.0,
+        "head_projection_m16": 5.7220458984375e-06,
+        "head_combined_m16": 5.7220458984375e-06,
+        "head_norm_m80": 0.0,
+        "head_projection_m80": 4.1484832763671875e-05,
+        "head_combined_m80": 4.1484832763671875e-05
+      },
+      "greedy_five_step_graph_mutated_replays": 3,
+      "shared_head_norm_projection_graph": true,
+      "hc_pre_post_bitwise_rows": [
+        1,
+        16,
+        80
+      ],
+      "hc_changed_input_graph_bitwise": true,
+      "rng_replay_and_request_reordering_exact": true,
+      "stochastic_five_step_graph_exact": true,
+      "two_category_samples": 4096,
+      "category_zero_frequency": 0.682861328125
+    }
+  ],
+  "not_qualified": [
+    "Rust allocation/ownership and cancellation",
+    "Full distribution/tail quality",
+    "Alternating-wave overlap",
+    "Full model execution"
+  ],
+  "terminal_owner_bytes_at_16_requests": 104368448,
+  "two_wave_partial_dspark_bytes_excluding_shared_head_weight": 8293027672,
+  "source_sha256": {
+    "native/cuda/kernels/v41_hc.cu": "83728e5275dbb99f27410ae4339a8e982000314b6f3025b925051fc23a2ca265",
+    "native/include/ds41rt_v41_hc.h": "6ecd8257a76d9d7b36bab76e6c033e02226f06db265d1b248823031278585ebc",
+    "rust/crates/ds41rt-ffi/src/v41_hc.rs": "87b549200a73047cc7f464027fad89369367e0ea5e1d9f0e2b2b9eba29c8e556",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/terminal.rs": "afa8eac550e19eff3e16ad6e5aecf93ea2b11a46580790c86cfe2d860d5a75f2"
+  }
+}
