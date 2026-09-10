@@ -36,3 +36,5 @@ Addressing evidence: `scripts/qualify-ds41-engram.py` matches the pinned officia
 Cleanup progress: obsolete Pro benchmark data, plots, deployment claims, and architecture diagrams were removed, while alternate-format execution and quantization tooling still await replacement/removal.
 
 FP8 progress: native 32x32 checkpoint packing, independent K32 scales, and exact two/four-way FP32 reduction pass on both RTX GPUs and ostrich/dodo, with variable-M Spark prefill and preplanned split workspace still open as recorded in `docs/ds41-fp8-qualification.md`.
+
+Checkpoint contract progress: a strict typed reader validates every official nested text, vision, engram, dSpark, and quantization field against the pinned configuration, with 60 loader tests passing and integration into the replacement tensor catalog and execution path still pending.

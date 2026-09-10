@@ -100,3 +100,11 @@ Dequantization matches PyTorch exactly across the tested encoding cases, and the
 A 104860-row GPU case validates element offsets beyond 2^31, both CPU native self-tests and all three CUDA native self-tests pass, and the compiler reports zero stack and local memory for both new kernels.
 
 These results qualify the two CUDA primitives; engram projection GEMM, pinned host/device staging, prefetch deadlines, and request graph integration remain unfinished.
+
+## Strict checkpoint configuration
+
+`ds41rt-loader::OfficialV41Config` validates the official nested configuration against an embedded byte-identical copy of the pinned `config.json`, whose SHA256 is recorded in `ds41-reference-lock.json`.
+
+The reader rejects missing or unknown fields and altered architecture/quantization values, preserves separate backbone and dSpark expert geometry, and exposes target and dSpark compression schedules separately; only the informational Transformers version may vary.
+
+This new contract is not yet selected by the legacy `read_model_facts`/execution path, so passing its 60 loader tests does not mean the official model can already be loaded or served.

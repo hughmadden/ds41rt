@@ -1,3 +1,8 @@
+mod v41_config;
+pub use v41_config::{
+    read_official_v41_config, OfficialV41Config, V41QuantizationConfig, V41RopeScaling,
+    V41TextConfig, V41VisionConfig, OFFICIAL_V41_MODEL_ID, OFFICIAL_V41_REVISION,
+};
 mod engram_tokenizer;
 pub use engram_tokenizer::EngramTokenMap;
 mod engram_prefetch;
