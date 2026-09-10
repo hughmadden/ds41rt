@@ -1,0 +1,15 @@
+{
+  "scope": "Daemon compilation only; no runtime tests or full container rebuild",
+  "runtime_qualified": false,
+  "m16_execution_bytes": 2452500,
+  "m16_stable_input_bytes": 851984,
+  "excluded": [
+    "Resident weights",
+    "Gathered-row owner",
+    "CUDA graph and driver allocations"
+  ],
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_engram/layer.rs": "9449e44829a273134d4cf3be4f7f220b335d2b75ee601504c0b18909dd194399"
+  },
+  "build_log": "/tmp/ds41-v41-fp8-aot/engram-graph-build.log"
+}

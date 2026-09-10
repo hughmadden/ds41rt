@@ -86,3 +86,5 @@ Engram residency progress: bounded coordinator range reads now load native proje
 FP8 export progress: native K32 activation and engram 32x32-scale GEMM artifacts now build and link at all six capacities with ABI/scratch manifests, while native launch bindings, scale packing and runtime qualification remain open in `docs/ds41-native-fp8-aot-build.md`.
 
 Engram execution progress: the C/Rust FP8 bridge, native scale packer and owned quantization/projection/gate sequence now build with coordinator release/WIP artifact support and a b12x-owned launch-grid export, while scheduler integration, full container rebuilds and runtime qualification remain open.
+
+Engram graph progress: stable owned inputs now support capture and replay of native quantization/projection/gating with fixed-row validation and drained staging. M16 execution storage is 2,452,500 bytes; scheduler wiring, graph runtime qualification and full container rebuilds remain open.
