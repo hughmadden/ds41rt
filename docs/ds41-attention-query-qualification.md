@@ -1,0 +1,17 @@
+# Real backbone attention queries
+
+`v41_attention_query.rs` owns the official backbone query weights and captured low-rank query production. Its graph applies K32 FP8 `wq_a` (5120→1280), BF16 RMS normalization with epsilon 1e-20, K32 FP8 `wq_b` (1280→32768), and rotary embedding over the final 64 coordinates of each of 64 heads. Frequencies come from the qualified backbone generator: plain base10000 in layers 0/1, and base160000 with official YaRN thereafter.
+
+Weights are immutable and shared between independent waves. Each layer uses 50,062,080 resident bytes, including packed MMA scales. Each wave owns input, raw/normalized query rank, projected/rotated queries, positions, frequencies, two FP8 scratch regions and one aligned read-only alpha scalar shared by the projections. Allocation is the two exported scratch requirements plus 4 bytes and 146,696 bytes per capacity row: 12,290,692 bytes at capacity80 and 628,719,620 bytes at4096. Budget checks precede allocation. Supported capacities are 1, 16, 80, 256, 1024 and 4096.
+
+Borrowed outputs expose normalized rank for the learned indexer, rotated queries for attention, and intermediate buffers for qualification. Capture fixes the live row count; changed inputs/positions replay without reallocating weights or wave storage. Preparation clears publication, launch errors always drain, duplicate capture and mismatched replay counts fail, and graph destruction drains before freeing storage. Request/token correspondence is still the caller's explicit unsafe contract.
+
+## Qualification
+
+Both RTX PRO 6000 Blackwell GPUs pass **60 owner cases**: all 40 layers at capacity80, plus the other five capacities for layers 0, 1, 20 and 39. Each case uses two independent captured waves sharing real checkpoint weights. Changed hidden inputs and absolute positions produce identical results across those waves. Exact and one-byte-short weight/wave budgets, unpublished outputs, replay before capture, duplicate capture, mismatched live rows, recovery and explicit graph clearing are checked. Positions span the YaRN range and context limit.
+
+`scripts/qualify-ds41-attention-query.py` validates **120 dumped output sets per GPU** against the actual pinned reference functions and FP8 GEMMs. `wq_a` is compared from the original hidden input. Normalization is compared from the native raw rank, and `wq_b` from the native normalized rank, isolating stage arithmetic. Every coordinate passes `rtol=0.008, atol=0.002`. Maximum absolute differences are respectively 0.0078125, 0.015625 and 0.03125 on both GPUs. Frequencies and rotary output are exact, with the reference rotary function receiving the native projected BF16 queries. This does not claim byte-exact end-to-end GEMM output or full-model logits.
+
+The qualifier checks pinned source hashes and records all weight/vector payload hashes. It retains the documented TileLang 0.1.8 activation-quantizer workaround `tir.disable_vectorize=True`, without changing model source or arithmetic. Daemon and owner-fixture builds pass. Adjacent JSON records source, fixture, build and result hashes; reusable qualification is tracked while the small Rust driver and vectors remain external.
+
+Composition with owned index/attention consumers, inverse rotary and grouped output projections, full backbone/CED execution, scheduler transactions, dSpark FP8 storage and full-model correctness/performance remain open.
