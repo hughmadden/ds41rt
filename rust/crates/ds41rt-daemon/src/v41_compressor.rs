@@ -279,6 +279,38 @@ pub(crate) struct CompressorOutput<'a> {
     pub index_scales: Ds41rtDeviceBuffer,
     pub completed: &'a [CompressorLatentRow],
 }
+/// Borrowed accepted-history and current-wave index view. Consumers must drain
+/// before releasing these borrows. No proposed rows are published to the cache.
+pub(crate) struct IndexProposal<'a> {
+    pub cache: IndexCacheView<'a>,
+    pub packed: Ds41rtDeviceBuffer,
+    pub scales: Ds41rtDeviceBuffer,
+    pub capacity: usize,
+    first_token: u64,
+    end_token: u64,
+    start: u64,
+    count: u64,
+    offset: u64,
+    step: u64,
+    _wave: std::marker::PhantomData<&'a ()>,
+}
+impl IndexProposal<'_> {
+    /// Metadata uses slot zero because cache is a single-request page-table view.
+    pub fn metadata(&self, position: u64) -> Result<[u64; 6]> {
+        ensure!(
+            position >= self.first_token && position < self.end_token,
+            "query position is outside its compressor proposal"
+        );
+        Ok([
+            0,
+            (position + 1) / self.step,
+            self.start,
+            self.count,
+            self.offset,
+            self.step,
+        ])
+    }
+}
 pub(crate) struct CompressorWave<'w, 'a> {
     stream: LoadStream<'a>,
     kernel: V41Compressor<'a>,
@@ -625,6 +657,48 @@ impl CompressorWave<'_, '_> {
             index_scales,
             frequencies,
             completed: &prepared.completed,
+        })
+    }
+    /// Validate the entire wave's owner/generations/versions before exposing a
+    /// request's strided completed rows. Ratio-two incomplete rows are skipped.
+    pub fn index_proposal<'s>(
+        &'s self,
+        state: &'s CompressorState<'_>,
+        lease: CompressorLease,
+    ) -> Result<IndexProposal<'s>> {
+        let output = self.output(state)?;
+        let prepared = self
+            .ready
+            .as_ref()
+            .context("compressor output incomplete")?;
+        let i = prepared
+            .chunks
+            .iter()
+            .position(|c| c.lease == lease)
+            .context("request is absent from compressor proposal")?;
+        let chunk = prepared.chunks[i];
+        let step = self.weights.ratio as u64;
+        let end = chunk.position + u64::from(chunk.tokens);
+        let start = chunk.position / step;
+        let count = end / step - start;
+        let offset = prepared.offsets[i] as u64
+            + if step == 2 && chunk.position % 2 == 0 {
+                1
+            } else {
+                0
+            };
+        Ok(IndexProposal {
+            cache: state.index_cache(lease)?,
+            packed: output.index_packed,
+            scales: output.index_scales,
+            capacity: prepared.rows,
+            first_token: chunk.position,
+            end_token: end,
+            start,
+            count,
+            offset,
+            step,
+            _wave: std::marker::PhantomData,
         })
     }
     /// Consume this proposal once. Validate all requests before any GPU write;

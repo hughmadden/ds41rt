@@ -46,6 +46,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Select top-512 over bounded score tiles with deterministic ties and full-history partition/replay qualification.
 - [x] Implement tiled eight-row candidate maxima, newest-block pinning, top-2048 blocks and causal expansion.
 - [x] Produce real-weight learned index queries and scaled head weights in captured RTX waves; qualify all eight producer layers and shared-weight ownership.
+- [x] Score causal, strided index proposals without cache mutation and expose lease/version-checked compressor views.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -114,3 +115,5 @@ Bounded tiled top-512 selection is qualified in `docs/ds41-index-topk-qualificat
 Hierarchical candidate selection is qualified in `docs/ds41-candidate-blocks-qualification.md`; learned query production, candidate sharing and proposal overlays remain open.
 
 Learned index queries are qualified in `docs/ds41-index-query-qualification.md`; request-owned selection composition, candidate sharing and proposal overlays remain open.
+
+Causal index proposals and borrowed compressor views are qualified in `docs/ds41-index-overlay-qualification.md`; complete query/selection ownership and shared candidate scheduling remain open.
