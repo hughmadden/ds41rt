@@ -30,6 +30,11 @@ pub struct ExpertProtocolV2RequestView<'a> {
 }
 
 impl<'a> ExpertProtocolV2RequestView<'a> {
+    /// Original validated wire frame, suitable for an owned worker handoff.
+    pub fn frame_bytes(&self) -> &'a [u8] {
+        self.frame_bytes
+    }
+
     pub fn parse(bytes: &'a [u8]) -> Result<Self> {
         if bytes.len() < EXPERT_PROTOCOL_V2_REQUEST_HEADER_LEN {
             bail!("ExpertProtocolV2 request frame too short: {}", bytes.len());

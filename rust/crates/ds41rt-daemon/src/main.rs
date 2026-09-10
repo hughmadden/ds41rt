@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
         Commands::Tokenize(args) => run_tokenize(args),
         Commands::Coordinator(args) => run_coordinator(args).await,
         Commands::Expertd(args) => run_expertd(args).await,
+        Commands::ExpertdNative(args) => v41_experts::service::run(args).await,
         Commands::BenchRdma(args) => run_bench_rdma(args),
         Commands::BenchRdmaRing(args) => run_bench_rdma_ring(args),
         Commands::BenchCudaKernels(args) => run_bench_cuda_kernels(args),

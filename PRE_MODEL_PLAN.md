@@ -70,3 +70,5 @@ Native TP transport progress: strict canonical requests, borrowed FP32 route res
 Bounded TP response progress: row-indexed frame production, incremental four-rank validation and an owned-execution chunk callback compile in the daemon, while service wiring and runtime qualification remain pending with no new tests or benchmarks run.
 
 TCP streaming progress: the service listener now supports opt-in bounded streaming callbacks and the persistent client consumes bounded multi-frame responses with connection disposal on error or cancellation, while native executor registration and runtime qualification remain pending.
+
+Native service progress: `expertd-native` registers a dedicated GPU worker with full TP-rank residency, pre-admitted loading/workspace budgets, shared execution scratch and bounded queues, while deployment migration, coordinator dispatch and runtime qualification remain open in `docs/ds41-native-expert-service.md`.

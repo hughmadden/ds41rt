@@ -51,6 +51,12 @@ pub(crate) struct ExpertExecution<'weights, 'library> {
 impl<'library> ExpertWeights<'library> {
     pub fn execution_budget(&self, capacity: u32) -> Result<ExpertExecutionBudget> {
         let library = self.buffers[0].library;
+        Self::plan_execution(library, capacity)
+    }
+    pub(super) fn plan_execution(
+        library: &NativeLibrary,
+        capacity: u32,
+    ) -> Result<ExpertExecutionBudget> {
         let info = library.v41_expert_info(capacity)?;
         let hidden = (capacity as usize)
             .checked_mul(5120 * 2)
@@ -134,7 +140,24 @@ impl<'library> ExpertWeights<'library> {
         })
     }
 }
-impl ExpertExecution<'_, '_> {
+impl<'weights, 'library> ExpertExecution<'weights, 'library> {
+    /// Reuse a wave's workspace across resident layers after its prior work drains.
+    /// Captured graphs retain weight addresses and cannot be rebound.
+    pub fn bind_layer(&mut self, weights: &'weights ExpertWeights<'library>) -> Result<()> {
+        ensure!(
+            self.graph.is_none(),
+            "cannot rebind a captured expert graph"
+        );
+        ensure!(
+            std::ptr::eq(self.library, weights.buffers[0].library),
+            "expert layer belongs to a different native library"
+        );
+        self.synchronize()?;
+        weights.bind(&self.kernel, &mut self.slots)?;
+        self._weights = weights;
+        Ok(())
+    }
+
     pub fn budget(&self) -> ExpertExecutionBudget {
         self.budget
     }

@@ -20,6 +20,8 @@ pub(crate) enum Commands {
     Tokenize(TokenizeArgs),
     Coordinator(CoordinatorArgs),
     Expertd(ExpertDaemonArgs),
+    /// Serve official V4.1 native TP4 experts over bounded TCP responses.
+    ExpertdNative(NativeExpertDaemonArgs),
     BenchRdma(BenchRdmaArgs),
     BenchRdmaRing(BenchRdmaRingArgs),
     BenchCudaKernels(BenchCudaKernelsArgs),
@@ -135,6 +137,27 @@ pub(crate) struct ExpertDaemonArgs {
     pub(crate) real_layer: Option<u32>,
     #[arg(long = "role", visible_alias = "role-hostname")]
     pub(crate) role_hostname: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct NativeExpertDaemonArgs {
+    /// Official local snapshot directory, including all shard headers.
+    #[arg(long)]
+    pub(crate) snapshot: PathBuf,
+    /// Spark-role native library built with V4.1 expert AOT kernels.
+    #[arg(long)]
+    pub(crate) native_lib: PathBuf,
+    #[arg(long, value_parser = clap::value_parser!(u32).range(0..4))]
+    pub(crate) rank: u32,
+    #[arg(long, default_value_t = 16)]
+    pub(crate) capacity: u32,
+    /// Total device bytes allowed for resident weights, loading and execution.
+    #[arg(long)]
+    pub(crate) device_budget_bytes: usize,
+    #[arg(long, default_value_t = 64 * 1024 * 1024)]
+    pub(crate) max_frame_bytes: usize,
+    #[arg(long, default_value = "0.0.0.0:9100")]
+    pub(crate) listen: String,
 }
 
 #[derive(Debug, Args)]

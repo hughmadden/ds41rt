@@ -29,3 +29,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-v41-aot/chunk-check.log` and `chunk-daemon-check.log` with the temporary AOT staging tree; these are compilation logs, not runtime qualification evidence.
 
 - Delete `/tmp/ds41-v41-aot/streaming-tcp-check.log` and `streaming-tcp-daemon-check.log` with the temporary AOT staging tree; retain the production TCP streaming interfaces.
+
+- Delete `/tmp/ds41-v41-aot/native-service-check.log` and `native-service-build.log` with the temporary AOT staging tree; retain the production native worker and launch command.
