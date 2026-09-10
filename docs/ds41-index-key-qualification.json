@@ -1,0 +1,605 @@
+{
+  "scope": "Real-weight index-key projection/normalization/RoPE composed into compressor proposal graphs, before FP4 encoding",
+  "gpus": {
+    "0": {
+      "norm_cases": 66,
+      "index_norm_cases": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        }
+      ],
+      "owner_cases": [
+        "PASS layer=2 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=1 case=1 max_error=0.000015258789 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=1 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=1 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=3 case=0 max_error=0.00048828125 index_error=0.0009765625 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=3 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=3 case=2 max_error=0.0000076293945 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=3 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=16 case=0 max_error=0.000015258789 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=2 requests=16 case=1 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=2 requests=16 case=2 max_error=0.001953125 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=2 requests=16 case=3 max_error=0.00024414063 index_error=0.00048828125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS BULK layer=2 rows=4096 requests=16 prefill_error=0.0078125 replacement_tail_error=0.0009765625 index_prefill_error=0.0078125 index_tail_error=0.001953125 accepted_prefix=true device_bytes=70320128",
+        "PASS layer=8 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=1 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=1 case=2 max_error=0.0000076293945 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=1 case=3 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=3 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=3 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=3 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=3 case=3 max_error=0.000030517578 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=16 case=0 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=8 requests=16 case=1 max_error=0.001953125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=8 requests=16 case=2 max_error=0.001953125 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=8 requests=16 case=3 max_error=0.0009765625 index_error=0.001953125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=1 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=1 case=2 max_error=0.0000019073486 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=1 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=3 case=0 max_error=0.0009765625 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=3 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=3 case=2 max_error=0.000000074505806 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=3 case=3 max_error=0.000030517578 index_error=0.0009765625 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=16 case=0 max_error=0.00048828125 index_error=0.00048828125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=16 case=1 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=16 case=2 max_error=0.0009765625 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=16 case=3 max_error=0.001953125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=20 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=1 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=1 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=1 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=3 case=0 max_error=0.00012207031 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=3 case=1 max_error=0.001953125 index_error=0.001953125 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=3 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=3 case=3 max_error=0.000030517578 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=16 case=0 max_error=0.0078125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS layer=20 requests=16 case=1 max_error=0.0078125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS layer=20 requests=16 case=2 max_error=0.0078125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS layer=20 requests=16 case=3 max_error=0.00024414063 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS BULK layer=20 rows=4096 requests=16 prefill_error=0.00390625 replacement_tail_error=0.00390625 index_prefill_error=0.00390625 index_tail_error=0.0078125 accepted_prefix=true device_bytes=57704448"
+      ]
+    },
+    "1": {
+      "norm_cases": 66,
+      "index_norm_cases": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 5
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 128,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        }
+      ],
+      "owner_cases": [
+        "PASS layer=2 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=1 case=1 max_error=0.000015258789 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=1 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=1 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=2 requests=3 case=0 max_error=0.00048828125 index_error=0.0009765625 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=3 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=3 case=2 max_error=0.0000076293945 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=3 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=2 requests=16 case=0 max_error=0.000015258789 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=2 requests=16 case=1 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=2 requests=16 case=2 max_error=0.001953125 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=2 requests=16 case=3 max_error=0.00024414063 index_error=0.00048828125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS BULK layer=2 rows=4096 requests=16 prefill_error=0.0078125 replacement_tail_error=0.0009765625 index_prefill_error=0.0078125 index_tail_error=0.001953125 accepted_prefix=true device_bytes=70320128",
+        "PASS layer=8 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=1 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=1 case=2 max_error=0.0000076293945 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=1 case=3 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=8 requests=3 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=3 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=3 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=3 case=3 max_error=0.000030517578 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=8 requests=16 case=0 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=8 requests=16 case=1 max_error=0.001953125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=8 requests=16 case=2 max_error=0.001953125 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=8 requests=16 case=3 max_error=0.0009765625 index_error=0.001953125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=1 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=1 case=2 max_error=0.0000019073486 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=1 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4275024 state_bytes=65536",
+        "PASS layer=14 requests=3 case=0 max_error=0.0009765625 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=3 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=3 case=2 max_error=0.000000074505806 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=3 case=3 max_error=0.000030517578 index_error=0.0009765625 accepted_prefix=true stale_wave_rejected=true device_bytes=4436464 state_bytes=65536",
+        "PASS layer=14 requests=16 case=0 max_error=0.00048828125 index_error=0.00048828125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=16 case=1 max_error=0.00390625 index_error=0.00390625 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=16 case=2 max_error=0.0009765625 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=14 requests=16 case=3 max_error=0.001953125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5485824 state_bytes=65536",
+        "PASS layer=20 requests=1 case=0 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=1 case=1 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=1 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=1 case=3 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4259624 state_bytes=0",
+        "PASS layer=20 requests=3 case=0 max_error=0.00012207031 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=3 case=1 max_error=0.001953125 index_error=0.001953125 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=3 case=2 max_error=0 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=3 case=3 max_error=0.000030517578 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=4390264 state_bytes=0",
+        "PASS layer=20 requests=16 case=0 max_error=0.0078125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS layer=20 requests=16 case=1 max_error=0.0078125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS layer=20 requests=16 case=2 max_error=0.0078125 index_error=0.0078125 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS layer=20 requests=16 case=3 max_error=0.00024414063 index_error=0 accepted_prefix=true stale_wave_rejected=true device_bytes=5239424 state_bytes=0",
+        "PASS BULK layer=20 rows=4096 requests=16 prefill_error=0.00390625 replacement_tail_error=0.00390625 index_prefill_error=0.00390625 index_tail_error=0.0078125 accepted_prefix=true device_bytes=57704448"
+      ]
+    }
+  },
+  "sha256": {
+    "/home/tj/Developer/ds41rt/native/cuda/kernels/v41_attention_ops.cu": "af46fd507eac7aadb8211a930294096d2dd405a701d6a9bdc9d28ab9697f6c33",
+    "/home/tj/Developer/ds41rt/native/cuda/kernels/v41_compressor.cu": "5ac68bea1250c3ba3cc7efe3703388dcd064ab3c5f4af2dad1e296fb0a1c0d8e",
+    "/home/tj/Developer/ds41rt/native/include/ds41rt_v41_attention_ops.h": "01f150fea4e77fa81337f4ee9ffde398c26fe928439a33231efaabc27cb07cff",
+    "/home/tj/Developer/ds41rt/native/include/ds41rt_v41_compressor.h": "33d112225ef7fe5d7f84ee8b66508193f076145a87a3ba76e8fa0a5658a51628",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "ad9c47731df27f1bf0be5c73e0f667f32aeac2a852ac88ec5091b6f140dd5be7",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-ffi/src/v41_compressor.rs": "e4da7ffd0c4501636872b19ebcf7bfdd84151111bcaaec26e8dac221a628918d",
+    "/home/tj/Developer/ds41rt/rust/crates/ds41rt-daemon/src/v41_compressor.rs": "96ed056669cea0bc16716c60bdc54cc7a849f78d7ded49e796a1a9825e3be901",
+    "/home/tj/Developer/ds41rt/scripts/qualify-ds41-attention-ops.py": "ac18c2c1d85cdc85c0593526babd713e3903bb1de75c4730bb598c904bd631d6",
+    "/tmp/ds41-index-key/generate.py": "72da9a6d6481ee2c073bb4d0d5dcbe004d9a7eaa79915c1d66c7a3fec8086363",
+    "/tmp/ds41-compressor-owner/src/main.rs": "0e54d2190ee69674d4d18f392dd712a83596663b681cafce99181ab074986925",
+    "/tmp/ds41-index-key-native-build.log": "d41ec49d0c9f2f2b63fd241261ffe15d5e260342614c7f6115f00757de7f2fc8",
+    "/tmp/ds41-index-key-owner-build.log": "4de2a891624b1cdc9b2573bfeaa46103d7a79d96b69e82ed0bad35fdce6e5af8",
+    "/tmp/ds41-index-key-fixture-qualified-build.log": "240d76e4ed5501252c9c341d102d61fac117c44fb86b8b9bbc9dee1bfcf58030",
+    "/tmp/ds41-index-key-generate.log": "12d8d12991ec5de2bec23f68ea4569833d292c1b6c8f7a142428ad039eaf16e8",
+    "/tmp/ds41-index-key/norm-rtx0.json": "caeb7cbe019252e751707cc7b5d5cea9c1c74eaf3213b18378e05cbd71e377ad",
+    "/tmp/ds41-index-key-owner-rtx0.log": "a4301fe879507ad29090f187e6b67bee8388e4edefec29ffcce64f1e2fe765b2",
+    "/tmp/ds41-index-key/norm-rtx1.json": "b9e819f31a7e67ccf3d20379071c0998c18f0cdd9a7c04dc18cf843b9c8d4220",
+    "/tmp/ds41-index-key-owner-rtx1.log": "a4301fe879507ad29090f187e6b67bee8388e4edefec29ffcce64f1e2fe765b2"
+  },
+  "index_payload_sha256": {
+    "layers.2.attn.indexer.wk.weight": "99b2f31afade5b768ded48a19c76103cfe0e78570fd460bd971ed0c6688256d3",
+    "layers.2.attn.indexer.k_norm.weight": "957e99681fe8cdb79861e50352db7799c8ea732d6c7defe1359dbf59bc4d48d1",
+    "layers.8.attn.indexer.wk.weight": "18a6173d26b0e73752d68512acced91e10cb450bbc45e586565407d0ee075f22",
+    "layers.8.attn.indexer.k_norm.weight": "910b669be5163587a7175890091580857388408910d98e7d0bc07e7e7256d68c",
+    "layers.14.attn.indexer.wk.weight": "71dac78e35ef5acea69a13509ee71f174b1f0e5452bc6d0fca442fa17a73ce70",
+    "layers.14.attn.indexer.k_norm.weight": "dca993ce76ba8e2f06364ab31956335fbaa8ba5f76bca81873d4210eae4272ff",
+    "layers.20.attn.indexer.wk.weight": "58be282c2387b7a9e593c015584d1f7d23c9c4429e987b01aa3a3c7f2891f5e6",
+    "layers.20.attn.indexer.k_norm.weight": "9a077b7d9215c21e062eb2c3cd928201cd18445a20d56afda18ba42abe7921de"
+  }
+}

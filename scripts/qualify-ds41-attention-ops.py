@@ -63,13 +63,13 @@ def main():
         def check(status): assert status == 0, status
         for rows in (1,16,80,255,1023,4095):
             f=frequencies(rows)
-            for dim in (512,1280,5120):
+            for dim in (128,512,1280,5120):
                 x=(torch.randn((rows,dim),device='cuda')*.3).bfloat16()
                 w=(torch.randn(dim,device='cuda')*.2+1).bfloat16()
                 layer=ns['RMSNorm'](dim, eps=norm_eps).cuda().bfloat16()
                 layer.weight.copy_(w)
                 y=torch.empty_like(x)
-                for rotated in ([False,True] if dim==512 else [False]):
+                for rotated in ([False,True] if dim in (128,512) else [False]):
                     def launch(): check(norm(x.data_ptr(),w.data_ptr(),f.data_ptr() if rotated else None,y.data_ptr(),rows,dim,stream.cuda_stream))
                     launch()
                     expected=layer(x)
@@ -93,7 +93,7 @@ def main():
                     assert norm(x.data_ptr(),w.data_ptr(),None,y.data_ptr(),rows,513,stream.cuda_stream)!=0
                     assert norm(x.data_ptr(),w.data_ptr(),f.data_ptr(),y.data_ptr(),rows,1280,stream.cuda_stream)!=0
                     results.append({'op':'norm_rope' if rotated else 'norm','rows':rows,'dim':dim,'initial':initial,'changed_graph':changed,'tiny':tiny,'zero_exact':True,'guards':True})
-                    if rotated:
+                    if rotated and dim==512:
                         z=torch.empty_like(x)
                         def kv_launch(): check(kv(x.data_ptr(),w.data_ptr(),f.data_ptr(),z.data_ptr(),rows,stream.cuda_stream))
                         def quantized():

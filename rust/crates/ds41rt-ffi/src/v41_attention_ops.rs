@@ -252,11 +252,11 @@ impl V41AttentionOps<'_> {
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!(
-            (1..=4096).contains(&rows) && [512, 1280, 5120].contains(&dim),
+            (1..=4096).contains(&rows) && [128, 512, 1280, 5120].contains(&dim),
             "invalid attention norm geometry"
         );
         ensure!(
-            frequencies.is_none() || dim == 512,
+            frequencies.is_none() || dim == 128 || dim == 512,
             "rotated norm requires KV geometry"
         );
         buffer(input, rows as usize * dim as usize * 2)?;

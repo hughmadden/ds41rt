@@ -13,6 +13,8 @@ type Project = unsafe extern "C" fn(
     i32,
     *mut c_void,
 ) -> i32;
+type IndexProject =
+    unsafe extern "C" fn(*mut c_void, *const u16, *const u16, *mut u16, i32, *mut c_void) -> i32;
 type Pool = unsafe extern "C" fn(
     *const f32,
     *const f32,
@@ -30,6 +32,7 @@ pub struct V41Compressor<'a> {
     handle: *mut c_void,
     destroy: Destroy,
     project: Project,
+    index_project: IndexProject,
     pool: Pool,
 }
 fn buffer(b: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
@@ -51,6 +54,8 @@ impl NativeLibrary {
         let create: Create = unsafe { *self.lib.get(b"ds41rt_v41_compressor_create")? };
         let destroy: Destroy = unsafe { *self.lib.get(b"ds41rt_v41_compressor_destroy")? };
         let project: Project = unsafe { *self.lib.get(b"ds41rt_v41_compressor_project")? };
+        let index_project: IndexProject =
+            unsafe { *self.lib.get(b"ds41rt_v41_index_key_project")? };
         let pool: Pool = unsafe { *self.lib.get(b"ds41rt_v41_compressor_pool")? };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { create(workspace.ptr, workspace.bytes as u64, &mut handle) };
@@ -60,11 +65,42 @@ impl NativeLibrary {
             handle,
             destroy,
             project,
+            index_project,
             pool,
         })
     }
 }
 impl V41Compressor<'_> {
+    /// # Safety
+    /// Initialized unrotated BF16 latents [rows,512], weight [128,512] and
+    /// disjoint output [rows,128] are live on the handle's device. Serialize use
+    /// with all other operations sharing the handle/workspace.
+    pub unsafe fn index_project(
+        &self,
+        input: Ds41rtDeviceBuffer,
+        weight: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=4096).contains(&rows), "invalid index projection rows");
+        buffer(input, rows * 1024)?;
+        buffer(weight, 128 * 512 * 2)?;
+        buffer(output, rows * 256)?;
+        let status = unsafe {
+            (self.index_project)(
+                self.handle,
+                input.ptr.cast(),
+                weight.ptr.cast(),
+                output.ptr.cast(),
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native index projection status {status}");
+        Ok(())
+    }
+
     pub const WORKSPACE_BYTES: usize = 4 * 1024 * 1024;
     /// # Safety
     /// BF16 input [rows,5120] and weight [512,5120] are initialized on this

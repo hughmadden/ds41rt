@@ -44,8 +44,8 @@ template<int D, bool Quantize=false> __global__ void norm_kernel(const __nv_bflo
     const auto a=__float2bfloat16_rn(__fmul_rn(__fmul_rn(__bfloat162float(input[base+i]),inverse),__bfloat162float(weight[i])));
     const auto b=__float2bfloat16_rn(__fmul_rn(__fmul_rn(__bfloat162float(input[base+i+1]),inverse),__bfloat162float(weight[i+1])));
     __nv_bfloat16 pair[2]={a,b};
-    if (D==512 && freq && i>=448) {
-      const uint64_t f=row*64+i-448;
+    if ((D==128 || D==512) && freq && i>=D-64) {
+      const uint64_t f=row*64+i-(D-64);
       rotate(__bfloat162float(a),__bfloat162float(b),freq[f],freq[f+1],pair);
     }
     if constexpr (Quantize) {
@@ -77,13 +77,13 @@ __global__ void rope_kernel(const __nv_bfloat16* input, const float* freq,
 }
 extern "C" int32_t ds41rt_v41_attention_norm(const uint16_t* input, const uint16_t* weight,
     const float* freq, uint16_t* output, int32_t rows, int32_t dim, void* stream) {
-  if (rows<1 || rows>4096 || (dim!=512 && dim!=1280 && dim!=5120) || (freq && dim!=512)) return cudaErrorInvalidValue;
+  if (rows<1 || rows>4096 || (dim!=128 && dim!=512 && dim!=1280 && dim!=5120) || (freq && dim!=128 && dim!=512)) return cudaErrorInvalidValue;
   const uint64_t bytes=uint64_t(rows)*dim*2, w=uint64_t(dim)*2, f=uint64_t(rows)*256;
   if (!valid(input,bytes,2) || !valid(weight,w,2) || !valid(output,bytes,2) ||
       !disjoint(input,bytes,output,bytes) || !disjoint(weight,w,output,bytes) ||
       (freq && (!valid(freq,f,4) || !disjoint(freq,f,output,bytes)))) return cudaErrorInvalidValue;
 #define LAUNCH(D) norm_kernel<D><<<rows,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(reinterpret_cast<const __nv_bfloat16*>(input),reinterpret_cast<const __nv_bfloat16*>(weight),freq,reinterpret_cast<__nv_bfloat16*>(output))
-  if(dim==512) {LAUNCH(512);} else if(dim==1280) {LAUNCH(1280);} else {LAUNCH(5120);}
+  if(dim==128) {LAUNCH(128);} else if(dim==512) {LAUNCH(512);} else if(dim==1280) {LAUNCH(1280);} else {LAUNCH(5120);}
 #undef LAUNCH
   return cudaGetLastError();
 }

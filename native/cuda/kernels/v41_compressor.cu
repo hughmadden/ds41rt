@@ -79,13 +79,13 @@ extern "C" int32_t ds41rt_v41_compressor_destroy(void* opaque) {
   if(!opaque)return cudaErrorInvalidValue;
   auto* h=static_cast<Handle*>(opaque);auto status=cublasDestroy(h->blas);delete h;return bs(status);
 }
-extern "C" int32_t ds41rt_v41_compressor_project(void* opaque,const uint16_t* input,
-    const uint16_t* weight,void* output,int32_t rows,int32_t ratio,void* stream) {
+static int32_t project(void* opaque,const uint16_t* input,
+    const uint16_t* weight,void* output,int32_t rows,int32_t ratio,void* stream,int n,int k) {
   if(!opaque || rows<1 || rows>4096 || (ratio!=1 && ratio!=2))return cudaErrorInvalidValue;
   auto* h=static_cast<Handle*>(opaque);int device;auto cuda=cudaGetDevice(&device);
   if(cuda!=cudaSuccess)return cuda;
   if(device!=h->device)return cudaErrorInvalidDevice;
-  const uint64_t x=uint64_t(rows)*5120*2,w=uint64_t(512)*5120*2,o=uint64_t(rows)*512*(ratio==2?4:2);
+  const uint64_t x=uint64_t(rows)*k*2,w=uint64_t(n)*k*2,o=uint64_t(rows)*n*(ratio==2?4:2);
   if(!valid(input,x,2)||!valid(weight,w,2)||!valid(output,o,ratio==2?4:2)||
       !disjoint(input,x,output,o)||!disjoint(weight,w,output,o)||
       !disjoint(h->workspace,workspace_bytes,input,x)||!disjoint(h->workspace,workspace_bytes,weight,w)||
@@ -95,9 +95,17 @@ extern "C" int32_t ds41rt_v41_compressor_project(void* opaque,const uint16_t* in
   status=cublasSetWorkspace(h->blas,h->workspace,workspace_bytes);
   if(status!=CUBLAS_STATUS_SUCCESS)return bs(status);
   const float alpha=1,beta=0;
-  return bs(cublasGemmEx(h->blas,CUBLAS_OP_T,CUBLAS_OP_N,512,rows,5120,&alpha,
-      weight,CUDA_R_16BF,5120,input,CUDA_R_16BF,5120,&beta,output,ratio==2?CUDA_R_32F:CUDA_R_16BF,
-      512,CUBLAS_COMPUTE_32F,CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  return bs(cublasGemmEx(h->blas,CUBLAS_OP_T,CUBLAS_OP_N,n,rows,k,&alpha,
+      weight,CUDA_R_16BF,k,input,CUDA_R_16BF,k,&beta,output,ratio==2?CUDA_R_32F:CUDA_R_16BF,
+      n,CUBLAS_COMPUTE_32F,CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+}
+extern "C" int32_t ds41rt_v41_compressor_project(void* handle,const uint16_t* input,
+    const uint16_t* weight,void* output,int32_t rows,int32_t ratio,void* stream) {
+  return project(handle,input,weight,output,rows,ratio,stream,512,5120);
+}
+extern "C" int32_t ds41rt_v41_index_key_project(void* handle,const uint16_t* input,
+    const uint16_t* weight,uint16_t* output,int32_t rows,void* stream) {
+  return project(handle,input,weight,output,rows,1,stream,128,512);
 }
 extern "C" int32_t ds41rt_v41_compressor_pool(const float* kv,const float* scores,
     const float* pending_kv,const float* pending_scores,const uint64_t* predecessors,

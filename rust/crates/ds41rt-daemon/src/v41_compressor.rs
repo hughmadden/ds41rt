@@ -158,10 +158,15 @@ impl<'a> CompressorWeights<'a> {
         } else {
             vec!["wkv", "norm"]
         };
-        Ok(suffixes
+        let mut names = suffixes
             .into_iter()
             .map(|s| format!("layers.{layer}.attn.compressor.{s}.weight"))
-            .collect())
+            .collect::<Vec<_>>();
+        names.extend([
+            format!("layers.{layer}.attn.indexer.wk.weight"),
+            format!("layers.{layer}.attn.indexer.k_norm.weight"),
+        ]);
+        Ok(names)
     }
     pub fn device_bytes(catalog: &OfficialV41Catalog, layer: usize) -> Result<usize> {
         NativeRtxTensors::plan(catalog, &Self::names(layer)?)
@@ -224,6 +229,8 @@ impl<'a> CompressorWeights<'a> {
             )?,
             positions: DeviceAllocation::new(self.library, rows * 8)?,
             frequencies: DeviceAllocation::new(self.library, rows * 256)?,
+            index_projected: DeviceAllocation::new(self.library, rows * 256)?,
+            index_key: DeviceAllocation::new(self.library, rows * 256)?,
             output: DeviceAllocation::new(self.library, rows * 1024)?,
             capacity: rows,
             graph: None,
@@ -243,6 +250,8 @@ struct Prepared {
 pub(crate) struct CompressorOutput<'a> {
     pub buffer: Ds41rtDeviceBuffer,
     pub frequencies: Ds41rtDeviceBuffer,
+    /// Normalized, rotated index key before FP4 cache encoding.
+    pub index_key: Ds41rtDeviceBuffer,
     pub completed: &'a [CompressorLatentRow],
 }
 pub(crate) struct CompressorWave<'w, 'a> {
@@ -258,6 +267,8 @@ pub(crate) struct CompressorWave<'w, 'a> {
     staging: HostAllocation<'a>,
     positions: DeviceAllocation<'a>,
     frequencies: DeviceAllocation<'a>,
+    index_projected: DeviceAllocation<'a>,
+    index_key: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
@@ -272,9 +283,9 @@ impl CompressorWave<'_, '_> {
         Ok(V41Compressor::WORKSPACE_BYTES
             + rows
                 * if ratio(layer)? == 2 {
-                    10240 + 2048 + 2048 + 8 + 1024 + 264
+                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512
                 } else {
-                    10240 + 1024 + 1024 + 264
+                    10240 + 1024 + 1024 + 264 + 512
                 })
     }
     /// Packed BF16 [sum(chunk.tokens),5120], in chunk order. Finish all producer
@@ -440,6 +451,26 @@ impl CompressorWave<'_, '_> {
                     self.stream.raw,
                 )?;
             }
+            self.kernel.index_project(
+                self.output.buffer,
+                self.weights
+                    .tensors
+                    .get(&self.weights.names[self.weights.names.len() - 2])?,
+                self.index_projected.buffer,
+                rows,
+                self.stream.raw,
+            )?;
+            self.norm.norm(
+                self.index_projected.buffer,
+                self.weights
+                    .tensors
+                    .get(&self.weights.names[self.weights.names.len() - 1])?,
+                Some(self.frequencies.buffer),
+                self.index_key.buffer,
+                rows as u32,
+                128,
+                self.stream.raw,
+            )?;
         }
         Ok(())
     }
@@ -538,8 +569,11 @@ impl CompressorWave<'_, '_> {
         buffer.bytes = prepared.rows * 1024;
         let mut frequencies = self.frequencies.buffer;
         frequencies.bytes = prepared.rows * 256;
+        let mut index_key = self.index_key.buffer;
+        index_key.bytes = prepared.rows * 256;
         Ok(CompressorOutput {
             buffer,
+            index_key,
             frequencies,
             completed: &prepared.completed,
         })
