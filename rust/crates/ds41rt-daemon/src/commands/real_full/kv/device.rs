@@ -8049,7 +8049,7 @@ impl<'a> RealFullDeviceKvCache<'a> {
         descriptors: &[KvBlockDescriptor],
     ) -> Result<Option<RealFullDeviceMlaKvDeviceBufferView>> {
         if self.config.dtype == KvCacheDType::Nvfp4 {
-            // The long profile retains its bounded frontier in packed FP8 and
+            // The legacy NVFP4 path retains its bounded frontier in packed FP8 and
             // consumes it directly in sparse attention. Dense fallback reads
             // the canonical compressed cache instead of expanding this copy.
             return Ok(None);

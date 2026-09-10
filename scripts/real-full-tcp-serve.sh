@@ -64,7 +64,7 @@ Environment:
       and coordinator native libraries; default: 1.
   DS41RT_REAL_FULL_KV_POOL_TOKENS
       physical shared target KV/DSA pool capacity, divisible by 64 and at
-      least the per-sequence maximum. The production profile supplies a
+      least the per-sequence maximum. The launch settings supply a
       memory-budgeted value after reserving model and concurrent-prefill
       workspace; without an explicit value the daemon uses one page-aligned
       MAX_CONTEXT_TOKENS shared context.

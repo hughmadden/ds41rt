@@ -862,7 +862,7 @@ ds41rt_status_t ds41rt_cuda_ds4_flash_spark_w4a16_prefill_topk6_bf16_async(
     void* cuda_stream);
 /* Executes directly from the resident rank-local uniform-tier trellis slabs. Both
  * output_f32 and output_bf16 are written; the caller selects the transport
- * representation required by the active accuracy profile. */
+ * representation required by the reduction transport. */
 ds41rt_status_t ds41rt_cuda_ds4_flash_spark_exl3_k2_decode_m1_async(
     const ds41rt_ds4_flash_spark_exl3_k2_moe_buffers_t* buffers,
     void* cuda_stream);
