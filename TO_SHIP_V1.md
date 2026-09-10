@@ -137,4 +137,4 @@ Owned cache/selection attention composition is qualified in `docs/ds41-attention
 
 Real backbone query production is qualified in `docs/ds41-attention-query-qualification.md`; query/index/attention handoff and inverse rotary/grouped output production remain open.
 
-Real backbone output production is qualified in `docs/ds41-attention-output-qualification.md`; complete query/index/attention/output composition remains open.
+Real backbone output production is qualified in `docs/ds41-backbone-attention-output-qualification.md`; complete query/index/attention/output composition remains open.
