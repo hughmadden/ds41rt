@@ -80,3 +80,5 @@ Engram staging progress: reusable 16-request gathers deduplicate and address-sor
 Engram I/O progress: a budgeted staging pool now backs cancellable background gathers and nonblocking CUDA-side completion/upload polling, while scheduler submission, rollback cancellation, projection/gate integration and runtime qualification remain open.
 
 Engram transaction progress: the request-owned pipeline now starts both layers' prefetch/gathers from token IDs, validates current history generations before upload and commits accepted prefixes only after whole-wave validation, while model scheduler call sites and projection/gate execution remain open in `docs/ds41-engram-pipeline.md`.
+
+Engram residency progress: bounded coordinator range reads now load native projection/scales and BF16 gate weights into owned RTX storage, and a completion-gated residual owner calls the fused gate while native FP8 projection export, scheduler integration and runtime qualification remain open.

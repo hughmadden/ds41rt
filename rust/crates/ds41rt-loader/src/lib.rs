@@ -9,6 +9,7 @@ pub use v41_expert_staging::{V41ExpertSelection, V41ExpertStaging};
 mod v41_catalog;
 pub use v41_catalog::{
     read_official_v41_catalog, OfficialV41Catalog, V41StorageBudget, V41Tensor, V41TensorPlacement,
+    V41CoordinatorTensorReader,
 };
 mod v41_config;
 pub use v41_config::{

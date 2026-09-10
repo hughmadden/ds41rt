@@ -39,7 +39,48 @@ pub struct OfficialV41Catalog {
     tensors: Vec<V41Tensor>,
 }
 
+/// Bounded range reads for a validated, unsharded coordinator tensor.
+pub struct V41CoordinatorTensorReader {
+    file: File,
+    offset: u64,
+    bytes: u64,
+}
+impl V41CoordinatorTensorReader {
+    pub fn bytes(&self) -> u64 {
+        self.bytes
+    }
+    pub fn read_into(&self, offset: u64, destination: &mut [u8]) -> Result<()> {
+        use std::os::unix::fs::FileExt;
+        let end = offset
+            .checked_add(u64::try_from(destination.len())?)
+            .context("coordinator tensor read extent overflow")?;
+        ensure!(
+            end <= self.bytes,
+            "coordinator tensor range exceeds payload"
+        );
+        self.file.read_exact_at(
+            destination,
+            self.offset
+                .checked_add(offset)
+                .context("coordinator tensor file offset overflow")?,
+        )?;
+        Ok(())
+    }
+}
+
 impl OfficialV41Catalog {
+    pub fn coordinator_tensor_reader(&self, name: &str) -> Result<V41CoordinatorTensorReader> {
+        let tensor = self.tensor(name)?;
+        ensure!(
+            matches!(tensor.placement, V41TensorPlacement::CoordinatorRtx),
+            "only unsharded RTX tensors support coordinator range reads"
+        );
+        Ok(V41CoordinatorTensorReader {
+            file: File::open(self.snapshot.join(&tensor.shard))?,
+            offset: tensor.metadata.byte_offset,
+            bytes: tensor.metadata.byte_length,
+        })
+    }
     pub fn config(&self) -> &OfficialV41Config {
         &self.config
     }
