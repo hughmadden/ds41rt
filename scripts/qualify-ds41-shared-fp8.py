@@ -99,7 +99,8 @@ def main():
             assert torch.equal(actual_s,s)
             return compare(self.output[:x.shape[0]],reference(x,self.weight,self.scales))
     with torch.cuda.stream(stream):
-        for k,n in ((6144,25600),(5120,2304),(2304,5120)):
+        for k,n in ((6144,25600),(5120,2304),(2304,5120),(15360,5120),
+                    (5120,1280),(1280,32768),(5120,512),(8192,5120)):
             for capacity in (1,16,80,256,1024,4096):
                 p = Projection(capacity,k,n)
                 # Tail rows use the capacity's exported quantization grid and GEMM.

@@ -10,7 +10,11 @@ from pathlib import Path
 import _pinned_sparkinfer  # noqa: F401
 
 
-PROJECTIONS = (('engram', 25600, 6144), ('ffn_up', 2304, 5120), ('ffn_down', 5120, 2304))
+PROJECTIONS = (
+    ('engram', 25600, 6144), ('ffn_up', 2304, 5120), ('ffn_down', 5120, 2304),
+    ('main', 5120, 15360), ('q_a', 1280, 5120), ('q_b', 32768, 1280),
+    ('kv', 512, 5120), ('o_b', 5120, 8192),
+)
 
 def validate_abi(path: Path, label: str, kind: str) -> dict:
     header = path.read_text()
@@ -49,7 +53,7 @@ def dispatch_header(output: Path, manifest: dict) -> None:
         grids = [mxfp8_rows_quant_aot_grid(size_k=k, rows=rows, expected_m=capacity,
                                          sm_count=manifest['physical_sms']) for rows in range(1, capacity + 1)]
         lines.append('static const uint32_t ' + label + '_grids[] = {' + ','.join(map(str, grids)) + '};')
-        info = [1, capacity, k, n, variant['activation_scratch_bytes'],
+        info = [1, capacity, k, n, variant['scratch_bytes'],
                 variant['activation_values_offset'], variant['activation_row_scales_offset'],
                 variant['activation_mma_scales_offset'], n * k // 32]
         modules = []
@@ -57,7 +61,7 @@ def dispatch_header(output: Path, manifest: dict) -> None:
             prefix = '_mlir_ds41rt_' + label + '_' + kind
             modules.append('{' + ','.join((prefix + '_cuda_init', prefix + '_cuda_load_to_device',
                                            variant[kind + '_abi']['symbol'])) + '}')
-        variants.append('{{' + ','.join(map(str, info)) + '},' + ','.join(modules) + ',' + label + '_grids}')
+        variants.append('{{' + ','.join(map(str, info)) + '},' + ','.join(modules) + ',' + label + '_grids,' + str(variant['split_k_offset']) + ',' + str(variant['split_k_slices']) + '}')
     lines.append('#define DS41RT_V41_FP8_VARIANTS ' + ','.join(variants))
     (output / 'v41_fp8_variants.h').write_text('\n'.join(lines) + '\n')
 
@@ -88,18 +92,23 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
             label = f'v41_{name}_fp8_m{capacity}'
             quant = compile_mxfp8_rows_quant_aot(size_k=k, scale_block_size=32, expected_m=capacity, amax_floor=1e-4)
             quant.export_to_c(str(output), label + '_quant', 'ds41rt_' + label + '_quant')
-            gemm = compile_dense_gemm_mxfp8_aot(size_m=capacity, size_n=n, size_k=k,
-                                              expected_m=capacity, sfb_k_replicated=False, device=device)
+            gemm, split_k = compile_dense_gemm_mxfp8_aot(size_m=capacity, size_n=n, size_k=k,
+                                              expected_m=capacity, sfb_k_replicated=False, device=device,
+                                              return_split_k_metadata=True)
             gemm.export_to_c(str(output), label + '_gemm', 'ds41rt_' + label + '_gemm')
             layout = _block_fp8_linear_scratch_layout(tokens=capacity, in_features=k,
                                                     out_features=n, output_dtype=torch.bfloat16)
+            split_offset = ((layout.nbytes + 255) // 256) * 256 if split_k > 1 else 0
+            split_bytes = split_k * capacity * n * 4 if split_k > 1 else 0
             manifest['variants'].append({'capacity': capacity, 'label': label, 'input_dim': k, 'output_dim': n,
                 'activation_scratch_bytes': layout.nbytes,
+                'scratch_bytes': split_offset + split_bytes if split_k > 1 else layout.nbytes,
+                'split_k_offset': split_offset, 'split_k_bytes': split_bytes,
                 'activation_values_offset': layout.x_values_offset_bytes,
                 'activation_row_scales_offset': layout.x_scale_rows_offset_bytes,
                 'activation_mma_scales_offset': layout.x_scale_mma_offset_bytes,
                 'activation_mma_scale_shape': list(layout.x_scale_mma_physical_shape),
-                'split_k_slices': 1, 'output_dtype': 'BF16', 'output_bytes': capacity * n * 2,
+                'split_k_slices': split_k, 'gemm_output_dtype': 'FP32' if split_k > 1 else 'BF16', 'output_dtype': 'BF16', 'output_bytes': capacity * n * 2,
                 'quant_abi': validate_abi(output / (label + '_quant.h'), label + '_quant', 'quant'),
                 'gemm_abi': validate_abi(output / (label + '_gemm.h'), label + '_gemm', 'gemm')})
             print(f'exported {label}', flush=True)

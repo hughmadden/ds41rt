@@ -120,3 +120,5 @@ Expert-floor progress: both fused routed-expert K32 quantizers now apply the off
 FFN-boundary progress: one-stream dSpark mHC/router/shared/routed execution and complete graph replay now pass Rust-owned nonzero stage-zero fixtures on both RTX GPUs, including shifted pre-mix and error recovery, while attention and three-stage sequencing remain open in `docs/ds41-ffn-boundary-qualification.md`.
 
 Committed-cache progress: generation-checked dSpark KV windows, batched ring updates and captured FP8 quantize/dequantize writes pass Rust-owned bitwise tests on both RTX GPUs and are included in memory admission, while attention producers/consumers remain open in `docs/ds41-dspark-cache-qualification.md`.
+
+dSpark projection progress: all thirteen main/attention FP8 bindings and native split-K reduction pass owned and numerical graph checks on both RTX GPUs, with explicit memory admission while normalization/RoPE, attention and stage sequencing remain open in `docs/ds41-dspark-projection-qualification.md`.

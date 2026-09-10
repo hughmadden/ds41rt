@@ -37,7 +37,9 @@ extern "C" int32_t ds41rt_v41_shared_swiglu(const uint16_t* gate, const uint16_t
 }
 extern "C" int32_t ds41rt_v41_fp8_matrix_pack_scales(
     const uint8_t* source, uint8_t* destination, int32_t k, int32_t n, void* stream) {
-  if (!((k == 6144 && n == 25600) || (k == 5120 && n == 2304) || (k == 2304 && n == 5120)))
+  if (!((k == 6144 && n == 25600) || (k == 5120 && n == 2304) || (k == 2304 && n == 5120) ||
+        (k == 15360 && n == 5120) || (k == 5120 && n == 1280) || (k == 1280 && n == 32768) ||
+        (k == 5120 && n == 512) || (k == 8192 && n == 5120)))
     return cudaErrorInvalidValue;
   const uint64_t src_bytes = uint64_t(k) * n / 1024, dst_bytes = src_bytes * 32;
   auto a = reinterpret_cast<uintptr_t>(source), b = reinterpret_cast<uintptr_t>(destination);
@@ -54,5 +56,24 @@ extern "C" int32_t ds41rt_v41_fp8_initialize_storage(void* scratch, uint64_t byt
   auto status = cudaMemsetAsync(scratch, 0, bytes, reinterpret_cast<cudaStream_t>(stream));
   if (status != cudaSuccess) return status;
   alpha_one<<<1, 1, 0, reinterpret_cast<cudaStream_t>(stream)>>>(alpha);
+  return cudaGetLastError();
+}
+
+namespace {
+__global__ void reduce_splits(const float* partials, __nv_bfloat16* output, uint64_t elements, int slices) {
+  const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (i >= elements) return;
+  float sum = 0;
+  for (int split = 0; split < slices; ++split) sum += partials[uint64_t(split) * elements + i];
+  output[i] = __float2bfloat16_rn(sum);
+}
+}
+extern "C" int32_t ds41rt_v41_fp8_reduce_splits(const float* partials, uint16_t* output,
+    int32_t rows, int32_t columns, int32_t slices, void* stream) {
+  if (rows < 1 || rows > 4096 || columns < 1 || (slices != 2 && slices != 4))
+    return cudaErrorInvalidValue;
+  const uint64_t elements = uint64_t(rows) * columns;
+  reduce_splits<<<(elements + 255) / 256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      partials,reinterpret_cast<__nv_bfloat16*>(output),elements,slices);
   return cudaGetLastError();
 }

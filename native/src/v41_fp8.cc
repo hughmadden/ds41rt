@@ -17,6 +17,8 @@ struct Variant {
   ds41rt_v41_fp8_info_t info;
   Module quant, gemm;
   const uint32_t* grids;
+  uint64_t split_offset;
+  uint32_t split_slices;
   int device = -1;
 };
 Variant variants[] = {DS41RT_V41_FP8_VARIANTS};
@@ -42,6 +44,7 @@ int device_matches(Variant* v) {
   return status ? int(status) : (device == v->device ? 0 : int(cudaErrorInvalidDevice));
 }
 }
+extern "C" int32_t ds41rt_v41_fp8_reduce_splits(const float*, uint16_t*, int32_t, int32_t, int32_t, void*);
 extern "C" int32_t ds41rt_v41_fp8_initialize_storage(void*, uint64_t, float*, void*);
 extern "C" int32_t ds41rt_v41_fp8_matrix_info(int32_t rows, int32_t k, int32_t n, ds41rt_v41_fp8_info_t* out) {
   auto* v = capacity(rows, k, n); if (!v || !out) return cudaErrorInvalidValue;
@@ -94,9 +97,13 @@ extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, c
   void* quant_args[] = {&x,&a,&sr,&sm,&rows,&grid,&stream,&status};
   v->quant.launch(quant_args,8); if (status) return status;
   void* w=const_cast<uint8_t*>(weight), *s=const_cast<uint8_t*>(packed_scales), *c=output, *one=const_cast<float*>(alpha);
+  if (v->split_slices > 1) c = static_cast<char*>(scratch) + v->split_offset;
   // Quantized-output slots are compile-time inactive for this BF16 projection.
   void* gemm_args[] = {&a,&w,&sm,&s,&c,&c,&c,&c,&one,&rows,&stream,&status};
-  v->gemm.launch(gemm_args,12); return status;
+  v->gemm.launch(gemm_args,12);
+  if (status || v->split_slices == 1) return status;
+  return ds41rt_v41_fp8_reduce_splits(static_cast<const float*>(c), output,
+      rows, v->info.output_dim, v->split_slices, stream);
 }
 
 // Existing engram entry points retain their explicit geometry.

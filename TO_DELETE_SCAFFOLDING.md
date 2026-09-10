@@ -77,3 +77,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-ffn-boundary/`, the `ds41-ffn-boundary-fixture` binary under `rust/target/debug/`, and `dspark-ffn-*.log` under `/tmp/ds41-v41-fp8-aot/` during Goal 2 cleanup; the sparse checkpoint contains only synthetic payloads, and production FFN ownership and committed evidence must remain.
 
 - Delete `/tmp/ds41-dspark-cache/`, `rust/target/debug/ds41-dspark-cache-fixture`, and `dspark-cache-*.log` under `/tmp/ds41-v41-fp8-aot/` during Goal 2 cleanup; retain production cache ownership, native kernels and committed evidence.
+
+- Delete `/tmp/ds41-projection-owner/`, `rust/target/debug/ds41-projection-owner-fixture`, `/tmp/ds41-v41-aot/dspark-projections-rtx*.json`, and `dspark-projection-*.log` under `/tmp/ds41-v41-fp8-aot/`, including failed initial split-export/build diagnostics; retain production owners, reusable qualification/regression tests and committed evidence.

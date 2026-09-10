@@ -4,13 +4,13 @@
 extern "C" {
 #endif
 /* All entry points return raw CUDA status; caller owns storage and stream ordering.
- * Weights remain contiguous FP8 [25600,6144]; native scales are UE8M0 [800,192]. */
+ * Weights remain contiguous FP8 [N,K]; native scales are UE8M0 [N/32,K/32]. */
 typedef struct {
   uint32_t abi_version, capacity_rows, input_dim, output_dim;
   uint64_t scratch_bytes, values_offset, row_scales_offset, mma_scales_offset;
   uint64_t packed_weight_scale_bytes;
 } ds41rt_v41_fp8_info_t;
-/* Matrix entry points additionally cover shared FFN [2304,5120] and [5120,2304].
+/* Matrix entry points cover engram, shared FFN, dSpark main and attention FP8 shapes.
  * Shapes are explicit (K input, N output); only compiled capacities are admitted. */
 int32_t ds41rt_v41_fp8_matrix_info(int32_t capacity, int32_t k, int32_t n, ds41rt_v41_fp8_info_t* out);
 int32_t ds41rt_v41_fp8_matrix_initialize(int32_t capacity, int32_t k, int32_t n, void** out);

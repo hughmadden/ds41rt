@@ -55,3 +55,5 @@ Per-stage routing now writes directly into owned expert-wave inputs and adds 122
 Shared-FFN packing adds 3,317,760 resident bytes, and three capacity-80 shared execution owners add 5,246,988 bytes per wave, raising the partial two-wave budget to 8,415,327,088 bytes; ownership, qualification and remaining exclusions are detailed in ds41-shared-fp8-qualification.md.
 
 Three committed KV window owners reserve 18,875,520 device bytes once across waves, bringing the partial two-wave capacity-80 admission total to 8,434,202,608 bytes; draft attention scratch/projections and graph/driver allocations remain separate, with details in ds41-dspark-cache-qualification.md.
+
+Main and attention FP8 projections now add 11,182,080 resident packed-scale bytes and 38,235,188 bytes per capacity-80 wave, bringing the current partial two-wave admission total to 8,521,855,064 bytes; grouped BF16 output A, remaining attention/norm/RoPE scratch, shared vocabulary residency and driver/graph allocations remain separate, with both-RTX numerical and owned execution evidence in `ds41-dspark-projection-qualification.md`.
