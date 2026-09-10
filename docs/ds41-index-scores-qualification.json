@@ -1,0 +1,225 @@
+{
+  "scope": "Paged committed-history index scores; no top-k selection, query projection or complete sparse attention",
+  "sources_sha256": {
+    "native/CMakeLists.txt": "e7230110bc3847360324a3c0354cc5d432525b0744c117e78daefdd03d907d5f",
+    "native/cuda/kernels/v41_index_scores.cu": "3ae018c6ca79d6b0961985cbbc0969ce08647c5b79894df1558593b973f00631",
+    "native/include/ds41rt_v41_index_scores.h": "cfaffeb81f4d353106d377cb9af34a437159859ee706ec9774b4c68c883e487f",
+    "rust/crates/ds41rt-ffi/src/v41_index_scores.rs": "8698f6cad1ce8e8a57f87b958939fe0f5f3c6025d39d2ed552b4b77143d7b459",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "4442c942c2d8090e6532cae8841cabd12be616a310889b18fb878adfa3ec01b0",
+    "scripts/qualify-ds41-index-scores.py": "db3cdfe80ac2f5a6abc18f7940556ffdc70d95b4e22a30a2b7363e9e915f88a2"
+  },
+  "reference_config_sha256": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+  "native_library_sha256": "8c697a3e80740a246998726a7f8caa468a98aa561338e5bc45d1e63fb0a3aa2a",
+  "build_logs_sha256": {
+    "/tmp/ds41-index-scores-native-build.log": "f73dc762b467c8646dacf62f029c0f8215f0489b5e17e8f77cfd5931bba44b45",
+    "/tmp/ds41-index-scores-rust-build.log": "6814295f9e2edb7b94c553ec266d12813aba6fe4c4a7b99dc596cb33c39e264e",
+    "/tmp/ds41-index-scores-owner-build.log": "6c429ea5eace77b3264f3c8e38512499d741de5c27a65a434f3bed9792814596"
+  },
+  "owner_fixture_sha256": {
+    "/tmp/ds41-compressor-owner/src/main.rs": "c15a99a70c0d5c0933d705d5b90a699b073c6ca2e6faee47831c0c8117f5bd3d",
+    "/tmp/ds41-compressor-owner/src/v41_tensors.rs": "a54889f4213d5c7d791c0507ebc1a820b5ade49e02455f0efd8ad93c8bb62c03",
+    "/tmp/ds41-compressor-owner/src/v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e",
+    "/tmp/ds41-compressor-owner/src/v41_compressor.rs": "b9382511893b9c134e5b55e11fd444a6a83d8389fa0c5f25adb7df327d0fab38",
+    "/tmp/ds41-compressor-owner/src/v41_compressor/index_cache.rs": "ab723db611c976bcc080e2e3d54bc61f7b2d746d9f7972ce6b5c2e1ae7dc93f6"
+  },
+  "gpus": {
+    "0": {
+      "primitive": {
+        "scope": "Committed-history index scores only; no selection or proposal overlay",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 0,
+        "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "native_library_sha256": "8c697a3e80740a246998726a7f8caa468a98aa561338e5bc45d1e63fb0a3aa2a",
+        "cases": [
+          {
+            "queries": 1,
+            "candidates": 3,
+            "slots": 1,
+            "stride": 1,
+            "capacity": 256,
+            "valid_scores": 2,
+            "changed_valid_scores": 2,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 16,
+            "candidates": 255,
+            "slots": 16,
+            "stride": 4,
+            "capacity": 16384,
+            "valid_scores": 2182,
+            "changed_valid_scores": 2182,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 80,
+            "candidates": 511,
+            "slots": 16,
+            "stride": 8,
+            "capacity": 32768,
+            "valid_scores": 21603,
+            "changed_valid_scores": 21603,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 256,
+            "candidates": 64,
+            "slots": 16,
+            "stride": 8,
+            "capacity": 32768,
+            "valid_scores": 7421,
+            "changed_valid_scores": 7421,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 4096,
+            "candidates": 3,
+            "slots": 16,
+            "stride": 1,
+            "capacity": 4096,
+            "valid_scores": 3556,
+            "changed_valid_scores": 3556,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 1,
+            "candidates": 4096,
+            "slots": 16,
+            "stride": 4096,
+            "capacity": 16777216,
+            "valid_scores": 4095,
+            "changed_valid_scores": 4095,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 1,
+            "candidates": 16384,
+            "slots": 1,
+            "stride": 64,
+            "capacity": 16384,
+            "valid_scores": 16382,
+            "changed_valid_scores": 16382,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          }
+        ]
+      },
+      "owner_cases": 55,
+      "owned_score_cases": 4,
+      "owner_log_sha256": "eb45d0d0945a27c13ce5f5b14006e2f9d190d4ebc4d2e737055be7c6b245dcf4",
+      "primitive_log_sha256": "ff3f4372feafac51e353a453ab4591775303d1a7cf3811fd2646d2d84b21f516"
+    },
+    "1": {
+      "primitive": {
+        "scope": "Committed-history index scores only; no selection or proposal overlay",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 1,
+        "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "native_library_sha256": "8c697a3e80740a246998726a7f8caa468a98aa561338e5bc45d1e63fb0a3aa2a",
+        "cases": [
+          {
+            "queries": 1,
+            "candidates": 3,
+            "slots": 1,
+            "stride": 1,
+            "capacity": 256,
+            "valid_scores": 2,
+            "changed_valid_scores": 2,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 16,
+            "candidates": 255,
+            "slots": 16,
+            "stride": 4,
+            "capacity": 16384,
+            "valid_scores": 2182,
+            "changed_valid_scores": 2182,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 80,
+            "candidates": 511,
+            "slots": 16,
+            "stride": 8,
+            "capacity": 32768,
+            "valid_scores": 21603,
+            "changed_valid_scores": 21603,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 256,
+            "candidates": 64,
+            "slots": 16,
+            "stride": 8,
+            "capacity": 32768,
+            "valid_scores": 7421,
+            "changed_valid_scores": 7421,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 4096,
+            "candidates": 3,
+            "slots": 16,
+            "stride": 1,
+            "capacity": 4096,
+            "valid_scores": 3556,
+            "changed_valid_scores": 3556,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 1,
+            "candidates": 4096,
+            "slots": 16,
+            "stride": 4096,
+            "capacity": 16777216,
+            "valid_scores": 4095,
+            "changed_valid_scores": 4095,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          },
+          {
+            "queries": 1,
+            "candidates": 16384,
+            "slots": 1,
+            "stride": 64,
+            "capacity": 16384,
+            "valid_scores": 16382,
+            "changed_valid_scores": 16382,
+            "reference_bf16_exact": true,
+            "all_masked_exact": true,
+            "guards": true
+          }
+        ]
+      },
+      "owner_cases": 55,
+      "owned_score_cases": 4,
+      "owner_log_sha256": "eb45d0d0945a27c13ce5f5b14006e2f9d190d4ebc4d2e737055be7c6b245dcf4",
+      "primitive_log_sha256": "ff3f4372feafac51e353a453ab4591775303d1a7cf3811fd2646d2d84b21f516"
+    }
+  }
+}

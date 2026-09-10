@@ -1,3 +1,5 @@
+mod v41_index_scores;
+pub use v41_index_scores::V41IndexScores;
 mod v41_compressor;
 pub use v41_compressor::V41Compressor;
 mod v41_dspark_attention;
