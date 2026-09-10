@@ -1,0 +1,627 @@
+{
+  "scope": "Tiled hierarchical candidate selection and composed committed-cache consumer; learned query production and attention remain open",
+  "sources_sha256": {
+    "native/CMakeLists.txt": "37296aace48b89139bb065a578e0de75cc39955107cbb5e2d87f27baee35b2e2",
+    "native/cuda/kernels/v41_index_topk.cu": "f31f12eb495638db4619bfa60cd57f578ac57891daa042c7aee296072d413ed7",
+    "native/include/ds41rt_v41_index_topk.h": "1cf25cb91270e7efb3fd78eec82e99f8c15457779ff54dc4dded3eb07c5b4084",
+    "native/cuda/kernels/v41_candidate_blocks.cu": "7ebe98fe23b02b596c0614376f49cb684f4e99cb01f6c06e8d7ef2dcc709c5fd",
+    "native/include/ds41rt_v41_candidate_blocks.h": "ab74a5f1ff94d3886f7d30aae9093b9d4779b5e09f9aff85bbcd57e3d5ac3f67",
+    "rust/crates/ds41rt-ffi/src/v41_index_topk.rs": "b9b9f5577e95fca6bd08d2d92cb5385a34d755b5aabe308a85f191b2227a09cb",
+    "rust/crates/ds41rt-ffi/src/v41_candidate_blocks.rs": "cdda15f6885dd0b73c541679c41f4eff4c5986e02f93fe4a68c6a017d4f89e9e",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "6013d6700a53f916a57bac886bfd7ffd7fe3c100f08e53cb4d292496e6c05e71",
+    "scripts/qualify-ds41-candidate-blocks.py": "c6d1641f5f08276903818ac38d80ea122579a9c43d01f159f01177dfc5ea9044"
+  },
+  "native_library_sha256": "440ab6d10a541c1619465ecf29a8a23e09494f211e20488d5d9fffd7378e90c2",
+  "build_logs_sha256": {
+    "/tmp/ds41-candidate-native-build.log": "502ac974deb90df16d5f1f799fe187b270febfdcdb6c03b13c972aa893e3da44",
+    "/tmp/ds41-candidate-rust-build.log": "d433142672ac7ed16a587f0593aa11b8d9fbe03b27b37a133b2aa15033e85cab",
+    "/tmp/ds41-candidate-owner-build.log": "f54ffe781e3b6e89aac62b191b6ce7c2aabe6c20ef0d5303a88a02fbb9f8727f"
+  },
+  "owner_fixture_sha256": {
+    "/tmp/ds41-compressor-owner/src/main.rs": "ec7803e57157820bed80a73994c7f12fc6d4c1e73b619dc560e5abc3fcbffd29",
+    "/tmp/ds41-compressor-owner/src/v41_tensors.rs": "a54889f4213d5c7d791c0507ebc1a820b5ade49e02455f0efd8ad93c8bb62c03",
+    "/tmp/ds41-compressor-owner/src/v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e",
+    "/tmp/ds41-compressor-owner/src/v41_compressor.rs": "b9382511893b9c134e5b55e11fd444a6a83d8389fa0c5f25adb7df327d0fab38",
+    "/tmp/ds41-compressor-owner/src/v41_compressor/index_cache.rs": "ab723db611c976bcc080e2e3d54bc61f7b2d746d9f7972ce6b5c2e1ae7dc93f6"
+  },
+  "gpus": {
+    "0": {
+      "candidate_cases": {
+        "scope": "Hierarchical candidate masks; deterministic lowest-block-ID ties",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 0,
+        "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "native_library_sha256": "440ab6d10a541c1619465ecf29a8a23e09494f211e20488d5d9fffd7378e90c2",
+        "cases": [
+          {
+            "kind": "pipeline",
+            "queries": 1,
+            "width": 1,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 3,
+            "width": 7,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 16,
+            "width": 8,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 16,
+            "width": 9,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 80,
+            "width": 127,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 4096,
+            "width": 1,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 1,
+            "width": 16383,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 1,
+            "width": 16384,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 3,
+            "width": 1048576,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 2047,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 2048,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 2049,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 4095,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 4096,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 4097,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 8193,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 16384,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "ties",
+            "latest_pinned": true,
+            "lowest_block_id": true
+          }
+        ]
+      },
+      "top512_regression": {
+        "scope": "Index top-512 selection only; deterministic lowest-position tie break",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 0,
+        "native_library_sha256": "440ab6d10a541c1619465ecf29a8a23e09494f211e20488d5d9fffd7378e90c2",
+        "cases": [
+          {
+            "queries": 1,
+            "candidates": 1,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 1,
+            "candidates": 511,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 1,
+            "candidates": 512,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 1,
+            "candidates": 513,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 3,
+            "candidates": 1023,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 24576
+          },
+          {
+            "queries": 16,
+            "candidates": 1024,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 131072
+          },
+          {
+            "queries": 16,
+            "candidates": 1025,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 262144
+          },
+          {
+            "queries": 3,
+            "candidates": 2049,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 73728
+          },
+          {
+            "queries": 1,
+            "candidates": 6145,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 57344
+          },
+          {
+            "queries": 80,
+            "candidates": 4095,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 2621440
+          },
+          {
+            "queries": 1,
+            "candidates": 16384,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 131072
+          },
+          {
+            "queries": 4096,
+            "candidates": 3,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 33554432
+          },
+          {
+            "queries": 1,
+            "history": 1048576,
+            "tile_candidates": 16384,
+            "tiles": 64,
+            "forward_reverse_exact": true,
+            "carry_order_independent": true,
+            "uneven_partition_exact": true,
+            "changed_graph_exact": true,
+            "scratch_bytes": 131072
+          }
+        ]
+      },
+      "owner_cases": 55,
+      "composed_hierarchy_cases": 4,
+      "owner_log_sha256": "57dff3f58aece8c81a91e4dc01b113cfe5ef81ea2f92007aeb81f749371f761e",
+      "candidate_log_sha256": "b41c33628410d862d2866e83b1d992ed16d5e2105979561f2d88c323584c8a7d",
+      "regression_log_sha256": "ca561fe8ff49197819e710cddf06ac9e53ea3e402f2b53a9f30ac9fb941d3541"
+    },
+    "1": {
+      "candidate_cases": {
+        "scope": "Hierarchical candidate masks; deterministic lowest-block-ID ties",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 1,
+        "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+        "native_library_sha256": "440ab6d10a541c1619465ecf29a8a23e09494f211e20488d5d9fffd7378e90c2",
+        "cases": [
+          {
+            "kind": "pipeline",
+            "queries": 1,
+            "width": 1,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 3,
+            "width": 7,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 16,
+            "width": 8,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 16,
+            "width": 9,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 80,
+            "width": 127,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 4096,
+            "width": 1,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 1,
+            "width": 16383,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 1,
+            "width": 16384,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "pipeline",
+            "queries": 3,
+            "width": 1048576,
+            "tile_width": 16384,
+            "reference_mask_exact": true,
+            "reverse_carry_exact": true,
+            "changed_graph_exact": true,
+            "empty_and_invalid_metadata": true,
+            "guards": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 2047,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 2048,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 2049,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 4095,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 4096,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 4097,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 8193,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "top2048",
+            "candidates": 16384,
+            "torch_topk_exact": true
+          },
+          {
+            "kind": "ties",
+            "latest_pinned": true,
+            "lowest_block_id": true
+          }
+        ]
+      },
+      "top512_regression": {
+        "scope": "Index top-512 selection only; deterministic lowest-position tie break",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 1,
+        "native_library_sha256": "440ab6d10a541c1619465ecf29a8a23e09494f211e20488d5d9fffd7378e90c2",
+        "cases": [
+          {
+            "queries": 1,
+            "candidates": 1,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 1,
+            "candidates": 511,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 1,
+            "candidates": 512,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 1,
+            "candidates": 513,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 8192
+          },
+          {
+            "queries": 3,
+            "candidates": 1023,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 24576
+          },
+          {
+            "queries": 16,
+            "candidates": 1024,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 131072
+          },
+          {
+            "queries": 16,
+            "candidates": 1025,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 262144
+          },
+          {
+            "queries": 3,
+            "candidates": 2049,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 73728
+          },
+          {
+            "queries": 1,
+            "candidates": 6145,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 57344
+          },
+          {
+            "queries": 80,
+            "candidates": 4095,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 2621440
+          },
+          {
+            "queries": 1,
+            "candidates": 16384,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 131072
+          },
+          {
+            "queries": 4096,
+            "candidates": 3,
+            "torch_topk_untied_exact": true,
+            "deterministic_ties_exact": true,
+            "changed_reset_graph": true,
+            "all_invalid_empty": true,
+            "guards": true,
+            "scratch_bytes": 33554432
+          },
+          {
+            "queries": 1,
+            "history": 1048576,
+            "tile_candidates": 16384,
+            "tiles": 64,
+            "forward_reverse_exact": true,
+            "carry_order_independent": true,
+            "uneven_partition_exact": true,
+            "changed_graph_exact": true,
+            "scratch_bytes": 131072
+          }
+        ]
+      },
+      "owner_cases": 55,
+      "composed_hierarchy_cases": 4,
+      "owner_log_sha256": "57dff3f58aece8c81a91e4dc01b113cfe5ef81ea2f92007aeb81f749371f761e",
+      "candidate_log_sha256": "b41c33628410d862d2866e83b1d992ed16d5e2105979561f2d88c323584c8a7d",
+      "regression_log_sha256": "ca561fe8ff49197819e710cddf06ac9e53ea3e402f2b53a9f30ac9fb941d3541"
+    }
+  }
+}

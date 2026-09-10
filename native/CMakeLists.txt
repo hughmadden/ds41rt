@@ -200,6 +200,7 @@ if(DS41RT_ENABLE_CUDA)
     cuda/kernels/v41_compressor.cu
     cuda/kernels/v41_index_scores.cu
     cuda/kernels/v41_index_topk.cu
+    cuda/kernels/v41_candidate_blocks.cu
     cuda/kernels/v41_attention_ops.cu
     cuda/kernels/norm.cu
     cuda/kernels/mlp.cu

@@ -16,6 +16,11 @@ extern "C" {
 int32_t ds41rt_v41_index_top512(const float* scores,const uint64_t* positions,
     uint64_t* carry,void* scratch,uint64_t scratch_bytes,int32_t* output,
     int32_t queries,int32_t candidates,int32_t reset,void* stream);
+// Same reduction for candidate blocks: carry/output width 2048, valid IDs
+// below 131072, scratch = queries * ceil(candidates/4096) * 2048 * 8 * 2.
+int32_t ds41rt_v41_index_top2048_blocks(const float* scores,const uint64_t* positions,
+    uint64_t* carry,void* scratch,uint64_t scratch_bytes,int32_t* output,
+    int32_t queries,int32_t candidates,int32_t reset,void* stream);
 #ifdef __cplusplus
 }
 #endif
