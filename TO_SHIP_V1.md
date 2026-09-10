@@ -42,6 +42,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Trigger engram work early for decode, verification and batched prefill and commit accepted-prefix history without stale-wave reuse.
 - [ ] Implement native image preprocessing, ViT, aligner, image-span embeddings and vision routing through the API.
 - [x] Qualify owned dSpark main projection, independent committed KV producers and draft attention with native rotary frequencies on both RTX GPUs.
+- [x] Implement and qualify allocation-free decoder stream-mean gathering directly into the owned dSpark main input on both RTX GPUs.
 - [ ] Gather dSpark taps from target-layer attention-input stream means after engram updates in layer order 37/38/39.
 - [ ] Compose the complete three-stage dSpark attention/mHC/FFN sequence with embedding, Markov, confidence and terminal sampling.
 - [ ] Wire proposal verification, acceptance, RNG ownership, cancellation and rollback across all caches and engram histories.
@@ -69,3 +70,5 @@ The next dSpark dependency is target-layer tap gathering followed by complete st
 `TO_DELETE_SCAFFOLDING.md` tracks temporary files committed to the repository, not a requirement to delete useful external test data now.
 
 Fleet checkpoint evidence is recorded in `docs/ds41-checkpoint-inventory.json` and `docs/ds41-checkpoint-inventory.md`; all weights still require execution qualification, and payload hashes were not scanned.
+
+The tap gather and composed main-context evidence is in `docs/ds41-dspark-taps-qualification.md`; production target-layer call sites remain unwired.

@@ -95,6 +95,27 @@ impl DsparkMainContext<'_, '_> {
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.main.input()
     }
+    /// Enqueue a decoder attention-input tap directly into the stable main input.
+    /// No intermediate allocation or copy; can be part of the backbone graph.
+    /// # Safety
+    /// The caller provides the post-engram/pre-attention BF16 streams, preserves
+    /// the same packed row order for all three layers, and keeps input and this
+    /// owner live through stream completion or graph replay; all three tap writes
+    /// must complete before execute/capture/replay consumes the main input.
+    pub unsafe fn enqueue_tap(
+        &mut self,
+        input: Ds41rtDeviceBuffer,
+        layer: u32,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        self.ready = None;
+        ensure!(
+            rows > 0 && rows <= self.capacity,
+            "invalid main context tap rows"
+        );
+        unsafe { self.ops.tap(input, self.main.input(), rows, layer, stream) }
+    }
     /// U64 [capacity] absolute committed main positions.
     pub fn positions(&self) -> Ds41rtDeviceBuffer {
         self.positions.buffer

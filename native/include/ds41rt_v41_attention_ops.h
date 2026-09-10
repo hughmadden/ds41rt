@@ -43,3 +43,14 @@ int32_t ds41rt_v41_dspark_frequencies(const uint64_t* positions,
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// BF16 [rows,4,5120] attention-input stream mean -> the layer's slice of
+// BF16 [rows,15360], layer=37/38/39; the other two slices stay unchanged.
+int32_t ds41rt_v41_dspark_tap(const uint16_t* input, uint16_t* output,
+    int32_t rows, int32_t layer, void* stream);
+#ifdef __cplusplus
+}
+#endif

@@ -205,3 +205,28 @@ extern "C" int32_t ds41rt_v41_dspark_frequencies(const uint64_t* positions,
   dspark_frequencies_kernel<<<rows,32,0,reinterpret_cast<cudaStream_t>(stream)>>>(positions,output);
   return cudaGetLastError();
 }
+
+namespace {
+__global__ void dspark_tap_kernel(const __nv_bfloat16* input,
+    __nv_bfloat16* output, uint64_t elements, int tap) {
+  const uint64_t i=uint64_t(blockIdx.x)*256+threadIdx.x;
+  if(i>=elements) return;
+  const uint64_t row=i/5120,column=i%5120,base=row*20480+column;
+  float sum=0.0f;
+  #pragma unroll
+  for(int stream=0;stream<4;++stream)
+    sum=__fadd_rn(sum,__bfloat162float(input[base+uint64_t(stream)*5120]));
+  output[row*15360+uint64_t(tap)*5120+column]=__float2bfloat16_rn(__fmul_rn(sum,0.25f));
+}
+}
+extern "C" int32_t ds41rt_v41_dspark_tap(const uint16_t* input,
+    uint16_t* output, int32_t rows, int32_t layer, void* stream) {
+  if(rows<1 || rows>4096 || layer<37 || layer>39) return cudaErrorInvalidValue;
+  const uint64_t in=uint64_t(rows)*40960,out=uint64_t(rows)*30720;
+  if(!valid(input,in,2) || !valid(output,out,2) || !disjoint(input,in,output,out))
+    return cudaErrorInvalidValue;
+  const uint64_t elements=uint64_t(rows)*5120;
+  dspark_tap_kernel<<<(elements+255)/256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(input),reinterpret_cast<__nv_bfloat16*>(output),elements,layer-37);
+  return cudaGetLastError();
+}

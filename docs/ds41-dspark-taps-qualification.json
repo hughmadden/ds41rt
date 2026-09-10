@@ -1,0 +1,239 @@
+{
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "b12x_revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "sha256": {
+    "native/cuda/kernels/v41_attention_ops.cu": "a5107b85ce5d523d86c5060c3e389361607e3ca1b8a6fdc8f0d002eff51027e9",
+    "native/include/ds41rt_v41_attention_ops.h": "06953ad180fc6a2d9b23b598705945e366f9c3b647657097b9a48387598dc9ab",
+    "rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "a138025d74427c3be8cce8c8a58c011f82bb93b4021502466b76cb45a63cc63a",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/main_context.rs": "9c713f558e57db76b2ec303361d13aeb7d3a79ee9669dbc0b054a743ef8ef317",
+    "scripts/qualify-ds41-dspark-taps.py": "80e12770d75a41c016e9f0e2d5981efa7f6ba1b9c6e2c3908a3229e6b67ec6b6",
+    "/tmp/ds41-main-context/src/main.rs": "5ccc5970dfd1baa61af62a0b07134ee826a5918a48587de7330641d2b4792b8d",
+    "/tmp/ds41-tap-native-build.log": "1b832d4a840f1ecd405debfade7e59b46230b60feba7275540c10d347e539b81",
+    "/tmp/ds41-tap-daemon-build.log": "cfde1600ab813e06973eba3a11ac94644cdcc1bd67fa2538b04301dfac2c73ed",
+    "/tmp/ds41-taps-main-final-build.log": "d6602551c04e417154643fefa61400c6ac26bbadb4d280ad9a6f3088b442a438"
+  },
+  "primitive": {
+    "rtx0": {
+      "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "results": [
+        {
+          "rows": 1,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 13,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 73,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 255,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 1001,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 4095,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 4096,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        }
+      ],
+      "native_sha256": "ac98b49c9cb196b0318f27b4363b1591964988b03d494c6971679024dd339f86",
+      "qualifier_sha256": "80e12770d75a41c016e9f0e2d5981efa7f6ba1b9c6e2c3908a3229e6b67ec6b6"
+    },
+    "rtx1": {
+      "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "results": [
+        {
+          "rows": 1,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 13,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 73,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 255,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 1001,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 4095,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        },
+        {
+          "rows": 4096,
+          "tap_order": [
+            39,
+            37,
+            38
+          ],
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "other_slices_unchanged": true,
+          "guards": true
+        }
+      ],
+      "native_sha256": "ac98b49c9cb196b0318f27b4363b1591964988b03d494c6971679024dd339f86",
+      "qualifier_sha256": "80e12770d75a41c016e9f0e2d5981efa7f6ba1b9c6e2c3908a3229e6b67ec6b6"
+    }
+  },
+  "owner": {
+    "rtx0": {
+      "sha256": "4b9d47b2460099d196101fc1626642d2142d712a182cc48efd104b549d402f41",
+      "cases": [
+        "PASS capacity=1 rows=1 case=0 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=1 rows=1 case=1 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=16 rows=13 case=0 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=16 rows=13 case=1 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=80 rows=73 case=0 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=80 rows=73 case=1 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=256 rows=255 case=0 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=256 rows=255 case=1 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=1024 rows=1001 case=0 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=1024 rows=1001 case=1 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=4096 rows=4095 case=0 max_abs=0 changed=0 bytes=495484944",
+        "PASS capacity=4096 rows=4095 case=1 max_abs=0 changed=0 bytes=495484944"
+      ]
+    },
+    "rtx1": {
+      "sha256": "4b9d47b2460099d196101fc1626642d2142d712a182cc48efd104b549d402f41",
+      "cases": [
+        "PASS capacity=1 rows=1 case=0 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=1 rows=1 case=1 max_abs=0 changed=0 bytes=287000",
+        "PASS capacity=16 rows=13 case=0 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=16 rows=13 case=1 max_abs=0 changed=0 bytes=2045072",
+        "PASS capacity=80 rows=73 case=0 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=80 rows=73 case=1 max_abs=0 changed=0 bytes=9725584",
+        "PASS capacity=256 rows=255 case=0 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=256 rows=255 case=1 max_abs=0 changed=0 bytes=30967824",
+        "PASS capacity=1024 rows=1001 case=0 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=1024 rows=1001 case=1 max_abs=0 changed=0 bytes=123871248",
+        "PASS capacity=4096 rows=4095 case=0 max_abs=0 changed=0 bytes=495484944",
+        "PASS capacity=4096 rows=4095 case=1 max_abs=0 changed=0 bytes=495484944"
+      ]
+    }
+  },
+  "extra_device_bytes": 0,
+  "real_checkpoint_execution": false
+}

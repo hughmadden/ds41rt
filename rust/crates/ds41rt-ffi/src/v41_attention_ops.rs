@@ -15,10 +15,12 @@ type Kv =
 type Rope =
     unsafe extern "C" fn(*const u16, *const f32, *mut u16, i32, i32, i32, *mut c_void) -> i32;
 type Frequencies = unsafe extern "C" fn(*const u64, *mut f32, i32, *mut c_void) -> i32;
+type Tap = unsafe extern "C" fn(*const u16, *mut u16, i32, i32, *mut c_void) -> i32;
 pub struct V41AttentionOps<'a> {
     _library: &'a NativeLibrary,
     norm: Norm,
     frequencies: Frequencies,
+    tap: Tap,
     kv: Kv,
     rope: Rope,
 }
@@ -33,6 +35,7 @@ impl NativeLibrary {
     pub fn v41_attention_ops(&self) -> Result<V41AttentionOps<'_>> {
         Ok(V41AttentionOps {
             _library: self,
+            tap: unsafe { *self.lib.get(b"ds41rt_v41_dspark_tap")? },
             frequencies: unsafe { *self.lib.get(b"ds41rt_v41_dspark_frequencies")? },
             kv: unsafe { *self.lib.get(b"ds41rt_v41_attention_kv")? },
             norm: unsafe { *self.lib.get(b"ds41rt_v41_attention_norm")? },
@@ -41,6 +44,37 @@ impl NativeLibrary {
     }
 }
 impl V41AttentionOps<'_> {
+    /// # Safety
+    /// Input is initialized finite BF16 [rows,4,5120] after the target layer's
+    /// engram update and before attention; output is disjoint [rows,15360].
+    /// Storage is on the stream device and stays live through completion/replay.
+    pub unsafe fn tap(
+        &self,
+        input: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: u32,
+        layer: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            (1..=4096).contains(&rows) && (37..=39).contains(&layer),
+            "invalid dSpark tap geometry"
+        );
+        buffer(input, rows as usize * 40960)?;
+        buffer(output, rows as usize * 30720)?;
+        let status = unsafe {
+            (self.tap)(
+                input.ptr.cast(),
+                output.ptr.cast(),
+                rows as i32,
+                layer as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native tap CUDA status {status}");
+        Ok(())
+    }
+
     /// # Safety
     /// Initialized U64 absolute positions and disjoint FP32 output are on the
     /// stream device and stay live through completion and graph replay.
