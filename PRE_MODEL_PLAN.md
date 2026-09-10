@@ -14,6 +14,7 @@ Goal 1 ends when the official checkpoint can be loaded and executed by the quali
 - [ ] Implement and fuse single-pass mHC, normalization, RoPE, projections, and modality-aware routing against the official numerical reference.
 - [x] Implement deterministic engram tokenizer compression, prime layouts, hashes, image barriers, and per-request history.
 - [ ] Memory-map native engram weights and scales with bounded asynchronous prefetch, deduplication, staging, and request-safe cancellation.
+- [x] Add CUDA engram row dequantization and fused gate/residual kernels with native and Rust entry points qualified on both RTX GPUs.
 - [ ] Wire early engram prefetch for decode, speculative verification, and batched prefill with rollback-safe history.
 - [ ] Implement native FP4 backbone expert tensor parallelism through the AFD transport with appropriate SparkInfer/b12x kernels.
 - [ ] Implement native image processing, ViT, aligner, image-span embeddings, and vision routing through the serving API.

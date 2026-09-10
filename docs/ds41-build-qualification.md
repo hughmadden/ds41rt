@@ -24,3 +24,9 @@ Container builds, GPU/native CUDA execution, the five CUTLASS-dependent tests, a
 The host default Python 3.14 exceeds the pinned PyO3 version's supported range; select Python 3.12 using `DS41RT_PYTHON="$(uv python find 3.12)" scripts/run-with-python-env.sh COMMAND` for current Rust qualification.
 
 An attempted unfiltered daemon run against the CPU native library correctly rejected CUDA-dependent tests, so that run does not qualify GPU behavior.
+
+## CUDA native library follow-up
+
+A native CUDA build using `/usr/local/cuda-13.3/bin/nvcc` and architecture 120 now succeeds, with all three native/CUDA/XGrammar self-tests passing; the CPU build also still passes both self-tests.
+
+The new engram CUDA primitives are qualified on both local RTX GPUs as recorded in `ds41-engram-cuda-qualification.json`, while container, Spark, and full serving qualification remains open.

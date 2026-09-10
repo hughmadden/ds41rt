@@ -84,3 +84,19 @@ Qualification command: `.venv/bin/python scripts/qualify-ds41-engram.py --refere
 The pinned official `NgramHashState` agrees exactly across 128 interleaved batches on 16 request histories, covering image barriers, chunked input, and partial or zero acceptance; this proves host addressing equivalence rather than full serving concurrency or GPU execution.
 
 The complete core and loader test suites pass 119 and 58 tests respectively, and the qualification tools create their transient inputs in automatically removed temporary directories.
+
+## Engram CUDA primitives
+
+The native library and Rust FFI expose allocation-free asynchronous engram row dequantization and fused gate/residual operations at the official dimensions.
+
+The gate uses one block per token and residual stream, retains the residual in registers, reduces per-stream norms and the weighted dot product, applies the signed-root sigmoid, and rounds the final residual addition to BF16 with round-to-nearest-even.
+
+The dequantizer consumes gathered 256-byte FP8 rows with eight UE8M0 scales, including subnormal scales and NaN encodings, and produces BF16 rows for the engram projection input.
+
+`docs/ds41-engram-cuda-qualification.json` records commands, source hashes, GPU identities, library hash, and results for both RTX GPUs, including graph replay with mutated inputs and unchanged replay allocation counts.
+
+Dequantization matches PyTorch exactly across the tested encoding cases, and the gate matches the pinned official forward within BF16 tolerance at 1, 16, 80, and 256 tokens, with maximum observed absolute difference 0.0078125.
+
+A 104860-row GPU case validates element offsets beyond 2^31, both CPU native self-tests and all three CUDA native self-tests pass, and the compiler reports zero stack and local memory for both new kernels.
+
+These results qualify the two CUDA primitives; engram projection GEMM, pinned host/device staging, prefetch deadlines, and request graph integration remain unfinished.

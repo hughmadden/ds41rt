@@ -807,6 +807,15 @@ ds41rt_cuda_ds4_flash_shared_expert_fp8_bf16_async(
 #endif
 
 #if !DS41RT_NATIVE_ENABLE_CUDA
+extern "C" ds41rt_status_t ds41rt_cuda_engram_dequant_bf16_async(
+    const uint8_t*, const uint8_t*, uint16_t*, int, void*) {
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "CUDA engram dequant is unavailable in this build");
+}
+extern "C" ds41rt_status_t ds41rt_cuda_engram_gate_bf16_async(
+    const uint16_t*, const uint16_t*, const uint16_t*, const uint16_t*,
+    const uint8_t*, uint16_t*, int, void*) {
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "CUDA engram gate is unavailable in this build");
+}
 extern "C" ds41rt_status_t ds41rt_cuda_b12x_quantize_bf16_nvfp4_row_payload_async(
     ds41rt_device_buffer_t, ds41rt_device_buffer_t, size_t, size_t, void*) {
   return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "CUDA kernels are not built");

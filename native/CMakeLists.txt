@@ -186,6 +186,7 @@ if(DS41RT_ENABLE_CUDA)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
   list(APPEND DS41RT_NATIVE_SOURCES
+    cuda/kernels/engram.cu
     cuda/kernels/norm.cu
     cuda/kernels/mlp.cu
     cuda/kernels/residual.cu

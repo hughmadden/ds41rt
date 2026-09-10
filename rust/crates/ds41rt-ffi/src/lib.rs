@@ -5659,6 +5659,62 @@ impl NativeLibrary {
         self.status_to_result("ds41rt_cuda_rmsnorm_bf16", status)
     }
 
+    /// Dequantize gathered engram FP8 rows and UE8M0 scales into a preallocated BF16 buffer.
+    ///
+    /// # Safety
+    /// Buffers must be nonoverlapping, device-resident on the stream's device,
+    /// and remain valid until the stream completes.
+    pub unsafe fn cuda_engram_dequant_bf16_async(
+        &self, weights: Ds41rtDeviceBuffer, scales: Ds41rtDeviceBuffer,
+        out: Ds41rtDeviceBuffer, hash_rows: i32, cuda_stream: *mut c_void,
+    ) -> Result<()> {
+        const NAME: &str = "ds41rt_cuda_engram_dequant_bf16_async";
+        validate_f32_rows(NAME, hash_rows, 256)?;
+        let values = checked_row_values(NAME, hash_rows as usize, 256)?;
+        validate_device_buffer_bytes(NAME, weights, values)?;
+        validate_device_buffer_bytes(NAME, scales, values / 32)?;
+        validate_u16_buffer_values(NAME, out, values)?;
+        type Kernel = unsafe extern "C" fn(*const u8, *const u8, *mut u16, i32, *mut c_void) -> Ds41rtStatus;
+        let kernel: Symbol<Kernel> = unsafe { self.lib.get(b"ds41rt_cuda_engram_dequant_bf16_async")? };
+        let status = unsafe { kernel(weights.ptr.cast(), scales.ptr.cast(), out.ptr.cast(), hash_rows, cuda_stream) };
+        self.status_to_result(NAME, status)
+    }
+
+    /// Fused official V4.1 engram gate; buffers must remain live on the stream.
+    ///
+    /// # Safety
+    /// All buffers must be device-resident on the stream's device; output may
+    /// equal x but must not overlap projected_kv, weights, or the text mask.
+    pub unsafe fn cuda_engram_gate_bf16_async(
+        &self,
+        x: Ds41rtDeviceBuffer,
+        projected_kv: Ds41rtDeviceBuffer,
+        q_weight: Ds41rtDeviceBuffer,
+        k_weight: Ds41rtDeviceBuffer,
+        text_mask: Option<Ds41rtDeviceBuffer>,
+        out: Ds41rtDeviceBuffer,
+        rows: i32,
+        cuda_stream: *mut c_void,
+    ) -> Result<()> {
+        const NAME: &str = "ds41rt_cuda_engram_gate_bf16_async";
+        validate_f32_rows(NAME, rows, 5120)?;
+        let residual_values = checked_row_values(NAME, rows as usize, 4 * 5120)?;
+        let kv_values = checked_row_values(NAME, rows as usize, 5 * 5120)?;
+        validate_u16_buffer_values(NAME, x, residual_values)?;
+        validate_u16_buffer_values(NAME, out, residual_values)?;
+        validate_u16_buffer_values(NAME, projected_kv, kv_values)?;
+        validate_u16_buffer_values(NAME, q_weight, 4 * 5120)?;
+        validate_u16_buffer_values(NAME, k_weight, 4 * 5120)?;
+        if let Some(mask) = text_mask { validate_device_buffer_bytes(NAME, mask, rows as usize)?; }
+        type Kernel = unsafe extern "C" fn(*const u16, *const u16, *const u16, *const u16,
+            *const u8, *mut u16, i32, *mut c_void) -> Ds41rtStatus;
+        let kernel: Symbol<Kernel> = unsafe { self.lib.get(b"ds41rt_cuda_engram_gate_bf16_async")? };
+        let status = unsafe { kernel(x.ptr.cast(), projected_kv.ptr.cast(), q_weight.ptr.cast(),
+            k_weight.ptr.cast(), text_mask.map_or(std::ptr::null(), |mask| mask.ptr.cast()),
+            out.ptr.cast(), rows, cuda_stream) };
+        self.status_to_result(NAME, status)
+    }
+
     pub unsafe fn cuda_rmsnorm_bf16_async(
         &self,
         x: Ds41rtDeviceBuffer,

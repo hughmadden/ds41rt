@@ -691,6 +691,20 @@ ds41rt_status_t ds41rt_cuda_rmsnorm_f32(const float* x, const float* weight, flo
                                       int rows, int hidden, float eps);
 ds41rt_status_t ds41rt_cuda_rmsnorm_f32_async(const float* x, const float* weight, float* out,
                                             int rows, int hidden, float eps, void* cuda_stream);
+// Dequantize gathered official FP8 rows [hash_rows,256] and UE8M0 scales
+// [hash_rows,8] to BF16 [hash_rows,256], on the supplied stream without allocation.
+ds41rt_status_t ds41rt_cuda_engram_dequant_bf16_async(
+    const uint8_t* weights, const uint8_t* scales, uint16_t* out, int hash_rows, void* cuda_stream);
+
+// V4.1 engram gate: BF16 x/out [rows,4,5120], projected kv [rows,5,5120],
+// q/k weights [4,5120], optional U8 text_mask [rows] (zero preserves x).
+// All pointers are device-resident; out may equal x but must not alias kv/weights.
+// No allocation or synchronization; valid during CUDA graph capture.
+ds41rt_status_t ds41rt_cuda_engram_gate_bf16_async(
+    const uint16_t* x, const uint16_t* kv, const uint16_t* q_weight,
+    const uint16_t* k_weight, const uint8_t* text_mask, uint16_t* out,
+    int rows, void* cuda_stream);
+
 ds41rt_status_t ds41rt_cuda_rmsnorm_bf16(const uint16_t* x, const uint16_t* weight, uint16_t* out,
                                        int rows, int hidden, float eps);
 ds41rt_status_t ds41rt_cuda_rmsnorm_bf16_async(const uint16_t* x, const uint16_t* weight,

@@ -1,0 +1,143 @@
+{
+  "source_sha256": {
+    "native/cuda/kernels/engram.cu": "aa1de802f1ed08c0fcf786aa81efef4c669423051582de9c33a904fd408a43da",
+    "native/include/ds41rt_native.h": "8a5a859f310e8a1383408257ad32d83bf70f24b5a812da77a672c2091c7db6d0",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "13779887dac2f0df0b1f6015c798a4f941c64ce509fba747aab2e9552e04966b",
+    "scripts/qualify-ds41-engram-gate.py": "443564794db353d9d9dfcf8736f02db5c387b9500db8d141122ef282815c6160"
+  },
+  "gpu_inventory": [
+    "0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.71.05",
+    "1, GPU-95f8f212-9131-df99-fd53-7535965197d7, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.71.05"
+  ],
+  "commands": [
+    "cmake -S native -B native/build-cuda-ds41 -G Ninja -DDS41RT_ENABLE_CUDA=ON -DDS41RT_ENABLE_RDMA=OFF -DDS41RT_CUDA_ARCHITECTURES=120 -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.3/bin/nvcc",
+    "cmake --build native/build-cuda-ds41 -j 12",
+    ".venv/bin/python scripts/qualify-ds41-engram-gate.py --library native/build-cuda-ds41/libds41rt_native.so --reference-dir /tmp/ds41-reference --device 0 --large-offset",
+    ".venv/bin/python scripts/qualify-ds41-engram-gate.py --library native/build-cuda-ds41/libds41rt_native.so --reference-dir /tmp/ds41-reference --device 1",
+    "ctest --test-dir native/build-cuda-ds41 --output-on-failure"
+  ],
+  "results": [
+    {
+      "device": 0,
+      "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "cases": [
+        {
+          "hash_rows": 1,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "hash_rows": 24,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "hash_rows": 384,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "hash_rows": 1920,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "rows": 1,
+          "max_abs_error": 0.0,
+          "graph_replay": true,
+          "inplace": true
+        },
+        {
+          "rows": 16,
+          "max_abs_error": 3.0517578125e-05,
+          "graph_replay": true,
+          "inplace": true
+        },
+        {
+          "rows": 80,
+          "max_abs_error": 0.0078125,
+          "graph_replay": true,
+          "inplace": true
+        },
+        {
+          "rows": 256,
+          "max_abs_error": 0.0078125,
+          "graph_replay": true,
+          "inplace": true
+        },
+        {
+          "rows": 104860,
+          "high_element_offset": 2147512320,
+          "large_offset": true
+        }
+      ],
+      "library_sha256": "c201b037d0d74df4bd1bc98f67c3ec25fb1eaa21d7e960ebe7d3fcb5fa1779a2"
+    },
+    {
+      "device": 1,
+      "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "cases": [
+        {
+          "hash_rows": 1,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "hash_rows": 24,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "hash_rows": 384,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "hash_rows": 1920,
+          "dequant_exact": true,
+          "graph_replay": true
+        },
+        {
+          "rows": 1,
+          "max_abs_error": 0.0,
+          "graph_replay": true,
+          "inplace": true
+        },
+        {
+          "rows": 16,
+          "max_abs_error": 3.0517578125e-05,
+          "graph_replay": true,
+          "inplace": true
+        },
+        {
+          "rows": 80,
+          "max_abs_error": 0.0078125,
+          "graph_replay": true,
+          "inplace": true
+        },
+        {
+          "rows": 256,
+          "max_abs_error": 0.0078125,
+          "graph_replay": true,
+          "inplace": true
+        }
+      ],
+      "library_sha256": "c201b037d0d74df4bd1bc98f67c3ec25fb1eaa21d7e960ebe7d3fcb5fa1779a2"
+    }
+  ],
+  "resources": {
+    "gate": {
+      "registers": 40,
+      "stack_bytes": 0,
+      "local_bytes": 0,
+      "shared_bytes": 1120
+    },
+    "dequant": {
+      "registers": 12,
+      "stack_bytes": 0,
+      "local_bytes": 0,
+      "shared_bytes": 0
+    }
+  },
+  "scope": "Engram primitive correctness and CUDA graph replay only; no throughput or complete model execution claim."
+}
