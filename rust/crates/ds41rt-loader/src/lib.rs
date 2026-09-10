@@ -1,3 +1,5 @@
+mod engram_staging;
+pub use engram_staging::{EngramBatchStaging, EngramGatherView};
 mod v41_expert_staging;
 pub use v41_expert_staging::{V41ExpertSelection, V41ExpertStaging};
 mod v41_catalog;

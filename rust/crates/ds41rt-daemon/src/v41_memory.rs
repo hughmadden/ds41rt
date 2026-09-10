@@ -1,0 +1,66 @@
+//! Native device/pinned allocation and stream owners shared by model components.
+use anyhow::Result;
+use ds41rt_ffi::{Ds41rtDeviceBuffer, Ds41rtHostBuffer, NativeLibrary};
+use std::ffi::c_void;
+
+pub(crate) struct DeviceAllocation<'a> {
+    pub(crate) library: &'a NativeLibrary,
+    pub(crate) buffer: Ds41rtDeviceBuffer,
+}
+impl<'a> DeviceAllocation<'a> {
+    pub(crate) fn new(library: &'a NativeLibrary, bytes: usize) -> Result<Self> {
+        Ok(Self {
+            library,
+            buffer: library.alloc_device_buffer(bytes)?,
+        })
+    }
+}
+impl Drop for DeviceAllocation<'_> {
+    fn drop(&mut self) {
+        if let Err(error) = self.library.free_device_buffer(&mut self.buffer) {
+            tracing::error!(%error, "freeing V4.1 device allocation");
+        }
+    }
+}
+pub(crate) struct HostAllocation<'a> {
+    pub(crate) library: &'a NativeLibrary,
+    pub(crate) buffer: Ds41rtHostBuffer,
+}
+impl<'a> HostAllocation<'a> {
+    pub(crate) fn new(library: &'a NativeLibrary, bytes: usize) -> Result<Self> {
+        let value = Self {
+            library,
+            buffer: library.alloc_host_buffer(bytes)?,
+        };
+        // Padding must also be initialized before copying the contiguous arena.
+        unsafe {
+            std::ptr::write_bytes(value.buffer.ptr.cast::<u8>(), 0, bytes);
+        }
+        Ok(value)
+    }
+    pub(crate) fn bytes_mut(&mut self) -> &mut [u8] {
+        unsafe { std::slice::from_raw_parts_mut(self.buffer.ptr.cast::<u8>(), self.buffer.bytes) }
+    }
+}
+impl Drop for HostAllocation<'_> {
+    fn drop(&mut self) {
+        if let Err(error) = self.library.free_host_buffer(&mut self.buffer) {
+            tracing::error!(%error, "freeing V4.1 pinned staging");
+        }
+    }
+}
+pub(crate) struct LoadStream<'a> {
+    pub(crate) library: &'a NativeLibrary,
+    pub(crate) raw: *mut c_void,
+}
+impl Drop for LoadStream<'_> {
+    fn drop(&mut self) {
+        // Owners must drop this stream before releasing buffers used by queued work.
+        if let Err(error) = unsafe { self.library.cuda_stream_synchronize(self.raw) } {
+            tracing::error!(%error, "draining V4.1 loading stream");
+        }
+        if let Err(error) = unsafe { self.library.cuda_stream_destroy(self.raw) } {
+            tracing::error!(%error, "destroying V4.1 loading stream");
+        }
+    }
+}

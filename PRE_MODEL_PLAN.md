@@ -74,3 +74,5 @@ TCP streaming progress: the service listener now supports opt-in bounded streami
 Native service progress: `expertd-native` registers a dedicated GPU worker with full TP-rank residency, pre-admitted loading/workspace budgets, shared execution scratch and bounded queues, while deployment migration, coordinator dispatch and runtime qualification remain open in `docs/ds41-native-expert-service.md`.
 
 Coordinator TP progress: concurrent four-peer dispatch now feeds an owned RTX wave through validated chunk copies and completion-gated native reduction, while model scheduler wiring, device ingress, RDMA and runtime qualification remain pending.
+
+Engram staging progress: reusable 16-request gathers deduplicate and address-sort mapped row reads before restoring token/head order, and an owned RTX upload/dequantization path produces BF16 embeddings and image masks while background gather scheduling, projection/gate wiring and runtime qualification remain open.

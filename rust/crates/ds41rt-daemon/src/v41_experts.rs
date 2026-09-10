@@ -1,4 +1,5 @@
 //! Native V4.1 expert residency; one GPU worker owns each layer and its buffers.
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 mod execution;
 pub(crate) mod service;
 pub(crate) mod coordinator;
@@ -6,7 +7,7 @@ pub(crate) use execution::{ExpertExecution, ExpertExecutionBudget, HostExpertExc
 
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, Ds41rtHostBuffer, NativeLibrary, V41ExpertKernel, V41_EXPERT_POINTER_COUNT,
+    NativeLibrary, V41ExpertKernel, V41_EXPERT_POINTER_COUNT,
 };
 use ds41rt_loader::{OfficialV41Catalog, V41ExpertSelection};
 use std::ffi::c_void;
@@ -44,68 +45,6 @@ impl ExpertLoadBudget {
         self.resident_bytes
             .checked_add(self.device_staging_bytes)
             .context("expert load budget overflow")
-    }
-}
-
-struct DeviceAllocation<'a> {
-    library: &'a NativeLibrary,
-    buffer: Ds41rtDeviceBuffer,
-}
-impl<'a> DeviceAllocation<'a> {
-    fn new(library: &'a NativeLibrary, bytes: usize) -> Result<Self> {
-        Ok(Self {
-            library,
-            buffer: library.alloc_device_buffer(bytes)?,
-        })
-    }
-}
-impl Drop for DeviceAllocation<'_> {
-    fn drop(&mut self) {
-        if let Err(error) = self.library.free_device_buffer(&mut self.buffer) {
-            tracing::error!(%error, "freeing V4.1 expert device allocation");
-        }
-    }
-}
-struct HostAllocation<'a> {
-    library: &'a NativeLibrary,
-    buffer: Ds41rtHostBuffer,
-}
-impl<'a> HostAllocation<'a> {
-    fn new(library: &'a NativeLibrary, bytes: usize) -> Result<Self> {
-        let value = Self {
-            library,
-            buffer: library.alloc_host_buffer(bytes)?,
-        };
-        // Padding must also be initialized before copying the contiguous arena.
-        unsafe {
-            std::ptr::write_bytes(value.buffer.ptr.cast::<u8>(), 0, bytes);
-        }
-        Ok(value)
-    }
-    fn bytes_mut(&mut self) -> &mut [u8] {
-        unsafe { std::slice::from_raw_parts_mut(self.buffer.ptr.cast::<u8>(), self.buffer.bytes) }
-    }
-}
-impl Drop for HostAllocation<'_> {
-    fn drop(&mut self) {
-        if let Err(error) = self.library.free_host_buffer(&mut self.buffer) {
-            tracing::error!(%error, "freeing V4.1 expert pinned staging");
-        }
-    }
-}
-struct LoadStream<'a> {
-    library: &'a NativeLibrary,
-    raw: *mut c_void,
-}
-impl Drop for LoadStream<'_> {
-    fn drop(&mut self) {
-        // Declared after buffers so failure cleanup drains GPU work before freeing them.
-        if let Err(error) = unsafe { self.library.cuda_stream_synchronize(self.raw) } {
-            tracing::error!(%error, "draining V4.1 expert loading stream");
-        }
-        if let Err(error) = unsafe { self.library.cuda_stream_destroy(self.raw) } {
-            tracing::error!(%error, "destroying V4.1 expert loading stream");
-        }
     }
 }
 

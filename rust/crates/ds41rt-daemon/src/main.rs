@@ -7,6 +7,8 @@ mod cli;
 mod commands;
 mod python_graph_capture;
 mod v41_experts;
+mod v41_memory;
+mod v41_engram;
 
 use cli::{Cli, Commands};
 use commands::bench_cuda_kernels::run_bench_cuda_kernels;
