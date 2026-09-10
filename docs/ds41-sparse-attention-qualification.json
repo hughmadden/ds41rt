@@ -1,0 +1,355 @@
+{
+  "scope": "Native FP8 sparse attention consumer; owned proposal/selection composition and backbone integration remain open",
+  "source_sha256": {
+    "native/CMakeLists.txt": "e80ebca5b12befd926f13603edbf76673514e1a8604fc283eb22bd55207861bd",
+    "native/cuda/kernels/v41_sparse_attention.cu": "e1bbbc84364383d697e49a1fead013d79dc5fa6eaa96dd31108fb432c93f3886",
+    "native/include/ds41rt_v41_sparse_attention.h": "954e2d9706090556d78e733a10ae077f1d6f6cd86de9f1a3e51f51d5b4118ad9",
+    "rust/crates/ds41rt-ffi/src/v41_sparse_attention.rs": "ae009357f462ff3fb993b81bf73202ef954605fc546a6214da36381ba17b8a78",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "2ed1d2bc10780efc105137817b494be1181044957931ee2e7f2e76ad949f4bfd",
+    "scripts/qualify-ds41-sparse-attention.py": "d9fc99874555ef65a08ce2c8b67b0704ea6b87ca27df15e82e165d476b68e6c6"
+  },
+  "native_library_sha256": "feb70ab33b224293b0b52dbfc06b501c928d6aaedbbe82ff5960387fb4b5c5af",
+  "build_logs_sha256": {
+    "/tmp/ds41-sparse-native-build.log": "e4c9165a715187724d403325e9b124292a31dd0c282a3db0a615e5f9c71e9f83",
+    "/tmp/ds41-sparse-rust-build.log": "a812b58953a7b69a6cc438502b5c9101b27f942b801b244f608450a185847178",
+    "/tmp/ds41-sparse-ffi-build.log": "02d52bab909b250454eb2d01a076baaef3681f8449091f0a7257dfddbd35ca56"
+  },
+  "ffi_fixture_sha256": {
+    "/tmp/ds41-sparse-ffi/src/main.rs": "425653e4b0ff1d4dd6f3b88dbd4b5b0a58c3646be3ed7b8e0b7f49d44dfa338b",
+    "/tmp/ds41-sparse-ffi/src/v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e"
+  },
+  "gpus": {
+    "0": {
+      "numerical": {
+        "device": 0,
+        "reference_lock": {
+          "model_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+          "files": {
+            "DeepSeek_V41_Tech_Report.pdf": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
+            "README.md": "347c9db4e5506acb531cbc3b724407ab88e9af8781679152f0823d7bac16d251",
+            "config.json": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
+            "inference/README.md": "2834402823199ee24e9a42bdf36a0fc6daf94448f444cb062c042a057a798f1c",
+            "inference/config.json": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+            "inference/convert.py": "035028340479145594a81d6084a8424e57363adf83c0d5983914783d95614d76",
+            "inference/engram.py": "11f35ecbead8150c35aa002b3d180ef290b05a25afe883a11884f94d476d3897",
+            "inference/generate.py": "8668d67f7d108e32b90d50cb0d8606889ceb2219bfe95741d84e22f70768e9f0",
+            "inference/image_processor.py": "482759e3bcc4e9bb5ee582b244cc563f5d0e163d8b48dda91ebb7106e62f9272",
+            "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+            "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+            "inference/vision.py": "5d49edc196a4ef22384abe76d35a40098cbe1e74b586c8f66a2edff4f076b26c",
+            "model.safetensors.index.json": "74b0686a3d2891980d5e303251b075a3bccae2c2ff650747db2620a649b98fa8",
+            "tokenizer.json": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b"
+          }
+        },
+        "oracle": "Independent blockwise transcription for every row; actual pinned TileLang sparse attention for first min(rows,8) rows and all64 heads in independent16-head groups, before and after replay",
+        "native_library_sha256": "feb70ab33b224293b0b52dbfc06b501c928d6aaedbbe82ff5960387fb4b5c5af",
+        "cases": [
+          {
+            "rows": 1,
+            "start": 0,
+            "ratio": 1,
+            "compressed": false,
+            "max_abs": 0.0,
+            "official_reference_rows": 1,
+            "changed_graph": true,
+            "metadata_guards": 4,
+            "span_guards": true
+          },
+          {
+            "rows": 3,
+            "start": 0,
+            "ratio": 2,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 3,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 16,
+            "start": 63,
+            "ratio": 2,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 80,
+            "start": 127,
+            "ratio": 1,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 16,
+            "start": 255,
+            "ratio": 2,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 3,
+            "start": 1023,
+            "ratio": 1,
+            "compressed": true,
+            "max_abs": 0.00048828125,
+            "official_reference_rows": 3,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 4096,
+            "start": 0,
+            "ratio": 1,
+            "compressed": true,
+            "max_abs": 0.0078125,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          }
+        ]
+      },
+      "large_pool": {
+        "device": 0,
+        "reference_lock": {
+          "model_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+          "files": {
+            "DeepSeek_V41_Tech_Report.pdf": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
+            "README.md": "347c9db4e5506acb531cbc3b724407ab88e9af8781679152f0823d7bac16d251",
+            "config.json": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
+            "inference/README.md": "2834402823199ee24e9a42bdf36a0fc6daf94448f444cb062c042a057a798f1c",
+            "inference/config.json": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+            "inference/convert.py": "035028340479145594a81d6084a8424e57363adf83c0d5983914783d95614d76",
+            "inference/engram.py": "11f35ecbead8150c35aa002b3d180ef290b05a25afe883a11884f94d476d3897",
+            "inference/generate.py": "8668d67f7d108e32b90d50cb0d8606889ceb2219bfe95741d84e22f70768e9f0",
+            "inference/image_processor.py": "482759e3bcc4e9bb5ee582b244cc563f5d0e163d8b48dda91ebb7106e62f9272",
+            "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+            "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+            "inference/vision.py": "5d49edc196a4ef22384abe76d35a40098cbe1e74b586c8f66a2edff4f076b26c",
+            "model.safetensors.index.json": "74b0686a3d2891980d5e303251b075a3bccae2c2ff650747db2620a649b98fa8",
+            "tokenizer.json": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b"
+          }
+        },
+        "oracle": "Independent blockwise transcription for every row; actual pinned TileLang sparse attention for first min(rows,8) rows and all64 heads in independent16-head groups, before and after replay",
+        "native_library_sha256": "feb70ab33b224293b0b52dbfc06b501c928d6aaedbbe82ff5960387fb4b5c5af",
+        "cases": [
+          {
+            "page": 65535,
+            "physical_capacity": 16777216,
+            "maximum_page_stride": 4096,
+            "analytic_exact": true,
+            "changed_graph": true,
+            "invalid_page_masked": false
+          },
+          {
+            "page": 0,
+            "physical_capacity": 16777216,
+            "maximum_page_stride": 4096,
+            "analytic_exact": true,
+            "changed_graph": true,
+            "invalid_page_masked": false
+          },
+          {
+            "page": 65536,
+            "physical_capacity": 16777216,
+            "maximum_page_stride": 4096,
+            "analytic_exact": true,
+            "changed_graph": true,
+            "invalid_page_masked": true
+          }
+        ]
+      },
+      "qualification_logs_sha256": {
+        "/tmp/ds41-sparse-rtx0.log": "af2eab7d08c29dec011e27d415f260c717460b240676594c622cfa4bfda079a1",
+        "/tmp/ds41-sparse-large-rtx0.log": "00a0fd755c17ab20257f752ebe32d3cc37d2f1621b3df92c92b946aeaa7616d2",
+        "/tmp/ds41-sparse-ffi-rtx0.log": "69af2ecec19cbc25cb5d3df1379826c0dee639087634a2b37eeee438fa566821"
+      },
+      "raw_report_sha256": {
+        "/tmp/ds41-sparse-rtx0.json": "8ff64fa14f31c5fa8c006db53496d9ec0a32c17e2554511a472aa49349630621",
+        "/tmp/ds41-sparse-large-rtx0.json": "1370b4f7acf672db761d63a486c3e20b79aaaac0c0b8146aede36f74c36d52ba"
+      }
+    },
+    "1": {
+      "numerical": {
+        "device": 1,
+        "reference_lock": {
+          "model_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+          "files": {
+            "DeepSeek_V41_Tech_Report.pdf": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
+            "README.md": "347c9db4e5506acb531cbc3b724407ab88e9af8781679152f0823d7bac16d251",
+            "config.json": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
+            "inference/README.md": "2834402823199ee24e9a42bdf36a0fc6daf94448f444cb062c042a057a798f1c",
+            "inference/config.json": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+            "inference/convert.py": "035028340479145594a81d6084a8424e57363adf83c0d5983914783d95614d76",
+            "inference/engram.py": "11f35ecbead8150c35aa002b3d180ef290b05a25afe883a11884f94d476d3897",
+            "inference/generate.py": "8668d67f7d108e32b90d50cb0d8606889ceb2219bfe95741d84e22f70768e9f0",
+            "inference/image_processor.py": "482759e3bcc4e9bb5ee582b244cc563f5d0e163d8b48dda91ebb7106e62f9272",
+            "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+            "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+            "inference/vision.py": "5d49edc196a4ef22384abe76d35a40098cbe1e74b586c8f66a2edff4f076b26c",
+            "model.safetensors.index.json": "74b0686a3d2891980d5e303251b075a3bccae2c2ff650747db2620a649b98fa8",
+            "tokenizer.json": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b"
+          }
+        },
+        "oracle": "Independent blockwise transcription for every row; actual pinned TileLang sparse attention for first min(rows,8) rows and all64 heads in independent16-head groups, before and after replay",
+        "native_library_sha256": "feb70ab33b224293b0b52dbfc06b501c928d6aaedbbe82ff5960387fb4b5c5af",
+        "cases": [
+          {
+            "rows": 1,
+            "start": 0,
+            "ratio": 1,
+            "compressed": false,
+            "max_abs": 0.0,
+            "official_reference_rows": 1,
+            "changed_graph": true,
+            "metadata_guards": 4,
+            "span_guards": true
+          },
+          {
+            "rows": 3,
+            "start": 0,
+            "ratio": 2,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 3,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 16,
+            "start": 63,
+            "ratio": 2,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 80,
+            "start": 127,
+            "ratio": 1,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 16,
+            "start": 255,
+            "ratio": 2,
+            "compressed": true,
+            "max_abs": 0.0009765625,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 3,
+            "start": 1023,
+            "ratio": 1,
+            "compressed": true,
+            "max_abs": 0.00048828125,
+            "official_reference_rows": 3,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          },
+          {
+            "rows": 4096,
+            "start": 0,
+            "ratio": 1,
+            "compressed": true,
+            "max_abs": 0.0078125,
+            "official_reference_rows": 8,
+            "changed_graph": true,
+            "metadata_guards": 9,
+            "span_guards": true
+          }
+        ]
+      },
+      "large_pool": {
+        "device": 1,
+        "reference_lock": {
+          "model_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+          "files": {
+            "DeepSeek_V41_Tech_Report.pdf": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
+            "README.md": "347c9db4e5506acb531cbc3b724407ab88e9af8781679152f0823d7bac16d251",
+            "config.json": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
+            "inference/README.md": "2834402823199ee24e9a42bdf36a0fc6daf94448f444cb062c042a057a798f1c",
+            "inference/config.json": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+            "inference/convert.py": "035028340479145594a81d6084a8424e57363adf83c0d5983914783d95614d76",
+            "inference/engram.py": "11f35ecbead8150c35aa002b3d180ef290b05a25afe883a11884f94d476d3897",
+            "inference/generate.py": "8668d67f7d108e32b90d50cb0d8606889ceb2219bfe95741d84e22f70768e9f0",
+            "inference/image_processor.py": "482759e3bcc4e9bb5ee582b244cc563f5d0e163d8b48dda91ebb7106e62f9272",
+            "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+            "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+            "inference/vision.py": "5d49edc196a4ef22384abe76d35a40098cbe1e74b586c8f66a2edff4f076b26c",
+            "model.safetensors.index.json": "74b0686a3d2891980d5e303251b075a3bccae2c2ff650747db2620a649b98fa8",
+            "tokenizer.json": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b"
+          }
+        },
+        "oracle": "Independent blockwise transcription for every row; actual pinned TileLang sparse attention for first min(rows,8) rows and all64 heads in independent16-head groups, before and after replay",
+        "native_library_sha256": "feb70ab33b224293b0b52dbfc06b501c928d6aaedbbe82ff5960387fb4b5c5af",
+        "cases": [
+          {
+            "page": 65535,
+            "physical_capacity": 16777216,
+            "maximum_page_stride": 4096,
+            "analytic_exact": true,
+            "changed_graph": true,
+            "invalid_page_masked": false
+          },
+          {
+            "page": 0,
+            "physical_capacity": 16777216,
+            "maximum_page_stride": 4096,
+            "analytic_exact": true,
+            "changed_graph": true,
+            "invalid_page_masked": false
+          },
+          {
+            "page": 65536,
+            "physical_capacity": 16777216,
+            "maximum_page_stride": 4096,
+            "analytic_exact": true,
+            "changed_graph": true,
+            "invalid_page_masked": true
+          }
+        ]
+      },
+      "qualification_logs_sha256": {
+        "/tmp/ds41-sparse-rtx1.log": "af2eab7d08c29dec011e27d415f260c717460b240676594c622cfa4bfda079a1",
+        "/tmp/ds41-sparse-large-rtx1.log": "00a0fd755c17ab20257f752ebe32d3cc37d2f1621b3df92c92b946aeaa7616d2",
+        "/tmp/ds41-sparse-ffi-rtx1.log": "69af2ecec19cbc25cb5d3df1379826c0dee639087634a2b37eeee438fa566821"
+      },
+      "raw_report_sha256": {
+        "/tmp/ds41-sparse-rtx1.json": "206876734d64e533fb901f1a29ace9bc549e7f294436dc2de4b233a18369f1b3",
+        "/tmp/ds41-sparse-large-rtx1.json": "b9d5683bacd1d7da3f500fa0ef6134b66806fdcd1f21f9f218cdcefbd90d891d"
+      }
+    }
+  }
+}

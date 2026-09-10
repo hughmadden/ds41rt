@@ -4,6 +4,8 @@ mod v41_index_topk;
 pub use v41_index_topk::V41IndexTopK;
 mod v41_index_scores;
 mod v41_kv;
+mod v41_sparse_attention;
+pub use v41_sparse_attention::{V41SparseAttention, V41SparseSource, V41SparseWindow};
 pub use v41_index_scores::V41IndexScores;
 pub use v41_kv::V41Kv;
 mod v41_compressor;
