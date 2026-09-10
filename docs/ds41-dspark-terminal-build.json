@@ -1,0 +1,30 @@
+{
+  "scope": "Native library build, symbol inspection and daemon build only",
+  "runtime_qualified": false,
+  "requests": 16,
+  "draft_positions": 5,
+  "terminal_owner_bytes": 137446208,
+  "terminal_additional_bytes": 124109248,
+  "two_waves_partial_residency_bytes": 8359183192,
+  "external_inputs": [
+    "Shared-head logits",
+    "Collapsed pre-final-norm hidden states",
+    "Independent Exp(1) noise",
+    "Per-request temperatures",
+    "Anchor token IDs"
+  ],
+  "source_sha256": {
+    "native/include/ds41rt_v41_dspark.h": "40c67f0641cd7bf629b29f19201d597801f454bbc97b012a31f538b3d8b85ca3",
+    "native/cuda/kernels/v41_dspark.cu": "5911f512cdd090e2498358159d946987ac9355fe7403a35010dc1dc4b79ca988",
+    "rust/crates/ds41rt-ffi/src/v41_dspark.rs": "316dee393a2ec19103dc7c2d050fd509c65d5742ef24a9d4f29a148a58a3b1e3",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/terminal.rs": "e8816abb5f0d4f40ee441a7869f7d1cdeee29a6f0c2bbf66f7c69f11b130eb77",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/markov.rs": "2e3f22ac16b6cad56c85f06e541069ce652e8a8b692a1b0f13369c4610fca646",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/confidence.rs": "9c7a02f32aa73bb0325ca652aa64c473b822bb5a628cf7050ba3490a4783adea",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "5bd0e41b9226372e348ef286bdb4de7ea57214248ef64e38bb8182683e6a3240"
+  },
+  "library_sha256": "af94018422c1ab4126c03be2ee26dc5dcece0a6810e5c3fd4e109b62e3567832",
+  "build_logs": [
+    "/tmp/ds41-v41-fp8-aot/dspark-terminal-rust-build.log",
+    "/tmp/ds41-v41-fp8-aot/dspark-terminal-native-final-build.log"
+  ]
+}

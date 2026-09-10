@@ -1,4 +1,5 @@
 #include <cuda_runtime.h>
+#include <math_constants.h>
 #include <cuda_bf16.h>
 #include <stdint.h>
 #include "ds41rt_v41_dspark.h"
@@ -108,4 +109,51 @@ extern "C" int32_t ds41rt_v41_markov_launch(void* opaque, const uint16_t* embedd
       129280, rows, 256, &alpha, weight, CUDA_R_16BF, 256,
       embedding, CUDA_R_16BF, 256, &beta, logits, CUDA_R_32F, 129280,
       CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+}
+
+namespace {
+// Position-local logits remain raw for verification. Sampling uses log-space
+// exponential racing, equivalent in distribution to softmax(logits/T)/Exp(1).
+__global__ void draft_step(const float* shared, const float* bias,
+    const float* noise, const float* temperatures, float* adjusted, uint32_t* tokens) {
+  const int row = blockIdx.x, tid = threadIdx.x;
+  const float temperature = temperatures[row];
+  float best = -CUDART_INF_F;
+  uint32_t id = UINT32_MAX;
+  for (uint32_t col = tid; col < 129280; col += 256) {
+    const uint64_t offset = uint64_t(row) * 129280 + col;
+    const float value = shared[offset] + bias[offset];
+    adjusted[offset] = value;
+    const float score = temperature == 0 ? value
+        : value / fmaxf(temperature, 1e-5f) - logf(noise[offset]);
+    if (score > best || (score == best && col < id)) { best = score; id = col; }
+  }
+  __shared__ float scores[256];
+  __shared__ uint32_t indices[256];
+  scores[tid] = best; indices[tid] = id;
+  __syncthreads();
+  for (int stride = 128; stride; stride >>= 1) {
+    if (tid < stride && (scores[tid + stride] > scores[tid] ||
+        (scores[tid + stride] == scores[tid] && indices[tid + stride] < indices[tid]))) {
+      scores[tid] = scores[tid + stride]; indices[tid] = indices[tid + stride];
+    }
+    __syncthreads();
+  }
+  if (tid == 0) tokens[row] = indices[0];
+}
+}
+extern "C" int32_t ds41rt_v41_draft_step(const float* shared, const float* bias,
+    const float* noise, const float* temperatures, float* adjusted, uint32_t* tokens,
+    int32_t rows, void* stream) {
+  if (rows < 1 || rows > 16) return cudaErrorInvalidValue;
+  const uint64_t logits = uint64_t(rows) * 129280 * 4, small = uint64_t(rows) * 4;
+  const void* pointers[] = {shared, bias, noise, temperatures, adjusted, tokens};
+  const uint64_t bytes[] = {logits, logits, logits, small, logits, small};
+  for (int i = 0; i < 6; ++i) if (!span(pointers[i], bytes[i], 4)) return cudaErrorInvalidValue;
+  for (int i = 4; i < 6; ++i)
+    for (int j = 0; j < i; ++j)
+      if (!disjoint(pointers[i], bytes[i], pointers[j], bytes[j])) return cudaErrorInvalidValue;
+  draft_step<<<rows, 256, 0, reinterpret_cast<cudaStream_t>(stream)>>>(
+      shared, bias, noise, temperatures, adjusted, tokens);
+  return cudaGetLastError();
 }

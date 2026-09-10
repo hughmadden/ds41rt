@@ -1,8 +1,10 @@
 //! RTX-only ownership for every native dSpark tensor and independent stage experts.
 mod confidence;
 mod markov;
+mod terminal;
 pub(crate) use confidence::DsparkConfidence;
 pub(crate) use markov::DsparkMarkov;
+pub(crate) use terminal::DsparkTerminal;
 
 use super::{ExpertExecution, ExpertLayer, ExpertWeights};
 use crate::v41_tensors::NativeRtxTensors;
@@ -18,6 +20,7 @@ pub(crate) struct DsparkBudget {
     pub execution_bytes_per_wave: usize,
     pub confidence_bytes_per_wave: usize,
     pub markov_bytes_per_wave: usize,
+    pub terminal_additional_bytes_per_wave: usize,
 }
 impl DsparkBudget {
     pub fn resident_bytes(self) -> Result<usize> {
@@ -34,6 +37,7 @@ impl DsparkBudget {
             .execution_bytes_per_wave
             .checked_add(self.confidence_bytes_per_wave)
             .and_then(|bytes| bytes.checked_add(self.markov_bytes_per_wave))
+            .and_then(|bytes| bytes.checked_add(self.terminal_additional_bytes_per_wave))
             .context("dSpark combined wave budget overflow")?
             .checked_mul(waves)
             .context("dSpark wave budget overflow")?;
@@ -89,8 +93,9 @@ impl<'library> DsparkWeights<'library> {
             auxiliary_resident_bytes,
             load_staging_bytes,
             execution_bytes_per_wave,
-            confidence_bytes_per_wave: DsparkConfidence::device_bytes(capacity as usize)?,
+            confidence_bytes_per_wave: DsparkConfidence::device_bytes((capacity as usize).max(80))?,
             markov_bytes_per_wave: DsparkMarkov::device_bytes(16)?,
+            terminal_additional_bytes_per_wave: DsparkTerminal::additional_bytes(16)?,
         })
     }
     /// Admit all three stages and the requested expert wave workspaces before

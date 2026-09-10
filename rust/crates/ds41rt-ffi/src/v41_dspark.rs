@@ -147,3 +147,74 @@ impl Drop for V41DsparkMarkov<'_> {
         }
     }
 }
+
+type DraftStepFn = unsafe extern "C" fn(
+    *const f32,
+    *const f32,
+    *const f32,
+    *const f32,
+    *mut f32,
+    *mut u32,
+    i32,
+    *mut c_void,
+) -> i32;
+pub struct V41DraftStep<'a> {
+    _library: &'a NativeLibrary,
+    launch: DraftStepFn,
+}
+impl NativeLibrary {
+    pub fn v41_draft_step(&self) -> Result<V41DraftStep<'_>> {
+        let launch = unsafe { *self.lib.get::<DraftStepFn>(b"ds41rt_v41_draft_step")? };
+        Ok(V41DraftStep {
+            _library: self,
+            launch,
+        })
+    }
+}
+impl V41DraftStep<'_> {
+    /// # Safety
+    /// All buffers must live on the stream device through completion. Shared+bias
+    /// must be finite, temperatures finite/nonnegative and stochastic noise must
+    /// be positive finite Exp(1) variates, independently supplied per vocabulary
+    /// entry. Output spans must not overlap each other or any input.
+    pub unsafe fn launch(
+        &self,
+        shared: Ds41rtDeviceBuffer,
+        bias: Ds41rtDeviceBuffer,
+        noise: Ds41rtDeviceBuffer,
+        temperatures: Ds41rtDeviceBuffer,
+        adjusted: Ds41rtDeviceBuffer,
+        tokens: Ds41rtDeviceBuffer,
+        rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=16).contains(&rows), "invalid draft sampling rows");
+        for (buffer, bytes) in [
+            (shared, rows * 129280 * 4),
+            (bias, rows * 129280 * 4),
+            (noise, rows * 129280 * 4),
+            (temperatures, rows * 4),
+            (adjusted, rows * 129280 * 4),
+            (tokens, rows * 4),
+        ] {
+            ensure!(
+                !buffer.ptr.is_null() && buffer.bytes >= bytes,
+                "invalid draft sampling buffer"
+            );
+        }
+        let status = unsafe {
+            (self.launch)(
+                shared.ptr.cast(),
+                bias.ptr.cast(),
+                noise.ptr.cast(),
+                temperatures.ptr.cast(),
+                adjusted.ptr.cast(),
+                tokens.ptr.cast(),
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "draft sampling CUDA status {status}");
+        Ok(())
+    }
+}

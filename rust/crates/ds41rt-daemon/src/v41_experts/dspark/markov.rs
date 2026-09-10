@@ -73,6 +73,10 @@ impl DsparkMarkov<'_, '_> {
         Ok(())
     }
     unsafe fn enqueue(&self, rows: usize) -> Result<()> {
+        unsafe { self.enqueue_on(rows, self.stream.raw) }
+    }
+    pub(super) unsafe fn enqueue_on(&self, rows: usize, stream: *mut c_void) -> Result<()> {
+        self.validate_rows(rows)?;
         unsafe {
             self.stream.library.cuda_embedding_lookup_bf16_async(
                 self.weights.tensor("mtp.2.markov_head.embed.weight")?,
@@ -81,7 +85,7 @@ impl DsparkMarkov<'_, '_> {
                 rows,
                 129280,
                 256,
-                self.stream.raw,
+                stream,
             )?;
             // BF16 checkpoint weights and embeddings are exact FP32 values;
             // accumulate and expose FP32 logits without a BF16 output rounding.
@@ -90,9 +94,12 @@ impl DsparkMarkov<'_, '_> {
                 self.weights.tensor("mtp.2.markov_head.head.weight")?,
                 self.logits.buffer,
                 rows,
-                self.stream.raw,
+                stream,
             )
         }
+    }
+    pub(super) fn storage(&self) -> [Ds41rtDeviceBuffer; 2] {
+        [self.embedding.buffer, self.logits.buffer]
     }
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }

@@ -196,3 +196,5 @@ All dSpark stage experts and native auxiliary tensors now have combined RTX owne
 The pinned V4.1 confidence head returns raw FP32 projection scores, whereas the inherited terminal helper applies sigmoid; the new native path preserves raw scores and fuses concatenation/promotion with a parallel FP32 reduction, with build-only evidence and runtime numerical qualification pending.
 
 The Markov head now has owned BF16 embedding gather and FP32 projection output using a dedicated native cuBLAS handle with an explicit 4 MiB workspace; this matches the reference input/weight values and output precision but numerical reduction equivalence and full terminal-head integration remain unqualified.
+
+The V4.1 terminal sequence now preserves sequential Markov conditioning and confidence embeddings across five proposals, with greedy and log-space exponential-race sampling over all vocabulary entries; its position-major layout and external shared-head/RNG contracts are explicit, and build evidence does not establish numerical or sampling equivalence.

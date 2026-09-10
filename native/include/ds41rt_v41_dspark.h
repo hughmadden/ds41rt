@@ -17,6 +17,13 @@ int32_t ds41rt_v41_markov_create(void* workspace, uint64_t bytes, void** handle)
 int32_t ds41rt_v41_markov_destroy(void* handle);
 int32_t ds41rt_v41_markov_launch(void* handle, const uint16_t* embedding,
     const uint16_t* weight, float* logits, int32_t rows, void* stream);
+// One draft position: FP32 shared/bias/noise/adjusted [rows,129280],
+// temperatures [rows], u32 output tokens [rows]. Temperatures must be finite
+// and nonnegative; stochastic rows need positive finite Exp(1) noise per logit.
+// Shared+bias must be finite; all output spans must be disjoint from inputs.
+int32_t ds41rt_v41_draft_step(const float* shared, const float* bias,
+    const float* noise, const float* temperatures, float* adjusted, uint32_t* tokens,
+    int32_t rows, void* stream);
 #ifdef __cplusplus
 }
 #endif

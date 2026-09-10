@@ -69,6 +69,10 @@ impl DsparkConfidence<'_, '_> {
         Ok(())
     }
     unsafe fn enqueue(&self, rows: usize) -> Result<()> {
+        unsafe { self.enqueue_on(rows, self.stream.raw) }
+    }
+    pub(super) unsafe fn enqueue_on(&self, rows: usize, stream: *mut c_void) -> Result<()> {
+        self.validate_rows(rows)?;
         unsafe {
             self.kernel.launch(
                 self.hidden.buffer,
@@ -76,9 +80,12 @@ impl DsparkConfidence<'_, '_> {
                 self.weights.tensor("mtp.2.confidence_head.proj.weight")?,
                 self.output.buffer,
                 rows,
-                self.stream.raw,
+                stream,
             )
         }
+    }
+    pub(super) fn storage(&self) -> [Ds41rtDeviceBuffer; 1] {
+        [self.output.buffer]
     }
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
