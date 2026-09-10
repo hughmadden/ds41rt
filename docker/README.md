@@ -26,8 +26,8 @@ Run `./build.sh` from the repository root. It:
 7. exports binaries and hashes under ignored `dist/`.
 
 The release build refuses an unrecorded dirty tree. Development iterations use
-`./wip.sh`; an intentional frozen dirty snapshot must provide the source
-manifest described by `./build.sh --help`.
+`./wip.sh`; `./build.sh` automatically records a source manifest for a dirty checkout
+and checks it throughout the build, so keep source files unchanged until it finishes.
 
 ## Image contract
 
