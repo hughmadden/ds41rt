@@ -8,9 +8,158 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 
 import _pinned_sparkinfer
+
+
+POINTER_SLOTS = (
+    "a_ptr",
+    "topk_ids_ptr",
+    "topk_weights_ptr",
+    "packed_a_ptr",
+    "sfa_ptr",
+    "packed_a_storage_ptr",
+    "scale_storage_ptr",
+    "intermediate_ptr",
+    "barrier_count",
+    "barrier_epoch",
+    "pair_head",
+    "producers_done_count",
+    "all_work_published",
+    "task_head",
+    "task_tail",
+    "task_ready_ptr",
+    "task_expert_ptr",
+    "task_m_tile_ptr",
+    "task_slice_begin_ptr",
+    "task_slice_count_ptr",
+    "task_valid_rows_ptr",
+    "tile_write_count_ptr",
+    "b_w13",
+    "sfb_w13_ptr",
+    "b_down",
+    "sfb_down_ptr",
+    "sfb_w13_mx_ptr",
+    "sfb_down_mx_ptr",
+    "w13_residual_ptr",
+    "down_residual_ptr",
+    "w13_rp_ptr",
+    "w13_sfb_rp_ptr",
+    "down_rp_ptr",
+    "down_sfb_rp_ptr",
+    "row_counts",
+    "expert_write_rows",
+    "expert_tile_base",
+    "input_global_scale",
+    "alpha",
+    "down_alpha",
+    "global_scale",
+    "scatter_ptr",
+    "token_map_ptr",
+    "token_weights_ptr",
+)
+SCALAR_SLOTS = (
+    "num_tokens",
+    "max_rows",
+    "scatter_rows",
+    "rows_padded",
+    "max_tasks",
+    "max_phys_tiles",
+    "max_active_clusters",
+    "stream",
+)
+
+
+def write_native_bridge(output_dir: Path, manifest: dict) -> None:
+    """Reject exporter ABI drift before generating a native argument bridge."""
+    entries, includes = [], []
+    geometry = manifest["geometry"]
+    for variant in manifest["variants"]:
+        name = variant["name"]
+        header = (output_dir / (name + ".h")).read_text()
+        wrapper = re.search(
+            r"static inline int32_t cute_dsl_\w+_wrapper\((.*?)\) \{", header, re.S
+        )
+        if wrapper is None:
+            raise ValueError(f"missing C wrapper for {name}")
+        parameters = tuple(
+            re.search(r"(\w+)$", arg.strip())[1] for arg in wrapper[1].split(",")[1:]
+        )
+        if parameters != POINTER_SLOTS + SCALAR_SLOTS:
+            raise ValueError(
+                f"unsupported V4.1 native launch ABI for {name}: {parameters}"
+            )
+        tensor_slots = (
+            set(POINTER_SLOTS[8:15]) | {"b_w13", "b_down"} | set(POINTER_SLOTS[34:41])
+        )
+        prefix = "ds41rt_" + name
+        expected_declarations = [f"{prefix}_Kernel_Module_t*module"]
+        expected_declarations += [
+            f"{prefix}_Tensor_{slot}_t*{slot}"
+            if slot in tensor_slots
+            else f"void*{slot}"
+            for slot in POINTER_SLOTS
+        ]
+        expected_declarations += [f"int32_t{slot}" for slot in SCALAR_SLOTS[:-1]]
+        expected_declarations.append("cudaStream_tstream")
+        if [
+            re.sub(r"\s+", "", arg) for arg in wrapper[1].split(",")
+        ] != expected_declarations:
+            raise ValueError(f"unsupported exported parameter types for {name}")
+        tensors = re.findall(
+            r"typedef struct\s*\{([^}]+)\}\s*\w+_Tensor_\w+_t;", header
+        )
+        if len(tensors) != 16 or any(
+            re.sub(r"\s+", "", body) != "void*data;" for body in tensors
+        ):
+            raise ValueError(f"unsupported exported tensor ABI for {name}")
+        entry = re.search(
+            r"void (_mlir_\w+)\(void \*\*args, int32_t num_args\)", header
+        )
+        if entry is None:
+            raise ValueError(f"missing native launch entry for {name}")
+        variant["native_entry"] = entry[1]
+        packed = next(
+            t for t in variant["scratch_tensors"] if t["name"] == "packed_input"
+        )
+        variant["rows_padded"] = packed["shape"][1]
+        info = [
+            1,
+            int(manifest["role"] == "spark"),
+            geometry["experts"],
+            geometry["hidden"],
+            geometry["intermediate"],
+            geometry["kernel_intermediate"],
+            geometry["topk"],
+            variant["capacity_rows"],
+            variant["core_scratch_nbytes"],
+            variant["max_rows"],
+            variant["rows_padded"],
+            variant["task_capacity"],
+            variant["physical_tiles"],
+            variant["max_active_clusters"],
+        ]
+        entries.append(
+            "{{"
+            + ", ".join(map(str, info))
+            + "}, "
+            + f"_mlir_ds41rt_{name}_cuda_init, _mlir_ds41rt_{name}_cuda_load_to_device, "
+            + entry[1]
+            + "}"
+        )
+        includes.append(f'#include "{name}.h"')
+    manifest["native_abi_version"] = 1
+    manifest["pointer_slots"] = list(POINTER_SLOTS)
+    lines = [
+        "#pragma once",
+        *includes,
+        f"#define DS41RT_V41_CC_MINOR {manifest['capability'][1]}",
+        f"#define DS41RT_V41_SMS {manifest['physical_sms']}",
+        "#define DS41RT_V41_VARIANTS " + ", ".join(entries),
+    ]
+    (output_dir / "v41_expert_variants.h").write_text("\n".join(lines) + "\n")
 
 
 def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
@@ -134,6 +283,7 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
             }
         )
         print(f"exported {name}: capacity={capacity}, scratch={offset}", flush=True)
+    write_native_bridge(output_dir, manifest)
     (output_dir / "v41_experts.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 

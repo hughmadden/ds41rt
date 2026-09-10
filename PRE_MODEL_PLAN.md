@@ -50,3 +50,5 @@ TP arithmetic progress: native scratch-backed FP32 route outputs and TP4-before-
 Wire precision progress: revision-3 frames preserve FP32 routing weights and FP32 output payloads with owned/borrowed and persistent-TCP checks, while native executor, per-route collective, and RDMA integration remain open in `docs/ds41-wire-qualification.md`.
 
 AOT progress: role-specific native expert exports and b12x-owned scratch manifests now build into coordinator/Spark libraries and release/WIP artifacts, with M16 C-entry numerical/graph checks passing on RTX and ostrich while Rust binding and native preparation/reduction remain open.
+
+Native bridge progress: the Rust argument builder and checked C expert launch interface pass M16 numerical/graph checks on RTX and ostrich, with generated ABI validation and device/SM guards; native preparation, reduction and serving integration remain open in `docs/ds41-native-expert-bridge-qualification.md`.

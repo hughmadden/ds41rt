@@ -1,0 +1,46 @@
+{
+  "source_sha256": {
+    "native/include/ds41rt_v41_experts.h": "c93d7bee458956f55d1f8022eba94e6c91842cb54d5bb14738b0b7e9cf9f5285",
+    "native/src/v41_experts.cc": "1c90bdcdf24a44138467abf6a475cfe4aa5e42a0407f62515f4461a1d9879d72",
+    "native/cmake/v41_experts.cmake": "014f7126f7f8629f58ed9ff8d011f9e06f689bb7735fdce03a3efc0172773802",
+    "native/CMakeLists.txt": "de408e384af64a018221fa08e26c962b6051a5809dd60346c9503ffa2ee3204e",
+    "python/tools/export_b12x_v41_experts_aot.py": "952164f6f299bd39b8687b6d4849531b77f7784d4bed96f66cf2580dbdaedb22",
+    "rust/crates/ds41rt-ffi/src/v41_experts.rs": "b4671ece97d431c847df94cc4f98b0df63d9e709675ffd61598b9f7cfeca62b7",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "56dcd4ecbeb0cc38dd24f01bbfd5ecddf5075d845cb639dc1b23682a7782dc36"
+  },
+  "sparkinfer_revision": "cc3a553431a5890ea4c32408e6a5eac0fe2ecd48",
+  "results": {
+    "coordinator": {
+      "path": "Rust V41ExpertKernel -> checked native bridge -> exported AOT kernel",
+      "case": [
+        16,
+        2304,
+        128
+      ],
+      "numeric_and_mutated_graph": "passed",
+      "log_sha256": "1e4d01490593cdbdee955a3ada3477136bf72d823292bcf0d9d96b8e6200e36e",
+      "native_library_sha256": "f461e6a43a81992f742e2d8dfd3d514e7cee81ed2e24a8584101340e9cd92f3b",
+      "manifest_sha256": "0ce1ffa93d089169dabaac630cc658359c024351c4078a3943d75ab39435b917"
+    },
+    "spark": {
+      "path": "Rust V41ExpertKernel -> checked native bridge -> exported AOT kernel",
+      "case": [
+        16,
+        576,
+        384
+      ],
+      "numeric_and_mutated_graph": "passed",
+      "log_sha256": "725c07bb72e33b3f6c5b68eb86b19a722e61412d6e763efb479bea468c793660",
+      "native_library_sha256": "84ac0245540514509e2d0215b2291acd3a5de58910315089242da45fb4c1bb6f",
+      "manifest_sha256": "475d94f384e6572415db96ca29127e0709eabbd5a84085583fe06f62dbe44734"
+    }
+  },
+  "export_abi_rejections": {
+    "pointer_type": "unsupported exported parameter types for v41_coordinator_m1",
+    "scalar_width": "unsupported exported parameter types for v41_coordinator_m1",
+    "tensor_layout": "unsupported exported tensor ABI for v41_coordinator_m1",
+    "slot_name": "unsupported V4.1 native launch ABI for v41_coordinator_m1: ('a_ptr', 'wrong_route_ptr', 'topk_weights_ptr', 'packed_a_ptr', 'sfa_ptr', 'packed_a_storage_ptr', 'scale_storage_ptr', 'intermediate_ptr', 'barrier_count', 'barrier_epoch', 'pair_head', 'producers_done_count', 'all_work_published', 'task_head', 'task_tail', 'task_ready_ptr', 'task_expert_ptr', 'task_m_tile_ptr', 'task_slice_begin_ptr', 'task_slice_count_ptr', 'task_valid_rows_ptr', 'tile_write_count_ptr', 'b_w13', 'sfb_w13_ptr', 'b_down', 'sfb_down_ptr', 'sfb_w13_mx_ptr', 'sfb_down_mx_ptr', 'w13_residual_ptr', 'down_residual_ptr', 'w13_rp_ptr', 'w13_sfb_rp_ptr', 'down_rp_ptr', 'down_sfb_rp_ptr', 'row_counts', 'expert_write_rows', 'expert_tile_base', 'input_global_scale', 'alpha', 'down_alpha', 'global_scale', 'scatter_ptr', 'token_map_ptr', 'token_weights_ptr', 'num_tokens', 'max_rows', 'scatter_rows', 'rows_padded', 'max_tasks', 'max_phys_tiles', 'max_active_clusters', 'stream')"
+  },
+  "rust_unit_log": "   Compiling ds41rt-ffi v0.1.0 (/home/tj/Developer/ds41rt/rust/crates/ds41rt-ffi)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.35s\n     Running unittests src/lib.rs (rust/target/debug/deps/ds41rt_ffi-79d254786a7c10a3)\n\nrunning 1 test\ntest v41_experts::tests::native_abi_layout_and_capacity_checks ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 85 filtered out; finished in 0.00s\n\n",
+  "scope": "Native Rust argument builder and checked C launch bridge, M16 only; Python still prepares weights/scratch and launches final reduction. Full serving integration remains open."
+}

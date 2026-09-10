@@ -1,0 +1,111 @@
+#include "ds41rt_v41_experts.h"
+#include <cuda_runtime.h>
+#include <algorithm>
+#include <cstddef>
+#include <mutex>
+#include "v41_expert_variants.h"
+
+static_assert(sizeof(ds41rt_v41_expert_info_t) == 64);
+static_assert(sizeof(ds41rt_v41_expert_launch_t) == 392);
+static_assert(offsetof(ds41rt_v41_expert_launch_t, stream) == 384);
+
+namespace {
+using ModuleFn = void (*)(void**);
+using LaunchFn = void (*)(void**, int32_t);
+struct Variant {
+  ds41rt_v41_expert_info_t info;
+  ModuleFn initialize;
+  ModuleFn load;
+  LaunchFn launch;
+  cudaLibrary_t library = nullptr;
+  int device = -1;
+  ~Variant() { if (library) cudaLibraryUnload(library); }
+};
+Variant variants[] = {DS41RT_V41_VARIANTS};
+std::mutex initialization_mutex;
+Variant* by_capacity(int32_t capacity) {
+  for (auto& variant : variants)
+    if (variant.info.capacity_rows == static_cast<uint32_t>(capacity)) return &variant;
+  return nullptr;
+}
+}
+
+extern "C" int32_t ds41rt_v41_expert_info(int32_t capacity, ds41rt_v41_expert_info_t* out) {
+  auto* variant = by_capacity(capacity);
+  if (!variant || !out) return cudaErrorInvalidValue;
+  *out = variant->info;
+  return cudaSuccess;
+}
+
+extern "C" int32_t ds41rt_v41_expert_initialize(int32_t capacity, void** out) {
+  if (!out) return cudaErrorInvalidValue;
+  *out = nullptr;
+  auto* variant = by_capacity(capacity);
+  if (!variant) return cudaErrorInvalidValue;
+  int device = -1, major = 0, minor = 0, sms = 0;
+  cudaError_t status = cudaGetDevice(&device);
+  if (status != cudaSuccess) return status;
+  status = cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
+  if (status != cudaSuccess) return status;
+  status = cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+  if (status != cudaSuccess) return status;
+  status = cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, device);
+  if (status != cudaSuccess) return status;
+  if (major != 12 || minor != DS41RT_V41_CC_MINOR || sms != DS41RT_V41_SMS)
+    return cudaErrorInvalidDevice;
+  std::lock_guard<std::mutex> lock(initialization_mutex);
+  if (variant->device >= 0) {
+    if (variant->device != device) return cudaErrorInvalidDevice;
+    *out = variant;
+    return cudaSuccess;
+  }
+  auto* library_ptr = &variant->library;
+  void* init_args[] = {&library_ptr, &status};
+  variant->initialize(init_args);
+  if (status != cudaSuccess) {
+    if (variant->library) cudaLibraryUnload(variant->library);
+    variant->library = nullptr;
+    return status;
+  }
+  void* load_args[] = {&library_ptr, &device, &status};
+  variant->load(load_args);
+  if (status != cudaSuccess) {
+    cudaLibraryUnload(variant->library);
+    variant->library = nullptr;
+    return status;
+  }
+  variant->device = device;
+  *out = variant;
+  return cudaSuccess;
+}
+
+extern "C" int32_t ds41rt_v41_expert_launch(void* kernel, const ds41rt_v41_expert_launch_t* args) {
+  Variant* variant = nullptr;
+  for (auto& candidate : variants) if (&candidate == kernel) variant = &candidate;
+  if (!variant || !args || variant->device < 0) return cudaErrorInvalidValue;
+  const auto& info = variant->info;
+  if (args->num_tokens <= 0 || static_cast<uint32_t>(args->num_tokens) > info.capacity_rows ||
+      args->scatter_rows != args->num_tokens * static_cast<int32_t>(info.topk) ||
+      args->max_rows != info.max_rows || args->rows_padded != info.rows_padded ||
+      args->max_tasks != info.max_tasks || args->max_phys_tiles != info.max_phys_tiles ||
+      args->max_active_clusters <= 0 || args->max_active_clusters > 2 * DS41RT_V41_SMS)
+    return cudaErrorInvalidValue;
+  for (auto* pointer : args->tensors) if (!pointer) return cudaErrorInvalidValue;
+  int device = -1;
+  auto status = cudaGetDevice(&device);
+  if (status != cudaSuccess) return status;
+  if (device != variant->device) return cudaErrorInvalidDevice;
+  void* pointers[44];
+  std::copy(args->tensors, args->tensors + 44, pointers);
+  int32_t scalars[] = {args->num_tokens, args->max_rows, args->scatter_rows,
+    args->rows_padded, args->max_tasks, args->max_phys_tiles, args->max_active_clusters};
+  void* stream = args->stream;
+  int32_t result = 0;
+  void* parameters[53];
+  for (int i = 0; i < 44; ++i) parameters[i] = &pointers[i];
+  for (int i = 0; i < 7; ++i) parameters[44 + i] = &scalars[i];
+  parameters[51] = &stream;
+  parameters[52] = &result;
+  variant->launch(parameters, 53);
+  return result;
+}

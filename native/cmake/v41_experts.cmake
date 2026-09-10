@@ -19,6 +19,7 @@ foreach(rows IN ITEMS 1 16 80 256 1024 4096)
 endforeach()
 add_custom_command(
   OUTPUT "${DS41RT_V41_EXPERT_DIR}/v41_experts.json"
+    "${DS41RT_V41_EXPERT_DIR}/v41_expert_variants.h"
     ${DS41RT_V41_EXPERT_OBJECTS} ${DS41RT_V41_EXPERT_HEADERS}
   COMMAND ${DS41RT_SPARKINFER_VERIFY_COMMAND}
   COMMAND "${CMAKE_COMMAND}" -E env ${DS41RT_SPARKINFER_PYTHON_ENV}
@@ -31,9 +32,10 @@ add_custom_command(
   VERBATIM
 )
 add_custom_target(ds41rt_v41_experts_export DEPENDS
+  "${DS41RT_V41_EXPERT_DIR}/v41_expert_variants.h"
   "${DS41RT_V41_EXPERT_DIR}/v41_experts.json"
   ${DS41RT_V41_EXPERT_OBJECTS} ${DS41RT_V41_EXPERT_HEADERS})
 add_dependencies(ds41rt_v41_experts_export ds41rt_verify_sparkinfer_source)
 set_source_files_properties(${DS41RT_V41_EXPERT_OBJECTS} PROPERTIES
   EXTERNAL_OBJECT TRUE GENERATED TRUE)
-list(APPEND DS41RT_NATIVE_SOURCES ${DS41RT_V41_EXPERT_OBJECTS})
+list(APPEND DS41RT_NATIVE_SOURCES ${DS41RT_V41_EXPERT_OBJECTS} src/v41_experts.cc)

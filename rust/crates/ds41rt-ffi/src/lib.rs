@@ -1,3 +1,9 @@
+mod v41_experts;
+pub use v41_experts::{
+    V41ExpertInfo, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPointer,
+    V41_EXPERT_POINTER_COUNT,
+};
+
 use anyhow::{Context, Result};
 use libloading::{Library, Symbol};
 use std::ffi::{CStr, CString};

@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "ds41rt_v41_experts.h"
 
 #ifdef __cplusplus
 extern "C" {

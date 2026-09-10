@@ -720,6 +720,7 @@ endif()
 add_library(ds41rt_native SHARED ${DS41RT_NATIVE_SOURCES})
 if(DS41RT_ENABLE_V41_EXPERT_AOT)
   add_dependencies(ds41rt_native ds41rt_v41_experts_export)
+  target_include_directories(ds41rt_native PRIVATE "${DS41RT_V41_EXPERT_DIR}")
 endif()
 target_include_directories(ds41rt_native PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
