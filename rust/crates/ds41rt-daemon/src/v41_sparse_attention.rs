@@ -25,6 +25,11 @@ pub(crate) struct SparseAttentionOutput<'a> {
     _inputs: PhantomData<&'a ()>,
 }
 impl SparseAttentionOutput<'_> {
+    pub fn binding(&self) -> Result<QueryBinding> {
+        self.tokens()?;
+        self.query.context("attention query missing")
+    }
+
     pub fn tokens(&self) -> Result<&[u64]> {
         let query = self.query.context("attention has no query origin")?;
         ensure!(query.layer() == self.layer, "attention query layer differs");

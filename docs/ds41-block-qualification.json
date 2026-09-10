@@ -1,0 +1,685 @@
+{
+  "scope": "Backbone phase sequencing and real attention composition; explicit identity FFN fixture only, actual MoE not qualified",
+  "sources_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_block.rs": "b08ecdb88dc78bbeed8f47ef526df6e51be28f8a7685a807ca270a47d44d442b",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_hc.rs": "bdaa52cd61515bc3472c7a1c6d3e444de48690ee4a6971e9a11d4c553df29be6",
+    "rust/crates/ds41rt-daemon/src/v41_attention_query.rs": "9c1798c58c8c5bb0e0c452c65f31b8c7844d9ce02dc9c2b4e459967127ba3d4a",
+    "rust/crates/ds41rt-daemon/src/v41_attention_output.rs": "d2d46ee28a45dc365b223711cc76b8cf717761418d159330d9e18052bf9c65ce",
+    "rust/crates/ds41rt-daemon/src/v41_sparse_attention.rs": "4cb1be2563206ee70a195828fe5ee95211ed7d442324496d5a315a3a55ad0e74",
+    "scripts/qualify-ds41-block.py": "5f1525f4119726ef67c53a81df1a2d65a9f55db3239958efaa14076b81f6218c"
+  },
+  "native_library_sha256": "feb70ab33b224293b0b52dbfc06b501c928d6aaedbbe82ff5960387fb4b5c5af",
+  "fixture_sources_sha256": {
+    "/tmp/ds41-block/src/main.rs": "69d3cd33a83b6a2673f1ad8bdf0244bbdb8f1ebe3a48c982acd3ccc7a7cf5aa0",
+    "/tmp/ds41-block/src/v41_attention_binding.rs": "fe6cca3ef111b915ab20eaea2af442c521b30800cc16ff2b9bd56511a38fe17e",
+    "/tmp/ds41-block/src/v41_attention_output.rs": "d2d46ee28a45dc365b223711cc76b8cf717761418d159330d9e18052bf9c65ce",
+    "/tmp/ds41-block/src/v41_attention_query.rs": "9c1798c58c8c5bb0e0c452c65f31b8c7844d9ce02dc9c2b4e459967127ba3d4a",
+    "/tmp/ds41-block/src/v41_backbone_hc.rs": "bdaa52cd61515bc3472c7a1c6d3e444de48690ee4a6971e9a11d4c553df29be6",
+    "/tmp/ds41-block/src/v41_block.rs": "b08ecdb88dc78bbeed8f47ef526df6e51be28f8a7685a807ca270a47d44d442b",
+    "/tmp/ds41-block/src/v41_compressor/source_cache.rs": "8455601262395da0bc679aa45583bdd308f97ad6b19c2998e539b442e90d1f19",
+    "/tmp/ds41-block/src/v41_compressor.rs": "abc3ff4351fa686eda2072006b0e60ee360b2850a222fe6e49c1d1b30cb38f5b",
+    "/tmp/ds41-block/src/v41_hc.rs": "2d40b266484f8b625aed829de2036a9b8ecca5c706ed993f13f0894646d8817a",
+    "/tmp/ds41-block/src/v41_index_query.rs": "3c8b979868126192abc426328faddd8f9c0bcf00ac75d05cfc36a2242f0f095d",
+    "/tmp/ds41-block/src/v41_index_selection.rs": "f4b31a9778d4ee805f2c6c685208458ef3ab647e5ca1b7074183375284a84bea",
+    "/tmp/ds41-block/src/v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e",
+    "/tmp/ds41-block/src/v41_sparse_attention.rs": "4cb1be2563206ee70a195828fe5ee95211ed7d442324496d5a315a3a55ad0e74",
+    "/tmp/ds41-block/src/v41_tensors.rs": "a54889f4213d5c7d791c0507ebc1a820b5ade49e02455f0efd8ad93c8bb62c03",
+    "/tmp/ds41-block/src/v41_window.rs": "113f76843bf8aee9e01269a5cdae7cd2ea647563247cf1de02bd7e35b81c2412"
+  },
+  "build_logs_sha256": {
+    "/tmp/ds41-block-build.log": "ace7b65f3a15490508f46a60d281d19d5530ed6667fe1c25b1f955ca705063df",
+    "/tmp/ds41-block-fixture-build.log": "d27c9bf27f6e91f3c9a614d056614fde26620ceab0ae26ae1ab1813f621ecf9d"
+  },
+  "gpus": {
+    "0": {
+      "owner_log_sha256": "efa933dc05beebbe580b203201cb35aff29793b113e4d27b81146959bad15c91",
+      "initial_chained_failure_sha256": "9cbdcec4edb83a8e7f98f87b675d4f63e972852cd61b95c9edb9fd668ed8a244",
+      "reference_hashes": {
+        "/tmp/ds41-block-math-rtx0.json": "97f4d49714e88c6bd286bf6e7c77e918897c0dc09359feff4329beb62c5c6916",
+        "/tmp/ds41-block-math-rtx0.log": "3e05a662f9be118cdec7c67c184f587f76baa824d0edcd14b2c1ddc7676841d2",
+        "/tmp/ds41-block-attention-rtx0.json": "1ccfb50d3bd54b2abb08382a9d16dae47ada1e020b515f4cfc90e719580e89f8",
+        "/tmp/ds41-block-attention-rtx0.log": "128d2280a6587d3448bc69b33e1b6eb4b028e65f71a154c2e0fb2aafd9d1d066",
+        "/tmp/ds41-block-projection-rtx0.json": "a46f6262d0e1fb863026c017990d9f631ac2695b2ccf04631bbaa904e59edfa6",
+        "/tmp/ds41-block-projection-rtx0.log": "f20f8d26472d1fe4eb7b0b0c600d44c4c6c772382363e9d48508e15573a29398"
+      },
+      "unchanged_attention_projection_payloads": 1224,
+      "cases": {
+        "math": [
+          {
+            "layer": 0,
+            "rows": 80,
+            "pre_max_abs": 1.1920928955078125e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.001953125,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 4.172325134277344e-07,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.001953125,
+            "output_max_abs": 0.001953125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 2,
+            "rows": 80,
+            "pre_max_abs": 1.1920928955078125e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.001953125,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 3.0994415283203125e-06,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0009765625,
+            "output_max_abs": 0.00390625,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 7,
+            "rows": 80,
+            "pre_max_abs": 1.9371509552001953e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 7.137656211853027e-06,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.001953125,
+            "output_max_abs": 0.00390625,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 8,
+            "rows": 80,
+            "pre_max_abs": 2.384185791015625e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 3.5762786865234375e-07,
+            "chained_pre_max_abs": 1.385807991027832e-05,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.00390625,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 14,
+            "rows": 80,
+            "pre_max_abs": 5.364418029785156e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 2.086162567138672e-07,
+            "chained_pre_max_abs": 1.2814998626708984e-05,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 20,
+            "rows": 80,
+            "pre_max_abs": 2.8312206268310547e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 3.5762786865234375e-07,
+            "chained_pre_max_abs": 4.951655864715576e-05,
+            "chained_pre_outside_stage_tolerance": 1,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 24,
+            "rows": 80,
+            "pre_max_abs": 9.5367431640625e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 4.172325134277344e-07,
+            "chained_pre_max_abs": 1.3150274753570557e-05,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 39,
+            "rows": 80,
+            "pre_max_abs": 2.980232238769531e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.0078125,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 2.250075340270996e-06,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          }
+        ],
+        "attention": [
+          {
+            "layer": 0,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.0009765625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 2,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.00390625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 7,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.0009765625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 8,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.00390625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 14,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 20,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 24,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 39,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          }
+        ],
+        "projection": [
+          {
+            "layer": 0,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 0,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 2,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 2,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 7,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 7,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 8,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 8,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 14,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 14,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 20,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 20,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 24,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 24,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 39,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 39,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          }
+        ]
+      }
+    },
+    "1": {
+      "owner_log_sha256": "efa933dc05beebbe580b203201cb35aff29793b113e4d27b81146959bad15c91",
+      "initial_chained_failure_sha256": "9cbdcec4edb83a8e7f98f87b675d4f63e972852cd61b95c9edb9fd668ed8a244",
+      "reference_hashes": {
+        "/tmp/ds41-block-math-rtx1.json": "14852981fc57b06ca1ea3529e0501d047c0e6c7c431743ab51512e79fdc201e2",
+        "/tmp/ds41-block-math-rtx1.log": "3e05a662f9be118cdec7c67c184f587f76baa824d0edcd14b2c1ddc7676841d2",
+        "/tmp/ds41-block-attention-rtx1.json": "c7235a14e5986db8591d077bc36a5084ece11cc34db6e6b53088af164f6ea490",
+        "/tmp/ds41-block-attention-rtx1.log": "128d2280a6587d3448bc69b33e1b6eb4b028e65f71a154c2e0fb2aafd9d1d066",
+        "/tmp/ds41-block-projection-rtx1.json": "f484af9481943096d5963b8c96f3917d842fd937b9b96c3530df6c6d9b0429fd",
+        "/tmp/ds41-block-projection-rtx1.log": "f20f8d26472d1fe4eb7b0b0c600d44c4c6c772382363e9d48508e15573a29398"
+      },
+      "unchanged_attention_projection_payloads": 1224,
+      "cases": {
+        "math": [
+          {
+            "layer": 0,
+            "rows": 80,
+            "pre_max_abs": 1.1920928955078125e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.001953125,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 4.172325134277344e-07,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.001953125,
+            "output_max_abs": 0.001953125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 2,
+            "rows": 80,
+            "pre_max_abs": 1.1920928955078125e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.001953125,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 3.0994415283203125e-06,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0009765625,
+            "output_max_abs": 0.00390625,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 7,
+            "rows": 80,
+            "pre_max_abs": 1.9371509552001953e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 7.137656211853027e-06,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.001953125,
+            "output_max_abs": 0.00390625,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 8,
+            "rows": 80,
+            "pre_max_abs": 2.384185791015625e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 3.5762786865234375e-07,
+            "chained_pre_max_abs": 1.385807991027832e-05,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.00390625,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 14,
+            "rows": 80,
+            "pre_max_abs": 5.364418029785156e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 2.086162567138672e-07,
+            "chained_pre_max_abs": 1.2814998626708984e-05,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 20,
+            "rows": 80,
+            "pre_max_abs": 2.8312206268310547e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 3.5762786865234375e-07,
+            "chained_pre_max_abs": 4.951655864715576e-05,
+            "chained_pre_outside_stage_tolerance": 1,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 24,
+            "rows": 80,
+            "pre_max_abs": 9.5367431640625e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.00390625,
+            "handoff_pre_max_abs": 4.172325134277344e-07,
+            "chained_pre_max_abs": 1.3150274753570557e-05,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          },
+          {
+            "layer": 39,
+            "rows": 80,
+            "pre_max_abs": 2.980232238769531e-07,
+            "attn_input_max_abs": 0.0,
+            "handoff_residual_max_abs": 0.0078125,
+            "handoff_pre_max_abs": 1.1920928955078125e-07,
+            "chained_pre_max_abs": 2.250075340270996e-06,
+            "chained_pre_outside_stage_tolerance": 0,
+            "ffn_input_max_abs": 0.0,
+            "output_max_abs": 0.0078125,
+            "identity_ffn_fixture": true
+          }
+        ],
+        "attention": [
+          {
+            "layer": 0,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.0009765625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 2,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.00390625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 7,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.0009765625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 8,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.00390625,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 14,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 20,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 24,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          },
+          {
+            "layer": 39,
+            "requests": 16,
+            "rows": 80,
+            "max_abs": 0.001953125,
+            "replay_recovery_exact": true
+          }
+        ],
+        "projection": [
+          {
+            "layer": 0,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 0,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 2,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 2,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 7,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 7,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.001953125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 8,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 8,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 14,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 14,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 20,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 20,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 24,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 24,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.00390625,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 39,
+            "rows": 80,
+            "case": 0,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          },
+          {
+            "layer": 39,
+            "rows": 80,
+            "case": 1,
+            "grouped_max_abs": 0.0,
+            "projection_max_abs": 0.0078125,
+            "frequencies_exact": true,
+            "inverse_rotary_exact": true
+          }
+        ]
+      }
+    }
+  }
+}

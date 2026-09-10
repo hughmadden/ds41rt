@@ -44,6 +44,23 @@ impl<'a> BackboneHcWeights<'a> {
             tensors: NativeRtxTensors::load(library, catalog, &names, budget, staging)?,
         })
     }
+    pub fn block(
+        &self,
+        capacity: usize,
+        budget: usize,
+    ) -> Result<crate::v41_block::BackboneBlockWave<'_, 'a>> {
+        ensure!(
+            crate::v41_block::BackboneBlockWave::device_bytes(capacity)? <= budget,
+            "backbone block exceeds budget"
+        );
+        Ok(crate::v41_block::BackboneBlockWave::new(
+            self.library,
+            self.layer,
+            self.boundary(true, capacity, HcSublayer::device_bytes(capacity)?)?,
+            self.boundary(false, capacity, HcSublayer::device_bytes(capacity)?)?,
+            capacity,
+        ))
+    }
     pub fn boundary(
         &self,
         attention: bool,

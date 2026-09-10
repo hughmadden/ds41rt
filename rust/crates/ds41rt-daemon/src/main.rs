@@ -17,6 +17,7 @@ mod v41_attention_query;
 mod v41_attention_binding;
 mod v41_hc;
 mod v41_backbone_hc;
+mod v41_block;
 mod v41_attention_output;
 mod v41_dspark_cache;
 mod v41_tensors;

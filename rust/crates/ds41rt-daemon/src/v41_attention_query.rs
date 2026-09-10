@@ -180,6 +180,9 @@ impl AttentionQueryWave<'_, '_> {
     fn b(&self, i: usize) -> Ds41rtDeviceBuffer {
         self.buffers[i].buffer
     }
+    pub fn layer(&self) -> usize {
+        self.weights.layer
+    }
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.b(0)
     }

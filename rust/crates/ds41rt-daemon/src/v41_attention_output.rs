@@ -1,4 +1,5 @@
 //! Backbone inverse rotary, grouped BF16 wo_a and native FP8 wo_b.
+use crate::v41_attention_binding::QueryBinding;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_sparse_attention::SparseAttentionOutput;
 use crate::v41_tensors::NativeRtxTensors;
@@ -130,6 +131,7 @@ impl<'a> AttentionOutputWeights<'a> {
             capacity,
             graph: None,
             ready: None,
+            origin: None,
         };
         ensure!(
             value.b(0).device_id == self.grouped.buffer.device_id,
@@ -147,6 +149,7 @@ impl<'a> AttentionOutputWeights<'a> {
     }
 }
 pub(crate) struct AttentionOutput<'a> {
+    origin: Option<QueryBinding>,
     pub layer: usize,
     pub rows: usize,
     pub input: Ds41rtDeviceBuffer,
@@ -156,6 +159,18 @@ pub(crate) struct AttentionOutput<'a> {
     pub positions: Ds41rtDeviceBuffer,
     pub frequencies: Ds41rtDeviceBuffer,
     _owner: PhantomData<&'a ()>,
+}
+impl AttentionOutput<'_> {
+    pub fn binding(&self) -> Result<QueryBinding> {
+        let b = self
+            .origin
+            .context("attention projection has no query origin")?;
+        ensure!(
+            b.layer() == self.layer,
+            "attention projection layer differs"
+        );
+        Ok(b)
+    }
 }
 pub(crate) struct AttentionOutputWave<'w, 'a> {
     stream: LoadStream<'a>,
@@ -170,6 +185,7 @@ pub(crate) struct AttentionOutputWave<'w, 'a> {
     capacity: u32,
     graph: Option<(*mut c_void, u32)>,
     ready: Option<u32>,
+    origin: Option<QueryBinding>,
 }
 impl AttentionOutputWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -194,6 +210,7 @@ impl AttentionOutputWave<'_, '_> {
     }
     fn validate(&mut self, rows: u32) -> Result<()> {
         self.ready = None;
+        self.origin = None;
         ensure!(
             rows > 0 && rows <= self.capacity,
             "attention output rows exceed capacity"
@@ -253,6 +270,7 @@ impl AttentionOutputWave<'_, '_> {
     /// Same inputs as execute. Warmup is drained but not published after capture.
     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
         self.ready = None;
+        self.origin = None;
         ensure!(
             self.graph.is_none(),
             "attention output graph already captured"
@@ -261,6 +279,7 @@ impl AttentionOutputWave<'_, '_> {
             self.execute(rows)?;
         }
         self.ready = None;
+        self.origin = None;
         unsafe {
             self.stream
                 .library
@@ -304,6 +323,7 @@ impl AttentionOutputWave<'_, '_> {
         attention: &SparseAttentionOutput<'_>,
     ) -> Result<AttentionOutput<'_>> {
         self.ready = None;
+        self.origin = None;
         let tokens = attention.tokens()?;
         ensure!(
             attention.layer == self.weights.layer
@@ -329,7 +349,11 @@ impl AttentionOutputWave<'_, '_> {
                 self.capture(rows)?;
             }
         }
-        unsafe { self.replay(rows) }
+        unsafe {
+            self.replay(rows)?;
+        }
+        self.origin = Some(attention.binding()?);
+        self.output()
     }
     pub fn output(&self) -> Result<AttentionOutput<'_>> {
         let rows = self.ready.context("attention output unpublished")? as usize;
@@ -339,6 +363,7 @@ impl AttentionOutputWave<'_, '_> {
             b
         };
         Ok(AttentionOutput {
+            origin: self.origin,
             layer: self.weights.layer,
             rows,
             input: b(0),
@@ -352,6 +377,7 @@ impl AttentionOutputWave<'_, '_> {
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready = None;
+        self.origin = None;
         self.synchronize()?;
         if let Some((graph, _)) = self.graph.take() {
             unsafe {
