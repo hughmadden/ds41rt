@@ -1,3 +1,5 @@
+mod v41_index_topk;
+pub use v41_index_topk::V41IndexTopK;
 mod v41_index_scores;
 pub use v41_index_scores::V41IndexScores;
 mod v41_compressor;
