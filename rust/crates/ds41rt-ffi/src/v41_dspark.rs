@@ -151,10 +151,11 @@ impl Drop for V41DsparkMarkov<'_> {
 type DraftStepFn = unsafe extern "C" fn(
     *const f32,
     *const f32,
-    *const f32,
+    *const u64,
     *const f32,
     *mut f32,
     *mut u32,
+    i32,
     i32,
     *mut c_void,
 ) -> i32;
@@ -164,7 +165,7 @@ pub struct V41DraftStep<'a> {
 }
 impl NativeLibrary {
     pub fn v41_draft_step(&self) -> Result<V41DraftStep<'_>> {
-        let launch = unsafe { *self.lib.get::<DraftStepFn>(b"ds41rt_v41_draft_step")? };
+        let launch = unsafe { *self.lib.get::<DraftStepFn>(b"ds41rt_v41_draft_step_rng")? };
         Ok(V41DraftStep {
             _library: self,
             launch,
@@ -174,25 +175,27 @@ impl NativeLibrary {
 impl V41DraftStep<'_> {
     /// # Safety
     /// All buffers must live on the stream device through completion. Shared+bias
-    /// must be finite, temperatures finite/nonnegative and stochastic noise must
-    /// be positive finite Exp(1) variates, independently supplied per vocabulary
-    /// entry. Output spans must not overlap each other or any input.
+    /// must be finite and temperatures finite/nonnegative. RNG [rows,2] contains
+    /// seeds and base Philox subsequences with room for 1280 subsequences each.
+    /// Output spans must not overlap each other or any input.
     pub unsafe fn launch(
         &self,
         shared: Ds41rtDeviceBuffer,
         bias: Ds41rtDeviceBuffer,
-        noise: Ds41rtDeviceBuffer,
+        rng: Ds41rtDeviceBuffer,
         temperatures: Ds41rtDeviceBuffer,
         adjusted: Ds41rtDeviceBuffer,
         tokens: Ds41rtDeviceBuffer,
         rows: usize,
+        position: usize,
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!((1..=16).contains(&rows), "invalid draft sampling rows");
+        ensure!(position < 5, "invalid draft position");
         for (buffer, bytes) in [
             (shared, rows * 129280 * 4),
             (bias, rows * 129280 * 4),
-            (noise, rows * 129280 * 4),
+            (rng, rows * 16),
             (temperatures, rows * 4),
             (adjusted, rows * 129280 * 4),
             (tokens, rows * 4),
@@ -206,11 +209,12 @@ impl V41DraftStep<'_> {
             (self.launch)(
                 shared.ptr.cast(),
                 bias.ptr.cast(),
-                noise.ptr.cast(),
+                rng.ptr.cast(),
                 temperatures.ptr.cast(),
                 adjusted.ptr.cast(),
                 tokens.ptr.cast(),
                 rows as i32,
+                position as i32,
                 stream,
             )
         };

@@ -1,0 +1,22 @@
+{
+  "scope": "Native library build, symbol inspection and daemon build only",
+  "runtime_qualified": false,
+  "requests": 16,
+  "philox_subsequences_per_draft": 1280,
+  "uniform_precision_bits": 23,
+  "terminal_owner_bytes": 96076864,
+  "terminal_additional_bytes": 82739904,
+  "two_waves_partial_residency_bytes": 8276444504,
+  "source_sha256": {
+    "native/include/ds41rt_v41_dspark.h": "6631fb8f99f0d2cd713df44411facfa758eb6cd149c44febd6a224548d5a6790",
+    "native/cuda/kernels/v41_dspark.cu": "a9f6f9d6d1e6ee2cd360626cccc250f6ea609a25530cd2b9c5b368e8cb834383",
+    "rust/crates/ds41rt-core/src/dspark_rng.rs": "efcb8e060bc00b333ba8daf692b022ec3a3eb4cb6e80ec96692ad88ac2cb6ec9",
+    "rust/crates/ds41rt-ffi/src/v41_dspark.rs": "73ea2e929e002b1c2a43f1c9748d5b27c2f6e9bc1ccc70ccc8c4a7c92a2f745c",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/terminal.rs": "69d516322388d7cc549fa32718ec085fe51c2a6dfd292419245a35640a794851"
+  },
+  "library_sha256": "8d7f13c6108fb3ef5017c9a2a5ea5237390db9db884e9a840fcf60954a1bc97b",
+  "build_logs": [
+    "/tmp/ds41-v41-fp8-aot/dspark-rng-rust-build.log",
+    "/tmp/ds41-v41-fp8-aot/dspark-rng-native-build.log"
+  ]
+}

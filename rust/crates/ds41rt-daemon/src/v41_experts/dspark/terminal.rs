@@ -1,6 +1,7 @@
 use super::{DsparkConfidence, DsparkMarkov, DsparkWeights};
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
+use ds41rt_core::DsparkRng;
 use ds41rt_ffi::{Ds41rtDeviceBuffer, V41DraftStep};
 use std::ffi::c_void;
 
@@ -13,7 +14,8 @@ pub(crate) struct DsparkTerminal<'weights, 'library> {
     sample: V41DraftStep<'library>,
     shared_logits: DeviceAllocation<'library>,
     adjusted_logits: DeviceAllocation<'library>,
-    noise: DeviceAllocation<'library>,
+    rng: DeviceAllocation<'library>,
+    sampling_requests: Option<usize>,
     temperatures: DeviceAllocation<'library>,
     tokens: DeviceAllocation<'library>,
     capacity: usize,
@@ -40,7 +42,8 @@ impl<'library> DsparkWeights<'library> {
             sample: library.v41_draft_step()?,
             shared_logits: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
             adjusted_logits: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
-            noise: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
+            rng: DeviceAllocation::new(library, capacity * 16)?,
+            sampling_requests: None,
             temperatures: DeviceAllocation::new(library, capacity * 4)?,
             tokens: DeviceAllocation::new(library, capacity * 6 * 4)?,
             capacity,
@@ -55,7 +58,7 @@ impl DsparkTerminal<'_, '_> {
             (1..=16).contains(&capacity),
             "terminal request capacity must be 1 through 16"
         );
-        Ok(capacity * (5 * 129280 * 4 * 3 + 7 * 4))
+        Ok(capacity * (5 * 129280 * 4 * 2 + 7 * 4 + 16))
     }
     pub fn device_bytes(capacity: usize) -> Result<usize> {
         Ok(Self::additional_bytes(capacity)?
@@ -63,19 +66,58 @@ impl DsparkTerminal<'_, '_> {
             + DsparkConfidence::device_bytes(capacity * 5)?)
     }
     /// Stable inputs: raw shared-head logits [5,R,V], collapsed pre-final-norm
-    /// hidden [5,R,5120], Exp(1) noise [5,R,V], temperatures [R], anchor IDs [R].
+    /// hidden [5,R,5120], anchor IDs [R]. Sampling is set via `prepare_sampling`.
     /// Use live R densely, without capacity padding between positions. Never free
     /// or retain after drop; finish all producer writes before execute/replay.
-    pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 5] {
+    pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] {
         let mut anchors = self.tokens.buffer;
         anchors.bytes = self.capacity * 4;
         [
             self.shared_logits.buffer,
             self.confidence.inputs()[0],
-            self.noise.buffer,
-            self.temperatures.buffer,
             anchors,
         ]
+    }
+    /// Atomically admit a batch's RNG ranges before reserving any. Once reserved,
+    /// failures/cancellation consume them; replay intentionally retains the same
+    /// draws until this method prepares a new attempt. Temperatures are validated
+    /// here and uploaded with request-owned seed/range metadata after prior work.
+    pub fn prepare_sampling(
+        &mut self,
+        rngs: &mut [&mut DsparkRng],
+        temperatures: &[f32],
+    ) -> Result<()> {
+        self.ready_requests = None;
+        self.sampling_requests = None;
+        ensure!(
+            !rngs.is_empty() && rngs.len() <= self.capacity && rngs.len() == temperatures.len(),
+            "invalid terminal sampling request count"
+        );
+        ensure!(
+            temperatures.iter().all(|t| t.is_finite() && *t >= 0.0),
+            "invalid draft temperature"
+        );
+        ensure!(
+            rngs.iter().all(|rng| rng.can_reserve()),
+            "dSpark RNG exhausted"
+        );
+        self.synchronize()?;
+        let mut metadata = Vec::with_capacity(rngs.len() * 16);
+        for rng in rngs.iter_mut() {
+            let reservation = rng.reserve().context("dSpark RNG exhausted")?;
+            metadata.extend_from_slice(&reservation.seed.to_ne_bytes());
+            metadata.extend_from_slice(&reservation.first_subsequence.to_ne_bytes());
+        }
+        let mut temperature_bytes = Vec::with_capacity(temperatures.len() * 4);
+        for temperature in temperatures {
+            temperature_bytes.extend_from_slice(&temperature.to_ne_bytes());
+        }
+        self.stream.library.copy_h2d(self.rng.buffer, &metadata)?;
+        self.stream
+            .library
+            .copy_h2d(self.temperatures.buffer, &temperature_bytes)?;
+        self.sampling_requests = Some(rngs.len());
+        Ok(())
     }
     fn slice(
         buffer: Ds41rtDeviceBuffer,
@@ -99,6 +141,10 @@ impl DsparkTerminal<'_, '_> {
         ensure!(
             requests > 0 && requests <= self.capacity,
             "terminal requests exceed capacity"
+        );
+        ensure!(
+            self.sampling_requests == Some(requests),
+            "sampling state does not match live requests"
         );
         let library = self.stream.library;
         let row_bytes = requests * 129280 * 4;
@@ -131,11 +177,12 @@ impl DsparkTerminal<'_, '_> {
                 self.sample.launch(
                     Self::slice(self.shared_logits.buffer, position * row_bytes, row_bytes)?,
                     bias,
-                    Self::slice(self.noise.buffer, position * row_bytes, row_bytes)?,
+                    self.rng.buffer,
                     self.temperatures.buffer,
                     Self::slice(self.adjusted_logits.buffer, position * row_bytes, row_bytes)?,
                     next,
                     requests,
+                    position,
                     self.stream.raw,
                 )?;
                 if position < 4 {
@@ -156,9 +203,9 @@ impl DsparkTerminal<'_, '_> {
     }
     /// # Safety
     /// Inputs must satisfy `inputs()` layout with initialized BF16 hidden states,
-    /// valid anchors <129280, finite shared+Markov logits, finite nonnegative
-    /// temperatures and positive finite independent Exp(1) noise for stochastic
-    /// rows. Producers must be complete; no input writes may race execution.
+    /// valid anchors <129280, finite shared+Markov logits and
+    /// sampling state prepared for these requests. Producers must be complete;
+    /// no input writes may race execution.
     pub unsafe fn execute(&mut self, requests: usize) -> Result<[Ds41rtDeviceBuffer; 3]> {
         self.ready_requests = None;
         unsafe {
@@ -199,9 +246,13 @@ impl DsparkTerminal<'_, '_> {
         }
     }
     /// # Safety
-    /// Same input contract as execute; refresh inputs and noise before replay.
+    /// Same input contract as execute; prepare new sampling state for a fresh attempt.
     pub unsafe fn replay(&mut self, requests: usize) -> Result<[Ds41rtDeviceBuffer; 3]> {
         self.ready_requests = None;
+        ensure!(
+            self.sampling_requests == Some(requests),
+            "sampling state does not match replay requests"
+        );
         let (graph, captured) = self.graph.context("terminal graph is not captured")?;
         ensure!(
             requests == captured,

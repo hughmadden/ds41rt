@@ -96,3 +96,5 @@ dSpark confidence progress: a native raw-FP32 confidence projection now has libr
 dSpark Markov progress: per-wave token gathering and BF16-to-FP32 projection now own a dedicated cuBLAS handle/workspace and graph lifetime for 16 requests, with combined residency admission updated while the sequential draft loop, sampling and runtime qualification remain open.
 
 dSpark terminal progress: one graph-owned stream now composes five Markov/sample positions and raw confidence for 16 requests with corrected-logit and embedding retention, while upstream shared-head/RNG production, verification, scheduler integration and runtime qualification remain open.
+
+dSpark RNG progress: request-owned Philox ranges now feed fused terminal sampling with cancellation-consuming reservations and bounded metadata uploads, removing full noise buffers while serving request wiring, distribution/replay qualification and verification remain open.

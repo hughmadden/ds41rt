@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 #include <math_constants.h>
+#include <curand_kernel.h>
 #include <cuda_bf16.h>
 #include <stdint.h>
 #include "ds41rt_v41_dspark.h"
@@ -115,17 +116,26 @@ namespace {
 // Position-local logits remain raw for verification. Sampling uses log-space
 // exponential racing, equivalent in distribution to softmax(logits/T)/Exp(1).
 __global__ void draft_step(const float* shared, const float* bias,
-    const float* noise, const float* temperatures, float* adjusted, uint32_t* tokens) {
+    const uint64_t* rng, const float* temperatures, float* adjusted, uint32_t* tokens, int position) {
   const int row = blockIdx.x, tid = threadIdx.x;
   const float temperature = temperatures[row];
+  curandStatePhilox4_32_10_t state;
+  if (temperature != 0)
+    curand_init(rng[uint64_t(row)*2], rng[uint64_t(row)*2+1] + uint64_t(position)*256 + tid, 0, &state);
   float best = -CUDART_INF_F;
   uint32_t id = UINT32_MAX;
   for (uint32_t col = tid; col < 129280; col += 256) {
     const uint64_t offset = uint64_t(row) * 129280 + col;
     const float value = shared[offset] + bias[offset];
     adjusted[offset] = value;
-    const float score = temperature == 0 ? value
-        : value / fmaxf(temperature, 1e-5f) - logf(noise[offset]);
+    float score = value;
+    if (temperature != 0) {
+      // Exactly representable 23-bit midpoints lie strictly inside (0,1).
+      // This avoids zero/infinite exponential values at float endpoints.
+      const float uniform = (float(curand(&state) >> 9) + 0.5f) * 0x1p-23f;
+      const float exponential = -logf(uniform);
+      score = value / fmaxf(temperature, 1e-5f) - logf(exponential);
+    }
     if (score > best || (score == best && col < id)) { best = score; id = col; }
   }
   __shared__ float scores[256];
@@ -142,18 +152,18 @@ __global__ void draft_step(const float* shared, const float* bias,
   if (tid == 0) tokens[row] = indices[0];
 }
 }
-extern "C" int32_t ds41rt_v41_draft_step(const float* shared, const float* bias,
-    const float* noise, const float* temperatures, float* adjusted, uint32_t* tokens,
-    int32_t rows, void* stream) {
-  if (rows < 1 || rows > 16) return cudaErrorInvalidValue;
+extern "C" int32_t ds41rt_v41_draft_step_rng(const float* shared, const float* bias,
+    const uint64_t* rng, const float* temperatures, float* adjusted, uint32_t* tokens,
+    int32_t rows, int32_t position, void* stream) {
+  if (rows < 1 || rows > 16 || position < 0 || position > 4) return cudaErrorInvalidValue;
   const uint64_t logits = uint64_t(rows) * 129280 * 4, small = uint64_t(rows) * 4;
-  const void* pointers[] = {shared, bias, noise, temperatures, adjusted, tokens};
-  const uint64_t bytes[] = {logits, logits, logits, small, logits, small};
-  for (int i = 0; i < 6; ++i) if (!span(pointers[i], bytes[i], 4)) return cudaErrorInvalidValue;
+  const void* pointers[] = {shared, bias, rng, temperatures, adjusted, tokens};
+  const uint64_t bytes[] = {logits, logits, small*4, small, logits, small};
+  for (int i = 0; i < 6; ++i) if (!span(pointers[i], bytes[i], i == 2 ? 8 : 4)) return cudaErrorInvalidValue;
   for (int i = 4; i < 6; ++i)
     for (int j = 0; j < i; ++j)
       if (!disjoint(pointers[i], bytes[i], pointers[j], bytes[j])) return cudaErrorInvalidValue;
   draft_step<<<rows, 256, 0, reinterpret_cast<cudaStream_t>(stream)>>>(
-      shared, bias, noise, temperatures, adjusted, tokens);
+      shared, bias, rng, temperatures, adjusted, tokens, position);
   return cudaGetLastError();
 }

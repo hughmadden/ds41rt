@@ -1,3 +1,5 @@
+mod dspark_rng;
+pub use dspark_rng::{DsparkRng, DsparkRngReservation};
 mod engram;
 pub use engram::{EngramBatch, EngramError, EngramHashes, EngramHistory, ENGRAM_LAYERS, ENGRAM_ROWS, ENGRAM_COMPRESSED_VOCAB};
 mod attention_geometry;
