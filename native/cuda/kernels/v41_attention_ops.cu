@@ -281,3 +281,28 @@ extern "C" int32_t ds41rt_v41_dspark_terminal_layout(const uint16_t* residual,
       reinterpret_cast<const __nv_bfloat16*>(residual),pre,reinterpret_cast<__nv_bfloat16*>(output),output_pre,requests);
   return cudaGetLastError();
 }
+
+namespace {
+__global__ void backbone_frequencies_kernel(const uint64_t* positions,float* output,bool compressed) {
+  const uint64_t row=blockIdx.x;const int pair=threadIdx.x;
+  float inverse=__fdiv_rn(1.0f,powf(compressed?160000.0f:10000.0f,float(pair)/32.0f));
+  if(compressed) {
+    // Official YaRN: original=65536, factor=16, beta_fast=32, beta_slow=1.
+    // The reference's FP64 host corrected_dim floors/ceils to 15 and 25.
+    // Tensor/scalar division in the pinned CUDA reference uses reciprocal multiply.
+    const float ramp=fminf(1.0f,fmaxf(0.0f,__fmul_rn(float(pair)-15.0f,0.1f)));
+    const float smooth=__fsub_rn(1.0f,ramp);
+    inverse=__fadd_rn(__fmul_rn(__fdiv_rn(inverse,16.0f),__fsub_rn(1.0f,smooth)),__fmul_rn(inverse,smooth));
+  }
+  const float phase=__fmul_rn(__ull2float_rn(positions[row]),inverse);
+  output[row*64+pair*2]=cosf(phase);output[row*64+pair*2+1]=sinf(phase);
+}
+}
+extern "C" int32_t ds41rt_v41_backbone_frequencies(const uint64_t* positions,
+    float* output,int32_t rows,int32_t layer,void* stream) {
+  if(rows<1 || rows>4096 || layer<0 || layer>=40)return cudaErrorInvalidValue;
+  const uint64_t p=uint64_t(rows)*8,o=uint64_t(rows)*256;
+  if(!valid(positions,p,8)||!valid(output,o,4)||!disjoint(positions,p,output,o))return cudaErrorInvalidValue;
+  backbone_frequencies_kernel<<<rows,32,0,reinterpret_cast<cudaStream_t>(stream)>>>(positions,output,layer>=2);
+  return cudaGetLastError();
+}

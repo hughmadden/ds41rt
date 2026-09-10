@@ -218,11 +218,12 @@ impl<'a> CompressorWeights<'a> {
             } else {
                 None
             },
-            staging: if self.ratio == 2 {
-                Some(HostAllocation::new(self.library, rows * 8)?)
-            } else {
-                None
-            },
+            staging: HostAllocation::new(
+                self.library,
+                rows * if self.ratio == 2 { 16 } else { 8 },
+            )?,
+            positions: DeviceAllocation::new(self.library, rows * 8)?,
+            frequencies: DeviceAllocation::new(self.library, rows * 256)?,
             output: DeviceAllocation::new(self.library, rows * 1024)?,
             capacity: rows,
             graph: None,
@@ -241,6 +242,7 @@ struct Prepared {
 }
 pub(crate) struct CompressorOutput<'a> {
     pub buffer: Ds41rtDeviceBuffer,
+    pub frequencies: Ds41rtDeviceBuffer,
     pub completed: &'a [CompressorLatentRow],
 }
 pub(crate) struct CompressorWave<'w, 'a> {
@@ -253,7 +255,9 @@ pub(crate) struct CompressorWave<'w, 'a> {
     projected: DeviceAllocation<'a>,
     scores: Option<DeviceAllocation<'a>>,
     descriptors: Option<DeviceAllocation<'a>>,
-    staging: Option<HostAllocation<'a>>,
+    staging: HostAllocation<'a>,
+    positions: DeviceAllocation<'a>,
+    frequencies: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
@@ -268,9 +272,9 @@ impl CompressorWave<'_, '_> {
         Ok(V41Compressor::WORKSPACE_BYTES
             + rows
                 * if ratio(layer)? == 2 {
-                    10240 + 2048 + 2048 + 8 + 1024
+                    10240 + 2048 + 2048 + 8 + 1024 + 264
                 } else {
-                    10240 + 1024 + 1024
+                    10240 + 1024 + 1024 + 264
                 })
     }
     /// Packed BF16 [sum(chunk.tokens),5120], in chunk order. Finish all producer
@@ -359,17 +363,43 @@ impl CompressorWave<'_, '_> {
         Ok(result)
     }
     fn upload(&mut self, prepared: &Prepared) -> Result<()> {
-        if let (Some(device), Some(host)) = (&self.descriptors, &mut self.staging) {
-            let bytes = &mut host.bytes_mut()[..prepared.rows * 8];
-            for (chunk, value) in bytes.chunks_exact_mut(8).zip(&prepared.descriptors) {
+        let offset = if self.descriptors.is_some() {
+            prepared.rows * 8
+        } else {
+            0
+        };
+        let bytes = self.staging.bytes_mut();
+        if let Some(device) = &self.descriptors {
+            for (chunk, value) in bytes[..offset]
+                .chunks_exact_mut(8)
+                .zip(&prepared.descriptors)
+            {
                 chunk.copy_from_slice(&value.to_ne_bytes());
             }
-            self.stream.library.copy_h2d(device.buffer, bytes)?;
+            self.stream
+                .library
+                .copy_h2d(device.buffer, &bytes[..offset])?;
         }
+        let positions = &mut bytes[offset..offset + prepared.rows * 8];
+        positions.fill(0);
+        for row in &prepared.completed {
+            positions[row.source_row as usize * 8..row.source_row as usize * 8 + 8]
+                .copy_from_slice(&row.position.to_ne_bytes());
+        }
+        self.stream
+            .library
+            .copy_h2d(self.positions.buffer, positions)?;
         Ok(())
     }
     unsafe fn enqueue(&self, state: &CompressorState<'_>, rows: usize) -> Result<()> {
         unsafe {
+            self.norm.backbone_frequencies(
+                self.positions.buffer,
+                self.frequencies.buffer,
+                rows as u32,
+                self.weights.layer as u32,
+                self.stream.raw,
+            )?;
             self.kernel.project(
                 self.input.buffer,
                 self.weights.tensors.get(&self.weights.names[0])?,
@@ -506,8 +536,11 @@ impl CompressorWave<'_, '_> {
         }
         let mut buffer = self.output.buffer;
         buffer.bytes = prepared.rows * 1024;
+        let mut frequencies = self.frequencies.buffer;
+        frequencies.bytes = prepared.rows * 256;
         Ok(CompressorOutput {
             buffer,
+            frequencies,
             completed: &prepared.completed,
         })
     }

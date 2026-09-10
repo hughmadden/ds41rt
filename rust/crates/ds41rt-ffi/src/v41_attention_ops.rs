@@ -14,6 +14,7 @@ type Kv =
     unsafe extern "C" fn(*const u16, *const u16, *const f32, *mut u16, i32, *mut c_void) -> i32;
 type Rope =
     unsafe extern "C" fn(*const u16, *const f32, *mut u16, i32, i32, i32, *mut c_void) -> i32;
+type BackboneFrequencies = unsafe extern "C" fn(*const u64, *mut f32, i32, i32, *mut c_void) -> i32;
 type Frequencies = unsafe extern "C" fn(*const u64, *mut f32, i32, *mut c_void) -> i32;
 type Tap = unsafe extern "C" fn(*const u16, *mut u16, i32, i32, *mut c_void) -> i32;
 type Embed =
@@ -26,6 +27,7 @@ pub struct V41AttentionOps<'a> {
     embed: Embed,
     terminal_layout: TerminalLayout,
     frequencies: Frequencies,
+    backbone_frequencies: BackboneFrequencies,
     tap: Tap,
     kv: Kv,
     rope: Rope,
@@ -44,6 +46,7 @@ impl NativeLibrary {
             terminal_layout: unsafe { *self.lib.get(b"ds41rt_v41_dspark_terminal_layout")? },
             embed: unsafe { *self.lib.get(b"ds41rt_v41_dspark_embed")? },
             tap: unsafe { *self.lib.get(b"ds41rt_v41_dspark_tap")? },
+            backbone_frequencies: unsafe { *self.lib.get(b"ds41rt_v41_backbone_frequencies")? },
             frequencies: unsafe { *self.lib.get(b"ds41rt_v41_dspark_frequencies")? },
             kv: unsafe { *self.lib.get(b"ds41rt_v41_attention_kv")? },
             norm: unsafe { *self.lib.get(b"ds41rt_v41_attention_norm")? },
@@ -52,6 +55,37 @@ impl NativeLibrary {
     }
 }
 impl V41AttentionOps<'_> {
+    /// # Safety
+    /// U64 absolute token positions and disjoint FP32 output [rows,32,2] are
+    /// initialized/live on the stream device. Compressed groups use their first
+    /// token position, not their latent index; layer selects the official RoPE.
+    pub unsafe fn backbone_frequencies(
+        &self,
+        positions: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: u32,
+        layer: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            (1..=4096).contains(&rows) && layer < 40,
+            "invalid backbone frequency geometry"
+        );
+        buffer(positions, rows as usize * 8)?;
+        buffer(output, rows as usize * 256)?;
+        let status = unsafe {
+            (self.backbone_frequencies)(
+                positions.ptr.cast(),
+                output.ptr.cast(),
+                rows as i32,
+                layer as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native backbone frequency status {status}");
+        Ok(())
+    }
+
     /// # Safety
     /// Initialized request-major residual/pre inputs and disjoint position-major
     /// outputs are on the stream device and live through completion.

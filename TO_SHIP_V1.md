@@ -37,6 +37,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Implement native ratio-two compressor projection/pooling and ratio-one projection/norm; qualify all four real-weight sources on both RTX GPUs.
 - [x] Add and qualify compressor request leases, partial-group ownership, captured proposal execution and accepted-prefix commit across two competing waves.
 - [ ] Implement CSA2 ratio-2 and ratio-1 production and source/reindex/reuse modes under the FP8-only serving KV contract.
+- [x] Qualify official backbone RoPE/YaRN through 1,048,576 positions and generate completed-latent frequencies inside compressor graphs.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -89,3 +90,5 @@ Three-stage composition is qualified in `docs/ds41-dspark-chain-qualification.md
 The official normalization contract and corrected regression evidence are in `docs/ds41-normalization-correction.md`; earlier default-epsilon normalization evidence is superseded.
 
 Native backbone compressor evidence is in `docs/ds41-compressor-qualification.md`; request-owned partial-group state and accepted-prefix commit are qualified in `docs/ds41-compressor-owner-qualification.md`, with index/cache producers next.
+
+Backbone rotary frequencies and their compressor handoff are qualified in `docs/ds41-backbone-frequencies-qualification.md`; index-key projection and packed cache producers remain next.

@@ -77,3 +77,16 @@ int32_t ds41rt_v41_dspark_terminal_layout(const uint16_t* residual,
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// U64 absolute token positions -> FP32 complex RoPE64 [rows,32,2].
+// Layers 0/1 use pure window base10000. Layers 2..39 use base160000 and
+// official YaRN original65536/factor16/beta_fast32/beta_slow1.
+// For compressed latents, callers supply the first represented token position.
+int32_t ds41rt_v41_backbone_frequencies(const uint64_t* positions,
+    float* output,int32_t rows,int32_t layer,void* stream);
+#ifdef __cplusplus
+}
+#endif
