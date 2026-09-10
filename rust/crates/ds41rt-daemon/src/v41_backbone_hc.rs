@@ -1,5 +1,5 @@
 //! Official backbone mHC parameters around attention and routed FFN execution.
-use crate::v41_hc::HcSublayer;
+use crate::v41_hc::{HcBinding, HcSublayer};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Result};
 use ds41rt_ffi::NativeLibrary;
@@ -10,6 +10,17 @@ pub(crate) struct BackboneHcWeights<'a> {
     tensors: NativeRtxTensors<'a>,
 }
 impl<'a> BackboneHcWeights<'a> {
+    pub fn layer(&self) -> usize { self.layer }
+    pub(crate) fn prepare_bindings<'w>(
+        &'w self,
+        attention: &HcSublayer<'w, 'a>,
+        ffn: &HcSublayer<'w, 'a>,
+    ) -> Result<[HcBinding<'w, 'a>; 2]> {
+        Ok([
+            attention.prepare_binding(&self.tensors, Self::names(self.layer, true)?)?,
+            ffn.prepare_binding(&self.tensors, Self::names(self.layer, false)?)?,
+        ])
+    }
     fn names(layer: usize, attention: bool) -> Result<[String; 4]> {
         ensure!(layer < 40, "invalid backbone mHC layer");
         let kind = if attention { "attn" } else { "ffn" };

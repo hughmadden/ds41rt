@@ -1,0 +1,173 @@
+{
+  "date": "2026-09-11",
+  "host": "ostrich",
+  "gpu": "GB10 SM121",
+  "checkpoint_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "scope": "Two passes of 40 real mHC layers with identity attention/FFN stand-ins, compared byte-for-byte to fresh workspaces at each layer. No full model execution or engram arithmetic.",
+  "cases": [
+    {
+      "rows": 1,
+      "cycle": 0,
+      "layers": 40,
+      "device_bytes": 225504,
+      "fresh_equal": true,
+      "stable_inputs": true
+    },
+    {
+      "rows": 1,
+      "cycle": 1,
+      "layers": 40,
+      "device_bytes": 225504,
+      "fresh_equal": true,
+      "stable_inputs": true
+    },
+    {
+      "rows": 80,
+      "cycle": 0,
+      "layers": 40,
+      "device_bytes": 18040320,
+      "fresh_equal": true,
+      "stable_inputs": true
+    },
+    {
+      "rows": 80,
+      "cycle": 1,
+      "layers": 40,
+      "device_bytes": 18040320,
+      "fresh_equal": true,
+      "stable_inputs": true
+    },
+    {
+      "rows": 4096,
+      "cycle": 0,
+      "layers": 40,
+      "device_bytes": 923664384,
+      "fresh_equal": true,
+      "stable_inputs": true
+    },
+    {
+      "rows": 4096,
+      "cycle": 1,
+      "layers": 40,
+      "device_bytes": 923664384,
+      "fresh_equal": true,
+      "stable_inputs": true
+    }
+  ],
+  "memory_accounting": [
+    {
+      "rows": 1,
+      "per_layer_device_bytes": {
+        "mhc": 225504,
+        "query": 181516,
+        "attention_output": 4435212,
+        "shared_ffn": 74244,
+        "sparse_attention": 131152
+      },
+      "forty_layers_device_bytes": 201905120,
+      "mhc_bytes_saved_per_lane": 8794656,
+      "five_groups_after_mhc_reuse_bytes": 193110464
+    },
+    {
+      "rows": 16,
+      "per_layer_device_bytes": {
+        "mhc": 3608064,
+        "query": 2479236,
+        "attention_output": 6889604,
+        "shared_ffn": 702468,
+        "sparse_attention": 2098432
+      },
+      "forty_layers_device_bytes": 631112160,
+      "mhc_bytes_saved_per_lane": 140714496,
+      "five_groups_after_mhc_reuse_bytes": 490397664
+    },
+    {
+      "rows": 80,
+      "per_layer_device_bytes": {
+        "mhc": 18040320,
+        "query": 12290692,
+        "attention_output": 17539716,
+        "shared_ffn": 3387396,
+        "sparse_attention": 10492160
+      },
+      "forty_layers_device_bytes": 2470011360,
+      "mhc_bytes_saved_per_lane": 703572480,
+      "five_groups_after_mhc_reuse_bytes": 1766438880
+    },
+    {
+      "rows": 256,
+      "per_layer_device_bytes": {
+        "mhc": 57729024,
+        "query": 39294980,
+        "attention_output": 46860292,
+        "shared_ffn": 10801156,
+        "sparse_attention": 33574912
+      },
+      "forty_layers_device_bytes": 7530414560,
+      "mhc_bytes_saved_per_lane": 2251431936,
+      "five_groups_after_mhc_reuse_bytes": 5278982624
+    },
+    {
+      "rows": 1024,
+      "per_layer_device_bytes": {
+        "mhc": 230916096,
+        "query": 157179908,
+        "attention_output": 174858244,
+        "shared_ffn": 43204612,
+        "sparse_attention": 134299648
+      },
+      "forty_layers_device_bytes": 29618340320,
+      "mhc_bytes_saved_per_lane": 9005727744,
+      "five_groups_after_mhc_reuse_bytes": 20612612576
+    },
+    {
+      "rows": 4096,
+      "per_layer_device_bytes": {
+        "mhc": 923664384,
+        "query": 628719620,
+        "attention_output": 686850052,
+        "shared_ffn": 172818436,
+        "sparse_attention": 537198592
+      },
+      "forty_layers_device_bytes": 117970043360,
+      "mhc_bytes_saved_per_lane": 36022910976,
+      "five_groups_after_mhc_reuse_bytes": 81947132384
+    }
+  ],
+  "memory_scope": "Static production allocation formulas and SM120 FP8 AOT scratch metadata, per lane; excludes weights, index/window/compressor/dSpark/cache and other owners.",
+  "copy_regression": {
+    "bytes": 16777216,
+    "changed_payloads": 8,
+    "fixed_exit": 0,
+    "baseline_exit": 133,
+    "baseline_error": "D2D must be complete on return failed: device not ready",
+    "baseline_native_sha256": "565fa554ec934de9f7a8ea4d05dc43989291096e6b9b8cd610542e78b9a5f362",
+    "fixed_native_sha256": "acea0f3bf08a25f92dea120bb2dd627a5a094af22468fce8c2a2436e955b67af"
+  },
+  "fixture_sha256": "70f38320c931dfe98053e0f015b09814bf9c4aae9f9dc11b72a5e33f065c1614",
+  "copy_regression_sha256": "bbce42ded19ebedbfa1b4bd60ebb75de11093d87bcd82a9bef221eaebdeb61f9",
+  "source_sha256": {
+    "native/src/ds41rt_native.cc": "f4565e31232c32ca3ecce4aa3c9cbdff0d4f3a56c68d14413605ae1f8e27e192",
+    "native/tests/cuda_selftest.cc": "bd8477b47db2a6f3e8ddae4bebff22b4aa369cfd9da2fc3d835cd1b7e96ee6f4",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "3afefc1a8f10633fd857b0f4c35d440a10a11fa876f4a1e0fdc17a9f2efccd71",
+    "rust/crates/ds41rt-daemon/src/v41_hc.rs": "2c4d34fc77cfaf1f00b1d21128fd0958614572ba2950bf83ca8d9c4fc43de34c",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_hc.rs": "74c34326d0be092c111ce33a9cbcb90750206f9f1a79e7ffebeffb4a59fbc453",
+    "rust/crates/ds41rt-daemon/src/v41_block.rs": "f7fab85eda5bbdb5d048915b6a18f015abebf3220e32d54711c1997a79196db1"
+  },
+  "validation": {
+    "daemon_build": "pass",
+    "native_sm120_build": "pass",
+    "native_sm121_build": "pass",
+    "rtx_execution": "blocked: loaded driver/userspace mismatch"
+  },
+  "artifacts": [
+    "/tmp/ds41-reusable-block",
+    "/tmp/ds41-reusable-block-run.log",
+    "/tmp/ds41-reusable-block-run-fixed.log",
+    "/tmp/ds41-copy-regression-baseline.log",
+    "/tmp/ds41-copy-regression-fixed.log",
+    "/tmp/ds41-reusable-block-final-build.log",
+    "/tmp/ds41-reusable-block-native-build.log",
+    "/tmp/ds41-copy-regression-sm120-build.log"
+  ]
+}

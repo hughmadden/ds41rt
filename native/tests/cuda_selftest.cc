@@ -649,6 +649,33 @@ void free_buffer(ds41rt_device_buffer_t* buffer) {
   require_status(ds41rt_free_device_buffer(buffer), "ds41rt_free_device_buffer");
 }
 
+void test_cuda_copy_d2d_completes_before_nonblocking_consumer() {
+  constexpr size_t bytes = 16 * 1024 * 1024;
+  auto source = device_buffer(bytes);
+  auto destination = device_buffer(bytes);
+  auto observed = device_buffer(bytes);
+  cudaStream_t consumer = nullptr;
+  require_cuda(cudaStreamCreateWithFlags(&consumer, cudaStreamNonBlocking),
+               "create independent copy consumer");
+  for (uint8_t value = 1; value <= 8; ++value) {
+    require_cuda(cudaMemset(source.ptr, value, bytes), "initialize copy source");
+    require_cuda(cudaStreamSynchronize(nullptr), "complete copy source");
+    require_status(ds41rt_copy_d2d(destination, source, bytes), "synchronous D2D");
+    // Check before any later default-stream operation can mask a missing wait.
+    require_cuda(cudaStreamQuery(nullptr), "D2D must be complete on return");
+    require_status(ds41rt_copy_d2d_async(observed, destination, bytes, consumer),
+                   "independent stream consumes completed copy");
+    require_cuda(cudaStreamSynchronize(consumer), "complete copy consumer");
+    const auto actual = copy_d2h<uint8_t>(observed, bytes);
+    assert(std::all_of(actual.begin(), actual.end(),
+                       [value](uint8_t byte) { return byte == value; }));
+  }
+  require_cuda(cudaStreamDestroy(consumer), "destroy copy consumer");
+  free_buffer(&source);
+  free_buffer(&destination);
+  free_buffer(&observed);
+}
+
 void test_cuda_copy_d2d_2d_async_copies_active_row_prefixes() {
   const std::vector<uint8_t> source = {
       1, 2, 3, 90, 91,
@@ -2805,6 +2832,7 @@ void test_cuda_generic_kv_page_table_init_base_is_exported_and_correct() {
 
 int main() {
   test_cuda_device_info();
+  test_cuda_copy_d2d_completes_before_nonblocking_consumer();
   test_cuda_copy_d2d_2d_async_copies_active_row_prefixes();
   test_cuda_copy_h2d_2d_async_copies_active_row_prefixes();
   test_cuda_mla_merge_state_bf16_matches_weighted_reference();

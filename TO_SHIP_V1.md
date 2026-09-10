@@ -66,6 +66,8 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
 - [x] Add adjacent-block preparation with predecessor identity, engram ordering guards and prepared dSpark tap inputs; all 39 transition guards/copies and distinct decoder tap placement pass on Spark with controlled producer values.
+- [x] Reuse each lane's two mHC workspaces across all 40 layers; two real-weight passes at 1/80/4096 rows match fresh owners on Spark. Fix and regression-check synchronous D2D completion before nonblocking consumers. See `docs/ds41-reusable-block-qualification.md`.
+- [ ] Share remaining query/output/shared-FFN/sparse-attention/index workspaces across layers and account for all weights, caches and alternating lanes before full-model allocation. Sharing mHC alone saves 33.55 GiB per 4096-row lane but does not establish full-model fit.
 - [ ] Execute the chained block/engram/prepared-query and owned dSpark tap paths on RTX, then connect them to scheduler-owned gather histories.
 - [x] Initialize target text residuals and identity pre-mix from the embedding table shared with dSpark, retaining token/position metadata and copying into layer-0 inputs; exact checkpoint comparisons and owner guards pass on Spark.
 - [ ] Qualify embedding-to-attention execution on RTX and integrate image embedding replacement before residual expansion.

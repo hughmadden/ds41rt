@@ -5442,6 +5442,9 @@ impl NativeLibrary {
             .then_some((staging.buffer.ptr as usize, staging.buffer.bytes))
     }
 
+    /// Copy initialized device storage and wait for the copy to complete.
+    /// Producers must have completed before this call; subsequent consumers
+    /// may use any stream. Use `copy_d2d_async` for explicitly ordered work.
     pub fn copy_d2d(
         &self,
         dst: Ds41rtDeviceBuffer,

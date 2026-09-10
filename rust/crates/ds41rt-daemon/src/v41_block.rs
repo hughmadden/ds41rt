@@ -59,6 +59,61 @@ pub(crate) struct BackboneBlockWave<'w, 'a> {
     phase: Phase,
 }
 impl<'w, 'a> BackboneBlockWave<'w, 'a> {
+    /// Reuse this lane's two mHC workspaces for the adjacent layer. Completed
+    /// residual/pre values are copied before installing both validated bindings.
+    /// No device allocation or graph capture occurs here.
+    pub fn advance(
+        &mut self,
+        next: &'w crate::v41_backbone_hc::BackboneHcWeights<'a>,
+    ) -> Result<()> {
+        let result = (|| -> Result<()> {
+            let (binding, rows) = match self.phase {
+                Phase::Ready(binding, rows) => (binding, rows),
+                _ => anyhow::bail!("block advance requires a completed FFN"),
+            };
+            ensure!(self.layer < 39 && next.layer() == self.layer + 1
+                && binding.layer() == self.layer && self.tokens.len() == rows,
+                "block advance layer or identity differs");
+            let [attention, ffn] = next.prepare_bindings(&self.attention, &self.ffn)?;
+            for (source, destination) in self.ffn.output()?.into_iter().zip(self.inputs()) {
+                self.library.copy_d2d(destination, source, source.bytes)?;
+            }
+            // Backbone mHC executes on its own drained streams; it has no
+            // external captured mHC graphs to invalidate during this rebind.
+            unsafe {
+                self.attention.install_binding(attention);
+                self.ffn.install_binding(ffn);
+            }
+            self.layer = next.layer();
+            self.phase = Phase::Prepared(binding, rows, ![1,14].contains(&self.layer));
+            Ok(())
+        })();
+        if result.is_err() { self.reset(); }
+        result
+    }
+    /// Start another sequence after completion, or after an explicit reset on
+    /// cancellation. Token initialization is required before attention resumes.
+    pub fn restart(
+        &mut self,
+        first: &'w crate::v41_backbone_hc::BackboneHcWeights<'a>,
+    ) -> Result<()> {
+        let result = (|| -> Result<()> {
+            ensure!(first.layer() == 0
+                && (matches!(self.phase, Phase::Idle)
+                    || (self.layer == 39 && matches!(self.phase, Phase::Ready(..)))),
+                "block restart requires layer zero and an idle or completed sequence");
+            let [attention, ffn] = first.prepare_bindings(&self.attention, &self.ffn)?;
+            unsafe {
+                self.attention.install_binding(attention);
+                self.ffn.install_binding(ffn);
+            }
+            self.layer = 0;
+            self.reset();
+            Ok(())
+        })();
+        if result.is_err() { self.reset(); }
+        result
+    }
     pub fn device_bytes(capacity: usize) -> Result<usize> {
         Ok(2 * HcSublayer::device_bytes(capacity)?)
     }

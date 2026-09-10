@@ -5,10 +5,16 @@ use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Hc};
 use std::ffi::c_void;
 
+pub(crate) struct HcBinding<'w, 'a> {
+    weights: &'w NativeRtxTensors<'a>,
+    names: [String; 4],
+}
+
 pub(crate) struct HcSublayer<'weights, 'library> {
     stream: LoadStream<'library>,
     kernel: V41Hc<'library>,
     weights: &'weights NativeRtxTensors<'library>,
+    retained_weights: Vec<&'weights NativeRtxTensors<'library>>,
     names: [String; 4],
     residual: DeviceAllocation<'library>,
     incoming_pre: DeviceAllocation<'library>,
@@ -46,6 +52,7 @@ impl<'weights, 'library> HcSublayer<'weights, 'library> {
             },
             kernel: library.v41_hc()?,
             weights,
+            retained_weights: vec![weights],
             names,
             residual: DeviceAllocation::new(library, capacity * 40960)?,
             incoming_pre: DeviceAllocation::new(library, capacity * 16)?,
@@ -61,6 +68,37 @@ impl<'weights, 'library> HcSublayer<'weights, 'library> {
             ready: None,
             pending: None,
         })
+    }
+    /// Validate and drain before changing either boundary in a reusable block.
+    pub(crate) fn prepare_binding(
+        &self,
+        weights: &'weights NativeRtxTensors<'library>,
+        names: [String; 4],
+    ) -> Result<HcBinding<'weights, 'library>> {
+        ensure!(self.begun.is_none() && self.pending.is_none(),
+            "cannot rebind an unfinished mHC boundary");
+        ensure!(self.retained_weights.len() < 40
+            || self.retained_weights.iter().any(|old| std::ptr::eq(*old, weights)),
+            "mHC binding bank exceeds 40 weight owners");
+        for (name, old) in names.iter().zip(&self.names) {
+            let value = weights.get(name)?;
+            ensure!(value.bytes == self.weights.get(old)?.bytes
+                && value.device_id == self.residual.buffer.device_id,
+                "mHC rebound weight extent or device differs");
+        }
+        self.synchronize()?;
+        Ok(HcBinding { weights, names })
+    }
+    /// # Safety
+    /// External streams using this boundary are drained. Captured external
+    /// graphs must be recaptured before use with the new weight binding.
+    pub(crate) unsafe fn install_binding(&mut self, binding: HcBinding<'weights, 'library>) {
+        self.invalidate();
+        if !self.retained_weights.iter().any(|old| std::ptr::eq(*old, binding.weights)) {
+            self.retained_weights.push(binding.weights);
+        }
+        self.weights = binding.weights;
+        self.names = binding.names;
     }
 }
 impl HcSublayer<'_, '_> {

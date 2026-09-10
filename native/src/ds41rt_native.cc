@@ -1514,6 +1514,13 @@ extern "C" ds41rt_status_t ds41rt_copy_d2d(ds41rt_device_buffer_t dst, ds41rt_de
   if (err != cudaSuccess) {
     return fail_cuda(DS41RT_STATUS_COPY_FAILED, "cudaMemcpy device-to-device failed", err);
   }
+  // D2D cudaMemcpy returns before completion. Consumers use nonblocking
+  // streams, which do not wait for the default stream's copy. This API promises
+  // a completed copy; callers needing stream ordering use copy_d2d_async.
+  err = cudaStreamSynchronize(nullptr);
+  if (err != cudaSuccess) {
+    return fail_cuda(DS41RT_STATUS_COPY_FAILED, "device-to-device copy synchronization failed", err);
+  }
 #else
   std::memcpy(dst.ptr, src.ptr, bytes);
 #endif
