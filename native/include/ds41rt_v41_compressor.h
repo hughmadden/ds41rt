@@ -21,6 +21,12 @@ int32_t ds41rt_v41_index_key_project(void* handle,const uint16_t* input,
 // rows <= 131072 also supports flattening 4096 queries with 32 index heads.
 int32_t ds41rt_v41_index_pack(const uint16_t* input,uint8_t* packed,
     uint8_t* scales,int32_t rows,void* stream);
+// Scatter proposal rows into physical index-cache rows. U64 destinations [rows]
+// must be unique among valid entries; >= capacity (including UINT64_MAX) skips.
+// packed/scales have 64/4 bytes per row. All input/output spans are disjoint.
+int32_t ds41rt_v41_index_store(const uint8_t* packed,const uint8_t* scales,
+    const uint64_t* destinations,uint8_t* cache,uint8_t* cache_scales,
+    int32_t rows,uint64_t capacity,void* stream);
 // FP32 projected KV/scores [rows,512], committed pending KV/scores [slots,512],
 // U64 predecessor descriptors [rows], BF16 norm weight [512] -> BF16 [rows,512].
 // UINT64_MAX: incomplete group, emit zero. Otherwise [0,slots) reads committed

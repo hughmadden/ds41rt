@@ -1,0 +1,136 @@
+{
+  "scope": "Request-owned paged persistent index writes inside compressor accepted-prefix commit; no full-model qualification",
+  "sources_sha256": {
+    "native/cuda/kernels/v41_compressor.cu": "7c12e59b1b7831ea44bcc50f56e34d5311655c6cb7a7b50532c6d8ca32e6c061",
+    "native/include/ds41rt_v41_compressor.h": "a755d04f06d81e48b179b1ae4f1d15072535966142242d86f94a1f617b29f997",
+    "rust/crates/ds41rt-ffi/src/v41_compressor.rs": "80b4ae99260e131226ccc6449bb90574194e9aa8976e5b3ed7aeddcb7a9fef53",
+    "rust/crates/ds41rt-daemon/src/v41_compressor.rs": "c41f2d07399617841425f2805d2ca560b766445ad0c534e3e53662354d3d8160",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/index_cache.rs": "52374c1016cf2516e0cd8da7f923a65a5d041970760ddeb6556aff573aafb588",
+    "scripts/qualify-ds41-index-store.py": "0126d1fff6bf78aff700d08e652fc9d514e072432d387e6e794256774786ac4d"
+  },
+  "build_logs_sha256": {
+    "/tmp/ds41-index-store-native-build.log": "bb29ef6d0e8ae6a103063357aeca337b440d6d0b641049dd7f6aed34fdb6a089",
+    "/tmp/ds41-index-store-rust-build.log": "df345d83b938ad78eba34ee30e8527963cd838f6a07fc5e877e9f3a868fe97c9",
+    "/tmp/ds41-index-store-owner-build.log": "532a72817420203941700ce96ba7a6ba58ebb0fc59e22291fac41bc24c6de5da"
+  },
+  "fixture_sources_sha256": {
+    "/tmp/ds41-compressor-owner/src/main.rs": "c990efa418e1fae0f6c7ad3c729a0e24dd66f0a97deeaf3d2d9cb9dafcebaed5",
+    "/tmp/ds41-compressor-owner/src/v41_tensors.rs": "a54889f4213d5c7d791c0507ebc1a820b5ade49e02455f0efd8ad93c8bb62c03",
+    "/tmp/ds41-compressor-owner/src/v41_memory.rs": "ee6c13489a7c7a37d697892a0de8450a5aeb608245dac394ebab893e9bae8b0e",
+    "/tmp/ds41-compressor-owner/src/v41_compressor.rs": "c41f2d07399617841425f2805d2ca560b766445ad0c534e3e53662354d3d8160",
+    "/tmp/ds41-compressor-owner/src/v41_compressor/index_cache.rs": "52374c1016cf2516e0cd8da7f923a65a5d041970760ddeb6556aff573aafb588"
+  },
+  "gpus": {
+    "0": {
+      "primitive": {
+        "scope": "Native index scatter only",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 0,
+        "native_library_sha256": "bacd294f5b521a60f195c564a44493371c4366518da88d2efe48b22ee75edca7",
+        "cases": [
+          {
+            "rows": 1,
+            "capacity": 1,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 3,
+            "capacity": 257,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 80,
+            "capacity": 1024,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 4096,
+            "capacity": 8192,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 4096,
+            "capacity": 16777216,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          }
+        ]
+      },
+      "owner_cases": 54,
+      "pool_cases": 4,
+      "owner_log_sha256": "602a90bb676ab38a79e1f0b78246b68faceef9288a1bc43206b9e66a81d69a19",
+      "primitive_log_sha256": "296f5b475835abe466d027e273b3f547cccde640bdeee613e03147553178e655"
+    },
+    "1": {
+      "primitive": {
+        "scope": "Native index scatter only",
+        "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "device": 1,
+        "native_library_sha256": "bacd294f5b521a60f195c564a44493371c4366518da88d2efe48b22ee75edca7",
+        "cases": [
+          {
+            "rows": 1,
+            "capacity": 1,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 3,
+            "capacity": 257,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 80,
+            "capacity": 1024,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 4096,
+            "capacity": 8192,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          },
+          {
+            "rows": 4096,
+            "capacity": 16777216,
+            "full_cache_exact": true,
+            "changed_graph_exact": true,
+            "skips_and_guards": true
+          }
+        ]
+      },
+      "owner_cases": 54,
+      "pool_cases": 4,
+      "owner_log_sha256": "602a90bb676ab38a79e1f0b78246b68faceef9288a1bc43206b9e66a81d69a19",
+      "primitive_log_sha256": "296f5b475835abe466d027e273b3f547cccde640bdeee613e03147553178e655"
+    }
+  },
+  "memory": {
+    "page_rows": 256,
+    "page_bytes": 17408,
+    "state_64pages_16slots_ratio2": 1179648,
+    "state_64pages_16slots_ratio1": 1114112,
+    "wave_ratio2_80": 5491904,
+    "wave_ratio2_4096": 70631424,
+    "wave_ratio1_80": 5245504,
+    "wave_ratio1_4096": 58015744
+  },
+  "not_fault_injected": [
+    "device copy/kernel failure and synchronization failure"
+  ]
+}

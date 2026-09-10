@@ -40,6 +40,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Qualify official backbone RoPE/YaRN through 1,048,576 positions and generate completed-latent frequencies inside compressor graphs.
 - [x] Project and normalize/rotate real-weight index keys inside the source graph; qualify all four sources and 16-request prefill/acceptance replay.
 - [x] Pack FP4/E8M0 index proposals inside source graphs and match official quantizer bytes on both RTX GPUs.
+- [x] Own paged persistent index storage and commit only accepted complete rows, with pool exhaustion/reuse qualification.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -96,3 +97,5 @@ Native backbone compressor evidence is in `docs/ds41-compressor-qualification.md
 Backbone rotary frequencies and their compressor handoff are qualified in `docs/ds41-backbone-frequencies-qualification.md`; index-key projection is qualified in `docs/ds41-index-key-qualification.md`, with packed cache producers next.
 
 Index proposal encoding is qualified in `docs/ds41-index-pack-qualification.md`; persistent index/KV cache writes and candidate selection remain next.
+
+Persistent index ownership and accepted writes are qualified in `docs/ds41-index-cache-qualification.md`; candidate selection and persistent FP8 KV remain open.

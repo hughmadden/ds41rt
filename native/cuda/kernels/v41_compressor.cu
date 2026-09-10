@@ -17,6 +17,14 @@ bool disjoint(const void* a,uint64_t na,const void* b,uint64_t nb) {
 }
 int32_t bs(cublasStatus_t s){return s==CUBLAS_STATUS_SUCCESS?0:-int32_t(s);}
 struct Handle {cublasHandle_t blas;void* workspace;int device;};
+__global__ void index_store_kernel(const uint8_t* packed,const uint8_t* scales,
+    const uint64_t* destinations,uint8_t* cache,uint8_t* cache_scales,uint64_t capacity) {
+  const uint64_t row=blockIdx.x,dst=destinations[row];
+  if(dst>=capacity)return;
+  const int t=threadIdx.x;
+  if(t<64)cache[dst*64+t]=packed[row*64+t];
+  if(t<4)cache_scales[dst*4+t]=scales[row*4+t];
+}
 __global__ void index_pack_kernel(const __nv_bfloat16* input,uint8_t* packed,
     uint8_t* scales,uint64_t groups) {
   const uint64_t pair=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
@@ -138,6 +146,20 @@ extern "C" int32_t ds41rt_v41_index_pack(const uint16_t* input,uint8_t* packed,
       !disjoint(packed,p,scales,s))return cudaErrorInvalidValue;
   index_pack_kernel<<<(p+255)/256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(input),packed,scales,uint64_t(rows)*4);
+  return cudaGetLastError();
+}
+extern "C" int32_t ds41rt_v41_index_store(const uint8_t* packed,const uint8_t* scales,
+    const uint64_t* destinations,uint8_t* cache,uint8_t* cache_scales,
+    int32_t rows,uint64_t capacity,void* stream) {
+  if(rows<1 || rows>4096 || capacity<1 || capacity>16*1048576ull)return cudaErrorInvalidValue;
+  const void* ptrs[]={packed,scales,destinations,cache,cache_scales};
+  const uint64_t bytes[]={uint64_t(rows)*64,uint64_t(rows)*4,uint64_t(rows)*8,capacity*64,capacity*4};
+  for(int i=0;i<5;++i) {
+    if(!valid(ptrs[i],bytes[i],i==2?8:1))return cudaErrorInvalidValue;
+    for(int j=0;j<i;++j)if(!disjoint(ptrs[i],bytes[i],ptrs[j],bytes[j]))return cudaErrorInvalidValue;
+  }
+  index_store_kernel<<<rows,64,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      packed,scales,destinations,cache,cache_scales,capacity);
   return cudaGetLastError();
 }
 extern "C" int32_t ds41rt_v41_compressor_pool(const float* kv,const float* scores,

@@ -16,6 +16,16 @@ type Project = unsafe extern "C" fn(
 type IndexProject =
     unsafe extern "C" fn(*mut c_void, *const u16, *const u16, *mut u16, i32, *mut c_void) -> i32;
 type IndexPack = unsafe extern "C" fn(*const u16, *mut u8, *mut u8, i32, *mut c_void) -> i32;
+type IndexStore = unsafe extern "C" fn(
+    *const u8,
+    *const u8,
+    *const u64,
+    *mut u8,
+    *mut u8,
+    i32,
+    u64,
+    *mut c_void,
+) -> i32;
 type Pool = unsafe extern "C" fn(
     *const f32,
     *const f32,
@@ -35,6 +45,7 @@ pub struct V41Compressor<'a> {
     project: Project,
     index_project: IndexProject,
     index_pack: IndexPack,
+    index_store: IndexStore,
     pool: Pool,
 }
 fn buffer(b: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
@@ -59,6 +70,7 @@ impl NativeLibrary {
         let index_project: IndexProject =
             unsafe { *self.lib.get(b"ds41rt_v41_index_key_project")? };
         let index_pack: IndexPack = unsafe { *self.lib.get(b"ds41rt_v41_index_pack")? };
+        let index_store: IndexStore = unsafe { *self.lib.get(b"ds41rt_v41_index_store")? };
         let pool: Pool = unsafe { *self.lib.get(b"ds41rt_v41_compressor_pool")? };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { create(workspace.ptr, workspace.bytes as u64, &mut handle) };
@@ -70,11 +82,51 @@ impl NativeLibrary {
             project,
             index_project,
             index_pack,
+            index_store,
             pool,
         })
     }
 }
 impl V41Compressor<'_> {
+    /// # Safety
+    /// All disjoint spans are live on the stream device. Each in-range U64
+    /// destination is unique and owned by the committing request; other values
+    /// skip writes. Validate acceptance and reserve physical pages before launch.
+    pub unsafe fn index_store(
+        &self,
+        packed: Ds41rtDeviceBuffer,
+        scales: Ds41rtDeviceBuffer,
+        destinations: Ds41rtDeviceBuffer,
+        cache: Ds41rtDeviceBuffer,
+        cache_scales: Ds41rtDeviceBuffer,
+        rows: usize,
+        capacity: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            (1..=4096).contains(&rows) && (1..=16 * 1048576).contains(&capacity),
+            "invalid index store shape"
+        );
+        buffer(packed, rows * 64)?;
+        buffer(scales, rows * 4)?;
+        buffer(destinations, rows * 8)?;
+        buffer(cache, capacity * 64)?;
+        buffer(cache_scales, capacity * 4)?;
+        let status = unsafe {
+            (self.index_store)(
+                packed.ptr.cast(),
+                scales.ptr.cast(),
+                destinations.ptr.cast(),
+                cache.ptr.cast(),
+                cache_scales.ptr.cast(),
+                rows as i32,
+                capacity as u64,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native index store status {status}");
+        Ok(())
+    }
     /// # Safety
     /// Finite BF16 vectors [rows,128] and disjoint packed [rows,64] / scale
     /// [rows,4] byte outputs are live on the stream device. Flatten query heads

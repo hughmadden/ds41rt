@@ -8,6 +8,9 @@ use std::{
     ffi::c_void,
     sync::atomic::{AtomicU64, Ordering},
 };
+mod index_cache;
+use index_cache::IndexCache;
+pub(crate) use index_cache::IndexCacheView;
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 fn ratio(layer: usize) -> Result<usize> {
     match layer {
@@ -43,6 +46,7 @@ struct Slot {
     end: u64,
 }
 pub(crate) struct CompressorState<'a> {
+    index: IndexCache<'a>,
     pending: Option<[DeviceAllocation<'a>; 2]>,
     slots: [Slot; 16],
     slot_count: usize,
@@ -50,24 +54,27 @@ pub(crate) struct CompressorState<'a> {
     owner: u64,
 }
 impl<'a> CompressorState<'a> {
-    pub fn device_bytes(layer: usize, slots: usize) -> Result<usize> {
+    pub fn device_bytes(layer: usize, slots: usize, index_pages: usize) -> Result<usize> {
         ensure!((1..=16).contains(&slots), "invalid compressor slot count");
-        Ok(if ratio(layer)? == 2 { slots * 4096 } else { 0 })
+        Ok(IndexCache::device_bytes(index_pages)?
+            + if ratio(layer)? == 2 { slots * 4096 } else { 0 })
     }
     pub fn new(
         library: &'a NativeLibrary,
         layer: usize,
         slots: usize,
+        index_pages: usize,
         budget: usize,
     ) -> Result<Self> {
         ensure!(
-            Self::device_bytes(layer, slots)? <= budget,
+            Self::device_bytes(layer, slots, index_pages)? <= budget,
             "compressor state exceeds budget"
         );
         let owner = NEXT_OWNER
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| anyhow::anyhow!("compressor owner IDs exhausted"))?;
         Ok(Self {
+            index: IndexCache::new(library, index_pages)?,
             pending: if ratio(layer)? == 2 {
                 Some([
                     DeviceAllocation::new(library, slots * 2048)?,
@@ -127,8 +134,16 @@ impl<'a> CompressorState<'a> {
     pub fn committed_end(&self, lease: CompressorLease) -> Result<u64> {
         Ok(self.slots[self.validate(lease)?].end)
     }
+    pub fn index_cache(&self, lease: CompressorLease) -> Result<IndexCacheView<'_>> {
+        let slot = self.validate(lease)?;
+        Ok(self
+            .index
+            .view(slot, self.slots[slot].end as usize / ratio(self.layer)?))
+    }
+    /// All device consumers of this request's cache must have finished.
     pub fn release(&mut self, lease: CompressorLease) -> Result<()> {
         let slot = self.validate(lease)?;
+        self.index.release(slot);
         self.slots[slot].request = None;
         Ok(())
     }
@@ -139,6 +154,7 @@ impl<'a> CompressorState<'a> {
             .map(|&l| self.validate(l))
             .collect::<Result<Vec<_>>>()?;
         for slot in slots {
+            self.index.release(slot);
             self.slots[slot].request = None;
         }
         Ok(())
@@ -233,6 +249,7 @@ impl<'a> CompressorWeights<'a> {
             index_key: DeviceAllocation::new(self.library, rows * 256)?,
             index_packed: DeviceAllocation::new(self.library, rows * 64)?,
             index_scales: DeviceAllocation::new(self.library, rows * 4)?,
+            cache_destinations: DeviceAllocation::new(self.library, rows * 8)?,
             output: DeviceAllocation::new(self.library, rows * 1024)?,
             capacity: rows,
             graph: None,
@@ -277,6 +294,7 @@ pub(crate) struct CompressorWave<'w, 'a> {
     index_key: DeviceAllocation<'a>,
     index_packed: DeviceAllocation<'a>,
     index_scales: DeviceAllocation<'a>,
+    cache_destinations: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
@@ -291,9 +309,9 @@ impl CompressorWave<'_, '_> {
         Ok(V41Compressor::WORKSPACE_BYTES
             + rows
                 * if ratio(layer)? == 2 {
-                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68
+                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68 + 8
                 } else {
-                    10240 + 1024 + 1024 + 264 + 512 + 68
+                    10240 + 1024 + 1024 + 264 + 512 + 68 + 8
                 })
     }
     /// Packed BF16 [sum(chunk.tokens),5120], in chunk order. Finish all producer
@@ -317,6 +335,10 @@ impl CompressorWave<'_, '_> {
         ensure!(
             !chunks.is_empty() && chunks.len() <= state.slot_count,
             "invalid compressor batch count"
+        );
+        ensure!(
+            state.index.packed.buffer.device_id == self.input.buffer.device_id,
+            "compressor index cache device differs"
         );
         if let Some(pending) = &state.pending {
             ensure!(
@@ -356,6 +378,10 @@ impl CompressorWave<'_, '_> {
             ensure!(
                 end <= self.capacity,
                 "compressor batch exceeds row capacity"
+            );
+            ensure!(
+                chunk.position + u64::from(chunk.tokens) <= 1048576,
+                "compressor chunk exceeds model context"
             );
             result.versions.push(state.slots[slot].version);
             result.offsets.push(result.rows);
@@ -601,7 +627,8 @@ impl CompressorWave<'_, '_> {
     }
     /// Consume this proposal once. Validate all requests before any GPU write;
     /// zero acceptance also invalidates competing proposals via version advance.
-    /// Returned rows name only accepted complete latents for later cache writes.
+    /// Reserve all index pages before writes, drain index/pending writes before
+    /// publishing history, and return accepted complete latents for KV commit.
     pub fn commit(
         &mut self,
         state: &mut CompressorState<'_>,
@@ -631,12 +658,68 @@ impl CompressorWave<'_, '_> {
                 .checked_add(1)
                 .context("compressor version exhausted")?;
         }
+        let ratio = self.weights.ratio;
+        let mut completed = vec![];
+        let mut appends = vec![];
+        for (i, chunk) in prepared.chunks.iter().enumerate() {
+            let end = prepared.offsets[i] + accepted[i] as usize;
+            completed.extend(
+                prepared
+                    .completed
+                    .iter()
+                    .filter(|r| {
+                        r.source_row as usize >= prepared.offsets[i]
+                            && (r.source_row as usize) < end
+                    })
+                    .copied(),
+            );
+            appends.push((
+                chunk.lease.slot,
+                chunk.position as usize / ratio,
+                (chunk.position as usize + accepted[i] as usize) / ratio,
+            ));
+        }
+        let plan = state.index.reserve(&appends)?;
+        let mut destinations = vec![u64::MAX; prepared.rows];
+        for row in &completed {
+            destinations[row.source_row as usize] =
+                state
+                    .index
+                    .destination(&plan, row.lease.slot, row.position as usize / ratio)?;
+        }
+        // Reuse pinned proposal metadata after execution has drained. Commit is
+        // outside the proposal graph because acceptance is only known afterward.
+        for (dst, value) in self.staging.bytes_mut()[..prepared.rows * 8]
+            .chunks_exact_mut(8)
+            .zip(&destinations)
+        {
+            dst.copy_from_slice(&value.to_ne_bytes());
+        }
         let slice = |b: Ds41rtDeviceBuffer, row: usize| Ds41rtDeviceBuffer {
             ptr: unsafe { b.ptr.cast::<u8>().add(row * 2048).cast() },
             bytes: 2048,
             ..b
         };
         let write = (|| -> Result<()> {
+            if !completed.is_empty() {
+                unsafe {
+                    self.stream.library.copy_h2d_async(
+                        self.cache_destinations.buffer,
+                        &self.staging.bytes_mut()[..prepared.rows * 8],
+                        self.stream.raw,
+                    )?;
+                    self.kernel.index_store(
+                        self.index_packed.buffer,
+                        self.index_scales.buffer,
+                        self.cache_destinations.buffer,
+                        state.index.packed.buffer,
+                        state.index.scales.buffer,
+                        prepared.rows,
+                        state.index.capacity,
+                        self.stream.raw,
+                    )?;
+                }
+            }
             if let Some(pending) = &state.pending {
                 for (i, chunk) in prepared.chunks.iter().enumerate() {
                     let count = accepted[i] as usize;
@@ -663,25 +746,15 @@ impl CompressorWave<'_, '_> {
         let drained = self.synchronize();
         if let Err(error) = write.and(drained) {
             for chunk in &prepared.chunks {
+                state.index.release(chunk.lease.slot);
                 state.slots[chunk.lease.slot].request = None;
             }
             return Err(error);
         }
-        let mut completed = vec![];
+        state.index.apply(plan);
         for (i, chunk) in prepared.chunks.iter().enumerate() {
             state.slots[chunk.lease.slot].end = chunk.position + u64::from(accepted[i]);
             state.slots[chunk.lease.slot].version += 1;
-            let end = prepared.offsets[i] + accepted[i] as usize;
-            completed.extend(
-                prepared
-                    .completed
-                    .iter()
-                    .filter(|r| {
-                        r.source_row as usize >= prepared.offsets[i]
-                            && (r.source_row as usize) < end
-                    })
-                    .copied(),
-            );
         }
         Ok(completed)
     }
