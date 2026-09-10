@@ -51,6 +51,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Persist fixed K32 FP8 compressed-source KV with paired index/KV page ownership and accepted-prefix publication.
 - [x] Own real-weight FP8 backbone window production, private proposals and accepted ring writes across all 40 layers and 16 requests.
 - [x] Implement direct FP8 window/paged-source sparse attention with private overlays, reference arithmetic and maximum-pool addressing qualification.
+- [x] Compose owned sparse attention with request/window/source views and exact selection snapshots across source, reuse and later index layers.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -129,3 +130,5 @@ Fixed FP8 source KV and paired index/KV commit are qualified in `docs/ds41-kv-qu
 Fixed FP8 backbone windows are qualified in `docs/ds41-window-qualification.md`; sparse attention consumption, dSpark storage conversion and backbone/scheduler integration remain open.
 
 Native direct FP8 sparse attention is qualified in `docs/ds41-sparse-attention-qualification.md`; owned composition with selection/window/source views and backbone query/output production remain open.
+
+Owned cache/selection attention composition is qualified in `docs/ds41-attention-owner-qualification.md`; real backbone attention query and output production remain open.

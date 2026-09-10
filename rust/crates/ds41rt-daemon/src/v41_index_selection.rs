@@ -29,6 +29,24 @@ struct Ready {
     rows: usize,
     bindings: Vec<(IndexBinding, u64)>,
 }
+impl IndexSelectionOutput<'_> {
+    /// Bind an attention row to the exact source execution and token used by
+    /// selection. Intermediate layers reuse their nearest index producer.
+    pub fn validate_attention(&self, layer: usize, bindings: &[(IndexBinding, u64)]) -> Result<()> {
+        let producer = [2, 8, 14, 20, 24, 28, 32, 36]
+            .into_iter()
+            .rev()
+            .find(|&n| n <= layer);
+        ensure!(
+            layer < 40
+                && producer == Some(self.layer)
+                && self.bindings == bindings
+                && self.rows == bindings.len(),
+            "attention selection layer, snapshot or row order differs"
+        );
+        Ok(())
+    }
+}
 pub(crate) struct IndexSelectionWave<'a> {
     stream: LoadStream<'a>,
     buffers: Vec<DeviceAllocation<'a>>,

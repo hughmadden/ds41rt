@@ -294,6 +294,11 @@ pub(crate) struct WindowBinding {
     snapshot: u64,
     lease: WindowLease,
 }
+impl WindowBinding {
+    pub fn same_pool(self, other: Self) -> bool {
+        self.lease.owner == other.lease.owner
+    }
+}
 pub(crate) struct WindowProposal<'a> {
     pub cache: WindowCacheView<'a>,
     pub values: Ds41rtDeviceBuffer,

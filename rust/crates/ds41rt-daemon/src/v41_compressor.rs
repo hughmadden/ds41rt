@@ -310,6 +310,7 @@ impl IndexBinding {
 /// before releasing these borrows. No proposed rows are published to the cache.
 pub(crate) struct IndexProposal<'a> {
     binding: IndexBinding,
+    request: u64,
     pub source_layer: usize,
     pub cache: IndexCacheView<'a>,
     pub kv_cache: KvCacheView<'a>,
@@ -327,6 +328,12 @@ pub(crate) struct IndexProposal<'a> {
     _wave: std::marker::PhantomData<&'a ()>,
 }
 impl IndexProposal<'_> {
+    pub fn request_id(&self) -> u64 {
+        self.request
+    }
+    pub fn first_token(&self) -> u64 {
+        self.first_token
+    }
     pub fn binding(&self) -> IndexBinding {
         self.binding
     }
@@ -744,6 +751,7 @@ impl CompressorWave<'_, '_> {
                 0
             };
         Ok(IndexProposal {
+            request: state.request_id(lease)?,
             binding: IndexBinding {
                 snapshot: prepared.snapshot,
                 lease,
