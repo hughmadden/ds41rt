@@ -185,6 +185,58 @@ impl TcpProtocolV2PersistentClient {
         Ok(view)
     }
 
+    /// Consume a bounded response stream on a persistent connection.
+    /// The sink must finish reading each frame before returning; native TP callers
+    /// can feed it to V41Tp4ChunkReceiver to validate and copy route-plane chunks.
+    /// Errors and cancellation discard the connection without replaying a partially
+    /// delivered wave; callers own rollback of any destination writes.
+    pub async fn roundtrip_chunks<F>(
+        &mut self,
+        request: &ExpertProtocolV2Request,
+        max_response_frames: usize,
+        mut sink: F,
+    ) -> Result<()>
+    where
+        F: FnMut(&[u8]) -> Result<()>,
+    {
+        anyhow::ensure!(
+            max_response_frames > 0,
+            "response frame limit must be positive"
+        );
+        // Hold the socket in the future, not in self, until all frames are consumed.
+        // Dropping this future therefore closes a stream with unread response bytes.
+        let mut stream = match self.stream.take() {
+            Some(stream) => stream,
+            None => connect_protocol_v2_stream(self.addr, self.config.clone()).await?,
+        };
+        write_protocol_v2_request_with_timeout(
+            &mut stream,
+            request,
+            self.config.timeout,
+            self.config.max_frame_bytes,
+            &mut self.request_buffer,
+        )
+        .await?;
+        for _ in 0..max_response_frames {
+            read_protocol_v2_response_frame_with_timeout(
+                &mut stream,
+                self.config.timeout,
+                self.config.max_frame_bytes,
+                &mut self.response_buffer,
+            )
+            .await?;
+            let response = ExpertProtocolV2ResponseView::parse(self.response_buffer.as_slice())?;
+            validate_response_matches_request(&response.header, request)?;
+            let final_chunk = !response.more_chunks();
+            sink(self.response_buffer.as_slice())?;
+            if final_chunk {
+                self.stream = Some(stream);
+                return Ok(());
+            }
+        }
+        bail!("TCP response exceeded admitted frame count without a final chunk")
+    }
+
     async fn roundtrip_once(
         &mut self,
         request: &ExpertProtocolV2Request,
@@ -407,38 +459,100 @@ pub(crate) async fn handle_protocol_v2_connection_with_executor(
         );
         let timing_enabled = protocol_v2_tcp_timing_enabled();
         let execute_started = Instant::now();
-        let response = executor.execute_with_identity(&request)?;
-        let execute_ms = elapsed_ms(execute_started);
-        let write_started = Instant::now();
-        write_protocol_v2_response_with_timeout(
-            &mut stream,
-            &response,
-            DEFAULT_TIMEOUT,
-            DEFAULT_MAX_FRAME_BYTES,
-            &mut write_buffer,
-        )
-        .await?;
-        let write_ms = elapsed_ms(write_started);
+        let request_header = request.header.clone();
+        let request_wire_bytes = request.wire_stats().wire_bytes;
+        let (response_wire_bytes, execute_ms, write_ms) = if executor.tcp_response_chunks() {
+            // GPU execution and synchronous streaming callbacks must not block the
+            // async socket runtime. One queued frame bounds buffering under backpressure.
+            let frame = read_buffer.as_slice().to_vec();
+            let worker_executor = Arc::clone(&executor);
+            let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+            let worker = tokio::task::spawn_blocking(move || -> Result<()> {
+                let request = ExpertProtocolV2RequestView::parse(&frame)?;
+                let mut final_seen = false;
+                worker_executor.execute_streaming_with_identity(&request, &mut |response| {
+                    anyhow::ensure!(!final_seen, "executor emitted a response after final chunk");
+                    response.validate()?;
+                    anyhow::ensure!(
+                        response.wire_stats().wire_bytes <= DEFAULT_MAX_FRAME_BYTES,
+                        "executor response exceeds TCP frame budget"
+                    );
+                    anyhow::ensure!(
+                        response.header.request_id == request.header.request_id
+                            && response.header.placement_version
+                                == request.header.placement_version
+                            && response.header.layer_id == request.header.layer_id,
+                        "executor emitted a response for a different request"
+                    );
+                    final_seen = !response.more_chunks();
+                    sender
+                        .blocking_send(response.to_owned()?)
+                        .map_err(|_| anyhow::anyhow!("TCP response consumer disconnected"))
+                })?;
+                anyhow::ensure!(final_seen, "executor ended without a final response chunk");
+                Ok(())
+            });
+            let mut response_wire_bytes = 0usize;
+            let mut write_ms = 0.0;
+            while let Some(response) = receiver.recv().await {
+                let write_started = Instant::now();
+                write_protocol_v2_response_with_timeout(
+                    &mut stream,
+                    &response,
+                    DEFAULT_TIMEOUT,
+                    DEFAULT_MAX_FRAME_BYTES,
+                    &mut write_buffer,
+                )
+                .await?;
+                write_ms += elapsed_ms(write_started);
+                response_wire_bytes = response_wire_bytes
+                    .checked_add(response.wire_stats().wire_bytes)
+                    .context("TCP response byte count overflow")?;
+            }
+            worker
+                .await
+                .context("TCP expert execution worker failed")??;
+            // Execution overlaps writes; this is the non-write portion of elapsed time.
+            let execute_ms = (elapsed_ms(execute_started) - write_ms).max(0.0);
+            (response_wire_bytes, execute_ms, write_ms)
+        } else {
+            let response = executor.execute_with_identity(&request)?;
+            let execute_ms = elapsed_ms(execute_started);
+            let write_started = Instant::now();
+            write_protocol_v2_response_with_timeout(
+                &mut stream,
+                &response,
+                DEFAULT_TIMEOUT,
+                DEFAULT_MAX_FRAME_BYTES,
+                &mut write_buffer,
+            )
+            .await?;
+            (
+                response.wire_stats().wire_bytes,
+                execute_ms,
+                elapsed_ms(write_started),
+            )
+        };
         if timing_enabled {
             eprintln!(
                 "protocol_v2_expert_server_roundtrip_timing request_id={} layer_id={} rows={} routes={} request_wire_bytes={} response_wire_bytes={} executor={} execute_ms={:.3} write_ms={:.3}",
-                request.header.request_id,
-                request.header.layer_id,
-                request.header.row_count,
-                request.header.route_count,
-                request.wire_stats().wire_bytes,
-                response.wire_stats().wire_bytes,
+                request_header.request_id,
+                request_header.layer_id,
+                request_header.row_count,
+                request_header.route_count,
+                request_wire_bytes,
+                response_wire_bytes,
                 executor.name(),
                 execute_ms,
                 write_ms
             );
             tracing::info!(
-                request_id = request.header.request_id,
-                layer_id = request.header.layer_id,
-                rows = request.header.row_count,
-                routes = request.header.route_count,
-                request_wire_bytes = request.wire_stats().wire_bytes,
-                response_wire_bytes = response.wire_stats().wire_bytes,
+                request_id = request_header.request_id,
+                layer_id = request_header.layer_id,
+                rows = request_header.row_count,
+                routes = request_header.route_count,
+                request_wire_bytes = request_wire_bytes,
+                response_wire_bytes = response_wire_bytes,
                 executor = executor.name(),
                 execute_ms = execute_ms,
                 write_ms = write_ms,

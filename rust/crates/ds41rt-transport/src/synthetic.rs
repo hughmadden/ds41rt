@@ -55,6 +55,12 @@ pub trait ProtocolV2ExpertExecutor: Send + Sync {
         request: &ExpertProtocolV2RequestView<'_>,
     ) -> Result<ExpertProtocolV2Response>;
 
+    /// Opt in only when TCP clients consume all frames through the final marker.
+    /// Existing single-response executors retain their current wire behavior.
+    fn tcp_response_chunks(&self) -> bool {
+        false
+    }
+
     fn execute_with_identity(
         &self,
         request: &ExpertProtocolV2RequestView<'_>,

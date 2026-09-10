@@ -27,3 +27,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Delete `/tmp/ds41-native-tp4/`, its binary in `rust/target/debug/`, `tp4-execution/`, `prepare_tp4_execution.py`, `check_tp4_execution.py` and related logs under `/tmp/ds41-v41-aot/`, ostrich's `native-tp4-src/` and temporary worker binary, and dodo's `/tmp/ds41-native-tp4/` after checkpoint-backed TP serving replaces the synthetic network workers; retain production request/response contracts and host adapter.
 
 - Delete `/tmp/ds41-v41-aot/chunk-check.log` and `chunk-daemon-check.log` with the temporary AOT staging tree; these are compilation logs, not runtime qualification evidence.
+
+- Delete `/tmp/ds41-v41-aot/streaming-tcp-check.log` and `streaming-tcp-daemon-check.log` with the temporary AOT staging tree; retain the production TCP streaming interfaces.

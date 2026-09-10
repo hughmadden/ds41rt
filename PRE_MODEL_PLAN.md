@@ -68,3 +68,5 @@ Owned execution progress: resident weights now feed per-wave native scratch/I/O/
 Native TP transport progress: strict canonical requests, borrowed FP32 route responses and rank-ordered assembly now connect to owned execution, with four logical native TP ranks across ostrich/dodo and RTX reduction matching a full-width oracle over persistent TCP while production service/RDMA/streaming integration remains open.
 
 Bounded TP response progress: row-indexed frame production, incremental four-rank validation and an owned-execution chunk callback compile in the daemon, while service wiring and runtime qualification remain pending with no new tests or benchmarks run.
+
+TCP streaming progress: the service listener now supports opt-in bounded streaming callbacks and the persistent client consumes bounded multi-frame responses with connection disposal on error or cancellation, while native executor registration and runtime qualification remain pending.
