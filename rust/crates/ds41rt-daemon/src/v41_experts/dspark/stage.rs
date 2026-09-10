@@ -62,12 +62,12 @@ impl DsparkStage<'_, '_> {
     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 2] {
         self.boundary.inputs()
     }
-    fn invalidate(&mut self) {
+    pub(super) fn invalidate(&mut self) {
         self.ready = false;
         self.boundary.invalidate();
         self.ffn.invalidate();
     }
-    fn prepare(
+    pub(super) fn prepare(
         &mut self,
         window: &DsparkWindow<'_>,
         requests: &[(WindowLease, u64)],
@@ -80,8 +80,26 @@ impl DsparkStage<'_, '_> {
         self.attention.prepare(window, requests)
     }
     unsafe fn enqueue(&mut self, read: &WindowRead, requests: usize) -> Result<()> {
+        unsafe { self.enqueue_on(read, requests, self.ffn.stream()) }
+    }
+    pub(super) fn output_storage(&self) -> [Ds41rtDeviceBuffer; 2] {
+        self.ffn.output_storage()
+    }
+    pub(super) fn upload(
+        &mut self,
+        read: &WindowRead,
+        requests: &[(WindowLease, u64)],
+    ) -> Result<()> {
+        self.attention.upload(read, requests)
+    }
+    /// The containing owner retains and drains the supplied stream through all children.
+    pub(super) unsafe fn enqueue_on(
+        &mut self,
+        read: &WindowRead,
+        requests: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
         let rows = requests as u32 * 5;
-        let stream = self.ffn.stream();
         unsafe {
             self.boundary
                 .enqueue_begin(rows as usize, Some(self.attention.input()), stream)?;
@@ -98,7 +116,7 @@ impl DsparkStage<'_, '_> {
             )?;
             self.library
                 .copy_d2d_async(destination[1], source[1], rows as usize * 16, stream)?;
-            self.ffn.enqueue(rows)
+            self.ffn.enqueue_on(rows, stream)
         }
     }
     /// # Safety

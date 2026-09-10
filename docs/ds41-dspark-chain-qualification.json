@@ -1,0 +1,89 @@
+{
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "b12x_revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_experts/execution.rs": "3f65f9247afc48ad6959612bc705dc3976b8d3f720257f7c1225e693b347fb3a",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/chain.rs": "31a3e771bfa5d14f363d90ab07f000cbcb6927d7394575d072a4dfe283214419",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/stage.rs": "cc2e3bd578bb7d686536beaae7c63502ae4948fc90873f835cd62aa577a8e6b0",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/ffn.rs": "3dde867668c0eddea3740f7685dccc8804dcbf7d43f5bc7ec94f9fbd55867377",
+    "/tmp/ds41-chain/src/main.rs": "739dfb751891c92706253b54b29afb3cb56ee453fc11ff6c42a590bc128bd600",
+    "/tmp/ds41-chain-build.log": "8cb4e3131b037ac6d51861716113627c5a929ab7cb8312625bcc2ee2c849f70a",
+    "/tmp/ds41-chain-fixture-final-build.log": "3f2df83a3833c56830fbd03b6f3343f609ae1c51b5e9610720ad45b98d588a7d",
+    "/tmp/ds41-chain-stage-regression-build.log": "d8ab46c972dadb32e0f5f8336a1598e7efe3d440627d291e7d5ab74714332fb6"
+  },
+  "chain": {
+    "rtx0": {
+      "sha256": "bfa434354e0ff6ea6915a875c96e957def8beeff44f36a1ee49053300cd38d95",
+      "cases": [
+        "PASS requests=1 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157516",
+        "PASS requests=1 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157516",
+        "PASS requests=3 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154556",
+        "PASS requests=3 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154556",
+        "PASS requests=16 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906468",
+        "PASS requests=16 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906468"
+      ]
+    },
+    "rtx1": {
+      "sha256": "bfa434354e0ff6ea6915a875c96e957def8beeff44f36a1ee49053300cd38d95",
+      "cases": [
+        "PASS requests=1 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157516",
+        "PASS requests=1 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=62157516",
+        "PASS requests=3 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154556",
+        "PASS requests=3 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=64154556",
+        "PASS requests=16 case=0 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906468",
+        "PASS requests=16 case=1 exact_residual=true exact_pre=true guards=true rings_unchanged=true device_bytes=228906468"
+      ]
+    }
+  },
+  "stage_reference_regression": {
+    "rtx0": {
+      "sha256": "69413c85ecbf06dc0ef3487748fb5832789c995466f4ad490b963a54980e3f60",
+      "cases": [
+        "PASS stage=0 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true"
+      ]
+    },
+    "rtx1": {
+      "sha256": "69413c85ecbf06dc0ef3487748fb5832789c995466f4ad490b963a54980e3f60",
+      "cases": [
+        "PASS stage=0 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=0 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=1 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=0 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=1 case=1 bytes=20719172 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=0 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=3 case=1 bytes=21384852 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=0 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true",
+        "PASS stage=2 requests=16 case=1 bytes=76302156 max_error=0 changed_elements=0 ring_unchanged=true"
+      ]
+    }
+  },
+  "partial_two_wave_device_bytes80": 8853577584,
+  "real_checkpoint_gpu_execution": false,
+  "terminal_heads_wired": false
+}

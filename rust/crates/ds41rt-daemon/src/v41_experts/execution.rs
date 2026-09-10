@@ -214,6 +214,16 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         shared: &mut super::dspark::DsparkSharedFfn<'_, '_>,
         rows: u32,
     ) -> Result<()> {
+        unsafe { self.enqueue_draft_ffn_on(router, shared, rows, self.stream.raw) }
+    }
+    /// Containing owner must drain the supplied stream before releasing scratch.
+    pub(super) unsafe fn enqueue_draft_ffn_on(
+        &mut self,
+        router: &mut super::dspark::DsparkRouter<'_, '_>,
+        shared: &mut super::dspark::DsparkSharedFfn<'_, '_>,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
         ensure!(
             router.matches(self._weights) && shared.matches(self._weights),
             "dSpark FFN stage owners differ"
@@ -228,9 +238,9 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
             .context("dSpark FFN requires coordinator output")?
             .buffer;
         unsafe {
-            router.enqueue(self.inputs(), rows as usize, self.stream.raw)?;
-            shared.enqueue(self.hidden.buffer, output, rows, self.stream.raw)?;
-            self.launch(rows, true)
+            router.enqueue(self.inputs(), rows as usize, stream)?;
+            shared.enqueue(self.hidden.buffer, output, rows, stream)?;
+            self.launch_on(rows, true, stream)
         }
     }
 
@@ -290,11 +300,14 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
     /// Initialize shared BF16 output too if requested. External readers/writers must
     /// finish before storage is reused; all operations belong to this GPU worker.
     pub unsafe fn launch(&mut self, rows: u32, include_shared: bool) -> Result<()> {
+        unsafe { self.launch_on(rows, include_shared, self.stream.raw) }
+    }
+    unsafe fn launch_on(&mut self, rows: u32, include_shared: bool, stream: *mut c_void) -> Result<()> {
         ensure!(
             !include_shared || self.shared.is_some(),
             "shared output belongs on coordinator RTX"
         );
-        let args = V41ExpertLaunchArgs::new(self.kernel.info(), self.slots, rows, self.stream.raw)?;
+        let args = V41ExpertLaunchArgs::new(self.kernel.info(), self.slots, rows, stream)?;
         unsafe {
             self.kernel.launch(&args)?;
         }
@@ -316,7 +329,7 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
                     rows,
                     1,
                     3,
-                    self.stream.raw,
+                    stream,
                 )?;
             }
         }

@@ -107,8 +107,14 @@ impl DsparkFfn<'_, '_> {
     }
     /// Scratch owners and borrowed weights must live through stream completion.
     pub(super) unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
+        unsafe { self.enqueue_on(rows, self.experts.stream()) }
+    }
+    pub(super) fn output_storage(&self) -> [Ds41rtDeviceBuffer; 2] {
+        self.boundary.output_storage()
+    }
+    /// The containing owner serializes and drains this supplied stream.
+    pub(super) unsafe fn enqueue_on(&mut self, rows: u32, stream: *mut c_void) -> Result<()> {
         self.boundary.invalidate();
-        let stream = self.experts.stream();
         let normalized = self.experts.inputs()[0];
         let result = self
             .experts
@@ -119,7 +125,7 @@ impl DsparkFfn<'_, '_> {
             self.boundary
                 .enqueue_begin(rows as usize, Some(normalized), stream)?;
             self.experts
-                .enqueue_draft_ffn(&mut self.router, &mut self.shared, rows)?;
+                .enqueue_draft_ffn_on(&mut self.router, &mut self.shared, rows, stream)?;
             self.boundary.enqueue_finish(Some(result), stream)
         }
     }
