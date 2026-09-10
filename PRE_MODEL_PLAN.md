@@ -130,3 +130,5 @@ Attention-output progress: official FP8-to-BF16 output-A loading and the owned i
 dSpark attention-kernel progress: native tensor-core QK, 64-key online softmax, BF16 probability PV and sink pass mixed-window and changed-input graph checks on both RTX GPUs at up to sixteen requests, while owned producer/cache/output composition remains open in `docs/ds41-dspark-attention-qualification.md`.
 
 b12x master progress: all seven V4.1 commits are merged into the fork's master with a fixed provenance pin, RTX/Spark regressions and fresh AOT projection checks, while reusable attention/mHC/loader candidates and incompatibilities are recorded in `docs/ds41-b12x-master-review.md`.
+
+Owned-attention progress: the complete query/KV-to-output wave and fused private KV producer pass changed-input graphs on both RTX GPUs for all three stages at up to sixteen requests, with generation-checked cache reads while frequency/main-cache producers and outer mHC sequencing remain open in `docs/ds41-attention-wave-qualification.md`.

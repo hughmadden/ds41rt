@@ -25,6 +25,10 @@ int32_t ds41rt_v41_grouped_output_launch(void* handle, const uint16_t* input,
 // Official FP8 [8192,4096] and UE8 [256,128] -> resident BF16 [8192,4096].
 int32_t ds41rt_v41_grouped_output_dequant(const uint8_t* weight,
     const uint8_t* scales, uint16_t* output, void* stream);
+// Fused KV norm -> BF16 -> RoPE -> BF16 -> K32 UE8 FP8 quantize/dequantize.
+// Shapes as attention_norm dim512, mandatory frequencies; preserves both rounds.
+int32_t ds41rt_v41_attention_kv(const uint16_t* input,const uint16_t* weight,
+    const float* frequencies,uint16_t* output,int32_t rows,void* stream);
 #ifdef __cplusplus
 }
 #endif

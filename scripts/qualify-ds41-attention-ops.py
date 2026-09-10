@@ -32,7 +32,9 @@ def main():
     P, I = C.c_void_p, C.c_int32
     norm.argtypes = [P,P,P,P,I,I,P]
     rope.argtypes = [P,P,P,I,I,I,P]
-    norm.restype = rope.restype = I
+    kv=lib.ds41rt_v41_attention_kv
+    kv.argtypes=[P,P,P,P,I,P]
+    norm.restype = rope.restype = kv.restype = I
     torch.cuda.set_device(args.device)
     torch.manual_seed(41091 + args.device)
     stream = torch.cuda.Stream()
@@ -85,6 +87,24 @@ def main():
                     assert norm(x.data_ptr(),w.data_ptr(),None,y.data_ptr(),rows,513,stream.cuda_stream)!=0
                     assert norm(x.data_ptr(),w.data_ptr(),f.data_ptr(),y.data_ptr(),rows,1280,stream.cuda_stream)!=0
                     results.append({'op':'norm_rope' if rotated else 'norm','rows':rows,'dim':dim,'initial':initial,'changed_graph':changed,'tiny':tiny,'zero_exact':True,'guards':True})
+                    if rotated:
+                        z=torch.empty_like(x)
+                        def kv_launch(): check(kv(x.data_ptr(),w.data_ptr(),f.data_ptr(),z.data_ptr(),rows,stream.cuda_stream))
+                        def quantized():
+                            groups=y.float().reshape(rows,16,32)
+                            amax=groups.abs().amax(-1).clamp_min(1e-4)
+                            scales=torch.exp2(torch.ceil(torch.log2(amax/448)))
+                            return ((groups/scales[...,None]).to(torch.float8_e4m3fn).float()*scales[...,None]).reshape(rows,512).bfloat16()
+                        kv_launch();torch.testing.assert_close(z,quantized(),rtol=0,atol=0)
+                        kv_graph=torch.cuda.CUDAGraph()
+                        with torch.cuda.graph(kv_graph,stream=stream): kv_launch()
+                        x.copy_((torch.randn_like(x.float())*.9).bfloat16());f.copy_(frequencies(rows))
+                        graph.replay();kv_graph.replay()
+                        torch.testing.assert_close(z,quantized(),rtol=0,atol=0)
+                        x.zero_();kv_graph.replay();assert torch.count_nonzero(z).item()==0
+                        assert kv(x.data_ptr(),w.data_ptr(),f.data_ptr(),x.data_ptr(),rows,stream.cuda_stream)!=0
+                        results.append({'op':'fused_kv','rows':rows,'tiny_exact':True,'changed_graph_exact':True,'zero_exact':True,'overlap_guard':True})
+                        del kv_graph
                     del graph
             for heads in (1,64):
                 x=torch.randn((rows,heads,512),device='cuda').bfloat16()

@@ -1,7 +1,9 @@
 //! Committed dSpark KV rings with generation-checked request slots.
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41DsparkCache, V41KvWrite};
+use ds41rt_ffi::{
+    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionWindow, V41DsparkCache, V41KvWrite,
+};
 use std::{
     ffi::c_void,
     sync::atomic::{AtomicU64, Ordering},
@@ -30,6 +32,12 @@ pub(crate) struct WindowView {
     pub buffer: Ds41rtDeviceBuffer,
     pub valid_rows: usize,
     pub committed_end: u64,
+}
+pub(crate) struct WindowRead {
+    pub owner: u64,
+    pub ring: Ds41rtDeviceBuffer,
+    pub slots: u32,
+    pub descriptors: [V41AttentionWindow; 16],
 }
 pub(crate) struct DsparkWindow<'a> {
     stream: LoadStream<'a>,
@@ -238,6 +246,40 @@ impl<'a> DsparkWindow<'a> {
             }
         }
         Ok(())
+    }
+    /// Validate the entire read batch before metadata upload; the caller holds
+    /// this borrow through GPU completion, preventing safe concurrent mutation.
+    pub fn attention_read(&self, requests: &[(WindowLease, u64)]) -> Result<WindowRead> {
+        ensure!(
+            (1..=16).contains(&requests.len()),
+            "invalid attention request count"
+        );
+        let mut seen = [false; 16];
+        let mut descriptors = [V41AttentionWindow::default(); 16];
+        for (i, &(lease, expected_end)) in requests.iter().enumerate() {
+            let slot = self.validate(lease)?;
+            ensure!(!seen[slot], "duplicate attention cache slot");
+            seen[slot] = true;
+            let view = self.view(lease)?;
+            ensure!(
+                view.committed_end == expected_end,
+                "attention cache position changed"
+            );
+            ensure!(
+                expected_end >= 2 && expected_end.checked_add(5).is_some(),
+                "invalid attention draft positions"
+            );
+            descriptors[i] = V41AttentionWindow {
+                slot: slot as u32,
+                valid_rows: view.valid_rows as u32,
+            };
+        }
+        Ok(WindowRead {
+            owner: self.owner,
+            ring: self.ring.buffer,
+            slots: self.slot_count as u32,
+            descriptors,
+        })
     }
     /// Physical ring order: attention reads 0..valid_rows, then its five private
     /// draft positions. No chronological reordering of this buffer is necessary.

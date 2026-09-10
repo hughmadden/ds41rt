@@ -10,11 +10,14 @@ type Norm = unsafe extern "C" fn(
     i32,
     *mut c_void,
 ) -> i32;
+type Kv =
+    unsafe extern "C" fn(*const u16, *const u16, *const f32, *mut u16, i32, *mut c_void) -> i32;
 type Rope =
     unsafe extern "C" fn(*const u16, *const f32, *mut u16, i32, i32, i32, *mut c_void) -> i32;
 pub struct V41AttentionOps<'a> {
     _library: &'a NativeLibrary,
     norm: Norm,
+    kv: Kv,
     rope: Rope,
 }
 fn buffer(value: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
@@ -28,12 +31,43 @@ impl NativeLibrary {
     pub fn v41_attention_ops(&self) -> Result<V41AttentionOps<'_>> {
         Ok(V41AttentionOps {
             _library: self,
+            kv: unsafe { *self.lib.get(b"ds41rt_v41_attention_kv")? },
             norm: unsafe { *self.lib.get(b"ds41rt_v41_attention_norm")? },
             rope: unsafe { *self.lib.get(b"ds41rt_v41_attention_rope")? },
         })
     }
 }
 impl V41AttentionOps<'_> {
+    /// # Safety
+    /// Same initialized, disjoint and live device-buffer contract as norm;
+    /// produces official quantized/dequantized BF16 KV without intermediate storage.
+    pub unsafe fn kv(
+        &self,
+        input: Ds41rtDeviceBuffer,
+        weight: Ds41rtDeviceBuffer,
+        frequencies: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=4096).contains(&rows), "invalid KV rows");
+        buffer(input, rows as usize * 1024)?;
+        buffer(weight, 1024)?;
+        buffer(frequencies, rows as usize * 256)?;
+        buffer(output, rows as usize * 1024)?;
+        let status = unsafe {
+            (self.kv)(
+                input.ptr.cast(),
+                weight.ptr.cast(),
+                frequencies.ptr.cast(),
+                output.ptr.cast(),
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native KV CUDA status {status}");
+        Ok(())
+    }
     /// # Safety
     /// Finite initialized BF16 input/weight and optional per-row complex FP32
     /// frequencies are on the stream device; output is disjoint from inputs.

@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 #include <cuda_bf16.h>
+#include <cuda_fp8.h>
 #include <stdint.h>
 #include "ds41rt_v41_attention_ops.h"
 namespace {
@@ -20,7 +21,7 @@ __device__ void rotate(float x, float y, float c, float s, __nv_bfloat16* out) {
   out[0]=__float2bfloat16_rn(fmaf(x,c,-__fmul_rn(y,s)));
   out[1]=__float2bfloat16_rn(fmaf(y,c,__fmul_rn(x,s)));
 }
-template<int D> __global__ void norm_kernel(const __nv_bfloat16* input,
+template<int D, bool Quantize=false> __global__ void norm_kernel(const __nv_bfloat16* input,
     const __nv_bfloat16* weight, const float* freq, __nv_bfloat16* output) {
   const uint64_t row=blockIdx.x, base=row*D;
   const int t=threadIdx.x;
@@ -42,10 +43,24 @@ template<int D> __global__ void norm_kernel(const __nv_bfloat16* input,
   for (int i=t*2;i<D;i+=512) {
     const auto a=__float2bfloat16_rn(__fmul_rn(__fmul_rn(__bfloat162float(input[base+i]),inverse),__bfloat162float(weight[i])));
     const auto b=__float2bfloat16_rn(__fmul_rn(__fmul_rn(__bfloat162float(input[base+i+1]),inverse),__bfloat162float(weight[i+1])));
+    __nv_bfloat16 pair[2]={a,b};
     if (D==512 && freq && i>=448) {
       const uint64_t f=row*64+i-448;
-      rotate(__bfloat162float(a),__bfloat162float(b),freq[f],freq[f+1],output+base+i);
-    } else {output[base+i]=a; output[base+i+1]=b;}
+      rotate(__bfloat162float(a),__bfloat162float(b),freq[f],freq[f+1],pair);
+    }
+    if constexpr (Quantize) {
+      static_assert(D==512);
+      const float x=__bfloat162float(pair[0]),y=__bfloat162float(pair[1]);
+      float maximum=fmaxf(fabsf(x),fabsf(y));
+      // Sixteen adjacent pairs are one official K32 activation group.
+      for(int offset=8;offset;offset>>=1)maximum=fmaxf(maximum,__shfl_xor_sync(0xffffffffu,maximum,offset,16));
+      const uint32_t bits=__float_as_uint(fmaxf(maximum,1e-4f)*(1.0f/448.0f));
+      const int exponent=int((bits>>23)&255)-127+((bits&0x7fffff)!=0);
+      const float scale=ldexpf(1.0f,exponent);
+      pair[0]=__float2bfloat16_rn(float(__nv_fp8_e4m3(x/scale))*scale);
+      pair[1]=__float2bfloat16_rn(float(__nv_fp8_e4m3(y/scale))*scale);
+    }
+    output[base+i]=pair[0];output[base+i+1]=pair[1];
   }
 }
 __global__ void rope_kernel(const __nv_bfloat16* input, const float* freq,
@@ -155,5 +170,16 @@ extern "C" int32_t ds41rt_v41_grouped_output_dequant(const uint8_t* input,
       !disjoint(input,w,output,o)||!disjoint(scales,s,output,o)) return cudaErrorInvalidValue;
   grouped_dequant_kernel<<<w/256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       input,scales,reinterpret_cast<__nv_bfloat16*>(output));
+  return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_attention_kv(const uint16_t* input,const uint16_t* weight,
+    const float* freq,uint16_t* output,int32_t rows,void* stream) {
+  if(rows<1||rows>4096)return cudaErrorInvalidValue;
+  const uint64_t b=uint64_t(rows)*1024,f=uint64_t(rows)*256;
+  if(!valid(input,b,2)||!valid(weight,1024,2)||!valid(freq,f,4)||!valid(output,b,2)||
+      !disjoint(input,b,output,b)||!disjoint(weight,1024,output,b)||!disjoint(freq,f,output,b))return cudaErrorInvalidValue;
+  norm_kernel<512,true><<<rows,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(input),reinterpret_cast<const __nv_bfloat16*>(weight),freq,reinterpret_cast<__nv_bfloat16*>(output));
   return cudaGetLastError();
 }

@@ -1,0 +1,1554 @@
+{
+  "scope": "Owned normalized-hidden-to-attention-output dSpark wave with committed-window read leases and fused private KV production",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "b12x_lock": {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+    "revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+    "source_tree_sha256": "ee3901f1a27f7bcf70a9cb810969e58b778d84c7e419e94b1820e5ebe164e83f"
+  },
+  "source_sha256": {
+    "native/cuda/kernels/v41_attention_ops.cu": "64b6bea34d79cfe5cbf7a6d8ba02591d025d24fdc01b858b3308061a1716c0cd",
+    "native/include/ds41rt_v41_attention_ops.h": "79aa374bdf2fcad17cc36490bac92ead5dc3cb0d5c2ea0a55e8c977b244ae181",
+    "rust/crates/ds41rt-ffi/src/v41_attention_ops.rs": "b4cb0d6b5e4754eb635bca3b93e00dcea00c833aecd51551861cb4d8bb53b108",
+    "rust/crates/ds41rt-daemon/src/v41_dspark_cache.rs": "07f4ea84156e83e269f366a1e915e1ab1ed9cdaaa50781ebe75331d4a9a67bcb",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "cc9b01272e1d64a6b4411ffd42f90f8561fefc3df84939d8c031676185172105",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/attention_wave.rs": "bbb31ed441ab4626cb3847a0cf69ee295dde77372547ce544eac98c368af7091",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/attention_output.rs": "cfab1c11582d56bafee6a736c889bf39a90d26d64d423cc6a2eae4b9a085fd1e",
+    "scripts/qualify-ds41-attention-ops.py": "0cf45624eae9d59a639cce388dfa05c9df766243031cd38e257b35045d8941f0"
+  },
+  "fixture_sha256": {
+    "src/main.rs": "d1b00df6ca7f13d522ddcfd61ee444d58fdca4d4877483435ff55edc3fa12987",
+    "generate.py": "2b5ed132ead6277d7a7adcd70237be797a388396ae5c1c80ac9015342d215bd2",
+    "append.bin": "b0aef49622023afb0e3d866fab318f288315d33823e27fb3763066d6bd13a13c",
+    "expected-r1-c0-s0.bin": "4d38c36d13e313b8b708e20b2bf1169a5ef0bd984a5dc01a45f7e275a29050e5",
+    "expected-r1-c0-s1.bin": "292a9f08ec8009aac1c82472b6ffdca975bcfd2a5c1c6c451577632ba26a45ac",
+    "expected-r1-c0-s2.bin": "64389be467212e446ea03f3f715f1cbeb484441f90750af68d97a1bf2081789d",
+    "expected-r1-c1-s0.bin": "31c302dd270193deed365558d86dc3239f21b872f6db63fa427cdf57fddb090e",
+    "expected-r1-c1-s1.bin": "3064273f59c39a857ed6aed73ea22c07074003950f9957acf2367af60d1afffe",
+    "expected-r1-c1-s2.bin": "2ae0150f01347e2b8da463aaed3656db21438ecb00535836e271a870e3149893",
+    "expected-r16-c0-s0.bin": "6f659b34139ff50cafe7756ece11b8dd75a54b4cd4d26d0dd189bfac78207703",
+    "expected-r16-c0-s1.bin": "6a52e45852cbb3e827fb87d99604f2e1d5c0f46e1d9f5f6998608ddbe13e6177",
+    "expected-r16-c0-s2.bin": "a5f5663828b1a753833210780491497334324b60662b91456645d1dbd8d7e710",
+    "expected-r16-c1-s0.bin": "795468baa9b396943575aa79e3271a31c6584dacb5bf5d5d6c0bb447c621efba",
+    "expected-r16-c1-s1.bin": "9419d919aa9eda85875804c22afed6f6f1c39b2f746e958d3c86f1fb3907a275",
+    "expected-r16-c1-s2.bin": "edbd67b15f612ef9614c473aba50b37e199dec82ec04d306204166bbf907d51f",
+    "expected-r3-c0-s0.bin": "f8260f316024c4b6d570581e7227fadbf253706af56232827818f9f9d35905d8",
+    "expected-r3-c0-s1.bin": "d3a355e4dd3b42bd446f7983be266c135290b379bd5ce40ff155f97aff8f824a",
+    "expected-r3-c0-s2.bin": "5b3a0f13355b39716dd47cdc7ccb385a19db68f531e5f6a52ae70534228a67e2",
+    "expected-r3-c1-s0.bin": "012c41d8e72e92d1c3e3dbd199e576dde4732fc9928cf149b56734d4f63b5759",
+    "expected-r3-c1-s1.bin": "be53f7771d0128faf88e3efdf7d5ed0340bd01db3dfef788dd388b96e9c125d3",
+    "expected-r3-c1-s2.bin": "f9a862187d94bd854f837b974c5f3adb0406009efc3002aefb7fb9fd7413af24",
+    "freq-r1-c0.bin": "3cb4f61e43edaede147a235968e50f3c10e3ab3d29675ee582e552f10b37778c",
+    "freq-r1-c1.bin": "b89fe9fdd8622b68a66cc4142e534712396b6b4a7764e25fd7a90aaf412ebe50",
+    "freq-r16-c0.bin": "72993ecf0bd0d7b870f1d19acc8d0ccfcee592ca14a05d96fe6c26cd9c5db2b7",
+    "freq-r16-c1.bin": "24193fbbdb19ed4736dd262bb40c229509aa4f079838bb2b8434f43134d500d5",
+    "freq-r3-c0.bin": "684524fe1f242f30aacd17e0a844227e888824c942cb7e31768a1e8a4f2fb075",
+    "freq-r3-c1.bin": "6951912fb7dc18e14bac79fbb8e368682078b7931630c7d21678b5c73660daa4",
+    "input-r1-c0.bin": "a6674b41cc680d6186c819250bcf35d84130c8b685a33a7ac1bb58d0ec4d1ad0",
+    "input-r1-c1.bin": "5d722768561bc8f72ba07bf9ce2a815e1d0ceaf8aa5bf0add93fe6c1c15bade0",
+    "input-r16-c0.bin": "02a9fef9676e44bb573a69815c2c63abc84857c1705f3033b4814a699233d17c",
+    "input-r16-c1.bin": "4c8cfec08fc6a1e8b95cfc19a469a6720034419edfab37fea3ef759dbefd133d",
+    "input-r3-c0.bin": "38b637e181fb7714e4f6609ec9405b82c840ee9018817a98a70da5e43cc3e6b6",
+    "input-r3-c1.bin": "3ff166895527614603e9444771594d3de199f770021d5a6b426e509dec7fc61e",
+    "source.bin": "11326522df3e0df824e4d1868b02f26e636154878d8b0b1eeacf669deb509e4d"
+  },
+  "fixture_binary_sha256": "2aa373c7715a02870965c0e9935474b35719c1edf9c1f42ac02b2b2a24668ec8",
+  "native_library_sha256": "5a1f8f5765e5e141c768ff48a05b155205e7a4b8eebd9721396e9a30f22d97b4",
+  "owner_device_bytes_by_request_capacity": {
+    "1": 8934544,
+    "3": 9600144,
+    "16": 31235216
+  },
+  "pinned_bytes_per_owner": 128,
+  "additional_three_stage_wave80_bytes": 15974784,
+  "partial_two_wave80_bytes": 8843334488,
+  "owned_gpu_results": [
+    {
+      "device": 0,
+      "passed": true,
+      "log_sha256": "9da213f66f6ac3a97177213864f717aa0af4122d833a030b373d278ba0dbe746",
+      "log": "PASS stage=0 requests=1 case=0 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=1 case=1 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=3 case=0 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=3 case=1 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=16 case=0 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=16 case=1 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=1 case=0 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=1 case=1 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=3 case=0 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=3 case=1 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=16 case=0 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=16 case=1 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=1 case=0 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=1 case=1 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=3 case=0 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=3 case=1 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=16 case=0 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=16 case=1 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nDONE wave_extra80=15974784 total_two_wave80=8843334488\n"
+    },
+    {
+      "device": 1,
+      "passed": true,
+      "log_sha256": "9da213f66f6ac3a97177213864f717aa0af4122d833a030b373d278ba0dbe746",
+      "log": "PASS stage=0 requests=1 case=0 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=1 case=1 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=3 case=0 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=3 case=1 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=16 case=0 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=0 requests=16 case=1 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=1 case=0 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=1 case=1 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=3 case=0 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=3 case=1 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=16 case=0 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=1 requests=16 case=1 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=1 case=0 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=1 case=1 bytes=8934544 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=3 case=0 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=3 case=1 bytes=9600144 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=16 case=0 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nPASS stage=2 requests=16 case=1 bytes=31235216 max_error=0 changed_elements=0 ring_unchanged=true\nDONE wave_extra80=15974784 total_two_wave80=8843334488\n"
+    }
+  ],
+  "primitive_gpu_results": [
+    {
+      "scope": "Native dSpark norm and rotary operations; excludes frequency ownership, full attention and serving",
+      "device": 0,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "native_library_sha256": "5a1f8f5765e5e141c768ff48a05b155205e7a4b8eebd9721396e9a30f22d97b4",
+      "qualifier_sha256": "0cf45624eae9d59a639cce388dfa05c9df766243031cd38e257b35045d8941f0",
+      "results": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 16,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.000244140625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 80,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 255,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 6
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 4
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1023,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 3
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 7
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 10
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 12
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 7
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0009765625,
+            "different_bf16_elements": 2
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 6
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 4095,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 13
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 16
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 69
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 83
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        }
+      ]
+    },
+    {
+      "scope": "Native dSpark norm and rotary operations; excludes frequency ownership, full attention and serving",
+      "device": 1,
+      "device_name": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+      "reference_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "native_library_sha256": "5a1f8f5765e5e141c768ff48a05b155205e7a4b8eebd9721396e9a30f22d97b4",
+      "qualifier_sha256": "0cf45624eae9d59a639cce388dfa05c9df766243031cd38e257b35045d8941f0",
+      "results": [
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 16,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 16,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 16,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 16,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 80,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 80,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 80,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 1
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 80,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 255,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 255,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 255,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.001953125,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 255,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 2
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00048828125,
+            "different_bf16_elements": 1
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 1023,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 1023,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 3
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 1023,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 10
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 26
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 1023,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 4
+          },
+          "changed_graph": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 7
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm_rope",
+          "rows": 4095,
+          "dim": 512,
+          "initial": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "changed_graph": {
+            "max_abs_error": 0.00390625,
+            "different_bf16_elements": 7
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "fused_kv",
+          "rows": 4095,
+          "tiny_exact": true,
+          "changed_graph_exact": true,
+          "zero_exact": true,
+          "overlap_guard": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 1280,
+          "initial": {
+            "max_abs_error": 0.0078125,
+            "different_bf16_elements": 25
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 19
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "norm",
+          "rows": 4095,
+          "dim": 5120,
+          "initial": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 63
+          },
+          "changed_graph": {
+            "max_abs_error": 0.015625,
+            "different_bf16_elements": 59
+          },
+          "tiny": {
+            "max_abs_error": 0.0,
+            "different_bf16_elements": 0
+          },
+          "zero_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 1,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": false,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        },
+        {
+          "op": "rope",
+          "rows": 4095,
+          "heads": 64,
+          "inverse": true,
+          "initial_exact": true,
+          "changed_graph_exact": true,
+          "guards": true
+        }
+      ]
+    }
+  ],
+  "builds": {
+    "native": "passed",
+    "daemon": "passed, 497 warnings"
+  },
+  "not_qualified": [
+    "frequency generation in the runtime",
+    "main-hidden projection/cache producer",
+    "mHC attention boundary composition",
+    "full three-stage dSpark sequencing and sampling/verification",
+    "serving and alternating-wave overlap",
+    "performance or full-model quality"
+  ]
+}

@@ -74,6 +74,7 @@ impl DsparkAttentionOutput<'_, '_> {
             .checked_add(Self::additional_bytes(capacity)?)
             .context("dSpark attention output storage overflow")
     }
+    pub(super) fn output_storage(&self)->Ds41rtDeviceBuffer {self.projection.output_storage()}
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.input.buffer
     }
