@@ -8,6 +8,7 @@ mod commands;
 mod python_graph_capture;
 mod v41_experts;
 mod v41_memory;
+mod v41_dspark_cache;
 mod v41_tensors;
 mod v41_engram;
 

@@ -118,3 +118,5 @@ Shared-FFN progress: native dense FP8 shapes, packed-scale residency and single-
 Expert-floor progress: both fused routed-expert K32 quantizers now apply the official 1e-4 activation floor, with bitwise tiny-value graph tests on RTX and Spark, counterfactual failures and fresh pinned AOT builds recorded in `docs/ds41-expert-floor-qualification.md`.
 
 FFN-boundary progress: one-stream dSpark mHC/router/shared/routed execution and complete graph replay now pass Rust-owned nonzero stage-zero fixtures on both RTX GPUs, including shifted pre-mix and error recovery, while attention and three-stage sequencing remain open in `docs/ds41-ffn-boundary-qualification.md`.
+
+Committed-cache progress: generation-checked dSpark KV windows, batched ring updates and captured FP8 quantize/dequantize writes pass Rust-owned bitwise tests on both RTX GPUs and are included in memory admission, while attention producers/consumers remain open in `docs/ds41-dspark-cache-qualification.md`.

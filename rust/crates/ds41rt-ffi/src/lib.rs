@@ -1,3 +1,5 @@
+mod v41_dspark_cache;
+pub use v41_dspark_cache::{V41DsparkCache, V41KvWrite};
 mod v41_router;
 pub use v41_router::V41Router;
 mod v41_hc;

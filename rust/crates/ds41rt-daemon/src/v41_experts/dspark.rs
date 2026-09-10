@@ -15,6 +15,7 @@ pub(crate) use router::DsparkRouter;
 pub(crate) use terminal::DsparkTerminal;
 
 use super::{ExpertExecution, ExpertLayer, ExpertWeights};
+use crate::v41_dspark_cache::DsparkWindow;
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
@@ -27,6 +28,7 @@ pub(crate) struct DsparkBudget {
     pub shared_packed_scale_bytes: usize,
     pub shared_execution_bytes_per_wave: usize,
     pub load_staging_bytes: usize,
+    pub window_cache_bytes: usize,
     pub execution_bytes_per_wave: usize,
     pub hc_bytes_per_wave: usize,
     pub router_bytes_per_wave: usize,
@@ -42,8 +44,9 @@ impl DsparkBudget {
             .context("dSpark residency overflow")
     }
     /// Experts load serially, then native auxiliary tensors, then execution waves.
-    /// Attention caches, dense scratch, shared backbone embedding/head, driver and
-    /// graph allocations must be budgeted separately by the coordinator.
+    /// Committed dSpark windows are shared across waves and counted once below.
+    /// Draft-attention scratch, dense projections, shared backbone embedding/head,
+    /// driver and graph allocations must be budgeted separately by the coordinator.
     pub fn peak_device_bytes(self, waves: usize) -> Result<usize> {
         ensure!((1..=2).contains(&waves), "dSpark needs one or two waves");
         let execution = self
@@ -64,6 +67,7 @@ impl DsparkBudget {
         let serving = self
             .resident_bytes()?
             .checked_add(execution)
+            .and_then(|bytes| bytes.checked_add(self.window_cache_bytes))
             .context("dSpark serving peak overflow")?;
         Ok(loading.max(serving))
     }
@@ -111,6 +115,7 @@ impl<'library> DsparkWeights<'library> {
             shared_packed_scale_bytes: shared::packed_scale_bytes(library)?,
             shared_execution_bytes_per_wave: DsparkSharedFfn::device_bytes(library, capacity)? * 3,
             load_staging_bytes,
+            window_cache_bytes: DsparkWindow::device_bytes(16, 4096)? * 3,
             execution_bytes_per_wave,
             router_bytes_per_wave: DsparkRouter::device_bytes(capacity as usize)? * 3,
             hc_bytes_per_wave: HcSublayer::device_bytes(capacity as usize)?
@@ -176,6 +181,21 @@ impl<'library> DsparkWeights<'library> {
             auxiliary,
             budget,
         })
+    }
+    /// Three independent committed windows, shared across alternating waves.
+    /// Each admits sixteen requests and a total of 4096 source KV rows per batch.
+    pub fn windows(&self, budget: usize) -> Result<[DsparkWindow<'library>; 3]> {
+        let per_stage = DsparkWindow::device_bytes(16, 4096)?;
+        ensure!(
+            per_stage * 3 <= budget,
+            "dSpark windows exceed device budget"
+        );
+        let library = self.experts[0].buffers[0].library;
+        Ok([
+            DsparkWindow::new(library, 16, 4096, per_stage)?,
+            DsparkWindow::new(library, 16, 4096, per_stage)?,
+            DsparkWindow::new(library, 16, 4096, per_stage)?,
+        ])
     }
     pub fn budget(&self) -> DsparkBudget {
         self.budget

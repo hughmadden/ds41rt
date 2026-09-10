@@ -1,0 +1,69 @@
+{
+  "scope": "Rust-owned committed dSpark KV ring, captured native scatter/quantization, request leases",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "reference_kernel_sha256": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+  "source_sha256": {
+    "native/cuda/kernels/v41_dspark_cache.cu": "2c4632a535ce255a756a9f0ba150550f107a4d3cc8402ad4d9ff536a5e32fb00",
+    "native/include/ds41rt_v41_dspark_cache.h": "96308317c2c0d104c79f2cc0b13e53cf53b9bf0f8c4d705e7533795c70cd3d65",
+    "rust/crates/ds41rt-ffi/src/v41_dspark_cache.rs": "acbd7873305081c0431a370e16068af29183657b15cb70f03172369be91dca96",
+    "rust/crates/ds41rt-daemon/src/v41_dspark_cache.rs": "cc8633084ced3b06287d983d903567e76cac86544be67a0a062671909ccf2096"
+  },
+  "fixture_sha256": {
+    "src/main.rs": "fb024787c619ec23ece34439b7bbafcb0510ae50c2fbdee220535bcde110709b",
+    "generate.py": "3485757384c0dfe0c1610a9c8dc4ee97ecad1285331b161ed8ed17e9417b16c3",
+    "source.bin": "390574c870ee4be3ccd57186943997b0e1de64a507a13867db340f390cda98f6",
+    "expected.bin": "9ea16b554efea6f4f76d540168ad008ce25302b6cd2a65d531ff1cdf1ba48451"
+  },
+  "binary_sha256": "082bbc18efd6e1bc706da305e40adf6e0832491d41eeff0ad7a73a7a5ceffc6a",
+  "native_library_sha256": "185f206a6a7c0bd3ddbfe703011f805be27d4e2007eb6b514db29db64a40956a",
+  "slots": 16,
+  "source_rows": 4096,
+  "window_rows": 128,
+  "head_dim": 512,
+  "seed_lengths": [
+    1,
+    127,
+    128,
+    129,
+    255,
+    256,
+    257,
+    31,
+    63,
+    65,
+    130,
+    132,
+    33,
+    64,
+    32,
+    16
+  ],
+  "large_seed_position": 9223372036854775819,
+  "device_bytes_per_stage": 6291840,
+  "pinned_bytes_per_stage": 384,
+  "three_stage_window_bytes": 18875520,
+  "partial_two_wave_dspark_budget": 8434202608,
+  "gpu_results": [
+    {
+      "host_gpu": 0,
+      "passed": true,
+      "log": "PASS mixed prefill, long-chunk suffix and 64-bit seed\nPASS changed batches, wraparound and atomic admission rejection\nPASS release, generation reuse and foreign owner rejection\nDONE device_bytes=6291840 pinned_bytes=384\n",
+      "log_sha256": "bebf112f101c543cda8ea69181ae6d196f847183aeb80b3aa7b305ab0971de99"
+    },
+    {
+      "host_gpu": 1,
+      "passed": true,
+      "log": "PASS mixed prefill, long-chunk suffix and 64-bit seed\nPASS changed batches, wraparound and atomic admission rejection\nPASS release, generation reuse and foreign owner rejection\nDONE device_bytes=6291840 pinned_bytes=384\n",
+      "log_sha256": "bebf112f101c543cda8ea69181ae6d196f847183aeb80b3aa7b305ab0971de99"
+    }
+  ],
+  "not_qualified": [
+    "query/key projection, normalization or RoPE production",
+    "attention softmax/sink/output projection",
+    "draft-wave KV append",
+    "three-stage orchestration",
+    "injected CUDA faults",
+    "allocation instrumentation",
+    "serving integration"
+  ]
+}
