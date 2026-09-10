@@ -90,3 +90,5 @@ Engram execution progress: the C/Rust FP8 bridge, native scale packer and owned 
 Engram graph progress: stable owned inputs now support capture and replay of native quantization/projection/gating with fixed-row validation and drained staging. M16 execution storage is 2,452,500 bytes; scheduler wiring, graph runtime qualification and full container rebuilds remain open.
 
 dSpark RTX residency progress: a combined owner now loads three independent expert sets and all native auxiliary tensors with pre-admitted one/two-wave expert workspace budgets, while attention caches, dense execution, sampling/verification and scheduler integration remain open in `docs/ds41-dspark-residency.md`.
+
+dSpark confidence progress: a native raw-FP32 confidence projection now has library-borrowing Rust bindings, owned stable wave buffers and graph capture/replay, with confidence storage included in RTX admission while Markov execution, sampling/verification and numerical qualification remain open.

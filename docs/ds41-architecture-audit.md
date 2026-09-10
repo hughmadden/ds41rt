@@ -192,3 +192,5 @@ The native FP8 bridge now initializes checked module handles, uses generated b12
 Engram execution now owns stable residual/embedding/mask inputs and a fixed-row CUDA graph. External gather buffers are copied and drained before launch; designated owned input destinations avoid copies. Graph cleanup precedes buffer destruction. The daemon builds successfully; no numerical, graph replay or full serving qualification was run for this change.
 
 All dSpark stage experts and native auxiliary tensors now have combined RTX ownership and capacity-dependent expert wave admission; separate stage workspaces preserve graph weight lifetimes, while complete dSpark execution and total coordinator memory budgeting remain pending.
+
+The pinned V4.1 confidence head returns raw FP32 projection scores, whereas the inherited terminal helper applies sigmoid; the new native path preserves raw scores and fuses concatenation/promotion with a parallel FP32 reduction, with build-only evidence and runtime numerical qualification pending.

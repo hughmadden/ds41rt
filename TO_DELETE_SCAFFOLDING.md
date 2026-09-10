@@ -49,3 +49,5 @@ Delete listed artifacts at the start of Goal 2 after preserving any reusable qua
 - Include `/tmp/ds41-v41-fp8-aot/engram-graph-build.log` in the FP8 staging cleanup; retain production graph ownership and its build evidence.
 
 - Include `/tmp/ds41-v41-fp8-aot/dspark-residency-build.log` in the FP8 staging cleanup; retain production dSpark residency and static budget evidence.
+
+- Include `dspark-confidence-native-build.log`, `dspark-confidence-rust-build.log` and `dspark-confidence-final-build.log` under `/tmp/ds41-v41-fp8-aot/` in staging cleanup; retain the production confidence kernel, bindings and owned execution.

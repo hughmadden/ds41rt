@@ -1,0 +1,25 @@
+{
+  "scope": "Native shared-library build, exported-symbol inspection and daemon build only",
+  "runtime_qualified": false,
+  "confidence_output": "Raw FP32 projection without sigmoid",
+  "capacity_80_confidence_bytes_per_wave": 860480,
+  "two_capacity_80_expert_and_confidence_waves_plus_residency_bytes": 8086011736,
+  "excluded": [
+    "Attention caches",
+    "Dense projection scratch and packed scales",
+    "Shared backbone embedding and output head",
+    "CUDA graph and driver allocations"
+  ],
+  "source_sha256": {
+    "native/include/ds41rt_v41_dspark.h": "89a2ca91aae494f7ce28e7777ece2b49926d108a340479711a4d3d5d46a1aef8",
+    "native/cuda/kernels/v41_dspark.cu": "057dd2b2f75d9b4387d0ef707b7438ec9821695a7a66d7ce64e0c2aed146f5e7",
+    "rust/crates/ds41rt-ffi/src/v41_dspark.rs": "ecc0ac8c11ddd0fa1e7155fd8ff6fd9b5f3ba420c985ac5df22f282571cb4b38",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark/confidence.rs": "d6f4cfe4c16a84f6802fef163ed9337b8badd780496caade3c9cc3d35ced14b9",
+    "rust/crates/ds41rt-daemon/src/v41_experts/dspark.rs": "c17b77c059b8c15b446b569e131d0b0aca0ae5f0861fa27b42df1d42161cc4c9"
+  },
+  "library_sha256": "28cc5aa060375f7ddf0780d2179070787e0aaed333a43e8239af658fce7b1dd6",
+  "build_logs": [
+    "/tmp/ds41-v41-fp8-aot/dspark-confidence-native-build.log",
+    "/tmp/ds41-v41-fp8-aot/dspark-confidence-final-build.log"
+  ]
+}
