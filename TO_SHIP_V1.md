@@ -21,7 +21,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Pin the architecture/reference audit to official revision `df42c109f1defefcbfcedbe7d905718a12266e40`.
 - [x] Validate the completed local `dba1be0a40aa45a94ad051997016db3960a90277` snapshot with the production 96,085-tensor catalog reader.
 - [x] Confirm checkpoint headers and required configuration, tokenizer and vision assets agree across all five hosts and record any differences from the reference lock.
-- [ ] Validate checkpoint payload representations through selected real-weight component execution before full-model loading.
+- [x] Validate checkpoint payload representations through selected real-weight component execution before full-model loading.
 - [ ] Read and stage only each node's required tensors or TP slices with explicit native packed-storage and workspace budgets.
 - [x] Add bounded expert read-ahead and verify real TP staging bytes with a reusable cold/warm I/O probe on ostrich and the coordinator.
 - [ ] Measure useful weight bytes, physical read bytes and load time separately and optimize loading when it falls behind measured Spark NVMe throughput near 5 GB/s.
@@ -59,6 +59,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Sequence backbone attention and FFN mHC phases with exact query-result binding; qualify real attention composition and explicitly bounded identity-FFN fixtures.
 - [x] Share native FP8 shared-expert execution with dSpark, load all 40 backbone shared experts and qualify captured waves plus block-bound normalized-input handoffs.
 - [x] Own real backbone text/vision routing, bind canonical TP4 requests and shared results to block execution, and qualify analytical transport/reduction handoffs.
+- [x] Execute generated routes against real checkpoint layers 0/20/39 on all four Sparks, qualify every selected expert and RTX shared reduction, and finish the block mHC boundary.
 - [ ] Wire hierarchical candidate-block selection and causal sparse top-512 attention with large-pool addressing checks.
 - [x] Correct RMS epsilon to the official 1e-20 separately from mHC mixing epsilon 1e-6, and requalify primitive/stage/draft paths.
 - [ ] Compose reference-qualified mHC, normalization, RoPE, projections and modality-aware routing into backbone execution.
@@ -153,3 +154,5 @@ Backbone phase sequencing is recorded in `docs/ds41-block-qualification.md`, inc
 Backbone shared-expert ownership and real-weight qualification are recorded in `docs/ds41-backbone-shared-qualification.md`; the shared contribution carries block execution identity, while four-Spark routed contribution and complete FFN reduction remain to be connected.
 
 Backbone routing and the bound TP4/shared handoff are recorded in `docs/ds41-backbone-router-qualification.md`; local analytical rank peers qualify this composition, while executing these generated routes on real Spark expert weights remains open.
+
+Real four-Spark checkpoint execution is recorded in `docs/ds41-real-tp4-qualification.md`: six 80-row batches across layers 0/20/39, official FP4 expert comparisons, exact transport reduction and qualified mHC finishes. Cache-backed timings do not establish cold NVMe throughput; complete startup and full-model scheduling remain open.

@@ -12,6 +12,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--reference-dir',type=Path,required=True);p.add_argument('--snapshot',type=Path,required=True)
     p.add_argument('--vectors-dir',type=Path,required=True);p.add_argument('--device',type=int,required=True)
+    p.add_argument('--layers',type=int,nargs='+',help='Backbone layer subset; defaults to representative attention modes')
     p.add_argument('--ffn-result',action='store_true',help='Read block-ffn_result.bin; its producer must be qualified independently')
     p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     root=Path(__file__).resolve().parents[1];lock=json.loads((root/'docs/ds41-reference-lock.json').read_text())
@@ -42,7 +43,7 @@ def main():
         raw=(a.vectors_dir/f'{prefix}-{name}.bin').read_bytes()
         return torch.frombuffer(bytearray(raw),dtype=dtype).reshape(shape).cuda(),hashlib.sha256(raw).hexdigest()
     with torch.device('cuda'),torch.cuda.stream(stream),tvm_ffi.use_torch_stream(),torch.no_grad():
-        for layer in (0,2,7,8,14,20,24,39):
+        for layer in (a.layers or (0,2,7,8,14,20,24,39)):
             params={}
             for kind in ('attn','ffn'):
                 params[kind]=[weight(f'layers.{layer}.hc_{kind}_{suffix}',torch.float32) for suffix in ('fn','scale','base')]
