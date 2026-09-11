@@ -5,7 +5,7 @@ use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Router};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41ExpertInputQuantizer, V41Router};
 use ds41rt_loader::OfficialV41Catalog;
 use std::marker::PhantomData;
 pub(crate) struct BackboneRouterWeights<'a> {
@@ -63,7 +63,8 @@ impl<'a> BackboneRouterWeights<'a> {
                 raw: self.library.cuda_stream_create()?,
             },
             kernel: self.library.v41_router()?,
-            buffers: [10240, 1, 1536, 24, 24]
+            input_quantizer: self.library.v41_expert_input_quantizer()?,
+            buffers: [10240, 1, 1536, 24, 24, 5280]
                 .into_iter()
                 .map(|n| DeviceAllocation::new(self.library, n * capacity as usize))
                 .collect::<Result<Vec<_>>>()?,
@@ -81,6 +82,7 @@ pub(crate) struct RouterOutput<'a> {
     pub layer: usize,
     pub rows: u32,
     pub input: Ds41rtDeviceBuffer,
+    pub expert_input: Ds41rtDeviceBuffer,
     pub mask: Ds41rtDeviceBuffer,
     pub scores: Ds41rtDeviceBuffer,
     pub ids: Ds41rtDeviceBuffer,
@@ -161,6 +163,7 @@ mod reuse_tests {
                         (actual.scores, reference.scores),
                         (actual.ids, reference.ids),
                         (actual.routing, reference.routing),
+                        (actual.expert_input, reference.expert_input),
                     ] {
                         assert_eq!(bytes(&library, a)?, bytes(&library, b)?);
                     }
@@ -177,7 +180,7 @@ mod reuse_tests {
                     }
                     comparisons += 1;
                 }
-                eprintln!("PASS real router rows={rows} cycle={cycle} layers={} scores/ids/routing exact; stable inputs and cached handles",layers.len());
+                eprintln!("PASS real router rows={rows} cycle={cycle} layers={} scores/ids/routing/encoded-input exact; stable inputs and cached handles",layers.len());
             }
             assert!(unsafe { lane.execute_captured(0) }.is_err());
             assert!(lane.output().is_err());
@@ -196,6 +199,7 @@ mod reuse_tests {
 pub(crate) struct BackboneRouterWave<'w, 'a> {
     stream: LoadStream<'a>,
     kernel: V41Router<'a>,
+    input_quantizer: V41ExpertInputQuantizer<'a>,
     weights: &'w BackboneRouterWeights<'a>,
     buffers: Vec<DeviceAllocation<'a>>,
     tokens: Vec<u64>,
@@ -230,7 +234,7 @@ impl BackboneRouterWave<'_, '_> {
             (1..=4096).contains(&capacity),
             "invalid backbone router capacity"
         );
-        Ok(capacity as usize * 11825)
+        Ok(capacity as usize * (11825 + 5280))
     }
     fn b(&self, i: usize) -> Ds41rtDeviceBuffer {
         self.buffers[i].buffer
@@ -269,7 +273,9 @@ impl BackboneRouterWave<'_, '_> {
                 rows as usize,
                 384,
                 self.stream.raw,
-            )
+            )?;
+            self.input_quantizer
+                .launch(self.b(0), self.b(5), rows, self.stream.raw)
         }
     }
     /// # Safety
@@ -399,6 +405,7 @@ impl BackboneRouterWave<'_, '_> {
             layer: self.layer,
             rows,
             input: b(0, 10240),
+            expert_input: b(5, 5280),
             mask: b(1, 1),
             scores: b(2, 1536),
             ids: b(3, 24),
@@ -477,10 +484,10 @@ impl RouterOutput<'_> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .ok()
             .context("native expert request IDs exhausted")?;
-        let mut hidden = vec![0; rows.len() * 10240];
+        let mut hidden = vec![0; rows.len() * 5280];
         let mut ids = vec![0; rows.len() * 24];
         let mut weights = vec![0; rows.len() * 24];
-        library.copy_d2h(&mut hidden, self.input)?;
+        library.copy_d2h(&mut hidden, self.expert_input)?;
         library.copy_d2h(&mut ids, self.ids)?;
         library.copy_d2h(&mut weights, self.routing)?;
         let descriptors = rows
@@ -510,7 +517,7 @@ impl RouterOutput<'_> {
             placement,
             self.layer as u32,
             5120,
-            ExpertV2Dtype::Bf16,
+            ExpertV2Dtype::Fp8E4m3Ue8m0K32,
             descriptors,
             routes,
             hidden,

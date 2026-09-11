@@ -4,14 +4,19 @@ if(NOT DS41RT_ENABLE_CUDA)
 endif()
 if(DS41RT_CUDA_ARCHITECTURES STREQUAL "120" OR DS41RT_CUDA_ARCHITECTURES STREQUAL "120f")
   set(DS41RT_V41_EXPERT_ROLE coordinator)
+  set(DS41RT_V41_EXPERT_INPUT_FORMAT bf16)
 elseif(DS41RT_CUDA_ARCHITECTURES STREQUAL "121")
   set(DS41RT_V41_EXPERT_ROLE spark)
+  set(DS41RT_V41_EXPERT_INPUT_FORMAT fp8_k32)
 else()
   message(FATAL_ERROR "V4.1 expert AOT requires one native SM120 or SM121 target")
 endif()
 set(DS41RT_V41_EXPERT_DIR "${CMAKE_CURRENT_BINARY_DIR}/v41_experts")
 set(DS41RT_V41_EXPERT_OBJECTS)
-set(DS41RT_V41_EXPERT_HEADERS)
+set(DS41RT_V41_EXPERT_HEADERS
+  "${DS41RT_V41_EXPERT_DIR}/v41_expert_input_quant.h"
+  "${DS41RT_V41_EXPERT_DIR}/v41_input_quant_dispatch.h")
+list(APPEND DS41RT_V41_EXPERT_OBJECTS "${DS41RT_V41_EXPERT_DIR}/v41_expert_input_quant.o")
 foreach(rows IN ITEMS 1 16 80 256 1024 4096)
   set(stem "${DS41RT_V41_EXPERT_DIR}/v41_${DS41RT_V41_EXPERT_ROLE}_m${rows}")
   list(APPEND DS41RT_V41_EXPERT_OBJECTS "${stem}.o")
@@ -26,6 +31,7 @@ add_custom_command(
     "${Python3_EXECUTABLE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_experts_aot.py"
     --output-dir "${DS41RT_V41_EXPERT_DIR}" --role "${DS41RT_V41_EXPERT_ROLE}"
+    --input-format "${DS41RT_V41_EXPERT_INPUT_FORMAT}"
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_experts_aot.py"
     ${DS41RT_SPARKINFER_PROVENANCE_INPUTS} ${DS41RT_SPARKINFER_EXPORT_INPUTS}
   COMMENT "Exporting native V4.1 expert kernels and scratch layouts"

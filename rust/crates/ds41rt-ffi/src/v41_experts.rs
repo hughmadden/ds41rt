@@ -530,3 +530,68 @@ mod tests {
         );
     }
 }
+
+type InputQuantFn = unsafe extern "C" fn(*mut c_void, *const u16, *mut u8, u32, *mut c_void) -> i32;
+
+/// Preinitialized runtime-row quantizer writing the exact expert wire layout.
+pub struct V41ExpertInputQuantizer<'a> {
+    _library: &'a NativeLibrary,
+    handle: NonNull<c_void>,
+    launch: InputQuantFn,
+}
+impl NativeLibrary {
+    pub fn v41_expert_input_quantizer(&self) -> Result<V41ExpertInputQuantizer<'_>> {
+        type Init = unsafe extern "C" fn(*mut *mut c_void) -> i32;
+        let init = unsafe {
+            self.lib
+                .get::<Init>(b"ds41rt_v41_expert_input_quant_initialize")?
+        };
+        let launch = unsafe {
+            *self
+                .lib
+                .get::<InputQuantFn>(b"ds41rt_v41_expert_input_quantize_async")?
+        };
+        let mut raw = std::ptr::null_mut();
+        let status = unsafe { init(&mut raw) };
+        ensure!(
+            status == 0,
+            "expert input quantizer initialization failed: {status}"
+        );
+        Ok(V41ExpertInputQuantizer {
+            _library: self,
+            handle: NonNull::new(raw).context("null input quantizer handle")?,
+            launch,
+        })
+    }
+}
+impl V41ExpertInputQuantizer<'_> {
+    /// # Safety
+    /// Initialized finite BF16 input and exclusive output are on the current
+    /// device, nonoverlapping, and remain valid until this stream completes.
+    pub unsafe fn launch(
+        &self,
+        input: crate::Ds41rtDeviceBuffer,
+        output: crate::Ds41rtDeviceBuffer,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            (1..=4096).contains(&rows)
+                && input.device_id == output.device_id
+                && input.bytes >= rows as usize * 10240
+                && output.bytes >= rows as usize * 5280,
+            "invalid expert input quantization buffers"
+        );
+        let status = unsafe {
+            (self.launch)(
+                self.handle.as_ptr(),
+                input.ptr.cast(),
+                output.ptr.cast(),
+                rows,
+                stream,
+            )
+        };
+        ensure!(status == 0, "expert input quantization failed: {status}");
+        Ok(())
+    }
+}

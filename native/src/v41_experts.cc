@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <mutex>
 #include "v41_expert_variants.h"
+#include "v41_input_quant_dispatch.h"
 
 static_assert(sizeof(ds41rt_v41_expert_info_t) == 64);
 static_assert(sizeof(ds41rt_v41_expert_launch_t) == 392);
@@ -143,5 +144,66 @@ extern "C" int32_t ds41rt_v41_expert_launch(void* kernel, const ds41rt_v41_exper
   parameters[51] = &stream;
   parameters[52] = &result;
   variant->launch(parameters, 53);
+  return result;
+}
+
+namespace {
+struct InputQuantModule {
+  cudaLibrary_t library = nullptr;
+  int device = -1;
+  ~InputQuantModule() { if (library) cudaLibraryUnload(library); }
+} input_quant;
+}
+extern "C" int32_t ds41rt_v41_expert_input_quant_initialize(void** out) {
+  if (!out) return cudaErrorInvalidValue;
+  *out = nullptr;
+  int device, major, minor, sms;
+  auto status = cudaGetDevice(&device); if (status) return status;
+  status = cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device); if (status) return status;
+  status = cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device); if (status) return status;
+  status = cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, device); if (status) return status;
+  if (major != 12 || minor != DS41RT_V41_CC_MINOR || sms != DS41RT_V41_SMS)
+    return cudaErrorInvalidDevice;
+  std::lock_guard<std::mutex> lock(initialization_mutex);
+  if (input_quant.device >= 0) {
+    if (input_quant.device != device) return cudaErrorInvalidDevice;
+    *out = &input_quant;
+    return cudaSuccess;
+  }
+  auto* library = &input_quant.library;
+  void* init[] = {&library, &status};
+  _mlir_ds41rt_v41_expert_input_quant_cuda_init(init);
+  if (!status) {
+    void* load[] = {&library, &device, &status};
+    _mlir_ds41rt_v41_expert_input_quant_cuda_load_to_device(load);
+  }
+  if (status) {
+    if (input_quant.library) cudaLibraryUnload(input_quant.library);
+    input_quant.library = nullptr;
+    return status;
+  }
+  input_quant.device = device;
+  *out = &input_quant;
+  return cudaSuccess;
+}
+extern "C" int32_t ds41rt_v41_expert_input_quantize_async(void* kernel,
+    const uint16_t* input, uint8_t* output, uint32_t rows, void* stream) {
+  if (kernel != &input_quant || input_quant.device < 0 || !input || !output ||
+      rows == 0 || rows > 4096) return cudaErrorInvalidValue;
+  const auto a = reinterpret_cast<uintptr_t>(input), b = reinterpret_cast<uintptr_t>(output);
+  const uint64_t an = uint64_t(rows) * 10240, bn = uint64_t(rows) * 5280;
+  if (a % 16 || b % 16 || a > UINTPTR_MAX-an || b > UINTPTR_MAX-bn ||
+      (a <= b ? b-a < an : a-b < bn)) return cudaErrorInvalidValue;
+  int device;
+  auto status = cudaGetDevice(&device); if (status) return status;
+  if (device != input_quant.device) return cudaErrorInvalidDevice;
+  void* source = const_cast<uint16_t*>(input);
+  void* values = output;
+  void* scales = output + 5120;
+  void* unused_mma = output; // wire specialization does not write MMA scales
+  int32_t m = rows, grid = ds41rt_v41_input_quant_grids[rows-1];
+  int32_t result = 0;
+  void* args[] = {&source, &values, &scales, &unused_mma, &m, &grid, &stream, &result};
+  DS41RT_V41_INPUT_QUANT_ENTRY(args, 8);
   return result;
 }

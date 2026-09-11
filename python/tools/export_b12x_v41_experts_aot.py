@@ -205,6 +205,29 @@ def write_native_bridge(output_dir: Path, manifest: dict) -> None:
     (output_dir / "v41_expert_variants.h").write_text("\n".join(lines) + "\n")
 
 
+def export_input_quantizer(output_dir: Path, manifest: dict) -> None:
+    from b12x._lib.quant.mxfp8_rows import (
+        compile_mxfp8_rows_quant_aot, mxfp8_rows_quant_aot_grid,
+    )
+    from export_b12x_v41_fp8_aot import validate_abi
+    label = "v41_expert_input_quant"
+    compiled = compile_mxfp8_rows_quant_aot(
+        size_k=5120, expected_m=80, amax_floor=1e-4, wire_rows=True,
+    )
+    compiled.export_to_c(str(output_dir), label, "ds41rt_" + label)
+    abi = validate_abi(output_dir / (label + ".h"), label, "quant")
+    grids = [mxfp8_rows_quant_aot_grid(size_k=5120, rows=m, expected_m=80,
+             sm_count=manifest["physical_sms"]) for m in range(1, 4097)]
+    header = ["#pragma once", f'#include "{label}.h"',
+              f"#define DS41RT_V41_INPUT_QUANT_ENTRY {abi['symbol']}",
+              "static const uint32_t ds41rt_v41_input_quant_grids[] = {" +
+              ",".join(map(str, grids)) + "};"]
+    (output_dir / "v41_input_quant_dispatch.h").write_text("\n".join(header) + "\n")
+    manifest["input_quantizer"] = {"format": "row E4M3 payload then UE8M0 K32 scales",
+        "row_bytes": 5280, "max_rows": 4096, "expected_m": 80, "amax_floor": 1e-4,
+        "abi": abi, "object_sha256": hashlib.sha256((output_dir / (label + ".o")).read_bytes()).hexdigest()}
+
+
 def export(output_dir: Path, role: str, rows: tuple[int, ...], input_format: str = "bf16") -> None:
     if input_format not in ("bf16", "fp8_k32") or (role != "spark" and input_format != "bf16"):
         raise ValueError("FP8 K32 input is supported only for Spark backbone experts")
@@ -346,6 +369,7 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...], input_format: str
             }
         )
         print(f"exported {name}: capacity={capacity}, scratch={offset}", flush=True)
+    export_input_quantizer(output_dir, manifest)
     write_native_bridge(output_dir, manifest)
     (output_dir / "v41_experts.json").write_text(json.dumps(manifest, indent=2) + "\n")
 

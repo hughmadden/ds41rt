@@ -28,7 +28,7 @@ mod v41_fp8;
 pub use v41_fp8::{V41Fp8Info, V41Fp8Kernel, V41SharedSwiGlu};
 mod v41_experts;
 pub use v41_experts::{
-    V41ExpertInfo, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPacker, V41ExpertPointer,
+    V41ExpertInfo, V41ExpertInputQuantizer, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPacker, V41ExpertPointer,
     V41CompactReducer, V41RouteReducer, V41_EXPERT_POINTER_COUNT,
 };
 

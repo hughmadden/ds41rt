@@ -46,6 +46,15 @@ typedef struct ds41rt_v41_expert_info_t {
   uint32_t input_dtype; /* ABI 2: 1 BF16; 7 row E4M3 + UE8M0 K32 scales */
 } ds41rt_v41_expert_info_t;
 
+/* Prewarm before graph capture. Quantize BF16 [rows,5120] into contiguous
+ * 5280-byte rows: 5120 E4M3 bytes then 160 UE8M0 K32 scales, amax floor 1e-4.
+ * Caller owns nonoverlapping 16-byte-aligned input/output on the initialized
+ * device, valid through stream completion; 1 <= rows <= 4096. No allocation
+ * or synchronization occurs in quantize. Input BF16 rounding is preserved. */
+int32_t ds41rt_v41_expert_input_quant_initialize(void** out_kernel);
+int32_t ds41rt_v41_expert_input_quantize_async(void* kernel,
+    const uint16_t* input, uint8_t* output, uint32_t rows, void* stream);
+
 /* These functions return CUDA runtime error codes (zero is success).
  * Initialize before graph capture; each variant binds to its first CUDA device.
  * Kernel handles borrow the library and must outlive every launch/graph replay.
