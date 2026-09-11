@@ -26,6 +26,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot", type=Path, required=True)
     parser.add_argument("--native-lib", type=Path, required=True)
+    parser.add_argument(
+        "--candidate-dir",
+        type=Path,
+        help="Use exported w64/w128/w192 native libraries instead of Python candidate launches",
+    )
     parser.add_argument("--inputs", type=Path, required=True)
     parser.add_argument(
         "--baseline",
@@ -33,10 +38,16 @@ def main():
         help="Earlier Rust-owner route files; required files must match exactly",
     )
     parser.add_argument("--layer", type=int, choices=range(40), required=True)
+    parser.add_argument("--rank", type=int, choices=range(4), default=0)
+    parser.add_argument(
+        "--no-timing",
+        action="store_true",
+        help="Run numerical/replay checks without the timing sweep",
+    )
     parser.add_argument("--output", type=Path, required=True)
     options = parser.parse_args()
-    if options.baseline and options.layer not in (0, 1):
-        parser.error("Rust-owner baseline files cover layers zero and one")
+    if options.baseline and (options.layer not in (0, 1) or options.rank != 0):
+        parser.error("Rust-owner baseline files cover rank zero, layers zero and one")
     records = []
 
     def emit(kind, value):
@@ -47,6 +58,14 @@ def main():
         str(path): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in [
             options.native_lib,
+            *(
+                [
+                    options.candidate_dir / f"w{width}" / "libds41rt_native.so"
+                    for width in (64, 128, 192)
+                ]
+                if options.candidate_dir
+                else []
+            ),
             Path(__file__),
             Path(inspect.getsourcefile(Native)),
             Path(inspect.getsourcefile(V41FusedSliceKernel)),
@@ -63,9 +82,12 @@ def main():
         "SOURCE",
         dict(
             b12x_revision=_pinned_sparkinfer.REVISION,
+            rank=options.rank,
+            timing_enabled=not options.no_timing,
             sha256=hashes,
             device=torch.cuda.get_device_name(),
             capability=torch.cuda.get_device_capability(),
+            candidate_launch="native_abi" if options.candidate_dir else "python_jit",
         ),
     )
     snapshot = options.snapshot
@@ -126,9 +148,15 @@ def main():
                 ), (key, tensor.dtype)
                 raw = tensor.view(torch.uint8)
                 shard_tensor = (
-                    raw[:576]
+                    raw[options.rank * 576 : (options.rank + 1) * 576]
                     if projection != "w2"
-                    else raw[:, : 288 if suffix == "weight" else 18]
+                    else raw[
+                        :,
+                        options.rank * (288 if suffix == "weight" else 18) : (
+                            options.rank + 1
+                        )
+                        * (288 if suffix == "weight" else 18),
+                    ]
                 )
                 sources.append(shard_tensor.contiguous().cuda())
             src = (P * 6)(*[x.data_ptr() for x in sources])
@@ -157,67 +185,81 @@ def main():
     }
     variants = {}
     planners = {}
-    for capacity in [1, 16, 80]:
-        metadata = torch.full((capacity * 6, 19), -1, device="cuda", dtype=torch.int32)
-        pairmap = torch.empty(capacity * 6, device="cuda", dtype=torch.int32)
-        rw = torch.empty(capacity * 6, device="cuda")
-        mv = from_dlpack(metadata, assumed_align=16)
-        pv = from_dlpack(pairmap, assumed_align=16)
-        live = torch.empty(1, device="cuda", dtype=torch.int32)
-        planner_buffers = [
-            ids.flatten(),
-            routing.flatten(),
-            live,
-            torch.empty(384 * capacity * 6, device="cuda", dtype=torch.int32),
-            torch.empty(384, device="cuda", dtype=torch.int32),
-            torch.empty((384, 2), device="cuda", dtype=torch.int32),
-            metadata,
-            rw,
-            pairmap,
-        ]
-        planner_args = [from_dlpack(t, assumed_align=16) for t in planner_buffers]
-        planner = cute.compile(
-            V41RoutePlan(capacity), *planner_args, current_cuda_stream()
-        )
-        planners[capacity] = (planner, planner_args, planner_buffers)
-        for width in [64, 128, 192]:
-            output = torch.empty(
-                ((576 + width - 1) // width, capacity * 6, 5120), device="cuda"
+    native_variants = {}
+    if options.candidate_dir:
+        for width in (64, 128, 192):
+            candidate_lib = library(
+                str(options.candidate_dir / f"w{width}" / "libds41rt_native.so")
             )
-            reduced = torch.empty((capacity * 6, 5120), device="cuda")
-            args = [
-                from_dlpack(x, assumed_align=16) for x in [qa, qs, *packed, rw, output]
-            ]
-            rv = from_dlpack(reduced, assumed_align=16)
-            fn = cute.compile(
-                V41FusedSliceKernel(width, grouped=True),
-                *args,
-                cutlass.Int32(80),
-                current_cuda_stream(),
-                mv,
-                cutlass.Int32(capacity * 6),
+            for capacity in (1, 16, 80):
+                native_variants[capacity, width] = Native(
+                    candidate_lib, capacity, weights, wire, ids, routing
+                )
+    else:
+        for capacity in [1, 16, 80]:
+            metadata = torch.full(
+                (capacity * 6, 19), -1, device="cuda", dtype=torch.int32
             )
-            reduce = cute.compile(
-                V41SliceReduce(width, capacity),
-                args[-1],
-                rv,
-                pv,
-                planner_args[2],
-                current_cuda_stream(),
-            )
-            variants[capacity, width] = (
+            pairmap = torch.empty(capacity * 6, device="cuda", dtype=torch.int32)
+            rw = torch.empty(capacity * 6, device="cuda")
+            mv = from_dlpack(metadata, assumed_align=16)
+            pv = from_dlpack(pairmap, assumed_align=16)
+            live = torch.empty(1, device="cuda", dtype=torch.int32)
+            planner_buffers = [
+                ids.flatten(),
+                routing.flatten(),
+                live,
+                torch.empty(384 * capacity * 6, device="cuda", dtype=torch.int32),
+                torch.empty(384, device="cuda", dtype=torch.int32),
+                torch.empty((384, 2), device="cuda", dtype=torch.int32),
                 metadata,
-                pairmap,
                 rw,
-                mv,
-                pv,
-                output,
-                reduced,
-                rv,
-                args,
-                fn,
-                reduce,
+                pairmap,
+            ]
+            planner_args = [from_dlpack(t, assumed_align=16) for t in planner_buffers]
+            planner = cute.compile(
+                V41RoutePlan(capacity), *planner_args, current_cuda_stream()
             )
+            planners[capacity] = (planner, planner_args, planner_buffers)
+            for width in [64, 128, 192]:
+                output = torch.empty(
+                    ((576 + width - 1) // width, capacity * 6, 5120), device="cuda"
+                )
+                reduced = torch.empty((capacity * 6, 5120), device="cuda")
+                args = [
+                    from_dlpack(x, assumed_align=16)
+                    for x in [qa, qs, *packed, rw, output]
+                ]
+                rv = from_dlpack(reduced, assumed_align=16)
+                fn = cute.compile(
+                    V41FusedSliceKernel(width, grouped=True),
+                    *args,
+                    cutlass.Int32(80),
+                    current_cuda_stream(),
+                    mv,
+                    cutlass.Int32(capacity * 6),
+                )
+                reduce = cute.compile(
+                    V41SliceReduce(width, capacity),
+                    args[-1],
+                    rv,
+                    pv,
+                    planner_args[2],
+                    current_cuda_stream(),
+                )
+                variants[capacity, width] = (
+                    metadata,
+                    pairmap,
+                    rw,
+                    mv,
+                    pv,
+                    output,
+                    reduced,
+                    rv,
+                    args,
+                    fn,
+                    reduce,
+                )
     for case, (wire_cpu, ids_cpu, rw_cpu) in enumerate(cases):
         wire.copy_(wire_cpu)
         ids.copy_(ids_cpu)
@@ -266,18 +308,26 @@ def main():
             tasks, pairs = _metadata(ids_cpu[:rows])
             groups = len(tasks)
             routes = rows * 6
-            planner, planner_args, planner_buffers = planners[cap]
-            planner_buffers[2].fill_(rows)
+            if not options.candidate_dir:
+                planner, planner_args, planner_buffers = planners[cap]
+                planner_buffers[2].fill_(rows)
             metrics = {}
             for width in [64, 128, 192]:
-                meta, pmap, rw, mv, pv, out, reduced, rv, args, fn, reduce = variants[
-                    cap, width
-                ]
+                if options.candidate_dir:
+                    owner = native_variants[cap, width]
+                    reduced = owner.output
 
-                def run():
-                    planner(*planner_args, current_cuda_stream())
-                    fn(*args, rows, current_cuda_stream(), mv, cap * 6)
-                    reduce(args[-1], rv, pv, planner_args[2], current_cuda_stream())
+                    def run():
+                        owner.run(rows)
+                else:
+                    meta, pmap, rw, mv, pv, out, reduced, rv, args, fn, reduce = (
+                        variants[cap, width]
+                    )
+
+                    def run():
+                        planner(*planner_args, current_cuda_stream())
+                        fn(*args, rows, current_cuda_stream(), mv, cap * 6)
+                        reduce(args[-1], rv, pv, planner_args[2], current_cuda_stream())
 
                 run()
                 torch.cuda.synchronize()
@@ -287,12 +337,13 @@ def main():
                 before = torch.cuda.memory_allocated()
                 graph.replay()
                 assert before == torch.cuda.memory_allocated()
-                assert torch.equal(meta[:groups].cpu(), tasks)
-                expected_inverse = torch.empty(routes, dtype=torch.int32)
-                expected_inverse[pairs[:, 0] * 6 + pairs[:, 1]] = torch.arange(
-                    routes, dtype=torch.int32
-                )
-                assert torch.equal(pmap[:routes].cpu(), expected_inverse)
+                if not options.candidate_dir:
+                    assert torch.equal(meta[:groups].cpu(), tasks)
+                    expected_inverse = torch.empty(routes, dtype=torch.int32)
+                    expected_inverse[pairs[:, 0] * 6 + pairs[:, 1]] = torch.arange(
+                        routes, dtype=torch.int32
+                    )
+                    assert torch.equal(pmap[:routes].cpu(), expected_inverse)
                 candidate = reduced[:routes]
                 diff = candidate - base
                 rel = (diff.norm() / base.norm()).item()
@@ -337,6 +388,10 @@ def main():
                     assert torch.equal(candidate, base), metrics[width]
                 graphs[str(width)] = graph
                 outputs[str(width)] = reduced
+            if options.no_timing:
+                for graph in graphs.values():
+                    graph.reset()
+                continue
             samples = {arm: [] for arm in graphs}
             for _ in range(5):
                 for graph in graphs.values():

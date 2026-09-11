@@ -232,8 +232,8 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...], input_format: str
     if input_format not in ("bf16", "fp8_k32") or (role != "spark" and input_format != "bf16"):
         raise ValueError("FP8 K32 input is supported only for Spark backbone experts")
     # Export requires compiler IR, which executable-only cache entries omit.
-    os.environ["SPARKINFER_COMPILE_DISK_CACHE"] = "0"
-    os.environ["SPARKINFER_COMPILE_MEMORY_CACHE"] = "0"
+    os.environ["B12X_COMPILE_DISK_CACHE"] = "0"
+    os.environ["B12X_COMPILE_MEMORY_CACHE"] = "0"
     import torch
     from b12x.moe.fused_moe import _impl as moe
 

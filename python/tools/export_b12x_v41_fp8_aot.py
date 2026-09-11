@@ -67,8 +67,8 @@ def dispatch_header(output: Path, manifest: dict) -> None:
 
 
 def export(output: Path, rows: tuple[int, ...]) -> None:
-    os.environ['SPARKINFER_COMPILE_DISK_CACHE'] = '0'
-    os.environ['SPARKINFER_COMPILE_MEMORY_CACHE'] = '0'
+    os.environ['B12X_COMPILE_DISK_CACHE'] = '0'
+    os.environ['B12X_COMPILE_MEMORY_CACHE'] = '0'
     import torch
     from b12x._lib.dense_gemm import compile_dense_gemm_mxfp8_aot
     from b12x._lib.quant.mxfp8_rows import compile_mxfp8_rows_quant_aot

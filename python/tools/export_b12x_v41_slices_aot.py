@@ -11,12 +11,13 @@ import os
 import json
 import re
 from pathlib import Path
+
+os.environ["B12X_COMPILE_DISK_CACHE"] = "0"
+os.environ["B12X_COMPILE_MEMORY_CACHE"] = "0"
 import _pinned_sparkinfer
 
 
 def export(output, capacities, width):
-    os.environ["SPARKINFER_COMPILE_DISK_CACHE"] = "0"
-    os.environ["SPARKINFER_COMPILE_MEMORY_CACHE"] = "0"
     import torch
     import cutlass
     import cutlass.cute as cute
