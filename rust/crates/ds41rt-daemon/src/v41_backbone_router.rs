@@ -2,7 +2,7 @@
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_block::FfnInput;
 use crate::v41_layer_graphs::LayerGraphs;
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41ExpertInputQuantizer, V41Router};
@@ -68,6 +68,9 @@ impl<'a> BackboneRouterWeights<'a> {
                 .into_iter()
                 .map(|n| DeviceAllocation::new(self.library, n * capacity as usize))
                 .collect::<Result<Vec<_>>>()?,
+            // Decode/verification benefits from batching small DMA transfers.
+            // Large prefill retains direct downloads to avoid another host copy.
+            request_staging: HostAllocation::new(self.library, capacity.min(80) as usize * 5328)?,
             weights: self,
             tokens: Vec::new(),
             layer: self.layer,
@@ -88,6 +91,8 @@ pub(crate) struct RouterOutput<'a> {
     pub ids: Ds41rtDeviceBuffer,
     pub routing: Ds41rtDeviceBuffer,
     pub tokens: &'a [u64],
+    stream: *mut std::ffi::c_void,
+    request_staging: ds41rt_ffi::Ds41rtHostBuffer,
     origin: Option<QueryBinding>,
     _owner: PhantomData<&'a ()>,
 }
@@ -167,6 +172,10 @@ mod reuse_tests {
                     ] {
                         assert_eq!(bytes(&library, a)?, bytes(&library, b)?);
                     }
+                    let (hidden, ids, routing) = unsafe { actual.download_request(&library)? };
+                    assert_eq!(hidden, bytes(&library, reference.expert_input)?);
+                    assert_eq!(ids, bytes(&library, reference.ids)?);
+                    assert_eq!(routing, bytes(&library, reference.routing)?);
                     for buffer in [actual.scores, actual.routing] {
                         assert!(bytes(&library, buffer)?
                             .chunks_exact(4)
@@ -202,6 +211,7 @@ pub(crate) struct BackboneRouterWave<'w, 'a> {
     input_quantizer: V41ExpertInputQuantizer<'a>,
     weights: &'w BackboneRouterWeights<'a>,
     buffers: Vec<DeviceAllocation<'a>>,
+    request_staging: HostAllocation<'a>,
     tokens: Vec<u64>,
     layer: usize,
     capacity: u32,
@@ -411,6 +421,8 @@ impl BackboneRouterWave<'_, '_> {
             ids: b(3, 24),
             routing: b(4, 24),
             tokens: &self.tokens,
+            stream: self.stream.raw,
+            request_staging: self.request_staging.buffer,
             origin: self.origin,
             _owner: PhantomData,
         })
@@ -442,7 +454,7 @@ pub(crate) struct ExpertRow {
     pub position: u64,
     pub kind: ds41rt_transport::ExpertV2SourceKind,
 }
-/// An immutable host request owns its BF16 input and router result after D2H.
+/// An immutable host request owns its FP8 input and router result after D2H.
 /// The private binding survives asynchronous transport and router-wave reuse.
 pub(crate) struct BoundExpertRequest {
     request: ds41rt_transport::ExpertProtocolV2Request,
@@ -458,8 +470,43 @@ impl BoundExpertRequest {
 }
 impl RouterOutput<'_> {
     /// # Safety
+    /// The completed output and its owning stream remain exclusively borrowed
+    /// until all transfers drain, including after a partial enqueue failure.
+    unsafe fn download_request(
+        &self,
+        library: &NativeLibrary,
+    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+        let bytes = self.rows as usize * 5328;
+        if bytes > self.request_staging.bytes {
+            let mut hidden = vec![0; self.rows as usize * 5280];
+            let mut ids = vec![0; self.rows as usize * 24];
+            let mut weights = vec![0; self.rows as usize * 24];
+            library.copy_d2h(&mut hidden, self.expert_input)?;
+            library.copy_d2h(&mut ids, self.ids)?;
+            library.copy_d2h(&mut weights, self.routing)?;
+            return Ok((hidden, ids, weights));
+        }
+        let staging = unsafe {
+            std::slice::from_raw_parts_mut(self.request_staging.ptr.cast::<u8>(), bytes)
+        };
+        let (hidden, routes) = staging.split_at_mut(self.rows as usize * 5280);
+        let (ids, weights) = routes.split_at_mut(self.rows as usize * 24);
+        let copied = (|| -> Result<()> {
+            unsafe {
+                library.copy_d2h_async(hidden, self.expert_input, self.stream)?;
+                library.copy_d2h_async(ids, self.ids, self.stream)?;
+                library.copy_d2h_async(weights, self.routing, self.stream)
+            }
+        })();
+        let drained = unsafe { library.cuda_stream_synchronize(self.stream) };
+        copied.and(drained)?;
+        Ok((hidden.to_vec(), ids.to_vec(), weights.to_vec()))
+    }
+
+    /// # Safety
     /// Device views still hold this completed router execution with no external
     /// writes. Metadata identifies the actual requests represented by the block.
+    /// Calls sharing this wave's pinned staging must not overlap.
     pub unsafe fn expert_request(
         &self,
         library: &NativeLibrary,
@@ -484,12 +531,7 @@ impl RouterOutput<'_> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .ok()
             .context("native expert request IDs exhausted")?;
-        let mut hidden = vec![0; rows.len() * 5280];
-        let mut ids = vec![0; rows.len() * 24];
-        let mut weights = vec![0; rows.len() * 24];
-        library.copy_d2h(&mut hidden, self.expert_input)?;
-        library.copy_d2h(&mut ids, self.ids)?;
-        library.copy_d2h(&mut weights, self.routing)?;
+        let (hidden, ids, weights) = unsafe { self.download_request(library)? };
         let descriptors = rows
             .iter()
             .enumerate()

@@ -1,0 +1,1698 @@
+{
+  "scope": "Small request pinned download qualification; no broad quality or throughput closure.",
+  "quality_comparison": [
+    {
+      "case": "arithmetic",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "signed_sort",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "extraction",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "logic",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "unicode",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "translation",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "explanation",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "long_retrieval",
+      "text_and_usage_exact": true
+    }
+  ],
+  "quality": {
+    "scope": "Eight paired single-client greedy cases. Six objective checks and two open-ended comparisons; not broad model quality, stochastic equivalence or release performance.",
+    "cases": [
+      {
+        "case": {
+          "name": "arithmetic",
+          "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+          "expected": "575"
+        },
+        "runs": {
+          "target": {
+            "text": "575",
+            "first_content_seconds": 0.14259410498198122,
+            "finish_seconds": 0.1929741919739172,
+            "observed_decode_tokens_per_second": 19.849112212927775,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "575",
+            "first_content_seconds": 0.13343632908072323,
+            "finish_seconds": 0.20759630110114813,
+            "observed_decode_tokens_per_second": 13.48436323202203,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "signed_sort",
+          "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+          "expected_json": [
+            -11,
+            -4,
+            0,
+            7,
+            7,
+            12
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.168241614010185,
+            "finish_seconds": 0.9555377259384841,
+            "observed_decode_tokens_per_second": 22.863062229423665,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.18183917610440403,
+            "finish_seconds": 0.5096647820901126,
+            "observed_decode_tokens_per_second": 54.90724236100308,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "extraction",
+          "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+          "expected_json": {
+            "total": 40,
+            "names": [
+              "Alice",
+              "Bob"
+            ]
+          }
+        },
+        "runs": {
+          "target": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.1834593010134995,
+            "finish_seconds": 0.8651005380088463,
+            "observed_decode_tokens_per_second": 23.47275829515171,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.19334447709843516,
+            "finish_seconds": 0.46798647509422153,
+            "observed_decode_tokens_per_second": 58.25765948675292,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "logic",
+          "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+          "expected_json": [
+            "D",
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.1672081119613722,
+            "finish_seconds": 0.6777274489868432,
+            "observed_decode_tokens_per_second": 23.50547595301232,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.16816794406622648,
+            "finish_seconds": 0.30964598210994154,
+            "observed_decode_tokens_per_second": 84.8188182839526,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "unicode",
+          "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+          "expected": "36"
+        },
+        "runs": {
+          "target": {
+            "text": "36",
+            "first_content_seconds": 0.14320351008791476,
+            "finish_seconds": 0.1945626970846206,
+            "observed_decode_tokens_per_second": 19.470713196144242,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "36",
+            "first_content_seconds": 0.14013388904277235,
+            "finish_seconds": 0.21603395405691117,
+            "observed_decode_tokens_per_second": 13.175219280954739,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "translation",
+          "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+        },
+        "runs": {
+          "target": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.13866674597375095,
+            "finish_seconds": 0.43938411795534194,
+            "observed_decode_tokens_per_second": 23.277670837149106,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.14542608696501702,
+            "finish_seconds": 0.3664644679520279,
+            "observed_decode_tokens_per_second": 31.66870825212635,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "explanation",
+          "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+        },
+        "runs": {
+          "target": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.150400448939763,
+            "finish_seconds": 1.439873766968958,
+            "observed_decode_tokens_per_second": 24.040823153580078,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.14860817603766918,
+            "finish_seconds": 0.9234049540245906,
+            "observed_decode_tokens_per_second": 40.01049162922988,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "long_retrieval",
+          "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+          "expected": "quartz-731"
+        },
+        "runs": {
+          "target": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.3217309250030667,
+            "finish_seconds": 3.6601052340120077,
+            "observed_decode_tokens_per_second": 11.821228425158914,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.2449458109913394,
+            "finish_seconds": 3.3762254319153726,
+            "observed_decode_tokens_per_second": 30.46931406295464,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      }
+    ]
+  },
+  "api": {
+    "before-target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-6485fb3b-4082-4ea0-860f-62f028b311df",
+        "object": "chat.completion",
+        "created": 1789127735,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13401845400221646,
+          "finish_seconds": 2.4922741819173098,
+          "observed_decode_tokens_per_second": 24.594448902824094,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1467499160207808,
+          "finish_seconds": 2.4765030259732157,
+          "observed_decode_tokens_per_second": 24.89534180777814,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13816882797982544,
+          "finish_seconds": 2.486911458079703,
+          "observed_decode_tokens_per_second": 24.6940636478053,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12692465004511178,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-5a9d8ae5-4b5b-45b5-9594-c07604a40681",
+        "object": "chat.completion",
+        "created": 1789127743,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "before-spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-f262c955-659a-4da0-a63e-6aceeb423a05",
+        "object": "chat.completion",
+        "created": 1789127743,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13984308193903416,
+          "finish_seconds": 0.8648320829961449,
+          "observed_decode_tokens_per_second": 80.00121369486966,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1658022610936314,
+          "finish_seconds": 0.8478234090143815,
+          "observed_decode_tokens_per_second": 85.0413512496236,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1413175460183993,
+          "finish_seconds": 0.8147712360369042,
+          "observed_decode_tokens_per_second": 86.12321954670158,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12273322499822825,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-eb745550-7344-408a-bc60-deee1bed5c70",
+        "object": "chat.completion",
+        "created": 1789127746,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-5c73fe03-9a0a-40ea-b2f5-167085eafc2a",
+        "object": "chat.completion",
+        "created": 1789127808,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1460385579848662,
+          "finish_seconds": 2.4937730039237067,
+          "observed_decode_tokens_per_second": 24.704667983352888,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14422919997014105,
+          "finish_seconds": 2.4797130160732195,
+          "observed_decode_tokens_per_second": 24.834254727047153,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14113406103570014,
+          "finish_seconds": 2.486305868020281,
+          "observed_decode_tokens_per_second": 24.731663508515535,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12604316603392363,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-ef567b3e-81af-49a7-bb7a-d17507dcdecc",
+        "object": "chat.completion",
+        "created": 1789127816,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-f37b554b-957e-4950-ac34-4c9ae394b1c4",
+        "object": "chat.completion",
+        "created": 1789127816,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14114840200636536,
+          "finish_seconds": 0.8166540439706296,
+          "observed_decode_tokens_per_second": 85.86160706422099,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1420999119291082,
+          "finish_seconds": 0.7933984169503674,
+          "observed_decode_tokens_per_second": 89.0528683128281,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13670991593971848,
+          "finish_seconds": 0.7909822770161554,
+          "observed_decode_tokens_per_second": 88.64809741401258,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12686749501153827,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-4a9e804e-8259-442d-a6aa-e598bb32398a",
+        "object": "chat.completion",
+        "created": 1789127819,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    }
+  },
+  "microbenchmark": [
+    {
+      "rows": 1,
+      "sync_us": 17.0805,
+      "chain_us": 17.356,
+      "pinned_chain_us": 9.554,
+      "samples": 200
+    },
+    {
+      "rows": 2,
+      "sync_us": 17.016,
+      "chain_us": 17.336,
+      "pinned_chain_us": 9.614,
+      "samples": 200
+    },
+    {
+      "rows": 6,
+      "sync_us": 17.912,
+      "chain_us": 18.217,
+      "pinned_chain_us": 9.765,
+      "samples": 200
+    },
+    {
+      "rows": 16,
+      "sync_us": 20.4,
+      "chain_us": 20.861,
+      "pinned_chain_us": 11.0615,
+      "samples": 200
+    },
+    {
+      "rows": 80,
+      "sync_us": 36.43,
+      "chain_us": 36.905,
+      "pinned_chain_us": 23.976,
+      "samples": 200
+    },
+    {
+      "rows": 4096,
+      "sync_us": 803.642,
+      "chain_us": 813.156,
+      "pinned_chain_us": 1278.195,
+      "samples": 200
+    }
+  ],
+  "timings": [
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-spec-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 98.1491935483871,
+          "median": 96.0,
+          "p95": 109.0,
+          "max": 146.0
+        },
+        "projection_us": {
+          "mean": 107.55,
+          "median": 93.0,
+          "p95": 169.0,
+          "max": 279.0
+        },
+        "sparse_us": {
+          "mean": 200.82311827956988,
+          "median": 182.0,
+          "p95": 293.0,
+          "max": 1558.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-spec-api.log",
+      "kind": "coordinator_collection",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "receive_us": {
+          "mean": 547.2069892473119,
+          "median": 517.0,
+          "p95": 660.0,
+          "max": 15115.0
+        },
+        "reduce_us": {
+          "mean": 7.46505376344086,
+          "median": 7.0,
+          "p95": 13.0,
+          "max": 34.0
+        },
+        "shared_copy_us": {
+          "mean": 5.788978494623656,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 67.0
+        },
+        "upload_us": {
+          "mean": 33.29032258064516,
+          "median": 33.0,
+          "p95": 41.0,
+          "max": 102.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-spec-api.log",
+      "kind": "coordinator_experts",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "collect_us": {
+          "mean": 597.380376344086,
+          "median": 566.5,
+          "p95": 710.0,
+          "max": 15166.0
+        },
+        "dispatch_us": {
+          "mean": 7.339247311827957,
+          "median": 7.0,
+          "p95": 12.0,
+          "max": 749.0
+        },
+        "routed_us": {
+          "mean": 71.1231182795699,
+          "median": 62.0,
+          "p95": 107.0,
+          "max": 296.0
+        },
+        "shared_us": {
+          "mean": 69.5244623655914,
+          "median": 56.0,
+          "p95": 131.0,
+          "max": 660.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-spec-api.log",
+      "kind": "coordinator_layer",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "attention_us": {
+          "mean": 410.0045698924731,
+          "median": 391.0,
+          "p95": 493.0,
+          "max": 1838.0
+        },
+        "experts_us": {
+          "mean": 747.5677419354839,
+          "median": 715.0,
+          "p95": 867.0,
+          "max": 15287.0
+        },
+        "finish_us": {
+          "mean": 13.349193548387097,
+          "median": 13.0,
+          "p95": 18.0,
+          "max": 28.0
+        },
+        "index_us": {
+          "mean": 34.839247311827954,
+          "median": 1.0,
+          "p95": 193.0,
+          "max": 357.0
+        },
+        "produced_us": {
+          "mean": 51.67634408602151,
+          "median": 36.0,
+          "p95": 92.0,
+          "max": 1092.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-target-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 94.90337837837838,
+          "median": 95.0,
+          "p95": 97.0,
+          "max": 132.0
+        },
+        "projection_us": {
+          "mean": 94.9704391891892,
+          "median": 91.0,
+          "p95": 97.0,
+          "max": 440.0
+        },
+        "sparse_us": {
+          "mean": 191.34515765765767,
+          "median": 181.0,
+          "p95": 291.0,
+          "max": 1726.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-target-api.log",
+      "kind": "coordinator_collection",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "receive_us": {
+          "mean": 194.70512387387387,
+          "median": 181.0,
+          "p95": 198.0,
+          "max": 23998.0
+        },
+        "reduce_us": {
+          "mean": 6.522916666666666,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 40.0
+        },
+        "shared_copy_us": {
+          "mean": 5.500731981981982,
+          "median": 5.0,
+          "p95": 6.0,
+          "max": 62.0
+        },
+        "upload_us": {
+          "mean": 21.44831081081081,
+          "median": 21.0,
+          "p95": 24.0,
+          "max": 121.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-target-api.log",
+      "kind": "coordinator_experts",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "collect_us": {
+          "mean": 230.68327702702703,
+          "median": 216.0,
+          "p95": 236.0,
+          "max": 24035.0
+        },
+        "dispatch_us": {
+          "mean": 4.176013513513514,
+          "median": 4.0,
+          "p95": 8.0,
+          "max": 235.0
+        },
+        "routed_us": {
+          "mean": 51.91109234234234,
+          "median": 50.0,
+          "p95": 63.0,
+          "max": 185.0
+        },
+        "shared_us": {
+          "mean": 56.32725225225225,
+          "median": 53.0,
+          "p95": 57.0,
+          "max": 180.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-target-api.log",
+      "kind": "coordinator_layer",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "attention_us": {
+          "mean": 383.72849099099096,
+          "median": 373.0,
+          "p95": 482.0,
+          "max": 2055.0
+        },
+        "experts_us": {
+          "mean": 345.0185247747748,
+          "median": 326.0,
+          "p95": 367.0,
+          "max": 24142.0
+        },
+        "finish_us": {
+          "mean": 12.409177927927928,
+          "median": 12.0,
+          "p95": 14.0,
+          "max": 88.0
+        },
+        "index_us": {
+          "mean": 24.333445945945947,
+          "median": 1.0,
+          "p95": 120.0,
+          "max": 628.0
+        },
+        "produced_us": {
+          "mean": 39.86283783783784,
+          "median": 33.0,
+          "p95": 78.0,
+          "max": 837.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/before-target-api.log",
+      "kind": "coordinator_step",
+      "rows": 1,
+      "samples": 442,
+      "metrics": {
+        "commit_us": {
+          "mean": 453.5475113122172,
+          "median": 443.5,
+          "p95": 522.0,
+          "max": 566.0
+        },
+        "execute_us": {
+          "mean": 40702.52488687783,
+          "median": 39292.5,
+          "p95": 51402.0,
+          "max": 110563.0
+        },
+        "prepared_us": {
+          "mean": 9.386877828054299,
+          "median": 9.0,
+          "p95": 16.0,
+          "max": 21.0
+        },
+        "sample_us": {
+          "mean": 115.26696832579185,
+          "median": 114.0,
+          "p95": 130.0,
+          "max": 192.0
+        },
+        "total_us": {
+          "mean": 41280.75339366516,
+          "median": 39849.0,
+          "p95": 51995.0,
+          "max": 111162.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/spec-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 98.89262295081967,
+          "median": 97.0,
+          "p95": 106.0,
+          "max": 124.0
+        },
+        "projection_us": {
+          "mean": 110.00286885245902,
+          "median": 94.0,
+          "p95": 170.0,
+          "max": 278.0
+        },
+        "sparse_us": {
+          "mean": 206.54754098360655,
+          "median": 182.0,
+          "p95": 297.0,
+          "max": 1557.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/spec-api.log",
+      "kind": "coordinator_collection",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "receive_us": {
+          "mean": 551.1262295081967,
+          "median": 508.0,
+          "p95": 673.0,
+          "max": 15398.0
+        },
+        "reduce_us": {
+          "mean": 7.24344262295082,
+          "median": 7.0,
+          "p95": 8.0,
+          "max": 39.0
+        },
+        "shared_copy_us": {
+          "mean": 6.170901639344263,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 52.0
+        },
+        "upload_us": {
+          "mean": 31.777049180327868,
+          "median": 31.0,
+          "p95": 36.0,
+          "max": 116.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/spec-api.log",
+      "kind": "coordinator_experts",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "collect_us": {
+          "mean": 599.0819672131148,
+          "median": 555.0,
+          "p95": 722.0,
+          "max": 15451.0
+        },
+        "dispatch_us": {
+          "mean": 5.252868852459017,
+          "median": 5.0,
+          "p95": 8.0,
+          "max": 20.0
+        },
+        "routed_us": {
+          "mean": 59.084016393442624,
+          "median": 49.0,
+          "p95": 96.0,
+          "max": 185.0
+        },
+        "shared_us": {
+          "mean": 72.98565573770492,
+          "median": 58.0,
+          "p95": 134.0,
+          "max": 217.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/spec-api.log",
+      "kind": "coordinator_layer",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "attention_us": {
+          "mean": 418.2200819672131,
+          "median": 389.0,
+          "p95": 516.0,
+          "max": 1832.0
+        },
+        "experts_us": {
+          "mean": 738.4180327868852,
+          "median": 694.0,
+          "p95": 857.0,
+          "max": 15564.0
+        },
+        "finish_us": {
+          "mean": 13.702459016393442,
+          "median": 14.0,
+          "p95": 15.0,
+          "max": 32.0
+        },
+        "index_us": {
+          "mean": 31.712295081967213,
+          "median": 1.0,
+          "p95": 185.0,
+          "max": 292.0
+        },
+        "produced_us": {
+          "mean": 53.62540983606557,
+          "median": 35.0,
+          "p95": 93.0,
+          "max": 1081.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/target-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 96.44269662921349,
+          "median": 96.0,
+          "p95": 98.0,
+          "max": 117.0
+        },
+        "projection_us": {
+          "mean": 97.57294007490637,
+          "median": 93.0,
+          "p95": 165.0,
+          "max": 447.0
+        },
+        "sparse_us": {
+          "mean": 196.34569288389514,
+          "median": 181.0,
+          "p95": 293.0,
+          "max": 1724.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/target-api.log",
+      "kind": "coordinator_collection",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "receive_us": {
+          "mean": 195.5874531835206,
+          "median": 179.0,
+          "p95": 197.0,
+          "max": 16638.0
+        },
+        "reduce_us": {
+          "mean": 6.936516853932584,
+          "median": 7.0,
+          "p95": 8.0,
+          "max": 37.0
+        },
+        "shared_copy_us": {
+          "mean": 6.13436329588015,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 65.0
+        },
+        "upload_us": {
+          "mean": 21.517883895131085,
+          "median": 21.0,
+          "p95": 24.0,
+          "max": 104.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/target-api.log",
+      "kind": "coordinator_experts",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "collect_us": {
+          "mean": 232.6827715355805,
+          "median": 216.0,
+          "p95": 235.0,
+          "max": 16678.0
+        },
+        "dispatch_us": {
+          "mean": 3.977808988764045,
+          "median": 4.0,
+          "p95": 7.0,
+          "max": 231.0
+        },
+        "routed_us": {
+          "mean": 43.29719101123595,
+          "median": 41.0,
+          "p95": 73.0,
+          "max": 133.0
+        },
+        "shared_us": {
+          "mean": 59.65252808988764,
+          "median": 56.0,
+          "p95": 119.0,
+          "max": 348.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/target-api.log",
+      "kind": "coordinator_layer",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "attention_us": {
+          "mean": 392.87799625468165,
+          "median": 375.0,
+          "p95": 487.0,
+          "max": 2020.0
+        },
+        "experts_us": {
+          "mean": 341.5881086142322,
+          "median": 320.0,
+          "p95": 360.0,
+          "max": 16781.0
+        },
+        "finish_us": {
+          "mean": 13.388389513108613,
+          "median": 13.0,
+          "p95": 15.0,
+          "max": 51.0
+        },
+        "index_us": {
+          "mean": 24.97303370786517,
+          "median": 1.0,
+          "p95": 119.0,
+          "max": 685.0
+        },
+        "produced_us": {
+          "mean": 42.56029962546816,
+          "median": 35.0,
+          "p95": 82.0,
+          "max": 876.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-router-pinned-rollout/target-api.log",
+      "kind": "coordinator_step",
+      "rows": 1,
+      "samples": 266,
+      "metrics": {
+        "commit_us": {
+          "mean": 444.9924812030075,
+          "median": 435.0,
+          "p95": 499.0,
+          "max": 594.0
+        },
+        "execute_us": {
+          "mean": 41303.6015037594,
+          "median": 39378.0,
+          "p95": 52744.0,
+          "max": 109605.0
+        },
+        "prepared_us": {
+          "mean": 7.597744360902255,
+          "median": 7.0,
+          "p95": 14.0,
+          "max": 23.0
+        },
+        "sample_us": {
+          "mean": 121.71804511278195,
+          "median": 122.0,
+          "p95": 138.0,
+          "max": 212.0
+        },
+        "total_us": {
+          "mean": 41877.95864661654,
+          "median": 39926.5,
+          "p95": 53361.0,
+          "max": 110210.0
+        }
+      }
+    }
+  ],
+  "commands": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-router-pinned-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-router-pinned-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-sparse-skip-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18041"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-router-pinned-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-router-pinned-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-sparse-skip-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18042"
+    ]
+  ],
+  "gpu_test_log": "\nrunning 1 test\nPASS real router rows=1 cycle=0 layers=40 scores/ids/routing/encoded-input exact; stable inputs and cached handles\nPASS real router rows=1 cycle=1 layers=40 scores/ids/routing/encoded-input exact; stable inputs and cached handles\nPASS real router rows=80 cycle=0 layers=40 scores/ids/routing/encoded-input exact; stable inputs and cached handles\nPASS real router rows=80 cycle=1 layers=40 scores/ids/routing/encoded-input exact; stable inputs and cached handles\nPASS real router rows=4096 cycle=0 layers=3 scores/ids/routing/encoded-input exact; stable inputs and cached handles\nPASS real router rows=4096 cycle=1 layers=3 scores/ids/routing/encoded-input exact; stable inputs and cached handles\nPASS 166 real-weight router comparisons and invalid-row recovery\ntest v41_backbone_router::reuse_tests::real_router_rebinding_matches_fresh_owners ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 759 filtered out; finished in 0.95s\n\n",
+  "sha256": {
+    "/tmp/ds41-router-pinned-artifacts/daemon": "15a4b1675b8c0d2024df9e356debd0b2caacf2ac5fc7a38482d121c03e43c8b2",
+    "/tmp/ds41-router-download-bench.py": "2ad9a9b6ba7537f1009186c86e4bb7a1850f3555fb24b261d034006f34dfbb91",
+    "/tmp/ds41-router-pinned-final-gpu.log": "1d6d3e39945d74548170a7412fecb7e2e3a8fa91cffcb90dd374dacfdd491db4",
+    "/tmp/ds41-router-pinned-rollout/spec-api.log": "a63b1c744bbb8e697a4e4b80100db5fb1568bbcb0dc6cfd1fc4d24e0348e490a",
+    "/tmp/ds41-router-pinned-rollout/target-api.log": "668cdab09f6298e826dd80fb87de406e479235e76ecaf2c983da882567e715d9",
+    "/tmp/ds41-router-pinned-rollout/quality.log": "a33f37466e2cc46431f65e022dfe879771324be0f9f8ec6d9ea8c5554363dbd2",
+    "/tmp/ds41-router-pinned-rollout/spec.log": "151489296e2b41b61d975fb4f864ca22f600315370fd09ded5c022b8a7e13dbf",
+    "/tmp/ds41-router-pinned-rollout/target.log": "8e36279a14a614ffa58ce29b0b3ba84024a8e835145316e98653456f73509771",
+    "/tmp/ds41-router-pinned-rollout/before-spec-api.log": "0a3cbe0511a72341547a650821fe978b1c879ee693141cda89ef5172c02c03ea",
+    "/tmp/ds41-router-pinned-rollout/before-target-api.log": "a0709db5ae3cbdae868e5e2c8e89f78f3c6c6331419192267769b791fab3f2ab",
+    "/tmp/ds41-router-pinned-rollout/before-spec.log": "b5b48603f18577e05ccf1b099a600f48555957c2fb20f44e3ad3ccf904c949ce",
+    "/tmp/ds41-router-pinned-rollout/before-target.log": "890542538205ad03d739c78ef69de9746d5f6955e870d88d883f33022b656744"
+  }
+}
