@@ -9,6 +9,12 @@ pub struct EngramTokenMap {
 }
 
 impl EngramTokenMap {
+    pub fn from_file(path: &std::path::Path) -> Result<Self> {
+        let tokenizer = Tokenizer::from_file(path)
+            .map_err(|error| anyhow::anyhow!("loading engram tokenizer: {error}"))?;
+        Self::from_tokenizer(&tokenizer)
+    }
+
     pub fn from_tokenizer(tokenizer: &Tokenizer) -> Result<Self> {
         let ids = compressed_ids(tokenizer)?;
         ensure!(

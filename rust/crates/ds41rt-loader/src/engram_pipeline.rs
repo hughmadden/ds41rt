@@ -34,13 +34,8 @@ impl EngramWave {
         self.prefetch.clear();
         self.layers = [LayerIo::Consumed, LayerIo::Consumed];
     }
-    /// Commit accepted prefixes only after validating the complete physical wave.
-    /// Rejected speculative rows never enter history; remaining I/O is cancelled.
-    pub fn commit(
-        &mut self,
-        histories: &mut [&mut EngramHistory],
-        accepted: &[usize],
-    ) -> Result<()> {
+    /// Preflight history publication before an enclosing device-cache commit.
+    pub fn validate_commit(&self, histories: &[&EngramHistory], accepted: &[usize]) -> Result<()> {
         ensure!(!self.finished, "engram wave is already finished");
         ensure!(
             histories.len() == self.batches.len() && accepted.len() == self.batches.len(),
@@ -49,6 +44,19 @@ impl EngramWave {
         for ((history, batch), &count) in histories.iter().zip(&self.batches).zip(accepted) {
             history.validate_commit(batch, count)?;
         }
+        Ok(())
+    }
+    /// Commit accepted prefixes only after validating the complete physical wave.
+    /// Rejected speculative rows never enter history; remaining I/O is cancelled.
+    pub fn commit(
+        &mut self,
+        histories: &mut [&mut EngramHistory],
+        accepted: &[usize],
+    ) -> Result<()> {
+        self.validate_commit(
+            &histories.iter().map(|h| &**h).collect::<Vec<_>>(),
+            accepted,
+        )?;
         // Exclusive history borrows prevent changes between validation and commit.
         for ((history, batch), &count) in histories.iter_mut().zip(&self.batches).zip(accepted) {
             history.commit(batch, count)?;

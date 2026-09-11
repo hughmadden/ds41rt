@@ -23,8 +23,8 @@ Each planned cache batch now has a unique identity even when its request/positio
 
 Workspace totals exclude persistent caches, host staging, backbone/index/transport workspaces, engram, vision and dSpark. These figures do not establish full-model fit.
 
-The combined layer method has **not** executed on GPU. Real query/cache/index/attention/TP4/shared/mHC numerical composition, async cancellation across its owners and full accepted-prefix commit still need qualification. RTX execution remains unavailable under the current driver/library mismatch. Prior component qualifications do not prove this combined path. The source metadata and narrower test results are recorded in [the evidence file](ds41-backbone-execution.json).
+The initial owner qualification covered the build, progress guards and allocation/lifecycle tests only. Subsequent execution evidence is below. The original driver mismatch has since been worked around for development; see [RTX testing restoration](ds41-rtx-testing-restored.md).
 
 ## Subsequent distributed execution
 
-The combined layer-0 method now passes two real distributed batches on RTX plus four Sparks, including embedding/query/window/attention/shared/routed/mHC execution and partial-pass commit rejection. See [the layer-0 integration record](ds41-layer0-integration.md). This establishes execution of that path; independent assembled-layer numerical comparison, compressed/index/engram dependencies and the full 40-layer driver remain open.
+The combined layer-0 method now passes two real distributed batches on RTX plus four Sparks, including embedding/query/window/attention/shared/routed/mHC execution and partial-pass commit rejection. See [the layer-0 integration record](ds41-layer0-integration.md). Both layer-0 batches subsequently passed a complete independent reference computation. The [request/engram integration](ds41-request-engram-integration.md) now also executes the layer-1 engram gate and query on actual layer-0 output. Independent layer-1 arithmetic, compressed/index dependencies and the full 40-layer driver remain open.

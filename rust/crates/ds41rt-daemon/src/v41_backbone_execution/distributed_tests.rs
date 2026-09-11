@@ -1,7 +1,11 @@
 use super::*;
-use crate::v41_backbone_cache::CacheWork;
 use crate::v41_backbone_lane::BackboneLaneWeights;
+use crate::v41_engram::{
+    layer::{EngramGate, EngramLayerWeights},
+    EngramDeviceRows,
+};
 use crate::v41_index_lane::IndexLaneWeights;
+use crate::v41_requests::{RequestTokens, Requests};
 use crate::v41_target_embedding::TargetEmbeddingWave;
 use ds41rt_transport::v41_expert::V41Tp4Tcp;
 use ds41rt_transport::{ExpertV2SourceKind, TcpTransportConfig};
@@ -76,11 +80,22 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         80,
         BackboneExecution::workspace_bytes(&lib, 80)?,
     )?;
-    let mut bank =
-        BackboneCache::new(&lib, 16, [16; 4], BackboneCache::device_bytes(16, [16; 4])?)?;
-    let leases = (0..16)
-        .map(|slot| bank.begin_request(slot, 1000 + slot as u64))
-        .collect::<Result<Vec<_>>>()?;
+    let map = ds41rt_loader::EngramTokenMap::from_file(
+        &std::path::Path::new(&model).join("tokenizer.json"),
+    )?;
+    let pipeline =
+        unsafe { ds41rt_loader::EngramPipeline::new(&catalog, map, 80, 2, 8 * 1024 * 1024)? };
+    let mut requests = Requests::new(
+        &lib,
+        pipeline,
+        16,
+        [16; 4],
+        BackboneCache::device_bytes(16, [16; 4])?,
+    )?;
+    let engram_weights =
+        EngramLayerWeights::load(&lib, &catalog, 0, 256 * 1024 * 1024, 16 * 1024 * 1024)?;
+    let mut gate = EngramGate::new(&engram_weights, 80, 128 * 1024 * 1024)?;
+    let mut upload = EngramDeviceRows::new(&lib, 80, EngramDeviceRows::device_bytes(80)?)?;
     let tcp = V41Tp4Tcp::new(
         peers,
         [1, 2, 3, 4],
@@ -99,33 +114,37 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         execution.restart();
         lane.restart()?;
         index.restart()?;
-        let work = leases
-            .iter()
-            .map(|&lease| CacheWork {
-                lease,
-                tokens: 5,
-                kind: ExpertV2SourceKind::Prefill,
-            })
-            .collect::<Vec<_>>();
-        let batch = bank.plan(&work)?;
-        let positions = batch.positions();
+        let leases = (0..16)
+            .map(|slot| requests.admit(slot, 1000 + slot as u64))
+            .collect::<Result<Vec<_>>>()?;
         let tokens = (0..80u32)
             .map(|i| (i * 7919 + cycle * 113 + 17) % 129280)
             .collect::<Vec<_>>();
-        let embedded = embedding.execute(&tokens, &positions)?;
+        let work = leases
+            .iter()
+            .zip(tokens.chunks_exact(5))
+            .map(|(&lease, tokens)| RequestTokens {
+                lease,
+                tokens,
+                image_mask: None,
+                kind: ExpertV2SourceKind::Prefill,
+            })
+            .collect::<Vec<_>>();
+        let mut batch = requests.prepare(&work)?;
+        let positions = batch.cache()?.positions();
         unsafe {
-            lane.begin_embedded(&embedded)?;
+            requests.begin_text(&batch, &mut embedding, &mut lane)?;
         }
         let start = Instant::now();
         runtime.block_on(unsafe {
             execution.execute_layer(
-                &bank,
-                &batch,
+                requests.cache(),
+                batch.cache()?,
                 &mut lane,
                 &mut index,
                 &mut transport,
                 0,
-                &[0; 80],
+                batch.image_mask(),
             )
         })?;
         let output = lane.output()?;
@@ -154,15 +173,47 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             std::fs::write(dir.join(format!("layer0-c{cycle}-pre.bin")), &pre)?;
         }
         previous = Some(residual);
+        lane.advance()?;
+        let deadline = Instant::now() + Duration::from_secs(120);
+        while !unsafe { requests.poll_engram(&mut batch, &mut upload, &mut gate, &mut lane)? } {
+            ensure!(Instant::now() < deadline, "layer-1 engram timed out");
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        let prepared = lane.prepared_input()?;
+        assert_eq!(prepared.layer, 1);
+        assert_eq!(prepared.tokens, positions);
+        let mut gated = vec![0; prepared.residual.bytes];
+        lib.copy_d2h(&mut gated, prepared.residual)?;
+        assert_ne!(
+            gated,
+            *previous.as_ref().unwrap(),
+            "engram did not update real residual"
+        );
+        let query = unsafe { lane.begin_prepared()? };
+        assert_eq!(query.layer, 1);
+        assert_eq!(query.tokens()?, positions);
+        let mut rotated = vec![0; query.rotated.bytes];
+        lib.copy_d2h(&mut rotated, query.rotated)?;
+        for bytes in [&gated, &rotated] {
+            assert!(bytes
+                .chunks_exact(2)
+                .all(|b| u16::from_ne_bytes(b.try_into().unwrap()) & 0x7f80 != 0x7f80));
+        }
+        if let Some(dir) = std::env::var_os("DS41RT_LAYER0_OUTPUT") {
+            let dir = std::path::PathBuf::from(dir);
+            std::fs::write(dir.join(format!("layer1-c{cycle}-gated.bin")), &gated)?;
+            std::fs::write(dir.join(format!("layer1-c{cycle}-query.bin")), &rotated)?;
+        }
         assert!(
-            execution.commit(&mut bank, &batch, &[5; 16]).is_err(),
+            requests
+                .commit(&mut batch, &mut execution, &[5; 16])
+                .is_err(),
             "partial model pass committed"
         );
         for &lease in &leases {
-            assert_eq!(bank.committed_end(lease)?, 0);
+            assert!(requests.cache().committed_end(lease).is_err());
         }
-        eprintln!("PASS layer0 cycle={cycle} rows=80 requests=16 actual embedding/query/window/attention/shared/TP4/mHC, finite changed output, partial-pass commit rejected, elapsed={:.3}s",start.elapsed().as_secs_f64());
+        eprintln!("PASS cycle={cycle} rows=80 requests=16 actual distributed layer0 -> mapped layer1 engram -> prepared query; incomplete commit revoked request histories; elapsed={:.3}s", start.elapsed().as_secs_f64());
     }
-    bank.release(&leases)?;
     Ok(())
 }

@@ -191,6 +191,12 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         if result.is_err() { self.reset(); }
         result
     }
+    /// Metadata for gather association before engram makes query inputs ready.
+    pub fn pending_engram(&self) -> Result<(usize, &[u64])> {
+        ensure!(matches!(self.phase, Phase::Prepared(_, _, false)),
+            "block is not awaiting engram");
+        Ok((self.layer, &self.tokens))
+    }
     pub fn prepared_input(&self) -> Result<PreparedBlockInput<'_>> {
         let (previous, rows) = match self.phase {
             Phase::Prepared(binding, rows, true) => (binding, rows),

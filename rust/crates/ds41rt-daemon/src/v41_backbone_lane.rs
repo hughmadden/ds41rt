@@ -241,6 +241,10 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.phase = Phase::Query;
         Ok(result)
     }
+    pub fn pending_engram(&self) -> Result<(usize, &[u64])> {
+        ensure!(self.phase == Phase::Prepared, "backbone lane input not prepared");
+        self.block.pending_engram()
+    }
     pub fn prepared_input(&self) -> Result<PreparedBlockInput<'_>> {
         ensure!(
             self.phase == Phase::Prepared,

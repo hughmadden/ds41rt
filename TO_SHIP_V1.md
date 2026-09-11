@@ -94,6 +94,8 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Qualify the bound final target head on RTX and wire selected prefill/decode/verification rows into sampling. The owner builds and its real-weight numerical checks pass on Spark; final RTX and dSpark projection requalification remain open after the cuBLAS accumulation correction.
 - [ ] Connect native FP4 backbone TP4 experts, FP32 route transport and correctly ordered reduction to the production AFD scheduler.
 - [x] Implement deterministic engram tokenizer compression, prime layouts, hashes, image barriers and request histories.
+- [x] Add a request owner coupling cache leases with mapped engram histories; start gather at token-batch preparation and validate history publication before cache commit. Both-table upload/image-barrier and 16-request failure/re-admission tests pass on RTX. See `docs/ds41-request-engram-integration.md`.
+- [x] Execute request-owned text entry, actual distributed layer 0, mapped layer-1 engram gate and prepared layer-1 query on RTX/four Sparks for two changed 80-row batches. Layer-0 outputs remain byte-identical to prior reference-qualified outputs; new layer-1 arithmetic is not independently qualified.
 - [ ] Wire mapped engram tables/scales, bounded asynchronous prefetch, deduplicated gathers, staging and cancellation into execution.
 - [ ] Trigger engram work early for decode, verification and batched prefill and commit accepted-prefix history without stale-wave reuse.
 - [ ] Implement native image preprocessing, ViT, aligner, image-span embeddings and vision routing through the API.

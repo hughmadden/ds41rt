@@ -1,0 +1,130 @@
+{
+  "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+  "revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "sources": [
+    {
+      "path": "rust/crates/ds41rt-daemon/src/v41_requests.rs",
+      "bytes": 14422,
+      "sha256": "959d6ea026e3df89549666864f6adfde343a71f3f831966937320dc85e3e65fa"
+    },
+    {
+      "path": "rust/crates/ds41rt-daemon/src/v41_block.rs",
+      "bytes": 15917,
+      "sha256": "06c3b79b4779af8e9d748e7dd2140957a9a2a2330a403537a61a5876c9347618"
+    },
+    {
+      "path": "rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs",
+      "bytes": 20084,
+      "sha256": "c6ae20964baf78979565f5fc3e88564c4ed7cb61f31da9be829bdb7147bae228"
+    },
+    {
+      "path": "rust/crates/ds41rt-daemon/src/v41_backbone_execution/distributed_tests.rs",
+      "bytes": 8282,
+      "sha256": "8a8665a1b05d68d2dbf728fa71077e9b17939a4370f459c775119b6bb9c2d67e"
+    },
+    {
+      "path": "rust/crates/ds41rt-loader/src/engram_pipeline.rs",
+      "bytes": 8514,
+      "sha256": "d11d0b680273e03cc075e4b60de3824b705fa17edf1bab34f84733b404004111"
+    },
+    {
+      "path": "rust/crates/ds41rt-loader/src/engram_tokenizer.rs",
+      "bytes": 4891,
+      "sha256": "c6c1ab9e3da099c3f271c7568923ae37cfedf5f0dcbc007bd35e8e47e6cd74cb"
+    }
+  ],
+  "native": {
+    "path": "/tmp/ds41-v41-aot/cmake/libds41rt_native.so",
+    "bytes": 13255184,
+    "sha256": "854c317cf010bd20b54c22bc2be696b3b6c15586c0325caef18f585b0ed71a17"
+  },
+  "logs": [
+    {
+      "path": "/tmp/ds41-requests-rtx-test.log",
+      "bytes": 480,
+      "sha256": "6d998cf95e7435260dad8660c4f061054add3a5bf8ada59dfbbe5c4f95e8977b"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-rtx.log",
+      "bytes": 609,
+      "sha256": "e27fcf8e7b8687cb6b61a4cfdc98c0b27b810fb96bdecd02eb2bf2b8f804efca"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-daemon-build.log",
+      "bytes": 359469,
+      "sha256": "ee40aa431d114319d8c6cd14f677aa99851fd0efed7322c31bcc9dcbd8d14837"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-ostrich.log",
+      "bytes": 593,
+      "sha256": "85b45b6ba5601b51fc0a1b81b38559742ce12a699f2fc0333040536e85724ce2"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-dodo.log",
+      "bytes": 586,
+      "sha256": "9b66c18fcfcb73ab041b60110c4baa9170ca521ba9dea76a0b9792d5e4e4799d"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-emu.log",
+      "bytes": 586,
+      "sha256": "468d42d43611fa23dc811dd570beae3358a017e9fe683510a613bab31837163c"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-kiwi.log",
+      "bytes": 585,
+      "sha256": "90e7cc85a564643d9c8cbe3395da6ba0730c739c6642fdd287893b886c9cdfd0"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer0-c0-pre.bin",
+      "bytes": 1280,
+      "sha256": "bc58b1cf1fb7910cc871392b1926a7e51ea34c13231a6d26eb405b5d00cf62e2"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer0-c0-residual.bin",
+      "bytes": 3276800,
+      "sha256": "ec99593b959b7f2a9124a00d432f0fd2db66974b248ffd8b2dbadfcbab55a9ef"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer0-c1-pre.bin",
+      "bytes": 1280,
+      "sha256": "a5ca0472e77d99a71d534edf34c53dcf0231fe399afc4e49ae3bd601dc0c6554"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer0-c1-residual.bin",
+      "bytes": 3276800,
+      "sha256": "5a3cd6b560fe3de8d11131f291e8a948d0e50361f960b9274c3f42836b4939c3"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer1-c0-gated.bin",
+      "bytes": 3276800,
+      "sha256": "36f6d0fcf1e0437a1c59d53471a031d2ccb5a00ab14443dc24efd6cc459c23ea"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer1-c0-query.bin",
+      "bytes": 5242880,
+      "sha256": "cd266767a526c982f153f7fefc17046099d9ddf72b9633efbd3d7da5020450e3"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer1-c1-gated.bin",
+      "bytes": 3276800,
+      "sha256": "de9c7164b7617f5eb567d70b03b9fd5ecdd56da7d38271010ce92d221487f5f3"
+    },
+    {
+      "path": "/tmp/ds41-request-layer1-output/layer1-c1-query.bin",
+      "bytes": 5242880,
+      "sha256": "698e7f97955b08f6484dca4466596138f2821189880531068fd20a32c84c4be5"
+    }
+  ],
+  "request_test_seconds": 3.67,
+  "distributed_test_seconds": 6.15,
+  "layer0_matches_previous_reference_qualified_bytes": true,
+  "scope": "16 requests x 5 text tokens x 2 changed batches: real distributed layer0, mapped engram gate at layer1, prepared layer1 query; separate two-table image-mask upload and request failure tests",
+  "not_qualified": [
+    "Independent numerical comparison of layer1 gate/query",
+    "Layer1 attention and FFN",
+    "Complete 40-layer execution and successful request-owner commit",
+    "Vision, dSpark acceptance, API generation and end-to-end performance"
+  ]
+}
