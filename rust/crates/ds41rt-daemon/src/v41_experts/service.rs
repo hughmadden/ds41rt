@@ -27,7 +27,7 @@ pub(crate) async fn run(args: crate::cli::NativeExpertDaemonArgs) -> Result<()> 
         layers = 40,
         "native V4.1 expert worker ready"
     );
-    ds41rt_transport::serve_protocol_v2_tcp_with_executor(
+    ds41rt_transport::serve_protocol_v2_verbs_host_with_executor(
         &args.listen,
         std::sync::Arc::new(service),
     )
@@ -210,14 +210,19 @@ impl ProtocolV2ExpertExecutor for NativeExpertService {
     ) -> Result<()> {
         self.execute_streaming(request, emit)
     }
-    fn execute_streaming_device_payload(
+    // The verbs server owns mapped registered slots for the full callback.
+    // Retain the current GPU owner's host staging until direct mapped ingress is wired.
+    fn execute_streaming_device_payload_with_identity(
         &self,
-        _: &ExpertProtocolV2RequestView<'_>,
+        request: &ExpertProtocolV2RequestView<'_>,
         _: ds41rt_transport::ProtocolV2RequestDevicePayload,
-        _: &mut dyn FnMut(ds41rt_transport::ProtocolV2ExecutorResponseRef<'_>) -> Result<()>,
+        emit: &mut dyn FnMut(ds41rt_transport::ProtocolV2ExecutorResponseRef<'_>) -> Result<()>,
     ) -> Result<()> {
-        bail!("native expert service device ingress is not wired; use TCP host ingress")
+        self.execute_streaming(request, &mut |response| {
+            emit(ds41rt_transport::ProtocolV2ExecutorResponseRef::Host(response))
+        })
     }
+
 }
 
 fn run_worker(

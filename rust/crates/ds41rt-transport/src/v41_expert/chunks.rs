@@ -129,8 +129,30 @@ impl V41Tp4ChunkReceiver {
         self.received
     }
 
+    /// The verbs client has already checked framing and checksum before exposing
+    /// these owned/recycled payload bytes. Keep their owner alive through the sink.
+    pub(crate) fn push_rdma<'f, F>(
+        &mut self,
+        chunk: &'f crate::VerbsHostProtocolV2ResponseChunk,
+        sink: F,
+    ) -> Result<usize>
+    where
+        F: FnOnce(usize, u32, &'f [u8]) -> Result<()>,
+    {
+        ensure!(
+            chunk.wire_bytes <= self.max_frame_bytes,
+            "native response exceeds receive frame budget"
+        );
+        self.push_parts(
+            &chunk.header,
+            chunk.row_indices.as_deref(),
+            chunk.partial_output_payload.as_ref(),
+            sink,
+        )
+    }
+
     /// Validate before invoking the sink, then commit progress only if it succeeds.
-    /// The sink receives (rank, first token row, contiguous FP32 route bytes).
+    /// The sink receives (rank, first token row, contiguous BF16 rank-partial bytes).
     /// It must copy the bytes or keep their storage alive until asynchronous writes
     /// finish; `complete()` does not itself synchronize GPU copies.
     /// On sink error no progress is committed, but destination bytes may be partial.
@@ -143,9 +165,35 @@ impl V41Tp4ChunkReceiver {
             "native response exceeds receive frame budget"
         );
         let response = ExpertProtocolV2ResponseView::parse(frame)?;
-        let rank = self.identity.response_rank(&response.header)?;
+        let indices = if response.row_indexed() {
+            Some(
+                (0..response.header.row_count as usize)
+                    .map(|i| response.request_row_index(i))
+                    .collect::<Result<Vec<_>>>()?,
+            )
+        } else {
+            None
+        };
+        self.push_parts(
+            &response.header,
+            indices.as_deref(),
+            response.partial_output_payload(),
+            sink,
+        )
+    }
+
+    fn push_parts<'f, F>(
+        &mut self,
+        h: &ExpertProtocolV2ResponseHeader,
+        indices: Option<&[u32]>,
+        payload: &'f [u8],
+        sink: F,
+    ) -> Result<usize>
+    where
+        F: FnOnce(usize, u32, &'f [u8]) -> Result<()>,
+    {
+        let rank = self.identity.response_rank(h)?;
         ensure!(!self.finished[rank], "native TP rank already completed");
-        let h = &response.header;
         let allowed = EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16
             | EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM
             | EXPERT_PROTOCOL_V2_FLAG_RESPONSE_ROW_INDICES
@@ -162,24 +210,37 @@ impl V41Tp4ChunkReceiver {
             h.row_count > 0 && end <= self.identity.rows,
             "native response chunk exceeds remaining rows"
         );
-        if response.row_indexed() {
+        ensure!(
+            indices.is_some() == (h.flags & EXPERT_PROTOCOL_V2_FLAG_RESPONSE_ROW_INDICES != 0),
+            "native row-index flag mismatch"
+        );
+        let more_chunks = h.flags & EXPERT_PROTOCOL_V2_FLAG_RESPONSE_MORE_CHUNKS != 0;
+        ensure!(
+            payload.len() == h.output_payload_bytes as usize,
+            "native payload size mismatch"
+        );
+        if let Some(indices) = indices {
+            ensure!(
+                indices.len() == h.row_count as usize,
+                "native row index count mismatch"
+            );
             for i in 0..h.row_count {
                 ensure!(
-                    response.request_row_index(i as usize)? == start + i,
+                    indices[i as usize] == start + i,
                     "native response rows overlap, skip or reorder"
                 );
             }
         } else {
             ensure!(
-                start == 0 && h.row_count == self.identity.rows && !response.more_chunks(),
+                start == 0 && h.row_count == self.identity.rows && !more_chunks,
                 "unindexed native response must contain the entire plane"
             );
         }
         ensure!(
-            response.more_chunks() == (end < self.identity.rows),
+            more_chunks == (end < self.identity.rows),
             "native response has an early or missing final marker"
         );
-        sink(rank, start, response.partial_output_payload())?;
+        sink(rank, start, payload)?;
         self.received[rank] = end;
         self.finished[rank] = end == self.identity.rows;
         Ok(rank)

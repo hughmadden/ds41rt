@@ -3,12 +3,12 @@ use super::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41CompactReducer};
 use ds41rt_transport::{
-    v41_expert::{V41Tp4Pending, V41Tp4Tcp, V41_PARTIAL_ROW_BYTES},
+    v41_expert::{V41Tp4RocePending, V41Tp4Roce, V41_PARTIAL_ROW_BYTES},
     ExpertProtocolV2Request,
 };
 
 pub(crate) struct NativeTp4Wave<'a> {
-    transport: V41Tp4Tcp,
+    transport: V41Tp4Roce,
     // Drop drains the stream before fields release any GPU allocations.
     stream: LoadStream<'a>,
     planes: [DeviceAllocation<'a>; 4],
@@ -34,7 +34,7 @@ impl<'a> NativeTp4Wave<'a> {
     }
     pub fn new(
         library: &'a NativeLibrary,
-        transport: V41Tp4Tcp,
+        transport: V41Tp4Roce,
         available_bytes: usize,
     ) -> Result<Self> {
         let capacity = transport.capacity();
@@ -262,7 +262,7 @@ fn reduce_planes(
 /// Borrows every mutable reduction buffer and owns all unread response sockets.
 /// Dropping before completion leaves the wave unpublished and closes the sockets.
 pub(crate) struct NativePendingFfn<'w, 'a, 'r> {
-    pending: V41Tp4Pending<'w, 'r>,
+    pending: V41Tp4RocePending<'w, 'r>,
     request: &'r crate::v41_backbone_router::BoundExpertRequest,
     capacity: u32,
     library: &'a NativeLibrary,

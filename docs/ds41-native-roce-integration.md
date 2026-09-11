@@ -1,0 +1,13 @@
+# Native V4.1 RoCE integration
+
+The native coordinator now selects `V41Tp4Roce`, backed by the existing four persistent verbs clients. The native expert command selects the existing verbs server. TCP carries endpoint bootstrap and idle connection-liveness checks; inference requests and response chunks use the registered RDMA rings and QPs. This native path has no TCP inference fallback.
+
+Dispatch enqueues one request per rank and returns so shared FFN execution can overlap transport/expert execution. It does not claim that enqueuing means the NIC has finished sending. The pending wave exclusively borrows the transport until completion or cancellation. Cancellation/error queues QP resets; response destinations must be discarded. The selected streaming client path does not automatically replay partially delivered requests.
+
+Responses use the existing recycled payload owners, with native request/executor identity, contiguous row coverage, shape and final-marker validation before the coordinator sink. No extra monolithic response assembly is introduced. One admitted wave limits queued payloads to four validated rank planes; the underlying existing transport channel is unbounded and must be revisited before allowing multiple outstanding waves per owner.
+
+GPU integration remains incomplete: the worker currently copies the registered request view into its bounded GPU-owner queue, then uses its existing host staging and host response callback. The mapped device pointer is not yet passed into native expert execution. Coordinator input D2H and response H2D also remain. RoCE transport is not a claim of GPU-direct execution or completion of the latency work.
+
+Validation so far: transport library tests pass (150 passed, one ignored), including a new RDMA payload-owner test for interleaved rank chunks and stale, reordered and duplicate response rejection. These are CPU tests, not fabric qualification. Cross-host QP reuse, cancellation, native GPU execution and live API quality/performance must still be measured before rollout.
+
+The two old development API containers were stopped during integration because their frozen executables still use TCP inference. Spark weight/kernel artifacts remain intact. No new throughput result is available yet.

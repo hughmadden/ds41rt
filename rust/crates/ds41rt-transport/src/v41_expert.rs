@@ -11,6 +11,8 @@ pub use crate::protocol_v2::EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16;
 
 mod chunks;
 pub use chunks::V41Tp4ChunkReceiver;
+mod roce;
+pub use roce::{V41Tp4Roce, V41Tp4RocePending};
 mod tcp;
 pub use tcp::{V41Tp4Pending, V41Tp4Tcp};
 

@@ -7,7 +7,7 @@ use crate::v41_engram::{
 use crate::v41_index_lane::IndexLaneWeights;
 use crate::v41_requests::{RequestTokens, Requests};
 use crate::v41_target_embedding::TargetEmbeddingWave;
-use ds41rt_transport::v41_expert::V41Tp4Tcp;
+use ds41rt_transport::v41_expert::V41Tp4Roce;
 use ds41rt_transport::{ExpertV2SourceKind, TcpTransportConfig};
 use std::{
     net::SocketAddr,
@@ -96,7 +96,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         EngramLayerWeights::load(&lib, &catalog, 0, 256 * 1024 * 1024, 16 * 1024 * 1024)?;
     let mut gate = EngramGate::new(&engram_weights, 80, 128 * 1024 * 1024)?;
     let mut upload = EngramDeviceRows::new(&lib, 80, EngramDeviceRows::device_bytes(80)?)?;
-    let tcp = V41Tp4Tcp::new(
+    let roce = V41Tp4Roce::new(
         peers,
         [1, 2, 3, 4],
         80,
@@ -105,7 +105,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             max_frame_bytes: 2 * 1024 * 1024,
         },
     )?;
-    let mut transport = NativeTp4Wave::new(&lib, tcp, NativeTp4Wave::device_bytes(80)?)?;
+    let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(80)?)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;

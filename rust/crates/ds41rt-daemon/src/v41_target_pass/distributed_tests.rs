@@ -13,7 +13,7 @@ use crate::v41_target_head::{TargetHeadWave, TargetHeadWeights};
 use crate::v41_tensors::{NativeRtxTensors, VocabularyHead};
 use anyhow::Context;
 use ds41rt_ffi::NativeLibrary;
-use ds41rt_transport::v41_expert::V41Tp4Tcp;
+use ds41rt_transport::v41_expert::V41Tp4Roce;
 use ds41rt_transport::{ExpertV2SourceKind, TcpTransportConfig};
 use std::{
     net::SocketAddr,
@@ -136,7 +136,7 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
         )?,
         Duration::from_secs(120),
     )?;
-    let tcp = V41Tp4Tcp::new(
+    let roce = V41Tp4Roce::new(
         peers,
         [1, 2, 3, 4],
         80,
@@ -145,7 +145,7 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             max_frame_bytes: 2 * 1024 * 1024,
         },
     )?;
-    let mut transport = NativeTp4Wave::new(&lib, tcp, NativeTp4Wave::device_bytes(80)?)?;
+    let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(80)?)?;
     let dspark_weights = if std::env::var_os("DS41RT_TARGET_PASS_DSPARK").is_some() {
         let start = Instant::now();
         let weights = crate::v41_experts::dspark::DsparkWeights::load(

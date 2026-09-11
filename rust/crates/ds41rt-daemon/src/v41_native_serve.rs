@@ -20,7 +20,7 @@ use anyhow::Context;
 use anyhow::{ensure, Result};
 use ds41rt_api::native_v41::{InferenceChunk, InferenceFinishReason, NativeRequest, PromptUsage};
 use ds41rt_ffi::NativeLibrary;
-use ds41rt_transport::v41_expert::V41Tp4Tcp;
+use ds41rt_transport::v41_expert::V41Tp4Roce;
 use ds41rt_transport::{ExpertV2SourceKind, TcpTransportConfig};
 use speculative::DraftRuntime;
 use std::time::{Duration, Instant};
@@ -171,7 +171,7 @@ fn worker(
         )?,
         Duration::from_secs(120),
     )?;
-    let tcp = V41Tp4Tcp::new(
+    let roce = V41Tp4Roce::new(
         args.peers
             .clone()
             .try_into()
@@ -183,7 +183,7 @@ fn worker(
             max_frame_bytes: 2 * 1024 * 1024,
         },
     )?;
-    let mut transport = NativeTp4Wave::new(&lib, tcp, NativeTp4Wave::device_bytes(80)?)?;
+    let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(80)?)?;
     let draft_weights = if args.dspark {
         Some(crate::v41_experts::dspark::DsparkWeights::load(
             &lib,
