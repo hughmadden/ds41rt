@@ -112,6 +112,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Chain all three dSpark transformer stages in one graph with validated cross-stage cache bindings and exact residual/pre-mix handoff.
 - [x] Initialize dSpark seed/noise embeddings from the shared coordinator table inside the three-stage graph; qualify changed-token replay on both RTX GPUs.
 - [x] Compose and qualify the complete three-stage dSpark attention/mHC/FFN proposal graph with embedding, Markov, confidence and terminal sampling on both RTX GPUs.
+- [x] Requalify the complete chain with real committed target context and the current FP8 windows/head on RTX. [Real draft runs](docs/ds41-real-draft-chain.md) cover one and sixteen requests, changed-position replay equality and greedy consistency; target verification and acceptance remain open.
 - [ ] Wire proposal verification, acceptance, RNG ownership, cancellation and rollback across all caches and engram histories.
 - [ ] Complete concurrency-16 admission, mixed prefill/decode/verification scheduling, graph capacity management and alternating-wave overlap.
 

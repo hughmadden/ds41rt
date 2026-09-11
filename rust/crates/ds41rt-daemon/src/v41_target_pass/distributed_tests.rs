@@ -183,6 +183,20 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
         })
         .transpose()?;
     let request_count = if case.is_some() { 1 } else { 16 };
+    let mut draft_chain = dspark_weights
+        .as_ref()
+        .map(|weights| {
+            weights.draft(
+                &table,
+                &vocabulary,
+                request_count as u32,
+                weights.draft_bytes(request_count as u32)?,
+            )
+        })
+        .transpose()?;
+    let mut draft_rngs = (0..request_count)
+        .map(|i| ds41rt_core::DsparkRng::new(1000 + i as u64))
+        .collect::<Vec<_>>();
     let mut tokens: Vec<u32> = match &case {
         Some(case) => serde_json::from_value(case["token_ids"].clone())?,
         None => (0..80u32).map(|i| (i * 7919 + 17) % 129280).collect(),
@@ -494,6 +508,93 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             )?;
         }
         committed += count as u64;
+        if let Some(chain) = &mut draft_chain {
+            let bindings = transaction_leases
+                .iter()
+                .map(|leases| {
+                    leases
+                        .iter()
+                        .map(|&lease| (lease, committed))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            let windows = [
+                &transaction_windows[0],
+                &transaction_windows[1],
+                &transaction_windows[2],
+            ];
+            let bindings = [&bindings[0][..], &bindings[1][..], &bindings[2][..]];
+            chain.set_tokens(&tokens.iter().map(|&t| t as i32).collect::<Vec<_>>())?;
+            chain.prepare_sampling(
+                &mut draft_rngs.iter_mut().collect::<Vec<_>>(),
+                &vec![0.0; request_count],
+            )?;
+            let start = Instant::now();
+            unsafe {
+                chain.execute(windows, bindings)?;
+            }
+            let read =
+                |chain: &crate::v41_experts::dspark::DsparkChain<'_, '_>| -> Result<Vec<Vec<u8>>> {
+                    chain
+                        .draft_output()?
+                        .iter()
+                        .map(|&buffer| {
+                            let mut bytes = vec![0; buffer.bytes];
+                            lib.copy_d2h(&mut bytes, buffer)?;
+                            Ok(bytes)
+                        })
+                        .collect()
+                };
+            let expected = read(chain)?;
+            let ids = expected[0]
+                .chunks_exact(4)
+                .map(|b| i32::from_ne_bytes(b.try_into().unwrap()))
+                .collect::<Vec<_>>();
+            assert_eq!(ids.len(), 6 * request_count);
+            assert!(ids.iter().all(|&id| (0..129280).contains(&id)));
+            assert!(ids[..request_count]
+                .iter()
+                .zip(&tokens)
+                .all(|(&a, &b)| a as u32 == b));
+            let logits = expected[1]
+                .chunks_exact(4)
+                .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
+                .collect::<Vec<_>>();
+            assert_eq!(logits.len(), 5 * request_count * 129280);
+            assert!(logits.iter().all(|v| v.is_finite()));
+            for (i, row) in logits.chunks_exact(129280).enumerate() {
+                assert_eq!(
+                    row[ids[request_count + i] as usize],
+                    row.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+                );
+            }
+            assert!(expected[2]
+                .chunks_exact(4)
+                .all(|b| f32::from_ne_bytes(b.try_into().unwrap()).is_finite()));
+            if cycle == 0 {
+                unsafe {
+                    chain.capture(windows, bindings)?;
+                }
+            }
+            unsafe {
+                chain.replay(windows, bindings)?;
+            }
+            assert_eq!(
+                expected,
+                read(chain)?,
+                "draft graph replay differs from eager execution"
+            );
+            if let Some(dir) = std::env::var_os("DS41RT_TARGET_PASS_OUTPUT") {
+                for (i, name) in ["tokens", "logits", "confidence"].iter().enumerate() {
+                    std::fs::write(
+                        std::path::PathBuf::from(&dir)
+                            .join(format!("cycle{cycle}-draft-{name}.bin")),
+                        &expected[i],
+                    )?;
+                }
+            }
+            eprintln!("PASS real dSpark draft cycle={cycle} requests={request_count} end={committed} finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds={:.3}", start.elapsed().as_secs_f64());
+        }
         assert!(pass.output(&batch).is_err());
         assert!(pass.taps(&batch).is_err());
         for &lease in &leases {

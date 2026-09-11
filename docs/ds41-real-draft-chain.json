@@ -1,0 +1,112 @@
+{
+  "scope": "Real target-context dSpark execution, finite outputs, greedy sampling consistency and eager/graph equality. No independent full-chain numerical reference or speculative acceptance/performance measurement.",
+  "checkpoint": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "device": "RTX PRO 6000 Blackwell GPU 1",
+  "temperature": 0,
+  "target_logits_byte_equal_previous": true,
+  "runs": [
+    {
+      "case": "sixteen_requests",
+      "log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.301s\nreal dSpark weights loaded in 0.590s resident_bytes=8148701064\nPASS dSpark accepted prefixes: all three FP8 rings exact; rejected tails untouched; zero/foreign/stale/duplicate-commit guards\nPASS real dSpark draft cycle=0 requests=16 end=5 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.456\nPASS full target cycle=0 requests=16 input_rows=80 finite_logits=true cache_and_engram_commit=true seconds=4.164\nPASS real dSpark draft cycle=1 requests=16 end=6 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.436\nPASS full target cycle=1 requests=16 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.530\nPASS real dSpark draft cycle=2 requests=16 end=7 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.436\nPASS full target cycle=2 requests=16 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.430\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 13.64s\n\n",
+      "outputs": [
+        {
+          "file": "cycle0-draft-confidence.bin",
+          "bytes": 320,
+          "sha256": "043fedcbd387e001df16be16deebf1431340e431872816ffb3b79b75e1df1d7f"
+        },
+        {
+          "file": "cycle0-draft-logits.bin",
+          "bytes": 41369600,
+          "sha256": "894b1e8ed67da1f5f2c127a8096e1fd2e84048fbcf2eac1fbfe4ec4d2eb826d6"
+        },
+        {
+          "file": "cycle0-draft-tokens.bin",
+          "bytes": 384,
+          "sha256": "bf5d1e0bdd7f6a20c0a094638ccf50b29d2965f95446a3e617b616a4334f98da"
+        },
+        {
+          "file": "cycle1-draft-confidence.bin",
+          "bytes": 320,
+          "sha256": "eeb49fbac46d39b2f3b52513ef55f2895cb4d9be7955865d9c33450fc129503c"
+        },
+        {
+          "file": "cycle1-draft-logits.bin",
+          "bytes": 41369600,
+          "sha256": "510a239e7672f2cb611b4d1078afe99df8de72dea81b5fd99813e642dd188702"
+        },
+        {
+          "file": "cycle1-draft-tokens.bin",
+          "bytes": 384,
+          "sha256": "1aa76fec3bf69a8e3a5ff64fc35f39a162c2dae126ccf1ec85c9e4ace7e447eb"
+        },
+        {
+          "file": "cycle2-draft-confidence.bin",
+          "bytes": 320,
+          "sha256": "a048b40765d0b57e19c80b0c46c2b90f6ac03fc68f2eda878cc5f565e34e6f25"
+        },
+        {
+          "file": "cycle2-draft-logits.bin",
+          "bytes": 41369600,
+          "sha256": "38c53c80faeaa8f6f5aa87e7e6039c23ae8f5df5e975866d8fb24fad09085869"
+        },
+        {
+          "file": "cycle2-draft-tokens.bin",
+          "bytes": 384,
+          "sha256": "b15087a159e60c62f53b828b4757a2cd9bc5b4b7caad22f7b391d20ef721db77"
+        }
+      ]
+    },
+    {
+      "case": "arithmetic_prompt",
+      "log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.227s\nreal dSpark weights loaded in 0.573s resident_bytes=8148701064\nPASS real dSpark draft cycle=0 requests=1 end=18 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.053\nPASS full target cycle=0 requests=1 input_rows=18 finite_logits=true cache_and_engram_commit=true seconds=1.026\nPASS real dSpark draft cycle=1 requests=1 end=19 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.044\nPASS full target cycle=1 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.208\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 7.73s\n\n",
+      "outputs": [
+        {
+          "file": "cycle0-draft-confidence.bin",
+          "bytes": 20,
+          "sha256": "88bb2b2b0a57d0fc100a57081f93a249e32e41e3784ec80039cbbd6ea005cb08"
+        },
+        {
+          "file": "cycle0-draft-logits.bin",
+          "bytes": 2585600,
+          "sha256": "67cddba8bf97ad5c363eeaa71d4c62a42155e4809508ad35e1d1a799c126bedf"
+        },
+        {
+          "file": "cycle0-draft-tokens.bin",
+          "bytes": 24,
+          "sha256": "4ef808f14d4ad54c15bcf1cfc13189d2457a4304f51084e60d0407d04838c0dd",
+          "token_ids": [
+            22,
+            1,
+            129276,
+            22663,
+            22,
+            1
+          ]
+        },
+        {
+          "file": "cycle1-draft-confidence.bin",
+          "bytes": 20,
+          "sha256": "2af47e4c6443308b918f8c708ad34c75816d0aa9a204b4633135189761837e0b"
+        },
+        {
+          "file": "cycle1-draft-logits.bin",
+          "bytes": 2585600,
+          "sha256": "94c91218e1539ae5615e592d874bd2fc7b75fa645bf7d75c71dd66fb7f53ad22"
+        },
+        {
+          "file": "cycle1-draft-tokens.bin",
+          "bytes": 24,
+          "sha256": "17d9745c33e02592269726f09f8241c7c1a2c0e9209d90e4f3adefa4853da4b8",
+          "token_ids": [
+            1,
+            129276,
+            22663,
+            22,
+            1,
+            129276
+          ]
+        }
+      ]
+    }
+  ]
+}
