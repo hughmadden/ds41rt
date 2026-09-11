@@ -1,0 +1,860 @@
+{
+  "scope": "Instrumented development workload. GPU event intervals separate expert execution and compaction; host upload/download exclude network transfer. Unique-expert packed bytes exclude repeated reads and are not measured DRAM traffic. Server callback includes staging and, for queued workers, queueing. Coordinator expert phase includes routing, shared FFN and response collection; shared FFN overlaps the dispatched remote request. Receive time includes waiting for remote compute and client handling. Dispatch measures enqueue, not NIC send completion. No interval isolates pure link latency. Component medians are not additive; nested coordinator stage groups must not be summed together.",
+  "groups": [
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/ostrich-worker.log",
+      "kind": "gpu_and_staging",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "active_experts": {
+          "mean": 6.0,
+          "median": 6.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "compact_us": {
+          "mean": 4.106993431946758,
+          "median": 4.0960001945495605,
+          "p95": 4.0960001945495605,
+          "max": 23.392000198364258
+        },
+        "download_us": {
+          "mean": 5.323033707865169,
+          "median": 5.0,
+          "p95": 6.0,
+          "max": 102.0
+        },
+        "execution_host_us": {
+          "mean": 166.551404494382,
+          "median": 166.0,
+          "p95": 171.0,
+          "max": 490.0
+        },
+        "kernel_us": {
+          "mean": 157.67493643314205,
+          "median": 156.6719970703125,
+          "p95": 161.82400512695312,
+          "max": 479.8399963378906
+        },
+        "max_expert_rows": {
+          "mean": 1.0,
+          "median": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        "output_bytes": {
+          "mean": 10240.0,
+          "median": 10240.0,
+          "p95": 10240.0,
+          "max": 10240.0
+        },
+        "total_us": {
+          "mean": 187.08483146067417,
+          "median": 186.0,
+          "p95": 191.0,
+          "max": 511.0
+        },
+        "unique_expert_weight_bytes": {
+          "mean": 31334400.0,
+          "median": 31334400.0,
+          "p95": 31334400.0,
+          "max": 31334400.0
+        },
+        "upload_us": {
+          "mean": 15.210393258426967,
+          "median": 15.0,
+          "p95": 16.0,
+          "max": 148.0
+        }
+      },
+      "expert_row_distribution": [
+        {
+          "expert_rows": 1,
+          "experts": 64080,
+          "routes": 64080,
+          "expert_fraction": 1.0,
+          "route_fraction": 1.0
+        },
+        {
+          "expert_rows": 2,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 3,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 4,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 5,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 6,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 7,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 8,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 9,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 10,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 11,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 12,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 13,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 14,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 15,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 16,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": "17+",
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        }
+      ],
+      "expert_row_distribution_samples": 10680
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/ostrich-worker.log",
+      "kind": "gpu_and_staging",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "active_experts": {
+          "mean": 21.746721311475408,
+          "median": 22.0,
+          "p95": 28.0,
+          "max": 36.0
+        },
+        "compact_us": {
+          "mean": 4.111147720501071,
+          "median": 4.0960001945495605,
+          "p95": 4.0960001945495605,
+          "max": 14.336000442504883
+        },
+        "download_us": {
+          "mean": 6.43360655737705,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 19.0
+        },
+        "execution_host_us": {
+          "mean": 502.7467213114754,
+          "median": 500.0,
+          "p95": 643.0,
+          "max": 848.0
+        },
+        "kernel_us": {
+          "mean": 493.97968557389055,
+          "median": 490.2239990234375,
+          "p95": 634.0159912109375,
+          "max": 839.3920288085938
+        },
+        "max_expert_rows": {
+          "mean": 4.515983606557377,
+          "median": 4.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "output_bytes": {
+          "mean": 61440.0,
+          "median": 61440.0,
+          "p95": 61440.0,
+          "max": 61440.0
+        },
+        "total_us": {
+          "mean": 526.4754098360655,
+          "median": 523.0,
+          "p95": 667.0,
+          "max": 871.0
+        },
+        "unique_expert_weight_bytes": {
+          "mean": 113570077.37704918,
+          "median": 114892800.0,
+          "p95": 146227200.0,
+          "max": 188006400.0
+        },
+        "upload_us": {
+          "mean": 17.295081967213115,
+          "median": 17.0,
+          "p95": 18.0,
+          "max": 170.0
+        }
+      },
+      "expert_row_distribution": [
+        {
+          "expert_rows": 1,
+          "experts": 32741,
+          "routes": 32741,
+          "expert_fraction": 0.6170329049036976,
+          "route_fraction": 0.37273451730418944
+        },
+        {
+          "expert_rows": 2,
+          "experts": 12280,
+          "routes": 24560,
+          "expert_fraction": 0.23142738683050018,
+          "route_fraction": 0.2795992714025501
+        },
+        {
+          "expert_rows": 3,
+          "experts": 4111,
+          "routes": 12333,
+          "expert_fraction": 0.07747540612867966,
+          "route_fraction": 0.14040300546448087
+        },
+        {
+          "expert_rows": 4,
+          "experts": 2188,
+          "routes": 8752,
+          "expert_fraction": 0.04123478195318684,
+          "route_fraction": 0.09963570127504554
+        },
+        {
+          "expert_rows": 5,
+          "experts": 998,
+          "routes": 4990,
+          "expert_fraction": 0.018808186649579738,
+          "route_fraction": 0.056807832422586524
+        },
+        {
+          "expert_rows": 6,
+          "experts": 744,
+          "routes": 4464,
+          "expert_fraction": 0.014021333534356036,
+          "route_fraction": 0.05081967213114754
+        },
+        {
+          "expert_rows": 7,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 8,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 9,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 10,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 11,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 12,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 13,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 14,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 15,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": 16,
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        },
+        {
+          "expert_rows": "17+",
+          "experts": 0,
+          "routes": 0,
+          "expert_fraction": 0.0,
+          "route_fraction": 0.0
+        }
+      ],
+      "expert_row_distribution_samples": 2440
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/ostrich-worker.log",
+      "kind": "roce_server_boundary",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "copy_header_ms": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "copy_request_ms": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "encode_ms": {
+          "mean": 1.8726591760299626e-07,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.002
+        },
+        "execute_ms": {
+          "mean": 0.1923994382022472,
+          "median": 0.191,
+          "p95": 0.197,
+          "max": 0.516
+        },
+        "parse_ms": {
+          "mean": 1.8726591760299626e-07,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.001
+        },
+        "poll_recv_ms": {
+          "mean": 4.9625468164794e-06,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.002
+        },
+        "poll_send_ms": {
+          "mean": 0.001002808988764045,
+          "median": 0.001,
+          "p95": 0.001,
+          "max": 0.007
+        },
+        "post_recv_ms": {
+          "mean": 3.7453183520599253e-07,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.002
+        },
+        "request_wire_bytes": {
+          "mean": 5488.0,
+          "median": 5488.0,
+          "p95": 5488.0,
+          "max": 5488.0
+        },
+        "resize_ms": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "response_wire_bytes": {
+          "mean": 10340.0,
+          "median": 10340.0,
+          "p95": 10340.0,
+          "max": 10340.0
+        },
+        "send_ms": {
+          "mean": 0.001001123595505618,
+          "median": 0.001,
+          "p95": 0.001,
+          "max": 0.003
+        },
+        "total_ms": {
+          "mean": 0.20292294007490638,
+          "median": 0.202,
+          "p95": 0.208,
+          "max": 0.527
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/ostrich-worker.log",
+      "kind": "roce_server_boundary",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "copy_header_ms": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "copy_request_ms": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "encode_ms": {
+          "mean": 8.19672131147541e-07,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.002
+        },
+        "execute_ms": {
+          "mean": 0.5343577868852459,
+          "median": 0.53,
+          "p95": 0.675,
+          "max": 0.88
+        },
+        "parse_ms": {
+          "mean": 7.3770491803278695e-06,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.002
+        },
+        "poll_recv_ms": {
+          "mean": 1.3934426229508198e-05,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.012
+        },
+        "poll_send_ms": {
+          "mean": 0.001019672131147541,
+          "median": 0.001,
+          "p95": 0.001,
+          "max": 0.017
+        },
+        "post_recv_ms": {
+          "mean": 1.2295081967213116e-06,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.001
+        },
+        "request_wire_bytes": {
+          "mean": 32448.0,
+          "median": 32448.0,
+          "p95": 32448.0,
+          "max": 32448.0
+        },
+        "resize_ms": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "response_wire_bytes": {
+          "mean": 61560.0,
+          "median": 61560.0,
+          "p95": 61560.0,
+          "max": 61560.0
+        },
+        "send_ms": {
+          "mean": 0.0030200819672131147,
+          "median": 0.003,
+          "p95": 0.003,
+          "max": 0.01
+        },
+        "total_ms": {
+          "mean": 0.5454155737704919,
+          "median": 0.541,
+          "p95": 0.686,
+          "max": 0.891
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/spec-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 97.52090163934426,
+          "median": 96.0,
+          "p95": 105.0,
+          "max": 146.0
+        },
+        "projection_us": {
+          "mean": 107.49508196721311,
+          "median": 92.0,
+          "p95": 167.0,
+          "max": 279.0
+        },
+        "sparse_us": {
+          "mean": 205.1245901639344,
+          "median": 180.0,
+          "p95": 294.0,
+          "max": 1558.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/spec-api.log",
+      "kind": "coordinator_collection",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "receive_us": {
+          "mean": 535.4774590163935,
+          "median": 511.0,
+          "p95": 666.0,
+          "max": 15115.0
+        },
+        "reduce_us": {
+          "mean": 6.7639344262295085,
+          "median": 7.0,
+          "p95": 8.0,
+          "max": 24.0
+        },
+        "shared_copy_us": {
+          "mean": 5.695081967213115,
+          "median": 6.0,
+          "p95": 6.0,
+          "max": 67.0
+        },
+        "upload_us": {
+          "mean": 32.552868852459014,
+          "median": 32.0,
+          "p95": 37.0,
+          "max": 78.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/spec-api.log",
+      "kind": "coordinator_experts",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "collect_us": {
+          "mean": 583.5303278688525,
+          "median": 559.0,
+          "p95": 712.0,
+          "max": 15166.0
+        },
+        "dispatch_us": {
+          "mean": 6.354098360655738,
+          "median": 6.0,
+          "p95": 10.0,
+          "max": 749.0
+        },
+        "routed_us": {
+          "mean": 69.56926229508197,
+          "median": 60.0,
+          "p95": 104.0,
+          "max": 296.0
+        },
+        "shared_us": {
+          "mean": 69.81024590163935,
+          "median": 55.0,
+          "p95": 129.0,
+          "max": 170.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/spec-api.log",
+      "kind": "coordinator_layer",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "attention_us": {
+          "mean": 412.91434426229506,
+          "median": 384.0,
+          "p95": 509.0,
+          "max": 1838.0
+        },
+        "experts_us": {
+          "mean": 731.3102459016393,
+          "median": 706.0,
+          "p95": 862.0,
+          "max": 15287.0
+        },
+        "finish_us": {
+          "mean": 12.788934426229508,
+          "median": 13.0,
+          "p95": 14.0,
+          "max": 26.0
+        },
+        "index_us": {
+          "mean": 30.994672131147542,
+          "median": 1.0,
+          "p95": 178.0,
+          "max": 324.0
+        },
+        "produced_us": {
+          "mean": 50.59590163934426,
+          "median": 33.0,
+          "p95": 89.0,
+          "max": 1092.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/target-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 95.20505617977528,
+          "median": 95.0,
+          "p95": 98.0,
+          "max": 131.0
+        },
+        "projection_us": {
+          "mean": 95.34213483146067,
+          "median": 91.0,
+          "p95": 162.0,
+          "max": 440.0
+        },
+        "sparse_us": {
+          "mean": 195.36067415730338,
+          "median": 180.0,
+          "p95": 292.0,
+          "max": 1726.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/target-api.log",
+      "kind": "coordinator_collection",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "receive_us": {
+          "mean": 196.78211610486892,
+          "median": 183.0,
+          "p95": 199.0,
+          "max": 23998.0
+        },
+        "reduce_us": {
+          "mean": 6.596722846441947,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 37.0
+        },
+        "shared_copy_us": {
+          "mean": 5.469756554307116,
+          "median": 5.0,
+          "p95": 6.0,
+          "max": 61.0
+        },
+        "upload_us": {
+          "mean": 21.72799625468165,
+          "median": 21.0,
+          "p95": 24.0,
+          "max": 75.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/target-api.log",
+      "kind": "coordinator_experts",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "collect_us": {
+          "mean": 233.2070224719101,
+          "median": 219.0,
+          "p95": 237.0,
+          "max": 24035.0
+        },
+        "dispatch_us": {
+          "mean": 4.362640449438202,
+          "median": 4.0,
+          "p95": 8.0,
+          "max": 221.0
+        },
+        "routed_us": {
+          "mean": 52.1376404494382,
+          "median": 50.0,
+          "p95": 80.0,
+          "max": 185.0
+        },
+        "shared_us": {
+          "mean": 56.38267790262172,
+          "median": 53.0,
+          "p95": 112.0,
+          "max": 180.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/target-api.log",
+      "kind": "coordinator_layer",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "attention_us": {
+          "mean": 388.51320224719103,
+          "median": 372.0,
+          "p95": 483.0,
+          "max": 2055.0
+        },
+        "experts_us": {
+          "mean": 348.1061797752809,
+          "median": 328.0,
+          "p95": 370.0,
+          "max": 24142.0
+        },
+        "finish_us": {
+          "mean": 12.58932584269663,
+          "median": 12.0,
+          "p95": 14.0,
+          "max": 65.0
+        },
+        "index_us": {
+          "mean": 24.239794007490637,
+          "median": 1.0,
+          "p95": 117.0,
+          "max": 628.0
+        },
+        "produced_us": {
+          "mean": 39.697565543071164,
+          "median": 33.0,
+          "p95": 78.0,
+          "max": 837.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-hc-chain-rollout/target-api.log",
+      "kind": "coordinator_step",
+      "rows": 1,
+      "samples": 266,
+      "metrics": {
+        "commit_us": {
+          "mean": 436.6954887218045,
+          "median": 428.0,
+          "p95": 489.0,
+          "max": 566.0
+        },
+        "execute_us": {
+          "mean": 41206.93984962406,
+          "median": 39265.5,
+          "p95": 56537.0,
+          "max": 110563.0
+        },
+        "prepared_us": {
+          "mean": 8.225563909774436,
+          "median": 8.0,
+          "p95": 15.0,
+          "max": 20.0
+        },
+        "sample_us": {
+          "mean": 117.42105263157895,
+          "median": 117.0,
+          "p95": 132.0,
+          "max": 192.0
+        },
+        "total_us": {
+          "mean": 41769.31203007519,
+          "median": 39814.0,
+          "p95": 57115.0,
+          "max": 111162.0
+        }
+      }
+    }
+  ],
+  "row_filter": [
+    1,
+    6
+  ],
+  "source_sha256": {
+    "/tmp/ds41-hc-chain-rollout/spec-api.log": "7761a8c33232fd21c2bf451b4b49a237afff44acbbe646b6291b88e2354ab001",
+    "/tmp/ds41-hc-chain-rollout/target-api.log": "9571cd43e74db563b5ec8d2fdee948a0e4c2ac34de04ba33d9c41dff8e846a17",
+    "/tmp/ds41-hc-chain-rollout/ostrich-worker.log": "d04bfe13c95451d4c20a96021cb8ba3b1cfdcbaddda5766a36a00109166de953"
+  }
+}

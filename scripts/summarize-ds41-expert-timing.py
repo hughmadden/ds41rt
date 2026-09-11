@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize opt-in Spark GPU/staging and ProtocolV2 transport timings."""
+"""Summarize Spark GPU/staging, RoCE boundaries and coordinator stage timings."""
 import argparse
 import json
 import math
@@ -15,10 +15,15 @@ def summarize(paths):
             line = re.sub(r"\x1b\[[0-9;]*m", "", line)
             if "native expert execution" in line:
                 kind = "gpu_and_staging"
+            elif "protocol_v2_verbs_persistent_server_roundtrip_timing " in line:
+                kind = "roce_server_boundary"
             elif "protocol_v2_expert_server_roundtrip_timing request_id=" in line:
                 kind = "server_boundary"
             else:
-                continue
+                stage = re.search(r"\btarget (attention stages|collection|experts|layer|step) ", line)
+                if not stage:
+                    continue
+                kind = "coordinator_" + stage[1].replace(" ", "_")
             fields = {k: float(v) for k, v in re.findall(
                 r"\b(\w+)=([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)", line)}
             histogram = re.search(r"expert_rows_histogram=\[([0-9, ]+)\]", line)
@@ -46,7 +51,8 @@ def summarize(paths):
             values = sorted(r[name] for r in records)
             if not all(math.isfinite(v) and v >= 0 for v in values):
                 raise ValueError(f"invalid metric {name} in {source}")
-            metrics[name] = {"median": statistics.median(values),
+            metrics[name] = {"mean": statistics.fmean(values),
+                             "median": statistics.median(values),
                              "p95": values[math.ceil(len(values) * 0.95) - 1],
                              "max": values[-1]}
         group = {"source": source, "kind": kind, "rows": rows,
@@ -67,7 +73,7 @@ def summarize(paths):
             group["expert_row_distribution"] = distribution
             group["expert_row_distribution_samples"] = len(histograms)
         output.append(group)
-    return {"scope": "Instrumented development workload. GPU event intervals separate expert execution and compaction; host upload/download exclude socket transfer. Unique-expert packed bytes exclude repeated reads and are not measured DRAM traffic. Server execute time also includes queueing/staging; write time is host socket handling, not pure link time.",
+    return {"scope": "Instrumented development workload. GPU event intervals separate expert execution and compaction; host upload/download exclude network transfer. Unique-expert packed bytes exclude repeated reads and are not measured DRAM traffic. Server callback includes staging and, for queued workers, queueing. Coordinator expert phase includes routing, shared FFN and response collection; shared FFN overlaps the dispatched remote request. Receive time includes waiting for remote compute and client handling. Dispatch measures enqueue, not NIC send completion. No interval isolates pure link latency. Component medians are not additive; nested coordinator stage groups must not be summed together.",
             "groups": output}
 
 
