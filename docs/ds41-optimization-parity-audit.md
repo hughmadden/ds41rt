@@ -1,8 +1,12 @@
 # Optimization parity audit: native V4.1 versus GLMRT and DS4RT
 
-The native V4.1 path retained the TP4 model split, packed resident weights and several component graphs, but bypassed substantial serving optimizations already present in the older engines. The largest concrete regression is returning six FP32 route vectors from every Spark instead of reducing to hidden width before transport. Changing TCP to verbs alone cannot fix that payload problem.
+The native V4.1 path retained the TP4 model split, packed resident weights and several component graphs, but bypassed substantial serving optimizations already present in the older engines. At the audited baseline, the largest concrete regression was returning six FP32 route vectors from every Spark instead of reducing to hidden width before transport. Changing TCP to verbs alone cannot fix that payload problem.
 
 This is a source audit of the serving-critical paths, plus a bounded arithmetic experiment. It is not a claim that every old kernel has been benchmarked or that the missing features below have been restored. Inherited implementations elsewhere in this repository do not count as integrated unless `serve-native` actually reaches them.
+
+## Updates since the audited baseline
+
+Compact BF16 rank returns, prewarmed one-row dispatch and [FP8 input transport](ds41-fp8-transport-rollout.md) are now live. The source matrix and wire comparison below describe the pinned initial audit; their original “current” and “missing” labels are not fresh deployment claims. Return-order numerical qualification, wider scheduling/transport and large-prefill performance remain open. The latest rollout records actual expert-local M distributions for decode-weighted tiling.
 
 ## Source baseline
 
