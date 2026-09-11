@@ -6,7 +6,8 @@ use crate::v41_engram::layer::EngramGate;
 use crate::v41_engram::{EngramDeviceRows, EngramUploadPoll};
 use crate::v41_target_embedding::TargetEmbeddingWave;
 use anyhow::{ensure, Context, Result};
-use ds41rt_core::EngramHistory;
+use ds41rt_core::{EngramHistory, EngramPrefillCursor};
+mod reservation;
 use ds41rt_ffi::NativeLibrary;
 use ds41rt_loader::{EngramPipeline, EngramRequestTokens, EngramWave};
 use ds41rt_transport::ExpertV2SourceKind;
@@ -14,6 +15,7 @@ use ds41rt_transport::ExpertV2SourceKind;
 struct Request {
     lease: CacheLease,
     history: EngramHistory,
+    prefill: Option<EngramPrefillCursor>,
 }
 pub(crate) struct RequestTokens<'a> {
     pub lease: CacheLease,
@@ -23,6 +25,7 @@ pub(crate) struct RequestTokens<'a> {
 }
 pub(crate) struct RequestBatch {
     cache: CacheBatch,
+    prepared: Vec<EngramPrefillCursor>,
     engram: Option<EngramWave>,
     leases: Vec<CacheLease>,
     tokens: Vec<u32>,
@@ -84,7 +87,7 @@ impl<'a> Requests<'a> {
         );
         let history = self.pipeline.new_history()?;
         let lease = self.cache.begin_request(slot, id)?;
-        self.slots[slot] = Some(Request { lease, history });
+        self.slots[slot] = Some(Request { lease, history, prefill: None });
         Ok(lease)
     }
     pub fn release(&mut self, lease: CacheLease) -> Result<()> {
@@ -119,12 +122,15 @@ impl<'a> Requests<'a> {
     pub fn begin_decoder_replay(&mut self, lease: CacheLease) -> Result<u64> {
         ensure!(self.request(lease)?.history.position() == self.cache.committed_end(lease)?,
             "encoder history differs before replay");
-        self.cache.begin_decoder_replay(lease)
+        let start = self.cache.begin_decoder_replay(lease)?;
+        self.slots.iter_mut().flatten().find(|r| r.lease == lease)
+            .expect("validated request").prefill = None;
+        Ok(start)
     }
     pub fn prepare_replay(&self, work: &[CacheWork]) -> Result<RequestBatch> {
         let cache = self.cache.plan_replay(work)?;
         let rows = cache.positions().len();
-        let batch = RequestBatch { cache, engram: None, leases: work.iter().map(|w| w.lease).collect(),
+        let batch = RequestBatch { cache, prepared: Vec::new(), engram: None, leases: work.iter().map(|w| w.lease).collect(),
             tokens: Vec::new(), image_mask: vec![0; rows], finished: false };
         self.validate(&batch)?;
         Ok(batch)
@@ -146,7 +152,9 @@ impl<'a> Requests<'a> {
         let mut tokens = Vec::new();
         let mut mask = Vec::new();
         for r in requests {
-            let history = &self.request(r.lease)?.history;
+            let request = self.request(r.lease)?;
+            ensure!(request.prefill.is_none(), "reserved encoder requires reservation preparation");
+            let history = &request.history;
             ensure!(
                 history.position() == self.cache.committed_end(r.lease)?,
                 "request histories differ"
@@ -166,6 +174,7 @@ impl<'a> Requests<'a> {
         let engram = self.pipeline.prepare(&inputs)?;
         Ok(RequestBatch {
             cache,
+            prepared: Vec::new(),
             engram: Some(engram),
             leases: requests.iter().map(|r| r.lease).collect(),
             tokens,
@@ -214,11 +223,11 @@ impl<'a> Requests<'a> {
             positions == batch.cache.positions(),
             "engram lane positions differ"
         );
-        let histories = batch
-            .leases
-            .iter()
-            .map(|&l| Ok(&self.request(l)?.history))
-            .collect::<Result<Vec<_>>>()?;
+        let histories = if batch.prepared.is_empty() {
+            batch.leases.iter().map(|&l| Ok(&self.request(l)?.history)).collect::<Result<Vec<_>>>()?
+        } else {
+            batch.prepared.iter().map(|cursor| cursor.history()).collect()
+        };
         match upload.poll_wave(&self.pipeline, batch.engram.as_mut().context("decoder replay has no engram work")?, &histories, layer)? {
             EngramUploadPoll::Pending => Ok(false),
             EngramUploadPoll::Cancelled => anyhow::bail!("engram gather cancelled"),
@@ -414,6 +423,50 @@ mod tests {
             assert_eq!(requests.cache.committed_end(lease)?, 0);
             requests.release(lease)?;
         }
+        let queued = (0..16).map(|slot| requests.admit(slot, 1700 + slot as u64))
+            .collect::<Result<Vec<_>>>()?;
+        for &lease in &queued { requests.begin_encoder(lease, 10)?; }
+        let input = queued.iter().map(|&lease| RequestTokens { lease, tokens: &tokens,
+            image_mask: Some(&mask), kind: ExpertV2SourceKind::Prefill }).collect::<Vec<_>>();
+        let mut first = requests.reserve_encoder(&input)?;
+        let mut second = requests.reserve_encoder(&input)?;
+        assert!(requests.reserve_encoder(&input).is_err());
+        assert!(requests.prepare(&input).is_err());
+        let map = ds41rt_loader::EngramTokenMap::from_file(&model.join("tokenizer.json"))?;
+        let all_tokens = tokens.repeat(2);
+        let all_mask = mask.repeat(2);
+        for (i, &lease) in queued.iter().enumerate() {
+            let live = requests.request(lease)?;
+            assert_eq!(live.history.position(), 0);
+            assert_eq!(live.prefill.as_ref().unwrap().history().position(), 10);
+            assert_eq!(requests.cache.encoder_prepared_end(lease)?, 10);
+            let full = map.prepare_batch(&live.history, 0, &all_tokens, Some(&all_mask), 10)?;
+            assert_eq!(first.engram.as_ref().unwrap().batches()[i].hashes(), &full.hashes()[..5]);
+            assert_eq!(second.engram.as_ref().unwrap().batches()[i].hashes(), &full.hashes()[5..]);
+        }
+        for batch in [&mut first, &mut second] {
+            requests.validate(batch)?;
+            for layer in 0..2 {
+                let histories = batch.prepared.iter().map(|p| p.history()).collect::<Vec<_>>();
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+                loop {
+                    match upload.poll_wave(&requests.pipeline, batch.engram.as_mut().unwrap(), &histories, layer)? {
+                        EngramUploadPoll::Ready(view) => { assert_eq!(view.rows, 80); break; }
+                        EngramUploadPoll::Cancelled => anyhow::bail!("reserved gather cancelled"),
+                        EngramUploadPoll::Pending => {
+                            ensure!(std::time::Instant::now() < deadline, "reserved gather timed out");
+                            std::thread::sleep(std::time::Duration::from_millis(1));
+                        }
+                    }
+                }
+            }
+        }
+        assert!(requests.validate_acceptance(&second, &[5; 16]).is_err());
+        for &lease in &queued { requests.release(lease)?; }
+        assert!(requests.validate(&first).is_err());
+        assert!(requests.validate(&second).is_err());
+        first.cancel(); second.cancel();
+        eprintln!("PASS reserved Engram requests: 16 admissions, two chunks, exact hashes/image barriers, mapped I/O, extent rejection and release");
         eprintln!("PASS 16 request owners: cancelled batch rejected; incomplete commit revoked cache/engram admission; fresh generations recovered");
         Ok(())
     }

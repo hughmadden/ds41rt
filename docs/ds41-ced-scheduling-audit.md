@@ -207,3 +207,31 @@ This supersedes the single-pending-chunk restriction described in the earlier
 publication section. Integration with request-owned Engram cursors, retained
 chunk execution state, task scheduling and the API remains unfinished. The
 running CED artifacts and measured throughput are unchanged.
+
+## Implemented integration: request reservations and mapped Engram I/O
+
+`Requests::reserve_encoder` now combines cache reservations with the private
+Engram preparation frontier. It verifies the cache and Engram preparation
+positions, prepares hashes/prefetch/gather, and advances the live preparation
+cursor only after all cache reservations succeed. Capacity/extent rejection
+cancels the newly prepared I/O and leaves both frontiers unchanged. Ordinary
+preparation cannot be mixed into this reserved encoder sequence.
+
+Each reserved `RequestBatch` retains its starting cursor. Engram upload polling
+uses these retained histories rather than the still-unadvanced accepted request
+history. Acceptance validation and commit continue using the actual request
+history, so later chunks cannot commit early. Decoder replay clears the encoder
+preparation cursor after the phase transition succeeds; release discards it with
+the admission.
+
+The real request integration GPU test passes in 5.82 s: sixteen admissions with
+two queued five-token chunks each, exact hash comparison against a continuous
+prompt including image barriers, mapped gather/upload for both Engram layers,
+rejected over-extent preparation without frontier movement, out-of-order
+acceptance rejection, and release invalidation of both queued batches. Existing
+ordinary cancellation, incomplete-pass failure and admission recovery also pass.
+Raw logs: `/tmp/ds41-ced-bounds/request-reservation-{build,gpu}.log`.
+
+Cache and mapped-I/O preparation are now connected at the request layer. Retained
+execution lanes/index state and scheduling these batches through the backbone
+remain outstanding; neither API has been switched to this path yet.

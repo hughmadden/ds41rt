@@ -10,6 +10,11 @@ pub(super) struct EncoderPublication {
     pub sources: u8,
 }
 impl BackboneCache<'_> {
+    pub fn encoder_prepared_end(&self, lease: CacheLease) -> Result<u64> {
+        let live = self.request(lease)?;
+        ensure!(live.phase.stage() == CacheStage::Encoder, "encoder preparation requires encoder phase");
+        Ok(live.publication.back().map_or(live.end, |p| p.end))
+    }
     /// Reserve contiguous known prompt rows, with at most sixteen outstanding
     /// chunks per request. Failed planning changes no participant. Releasing a
     /// request cancels every reservation; completion must follow reservation order.
