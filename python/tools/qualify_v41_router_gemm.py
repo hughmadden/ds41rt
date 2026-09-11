@@ -19,6 +19,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--snapshot', type=Path, required=True)
     p.add_argument('--native-lib', type=Path, required=True)
+    p.add_argument('--serving-lib', type=Path, help='Qualify the native serving dispatch instead of the Python launch')
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--device', type=int, default=0)
     p.add_argument('--prefixes', nargs='+')
@@ -32,6 +33,15 @@ def main():
     old.argtypes = [C.c_void_p]*8 + [C.c_int32, C.c_int32, C.c_void_p]
     select = lib.ds41rt_v41_router_select_logits
     select.argtypes = [C.c_void_p]*6 + [C.c_int32, C.c_int32, C.c_void_p]
+    serving = None
+    if a.serving_lib:
+        serving_lib = C.CDLL(str(a.serving_lib.resolve()))
+        initialize = serving_lib.ds41rt_v41_router_initialize
+        initialize.restype = C.c_int32
+        assert initialize() == 0
+        assert initialize() == 0
+        serving = serving_lib.ds41rt_v41_router
+        serving.argtypes = old.argtypes
     compiled = {n: compile_v41_router_scores_aot(experts=n) for n in (128, 384)}
     # Compile both model geometries once. Subsequent live rows only change launch args.
     freeze_kernel_resolution('V4.1 router qualification')
@@ -47,6 +57,7 @@ def main():
     result = dict(scope='Component qualification; random BF16 activations, official gate weights; excludes full-model quality and API performance',
                   device=torch.cuda.get_device_name(), device_properties=str(torch.cuda.get_device_properties(a.device)),
                   native_sha256=hashlib.sha256(a.native_lib.read_bytes()).hexdigest(),
+                  serving_sha256=hashlib.sha256(a.serving_lib.read_bytes()).hexdigest() if a.serving_lib else None,
                   source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                   weight_sha256=hashes, cases=records)
     def save():
@@ -71,6 +82,9 @@ def main():
             def baseline():
                 assert old(*[t.data_ptr() for t in (x,w,b,bv,mask,scores,ids,routing)],rows,n,torch.cuda.current_stream().cuda_stream)==0
             def candidate():
+                if serving is not None:
+                    assert serving(*[t.data_ptr() for t in (x,w,b,bv,mask,candidate_scores,candidate_ids,candidate_routing)],rows,n,torch.cuda.current_stream().cuda_stream)==0
+                    return
                 compiled[n](xp,wp,zp,cutlass.Int32(rows),current_cuda_stream())
                 assert select(*[t.data_ptr() for t in (candidate_scores,b,bv,mask,candidate_ids,candidate_routing)],rows,n,torch.cuda.current_stream().cuda_stream)==0
             baseline(); candidate(); torch.cuda.synchronize()
@@ -112,6 +126,22 @@ def main():
                     max_abs_score=(candidate_scores-ref).abs().max().item(),
                     oracle_id_differences=int((candidate_ids!=ref_ids).sum()),
                     baseline_id_differences=int((candidate_ids!=ids).sum())))
+                if serving is not None:
+                    from b12x.moe._shared.v41_router import v41_router_gemm_min_rows
+                    if rows >= v41_router_gemm_min_rows(experts=n):
+                        py_scores=torch.empty_like(candidate_scores)
+                        py_ids=torch.empty_like(candidate_ids)
+                        py_routing=torch.empty_like(candidate_routing)
+                        compiled[n](xp,wp,ptr(py_scores,cutlass.Float32),cutlass.Int32(rows),current_cuda_stream())
+                        assert select(*[t.data_ptr() for t in (py_scores,b,bv,mask,py_ids,py_routing)],rows,n,torch.cuda.current_stream().cuda_stream)==0
+                        assert torch.equal(candidate_scores,py_scores)
+                        assert torch.equal(candidate_ids,py_ids)
+                        assert torch.equal(candidate_routing,py_routing)
+                    else:
+                        assert torch.equal(candidate_scores,scores)
+                        assert torch.equal(candidate_ids,ids)
+                        assert torch.equal(candidate_routing,routing)
+                    record['mutations'][-1]['native_dispatch_exact']=True
                 if not ids_exact:
                     changed=(candidate_ids!=ref_ids).any(dim=1).nonzero().flatten()
                     precise=torch.nn.functional.softplus(x[changed].double()@w.double().T).sqrt()

@@ -1,0 +1,375 @@
+{
+  "b12x": {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+    "revision": "e53fd5a1f4a8380377fef91a5b3e69414f192223",
+    "source_tree_sha256": "31bf77511027625efdaf939e280b36333219c5939a387a1cb32031a34b61aaa7"
+  },
+  "containers": [
+    "ds41-router2048-target-api-dev",
+    "ds41-router2048-spec-api-dev"
+  ],
+  "native_sha256": "fba058a7bdd5cd82ede63558e821acdc05237348c124173740fb8d41807c240a",
+  "daemon_sha256": "1882a7507d74681caa4db58ca0c7fff10b06ffb6c1a0350290a62b803a346c42",
+  "prefill": [
+    {
+      "kind": "code",
+      "mode": "target",
+      "prompt_tokens": 16410,
+      "prefill_tps": 1406.318451280912,
+      "ttft_seconds": 11.668765339069068,
+      "decode_tps": 38.31457581749931,
+      "baseline_prefill_tps": 1294.24994686727,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    },
+    {
+      "kind": "code",
+      "mode": "speculative",
+      "prompt_tokens": 16410,
+      "prefill_tps": 1426.1288674786415,
+      "ttft_seconds": 11.506674028001726,
+      "decode_tps": 114.4298663810154,
+      "baseline_prefill_tps": 1340.57693743321,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    },
+    {
+      "kind": "code",
+      "mode": "target",
+      "prompt_tokens": 16410,
+      "prefill_tps": 1554.3414372532,
+      "ttft_seconds": 10.557525912066922,
+      "decode_tps": 39.0995903899347,
+      "baseline_prefill_tps": 1430.0110152021082,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    },
+    {
+      "kind": "code",
+      "mode": "speculative",
+      "prompt_tokens": 16410,
+      "prefill_tps": 1558.736730081395,
+      "ttft_seconds": 10.527756024035625,
+      "decode_tps": 113.58109946214356,
+      "baseline_prefill_tps": 1446.693303342226,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    },
+    {
+      "kind": "repeated",
+      "mode": "target",
+      "prompt_tokens": 16411,
+      "prefill_tps": 1776.2101466583663,
+      "ttft_seconds": 9.239334676065482,
+      "decode_tps": 39.14012513972609,
+      "baseline_prefill_tps": 1623.280233942474,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    },
+    {
+      "kind": "repeated",
+      "mode": "speculative",
+      "prompt_tokens": 16411,
+      "prefill_tps": 1790.104820198465,
+      "ttft_seconds": 9.167619580053724,
+      "decode_tps": 116.03375027395488,
+      "baseline_prefill_tps": 1623.5676210763997,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    },
+    {
+      "kind": "repeated",
+      "mode": "target",
+      "prompt_tokens": 16411,
+      "prefill_tps": 1775.590483632052,
+      "ttft_seconds": 9.24255910993088,
+      "decode_tps": 39.14796413450036,
+      "baseline_prefill_tps": 1625.3644316590396,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    },
+    {
+      "kind": "repeated",
+      "mode": "speculative",
+      "prompt_tokens": 16411,
+      "prefill_tps": 1786.7171747775253,
+      "ttft_seconds": 9.185001538950019,
+      "decode_tps": 116.63147078162346,
+      "baseline_prefill_tps": 1638.0806729869862,
+      "text_unchanged": true,
+      "usage_unchanged": true,
+      "prompt_hash_unchanged": true
+    }
+  ],
+  "quality": [
+    {
+      "name": "arithmetic",
+      "pair_text_equal": true,
+      "pair_usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "575",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "575",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        }
+      }
+    },
+    {
+      "name": "signed_sort",
+      "pair_text_equal": true,
+      "pair_usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        }
+      }
+    },
+    {
+      "name": "extraction",
+      "pair_text_equal": true,
+      "pair_usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        }
+      }
+    },
+    {
+      "name": "logic",
+      "pair_text_equal": true,
+      "pair_usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        }
+      }
+    },
+    {
+      "name": "unicode",
+      "pair_text_equal": true,
+      "pair_usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n\n36",
+          "objective_pass": false,
+          "baseline_text_unchanged": false,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n\n36",
+          "objective_pass": false,
+          "baseline_text_unchanged": false,
+          "baseline_usage_unchanged": true
+        }
+      }
+    },
+    {
+      "name": "translation",
+      "pair_text_equal": true,
+      "pair_usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "紅色的門是開著的。",
+          "objective_pass": null,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "紅色的門是開著的。",
+          "objective_pass": null,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        }
+      }
+    },
+    {
+      "name": "explanation",
+      "pair_text_equal": false,
+      "pair_usage_equal": false,
+      "runs": {
+        "target": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+          "objective_pass": null,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+          "objective_pass": null,
+          "baseline_text_unchanged": false,
+          "baseline_usage_unchanged": false
+        }
+      }
+    },
+    {
+      "name": "long_retrieval",
+      "pair_text_equal": true,
+      "pair_usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "quartz-731",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        },
+        "speculative": {
+          "text": "quartz-731",
+          "objective_pass": true,
+          "baseline_text_unchanged": true,
+          "baseline_usage_unchanged": true
+        }
+      }
+    }
+  ],
+  "native_graph_comparisons": 144,
+  "native_abi": {
+    "passed": true,
+    "initialize_required": true,
+    "repeat_initialize": true,
+    "alignment_fallback_exact": true,
+    "rejected": [
+      {
+        "argument": 8,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 8,
+        "value": -1,
+        "status": 1
+      },
+      {
+        "argument": 8,
+        "value": 4097,
+        "status": 1
+      },
+      {
+        "argument": 9,
+        "value": 127,
+        "status": 1
+      },
+      {
+        "argument": 0,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 1,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 2,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 3,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 5,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 6,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 7,
+        "value": 0,
+        "status": 1
+      },
+      {
+        "argument": 5,
+        "value": 135873632927744,
+        "status": 1
+      },
+      {
+        "argument": 5,
+        "value": 18446744073709551600,
+        "status": 1
+      }
+    ],
+    "native_sha256": "fba058a7bdd5cd82ede63558e821acdc05237348c124173740fb8d41807c240a"
+  },
+  "upstream_gpu_tests": {
+    "passed": 21,
+    "deselected": 31
+  },
+  "native_ctest_passed": 2,
+  "raw_directory": "/tmp/ds41-router-serving",
+  "short_decode": {
+    "target": [
+      39.178306565749054,
+      40.31863015296328,
+      40.390204529394325
+    ],
+    "spec": [
+      118.89773737128645,
+      121.44892555107647,
+      120.5808412984856
+    ]
+  },
+  "raw_sha256": {
+    "native-qualification.json": "5f084f45c8d0ba262f137d1a98ac1df1419b14328d76a1df175c0881b449493d",
+    "native-abi.json": "78d6e8c89e07808ae870ca73f97b628c5e11bde7b13b6d7e2c1d69a0351996e2",
+    "target-api.json": "8f85530123df05b183f66dff33e2e126da467ab707075432338feb7bc53c6d13",
+    "spec-api.json": "792a2ad021464797115fe479ff0161099598b787ae47daa877c0cabfad85ed16",
+    "quality.json": "dac703744985d79583cb5da7be297d09f27d3d6edc9814056870674bfbeed92a",
+    "prefill-api.json": "b3d8358e3a06c5db090d1f6c52a551b68adbadead939463ec7c15ccd1a3dea14",
+    "upstream-router-comparison.json": "a6ce2aded8667647d2b1c27e360d8267b80a8e20daf985b7271a253a823f8629",
+    "upstream-tests.log": "080338187075f80eae377a0ed25540cd792bb3c5b3870f70471833153344e04d",
+    "ctest.log": "8edf01e27be937c4719b320d4a1b17f3e13a02e7f25acc039194590a734f04e5",
+    "dspark-components.json": "230ddb828ef64d99a9944e21ae1c6b31aace6fc5f2e7629151b9aa1a05355870"
+  },
+  "dspark_component_devices": [
+    0,
+    1
+  ]
+}

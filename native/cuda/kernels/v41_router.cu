@@ -3,6 +3,12 @@
 #include <math_constants.h>
 #include <stdint.h>
 #include "ds41rt_v41_router.h"
+#ifdef DS41RT_HAVE_V41_ROUTER_AOT
+#include "v41_router_dispatch.h"
+extern "C" int32_t ds41rt_v41_router_scores_aot(const uint16_t*,const uint16_t*,float*,int32_t,int32_t,void*);
+#else
+extern "C" int32_t ds41rt_v41_router_initialize() { return 0; }
+#endif
 namespace {
 __global__ void score_kernel(const __nv_bfloat16* hidden,const __nv_bfloat16* weight,float* scores,int experts) {
   const uint64_t row=blockIdx.y,expert=blockIdx.x;
@@ -69,6 +75,17 @@ extern "C" int32_t ds41rt_v41_router(const uint16_t* hidden,const uint16_t* weig
   for(int i=0;i<8;++i) if(n[i] && !span(p[i],n[i],i<2?2:i==4?1:4)) return cudaErrorInvalidValue;
   for(int i=5;i<8;++i) for(int j=0;j<i;++j) if(n[j] && !disjoint(p[i],n[i],p[j],n[j])) return cudaErrorInvalidValue;
   auto s=reinterpret_cast<cudaStream_t>(stream);
+#ifdef DS41RT_HAVE_V41_ROUTER_AOT
+  const int threshold=experts==384?DS41RT_V41_ROUTER_E384_MIN_ROWS:DS41RT_V41_ROUTER_E128_MIN_ROWS;
+  // Preserve the original ABI's weaker alignment contract for direct callers.
+  if(rows>=threshold && reinterpret_cast<uintptr_t>(hidden)%16==0 &&
+      reinterpret_cast<uintptr_t>(weight)%16==0 && reinterpret_cast<uintptr_t>(scores)%16==0) {
+    auto status=ds41rt_v41_router_scores_aot(hidden,weight,scores,rows,experts,stream);
+    if(status)return status;
+    select_kernel<true><<<rows,512,0,s>>>(scores,bias,bias_vl,image_mask,ids,routing,experts,topk);
+    return cudaGetLastError();
+  }
+#endif
   score_kernel<<<dim3(experts,rows),256,0,s>>>(reinterpret_cast<const __nv_bfloat16*>(hidden),
       reinterpret_cast<const __nv_bfloat16*>(weight),scores,experts);
   auto status=cudaGetLastError();if(status!=cudaSuccess) return status;

@@ -1,9 +1,9 @@
 # BF16 tensor-core router candidate
 
-The running APIs still use the original router. This change provides a CuTe
-projection, a separately callable native score-transform/top-k stage, an audited
-AOT exporter, and repeatable component qualification. Serving integration and
-full API quality/performance comparison remain outstanding.
+This records the initial component experiment before serving integration. The
+router is now deployed; see [native integration and upstream review](ds41-router-serving.md)
+for current API performance, validation and quality limitations. The measurements
+and numerical discrepancies below preserve the original experiment's evidence.
 
 The original score kernel launches one 256-thread CTA per token/expert dot
 product. The candidate uses TMA-fed BF16 warp MMA, tile M64/N16/K64, three stages,
@@ -76,6 +76,6 @@ python3 /workspace/ds41rt/python/tools/export_b12x_v41_router_aot.py \
   --output-dir /audit/final-aot
 ```
 
-Next: connect preloaded AOT modules to the native router with b12x-owned crossover
-selection, qualify generated C dispatch and failure boundaries, then measure
-real prompt quality and 16k prefill. Preserve the current small-row path.
+The follow-up integration connects preloaded AOT modules with b12x-owned crossover
+selection, qualifies generated C dispatch and failure boundaries, and measures
+real prompt quality and 16k prefill while preserving the small-row path.

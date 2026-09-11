@@ -20,6 +20,16 @@ pub struct V41Router<'a> {
 }
 impl NativeLibrary {
     pub fn v41_router(&self) -> Result<V41Router<'_>> {
+        let initialize = unsafe {
+            *self
+                .lib
+                .get::<unsafe extern "C" fn() -> i32>(b"ds41rt_v41_router_initialize")?
+        };
+        let status = unsafe { initialize() };
+        ensure!(
+            status == 0,
+            "native router initialization CUDA status {status}"
+        );
         Ok(V41Router {
             _library: self,
             launch: unsafe { *self.lib.get::<Launch>(b"ds41rt_v41_router")? },

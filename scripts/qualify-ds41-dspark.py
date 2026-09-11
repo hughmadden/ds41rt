@@ -4,6 +4,9 @@ import argparse
 import ctypes as C
 import hashlib
 import json
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 import torch
 
@@ -18,6 +21,22 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--devices', default='0,1')
     args = parser.parse_args()
+    devices = [int(value) for value in args.devices.split(',')]
+    if len(devices) > 1:
+        # Native AOT owners are bound to one serving device per process.
+        # Keep multi-device qualification while matching that ownership model.
+        records = []
+        with tempfile.TemporaryDirectory(prefix='ds41-dspark-') as temporary:
+            for device in devices:
+                output = Path(temporary)/f'device-{device}.json'
+                subprocess.run([sys.executable, str(Path(__file__).resolve()),
+                    '--native-lib', str(args.native_lib.resolve()),
+                    '--reference-dir', str(args.reference_dir.resolve()),
+                    '--output', str(output), '--devices', str(device)], check=True)
+                records.append(json.loads(output.read_text()))
+        record = dict(records[0], results=[result for item in records for result in item['results']])
+        args.output.write_text(json.dumps(record,indent=2)+'\n')
+        return
     root = Path(__file__).resolve().parents[1]
     lock = json.loads((root/'docs/ds41-reference-lock.json').read_text())
     reference_hash = hashlib.sha256((args.reference_dir/'inference/model.py').read_bytes()).hexdigest()
@@ -58,6 +77,10 @@ def main():
     results = []
     for device in map(int, args.devices.split(',')):
         torch.cuda.set_device(device)
+        initialize = getattr(lib, 'ds41rt_v41_router_initialize', None)
+        if initialize is not None:
+            initialize.restype = I
+            assert initialize() == 0
         torch.manual_seed(4100 + device)
         stream = torch.cuda.Stream(device=device)
         with torch.cuda.stream(stream):
