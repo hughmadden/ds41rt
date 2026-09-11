@@ -8056,5 +8056,93 @@
       "commit_us": 478.0,
       "total_us": 125749.5
     }
-  }
+  },
+  "real_route_host_exchange": [
+    {
+      "capacity": 1,
+      "host_exchange_medians": {
+        "bind_us": 0.704,
+        "upload_us": 16.160000000000004,
+        "execute_us": 384.668,
+        "download_us": 9.136000000000024,
+        "total_us": 410.731
+      }
+    },
+    {
+      "capacity": 1,
+      "production_exchange_with_encode_median_us": 418.572
+    },
+    {
+      "capacity": 1,
+      "live_rows": 1,
+      "median_us": 384.491,
+      "minimum_us": 376.972,
+      "maximum_us": 624.7610000000001,
+      "byte_exact_capacity1": true,
+      "workspace_bytes": 746728
+    },
+    {
+      "capacity": 16,
+      "host_exchange_medians": {
+        "bind_us": 0.72,
+        "upload_us": 15.599999999999998,
+        "execute_us": 392.764,
+        "download_us": 9.07099999999997,
+        "total_us": 418.284
+      }
+    },
+    {
+      "capacity": 16,
+      "production_exchange_with_encode_median_us": 425.9
+    },
+    {
+      "capacity": 16,
+      "live_rows": 1,
+      "median_us": 393.45200000000006,
+      "minimum_us": 388.444,
+      "maximum_us": 766.567,
+      "byte_exact_capacity1": true,
+      "workspace_bytes": 12046356
+    },
+    {
+      "capacity": 80,
+      "host_exchange_medians": {
+        "bind_us": 0.736,
+        "upload_us": 16.287,
+        "execute_us": 393.14799999999997,
+        "download_us": 9.328000000000031,
+        "total_us": 419.54699999999997
+      }
+    },
+    {
+      "capacity": 80,
+      "production_exchange_with_encode_median_us": 427.163
+    },
+    {
+      "capacity": 80,
+      "live_rows": 1,
+      "median_us": 393.691,
+      "minimum_us": 388.988,
+      "maximum_us": 404.78,
+      "byte_exact_capacity1": true,
+      "workspace_bytes": 51094324
+    }
+  ],
+  "single_peer_service_comparison": [
+    {
+      "port": 19441,
+      "median_roundtrip_us": 1336.017,
+      "samples": 120
+    },
+    {
+      "port": 19442,
+      "median_roundtrip_us": 1422.506,
+      "samples": 120
+    }
+  ],
+  "single_layer_worker_internal_us": {
+    "samples_after_warmup": 120,
+    "median": 501.0
+  },
+  "real_route_input_sha256": "b71ee5d6bd52aee9290c5ddbc82fda081da664f12bfafa761fe8e585bf5a2a75"
 }

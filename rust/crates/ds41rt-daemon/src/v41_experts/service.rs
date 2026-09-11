@@ -46,6 +46,7 @@ pub(crate) struct NativeExpertServiceConfig {
 struct Work {
     frame: Vec<u8>,
     responses: mpsc::SyncSender<WorkerResponse>,
+    queued_at: std::time::Instant,
 }
 enum WorkerResponse {
     Chunk(ExpertProtocolV2Response),
@@ -134,6 +135,7 @@ impl ProtocolV2ExpertExecutor for NativeExpertService {
             .try_send(Work {
                 frame: request.frame_bytes().to_vec(),
                 responses,
+                queued_at: std::time::Instant::now(),
             })
             .map_err(|error| match error {
                 mpsc::TrySendError::Full(_) => {
@@ -220,6 +222,7 @@ fn run_worker(
         let mut weights = Vec::with_capacity(40);
         let mut remaining = config.device_budget;
         for layer in 0..40 {
+            let started = std::time::Instant::now();
             let weight = ExpertWeights::load(
                 &library,
                 &catalog,
@@ -232,6 +235,13 @@ fn run_worker(
             remaining = remaining
                 .checked_sub(weight.budget().resident_bytes)
                 .context("resident budget exhausted")?;
+            tracing::info!(
+                rank = config.rank,
+                layer,
+                resident_bytes = weight.budget().resident_bytes,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "native expert layer loaded"
+            );
             weights.push(weight);
         }
         Ok((weights, remaining))
@@ -256,6 +266,9 @@ fn run_worker(
         .send(Ok(()))
         .map_err(|_| anyhow::anyhow!("native startup caller disconnected"))?;
     while let Ok(work) = requests.recv() {
+        let queued_us = work.queued_at.elapsed().as_micros() as u64;
+        let started = std::time::Instant::now();
+        let mut emit_us = 0u64;
         let mut disconnected = false;
         let result = (|| -> Result<()> {
             let request = V41BackboneRequest::parse(&work.frame, config.capacity)?;
@@ -267,6 +280,7 @@ fn run_worker(
                 &mut row_indices,
                 config.max_frame_bytes,
                 |response| {
+                    let emit_started = std::time::Instant::now();
                     if work
                         .responses
                         .send(WorkerResponse::Chunk(response.to_owned()?))
@@ -275,10 +289,15 @@ fn run_worker(
                         disconnected = true;
                         bail!("native response consumer disconnected");
                     }
+                    emit_us += emit_started.elapsed().as_micros() as u64;
                     Ok(())
                 },
             )
         })();
+        let total_us = started.elapsed().as_micros() as u64;
+        tracing::debug!(target: "ds41rt::timing", rank=config.rank, queued_us, emit_us,
+            execute_us=total_us.saturating_sub(emit_us), total_us,
+            "native expert service");
         let failed = result.is_err();
         let _ = work.responses.send(WorkerResponse::Done(result));
         // A disconnected socket does not poison GPU execution, but a native error
