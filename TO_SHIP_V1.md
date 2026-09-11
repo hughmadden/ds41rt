@@ -166,8 +166,10 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Finish and measure encoder scheduling overlap, including boundaries between chunk pairs,
   worker queue ordering/batching, and output transfer overlap. Preserve ordered
   KV publication, Engram history, decoder replay and dSpark seeding.
-- [ ] Qualify the attention register-rescale prototype in serving; measure whether
-  adjacent-query KV reuse beats the existing cache behavior before adding complexity.
+- [x] Qualify and deploy attention accumulator rescaling with reference, byte-exact
+  regression, API and sustained counting-decode comparisons.
+- [ ] Measure whether adjacent-query KV reuse beats the existing cache behavior
+  before adding complexity.
 - [ ] Revisit expert M grouping and ordering on the resulting real batch histogram;
   retain M16 unless larger groups win measured end-to-end prefill.
 - [ ] After this prefill work, broaden decode to code, math, structured output,
@@ -178,7 +180,7 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Current evidence and integration gaps
 
-- [Independent encoder progress](docs/ds41-encoder-wavefront.md) removes the per-layer pair barrier. Isolated warm 16k prefill reaches 3.78/3.86k code and 4.09/4.13k repeated tok/s, about 27% and 17–18% above serial CED. The 599-token decode check retains text and usage at 37.86 target / 119.74 dSpark tok/s versus 38.00 / 120.40 serial. Both API lifecycle checks and prior quality outputs are preserved; the inherited quality failures remain. This scheduler is selected on ports 18041/18042; serial CED is retained stopped for rollback. Wider scheduling, worker transfers and attention work remain open.
+- [Attention register rescaling](docs/ds41-attention-register-rescale.md) is selected on the [independent-chunk scheduler](docs/ds41-encoder-wavefront.md). Isolated warm 16k prefill reaches 4.18/4.26k code and 4.50/4.59k repeated tok/s, about 10–12% above the preceding wavefront deployment. The 599-token decode comparison preserves text and usage at 37.64 target / 119.33 dSpark tok/s versus 37.79 / 119.02. All 34 reference cases, 160 byte-exact kernel comparisons and both API lifecycle checks pass; prior quality outputs and their inherited failures remain. Live ports are 18041/18042; preceding wavefront and serial CED containers remain stopped for rollback. Adjacent-query KV reuse, wider scheduling, worker transfers and expert grouping remain open.
 
 Component records establish their stated scopes, not full-model readiness or the performance targets above. Historical records remain under `docs/ds41-*`; use the checklist for current completion status.
 

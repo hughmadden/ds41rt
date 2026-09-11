@@ -175,15 +175,18 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
     }
     __syncthreads();
     if(!empty) {
-      // WMMA accumulator lane ownership is opaque: rescale through shared storage
-      // instead of depending on an undocumented fragment-to-head mapping.
-#pragma unroll
-      for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],kOutputStride,wmma::mem_row_major);
+      // Load a multiplier through the same accumulator layout. Matching
+      // fragment elements have matching coordinates without a lane-map assumption.
+      for(int i=tid;i<16*16;i+=128)scratch[i]=rescale[i/16];
       __syncthreads();
-      for(int i=tid;i<16*512;i+=128)scratch[(i/512)*kOutputStride+i%512]*=rescale[i/512];
-      __syncthreads();
+      wmma::fragment<wmma::accumulator,16,16,16,float> factors;
+      wmma::load_matrix_sync(factors,scratch,16,wmma::mem_row_major);
 #pragma unroll
-      for(int t=0;t<8;++t)wmma::load_matrix_sync(acc[t],scratch+warp*128+t*16,kOutputStride,wmma::mem_row_major);
+      for(int t=0;t<8;++t) {
+#pragma unroll
+        for(int i=0;i<acc[t].num_elements;++i)
+          acc[t].x[i]=__fmul_rn(acc[t].x[i],factors.x[i]);
+      }
       __syncthreads();
     }
     empty=false;
