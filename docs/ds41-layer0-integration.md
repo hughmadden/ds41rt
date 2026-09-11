@@ -19,3 +19,18 @@ The test compiles from the production tree through `/tmp/ds41-lane-ffn`. Set `DS
 Workers used the previously qualified `/tmp/ds41-real-tp4/artifacts/ds41-real-tp4-worker` fixture with rank and layer arguments, native library from the same artifact directory, and `ds41rt-spark-expert-dev:latest`. Each worker loaded its real TP slice for layer 0, served two requests, recorded inputs/planes and exited. The RTX test used the [isolated matching driver libraries](ds41-rtx-testing-restored.md) and `ds41rt-coordinator-dev:latest`.
 
 Logs: `/tmp/ds41-layer0-rtx-test.log`, `/tmp/ds41-layer0-worker-{ostrich,dodo,emu,kiwi}.log`, `/tmp/ds41-layer0-fixture-build.log`. Fixture source and native/worker hashes are recorded below; no test-only bypass was added to the production execution path.
+
+## Routed expert numerical reference
+
+The actual recorded request hidden rows, expert IDs and routing weights now pass byte-for-byte checks against the on-wire payloads, and every rank's received frame matches. `qualify-ds41-real-tp4.py --routes-only` then ran the pinned official `Expert.forward`, activation quantizer and FP4 GEMM against the same real expert weights. Across the two batches, all **960 routes spanning 181 distinct experts** pass the established per-expert relative-L2/cosine bounds.
+
+| Batch | Active experts | Routed relative L2 | Routed max absolute error |
+| ---: | ---: | ---: | ---: |
+| 0 | 154 | 0.0000154975 | 0.00048828125 |
+| 1 | 141 | 0.0000297121 | 0.0009765625 |
+
+The compared native values are rank-ordered FP32 sums rounded to BF16 per route, before summing the six routes and adding the shared expert. This numerical check covers routed expert execution from the actual distributed layer's FFN hidden inputs; it does not independently validate the upstream attention/mHC inputs, selection of expert IDs/routing weights, shared FFN or final mHC output. The complete assembled-layer numerical comparison remains open.
+
+The qualifier's full mode also passed its existing real layer-0 shared/reduction fixture after this change. It now reads each case's own shared output rather than assuming case 0's output applies to both; the earlier fixture explicitly produced identical shared outputs, so that assumption did not invalidate its recorded result. The new routed-only mode makes no shared/reduction qualification claim. Both modes validate that fixture hidden rows, IDs and weights match recorded requests.
+
+Reference runtime: TileLang 0.1.8 and TVM FFI 0.1.6; the pinned reference activation-quantizer vectorization override remains enabled. See [the full per-expert results and payload hashes](ds41-layer0-routes-reference.json). Logs: `/tmp/ds41-layer0-routes-reference.log`, `/tmp/ds41-tp4-qualifier-default-regression.log`. Canonical request fields were extracted into `/tmp/ds41-layer0-reference-vectors/router`; all four original rank records remain in `/tmp/ds41-layer0-output`.
