@@ -168,6 +168,8 @@ Completion means a working, qualified release with measured performance, not com
   KV publication, Engram history, decoder replay and dSpark seeding.
 - [x] Qualify and deploy attention accumulator rescaling with reference, byte-exact
   regression, API and sustained counting-decode comparisons.
+- [x] Share decoded KV across all head groups for large prefill, with byte-exact
+  regression checks, bounded-replay qualification and shared-memory racecheck.
 - [ ] Measure whether adjacent-query KV reuse beats the existing cache behavior
   before adding complexity.
 - [ ] Revisit expert M grouping and ordering on the resulting real batch histogram;
@@ -180,7 +182,7 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Current evidence and integration gaps
 
-- [Attention register rescaling](docs/ds41-attention-register-rescale.md) is selected on the [independent-chunk scheduler](docs/ds41-encoder-wavefront.md). Isolated warm 16k prefill reaches 4.18/4.26k code and 4.50/4.59k repeated tok/s, about 10–12% above the preceding wavefront deployment. The 599-token decode comparison preserves text and usage at 37.64 target / 119.33 dSpark tok/s versus 37.79 / 119.02. All 34 reference cases, 160 byte-exact kernel comparisons and both API lifecycle checks pass; prior quality outputs and their inherited failures remain. Live ports are 18041/18042; preceding wavefront and serial CED containers remain stopped for rollback. Adjacent-query KV reuse, wider scheduling, worker transfers and expert grouping remain open.
+- [KV sharing across attention heads](docs/ds41-attention-head-reuse.md) is selected with 2048-token chunks. Isolated warm 16k prefill reaches 5.32/5.28k code and 6.56/6.46k repeated tok/s, about 27–28% and 45–46% above the preceding library. The 599-token decode comparison preserves text and usage at 38.02 target / 117.97 dSpark tok/s versus 37.87 / 118.78. All 34 reference cases, 220 byte-exact kernel comparisons, two shared-memory racecheck fixtures and both API lifecycle checks pass; inherited quality failures remain. A 4096-token chunk retest still loses and is not selected. Live ports are 18041/18042. Reprofile prefill before choosing expert grouping/ordering or remaining scheduling/transfer work; adjacent-query reuse and wider concurrency remain open.
 
 Component records establish their stated scopes, not full-model readiness or the performance targets above. Historical records remain under `docs/ds41-*`; use the checklist for current completion status.
 

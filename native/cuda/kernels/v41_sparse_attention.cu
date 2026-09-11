@@ -20,6 +20,11 @@ __device__ __forceinline__ uint32_t packed_fp8_pair(uint16_t input,uint32_t fact
 constexpr int kKvStride=520, kOutputStride=516, kProbabilityStride=80;
 constexpr int kKvBytes=64*kKvStride*2, kOutputBytes=16*kOutputStride*4;
 constexpr int kSharedBytes=kKvBytes+kOutputBytes+192+512;
+// A head group needs only scores/probabilities during the KV loop.
+constexpr int kScoreBytes=16*64*4;
+constexpr int kGroupedSharedBytes=kKvBytes+2*kScoreBytes+2*192+512;
+constexpr int kFourSharedBytes=kKvBytes+4*kScoreBytes+4*192+512;
+static_assert(2*kOutputBytes<=kKvBytes, "retired KV must fit two output groups");
 
 __device__ float warp_max(float x) {
   for(int n=16;n;n>>=1)x=fmaxf(x,__shfl_xor_sync(0xffffffffu,x,n));
@@ -50,8 +55,8 @@ __device__ __forceinline__ uint64_t locate(const ds41rt_v41_sparse_kv_t& v,const
   return physical<v.source_capacity?((2ull<<62)|physical):UINT64_MAX;
 }
 // Grid-constant descriptor avoids a per-thread copy for dynamic source indexing.
-template<bool Split>
-__global__ void attend(const __nv_bfloat16* query,const float* sink,
+template<bool Split,int Groups=1>
+__global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,
     int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v,float* partial,
     const uint64_t* window_begins) {
@@ -61,9 +66,13 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
     const uint64_t last=metadata[(uint64_t(gridDim.x)-1)*10+3];
     width=last<127?int(last+1):128;
   }
-  const int row=blockIdx.x,group=blockIdx.y;
+  static_assert(Groups==1 || Groups==2 || Groups==4);
+  static_assert(!Split || Groups==1);
+  // Each 128-thread group owns 16 heads; all groups share one decoded KV tile.
+  const int subgroup=Groups==1?0:threadIdx.x/128;
+  const int row=blockIdx.x,group=blockIdx.y*Groups+subgroup;
   const uint64_t partial_base=((uint64_t(row)*gridDim.z+blockIdx.z)*64+group*16)*514;
-  const int tid=threadIdx.x,warp=tid/32,lane=tid%32;
+  const int global_tid=threadIdx.x,tid=Groups==1?global_tid:global_tid%128,warp=tid/32,lane=tid%32;
   const uint64_t base=(uint64_t(row)*64+group*16)*512;
   const uint64_t* m=metadata+uint64_t(row)*10;
   const uint64_t window_begin=window_begins?window_begins[row]:0;
@@ -85,16 +94,16 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
   }
   extern __shared__ __align__(32) unsigned char memory[];
   auto* kv=reinterpret_cast<__nv_bfloat16*>(memory);
-  auto* scratch=reinterpret_cast<float*>(memory+kKvBytes);
+  auto* scratch=reinterpret_cast<float*>(memory+kKvBytes+(Groups==1?0:subgroup*kScoreBytes));
   // Scores, accumulator rescaling and PV probabilities have disjoint lifetimes.
   auto* probability=reinterpret_cast<__nv_bfloat16*>(scratch);
-  auto* maximum=reinterpret_cast<float*>(memory+kKvBytes+kOutputBytes);
+  auto* maximum=reinterpret_cast<float*>(memory+kKvBytes+(Groups==1?kOutputBytes:Groups*kScoreBytes+subgroup*192));
   float* sum=maximum+16;float* rescale=sum+16;
   if(tid<16){maximum[tid]=-1e30f;sum[tid]=0;}
   wmma::fragment<wmma::accumulator,16,16,16,float> acc[8];
 #pragma unroll
   for(int t=0;t<8;++t)wmma::fill_fragment(acc[t],0.0f);
-  auto* refs=reinterpret_cast<uint64_t*>(memory+kKvBytes+kOutputBytes+192);
+  auto* refs=reinterpret_cast<uint64_t*>(memory+kKvBytes+(Groups==1?kOutputBytes+192:Groups*kScoreBytes+Groups*192));
   const int count=width+(v.compressed?512:0);
   // The first valid tile starts from zero accumulators; no rescale is needed.
   bool empty=true;
@@ -102,15 +111,15 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
   const int first=Split?blockIdx.z*per_part*64:0;
   const int last=Split?min(count,int(blockIdx.z+1)*per_part*64):count;
   for(int start=first;start<last;start+=64) {
-    if(tid<64)refs[tid]=start+tid<count?locate(v,m,
-      v.compressed?selected+uint64_t(row)*512:nullptr,start+tid,width,window_begin):UINT64_MAX;
+    if(global_tid<64)refs[global_tid]=start+global_tid<count?locate(v,m,
+      v.compressed?selected+uint64_t(row)*512:nullptr,start+global_tid,width,window_begin):UINT64_MAX;
     // An entirely masked tile contributes zero probability and leaves both
     // online-softmax state and accumulators unchanged. Vote over the same
     // resolved references used below; valid entries may occur after empty tiles.
-    if(!__syncthreads_or(tid<64 && refs[tid]!=UINT64_MAX))continue;
+    if(!__syncthreads_or(global_tid<64 && refs[global_tid]!=UINT64_MAX))continue;
     // A warp stages four contiguous FP8 values per lane, reusing each
     // resolved key pointer. Preserve unaligned byte-addressed ABI inputs.
-    for(int key=warp;key<64;key+=4) {
+    for(int key=global_tid/32;key<64;key+=4*Groups) {
       const uint64_t ref=refs[key];
       for(int block=0;block<4;++block) {
         const int col=block*128+lane*4;
@@ -212,18 +221,41 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
     }
     __syncthreads();
   }
+  if constexpr(Groups==4) {
+    // Two groups fit in the retired KV tile. Drain both pairs before reuse.
 #pragma unroll
-  for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],kOutputStride,wmma::mem_row_major);
-  if(tid<16) {
-    if constexpr(Split) {
-      partial[partial_base+tid*514+512]=maximum[tid];
-      partial[partial_base+tid*514+513]=sum[tid];
-    } else sum[tid]+=expf(sink[group*16+tid]-maximum[tid]);
-  }
-  __syncthreads();
-  for(int i=tid;i<16*512;i+=128) {
-    if constexpr(Split)partial[partial_base+(i/512)*514+i%512]=scratch[(i/512)*kOutputStride+i%512];
-    else output[base+i]=__float2bfloat16_rn(scratch[(i/512)*kOutputStride+i%512]/sum[i/512]);
+    for(int first_group=0;first_group<4;first_group+=2) {
+      const bool active=subgroup>=first_group && subgroup<first_group+2;
+      auto* final_output=reinterpret_cast<float*>(memory+(subgroup%2)*kOutputBytes);
+      if(active) {
+#pragma unroll
+        for(int t=0;t<8;++t)wmma::store_matrix_sync(final_output+warp*128+t*16,acc[t],kOutputStride,wmma::mem_row_major);
+        if(tid<16)sum[tid]+=expf(sink[group*16+tid]-maximum[tid]);
+      }
+      __syncthreads();
+      if(active)for(int i=tid;i<16*512;i+=128)
+        output[base+i]=__float2bfloat16_rn(final_output[(i/512)*kOutputStride+i%512]/sum[i/512]);
+      __syncthreads();
+    }
+  } else {
+    if constexpr(Groups>1) {
+      // KV is dead after the final PV. Reuse its storage for both output groups.
+      __syncthreads();
+      scratch=reinterpret_cast<float*>(memory+subgroup*kOutputBytes);
+    }
+#pragma unroll
+    for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],kOutputStride,wmma::mem_row_major);
+    if(tid<16) {
+      if constexpr(Split) {
+        partial[partial_base+tid*514+512]=maximum[tid];
+        partial[partial_base+tid*514+513]=sum[tid];
+      } else sum[tid]+=expf(sink[group*16+tid]-maximum[tid]);
+    }
+    __syncthreads();
+    for(int i=tid;i<16*512;i+=128) {
+      if constexpr(Split)partial[partial_base+(i/512)*514+i%512]=scratch[(i/512)*kOutputStride+i%512];
+      else output[base+i]=__float2bfloat16_rn(scratch[(i/512)*kOutputStride+i%512]/sum[i/512]);
+    }
   }
 }
 __global__ void merge(const float* partial,const float* sink,__nv_bfloat16* output,int parts) {
@@ -261,7 +293,11 @@ bool disjoint(const void* a,uint64_t n,const void* b,uint64_t m) {
 extern "C" int32_t ds41rt_v41_sparse_attention_initialize(void) {
   const auto status=cudaFuncSetAttribute(attend<false>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
   if(status!=cudaSuccess)return status;
-  return cudaFuncSetAttribute(attend<true>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
+  const auto split=cudaFuncSetAttribute(attend<true>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
+  if(split!=cudaSuccess)return split;
+  const auto pair=cudaFuncSetAttribute(attend<false,2>,cudaFuncAttributeMaxDynamicSharedMemorySize,kGroupedSharedBytes);
+  if(pair!=cudaSuccess)return pair;
+  return cudaFuncSetAttribute(attend<false,4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kFourSharedBytes);
 }
 static int32_t launch_attention(const uint16_t* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
@@ -302,6 +338,14 @@ static int32_t launch_attention(const uint16_t* query,const float* sink,
     if(status!=cudaSuccess)return status;
     merge<<<dim3(rows,64),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       partial,sink,reinterpret_cast<__nv_bfloat16*>(output),parts);
+  } else if(rows>=256) {
+    attend<false,4><<<dim3(rows,1),512,kFourSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
+  } else if(rows>=128) {
+    attend<false,2><<<dim3(rows,2),256,kGroupedSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
   } else {
     attend<false><<<dim3(rows,4),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
