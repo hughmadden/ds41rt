@@ -79,7 +79,7 @@ def main():
     record = dict(model=MODEL, base_url=args.base_url, first_json=first,
                   streaming_request=long, streaming_runs=runs, cancellation=cancelled,
                   post_cancellation_json=recovered, unsupported_sampling_status=400,
-                  scope='One client, target-only greedy text, tiny prompts, three same-shape streams; first run warms. Not release throughput or broad quality qualification.')
+                  scope='One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification.')
     args.output.write_text(json.dumps(record, indent=2) + '\n')
     print(json.dumps(dict(json_content=first['choices'][0]['message']['content'],
                          stream_text=runs[-1]['text'], ttft_seconds=[r['first_content_seconds'] for r in runs],

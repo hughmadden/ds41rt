@@ -19,6 +19,10 @@ pub(crate) struct NativeTp4Wave<'a> {
     ready_rows: Option<u32>,
 }
 impl<'a> NativeTp4Wave<'a> {
+    pub fn reset_connections(&mut self) {
+        self.ready_rows = None;
+        self.transport.reset_connections();
+    }
     pub fn device_bytes(capacity: u32) -> Result<usize> {
         ensure!(
             capacity > 0 && capacity <= 4096,

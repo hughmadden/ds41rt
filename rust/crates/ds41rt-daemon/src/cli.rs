@@ -428,6 +428,9 @@ mod tests {
 
 #[derive(Debug, Args)]
 pub(crate) struct NativeServeArgs {
+    /// Enable greedy RTX dSpark proposal generation and target verification.
+    #[arg(long)] pub dspark: bool,
+
     #[arg(long)] pub snapshot: PathBuf,
     #[arg(long)] pub native_lib: PathBuf,
     #[arg(long,value_delimiter=',',num_args=1..)] pub peers: Vec<std::net::SocketAddr>,

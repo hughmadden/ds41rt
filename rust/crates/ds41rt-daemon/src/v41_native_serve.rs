@@ -1,3 +1,4 @@
+mod speculative;
 use crate::v41_backbone_cache::BackboneCache;
 use crate::v41_backbone_execution::BackboneExecution;
 use crate::v41_backbone_execution::CacheProducerWeights;
@@ -21,6 +22,7 @@ use ds41rt_api::native_v41::{InferenceChunk, InferenceFinishReason, NativeReques
 use ds41rt_ffi::NativeLibrary;
 use ds41rt_transport::v41_expert::V41Tp4Tcp;
 use ds41rt_transport::{ExpertV2SourceKind, TcpTransportConfig};
+use speculative::DraftRuntime;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
 
@@ -53,10 +55,14 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
     tracing::info!(%listen,"native V4.1 target API ready");
     axum::serve(listener, ds41rt_api::native_v41::router(send))
         .with_graceful_shutdown(async {
-            let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).expect("install SIGTERM handler");
+            let mut term =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                    .expect("install SIGTERM handler");
             tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = term.recv() => {} }
-        }).await?;
-    tokio::task::spawn_blocking(move || worker_thread.join()).await?
+        })
+        .await?;
+    tokio::task::spawn_blocking(move || worker_thread.join())
+        .await?
         .map_err(|_| anyhow::anyhow!("native CUDA worker panicked during shutdown"))?;
     Ok(())
 }
@@ -158,7 +164,11 @@ fn worker(
         upload,
         gates,
         head,
-        crate::v41_target_pass::TargetTapWave::new(&lib, 80, crate::v41_target_pass::TargetTapWave::device_bytes(80)?)?,
+        crate::v41_target_pass::TargetTapWave::new(
+            &lib,
+            80,
+            crate::v41_target_pass::TargetTapWave::device_bytes(80)?,
+        )?,
         Duration::from_secs(120),
     )?;
     let tcp = V41Tp4Tcp::new(
@@ -174,6 +184,22 @@ fn worker(
         },
     )?;
     let mut transport = NativeTp4Wave::new(&lib, tcp, NativeTp4Wave::device_bytes(80)?)?;
+    let draft_weights = if args.dspark {
+        Some(crate::v41_experts::dspark::DsparkWeights::load(
+            &lib,
+            &catalog,
+            80,
+            1,
+            32 * 1024 * 1024 * 1024,
+            16 * 1024 * 1024,
+        )?)
+    } else {
+        None
+    };
+    let mut draft = draft_weights
+        .as_ref()
+        .map(|weights| DraftRuntime::new(&lib, weights, &table, &vocabulary))
+        .transpose()?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
@@ -188,7 +214,13 @@ fn worker(
             continue;
         }
         id = id.checked_add(1).context("request ID exhausted")?;
+        // Spark's TCP fallback closes idle connections after five seconds.
+        // Keep sockets across model steps, but start each admission fresh.
+        transport.reset_connections();
         let lease = requests.admit(0, id)?;
+        if let Some(draft) = &mut draft {
+            draft.admit(id)?;
+        }
         let result = generate(
             &lib,
             &args.snapshot,
@@ -198,8 +230,16 @@ fn worker(
             &mut transport,
             lease,
             &job,
+            draft.as_mut(),
         );
-        let cleanup = requests.release(lease);
+        let cleanup = if requests.cache().request_id(lease).is_ok() {
+            requests.release(lease)
+        } else {
+            Ok(())
+        };
+        if let Some(draft) = &mut draft {
+            draft.release()?;
+        }
         if let Err(error) = result {
             let _ = job.events.blocking_send(Err(format!("{error:#}")));
         }
@@ -216,6 +256,7 @@ fn generate<'a>(
     transport: &mut NativeTp4Wave<'a>,
     lease: crate::v41_backbone_cache::CacheLease,
     job: &NativeRequest,
+    mut draft: Option<&mut DraftRuntime<'_, 'a>>,
 ) -> Result<()> {
     let prompt = ds41rt_loader::encode_tokenizer_text(snapshot, &job.prompt, false)?.token_ids;
     ensure!(
@@ -224,7 +265,14 @@ fn generate<'a>(
     );
     let mut decoder = ds41rt_loader::streaming_token_decoder(snapshot, false)?;
     job.events.blocking_send(Ok(InferenceChunk::Ready {
-        system_fingerprint: Some("ds41rt-native-fp8-kv".into()),
+        system_fingerprint: Some(
+            if draft.is_some() {
+                "ds41rt-native-fp8-kv-dspark"
+            } else {
+                "ds41rt-native-fp8-kv"
+            }
+            .into(),
+        ),
         prompt_usage: PromptUsage {
             prompt_tokens: prompt.len(),
             prompt_cache_hit_tokens: 0,
@@ -242,9 +290,11 @@ fn generate<'a>(
             chunk,
             ExpertV2SourceKind::Prefill,
             job,
+            draft.as_deref_mut(),
         )?;
     }
     let mut buffered = 0usize;
+    let mut pending = std::collections::VecDeque::new();
     for generated in 0..job.max_tokens {
         ensure!(!job.events.is_closed(), "client disconnected");
         buffered += 1;
@@ -266,17 +316,37 @@ fn generate<'a>(
             buffered = 0;
         }
         if generated + 1 < job.max_tokens {
-            next = step(
-                lib,
-                runtime,
-                pass,
-                requests,
-                transport,
-                lease,
-                &[next],
-                ExpertV2SourceKind::Decode,
-                job,
-            )?;
+            if pending.is_empty() {
+                if let Some(draft) = draft.as_deref_mut() {
+                    pending.extend(draft.verify(
+                        lib,
+                        runtime,
+                        pass,
+                        requests,
+                        transport,
+                        lease,
+                        next,
+                        job.max_tokens - generated - 1,
+                        job,
+                    )?);
+                } else {
+                    pending.push_back(step(
+                        lib,
+                        runtime,
+                        pass,
+                        requests,
+                        transport,
+                        lease,
+                        &[next],
+                        ExpertV2SourceKind::Decode,
+                        job,
+                        None,
+                    )?);
+                }
+            }
+            next = pending
+                .pop_front()
+                .context("generation produced no next token")?;
         }
     }
     if buffered > 0 {
@@ -300,6 +370,7 @@ fn step<'a>(
     tokens: &[u32],
     kind: ExpertV2SourceKind,
     job: &NativeRequest,
+    draft: Option<&mut DraftRuntime<'_, 'a>>,
 ) -> Result<u32> {
     ensure!(!job.events.is_closed(), "client disconnected");
     let timing = Instant::now();
@@ -327,7 +398,11 @@ fn step<'a>(
         }
         ensure!(!job.events.is_closed(), "client disconnected");
         let sampled_us = timing.elapsed().as_micros() as u64;
-        pass.commit(requests, &mut batch, &[tokens.len() as u32])?;
+        if let Some(draft) = draft {
+            draft.commit(pass, requests, &mut batch, tokens.len() as u32)?;
+        } else {
+            pass.commit(requests, &mut batch, &[tokens.len() as u32])?;
+        }
         tracing::debug!(target: "ds41rt::timing", rows=tokens.len(), prepared_us, execute_us=executed_us-prepared_us, sample_us=sampled_us-executed_us, commit_us=timing.elapsed().as_micros() as u64-sampled_us, total_us=timing.elapsed().as_micros() as u64, "target step");
         Ok(best.0)
     })();

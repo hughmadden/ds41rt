@@ -53,6 +53,13 @@ impl V41Tp4Tcp {
     pub fn capacity(&self) -> u32 {
         self.capacity
     }
+    /// Drop idle sockets before a new admission. Pending dispatches borrow this
+    /// owner exclusively, so an in-flight wave cannot be reset through this API.
+    pub fn reset_connections(&mut self) {
+        for client in &mut self.clients {
+            client.reset();
+        }
+    }
 
     /// Send the same canonical request to all ranks and accept every route row.
     /// The synchronous sink must consume/copy its frame slice before returning.
