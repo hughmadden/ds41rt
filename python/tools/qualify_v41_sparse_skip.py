@@ -1,6 +1,7 @@
 import argparse
 import ctypes as C
 import json
+import statistics
 import torch
 from pathlib import Path
 
@@ -18,7 +19,15 @@ parser.add_argument("--split-parts", type=int, choices=range(1, 11), default=Non
                     help="Qualify split rounding against independent FP32 attention; default requires bit equality")
 parser.add_argument("--seed", type=int, default=731)
 parser.add_argument("--query-scale", type=float, default=.2)
+parser.add_argument("--baseline-split", action="store_true",
+                    help="Use the same split count for both libraries and require bit equality")
+parser.add_argument("--timing-repeats", type=int, default=1,
+                    help="Alternate graph timing order and report the median across repetitions")
 args = parser.parse_args()
+if args.baseline_split and args.split_parts is None:
+    parser.error('--baseline-split requires --split-parts')
+if args.timing_repeats < 1:
+    parser.error('--timing-repeats must be positive')
 torch.cuda.set_device(args.device)
 
 
@@ -42,7 +51,7 @@ libs = [C.CDLL(args.baseline), C.CDLL(args.candidate)]
 launches = []
 for i, lib in enumerate(libs):
     assert lib.ds41rt_v41_sparse_attention_initialize() == 0
-    split = i == 1 and args.split_parts is not None
+    split = args.split_parts is not None and (i == 1 or args.baseline_split)
     fn = lib.ds41rt_v41_sparse_attention_split if split else lib.ds41rt_v41_sparse_attention
     fn.argtypes = [C.c_void_p] * 5 + [C.c_int32, C.c_int32, C.POINTER(View), C.c_void_p]
     if split:
@@ -109,7 +118,7 @@ for rows in args.rows:
             0,
             C.byref(v),
             torch.cuda.current_stream().cuda_stream,
-            *([scratch.data_ptr(), scratch.numel() * 4, args.split_parts] if i == 1 and scratch is not None else []),
+            *([scratch.data_ptr(), scratch.numel() * 4, args.split_parts] if (i == 1 or args.baseline_split) and scratch is not None else []),
         )
         assert status == 0, status
 
@@ -191,9 +200,9 @@ for rows in args.rows:
         error = out[0].float() - out[1].float()
         metrics = dict(max_abs=float(error.abs().max()),
                        relative_l2=float(error.norm() / out[0].float().norm().clamp_min(1e-30)))
-        if args.split_parts is None:
+        if args.split_parts is None or args.baseline_split:
             assert bit_exact, (rows, pattern, metrics)
-        else:
+        if scratch is not None:
             assert (storage[:64] == 19).all() and (storage[-64:] == 19).all()
         if args.split_parts is not None:
             # Independent address gathering and full FP32 softmax/PV, including sink.
@@ -231,24 +240,24 @@ for rows in args.rows:
             assert errors[1]["max_abs"] <= errors[0]["max_abs"] * 1.25 + 1e-5
             metrics["fp32_oracle_errors"] = errors
             metrics["prior_elementwise_tolerance_pass"] = bool(torch.isclose(out[1], out[0], rtol=.008, atol=.002).all())
-        elapsed = []
-        for g in graphs:
-            a, b = (
-                torch.cuda.Event(enable_timing=True),
-                torch.cuda.Event(enable_timing=True),
-            )
-            a.record()
-            for _ in range(20):
-                g.replay()
-            b.record()
-            b.synchronize()
-            elapsed.append(a.elapsed_time(b) * 1000 / 20)
+        samples = [[], []]
+        for repeat in range(args.timing_repeats):
+            for i in ([0, 1] if repeat % 2 == 0 else [1, 0]):
+                a, b = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                a.record()
+                for _ in range(20):
+                    graphs[i].replay()
+                b.record()
+                b.synchronize()
+                samples[i].append(a.elapsed_time(b) * 1000 / 20)
+        elapsed = [statistics.median(values) for values in samples]
         results.append(
             dict(
                 rows=rows,
                 pattern=pattern,
                 bit_exact=bit_exact,
                 split_parts=args.split_parts,seed=args.seed,query_scale=args.query_scale,
+                baseline_split=args.baseline_split,timing_samples_us=samples,
                 **metrics,
                 unaligned_values=args.unaligned_values,
                 window_only=args.window_only,

@@ -6,6 +6,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
+- [x] Deploy [packed FP8 KV conversion](docs/ds41-attention-packed.md) with exhaustive bit-exact conversion and native attention qualification. Warm 16k prefill reaches 1.58–1.60k code / 1.83–1.84k repeated tok/s. Retain 2048-token chunks after a same-artifact 4096 trial regresses repeated-text prefill; adjacent-query KV sharing remains an unproven candidate.
+
 - [x] Upload final expert responses from [retained registered receive slots](docs/ds41-registered-response-slots.md), with streamed-chunk fallback, reset-safe ownership and real RoCE/GPU qualification. Warm 16k prefill improves another 7–8% to about 1.43–1.45k code / 1.63–1.64k repeated tok/s; release performance and concurrency gates remain open.
 - [x] Deploy the [native BF16 tensor-core router](docs/ds41-router-serving.md), preserve small-row GEMV, and merge both new upstream attention commits in full. Native dispatch, ABI, two-device dSpark component and API lifecycle checks pass; warm 16k prefill reaches 1.55–1.56k code / 1.78–1.79k repeated tok/s. Strict paired text/usage is 7/8 and the existing Unicode-format failure persists; broader quality and release targets remain open.
 

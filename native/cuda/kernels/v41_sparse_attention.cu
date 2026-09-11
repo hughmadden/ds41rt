@@ -7,6 +7,15 @@
 #include <math_constants.h>
 namespace {
 using namespace nvcuda;
+#if defined(__CUDA_ARCH_SPECIFIC__) && __CUDA_ARCH_SPECIFIC__ == 1200
+__device__ __forceinline__ uint32_t packed_fp8_pair(uint16_t input,uint32_t factors) {
+  uint32_t output;
+  asm("{ .reg .b32 values; cvt.rn.bf16x2.e4m3x2 values, %1; mul.bf16x2 %0, values, %2; }"
+      : "=r"(output) : "h"(input), "r"(factors));
+  return output;
+}
+
+#endif
 // Pad shared rows to distribute WMMA traffic across memory banks.
 constexpr int kKvStride=520, kOutputStride=516, kProbabilityStride=80;
 constexpr int kKvBytes=64*kKvStride*2, kOutputBytes=16*kOutputStride*4;
@@ -113,6 +122,13 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
           else bytes=uint32_t(source[0])|(uint32_t(source[1])<<8)|
               (uint32_t(source[2])<<16)|(uint32_t(source[3])<<24);
           const uint8_t exponent=v.scales[tag][physical*16+col/32];
+#if defined(__CUDA_ARCH_SPECIFIC__) && __CUDA_ARCH_SPECIFIC__ == 1200
+          // Match the existing scale decoding, including zero and 255.
+          const uint32_t factor=exponent?(uint32_t(exponent)<<7):0x40;
+          const uint32_t factors=factor|(factor<<16);
+          packed=uint64_t(packed_fp8_pair(uint16_t(bytes),factors))|
+              (uint64_t(packed_fp8_pair(uint16_t(bytes>>16),factors))<<32);
+#else
           const float scale=exponent==0?0x1p-127f:__uint_as_float(uint32_t(exponent)<<23);
 #pragma unroll
           for(int j=0;j<4;++j) {
@@ -120,6 +136,7 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
             const auto value=__float2bfloat16_rn(__fmul_rn(float(f),scale));
             packed|=uint64_t(__bfloat16_as_ushort(value))<<(j*16);
           }
+#endif
         }
         *reinterpret_cast<uint64_t*>(kv+key*kKvStride+col)=packed;
       }

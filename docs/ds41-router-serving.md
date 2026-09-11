@@ -1,5 +1,7 @@
 # Native router integration and upstream attention merge
 
+This rollout is superseded by the [packed KV conversion deployment](ds41-attention-packed.md).
+
 The development APIs now use the native AOT router for backbone rows >=16 and
 dSpark rows >=26. Smaller requests retain the original GEMV. This removes most
 large-prefill router computation without changing its BF16 input, FP32 score

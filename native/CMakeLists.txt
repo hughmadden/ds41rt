@@ -744,6 +744,10 @@ if(DS41RT_ENABLE_V41_FP8_AOT)
 endif()
 add_library(ds41rt_native SHARED ${DS41RT_NATIVE_SOURCES})
 if(DS41RT_ENABLE_V41_FP8_AOT)
+  # Packed FP8->BF16 conversion requires the SM120 architecture-specific ISA.
+  # Keep the normal target's portable image as a fallback in the same fatbin.
+  set_property(SOURCE cuda/kernels/v41_sparse_attention.cu APPEND PROPERTY
+    COMPILE_OPTIONS "--generate-code=arch=compute_120a,code=sm_120a")
   target_compile_definitions(ds41rt_native PRIVATE DS41RT_HAVE_V41_HC_AOT=1 DS41RT_HAVE_V41_ROUTER_AOT=1)
   add_dependencies(ds41rt_native ds41rt_v41_fp8_export ds41rt_v41_index_export ds41rt_v41_router_export)
   target_include_directories(ds41rt_native PRIVATE "${DS41RT_V41_FP8_DIR}" "${DS41RT_V41_INDEX_DIR}" "${DS41RT_V41_ROUTER_DIR}")
