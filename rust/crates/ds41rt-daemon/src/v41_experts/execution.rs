@@ -279,6 +279,7 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
             "invalid expert output row count"
         );
         let (kernel, slots, scratch) = self.execution_state(rows);
+        ensure!(!kernel.accumulates_tokens(), "expert output is token accumulation, not route planes");
         Ok(Ds41rtDeviceBuffer {
             ptr: slots[41],
             bytes: rows as usize * kernel.info().topk as usize * 5120 * 4,
@@ -642,15 +643,14 @@ impl ExpertExecution<'_, '_> {
             .context("missing compact output")?
             .buffer;
         unsafe {
-            self.compact_reducer
-                .as_ref()
-                .context("missing compact reducer")?
-                .compact(
-                    self.route_partials(request.rows())?.ptr.cast(),
-                    output.ptr.cast(),
-                    request.rows(),
-                    self.stream.raw,
-                )?;
+            let reducer = self.compact_reducer.as_ref().context("missing compact reducer")?;
+            let (kernel, slots, _) = self.execution_state(request.rows());
+            if kernel.accumulates_tokens() {
+                reducer.compact_tokens(slots[41].cast(), output.ptr.cast(), request.rows(), self.stream.raw)?;
+            } else {
+                reducer.compact(self.route_partials(request.rows())?.ptr.cast(),
+                    output.ptr.cast(), request.rows(), self.stream.raw)?;
+            }
         }
         if let Some(timing) = &self.timing {
             unsafe {

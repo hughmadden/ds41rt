@@ -81,6 +81,14 @@ int32_t ds41rt_v41_expert_initialize_scratch_async(void* kernel, void* storage,
 int32_t ds41rt_v41_reduce_routes_async(const float* const planes[4],
     const uint16_t* shared, uint16_t* output, uint32_t rows,
     uint32_t ranks, uint32_t topk, void* stream);
+/* ABI 3 variants expose FP32 token accumulations instead of per-route planes.
+ * Kind 0: [rows,6,5120] FP32 routes; kind 1: [rows,5120] FP32 token sums. */
+int32_t ds41rt_v41_expert_output_kind(int32_t capacity, uint32_t* out);
+/* Round FP32 [rows,5120] token sums to BF16 without allocation or synchronization.
+ * Nonoverlapping storage must remain alive through stream completion. */
+int32_t ds41rt_v41_compact_tokens_bf16_async(const float* tokens,
+    uint16_t* output, uint32_t rows, void* stream);
+
 /* Compact backbone serving arithmetic: sum six local FP32 route vectors in
  * slot order, then round once to a BF16 hidden-width partial. This differs
  * from per-route TP reduction above. Input [rows,6,5120], output [rows,5120].

@@ -13,6 +13,8 @@ else()
 endif()
 set(DS41RT_V41_EXPERT_SLICE_WIDTH "" CACHE STRING
   "Experimental Spark fused-slice width (64, 128, 192); empty keeps qualified serving backend")
+set(DS41RT_V41_EXPERT_ATOMIC_MIN_CAPACITY "" CACHE STRING
+  "Experimental direct token accumulation threshold: empty, 256, 1024 or 4096")
 set(DS41RT_V41_EXPERT_EXPORT_SCRIPT export_b12x_v41_experts_aot.py)
 set(DS41RT_V41_EXPERT_EXPORT_ARGS
   --role "${DS41RT_V41_EXPERT_ROLE}" --input-format "${DS41RT_V41_EXPERT_INPUT_FORMAT}")
@@ -24,6 +26,14 @@ if(NOT DS41RT_V41_EXPERT_SLICE_WIDTH STREQUAL "")
   set(DS41RT_V41_EXPERT_EXPORT_SCRIPT export_b12x_v41_slices_aot.py)
   set(DS41RT_V41_EXPERT_EXPORT_ARGS --width "${DS41RT_V41_EXPERT_SLICE_WIDTH}"
     --rows "1,16,80,256,1024,4096")
+endif()
+if(NOT DS41RT_V41_EXPERT_ATOMIC_MIN_CAPACITY STREQUAL "")
+  if(DS41RT_V41_EXPERT_SLICE_WIDTH STREQUAL "" OR
+      NOT DS41RT_V41_EXPERT_ATOMIC_MIN_CAPACITY MATCHES "^(256|1024|4096)$")
+    message(FATAL_ERROR "Direct token accumulation requires Spark slices and a valid threshold")
+  endif()
+  list(APPEND DS41RT_V41_EXPERT_EXPORT_ARGS
+    --atomic-min-capacity "${DS41RT_V41_EXPERT_ATOMIC_MIN_CAPACITY}")
 endif()
 set(DS41RT_V41_EXPERT_DIR "${CMAKE_CURRENT_BINARY_DIR}/v41_experts")
 set(DS41RT_V41_EXPERT_OBJECTS)

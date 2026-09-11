@@ -40,14 +40,15 @@ bool overlaps(const void* a, uint64_t a_bytes, const void* b, uint64_t b_bytes) 
   return av <= bv ? bv - av < a_bytes : av - bv < b_bytes;
 }
 
+template<int Routes>
 __global__ void compact_routes(const float* routes, __nv_bfloat16* output,
     uint64_t count) {
   for (uint64_t offset = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
        offset < count; offset += uint64_t(gridDim.x) * blockDim.x) {
-    const uint64_t base = (offset / hidden) * 6 * hidden + offset % hidden;
+    const uint64_t base = (offset / hidden) * Routes * hidden + offset % hidden;
     float value = routes[base];
 #pragma unroll
-    for (int route = 1; route < 6; ++route)
+    for (int route = 1; route < Routes; ++route)
       value = __fadd_rn(value, routes[base + route * hidden]);
     output[offset] = __float2bfloat16_rn(value);
   }
@@ -77,8 +78,22 @@ extern "C" int32_t ds41rt_v41_compact_routes_bf16_async(const float* routes,
       overlaps(routes, count * 6 * 4, output, count * 2))
     return cudaErrorInvalidValue;
   const unsigned blocks = static_cast<unsigned>(count / 256 < 4096 ? count / 256 : 4096);
-  compact_routes<<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(
+  compact_routes<6><<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(
       routes, reinterpret_cast<__nv_bfloat16*>(output), count);
+  return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_compact_tokens_bf16_async(const float* tokens,
+    uint16_t* output, uint32_t rows, void* stream) {
+  const uint64_t count = uint64_t(rows) * hidden;
+  if (!rows || rows > 4096 || !tokens || !output ||
+      reinterpret_cast<uintptr_t>(tokens) % 4 || reinterpret_cast<uintptr_t>(output) % 2 ||
+      reinterpret_cast<uintptr_t>(tokens) > UINTPTR_MAX - count * 4 ||
+      reinterpret_cast<uintptr_t>(output) > UINTPTR_MAX - count * 2 ||
+      overlaps(tokens, count * 4, output, count * 2)) return cudaErrorInvalidValue;
+  const unsigned blocks = static_cast<unsigned>(count / 256 < 4096 ? count / 256 : 4096);
+  compact_routes<1><<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(
+      tokens, reinterpret_cast<__nv_bfloat16*>(output), count);
   return cudaGetLastError();
 }
 

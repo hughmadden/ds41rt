@@ -210,6 +210,7 @@ type ReduceCompactFn =
 pub struct V41CompactReducer<'a> {
     _library: &'a NativeLibrary,
     compact: CompactFn,
+    compact_tokens: Option<CompactFn>,
     reduce: ReduceCompactFn,
 }
 impl V41CompactReducer<'_> {
@@ -230,6 +231,18 @@ impl V41CompactReducer<'_> {
             status == 0,
             "V4.1 route compaction failed with CUDA status {status}"
         );
+        Ok(())
+    }
+
+    /// Round an already accumulated FP32 token vector once to BF16.
+    /// # Safety
+    /// Input is CUDA FP32 [rows,5120], output CUDA BF16 [rows,5120].
+    /// Both are disjoint, on the current device, and live through stream completion.
+    pub unsafe fn compact_tokens(&self, tokens: *const f32, output: *mut u16,
+        rows: u32, stream: *mut c_void) -> Result<()> {
+        let function = self.compact_tokens.context("native token compaction unavailable")?;
+        let status = unsafe { function(tokens, output, rows, stream) };
+        ensure!(status == 0, "V4.1 token compaction failed with CUDA status {status}");
         Ok(())
     }
 
@@ -292,6 +305,7 @@ pub struct V41ExpertKernel<'a> {
     bind_scratch: BindScratchFn,
     initialize_scratch: InitScratchFn,
     info: V41ExpertInfo,
+    token_accumulation: bool,
 }
 
 impl NativeLibrary {
@@ -303,6 +317,7 @@ impl NativeLibrary {
                     .lib
                     .get::<CompactFn>(b"ds41rt_v41_compact_routes_bf16_async")?
             },
+            compact_tokens: unsafe { self.lib.get::<CompactFn>(b"ds41rt_v41_compact_tokens_bf16_async").ok().map(|f| *f) },
             reduce: unsafe {
                 *self
                     .lib
@@ -353,7 +368,7 @@ impl NativeLibrary {
             "V4.1 expert metadata failed with CUDA status {status}"
         );
         ensure!(
-            info.abi_version == 2 && info.hidden_size == 5120,
+            matches!(info.abi_version, 2 | 3) && info.hidden_size == 5120,
             "unsupported V4.1 native expert ABI"
         );
         ensure!(
@@ -405,6 +420,16 @@ impl NativeLibrary {
             status == 0,
             "V4.1 expert initialization failed with CUDA status {status}"
         );
+        let token_accumulation = if info.abi_version == 3 {
+            type OutputKindFn = unsafe extern "C" fn(i32, *mut u32) -> i32;
+            let query = unsafe { self.lib.get::<OutputKindFn>(b"ds41rt_v41_expert_output_kind")? };
+            let mut kind = u32::MAX;
+            let status = unsafe { query(i32::try_from(capacity)?, &mut kind) };
+            ensure!(status == 0 && kind == 1 && info.role == 1, "unsupported V4.1 ABI 3 output layout");
+            // Reject incomplete libraries at plan time, before any graph or request.
+            unsafe { self.lib.get::<CompactFn>(b"ds41rt_v41_compact_tokens_bf16_async")?; }
+            true
+        } else { false };
         Ok(V41ExpertKernel {
             _library: self,
             handle: NonNull::new(handle).context("native expert returned a null kernel handle")?,
@@ -412,11 +437,14 @@ impl NativeLibrary {
             bind_scratch,
             initialize_scratch,
             info,
+            token_accumulation,
         })
     }
 }
 
 impl V41ExpertKernel<'_> {
+    pub fn accumulates_tokens(&self) -> bool { self.token_accumulation }
+
     pub fn info(&self) -> &V41ExpertInfo {
         &self.info
     }

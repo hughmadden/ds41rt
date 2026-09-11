@@ -5,6 +5,9 @@
 #include <mutex>
 #include "v41_expert_variants.h"
 #include "v41_input_quant_dispatch.h"
+#ifndef DS41RT_V41_OUTPUT_KIND
+#define DS41RT_V41_OUTPUT_KIND(capacity) 0
+#endif
 
 static_assert(sizeof(ds41rt_v41_expert_info_t) == 64);
 static_assert(sizeof(ds41rt_v41_expert_launch_t) == 392);
@@ -71,6 +74,13 @@ extern "C" int32_t ds41rt_v41_expert_info(int32_t capacity, ds41rt_v41_expert_in
   auto* variant = by_capacity(capacity);
   if (!variant || !out) return cudaErrorInvalidValue;
   *out = variant->info;
+  return cudaSuccess;
+}
+
+extern "C" int32_t ds41rt_v41_expert_output_kind(int32_t capacity, uint32_t* out) {
+  auto* variant = by_capacity(capacity);
+  if (!variant || !out) return cudaErrorInvalidValue;
+  *out = DS41RT_V41_OUTPUT_KIND(capacity);
   return cudaSuccess;
 }
 

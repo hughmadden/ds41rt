@@ -17,7 +17,7 @@ os.environ["B12X_COMPILE_MEMORY_CACHE"] = "0"
 import _pinned_sparkinfer
 
 
-def export(output, capacities, width):
+def export(output, capacities, width, atomic_min_capacity=None):
     import torch
     import cutlass
     import cutlass.cute as cute
@@ -44,6 +44,7 @@ def export(output, capacities, width):
     )
     includes, entries = [], []
     for capacity in capacities:
+        atomic = atomic_min_capacity is not None and capacity >= atomic_min_capacity
         selected_width = width[capacity] if isinstance(width, dict) else width
         routes = capacity * 6
         planes = (576 + selected_width - 1) // selected_width
@@ -63,8 +64,10 @@ def export(output, capacities, width):
             (cutlass.Int32, (routes, 19), (19, 1)),
             (cutlass.Float32, (routes,), (1,)),
             (cutlass.Int32, (routes,), (1,)),
-            (cutlass.Float32, (planes, routes, 5120), (routes * 5120, 5120, 1)),
-            (cutlass.Float32, (routes, 5120), (5120, 1)),
+            (cutlass.Float32, (1,), (1,)) if atomic else
+                (cutlass.Float32, (planes, routes, 5120), (routes * 5120, 5120, 1)),
+            (cutlass.Float32, (capacity * 5120,), (1,)) if atomic else
+                (cutlass.Float32, (routes, 5120), (5120, 1)),
         ]
         args = [
             make_fake_tensor(dtype, shape, stride, assumed_align=16)
@@ -72,7 +75,7 @@ def export(output, capacities, width):
         ]
         label = f"v41_slices_m{capacity}_w{selected_width}"
         compiled = cute.compile(
-            V41SlicePipeline(capacity, selected_width),
+            V41SlicePipeline(capacity, selected_width, atomic_tokens=atomic),
             *args,
             cutlass.Int32(capacity),
             current_cuda_stream(),
@@ -166,7 +169,7 @@ def export(output, capacities, width):
             ]
         )
         info = [
-            2,
+            3 if atomic else 2,
             1,
             384,
             5120,
@@ -200,6 +203,8 @@ def export(output, capacities, width):
             dict(
                 name=label,
                 width=selected_width,
+                output_kind="fp32_tokens" if atomic else "fp32_routes",
+                native_abi_version=3 if atomic else 2,
                 capacity_rows=capacity,
                 core_scratch_nbytes=offset,
                 scratch=scratch,
@@ -215,6 +220,9 @@ def export(output, capacities, width):
                 f"#define DS41RT_V41_CC_MINOR {props.minor}",
                 f"#define DS41RT_V41_SMS {props.multi_processor_count}",
                 "#define DS41RT_V41_VARIANTS " + ",".join(entries),
+                "#define DS41RT_V41_OUTPUT_KIND(capacity) (" +
+                (" || ".join(f"((capacity)=={v['capacity_rows']})" for v in manifest['variants']
+                             if v['output_kind'] == 'fp32_tokens') or "0") + " ? 1u : 0u)",
                 "",
             ]
         )
@@ -237,6 +245,8 @@ if __name__ == "__main__":
         required=True,
         help="64/128/192 or explicit capacity:width pairs, e.g. 1:64,16:192,80:192",
     )
+    parser.add_argument("--atomic-min-capacity", type=int, choices=[256, 1024, 4096],
+                        help="Use ABI 3 direct FP32 token accumulation at these larger capacities")
     args = parser.parse_args()
     capacities = tuple(int(x) for x in args.rows.split(","))
     if (
@@ -259,4 +269,4 @@ if __name__ == "__main__":
             raise ValueError("width must be 64, 128 or 192")
     except (ValueError, TypeError) as error:
         parser.error(str(error))
-    export(args.output_dir, capacities, width)
+    export(args.output_dir, capacities, width, args.atomic_min_capacity)

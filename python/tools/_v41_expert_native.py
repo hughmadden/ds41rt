@@ -98,7 +98,16 @@ class Native:
             info.topk,
             info.capacity_rows,
             info.input_dtype,
-        ) == (2, 1, 384, 5120, 576, 640, 6, capacity, 7)
+        ) == (info.abi_version, 1, 384, 5120, 576, 640, 6, capacity, 7)
+        assert info.abi_version in (2, 3)
+        self.token_accumulation = info.abi_version == 3
+        if self.token_accumulation:
+            query = lib.ds41rt_v41_expert_output_kind
+            query.argtypes = [I, C.POINTER(U)]
+            query.restype = I
+            kind = U(99)
+            check(query(capacity, C.byref(kind)))
+            assert kind.value == 1
         check(lib.ds41rt_v41_expert_initialize(capacity, C.byref(self.handle)))
         self.storage = torch.empty(info.scratch_bytes, device="cuda", dtype=torch.uint8)
         self.args = Launch()
@@ -146,10 +155,11 @@ class Native:
         ]:
             setattr(self.args, name, getattr(info, name))
         offset = slots[41] - self.storage.data_ptr()
+        output_rows = capacity if self.token_accumulation else capacity * 6
         self.output = (
-            self.storage[offset : offset + capacity * 6 * 5120 * 4]
+            self.storage[offset : offset + output_rows * 5120 * 4]
             .view(torch.float32)
-            .reshape(capacity * 6, 5120)
+            .reshape(output_rows, 5120)
         )
 
     def run(self, rows):
