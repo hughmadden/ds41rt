@@ -6,6 +6,8 @@ use ds41rt_ffi::{
     V41RouteReducer,
 };
 use std::ffi::c_void;
+mod timing;
+use timing::ExpertTiming;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ExpertExecutionBudget {
@@ -39,6 +41,7 @@ pub(crate) struct ExpertExecution<'weights, 'library> {
     library: &'library NativeLibrary,
     kernel: V41ExpertKernel<'library>,
     reducer: V41RouteReducer<'library>,
+    timing: Option<ExpertTiming<'library>>,
     scratch: DeviceAllocation<'library>,
     hidden: DeviceAllocation<'library>,
     ids: DeviceAllocation<'library>,
@@ -91,6 +94,13 @@ impl<'library> ExpertWeights<'library> {
         );
         let kernel = library.v41_expert_kernel(capacity)?;
         let reducer = library.v41_route_reducer()?;
+        let timing = if kernel.info().role == 1
+            && tracing::enabled!(target: "ds41rt::expert_timing", tracing::Level::DEBUG)
+        {
+            Some(ExpertTiming::new(library)?)
+        } else {
+            None
+        };
         let scratch = DeviceAllocation::new(library, budget.scratch_bytes)?;
         let hidden = DeviceAllocation::new(library, budget.hidden_bytes)?;
         let ids = DeviceAllocation::new(library, budget.routing_bytes / 2)?;
@@ -141,6 +151,7 @@ impl<'library> ExpertWeights<'library> {
             library,
             kernel,
             reducer,
+            timing,
             compact_reducer,
             compact_output,
             scratch,
@@ -495,6 +506,7 @@ impl ExpertExecution<'_, '_> {
             "host exchange is too small"
         );
         request.copy_routes_into(&mut exchange.ids, &mut exchange.routing)?;
+        let started = self.timing.as_ref().map(|_| std::time::Instant::now());
         self.synchronize()?;
         self.library
             .copy_h2d(self.hidden.buffer, request.hidden())?;
@@ -512,7 +524,20 @@ impl ExpertExecution<'_, '_> {
                 self.routing.buffer,
                 std::slice::from_raw_parts(exchange.routing.as_ptr().cast::<u8>(), routes * 4),
             )?;
+        }
+        let uploaded_us = started.map(|t| t.elapsed().as_micros() as u64);
+        if let Some(timing) = &self.timing {
+            unsafe {
+                timing.record(0, self.stream.raw)?;
+            }
+        }
+        unsafe {
             self.launch(request.rows(), false)?;
+        }
+        if let Some(timing) = &self.timing {
+            unsafe {
+                timing.record(1, self.stream.raw)?;
+            }
         }
         let output = self
             .compact_output
@@ -530,11 +555,36 @@ impl ExpertExecution<'_, '_> {
                     self.stream.raw,
                 )?;
         }
+        if let Some(timing) = &self.timing {
+            unsafe {
+                timing.record(2, self.stream.raw)?;
+            }
+        }
         self.synchronize()?;
+        let executed_us = started.map(|t| t.elapsed().as_micros() as u64);
         self.library.copy_d2h(
             &mut exchange.partials[..bytes],
             Ds41rtDeviceBuffer { bytes, ..output },
         )?;
+        if let (Some(timing), Some(started)) = (&self.timing, started) {
+            let total_us = started.elapsed().as_micros() as u64;
+            let (kernel_us, compact_us) = unsafe { timing.elapsed_us()? };
+            let mut histogram = [0u32; 384];
+            for &expert in &exchange.ids[..routes] {
+                histogram[expert as usize] += 1;
+            }
+            let active_experts = histogram.iter().filter(|&&count| count != 0).count();
+            let unique_expert_weight_bytes =
+                self._weights.budget().resident_bytes / 384 * active_experts;
+            tracing::debug!(target: "ds41rt::expert_timing",
+                layer, executor_id, rows=request.rows(), active_experts,
+                max_expert_rows=histogram.iter().copied().max().unwrap_or(0),
+                unique_expert_weight_bytes, output_bytes=bytes,
+                upload_us=uploaded_us.unwrap(), kernel_us, compact_us,
+                execution_host_us=executed_us.unwrap()-uploaded_us.unwrap(),
+                download_us=total_us-executed_us.unwrap(), total_us,
+                "native expert execution");
+        }
         request.response(executor_id, &exchange.partials[..bytes])
     }
 }

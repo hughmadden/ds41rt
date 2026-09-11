@@ -1,0 +1,1046 @@
+{
+  "scope": "Instrumented development workload. GPU event intervals separate expert execution and compaction; host upload/download exclude socket transfer. Unique-expert packed bytes exclude repeated reads and are not measured DRAM traffic. Server execute time also includes queueing/staging; write time is host socket handling, not pure link time.",
+  "groups": [
+    {
+      "source": "/tmp/ds41-expert-timing-dodo.log",
+      "kind": "gpu_and_staging",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "active_experts": {
+          "median": 6.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "compact_us": {
+          "median": 3.9039998054504395,
+          "p95": 3.936000108718872,
+          "max": 31.104000091552734
+        },
+        "download_us": {
+          "median": 12.0,
+          "p95": 17.0,
+          "max": 41.0
+        },
+        "execution_host_us": {
+          "median": 428.0,
+          "p95": 450.0,
+          "max": 793.0
+        },
+        "kernel_us": {
+          "median": 415.34400939941406,
+          "p95": 433.1519775390625,
+          "max": 760.927978515625
+        },
+        "max_expert_rows": {
+          "median": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        "output_bytes": {
+          "median": 10240.0,
+          "p95": 10240.0,
+          "max": 10240.0
+        },
+        "total_us": {
+          "median": 470.0,
+          "p95": 513.0,
+          "max": 873.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 31334400.0,
+          "p95": 31334400.0,
+          "max": 31334400.0
+        },
+        "upload_us": {
+          "median": 30.0,
+          "p95": 48.0,
+          "max": 108.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-dodo.log",
+      "kind": "gpu_and_staging",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "active_experts": {
+          "median": 22.0,
+          "p95": 30.0,
+          "max": 35.0
+        },
+        "compact_us": {
+          "median": 3.9039998054504395,
+          "p95": 3.936000108718872,
+          "max": 7.039999961853027
+        },
+        "download_us": {
+          "median": 12.0,
+          "p95": 13.0,
+          "max": 37.0
+        },
+        "execution_host_us": {
+          "median": 672.0,
+          "p95": 950.0,
+          "max": 1084.0
+        },
+        "kernel_us": {
+          "median": 658.7200012207031,
+          "p95": 937.0239868164062,
+          "max": 1067.263916015625
+        },
+        "max_expert_rows": {
+          "median": 4.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "output_bytes": {
+          "median": 61440.0,
+          "p95": 61440.0,
+          "max": 61440.0
+        },
+        "total_us": {
+          "median": 720.5,
+          "p95": 1000.0,
+          "max": 1153.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 114892800.0,
+          "p95": 156672000.0,
+          "max": 182784000.0
+        },
+        "upload_us": {
+          "median": 33.0,
+          "p95": 58.0,
+          "max": 112.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-dodo.log",
+      "kind": "gpu_and_staging",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "active_experts": {
+          "median": 86.0,
+          "p95": 116.0,
+          "max": 208.0
+        },
+        "compact_us": {
+          "median": 24.38399887084961,
+          "p95": 32.0,
+          "max": 67.58399963378906
+        },
+        "download_us": {
+          "median": 27.0,
+          "p95": 30.0,
+          "max": 53.0
+        },
+        "execution_host_us": {
+          "median": 3189.0,
+          "p95": 3879.0,
+          "max": 42565.0
+        },
+        "kernel_us": {
+          "median": 3154.944091796875,
+          "p95": 3840.89599609375,
+          "max": 6087.583984375
+        },
+        "max_expert_rows": {
+          "median": 38.0,
+          "p95": 63.0,
+          "max": 80.0
+        },
+        "output_bytes": {
+          "median": 819200.0,
+          "p95": 819200.0,
+          "max": 819200.0
+        },
+        "total_us": {
+          "median": 3295.0,
+          "p95": 3993.0,
+          "max": 44133.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 449126400.0,
+          "p95": 605798400.0,
+          "max": 1086259200.0
+        },
+        "upload_us": {
+          "median": 62.0,
+          "p95": 176.0,
+          "max": 1534.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-dodo.log",
+      "kind": "server_boundary",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "execute_ms": {
+          "median": 0.759,
+          "p95": 1.136,
+          "max": 1.963
+        },
+        "request_wire_bytes": {
+          "median": 10448.0,
+          "p95": 10448.0,
+          "max": 10448.0
+        },
+        "response_wire_bytes": {
+          "median": 10340.0,
+          "p95": 10340.0,
+          "max": 10340.0
+        },
+        "write_ms": {
+          "median": 0.031,
+          "p95": 0.093,
+          "max": 0.209
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-dodo.log",
+      "kind": "server_boundary",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "execute_ms": {
+          "median": 1.0575,
+          "p95": 1.585,
+          "max": 2.053
+        },
+        "request_wire_bytes": {
+          "median": 62208.0,
+          "p95": 62208.0,
+          "max": 62208.0
+        },
+        "response_wire_bytes": {
+          "median": 61560.0,
+          "p95": 61560.0,
+          "max": 61560.0
+        },
+        "write_ms": {
+          "median": 0.033,
+          "p95": 0.091,
+          "max": 0.172
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-dodo.log",
+      "kind": "server_boundary",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "execute_ms": {
+          "median": 3.9115,
+          "p95": 4.75,
+          "max": 44.701
+        },
+        "request_wire_bytes": {
+          "median": 828256.0,
+          "p95": 828256.0,
+          "max": 828256.0
+        },
+        "response_wire_bytes": {
+          "median": 819616.0,
+          "p95": 819616.0,
+          "max": 819616.0
+        },
+        "write_ms": {
+          "median": 0.173,
+          "p95": 0.478,
+          "max": 2.523
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-emu.log",
+      "kind": "gpu_and_staging",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "active_experts": {
+          "median": 6.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "compact_us": {
+          "median": 3.9039998054504395,
+          "p95": 3.936000108718872,
+          "max": 19.487998962402344
+        },
+        "download_us": {
+          "median": 10.0,
+          "p95": 18.0,
+          "max": 52.0
+        },
+        "execution_host_us": {
+          "median": 426.0,
+          "p95": 454.0,
+          "max": 785.0
+        },
+        "kernel_us": {
+          "median": 414.5920104980469,
+          "p95": 436.2559814453125,
+          "max": 773.4719848632812
+        },
+        "max_expert_rows": {
+          "median": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        "output_bytes": {
+          "median": 10240.0,
+          "p95": 10240.0,
+          "max": 10240.0
+        },
+        "total_us": {
+          "median": 463.0,
+          "p95": 522.0,
+          "max": 836.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 31334400.0,
+          "p95": 31334400.0,
+          "max": 31334400.0
+        },
+        "upload_us": {
+          "median": 26.0,
+          "p95": 54.0,
+          "max": 111.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-emu.log",
+      "kind": "gpu_and_staging",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "active_experts": {
+          "median": 22.0,
+          "p95": 30.0,
+          "max": 35.0
+        },
+        "compact_us": {
+          "median": 3.9039998054504395,
+          "p95": 3.936000108718872,
+          "max": 21.920000076293945
+        },
+        "download_us": {
+          "median": 11.0,
+          "p95": 17.0,
+          "max": 51.0
+        },
+        "execution_host_us": {
+          "median": 678.0,
+          "p95": 961.0,
+          "max": 1074.0
+        },
+        "kernel_us": {
+          "median": 664.2559814453125,
+          "p95": 950.7520141601562,
+          "max": 1057.823974609375
+        },
+        "max_expert_rows": {
+          "median": 4.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "output_bytes": {
+          "median": 61440.0,
+          "p95": 61440.0,
+          "max": 61440.0
+        },
+        "total_us": {
+          "median": 732.0,
+          "p95": 1017.0,
+          "max": 1161.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 114892800.0,
+          "p95": 156672000.0,
+          "max": 182784000.0
+        },
+        "upload_us": {
+          "median": 47.0,
+          "p95": 67.0,
+          "max": 138.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-emu.log",
+      "kind": "gpu_and_staging",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "active_experts": {
+          "median": 86.0,
+          "p95": 116.0,
+          "max": 208.0
+        },
+        "compact_us": {
+          "median": 24.38399887084961,
+          "p95": 32.57600021362305,
+          "max": 59.20000076293945
+        },
+        "download_us": {
+          "median": 30.0,
+          "p95": 32.0,
+          "max": 135.0
+        },
+        "execution_host_us": {
+          "median": 3218.0,
+          "p95": 3932.0,
+          "max": 6218.0
+        },
+        "kernel_us": {
+          "median": 3182.384033203125,
+          "p95": 3893.31201171875,
+          "max": 6170.27197265625
+        },
+        "max_expert_rows": {
+          "median": 38.0,
+          "p95": 63.0,
+          "max": 80.0
+        },
+        "output_bytes": {
+          "median": 819200.0,
+          "p95": 819200.0,
+          "max": 819200.0
+        },
+        "total_us": {
+          "median": 3384.5,
+          "p95": 4129.0,
+          "max": 6511.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 449126400.0,
+          "p95": 605798400.0,
+          "max": 1086259200.0
+        },
+        "upload_us": {
+          "median": 146.0,
+          "p95": 216.0,
+          "max": 1648.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-emu.log",
+      "kind": "server_boundary",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "execute_ms": {
+          "median": 0.696,
+          "p95": 1.036,
+          "max": 1.584
+        },
+        "request_wire_bytes": {
+          "median": 10448.0,
+          "p95": 10448.0,
+          "max": 10448.0
+        },
+        "response_wire_bytes": {
+          "median": 10340.0,
+          "p95": 10340.0,
+          "max": 10340.0
+        },
+        "write_ms": {
+          "median": 0.024,
+          "p95": 0.098,
+          "max": 0.212
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-emu.log",
+      "kind": "server_boundary",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "execute_ms": {
+          "median": 1.0139999999999998,
+          "p95": 1.466,
+          "max": 2.23
+        },
+        "request_wire_bytes": {
+          "median": 62208.0,
+          "p95": 62208.0,
+          "max": 62208.0
+        },
+        "response_wire_bytes": {
+          "median": 61560.0,
+          "p95": 61560.0,
+          "max": 61560.0
+        },
+        "write_ms": {
+          "median": 0.027,
+          "p95": 0.13,
+          "max": 0.227
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-emu.log",
+      "kind": "server_boundary",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "execute_ms": {
+          "median": 4.0825,
+          "p95": 5.005,
+          "max": 7.281
+        },
+        "request_wire_bytes": {
+          "median": 828256.0,
+          "p95": 828256.0,
+          "max": 828256.0
+        },
+        "response_wire_bytes": {
+          "median": 819616.0,
+          "p95": 819616.0,
+          "max": 819616.0
+        },
+        "write_ms": {
+          "median": 0.3615,
+          "p95": 0.526,
+          "max": 0.619
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-kiwi.log",
+      "kind": "gpu_and_staging",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "active_experts": {
+          "median": 6.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "compact_us": {
+          "median": 3.936000108718872,
+          "p95": 3.9679999351501465,
+          "max": 7.072000026702881
+        },
+        "download_us": {
+          "median": 12.0,
+          "p95": 13.0,
+          "max": 41.0
+        },
+        "execution_host_us": {
+          "median": 430.0,
+          "p95": 452.0,
+          "max": 778.0
+        },
+        "kernel_us": {
+          "median": 417.2480163574219,
+          "p95": 436.2239990234375,
+          "max": 764.6080322265625
+        },
+        "max_expert_rows": {
+          "median": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        "output_bytes": {
+          "median": 10240.0,
+          "p95": 10240.0,
+          "max": 10240.0
+        },
+        "total_us": {
+          "median": 472.0,
+          "p95": 513.0,
+          "max": 835.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 31334400.0,
+          "p95": 31334400.0,
+          "max": 31334400.0
+        },
+        "upload_us": {
+          "median": 30.0,
+          "p95": 48.0,
+          "max": 174.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-kiwi.log",
+      "kind": "gpu_and_staging",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "active_experts": {
+          "median": 22.0,
+          "p95": 30.0,
+          "max": 35.0
+        },
+        "compact_us": {
+          "median": 3.936000108718872,
+          "p95": 3.9679999351501465,
+          "max": 14.175999641418457
+        },
+        "download_us": {
+          "median": 12.0,
+          "p95": 13.0,
+          "max": 40.0
+        },
+        "execution_host_us": {
+          "median": 671.0,
+          "p95": 954.0,
+          "max": 1178.0
+        },
+        "kernel_us": {
+          "median": 658.0960083007812,
+          "p95": 938.4320068359375,
+          "max": 1165.31201171875
+        },
+        "max_expert_rows": {
+          "median": 4.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "output_bytes": {
+          "median": 61440.0,
+          "p95": 61440.0,
+          "max": 61440.0
+        },
+        "total_us": {
+          "median": 721.0,
+          "p95": 1004.0,
+          "max": 1238.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 114892800.0,
+          "p95": 156672000.0,
+          "max": 182784000.0
+        },
+        "upload_us": {
+          "median": 34.0,
+          "p95": 59.0,
+          "max": 80.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-kiwi.log",
+      "kind": "gpu_and_staging",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "active_experts": {
+          "median": 86.0,
+          "p95": 116.0,
+          "max": 208.0
+        },
+        "compact_us": {
+          "median": 23.392000198364258,
+          "p95": 30.59200096130371,
+          "max": 66.30400085449219
+        },
+        "download_us": {
+          "median": 26.0,
+          "p95": 29.0,
+          "max": 58.0
+        },
+        "execution_host_us": {
+          "median": 3177.0,
+          "p95": 3899.0,
+          "max": 5970.0
+        },
+        "kernel_us": {
+          "median": 3145.02392578125,
+          "p95": 3865.7919921875,
+          "max": 5923.2001953125
+        },
+        "max_expert_rows": {
+          "median": 38.0,
+          "p95": 63.0,
+          "max": 80.0
+        },
+        "output_bytes": {
+          "median": 819200.0,
+          "p95": 819200.0,
+          "max": 819200.0
+        },
+        "total_us": {
+          "median": 3272.5,
+          "p95": 3999.0,
+          "max": 6595.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 449126400.0,
+          "p95": 605798400.0,
+          "max": 1086259200.0
+        },
+        "upload_us": {
+          "median": 67.0,
+          "p95": 122.0,
+          "max": 1725.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-kiwi.log",
+      "kind": "server_boundary",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "execute_ms": {
+          "median": 0.765,
+          "p95": 1.17,
+          "max": 1.791
+        },
+        "request_wire_bytes": {
+          "median": 10448.0,
+          "p95": 10448.0,
+          "max": 10448.0
+        },
+        "response_wire_bytes": {
+          "median": 10340.0,
+          "p95": 10340.0,
+          "max": 10340.0
+        },
+        "write_ms": {
+          "median": 0.03,
+          "p95": 0.119,
+          "max": 0.155
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-kiwi.log",
+      "kind": "server_boundary",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "execute_ms": {
+          "median": 1.046,
+          "p95": 1.552,
+          "max": 2.366
+        },
+        "request_wire_bytes": {
+          "median": 62208.0,
+          "p95": 62208.0,
+          "max": 62208.0
+        },
+        "response_wire_bytes": {
+          "median": 61560.0,
+          "p95": 61560.0,
+          "max": 61560.0
+        },
+        "write_ms": {
+          "median": 0.035,
+          "p95": 0.09,
+          "max": 0.147
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-kiwi.log",
+      "kind": "server_boundary",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "execute_ms": {
+          "median": 3.681,
+          "p95": 4.549,
+          "max": 7.611
+        },
+        "request_wire_bytes": {
+          "median": 828256.0,
+          "p95": 828256.0,
+          "max": 828256.0
+        },
+        "response_wire_bytes": {
+          "median": 819616.0,
+          "p95": 819616.0,
+          "max": 819616.0
+        },
+        "write_ms": {
+          "median": 0.144,
+          "p95": 0.239,
+          "max": 2.03
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-ostrich.log",
+      "kind": "gpu_and_staging",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "active_experts": {
+          "median": 6.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "compact_us": {
+          "median": 3.9039998054504395,
+          "p95": 3.936000108718872,
+          "max": 14.144000053405762
+        },
+        "download_us": {
+          "median": 12.0,
+          "p95": 18.0,
+          "max": 41.0
+        },
+        "execution_host_us": {
+          "median": 430.0,
+          "p95": 453.0,
+          "max": 679.0
+        },
+        "kernel_us": {
+          "median": 417.1519775390625,
+          "p95": 435.552001953125,
+          "max": 666.3679809570312
+        },
+        "max_expert_rows": {
+          "median": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        "output_bytes": {
+          "median": 10240.0,
+          "p95": 10240.0,
+          "max": 10240.0
+        },
+        "total_us": {
+          "median": 473.0,
+          "p95": 519.0,
+          "max": 739.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 31334400.0,
+          "p95": 31334400.0,
+          "max": 31334400.0
+        },
+        "upload_us": {
+          "median": 31.0,
+          "p95": 51.0,
+          "max": 171.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-ostrich.log",
+      "kind": "gpu_and_staging",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "active_experts": {
+          "median": 22.0,
+          "p95": 30.0,
+          "max": 35.0
+        },
+        "compact_us": {
+          "median": 3.9039998054504395,
+          "p95": 3.936000108718872,
+          "max": 10.208000183105469
+        },
+        "download_us": {
+          "median": 11.0,
+          "p95": 13.0,
+          "max": 40.0
+        },
+        "execution_host_us": {
+          "median": 675.0,
+          "p95": 971.0,
+          "max": 1173.0
+        },
+        "kernel_us": {
+          "median": 662.0640258789062,
+          "p95": 954.5599975585938,
+          "max": 1163.2640380859375
+        },
+        "max_expert_rows": {
+          "median": 4.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        "output_bytes": {
+          "median": 61440.0,
+          "p95": 61440.0,
+          "max": 61440.0
+        },
+        "total_us": {
+          "median": 728.0,
+          "p95": 1024.0,
+          "max": 1200.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 114892800.0,
+          "p95": 156672000.0,
+          "max": 182784000.0
+        },
+        "upload_us": {
+          "median": 35.0,
+          "p95": 63.0,
+          "max": 152.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-ostrich.log",
+      "kind": "gpu_and_staging",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "active_experts": {
+          "median": 86.0,
+          "p95": 116.0,
+          "max": 208.0
+        },
+        "compact_us": {
+          "median": 24.38399887084961,
+          "p95": 32.57600021362305,
+          "max": 57.152000427246094
+        },
+        "download_us": {
+          "median": 28.0,
+          "p95": 33.0,
+          "max": 70.0
+        },
+        "execution_host_us": {
+          "median": 3205.0,
+          "p95": 3891.0,
+          "max": 6417.0
+        },
+        "kernel_us": {
+          "median": 3171.6639404296875,
+          "p95": 3859.10400390625,
+          "max": 6369.82373046875
+        },
+        "max_expert_rows": {
+          "median": 38.0,
+          "p95": 63.0,
+          "max": 80.0
+        },
+        "output_bytes": {
+          "median": 819200.0,
+          "p95": 819200.0,
+          "max": 819200.0
+        },
+        "total_us": {
+          "median": 3331.0,
+          "p95": 4048.0,
+          "max": 6509.0
+        },
+        "unique_expert_weight_bytes": {
+          "median": 449126400.0,
+          "p95": 605798400.0,
+          "max": 1086259200.0
+        },
+        "upload_us": {
+          "median": 74.0,
+          "p95": 202.0,
+          "max": 1600.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-ostrich.log",
+      "kind": "server_boundary",
+      "rows": 1,
+      "samples": 3480,
+      "metrics": {
+        "execute_ms": {
+          "median": 0.8015000000000001,
+          "p95": 1.239,
+          "max": 1.846
+        },
+        "request_wire_bytes": {
+          "median": 10448.0,
+          "p95": 10448.0,
+          "max": 10448.0
+        },
+        "response_wire_bytes": {
+          "median": 10340.0,
+          "p95": 10340.0,
+          "max": 10340.0
+        },
+        "write_ms": {
+          "median": 0.029,
+          "p95": 0.122,
+          "max": 0.194
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-ostrich.log",
+      "kind": "server_boundary",
+      "rows": 6,
+      "samples": 1160,
+      "metrics": {
+        "execute_ms": {
+          "median": 1.1475,
+          "p95": 1.702,
+          "max": 2.3
+        },
+        "request_wire_bytes": {
+          "median": 62208.0,
+          "p95": 62208.0,
+          "max": 62208.0
+        },
+        "response_wire_bytes": {
+          "median": 61560.0,
+          "p95": 61560.0,
+          "max": 61560.0
+        },
+        "write_ms": {
+          "median": 0.032,
+          "p95": 0.136,
+          "max": 0.186
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-expert-timing-ostrich.log",
+      "kind": "server_boundary",
+      "rows": 80,
+      "samples": 1400,
+      "metrics": {
+        "execute_ms": {
+          "median": 3.8745000000000003,
+          "p95": 4.877,
+          "max": 7.059
+        },
+        "request_wire_bytes": {
+          "median": 828256.0,
+          "p95": 828256.0,
+          "max": 828256.0
+        },
+        "response_wire_bytes": {
+          "median": 819616.0,
+          "p95": 819616.0,
+          "max": 819616.0
+        },
+        "write_ms": {
+          "median": 0.1845,
+          "p95": 0.524,
+          "max": 1.457
+        }
+      }
+    }
+  ],
+  "worker_sha256": "70d53762559e0bf0b9c40eedcc53ee5bde5d3bce79bef465bc1a6c8315d74869",
+  "native_library_sha256": "51d49d8ce5fe41e290f447bfe86c854586dcf3aac2e2332422cf54f85045aed4",
+  "qualification": {
+    "full_target_logit_arrays_byte_exact": 3,
+    "bytes_per_array": 8273920,
+    "quality_cases": 8,
+    "target_speculative_text_and_usage_equal": true,
+    "objective_cases_pass": 6
+  }
+}

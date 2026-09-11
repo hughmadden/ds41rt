@@ -134,6 +134,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Compare alternating waves with alternatives on the complete four-Spark AFD topology.
 - [ ] Tune fusions, shapes, expert reduction, engram prefetch and memory budgets using measured full-stack bottlenecks.
 - [ ] Prioritize expert tuning with separately recorded GEMM, weight-traffic, output, staging, transport and coordinator-feed costs; then profile fixed-window/proposal allocation, shared CSA2/index reuse and attention execution. Extend b12x with V4.1-specific CuTeDSL kernels when needed, preserving source ownership and model arithmetic rather than fitting old attention contracts.
+- [x] Add opt-in, reusable GPU-event expert/compactor timings plus host staging and routing-occupancy records; [four-Spark measurements](docs/ds41-expert-cost-profile.md) separate the roughly 415 µs decode kernel from broader server costs and preserve all three tested full-target logit arrays exactly. Actual DRAM traffic, large-prefill scaling and kernel/transport optimizations remain open.
 - [ ] Run sustained load, cancellation, recovery and restart tests before publishing release claims.
 - [x] Remove the offline V4 quantization pipeline, converter images/operations, GPTQModel and exllamav3 source dependencies, and old Docker comparison benchmarks.
 - [ ] Remove the remaining inherited V4 execution and alternate-format runtime paths, model-specific tools and tests while preserving serving features.

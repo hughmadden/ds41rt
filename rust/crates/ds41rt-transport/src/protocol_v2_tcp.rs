@@ -483,7 +483,7 @@ pub(crate) async fn handle_protocol_v2_connection_with_executor(
             Err(err) if is_connection_closed(&err) => return Ok(()),
             Err(err) => return Err(err),
         };
-        tracing::info!(
+        tracing::debug!(
             request_id = request.header.request_id,
             layer_id = request.header.layer_id,
             hidden_dim = request.header.hidden_dim,
