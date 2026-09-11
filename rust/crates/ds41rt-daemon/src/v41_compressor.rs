@@ -161,13 +161,16 @@ impl<'a> CompressorState<'a> {
             .index
             .kv_view(slot, self.slots[slot].end as usize / ratio(self.layer)?))
     }
-    /// Borrow committed global cache for a decoder replay range. No private
-    /// compressor rows are produced; causal counts still follow each query.
+    /// Borrow an immutable committed source range after its producer is published.
+    /// No private rows are produced; ratio-two encoder sources and ratio-one
+    /// decoder sources retain their per-query causal counts. The caller owns
+    /// the snapshot identity across consumers and must drain them before append.
     pub fn committed_proposal(&self, lease: CompressorLease, positions: std::ops::Range<u64>,
         snapshot: u64) -> Result<IndexProposal<'_>> {
         let end = self.committed_end(lease)?;
-        ensure!(self.layer == 20 && snapshot != 0 && positions.start < positions.end
-            && positions.end <= end, "invalid committed decoder source range");
+        let step = ratio(self.layer)? as u64;
+        ensure!(snapshot != 0 && positions.start < positions.end
+            && positions.end <= end, "invalid committed source range");
         let cache = self.index_cache(lease)?;
         let kv_cache = self.kv_cache(lease)?;
         // Valid read-only backing for zero-length private overlays. Their
@@ -178,7 +181,7 @@ impl<'a> CompressorState<'a> {
             kv_values: kv_cache.values, kv_scales: kv_cache.scales,
             packed: cache.packed, scales: cache.scales, capacity: 1,
             cache, kv_cache, first_token: positions.start, end_token: positions.end,
-            start: end, count: 0, offset: 0, step: 1,
+            start: end / step, count: 0, offset: 0, step,
             _wave: std::marker::PhantomData,
         })
     }

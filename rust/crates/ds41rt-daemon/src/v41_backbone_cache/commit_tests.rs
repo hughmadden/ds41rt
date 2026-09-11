@@ -237,6 +237,12 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         assert!(bank.begin_decoder_replay(lease).is_err());
     }
     assert!(bank.validate_batch(&stale).is_err());
+    // Keep one causal snapshot identity per request/source across appends. This
+    // is the committed-view primitive needed by interleaved encoder chunks.
+    let snapshots = (0..16).map(|_| (0..4)
+        .map(|_| crate::v41_compressor::reserve_source_snapshot())
+        .collect::<Result<Vec<_>>>()).collect::<Result<Vec<_>>>()?;
+    let mut prior_sources = Vec::new();
     for tokens in [64, 65] {
         let work = ced.iter().map(|&lease| CacheWork { lease, tokens, kind: ExpertV2SourceKind::Prefill }).collect::<Vec<_>>();
         assert!(bank.plan_replay(&work).is_err());
@@ -246,7 +252,29 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         produce(&lib, &bank, &batch, &mut windows, &mut sources, 10 + tokens as usize)?;
         bank.commit(&batch, &mut windows, &mut sources, &vec![tokens; 16])?;
         assert!(bank.validate_batch(&batch).is_err());
+        for (slot, &lease) in ced.iter().enumerate() {
+            let r = bank.request(lease)?;
+            for (i, &layer) in SOURCES.iter().enumerate() {
+                let state = &bank.sources[i];
+                let step = if layer == 20 { 1 } else { 2 };
+                let view = state.committed_proposal(r.sources[i], 0..64, snapshots[slot][i])?;
+                assert_eq!(view.source_layer, layer);
+                assert_eq!(view.cache.rows as u64, r.end / step);
+                for position in 0..64 {
+                    assert_eq!(view.metadata(position)?,
+                        [0, (position + 1) / step, r.end / step, 0, 0, step]);
+                }
+                if tokens == 64 { prior_sources.push(view.binding()); }
+                else { assert_eq!(view.binding(), prior_sources[slot * 4 + i]); }
+                let tail = state.committed_proposal(r.sources[i], r.end - 1..r.end, snapshots[slot][i])?;
+                assert_eq!(tail.metadata(r.end - 1)?[1], r.end / step);
+                assert!(tail.metadata(r.end).is_err());
+                assert!(state.committed_proposal(r.sources[i], 0..r.end + 1, snapshots[slot][i]).is_err());
+                assert!(state.committed_proposal(r.sources[i], 0..1, 0).is_err());
+            }
+        }
     }
+    eprintln!("PASS committed encoder source views: all 16 requests/all 4 sources, causal ratios, odd carry, stable snapshots across append");
     let r = bank.request(ced[0])?;
     let preserved_windows = (0..20).map(|layer| {
         let view = bank.windows[layer].view(r.windows[layer])?;

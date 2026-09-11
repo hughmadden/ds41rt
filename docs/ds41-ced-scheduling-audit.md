@@ -98,3 +98,22 @@ is a separate live gate even if one prompt's chunks overlap successfully.
 The small index/Engram/producer intervals in this warm trace favor scheduler and
 sparse-attention work first. They do not settle cold page-fault behavior, decode
 launch overhead, or accuracy tradeoffs of changing compressor precision.
+
+## Implemented prerequisite: committed encoder source views
+
+`CompressorState::committed_proposal` now accepts all four source layers, using
+ratio two for layers 2/8/14 and ratio one for layer 20. Metadata exposes only
+`floor((query_position + 1) / ratio)` causal rows, zero private overlay rows, and
+`floor(committed_tokens / ratio)` physical cache rows. Thus an incomplete final
+ratio-two group is never exposed as a complete latent. A caller-retained snapshot
+identity can be reused for older query ranges after later appends, while the
+borrow contract still requires existing consumers to drain before mutation.
+
+The real-weight cache transaction test covers all sixteen requests and all four
+sources after 64-token and 65-token appends, including per-query metadata, odd
+carry, stable binding identities, range rejection and zero-snapshot rejection.
+Existing full-prefix, decoder replay and late-failure recovery checks also run.
+Raw build and GPU logs are `/tmp/ds41-ced-bounds/encoder-source-{build,gpu}.log`.
+This removes the decoder-only restriction from the committed-view primitive;
+per-layer publication, retained index consumers and native scheduling remain to
+be integrated. The running APIs still use the previous frozen CED artifacts.
