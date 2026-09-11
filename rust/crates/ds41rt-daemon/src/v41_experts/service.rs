@@ -44,6 +44,9 @@ pub(crate) struct NativeExpertServiceConfig {
 }
 
 struct Work {
+    request_id: u64,
+    layer_id: u32,
+    rows: u32,
     frame: Vec<u8>,
     responses: Responses,
     queued_at: std::time::Instant,
@@ -97,6 +100,9 @@ impl NativeExpertService {
             .as_ref()
             .context("native expert service stopped")?
             .try_send(Work {
+                request_id: request.header.request_id,
+                layer_id: request.header.layer_id,
+                rows: request.header.row_count,
                 frame: request.frame_bytes().to_vec(),
                 responses,
                 queued_at: std::time::Instant::now(),
@@ -336,7 +342,7 @@ fn run_worker(
             )
         })();
         let total_us = started.elapsed().as_micros() as u64;
-        tracing::debug!(target: "ds41rt::timing", rank=config.rank, queued_us, emit_us,
+        tracing::debug!(target: "ds41rt::timing", rank=config.rank, request_id=work.request_id, layer_id=work.layer_id, rows=work.rows, queued_us, emit_us,
             execute_us=total_us.saturating_sub(emit_us), total_us,
             "native expert service");
         let failed = result.is_err();

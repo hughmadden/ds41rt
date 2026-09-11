@@ -1,0 +1,597 @@
+{
+  "summary": {
+    "0": {
+      "matched_rows1": 7080,
+      "polled_fraction": 0.0,
+      "median_queue_us": 105.5,
+      "median_service_us": 277.0,
+      "median_server_us": 512.0,
+      "median_server_residual_us": 99.0,
+      "cpu_core_equivalents": 0.1968288126550866,
+      "api_tps": [
+        11.512990569055262,
+        11.449115710731077,
+        11.312612586632879
+      ]
+    },
+    "1000": {
+      "matched_rows1": 7080,
+      "polled_fraction": 0.0009887005649717514,
+      "median_queue_us": 97.0,
+      "median_service_us": 280.0,
+      "median_server_us": 541.0,
+      "median_server_residual_us": 120.0,
+      "cpu_core_equivalents": 0.6031350672132848,
+      "api_tps": [
+        11.200760636564716,
+        10.842000177686247,
+        11.86096042965476
+      ]
+    },
+    "2000": {
+      "matched_rows1": 7080,
+      "polled_fraction": 0.5247175141242938,
+      "median_queue_us": 1.0,
+      "median_service_us": 196.0,
+      "median_server_us": 544.0,
+      "median_server_residual_us": 301.0,
+      "cpu_core_equivalents": 0.9346120725042453,
+      "api_tps": [
+        11.051940177270305,
+        11.083547765361331,
+        11.109098521305917
+      ]
+    }
+  },
+  "worker_sha256": "01b5e73ba97389a38148a02436fcf65c63c89a9f065ffc28e594a0def163970d",
+  "cargo_lock_sha256": "9a5bd8e02b16299d85ba32429d2ab1489ad88bce4bd83efb6b49fcdc3b9e9606",
+  "trials": {
+    "0": {
+      "api": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "base_url": "http://127.0.0.1:18041",
+        "first_json": {
+          "id": "chatcmpl-64d20fb5-693b-413a-b098-db459fe62ff7",
+          "object": "chat.completion",
+          "created": 1789123206,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "4"
+              },
+              "logprobs": null,
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 18,
+            "completion_tokens": 2,
+            "total_tokens": 20,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 18
+          }
+        },
+        "streaming_request": {
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+            }
+          ],
+          "thinking": {
+            "type": "disabled"
+          },
+          "temperature": 0,
+          "max_tokens": 96,
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          }
+        },
+        "streaming_runs": [
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.1882549710571766,
+            "finish_seconds": 5.226042473106645,
+            "observed_decode_tokens_per_second": 11.512990569055262,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          },
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.17585630400571972,
+            "finish_seconds": 5.241749728913419,
+            "observed_decode_tokens_per_second": 11.449115710731077,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          },
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.17665558098815382,
+            "finish_seconds": 5.303676377981901,
+            "observed_decode_tokens_per_second": 11.312612586632879,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          }
+        ],
+        "cancellation": {
+          "cancelled_after_content": true,
+          "first_content_seconds": 0.16580017795786262,
+          "text": "1"
+        },
+        "post_cancellation_json": {
+          "id": "chatcmpl-508015c2-8b8f-42ea-a104-273dcd9211bd",
+          "object": "chat.completion",
+          "created": 1789123222,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "4"
+              },
+              "logprobs": null,
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 18,
+            "completion_tokens": 2,
+            "total_tokens": 20,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 18
+          }
+        },
+        "unsupported_sampling_status": 400,
+        "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+      },
+      "api_sha256": "e928ea32d2a9a8901be8188f27bd3c34f26b11d98689c34b5e0db4abdab43e99",
+      "worker_log_sha256": "b564a3a39291f46581be61b4d29da05ae1f871dbfb083df7fffb9041c74719c7",
+      "command": [
+        "docker",
+        "create",
+        "--name",
+        "ds41-poll-0-worker",
+        "--gpus",
+        "all",
+        "--network",
+        "host",
+        "-e",
+        "RUST_LOG=warn,ds41rt::expert_timing=debug,ds41_fp8_worker::v41_experts::service=info,ds41rt::timing=debug",
+        "-v",
+        "/tmp/ds41-wire-artifacts:/audit:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/hf:ro",
+        "-v",
+        "/tmp/ds41-slice-artifacts/cmake:/audit/cmake:ro",
+        "-e",
+        "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+        "-e",
+        "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+        "-v",
+        "/tmp/ds41-poll-worker/worker:/audit/worker:ro",
+        "-e",
+        "DS41RT_EXPERT_IDLE_SPIN_US=0",
+        "--entrypoint",
+        "/audit/worker",
+        "ds41rt-spark-expert-dev:latest",
+        "0"
+      ],
+      "cpu": {
+        "before": {
+          "pid": "81093",
+          "time": 548188.141247943,
+          "cpu_seconds": 53.54
+        },
+        "after": {
+          "pid": "81093",
+          "time": 548205.719975129,
+          "cpu_seconds": 57.0
+        }
+      }
+    },
+    "1000": {
+      "api": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "base_url": "http://127.0.0.1:18041",
+        "first_json": {
+          "id": "chatcmpl-01a75693-8a09-4841-9bf1-fe87ebbbed56",
+          "object": "chat.completion",
+          "created": 1789123289,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "4"
+              },
+              "logprobs": null,
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 18,
+            "completion_tokens": 2,
+            "total_tokens": 20,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 18
+          }
+        },
+        "streaming_request": {
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+            }
+          ],
+          "thinking": {
+            "type": "disabled"
+          },
+          "temperature": 0,
+          "max_tokens": 96,
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          }
+        },
+        "streaming_runs": [
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.1803507509175688,
+            "finish_seconds": 5.3585705059813336,
+            "observed_decode_tokens_per_second": 11.200760636564716,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          },
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.1799041701015085,
+            "finish_seconds": 5.529470583074726,
+            "observed_decode_tokens_per_second": 10.842000177686247,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          },
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.1792152849957347,
+            "finish_seconds": 5.069207148975693,
+            "observed_decode_tokens_per_second": 11.86096042965476,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          }
+        ],
+        "cancellation": {
+          "cancelled_after_content": true,
+          "first_content_seconds": 0.15509935899171978,
+          "text": "1"
+        },
+        "post_cancellation_json": {
+          "id": "chatcmpl-32fa72e0-851c-4301-ad1c-886da1c5cbef",
+          "object": "chat.completion",
+          "created": 1789123306,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "4"
+              },
+              "logprobs": null,
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 18,
+            "completion_tokens": 2,
+            "total_tokens": 20,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 18
+          }
+        },
+        "unsupported_sampling_status": 400,
+        "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+      },
+      "api_sha256": "e79061bff045b64fbccccd4d84ee157f78c8002d93122ae9cfe6f16b2e80d634",
+      "worker_log_sha256": "c98a35be9c20aa705036d44f1a2f65059c0861589bd8dd9b113ef0d1cb56a7d6",
+      "command": [
+        "docker",
+        "create",
+        "--name",
+        "ds41-poll-1000-worker",
+        "--gpus",
+        "all",
+        "--network",
+        "host",
+        "-e",
+        "RUST_LOG=warn,ds41rt::expert_timing=debug,ds41_fp8_worker::v41_experts::service=info,ds41rt::timing=debug",
+        "-v",
+        "/tmp/ds41-wire-artifacts:/audit:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/hf:ro",
+        "-v",
+        "/tmp/ds41-slice-artifacts/cmake:/audit/cmake:ro",
+        "-e",
+        "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+        "-e",
+        "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+        "-v",
+        "/tmp/ds41-poll-worker/worker:/audit/worker:ro",
+        "-e",
+        "DS41RT_EXPERT_IDLE_SPIN_US=1000",
+        "--entrypoint",
+        "/audit/worker",
+        "ds41rt-spark-expert-dev:latest",
+        "0"
+      ],
+      "cpu": {
+        "before": {
+          "pid": "106692",
+          "time": 548271.397658687,
+          "cpu_seconds": 54.01
+        },
+        "after": {
+          "pid": "106692",
+          "time": 548289.121715173,
+          "cpu_seconds": 64.7
+        }
+      }
+    },
+    "2000": {
+      "api": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "base_url": "http://127.0.0.1:18041",
+        "first_json": {
+          "id": "chatcmpl-8c439cae-8c29-41d9-bc3d-50f7cbbafadd",
+          "object": "chat.completion",
+          "created": 1789123393,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "4"
+              },
+              "logprobs": null,
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 18,
+            "completion_tokens": 2,
+            "total_tokens": 20,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 18
+          }
+        },
+        "streaming_request": {
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+            }
+          ],
+          "thinking": {
+            "type": "disabled"
+          },
+          "temperature": 0,
+          "max_tokens": 96,
+          "stream": true,
+          "stream_options": {
+            "include_usage": true
+          }
+        },
+        "streaming_runs": [
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.173650047974661,
+            "finish_seconds": 5.4215973829850554,
+            "observed_decode_tokens_per_second": 11.051940177270305,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          },
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.1809745280770585,
+            "finish_seconds": 5.413955991039984,
+            "observed_decode_tokens_per_second": 11.083547765361331,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          },
+          {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 0.16864412010181695,
+            "finish_seconds": 5.389589806087315,
+            "observed_decode_tokens_per_second": 11.109098521305917,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 59,
+              "total_tokens": 80,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            }
+          }
+        ],
+        "cancellation": {
+          "cancelled_after_content": true,
+          "first_content_seconds": 0.15779156202916056,
+          "text": "1"
+        },
+        "post_cancellation_json": {
+          "id": "chatcmpl-71454eef-5412-4db7-bd2a-fd54c63e22c1",
+          "object": "chat.completion",
+          "created": 1789123410,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "4"
+              },
+              "logprobs": null,
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 18,
+            "completion_tokens": 2,
+            "total_tokens": 20,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 18
+          }
+        },
+        "unsupported_sampling_status": 400,
+        "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+      },
+      "api_sha256": "5ba0b8b176f7edf5e29ccc11f269159ffd3c27f89c519ad7a273db2135b25c40",
+      "worker_log_sha256": "c40bdf16816ab124cf21bac9ccd28714f2aa6ab53f7e7097114858ad6fdf7ced",
+      "command": [
+        "docker",
+        "create",
+        "--name",
+        "ds41-poll-2000-worker",
+        "--gpus",
+        "all",
+        "--network",
+        "host",
+        "-e",
+        "RUST_LOG=warn,ds41rt::expert_timing=debug,ds41_fp8_worker::v41_experts::service=info,ds41rt::timing=debug",
+        "-v",
+        "/tmp/ds41-wire-artifacts:/audit:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/hf:ro",
+        "-v",
+        "/tmp/ds41-slice-artifacts/cmake:/audit/cmake:ro",
+        "-e",
+        "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+        "-e",
+        "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+        "-v",
+        "/tmp/ds41-poll-worker/worker:/audit/worker:ro",
+        "-e",
+        "DS41RT_EXPERT_IDLE_SPIN_US=2000",
+        "--entrypoint",
+        "/audit/worker",
+        "ds41rt-spark-expert-dev:latest",
+        "0"
+      ],
+      "cpu": {
+        "before": {
+          "pid": "134658",
+          "time": 548375.518096455,
+          "cpu_seconds": 53.62
+        },
+        "after": {
+          "pid": "134658",
+          "time": 548393.450670293,
+          "cpu_seconds": 70.38
+        }
+      }
+    }
+  },
+  "experiment_source": {
+    "receive.rs": "//! Bounded active polling for the single GPU owner; ordinary idle waits sleep.\nuse std::sync::mpsc::{Receiver, RecvError, TryRecvError};\nuse std::time::{Duration, Instant};\n\npub(super) fn receive<T>(receiver: &Receiver<T>, spin: Duration) -> Result<(T, bool), RecvError> {\n    if !spin.is_zero() {\n        let start = Instant::now();\n        loop {\n            for _ in 0..64 {\n                match receiver.try_recv() {\n                    Ok(work) => return Ok((work, true)),\n                    Err(TryRecvError::Disconnected) => return Err(RecvError),\n                    Err(TryRecvError::Empty) => std::hint::spin_loop(),\n                }\n            }\n            if start.elapsed() >= spin {\n                break;\n            }\n        }\n    }\n    receiver.recv().map(|work| (work, false))\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    use std::sync::mpsc;\n\n    #[test]\n    fn queued_work_keeps_fifo_and_disconnect_is_observed() {\n        let (send, recv) = mpsc::sync_channel(2);\n        send.send(1).unwrap();\n        send.send(2).unwrap();\n        drop(send);\n        assert_eq!(receive(&recv, Duration::from_millis(1)).unwrap(), (1, true));\n        assert_eq!(receive(&recv, Duration::from_millis(1)).unwrap(), (2, true));\n        assert!(receive(&recv, Duration::from_millis(1)).is_err());\n    }\n\n    #[test]\n    fn zero_window_uses_blocking_receive() {\n        let (send, recv) = mpsc::sync_channel(1);\n        send.send(7).unwrap();\n        assert_eq!(receive(&recv, Duration::ZERO).unwrap(), (7, false));\n    }\n\n    #[test]\n    fn sender_after_window_wakes_sleeping_receiver() {\n        let (send, recv) = mpsc::sync_channel(1);\n        let writer = std::thread::spawn(move || {\n            std::thread::sleep(Duration::from_millis(20));\n            send.send(9).unwrap();\n        });\n        assert_eq!(receive(&recv, Duration::from_micros(10)).unwrap().0, 9);\n        writer.join().unwrap();\n        assert!(receive(&recv, Duration::ZERO).is_err());\n    }\n}\n",
+    "service.rs": "//! Native GPU resources remain on one owning thread; transport sees bounded queues.\n#[path = \"service/receive.rs\"]\nmod receive;\nuse super::{ExpertLayer, ExpertWeights, HostExpertExchange};\nuse anyhow::{bail, ensure, Context, Result};\nuse ds41rt_ffi::NativeLibrary;\nuse ds41rt_loader::{read_official_v41_catalog, OFFICIAL_V41_MODEL_ID};\nuse ds41rt_transport::{\n    v41_expert::V41BackboneRequest, ExpertProtocolV2RequestView, ExpertProtocolV2Response,\n    ExpertProtocolV2ResponseRef, ProtocolV2ExpertExecutor,\n};\nuse std::{path::PathBuf, sync::mpsc, thread};\n\npub(crate) async fn run(args: crate::cli::NativeExpertDaemonArgs) -> Result<()> {\n    let config = NativeExpertServiceConfig {\n        library: args.native_lib,\n        snapshot: args.snapshot,\n        rank: args.rank as usize,\n        capacity: args.capacity,\n        device_budget: args.device_budget_bytes,\n        max_frame_bytes: args.max_frame_bytes,\n    };\n    let service = tokio::task::spawn_blocking(move || NativeExpertService::start(config))\n        .await\n        .context(\"native expert startup task failed\")??;\n    tracing::info!(\n        rank = args.rank,\n        capacity = args.capacity,\n        layers = 40,\n        \"native V4.1 expert worker ready\"\n    );\n    ds41rt_transport::serve_protocol_v2_tcp_with_executor(\n        &args.listen,\n        std::sync::Arc::new(service),\n    )\n    .await\n}\n\npub(crate) struct NativeExpertServiceConfig {\n    pub library: PathBuf,\n    pub snapshot: PathBuf,\n    pub rank: usize,\n    pub capacity: u32,\n    pub device_budget: usize,\n    pub max_frame_bytes: usize,\n}\n\nstruct Work {\n    request_id: u64,\n    layer_id: u32,\n    rows: u32,\n    frame: Vec<u8>,\n    responses: Responses,\n    queued_at: std::time::Instant,\n}\nenum WorkerResponse {\n    Chunk(ExpertProtocolV2Response),\n    Done(Result<()>),\n}\n\n// The GPU thread blocks only on bounded response backpressure. The async variant\n// lets TCP receive directly, without a second blocking execution adapter.\nenum Responses {\n    Blocking(mpsc::SyncSender<WorkerResponse>),\n    Async(tokio::sync::mpsc::Sender<Result<ExpertProtocolV2Response>>),\n}\nimpl Responses {\n    fn send(&self, response: WorkerResponse) -> std::result::Result<(), ()> {\n        match self {\n            Self::Blocking(sender) => sender.send(response).map_err(|_| ()),\n            Self::Async(sender) => match response {\n                WorkerResponse::Chunk(response) => {\n                    sender.blocking_send(Ok(response)).map_err(|_| ())\n                }\n                WorkerResponse::Done(Err(error)) => {\n                    sender.blocking_send(Err(error)).map_err(|_| ())\n                }\n                WorkerResponse::Done(Ok(())) => Ok(()),\n            },\n        }\n    }\n}\n\npub(crate) struct NativeExpertService {\n    requests: Option<mpsc::SyncSender<Work>>,\n    worker: Option<thread::JoinHandle<Result<()>>>,\n    capacity: u32,\n    max_frame_bytes: usize,\n}\nimpl NativeExpertService {\n    fn submit(\n        &self,\n        request: &ExpertProtocolV2RequestView<'_>,\n        responses: Responses,\n    ) -> Result<()> {\n        ensure!(\n            request.frame_bytes().len() <= self.max_frame_bytes,\n            \"native request exceeds admitted frame size\"\n        );\n        V41BackboneRequest::parse(request.frame_bytes(), self.capacity)?;\n        self.requests\n            .as_ref()\n            .context(\"native expert service stopped\")?\n            .try_send(Work {\n                request_id: request.header.request_id,\n                layer_id: request.header.layer_id,\n                rows: request.header.row_count,\n                frame: request.frame_bytes().to_vec(),\n                responses,\n                queued_at: std::time::Instant::now(),\n            })\n            .map_err(|error| match error {\n                mpsc::TrySendError::Full(_) => {\n                    anyhow::anyhow!(\"native expert request queue is full\")\n                }\n                mpsc::TrySendError::Disconnected(_) => {\n                    anyhow::anyhow!(\"native expert worker stopped\")\n                }\n            })?;\n        Ok(())\n    }\n    /// Start with one visible CUDA device; all native allocations use logical GPU 0.\n    /// Returns only after all forty backbone layers and shared wave workspace load.\n    pub fn start(config: NativeExpertServiceConfig) -> Result<Self> {\n        ensure!(config.rank < 4, \"native expert rank must be 0..3\");\n        ensure!(\n            matches!(config.capacity, 1 | 16 | 80 | 256 | 1024 | 4096),\n            \"unsupported native expert capacity\"\n        );\n        ensure!(\n            config.max_frame_bytes >= 128 + 10240 + 40 + 6 * 12,\n            \"native response frame budget cannot fit a token row\"\n        );\n        ensure!(\n            config.max_frame_bytes <= 64 * 1024 * 1024,\n            \"native frame budget exceeds TCP service limit\"\n        );\n        let (requests, receive) = mpsc::sync_channel(16);\n        let (ready, readiness) = mpsc::sync_channel(1);\n        let capacity = config.capacity;\n        let max_frame_bytes = config.max_frame_bytes;\n        let worker = thread::Builder::new()\n            .name(format!(\"v41-expert-rank-{}\", config.rank))\n            .spawn(move || run_worker(config, receive, ready))\n            .context(\"starting native expert worker\")?;\n        let service = Self {\n            requests: Some(requests),\n            worker: Some(worker),\n            capacity,\n            max_frame_bytes,\n        };\n        readiness\n            .recv()\n            .context(\"native expert worker stopped during startup\")??;\n        Ok(service)\n    }\n}\nimpl Drop for NativeExpertService {\n    fn drop(&mut self) {\n        self.requests.take();\n        if let Some(worker) = self.worker.take() {\n            match worker.join() {\n                Ok(Ok(())) => {}\n                Ok(Err(error)) => tracing::error!(%error, \"native expert worker stopped\"),\n                Err(_) => tracing::error!(\"native expert worker panicked\"),\n            }\n        }\n    }\n}\nimpl ProtocolV2ExpertExecutor for NativeExpertService {\n    fn name(&self) -> &'static str {\n        \"v41-native-tp4\"\n    }\n    fn tcp_response_chunks(&self) -> bool {\n        true\n    }\n    fn execute(&self, _: &ExpertProtocolV2RequestView<'_>) -> Result<ExpertProtocolV2Response> {\n        bail!(\"native TP4 execution requires the bounded streaming interface\")\n    }\n    fn execute_streaming(\n        &self,\n        request: &ExpertProtocolV2RequestView<'_>,\n        emit: &mut dyn FnMut(ExpertProtocolV2ResponseRef<'_>) -> Result<()>,\n    ) -> Result<()> {\n        let (responses, receive) = mpsc::sync_channel(1);\n        self.submit(request, Responses::Blocking(responses))?;\n        loop {\n            match receive\n                .recv()\n                .context(\"native expert worker stopped before completion\")?\n            {\n                WorkerResponse::Chunk(response) => emit(response.as_borrowed())?,\n                WorkerResponse::Done(result) => return result,\n            }\n        }\n    }\n    fn submit_tcp_chunks(\n        &self,\n        request: &ExpertProtocolV2RequestView<'_>,\n    ) -> Option<Result<tokio::sync::mpsc::Receiver<Result<ExpertProtocolV2Response>>>> {\n        Some((|| {\n            let (responses, receive) = tokio::sync::mpsc::channel(1);\n            self.submit(request, Responses::Async(responses))?;\n            Ok(receive)\n        })())\n    }\n    // Native TP identity is the configured rank plus one, not a hash of a shared name.\n    fn execute_streaming_with_identity(\n        &self,\n        request: &ExpertProtocolV2RequestView<'_>,\n        emit: &mut dyn FnMut(ExpertProtocolV2ResponseRef<'_>) -> Result<()>,\n    ) -> Result<()> {\n        self.execute_streaming(request, emit)\n    }\n    fn execute_streaming_device_payload(\n        &self,\n        _: &ExpertProtocolV2RequestView<'_>,\n        _: ds41rt_transport::ProtocolV2RequestDevicePayload,\n        _: &mut dyn FnMut(ds41rt_transport::ProtocolV2ExecutorResponseRef<'_>) -> Result<()>,\n    ) -> Result<()> {\n        bail!(\"native expert service device ingress is not wired; use TCP host ingress\")\n    }\n}\n\nfn run_worker(\n    config: NativeExpertServiceConfig,\n    requests: mpsc::Receiver<Work>,\n    ready: mpsc::SyncSender<Result<()>>,\n) -> Result<()> {\n    let spin_us = std::env::var(\"DS41RT_EXPERT_IDLE_SPIN_US\")\n        .map(|value| value.parse::<u64>().context(\"invalid expert idle spin duration\"))\n        .unwrap_or(Ok(0))?;\n    ensure!(spin_us <= 2000, \"expert idle spin duration exceeds 2000 microseconds\");\n    let idle_spin = std::time::Duration::from_micros(spin_us);\n    // The library and every GPU owner are constructed and dropped on this thread.\n    let library = match unsafe { NativeLibrary::load(&config.library) } {\n        Ok(library) => library,\n        Err(error) => {\n            let _ = ready.send(Err(error));\n            return Ok(());\n        }\n    };\n    let initialize = || -> Result<_> {\n        let catalog = read_official_v41_catalog(OFFICIAL_V41_MODEL_ID, &config.snapshot)?;\n        let mut resident = 0usize;\n        let mut staging = 0usize;\n        for layer in 0..40 {\n            let plan = ExpertWeights::plan(\n                &library,\n                &catalog,\n                ExpertLayer::Backbone {\n                    layer,\n                    rank: config.rank,\n                },\n            )?;\n            resident = resident\n                .checked_add(plan.resident_bytes)\n                .context(\"resident budget overflow\")?;\n            staging = staging.max(plan.device_staging_bytes);\n        }\n        ensure!(\n            resident\n                .checked_add(staging)\n                .context(\"loading budget overflow\")?\n                <= config.device_budget,\n            \"native TP weights and staging exceed device budget\"\n        );\n        let workspace = ExpertWeights::plan_execution(&library, config.capacity)?.total()?;\n        ensure!(\n            resident\n                .checked_add(workspace)\n                .context(\"execution budget overflow\")?\n                <= config.device_budget,\n            \"native TP weights and execution workspace exceed device budget\"\n        );\n        let mut weights = Vec::with_capacity(40);\n        let mut remaining = config.device_budget;\n        for layer in 0..40 {\n            let started = std::time::Instant::now();\n            let weight = ExpertWeights::load(\n                &library,\n                &catalog,\n                ExpertLayer::Backbone {\n                    layer,\n                    rank: config.rank,\n                },\n                remaining,\n            )?;\n            remaining = remaining\n                .checked_sub(weight.budget().resident_bytes)\n                .context(\"resident budget exhausted\")?;\n            tracing::info!(\n                rank = config.rank,\n                layer,\n                resident_bytes = weight.budget().resident_bytes,\n                elapsed_ms = started.elapsed().as_millis() as u64,\n                \"native expert layer loaded\"\n            );\n            weights.push(weight);\n        }\n        Ok((weights, remaining))\n    };\n    let (weights, remaining) = match initialize() {\n        Ok(state) => state,\n        Err(error) => {\n            let _ = ready.send(Err(error));\n            return Ok(());\n        }\n    };\n    let mut execution = match weights[0].execution(config.capacity, remaining) {\n        Ok(execution) => execution,\n        Err(error) => {\n            let _ = ready.send(Err(error));\n            return Ok(());\n        }\n    };\n    let mut exchange = HostExpertExchange::new(config.capacity)?;\n    let mut row_indices = vec![0; config.capacity as usize];\n    ready\n        .send(Ok(()))\n        .map_err(|_| anyhow::anyhow!(\"native startup caller disconnected\"))?;\n    while let Ok((work, polled)) = receive::receive(&requests, idle_spin) {\n        let queued_us = work.queued_at.elapsed().as_micros() as u64;\n        let started = std::time::Instant::now();\n        let mut emit_us = 0u64;\n        let mut disconnected = false;\n        let result = (|| -> Result<()> {\n            let request = V41BackboneRequest::parse(&work.frame, config.capacity)?;\n            execution.bind_layer(&weights[request.layer() as usize])?;\n            execution.execute_host_chunks(\n                &request,\n                config.rank as u64 + 1,\n                &mut exchange,\n                &mut row_indices,\n                config.max_frame_bytes,\n                |response| {\n                    let emit_started = std::time::Instant::now();\n                    if work\n                        .responses\n                        .send(WorkerResponse::Chunk(response.to_owned()?))\n                        .is_err()\n                    {\n                        disconnected = true;\n                        bail!(\"native response consumer disconnected\");\n                    }\n                    emit_us += emit_started.elapsed().as_micros() as u64;\n                    Ok(())\n                },\n            )\n        })();\n        let total_us = started.elapsed().as_micros() as u64;\n        tracing::debug!(target: \"ds41rt::timing\", rank=config.rank, request_id=work.request_id, layer_id=work.layer_id, rows=work.rows, polled, spin_us, queued_us, emit_us,\n            execute_us=total_us.saturating_sub(emit_us), total_us,\n            \"native expert service\");\n        let failed = result.is_err();\n        let _ = work.responses.send(WorkerResponse::Done(result));\n        // A disconnected socket does not poison GPU execution, but a native error\n        // may leave CUDA state unusable; stop rather than executing queued waves.\n        if failed && !disconnected {\n            bail!(\"native expert execution failed; worker stopped\");\n        }\n    }\n    Ok(())\n}\n"
+  }
+}
