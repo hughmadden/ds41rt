@@ -251,7 +251,7 @@ impl<'a> IndexSelectionWave<'a> {
     pub unsafe fn execute<'s>(
         &'s mut self,
         query: &IndexQueryOutput<'_>,
-        requests: &'s [SelectionRequest<'_>],
+        requests: &[SelectionRequest<'_>],
         shared: Option<&IndexSelectionOutput<'_>>,
     ) -> Result<IndexSelectionOutput<'s>> {
         self.ready = None;
@@ -402,7 +402,13 @@ impl<'a> IndexSelectionWave<'a> {
             rows,
             bindings,
         });
-        let r = self.ready.as_ref().unwrap();
+        self.output()
+    }
+    /// Borrow completed selection storage. Consumers validate its retained source
+    /// bindings against live cache proposals before using these logical row IDs.
+    pub fn output(&self) -> Result<IndexSelectionOutput<'_>> {
+        let r = self.ready.as_ref().context("index selection output unpublished")?;
+        let rows = r.rows;
         Ok(IndexSelectionOutput {
             origin: r.origin,
             selected: slice(self.b(9), 0, rows * 2048),

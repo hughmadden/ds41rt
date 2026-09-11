@@ -1,0 +1,32 @@
+{
+  "scope": "Owned index lane production compilation and CPU-only official-checkpoint allocation gates; GPU composition unqualified",
+  "weight_bytes": 45916160,
+  "workspace_bytes": {
+    "1": [
+      4226060,
+      415808,
+      415808
+    ],
+    "80": [
+      6190724,
+      33264640,
+      33264640
+    ],
+    "4096": [
+      106266628,
+      1703149568,
+      1703149568
+    ]
+  },
+  "test": "official_index_lane_budgets_reject_before_allocation",
+  "result": "passed",
+  "seconds": 1.12,
+  "gpu_execution": false,
+  "daemon_build": "passed",
+  "source_sha256": {
+    "v41_index_lane.rs": "c503d807776f47fd7bc1485a25c0a62a75795888bb434c345f20e72afa8c611d",
+    "v41_index_query.rs": "99db65e2db64b1cf5662a25eeaeca652edbab6a28bf59b40ef16dbdb43f95268",
+    "v41_index_selection.rs": "53c1763d0b806b8ef0f4ef6cd3b138327b6ce85287bcec71ba541ca8d5ed12d8",
+    "v41_backbone_lane.rs": "dda9560531fc8c0cbe2456a96a5572b2e5f1e638687de6d4e6d46340035862cb"
+  }
+}

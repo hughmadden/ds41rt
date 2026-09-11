@@ -1,12 +1,13 @@
 //! Learned index-query projections and fused rotary/FP4 preparation on the RTX.
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_attention_query::AttentionQueryOutput;
+use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Compressor, V41Fp8Kernel};
 use ds41rt_loader::OfficialV41Catalog;
-use std::{ffi::c_void, marker::PhantomData};
+use std::marker::PhantomData;
 
 pub(crate) struct IndexQueryWeights<'a> {
     library: &'a NativeLibrary,
@@ -110,7 +111,7 @@ impl<'a> IndexQueryWeights<'a> {
             scales: DeviceAllocation::new(self.library, rows * 128)?,
             head_weights: DeviceAllocation::new(self.library, rows * 64)?,
             capacity,
-            graph: None,
+            graphs: LayerGraphs::new(self.library),
             ready: None,
             origin: None,
             tokens: Vec::new(),
@@ -161,10 +162,27 @@ pub(crate) struct IndexQueryWave<'w, 'a> {
     scales: DeviceAllocation<'a>,
     head_weights: DeviceAllocation<'a>,
     capacity: u32,
-    graph: Option<(*mut c_void, u32)>,
+    graphs: LayerGraphs<'w, 'a, IndexQueryWeights<'a>>,
     ready: Option<u32>,
     origin: Option<QueryBinding>,
     tokens: Vec<u64>,
+}
+impl<'w, 'a> IndexQueryWave<'w, 'a> {
+    /// Retain captured weight owners while reusing this lane's fixed buffers.
+    pub fn rebind(&mut self, weights: &'w IndexQueryWeights<'a>) -> Result<()> {
+        self.ready = None;
+        self.origin = None;
+        self.tokens.clear();
+        ensure!(
+            std::ptr::eq(self.stream.library, weights.library)
+                && weights.tensors.get(&weights.names[0])?.device_id
+                    == self.hidden.buffer.device_id,
+            "index query rebound library or device differs"
+        );
+        self.synchronize()?;
+        self.weights = weights;
+        Ok(())
+    }
 }
 impl IndexQueryWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -255,7 +273,10 @@ impl IndexQueryWave<'_, '_> {
         self.ready = None;
         self.origin = None;
         self.tokens.clear();
-        ensure!(self.graph.is_none(), "index query graph already captured");
+        ensure!(
+            self.graphs.get(self.weights.layer, self.weights).is_none(),
+            "index query graph already captured"
+        );
         unsafe {
             self.execute(rows)?;
         }
@@ -271,7 +292,15 @@ impl IndexQueryWave<'_, '_> {
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graph = Some((graph, rows));
+                if let Err(error) = unsafe {
+                    self.graphs
+                        .insert(self.weights.layer, self.weights, rows, graph)
+                } {
+                    unsafe {
+                        self.stream.library.cuda_graph_exec_destroy(graph)?;
+                    }
+                    return Err(error);
+                }
                 Ok(())
             }
             (Err(e), Ok(graph)) => {
@@ -287,7 +316,10 @@ impl IndexQueryWave<'_, '_> {
     /// Same matching initialized inputs as execute. Captured live row count is fixed.
     pub unsafe fn replay(&mut self, rows: u32) -> Result<IndexQueryOutput<'_>> {
         self.validate(rows)?;
-        let (graph, count) = self.graph.context("index query graph missing")?;
+        let (graph, count) = self
+            .graphs
+            .get(self.weights.layer, self.weights)
+            .context("index query graph missing")?;
         ensure!(count == rows, "index query capture row count differs");
         let launched = unsafe {
             self.stream
@@ -325,7 +357,11 @@ impl IndexQueryWave<'_, '_> {
             self.stream.library.copy_d2d(dst, src, src.bytes)?;
         }
         let rows = query.rows as u32;
-        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+        if self
+            .graphs
+            .get(self.weights.layer, self.weights)
+            .is_none_or(|(_, n)| n != rows)
+        {
             self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
@@ -359,17 +395,15 @@ impl IndexQueryWave<'_, '_> {
         self.origin = None;
         self.tokens.clear();
         self.synchronize()?;
-        if let Some((graph, _)) = self.graph.take() {
-            unsafe {
-                self.stream.library.cuda_graph_exec_destroy(graph)?;
-            }
-        }
-        Ok(())
+        unsafe { self.graphs.remove(self.weights.layer) }
     }
 }
 impl Drop for IndexQueryWave<'_, '_> {
     fn drop(&mut self) {
-        if let Err(error) = self.clear_graph() {
+        if let Err(error) = self
+            .synchronize()
+            .and_then(|_| unsafe { self.graphs.clear() })
+        {
             tracing::error!(%error,"draining index query graph");
         }
     }

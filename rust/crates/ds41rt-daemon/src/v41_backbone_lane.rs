@@ -306,6 +306,30 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             phase: &mut self.phase,
         })
     }
+    /// Produce learned index selections from this lane's completed query.
+    /// # Safety
+    /// Cache proposals correspond to the same admitted query batch, with all
+    /// producers complete and no external writes racing these owners.
+    pub unsafe fn select_index(
+        &self,
+        index: &mut crate::v41_index_lane::IndexLane<'_, '_>,
+        cache: &crate::v41_backbone_cache::CacheAttention<'_>,
+    ) -> Result<()> {
+        let query = self.query_output()?;
+        unsafe { index.select(&query, cache) }
+    }
+    /// Reuse the nearest learned selection, checking it against this cache batch.
+    /// # Safety
+    /// Same completed-producer and matching-sink contract as attention_cached_ffn.
+    pub unsafe fn attention_indexed_ffn(
+        &mut self,
+        sink: Ds41rtDeviceBuffer,
+        cache: &crate::v41_backbone_cache::CacheAttention<'_>,
+        index: &crate::v41_index_lane::IndexLane<'_, '_>,
+    ) -> Result<LaneFfn<'_, 'w, 'a>> {
+        let selection = if self.layer >= 2 { Some(index.output(self.layer, cache)?) } else { None };
+        unsafe { self.attention_cached_ffn(sink, cache, selection.as_ref()) }
+    }
     /// Execute attention from one cache-bank batch. The bank view pins all
     /// request leases and proposal buffers through the completed attention call.
     /// # Safety
