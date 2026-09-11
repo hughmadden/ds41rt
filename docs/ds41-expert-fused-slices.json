@@ -1,0 +1,299 @@
+{
+  "schema": 1,
+  "b12x_revision": "b4a02a7b42a5851659d2cebfd195d8b4ca3ca055",
+  "classification": "single-expert fused compute qualification, not serving or performance evidence",
+  "devices": {
+    "rtx": {
+      "cases": [
+        {
+          "width": 64,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 2,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 10240,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 6,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 30720,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 16,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "nonzero": 81920,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 2,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 10240,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 6,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 30720,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 16,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "nonzero": 81920,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 2,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 10240,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 6,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 30720,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 16,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "nonzero": 81920,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        }
+      ],
+      "log_sha256": "6dfdfc3484da7e8a70875b0580a619fc3aa8f9d77de8719e5334cc29007285c3",
+      "log": "{\"width\": 64, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 2, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 10240, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 30720, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 16, \"rel_l2\": 0.0, \"cosine\": 0.9999999403953552, \"nonzero\": 81920, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n.{\"width\": 128, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 2, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 10240, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 30720, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 16, \"rel_l2\": 0.0, \"cosine\": 0.9999999403953552, \"nonzero\": 81920, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n.{\"width\": 192, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 2, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 10240, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 30720, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 16, \"rel_l2\": 0.0, \"cosine\": 0.9999999403953552, \"nonzero\": 81920, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n.\n3 passed in 5.77s\n"
+    },
+    "spark": {
+      "cases": [
+        {
+          "width": 64,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 2,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 10240,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 6,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 30720,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 16,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 81920,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 64,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 2,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 10240,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 6,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 30720,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 16,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 81920,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 128,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 2,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 10240,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 6,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 30720,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 16,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 81920,
+          "invalid_row_nonzero": 0
+        },
+        {
+          "width": 192,
+          "rows": 1,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "nonzero": 5120,
+          "invalid_row_nonzero": 0
+        }
+      ],
+      "log_sha256": "2a60e0d7e92a7cb70cb640623e47606aa8e8258e5950eba1e973539d297efe34",
+      "log": "{\"width\": 64, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 2, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 10240, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 30720, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 16, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 81920, \"invalid_row_nonzero\": 0}\n{\"width\": 64, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n.{\"width\": 128, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 2, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 10240, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 30720, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 16, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 81920, \"invalid_row_nonzero\": 0}\n{\"width\": 128, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n.{\"width\": 192, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 2, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 10240, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 30720, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 16, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 81920, \"invalid_row_nonzero\": 0}\n{\"width\": 192, \"rows\": 1, \"rel_l2\": 0.0, \"cosine\": 1.0, \"nonzero\": 5120, \"invalid_row_nonzero\": 0}\n.\n3 passed in 6.44s\n"
+    }
+  },
+  "source_sha256": {
+    "b12x/moe/_shared/kernels/w4a8_v41_slice.py": "507aae5bf396cac71d7f8ecde3c31a4407205d900f9228641df07bf8b92fb192",
+    "tests/moe/test_v41_fused_slice.py": "7b0ad6ff5b3a03643418516cceb4733c191987fb40196cf62bc76724ab04ce31"
+  },
+  "limits": [
+    "Synthetic one-expert fixture; no full routed batch or official weights.",
+    "Final BF16 result matches exactly on these fixtures; no claim of FP32 bit equality across widths.",
+    "No timing, bandwidth, pipeline-overlap, or serving-dispatch qualification.",
+    "Spark run precedes whitespace-only ruff formatting; RTX run uses final source."
+  ],
+  "restored_api_smoke": [
+    {
+      "port": 18041,
+      "text": "ready",
+      "usage": {
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "total_tokens": 11,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 9
+      }
+    },
+    {
+      "port": 18042,
+      "text": "ready",
+      "usage": {
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "total_tokens": 11,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 9
+      }
+    }
+  ]
+}
