@@ -1,0 +1,862 @@
+{
+  "revision": "182a3fe",
+  "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "scope": "Development rollout and bounded quality/performance checks. Numerical equivalence remains open.",
+  "artifact_sha256": {
+    "/tmp/ds41-compact-release": "be27845d4f7bb1b6414f52d6a1464401d7ecc2fc678d39e7f09733f2672ee7b3",
+    "/tmp/ds41-compact-target-fixture": "0108cbe2d6c22b0f1bfe653338f40c322a73810958d2321b1d11a33af8d4c69c",
+    "/tmp/ds41-compact-cmake/libds41rt_native.so": "d800e488d876d0092ec6176f36d6f70bc87e4ada410627872e4716d5bf562746",
+    "/tmp/ds41-compact-artifacts/worker": "294f4ad0126f2982a540784d08af8c447b81f7ff847a4c5b6562392ca1076446",
+    "/tmp/ds41-compact-artifacts/cmake/libds41rt_native.so": "51d49d8ce5fe41e290f447bfe86c854586dcf3aac2e2332422cf54f85045aed4"
+  },
+  "worker_loading": {
+    "ostrich": {
+      "layers": 40,
+      "sum_layer_load_ms": 37432,
+      "ready": true
+    },
+    "dodo": {
+      "layers": 40,
+      "sum_layer_load_ms": 37244,
+      "ready": true
+    },
+    "emu": {
+      "layers": 40,
+      "sum_layer_load_ms": 37904,
+      "ready": true
+    },
+    "kiwi": {
+      "layers": 40,
+      "sum_layer_load_ms": 36490,
+      "ready": true
+    }
+  },
+  "cases": [
+    {
+      "name": "arithmetic",
+      "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+      "runs": {
+        "target": {
+          "text_before": "575",
+          "text_after": "575",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "usage_after": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 0.41195424599573016,
+          "finish_seconds_after": 0.5194791879039258,
+          "ttft_seconds_before": 0.2735843809787184,
+          "ttft_seconds_after": 0.39486228697933257
+        },
+        "speculative": {
+          "text_before": "575",
+          "text_after": "575",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "usage_after": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 0.4444505190476775,
+          "finish_seconds_after": 0.5497963589150459,
+          "ttft_seconds_before": 0.26685602602083236,
+          "ttft_seconds_after": 0.38524845999199897
+        }
+      }
+    },
+    {
+      "name": "signed_sort",
+      "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+      "runs": {
+        "target": {
+          "text_before": "[-11, -4, 0, 7, 7, 12]",
+          "text_after": "[-11, -4, 0, 7, 7, 12]",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_after": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 2.2686170369852334,
+          "finish_seconds_after": 2.1072419530246407,
+          "ttft_seconds_before": 0.35869448096491396,
+          "ttft_seconds_after": 0.26858569495379925
+        },
+        "speculative": {
+          "text_before": "[-11, -4, 0, 7, 7, 12]",
+          "text_after": "[-11, -4, 0, 7, 7, 12]",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_after": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 0.9296088170958683,
+          "finish_seconds_after": 0.917110395967029,
+          "ttft_seconds_before": 0.33846485102549195,
+          "ttft_seconds_after": 0.26296177797485143
+        }
+      }
+    },
+    {
+      "name": "extraction",
+      "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+      "runs": {
+        "target": {
+          "text_before": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "text_after": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "usage_after": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 1.9492461640620604,
+          "finish_seconds_after": 1.8150379480794072,
+          "ttft_seconds_before": 0.3749942510621622,
+          "ttft_seconds_after": 0.2749385250499472
+        },
+        "speculative": {
+          "text_before": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "text_after": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "usage_after": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 0.9381234010215849,
+          "finish_seconds_after": 0.8229056659620255,
+          "ttft_seconds_before": 0.35954881296493113,
+          "ttft_seconds_after": 0.2696324869757518
+        }
+      }
+    },
+    {
+      "name": "logic",
+      "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+      "runs": {
+        "target": {
+          "text_before": "[\"D\", \"A\", \"B\", \"C\"]",
+          "text_after": "[\"D\", \"A\", \"B\", \"C\"]",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_after": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 1.541550800902769,
+          "finish_seconds_after": 1.4589894610689953,
+          "ttft_seconds_before": 0.34481274196878076,
+          "ttft_seconds_after": 0.2607362160924822
+        },
+        "speculative": {
+          "text_before": "[\"D\", \"A\", \"B\", \"C\"]",
+          "text_after": "[\"D\", \"A\", \"B\", \"C\"]",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_after": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 0.6288081390084699,
+          "finish_seconds_after": 0.5206912379944697,
+          "ttft_seconds_before": 0.3338189129717648,
+          "ttft_seconds_after": 0.25653771101497114
+        }
+      }
+    },
+    {
+      "name": "unicode",
+      "prompt": "請計算 18 加 27，再減去 9。只輸出阿拉伯數字答案。",
+      "runs": {
+        "target": {
+          "text_before": "36",
+          "text_after": "36",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 25,
+            "completion_tokens": 2,
+            "total_tokens": 27,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "usage_after": {
+            "prompt_tokens": 25,
+            "completion_tokens": 2,
+            "total_tokens": 27,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 0.4110493570333347,
+          "finish_seconds_after": 0.323403108981438,
+          "ttft_seconds_before": 0.27605023502837867,
+          "ttft_seconds_after": 0.20663704897742718
+        },
+        "speculative": {
+          "text_before": "36",
+          "text_after": "36",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 25,
+            "completion_tokens": 2,
+            "total_tokens": 27,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "usage_after": {
+            "prompt_tokens": 25,
+            "completion_tokens": 2,
+            "total_tokens": 27,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 0.4376737829297781,
+          "finish_seconds_after": 0.37065840896684676,
+          "ttft_seconds_before": 0.27355594898108393,
+          "ttft_seconds_after": 0.21609341201838106
+        }
+      }
+    },
+    {
+      "name": "translation",
+      "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation.",
+      "runs": {
+        "target": {
+          "text_before": "紅色的門是開著的。",
+          "text_after": "紅色的門是開著的。",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "usage_after": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "usage_equal": true,
+          "objective_pass": null,
+          "finish_seconds_before": 0.977586128981784,
+          "finish_seconds_after": 0.9157309320289642,
+          "ttft_seconds_before": 0.2564017280237749,
+          "ttft_seconds_after": 0.20971739594824612
+        },
+        "speculative": {
+          "text_before": "紅色的門是開著的。",
+          "text_after": "紅色的門是開著的。",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "usage_after": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "usage_equal": true,
+          "objective_pass": null,
+          "finish_seconds_before": 0.7226146609755233,
+          "finish_seconds_after": 0.64096813602373,
+          "ttft_seconds_before": 0.2668162889312953,
+          "ttft_seconds_after": 0.20943490299396217
+        }
+      }
+    },
+    {
+      "name": "explanation",
+      "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences.",
+      "runs": {
+        "target": {
+          "text_before": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+          "text_after": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 26,
+            "completion_tokens": 29,
+            "total_tokens": 55,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "usage_after": {
+            "prompt_tokens": 26,
+            "completion_tokens": 29,
+            "total_tokens": 55,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "usage_equal": true,
+          "objective_pass": null,
+          "finish_seconds_before": 3.107145369052887,
+          "finish_seconds_after": 2.923617418971844,
+          "ttft_seconds_before": 0.29393185197841376,
+          "ttft_seconds_after": 0.21817775105591863
+        },
+        "speculative": {
+          "text_before": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+          "text_after": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 26,
+            "completion_tokens": 29,
+            "total_tokens": 55,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "usage_after": {
+            "prompt_tokens": 26,
+            "completion_tokens": 29,
+            "total_tokens": 55,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "usage_equal": true,
+          "objective_pass": null,
+          "finish_seconds_before": 1.9881995860487223,
+          "finish_seconds_after": 1.6864884130191058,
+          "ttft_seconds_before": 0.28192814404610544,
+          "ttft_seconds_after": 0.2124755480326712
+        }
+      }
+    },
+    {
+      "name": "long_retrieval",
+      "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+      "runs": {
+        "target": {
+          "text_before": "quartz-731",
+          "text_after": "quartz-731",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "usage_after": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 9.33097532694228,
+          "finish_seconds_after": 6.2689513199729845,
+          "ttft_seconds_before": 8.725518407998607,
+          "ttft_seconds_after": 5.655824712011963
+        },
+        "speculative": {
+          "text_before": "quartz-731",
+          "text_after": "quartz-731",
+          "text_equal": true,
+          "usage_before": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "usage_after": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "usage_equal": true,
+          "objective_pass": true,
+          "finish_seconds_before": 8.886947931023315,
+          "finish_seconds_after": 5.92003542301245,
+          "ttft_seconds_before": 8.668595317984,
+          "ttft_seconds_after": 5.716607042006217
+        }
+      }
+    }
+  ],
+  "api_measurements": {
+    "target": {
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification.",
+      "decode_tps": [
+        10.190351174255305,
+        10.114243164989094,
+        10.4701616427131
+      ],
+      "ttft_seconds": [
+        0.20382291299756616,
+        0.20386635803151876,
+        0.20819314697291702
+      ],
+      "cancellation_recovery": "4",
+      "completion_tokens": [
+        59,
+        59,
+        59
+      ]
+    },
+    "spec": {
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification.",
+      "decode_tps": [
+        46.48542578424911,
+        47.39247633114224,
+        46.80805978238934
+      ],
+      "ttft_seconds": [
+        0.20925045397598296,
+        0.20521577401086688,
+        0.20409231702797115
+      ],
+      "cancellation_recovery": "4",
+      "completion_tokens": [
+        59,
+        59,
+        59
+      ]
+    }
+  },
+  "phase_timings": {
+    "target": {
+      "target collection/rows=1": {
+        "samples": 10560,
+        "median_us": {
+          "shared_copy_us": 5.0,
+          "upload_us": 21.0,
+          "receive_us": 1409.5,
+          "reduce_us": 6.0
+        }
+      },
+      "target experts/rows=1": {
+        "samples": 10560,
+        "median_us": {
+          "routed_us": 49.0,
+          "dispatch_us": 13.0,
+          "shared_us": 53.0,
+          "collect_us": 1445.0
+        }
+      },
+      "target step/rows=1": {
+        "samples": 263,
+        "median_us": {
+          "prepared_us": 6,
+          "execute_us": 96645,
+          "sample_us": 116,
+          "commit_us": 427,
+          "total_us": 97190
+        }
+      },
+      "target collection/rows=80": {
+        "samples": 680,
+        "median_us": {
+          "shared_copy_us": 6.0,
+          "upload_us": 155.0,
+          "receive_us": 5317.5,
+          "reduce_us": 8.0
+        }
+      },
+      "target experts/rows=80": {
+        "samples": 680,
+        "median_us": {
+          "routed_us": 240.0,
+          "dispatch_us": 223.0,
+          "shared_us": 62.0,
+          "collect_us": 5487.5
+        }
+      },
+      "target step/rows=80": {
+        "samples": 17,
+        "median_us": {
+          "prepared_us": 36,
+          "execute_us": 323030,
+          "sample_us": 122,
+          "commit_us": 574,
+          "total_us": 323758
+        }
+      }
+    },
+    "spec": {
+      "target collection/rows=6": {
+        "samples": 2440,
+        "median_us": {
+          "shared_copy_us": 5.0,
+          "upload_us": 30.0,
+          "receive_us": 1762.0,
+          "reduce_us": 7.0
+        }
+      },
+      "target experts/rows=6": {
+        "samples": 2440,
+        "median_us": {
+          "routed_us": 63.0,
+          "dispatch_us": 23.0,
+          "shared_us": 54.0,
+          "collect_us": 1808.5
+        }
+      },
+      "target collection/rows=80": {
+        "samples": 680,
+        "median_us": {
+          "shared_copy_us": 6.0,
+          "upload_us": 158.0,
+          "receive_us": 5402.0,
+          "reduce_us": 9.0
+        }
+      },
+      "target experts/rows=80": {
+        "samples": 680,
+        "median_us": {
+          "routed_us": 241.0,
+          "dispatch_us": 228.0,
+          "shared_us": 61.0,
+          "collect_us": 5588.5
+        }
+      },
+      "target step/rows=80": {
+        "samples": 17,
+        "median_us": {
+          "prepared_us": 36,
+          "execute_us": 321488,
+          "sample_us": 118,
+          "commit_us": 800,
+          "total_us": 322441
+        }
+      }
+    }
+  },
+  "real_rank_comparison": [
+    {
+      "rank": 0,
+      "cycle": 0,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    },
+    {
+      "rank": 1,
+      "cycle": 0,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    },
+    {
+      "rank": 2,
+      "cycle": 0,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    },
+    {
+      "rank": 3,
+      "cycle": 0,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    },
+    {
+      "rank": 0,
+      "cycle": 1,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    },
+    {
+      "rank": 1,
+      "cycle": 1,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    },
+    {
+      "rank": 2,
+      "cycle": 1,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    },
+    {
+      "rank": 3,
+      "cycle": 1,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "different_fraction": 0.0
+    }
+  ],
+  "same_input_synthetic_prefill_logits": {
+    "cycle": 0,
+    "rows": 16,
+    "finite": true,
+    "relative_l2": 0.5473061800003052,
+    "max_abs": 13.448148727416992,
+    "min_row_cosine": 0.7148690057919905,
+    "top1_equal_rows": 7,
+    "old_top1": [
+      6676,
+      71288,
+      271,
+      271,
+      260,
+      223,
+      201,
+      223,
+      201,
+      201,
+      643,
+      271,
+      1388,
+      16,
+      271,
+      8060
+    ],
+    "new_top1": [
+      31138,
+      223,
+      223,
+      201,
+      260,
+      201,
+      201,
+      34460,
+      201,
+      201,
+      643,
+      271,
+      9417,
+      271,
+      271,
+      3108
+    ],
+    "sha256": [
+      "f4578e2fa896543b34c9eff11b0ff2aa4cf4e3e0afd606f41de82b0065900bea",
+      "afbd833de0a45ef25b30b1d7f3572d80b22e5e2aea898b9c815dfd485eedb67f"
+    ]
+  },
+  "real_chat_logits": [
+    {
+      "cycle": 0,
+      "relative_l2": 0.14614221453666687,
+      "max_abs": 2.1332998275756836,
+      "cosine": 0.9893692105451697,
+      "old_top1": 22,
+      "new_top1": 22
+    },
+    {
+      "cycle": 1,
+      "relative_l2": 0.2217988818883896,
+      "max_abs": 3.150075912475586,
+      "cosine": 0.9751721431428559,
+      "old_top1": 1,
+      "new_top1": 1
+    }
+  ],
+  "excluded_comparison": "Synthetic cycles 1 and 2 generated different next tokens, so their subsequent logits do not compare identical input histories."
+}
