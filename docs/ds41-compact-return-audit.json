@@ -1,0 +1,58 @@
+{
+  "scope": "Two saved real layer-0 TP4 batches; ordered CPU FP32 sums with explicit BF16 conversions; no shared expert, no later layers, not full-model or independent-reference qualification.",
+  "source_pattern": "/tmp/ds41-layer0-output/rank{0..3}/l0-c{0,1}-plane.bin",
+  "results": [
+    {
+      "cycle": 0,
+      "rank_return_dtype": "torch.float32",
+      "rows": 80,
+      "finite": true,
+      "relative_l2": 0.0025296348612755537,
+      "max_abs": 0.0078125,
+      "different_fraction": 0.3653540015220642,
+      "cosine": 0.9999968003434163
+    },
+    {
+      "cycle": 0,
+      "rank_return_dtype": "torch.bfloat16",
+      "rows": 80,
+      "finite": true,
+      "relative_l2": 0.0030069216154515743,
+      "max_abs": 0.0078125,
+      "different_fraction": 0.4543408155441284,
+      "cosine": 0.9999954791849133
+    },
+    {
+      "cycle": 1,
+      "rank_return_dtype": "torch.float32",
+      "rows": 80,
+      "finite": true,
+      "relative_l2": 0.0025284704752266407,
+      "max_abs": 0.0078125,
+      "different_fraction": 0.37058839201927185,
+      "cosine": 0.9999968035346234
+    },
+    {
+      "cycle": 1,
+      "rank_return_dtype": "torch.bfloat16",
+      "rows": 80,
+      "finite": true,
+      "relative_l2": 0.0030056259129196405,
+      "max_abs": 0.0078125,
+      "different_fraction": 0.457763671875,
+      "cosine": 0.9999954831938613
+    }
+  ],
+  "source_sha256": {
+    "rank0/l0-c0-plane.bin": "5cc738e4aa2fe4fc48949cff2ad415a3e493ad69a707aee190d400ed321b736a",
+    "rank1/l0-c0-plane.bin": "4b634e66503af21527beeb2838289c3c058195fbb7446b8590b9a2ad89ad6e54",
+    "rank2/l0-c0-plane.bin": "f8918bd02576cff11dc6e0b8f80b59f646c67384533754c94d8ce0756bf86e06",
+    "rank3/l0-c0-plane.bin": "b4534310ac85860cfd370ece223d4c4f6c2c2f880d037fec0e6eb6be79782977",
+    "rank0/l0-c1-plane.bin": "f38fa4943049d17defa9c0895915081a921ad77d6314e754a67025f946cac35d",
+    "rank1/l0-c1-plane.bin": "74bd088296c359f18dfde836d3eb202409cbe5a76db752d53c9b0eac8b6075fa",
+    "rank2/l0-c1-plane.bin": "f9a75c0e5cd00cc516cea5ebf83622c12043d14e55d0508f6b332ae589306a01",
+    "rank3/l0-c1-plane.bin": "9b8a54d69d5fedd43b12470028d1236fa97bae6af237ef30fb029548e0738a26"
+  },
+  "baseline_revision": "f9fdeb4",
+  "method": "Sum ranks 0,1,2,3 per route; round each route to BF16; sum routes 0..5 in FP32; round final result to BF16. Candidates instead sum routes 0..5 locally in FP32, convert each rank result to the candidate dtype, sum ranks 0..3 in FP32, and round final result to BF16. Shared expert excluded."
+}
