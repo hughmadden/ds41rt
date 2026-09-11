@@ -3,7 +3,7 @@ pub use dspark_rng::{DsparkRng, DsparkRngReservation};
 mod dspark_verify;
 pub use dspark_verify::{verify_dspark_greedy, GreedyVerification};
 mod engram;
-pub use engram::{EngramBatch, EngramError, EngramHashes, EngramHistory, ENGRAM_LAYERS, ENGRAM_ROWS, ENGRAM_COMPRESSED_VOCAB};
+pub use engram::{EngramBatch, EngramError, EngramHashes, EngramHistory, EngramPrefillCursor, ENGRAM_LAYERS, ENGRAM_ROWS, ENGRAM_COMPRESSED_VOCAB};
 mod attention_geometry;
 mod constants;
 mod coordinator_graphs;

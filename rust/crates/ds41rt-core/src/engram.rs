@@ -93,8 +93,27 @@ pub struct EngramHistory {
 pub struct EngramBatch {
     owner: u64,
     generation: u64,
+    position: u64,
+    recent: [Option<u32>; 3],
     tokens: Vec<Option<u32>>,
     hashes: Vec<EngramHashes>,
+}
+
+/// A private preparation frontier for known prompt tokens. Advancing this cursor
+/// never accepts tokens into the request history. Batches must still commit in
+/// order against the original history after execution succeeds.
+pub struct EngramPrefillCursor {
+    history: EngramHistory,
+}
+impl EngramPrefillCursor {
+    /// Use this history with the ordinary token-map/prefetch preparation path.
+    pub fn history(&self) -> &EngramHistory { &self.history }
+    /// Reserve a fully known prompt batch; partial speculative acceptance must
+    /// use the original history and discard dependent prepared batches.
+    pub fn advance_full(&mut self, batch: &EngramBatch) -> Result<()> {
+        ensure!(!batch.tokens.is_empty(), "empty engram prefill reservation");
+        self.history.commit(batch, batch.tokens.len())
+    }
 }
 
 impl EngramBatch {
@@ -139,6 +158,13 @@ impl EngramHistory {
             recent: [None; 3],
             pad,
         })
+    }
+
+    pub fn prefill_cursor(&self) -> EngramPrefillCursor {
+        EngramPrefillCursor { history: Self {
+            owner: self.owner, generation: self.generation, position: self.position,
+            recent: self.recent, pad: self.pad,
+        } }
     }
 
     pub fn pad_id(&self) -> u32 {
@@ -192,6 +218,8 @@ impl EngramHistory {
         Ok(EngramBatch {
             owner: self.owner,
             generation: self.generation,
+            position: self.position,
+            recent: self.recent,
             tokens: tokens.to_vec(),
             hashes,
         })
@@ -211,7 +239,8 @@ impl EngramHistory {
     /// Validate every request in a physical wave before mutating any history.
     pub fn validate_commit(&self, batch: &EngramBatch, accepted: usize) -> Result<()> {
         ensure!(
-            batch.owner == self.owner && batch.generation == self.generation,
+            batch.owner == self.owner && batch.generation == self.generation
+                && batch.position == self.position && batch.recent == self.recent,
             "stale or foreign engram batch"
         );
         ensure!(
@@ -231,6 +260,52 @@ impl EngramHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn prefill_lookahead_matches_sequential_hashes_without_early_acceptance() -> Result<()> {
+        for width in [1, 3, 64, 65, 128, 2048] {
+            let tokens = (0..width * 3 + 1).map(|i| {
+                if i % 67 == 0 { None } else { Some((i * 29 % 99092) as u32) }
+            }).collect::<Vec<_>>();
+            let mut history = EngramHistory::new(2)?;
+            let full = history.prepare(0, &tokens, tokens.len())?;
+            let mut cursor = history.prefill_cursor();
+            let mut batches = Vec::new();
+            for chunk in tokens.chunks(width) {
+                let start = cursor.history().position();
+                let batch = cursor.history().prepare(start, chunk, width)?;
+                assert_eq!(batch.hashes(), &full.hashes()[start as usize..start as usize + chunk.len()]);
+                cursor.advance_full(&batch)?;
+                batches.push(batch);
+                assert_eq!(history.position(), 0);
+            }
+            assert!(history.commit(&batches[1], batches[1].tokens.len()).is_err());
+            for batch in &batches { history.commit(batch, batch.tokens.len())?; }
+            assert_eq!(history.position(), tokens.len() as u64);
+            let next = [Some(42)];
+            assert_eq!(history.prepare(history.position(), &next, 1)?.hashes(),
+                cursor.history().prepare(history.position(), &next, 1)?.hashes());
+        }
+        Ok(())
+    }
+    #[test]
+    fn lookahead_rejects_partial_or_divergent_predecessors_and_foreign_history() -> Result<()> {
+        for accepted in [0, 1, 2] {
+            let mut history = EngramHistory::new(2)?;
+            let mut cursor = history.prefill_cursor();
+            let first = cursor.history().prepare(0, &[Some(1), Some(2)], 2)?;
+            cursor.advance_full(&first)?;
+            let second = cursor.history().prepare(2, &[Some(3)], 1)?;
+            let alternate = history.prepare(0, &[Some(8), Some(9)], 2)?;
+            history.commit(&alternate, accepted)?;
+            // Full alternate acceptance has the same generation and position,
+            // so the predecessor-context check is essential in this case.
+            assert!(history.commit(&second, 1).is_err());
+            let mut foreign = EngramHistory::new(2)?;
+            assert!(foreign.commit(&first, 2).is_err());
+            assert!(cursor.advance_full(&first).is_err());
+        }
+        Ok(())
+    }
     #[test]
     fn official_prime_ranges_match_checkpoint_rows() {
         for (layer, rows) in primes().iter().zip(ENGRAM_ROWS) {

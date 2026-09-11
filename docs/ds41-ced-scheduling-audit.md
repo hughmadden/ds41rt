@@ -149,3 +149,30 @@ acceptance rejection, and both ordinary and early-publication late source
 exhaustion with complete admission recovery. Build/GPU logs are
 `/tmp/ds41-ced-bounds/publication-{build,gpu}.log`. Native serving has not been
 switched to early publication yet; no new API throughput result is claimed.
+
+## Implemented prerequisite: Engram preparation lookahead
+
+`EngramHistory::prefill_cursor` creates a private preparation frontier containing
+only the request identity, generation, position and three preceding compressed
+IDs. `EngramPrefillCursor::advance_full` advances that frontier across known prompt
+batches without accepting anything into the actual request history. Its borrowed
+history works with the existing token-map and pipeline preparation interfaces.
+A scheduler must retain each in-flight batch's starting cursor for I/O validation
+while advancing its main preparation cursor, then commit completed batches to the
+actual request history in order. Cursor storage is constant-size; bounded batch
+and gather ownership remain scheduler responsibilities.
+
+Engram batches now record their starting position and preceding context as well
+as owner/generation. This matters because an alternative predecessor could have
+the same length and generation but different lookback tokens. Such a successor,
+or one whose predecessor was only partly accepted, must not enter history.
+Ordinary speculative accepted-prefix behavior remains supported; dependent
+lookahead batches must be discarded after divergence.
+
+Four core Engram tests pass. New coverage compares all hashes against a continuous
+prompt for chunk widths 1/3/64/65/128/2048 with image barriers, verifies that
+preparation does not advance accepted history, then commits in order and compares
+the next token. It also rejects out-of-order, foreign, stale, partial-predecessor
+and equal-length divergent-predecessor batches. Results are in
+`/tmp/ds41-ced-bounds/engram-lookahead-tests.log`. This is preparation state support;
+serving does not yet schedule several chunks concurrently.
