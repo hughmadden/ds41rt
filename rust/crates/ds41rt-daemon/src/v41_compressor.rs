@@ -606,6 +606,34 @@ impl CompressorWave<'_, '_> {
         }
         Ok(())
     }
+    /// Consume the exact normalized hidden rows used by a bound attention query.
+    /// # Safety
+    /// Query producers have completed; no external writes race query or cache
+    /// storage. The batch's request identities correspond to these hidden rows.
+    pub unsafe fn execute_query<'s>(
+        &'s mut self,
+        state: &'s CompressorState<'_>,
+        chunks: &[CompressorChunk],
+        query: &crate::v41_attention_query::AttentionQueryOutput<'_>,
+    ) -> Result<CompressorOutput<'s>> {
+        self.ready = None;
+        let prepared = self.prepare(state, chunks)?;
+        ensure!(query.binding()?.layer() == self.weights.layer
+            && query.layer == self.weights.layer
+            && query.rows == prepared.rows
+            && query.hidden.bytes == prepared.rows * 10240
+            && query.hidden.device_id == self.input.buffer.device_id
+            && query.tokens()?.iter().copied().eq(chunks.iter().flat_map(|c|
+                c.position..c.position + u64::from(c.tokens))),
+            "compressor query layer, rows or positions differ");
+        self.synchronize()?;
+        self.stream.library.copy_d2d(self.input.buffer, query.hidden, query.hidden.bytes)?;
+        if self.graph.is_none_or(|(_, rows, owner)| rows != prepared.rows || owner != state.owner) {
+            self.clear_graph()?;
+            unsafe { self.capture(state, chunks)?; }
+        }
+        unsafe { self.replay(state, chunks) }
+    }
     /// # Safety
     /// Finite input rows follow chunk order on this device, with producer writes
     /// complete. No external writes may race this wave or committed state.

@@ -1,7 +1,11 @@
 //! One request lease spans every backbone window and compressed source.
 use crate::v41_backbone_router::ExpertRow;
-use crate::v41_compressor::{CompressorChunk, CompressorLease, CompressorState, CompressorWave};
-use crate::v41_window::{WindowChunk, WindowLease, WindowState, WindowWave};
+use crate::v41_compressor::{
+    CompressorChunk, CompressorLease, CompressorState, CompressorWave, IndexProposal,
+};
+use crate::v41_index_selection::SelectionRequest;
+use crate::v41_sparse_attention::AttentionRequest;
+use crate::v41_window::{WindowChunk, WindowLease, WindowProposal, WindowState, WindowWave};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::NativeLibrary;
 use ds41rt_transport::ExpertV2SourceKind;
@@ -85,6 +89,43 @@ impl CacheBatch {
                 lease: r.sources[source],
                 position: r.position,
                 tokens: r.work.tokens,
+            })
+            .collect())
+    }
+}
+
+/// Borrows the bank and completed producers for the whole attention use. The
+/// request vectors are built from one validated batch, never independently zipped
+/// scheduler arrays. Drop all views before advancing or releasing cache history.
+pub(crate) struct CacheAttention<'a> {
+    windows: Vec<WindowProposal<'a>>,
+    sources: Vec<IndexProposal<'a>>,
+    positions: Vec<Vec<u64>>,
+}
+impl CacheAttention<'_> {
+    pub fn attention_requests(&self) -> Vec<AttentionRequest<'_>> {
+        self.windows
+            .iter()
+            .enumerate()
+            .map(|(i, window)| AttentionRequest {
+                window,
+                source: self.sources.get(i),
+                positions: &self.positions[i],
+            })
+            .collect()
+    }
+    pub fn selection_requests(&self) -> Result<Vec<SelectionRequest<'_>>> {
+        ensure!(
+            self.sources.len() == self.windows.len(),
+            "window-only layers have no index selection"
+        );
+        Ok(self
+            .sources
+            .iter()
+            .zip(&self.positions)
+            .map(|(proposal, positions)| SelectionRequest {
+                proposal,
+                positions,
             })
             .collect())
     }
@@ -307,6 +348,80 @@ impl<'a> BackboneCache<'a> {
             .position(|&l| l == layer)
             .context("invalid backbone source layer")?;
         Ok(&self.sources[source])
+    }
+    /// # Safety
+    /// Query rows correspond to this admitted batch and all query writes have
+    /// completed. No external writes race query, producer or persistent cache.
+    pub unsafe fn produce_window(
+        &self,
+        batch: &CacheBatch,
+        query: &crate::v41_attention_query::AttentionQueryOutput<'_>,
+        wave: &mut WindowWave<'_, '_>,
+    ) -> Result<()> {
+        let state = self.window(batch, query.layer)?;
+        let chunks = batch.window_chunks(query.layer)?;
+        unsafe {
+            wave.execute_query(state, &chunks, query)?;
+        }
+        Ok(())
+    }
+    /// # Safety
+    /// Same query/batch association and completed-producer contract as
+    /// produce_window. Only the four source layers may produce compressed KV.
+    pub unsafe fn produce_source(
+        &self,
+        batch: &CacheBatch,
+        query: &crate::v41_attention_query::AttentionQueryOutput<'_>,
+        wave: &mut CompressorWave<'_, '_>,
+    ) -> Result<()> {
+        let state = self.source(batch, query.layer)?;
+        let chunks = batch.source_chunks(query.layer)?;
+        unsafe {
+            wave.execute_query(state, &chunks, query)?;
+        }
+        Ok(())
+    }
+    /// Bind the matching layer's completed window and nearest compressed source
+    /// to this batch. Later reindex layers continue using source 20's proposal.
+    pub fn attention<'s>(
+        &'s self,
+        batch: &CacheBatch,
+        layer: usize,
+        window: &'s WindowWave<'_, '_>,
+        source: Option<&'s CompressorWave<'_, '_>>,
+    ) -> Result<CacheAttention<'s>> {
+        let state = self.window(batch, layer)?;
+        let chunks = batch.window_chunks(layer)?;
+        window.validate_batch(state, &chunks)?;
+        let source_layer = SOURCES.iter().copied().rev().find(|&n| n <= layer);
+        ensure!(
+            source.is_some() == source_layer.is_some(),
+            "attention batch source presence differs"
+        );
+        let mut sources = Vec::new();
+        if let Some(source_layer) = source_layer {
+            let wave = source.context("attention source absent")?;
+            let state = self.source(batch, source_layer)?;
+            let chunks = batch.source_chunks(source_layer)?;
+            wave.validate_batch(state, &chunks)?;
+            sources = chunks
+                .iter()
+                .map(|c| wave.index_proposal(state, c.lease))
+                .collect::<Result<Vec<_>>>()?;
+        }
+        let windows = chunks
+            .iter()
+            .map(|c| window.proposal(state, c.lease))
+            .collect::<Result<Vec<_>>>()?;
+        let positions = chunks
+            .iter()
+            .map(|c| (c.position..c.position + u64::from(c.tokens)).collect())
+            .collect();
+        Ok(CacheAttention {
+            windows,
+            sources,
+            positions,
+        })
     }
     /// Revoke host leases first, then release every associated device cache. All
     /// proposal/attention consumers must have drained before this mutable call.

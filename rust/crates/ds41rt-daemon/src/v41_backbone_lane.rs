@@ -306,6 +306,20 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             phase: &mut self.phase,
         })
     }
+    /// Execute attention from one cache-bank batch. The bank view pins all
+    /// request leases and proposal buffers through the completed attention call.
+    /// # Safety
+    /// Sink and selection match this layer; producers have drained and no
+    /// external writes race the cache/query buffers (as for attention_ffn).
+    pub unsafe fn attention_cached_ffn(
+        &mut self,
+        sink: Ds41rtDeviceBuffer,
+        cache: &crate::v41_backbone_cache::CacheAttention<'_>,
+        selection: Option<&IndexSelectionOutput<'_>>,
+    ) -> Result<LaneFfn<'_, 'w, 'a>> {
+        let requests = cache.attention_requests();
+        unsafe { self.attention_ffn(sink, &requests, selection) }
+    }
     /// # Safety
     /// Result is the completed shared plus routed reduction for the exact FFN
     /// binding and row order published by attention_ffn.
