@@ -1,9 +1,9 @@
 //! One coordinator wave owns TP route planes through final native reduction.
 use super::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41RouteReducer};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41CompactReducer};
 use ds41rt_transport::{
-    v41_expert::{V41Tp4Pending, V41Tp4Tcp, V41_ROUTE_ROW_BYTES},
+    v41_expert::{V41Tp4Pending, V41Tp4Tcp, V41_PARTIAL_ROW_BYTES},
     ExpertProtocolV2Request,
 };
 
@@ -15,7 +15,7 @@ pub(crate) struct NativeTp4Wave<'a> {
     shared: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     library: &'a NativeLibrary,
-    reducer: V41RouteReducer<'a>,
+    reducer: V41CompactReducer<'a>,
     ready_rows: Option<u32>,
 }
 impl<'a> NativeTp4Wave<'a> {
@@ -29,7 +29,7 @@ impl<'a> NativeTp4Wave<'a> {
             "invalid native TP wave capacity"
         );
         (capacity as usize)
-            .checked_mul(4 * V41_ROUTE_ROW_BYTES as usize + 2 * 5120 * 2)
+            .checked_mul(4 * V41_PARTIAL_ROW_BYTES as usize + 2 * 5120 * 2)
             .context("native TP wave budget overflow")
     }
     pub fn new(
@@ -42,8 +42,8 @@ impl<'a> NativeTp4Wave<'a> {
             Self::device_bytes(capacity)? <= available_bytes,
             "native TP wave exceeds device budget"
         );
-        let reducer = library.v41_route_reducer()?;
-        let plane_bytes = capacity as usize * V41_ROUTE_ROW_BYTES as usize;
+        let reducer = library.v41_compact_reducer()?;
+        let plane_bytes = capacity as usize * V41_PARTIAL_ROW_BYTES as usize;
         let mut planes = Vec::with_capacity(4);
         for _ in 0..4 {
             planes.push(DeviceAllocation::new(library, plane_bytes)?);
@@ -224,7 +224,7 @@ fn copy_chunk(
 ) -> Result<()> {
     ensure!(rank < 4, "native route rank exceeds TP4");
     let offset = (first_row as usize)
-        .checked_mul(V41_ROUTE_ROW_BYTES as usize)
+        .checked_mul(V41_PARTIAL_ROW_BYTES as usize)
         .context("native route chunk offset overflow")?;
     let end = offset
         .checked_add(bytes.len())
@@ -240,7 +240,7 @@ fn copy_chunk(
 }
 fn reduce_planes(
     library: &NativeLibrary,
-    reducer: &V41RouteReducer<'_>,
+    reducer: &V41CompactReducer<'_>,
     stream: &LoadStream<'_>,
     planes: &[DeviceAllocation<'_>; 4],
     output: Ds41rtDeviceBuffer,
@@ -248,13 +248,11 @@ fn reduce_planes(
     rows: u32,
 ) -> Result<()> {
     let launched = unsafe {
-        reducer.launch(
-            std::array::from_fn(|rank| planes[rank].buffer.ptr.cast::<f32>().cast_const()),
+        reducer.reduce(
+            std::array::from_fn(|rank| planes[rank].buffer.ptr.cast::<u16>().cast_const()),
             shared.map_or(std::ptr::null(), |b| b.ptr.cast()),
             output.ptr.cast(),
             rows,
-            4,
-            6,
             stream.raw,
         )
     };
@@ -272,7 +270,7 @@ pub(crate) struct NativePendingFfn<'w, 'a, 'r> {
     planes: &'w [DeviceAllocation<'a>; 4],
     shared: Ds41rtDeviceBuffer,
     output: Ds41rtDeviceBuffer,
-    reducer: &'w V41RouteReducer<'a>,
+    reducer: &'w V41CompactReducer<'a>,
     ready_rows: &'w mut Option<u32>,
 }
 impl<'w> NativePendingFfn<'w, '_, '_> {

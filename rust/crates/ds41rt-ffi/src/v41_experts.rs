@@ -187,6 +187,60 @@ pub struct V41RouteReducer<'a> {
     reduce: ReduceFn,
 }
 
+type CompactFn = unsafe extern "C" fn(*const f32, *mut u16, u32, *mut c_void) -> i32;
+type ReduceCompactFn =
+    unsafe extern "C" fn(*const *const u16, *const u16, *mut u16, u32, *mut c_void) -> i32;
+
+/// Compact BF16 backbone returns; independent from diagnostic per-route reduction.
+pub struct V41CompactReducer<'a> {
+    _library: &'a NativeLibrary,
+    compact: CompactFn,
+    reduce: ReduceCompactFn,
+}
+impl V41CompactReducer<'_> {
+    /// Sum six local FP32 routes and round the rank partial once to BF16.
+    /// # Safety
+    /// Routes are CUDA FP32 [rows,6,5120], output CUDA BF16 [rows,5120].
+    /// They must not overlap. Both allocations and this library must outlive
+    /// stream completion and graph replays, with producer writes ordered first.
+    pub unsafe fn compact(
+        &self,
+        routes: *const f32,
+        output: *mut u16,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let status = unsafe { (self.compact)(routes, output, rows, stream) };
+        ensure!(
+            status == 0,
+            "V4.1 route compaction failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+
+    /// Sum compact partials in TP rank order, then add shared and round to BF16.
+    /// # Safety
+    /// Planes, output and optional shared are CUDA BF16 [rows,5120] on the
+    /// current device. Output cannot overlap planes and may alias shared only
+    /// exactly. Storage and library must outlive stream completion/replay;
+    /// order all producer writes before this operation.
+    pub unsafe fn reduce(
+        &self,
+        planes: [*const u16; 4],
+        shared: *const u16,
+        output: *mut u16,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let status = unsafe { (self.reduce)(planes.as_ptr(), shared, output, rows, stream) };
+        ensure!(
+            status == 0,
+            "V4.1 compact reduction failed with CUDA status {status}"
+        );
+        Ok(())
+    }
+}
+
 impl V41RouteReducer<'_> {
     /// # Safety
     /// Active planes must be contiguous CUDA FP32 [rows,topk,5120] in identical
@@ -226,6 +280,22 @@ pub struct V41ExpertKernel<'a> {
 }
 
 impl NativeLibrary {
+    pub fn v41_compact_reducer(&self) -> Result<V41CompactReducer<'_>> {
+        Ok(V41CompactReducer {
+            _library: self,
+            compact: unsafe {
+                *self
+                    .lib
+                    .get::<CompactFn>(b"ds41rt_v41_compact_routes_bf16_async")?
+            },
+            reduce: unsafe {
+                *self
+                    .lib
+                    .get::<ReduceCompactFn>(b"ds41rt_v41_reduce_compact_bf16_async")?
+            },
+        })
+    }
+
     pub fn v41_expert_packer(&self, intermediate: u32) -> Result<V41ExpertPacker<'_>> {
         let sizes = unsafe {
             self.lib

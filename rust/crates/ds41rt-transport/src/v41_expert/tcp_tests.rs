@@ -1,4 +1,4 @@
-use super::{tests::request, V41BackboneRequest, V41Tp4Tcp, V41_ROUTE_ROW_BYTES};
+use super::{tests::request, V41BackboneRequest, V41Tp4Tcp, V41_PARTIAL_ROW_BYTES};
 use crate::{ExpertProtocolV2Request, TcpTransportConfig, EXPERT_PROTOCOL_V2_REQUEST_HEADER_LEN};
 use anyhow::Result;
 use std::{sync::Arc, time::Duration};
@@ -26,7 +26,7 @@ async fn respond(stream: &mut TcpStream, frame: &[u8], rank: usize) -> Result<()
     let native = V41BackboneRequest::parse(frame, 2)?;
     let id = ExpertProtocolV2Request::decode(frame)?.header.request_id;
     for row in 0..native.rows() {
-        let partials = vec![(id + rank as u64 + row as u64) as u8; V41_ROUTE_ROW_BYTES as usize];
+        let partials = vec![(id + rank as u64 + row as u64) as u8; V41_PARTIAL_ROW_BYTES as usize];
         let mut indices = [0u32];
         let response =
             native.response_chunk(EXECUTORS[rank], row, &partials, &mut indices, FRAME)?;
@@ -41,7 +41,7 @@ fn config() -> TcpTransportConfig {
     }
 }
 fn check_chunk(id: u64, rank: usize, row: u32, bytes: &[u8]) -> Result<()> {
-    assert_eq!(bytes.len(), V41_ROUTE_ROW_BYTES as usize);
+    assert_eq!(bytes.len(), V41_PARTIAL_ROW_BYTES as usize);
     assert!(bytes
         .iter()
         .all(|&b| b == (id + rank as u64 + row as u64) as u8));
@@ -178,7 +178,7 @@ async fn native_tcp_cancelled_receive_discards_partial_wave() -> Result<()> {
             let (mut stream, _) = listener.accept().await?;
             let frame = read_request(&mut stream).await?;
             let native = V41BackboneRequest::parse(&frame, 2)?;
-            let partials = vec![0; V41_ROUTE_ROW_BYTES as usize];
+            let partials = vec![0; V41_PARTIAL_ROW_BYTES as usize];
             let mut indices = [0];
             let first =
                 native.response_chunk(EXECUTORS[rank], 0, &partials, &mut indices, FRAME)?;

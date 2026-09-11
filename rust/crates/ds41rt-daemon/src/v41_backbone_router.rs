@@ -505,7 +505,7 @@ impl RouterOutput<'_> {
                 gate_weight: f32::from_ne_bytes(w.try_into().unwrap()),
             })
             .collect();
-        let request = ExpertProtocolV2Request::new(
+        let mut request = ExpertProtocolV2Request::new(
             request_id,
             placement,
             self.layer as u32,
@@ -515,6 +515,8 @@ impl RouterOutput<'_> {
             routes,
             hidden,
         )?;
+        request.header.flags |=
+            ds41rt_transport::v41_expert::EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16;
         // Prove the same complete-batch contract used by every Spark receiver.
         ds41rt_transport::v41_expert::V41BackboneRequest::parse(&request.encode()?, self.rows)?;
         Ok(BoundExpertRequest { request, binding })

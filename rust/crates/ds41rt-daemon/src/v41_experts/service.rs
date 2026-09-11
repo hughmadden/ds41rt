@@ -120,7 +120,7 @@ impl NativeExpertService {
             "unsupported native expert capacity"
         );
         ensure!(
-            config.max_frame_bytes >= 128 + 122880 + 4,
+            config.max_frame_bytes >= 128 + 10240 + 40 + 6 * 12,
             "native response frame budget cannot fit a token row"
         );
         ensure!(

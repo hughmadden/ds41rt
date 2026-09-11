@@ -24,6 +24,8 @@ pub const EXPERT_PROTOCOL_V2_FLAG_STREAM_PLAN: u32 = 1 << 6;
 pub const EXPERT_PROTOCOL_V2_FLAG_STREAM_DATA: u32 = 1 << 7;
 pub const EXPERT_PROTOCOL_V2_FLAG_STREAM_FINAL: u32 = 1 << 8;
 pub const EXPERT_PROTOCOL_V2_FLAG_SPARK_REDUCTION: u32 = 1 << 9;
+// Native V4.1 compact BF16 rank partials; echoed in responses.
+pub const EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16: u32 = 1 << 16;
 pub const EXPERT_PROTOCOL_V2_FLAG_SPARK_ROW_SHARDED_REDUCTION: u32 = 1 << 11;
 const EXPERT_PROTOCOL_V2_SPARK_COLLECTIVE_PART_COUNT_SHIFT: u32 = 12;
 const EXPERT_PROTOCOL_V2_SPARK_COLLECTIVE_PART_COUNT_MASK: u32 =
@@ -456,6 +458,7 @@ fn validate_flags(flags: u32, label: &str) -> Result<()> {
     let allowed = match label {
         "request" => {
             EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM
+                | EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16
                 | EXPERT_PROTOCOL_V2_FLAG_PRECOMPILE_WARMUP
                 | EXPERT_PROTOCOL_V2_FLAG_RESPONSE_FP8_E4M3_ROW_SCALED
                 | EXPERT_PROTOCOL_V2_FLAG_RESPONSE_NVFP4_E2M1_FP8_E4M3
@@ -468,6 +471,7 @@ fn validate_flags(flags: u32, label: &str) -> Result<()> {
         }
         "response" => {
             EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM
+                | EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16
                 | EXPERT_PROTOCOL_V2_FLAG_RESPONSE_ROW_INDICES
                 | EXPERT_PROTOCOL_V2_FLAG_RESPONSE_MORE_CHUNKS
         }

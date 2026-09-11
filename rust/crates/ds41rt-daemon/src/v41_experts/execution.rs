@@ -2,7 +2,8 @@
 use super::{DeviceAllocation, ExpertWeights, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, NativeLibrary, V41ExpertKernel, V41ExpertLaunchArgs, V41RouteReducer,
+    Ds41rtDeviceBuffer, NativeLibrary, V41CompactReducer, V41ExpertKernel, V41ExpertLaunchArgs,
+    V41RouteReducer,
 };
 use std::ffi::c_void;
 
@@ -42,6 +43,8 @@ pub(crate) struct ExpertExecution<'weights, 'library> {
     hidden: DeviceAllocation<'library>,
     ids: DeviceAllocation<'library>,
     routing: DeviceAllocation<'library>,
+    compact_reducer: Option<V41CompactReducer<'library>>,
+    compact_output: Option<DeviceAllocation<'library>>,
     output: Option<DeviceAllocation<'library>>,
     shared: Option<DeviceAllocation<'library>>,
     slots: [*mut c_void; 44],
@@ -71,7 +74,7 @@ impl<'library> ExpertWeights<'library> {
             output_and_shared_bytes: if info.role == 0 {
                 hidden.checked_mul(2).context("output buffer overflow")?
             } else {
-                0
+                hidden
             },
         })
     }
@@ -94,6 +97,16 @@ impl<'library> ExpertWeights<'library> {
         let routing = DeviceAllocation::new(library, budget.routing_bytes / 2)?;
         let output = if kernel.info().role == 0 {
             Some(DeviceAllocation::new(library, budget.hidden_bytes)?)
+        } else {
+            None
+        };
+        let compact_output = if kernel.info().role == 1 {
+            Some(DeviceAllocation::new(library, budget.hidden_bytes)?)
+        } else {
+            None
+        };
+        let compact_reducer = if kernel.info().role == 1 {
+            Some(library.v41_compact_reducer()?)
         } else {
             None
         };
@@ -128,6 +141,8 @@ impl<'library> ExpertWeights<'library> {
             library,
             kernel,
             reducer,
+            compact_reducer,
+            compact_output,
             scratch,
             hidden,
             ids,
@@ -302,7 +317,12 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
     pub unsafe fn launch(&mut self, rows: u32, include_shared: bool) -> Result<()> {
         unsafe { self.launch_on(rows, include_shared, self.stream.raw) }
     }
-    unsafe fn launch_on(&mut self, rows: u32, include_shared: bool, stream: *mut c_void) -> Result<()> {
+    unsafe fn launch_on(
+        &mut self,
+        rows: u32,
+        include_shared: bool,
+        stream: *mut c_void,
+    ) -> Result<()> {
         ensure!(
             !include_shared || self.shared.is_some(),
             "shared output belongs on coordinator RTX"
@@ -405,7 +425,7 @@ impl HostExpertExchange {
         Ok(Self {
             ids: vec![0; routes],
             routing: vec![0.0; routes],
-            partials: vec![0; routes * 5120 * 4],
+            partials: vec![0; capacity as usize * 5120 * 2],
         })
     }
 }
@@ -432,7 +452,7 @@ impl ExpertExecution<'_, '_> {
             "response row-index scratch is too short"
         );
         let response = self.execute_host_request(request, executor_id, exchange)?;
-        let stride = ds41rt_transport::v41_expert::V41_ROUTE_ROW_BYTES as usize;
+        let stride = ds41rt_transport::v41_expert::V41_PARTIAL_ROW_BYTES as usize;
         for start in (0..request.rows()).step_by(chunk_rows as usize) {
             let end = start.saturating_add(chunk_rows).min(request.rows());
             let payload =
@@ -448,7 +468,7 @@ impl ExpertExecution<'_, '_> {
         Ok(())
     }
 
-    /// Host fallback from a validated wire request to ordered FP32 route response.
+    /// Host fallback from a validated wire request to a compact BF16 rank response.
     /// The borrowed response prevents reuse of exchange storage until encoding/send ends.
     pub fn execute_host_request<'a>(
         &mut self,
@@ -494,10 +514,26 @@ impl ExpertExecution<'_, '_> {
             )?;
             self.launch(request.rows(), false)?;
         }
+        let output = self
+            .compact_output
+            .as_ref()
+            .context("missing compact output")?
+            .buffer;
+        unsafe {
+            self.compact_reducer
+                .as_ref()
+                .context("missing compact reducer")?
+                .compact(
+                    self.route_partials(request.rows())?.ptr.cast(),
+                    output.ptr.cast(),
+                    request.rows(),
+                    self.stream.raw,
+                )?;
+        }
         self.synchronize()?;
         self.library.copy_d2h(
             &mut exchange.partials[..bytes],
-            self.route_partials(request.rows())?,
+            Ds41rtDeviceBuffer { bytes, ..output },
         )?;
         request.response(executor_id, &exchange.partials[..bytes])
     }

@@ -1,0 +1,115 @@
+{
+  "scope": "Compact reduction component qualification, not live model or performance qualification.",
+  "rtx": {
+    "scope": "Qualify compact-return CUDA arithmetic, aliases and graph replay.\n\nThis compares the new operation with its explicit ordered arithmetic oracle.\nIt does not establish equivalence to per-route TP rounding or model quality.\n",
+    "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "capability": [
+      12,
+      0
+    ],
+    "device_uuid": "95f8f212-9131-df99-fd53-7535965197d7",
+    "torch_version": "2.12.0a0+5aff3928d8.nv26.05",
+    "cuda_version": "13.2",
+    "native_sha256": "d800e488d876d0092ec6176f36d6f70bc87e4ada410627872e4716d5bf562746",
+    "cases": [
+      {
+        "case": "synthetic-1",
+        "rows": 1,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-16",
+        "rows": 16,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-80",
+        "rows": 80,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-129",
+        "rows": 129,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-257",
+        "rows": 257,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "real-layer0-cycle0",
+        "rows": 80,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "real-layer0-cycle1",
+        "rows": 80,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      }
+    ]
+  },
+  "spark": {
+    "scope": "Qualify compact-return CUDA arithmetic, aliases and graph replay.\n\nThis compares the new operation with its explicit ordered arithmetic oracle.\nIt does not establish equivalence to per-route TP rounding or model quality.\n",
+    "device": "NVIDIA GB10",
+    "capability": [
+      12,
+      1
+    ],
+    "device_uuid": "a7c503f0-bb16-4333-4f44-92e331dbcf2e",
+    "torch_version": "2.12.0a0+5aff3928d8.nv26.05",
+    "cuda_version": "13.2",
+    "native_sha256": "51d49d8ce5fe41e290f447bfe86c854586dcf3aac2e2332422cf54f85045aed4",
+    "cases": [
+      {
+        "case": "synthetic-1",
+        "rows": 1,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-16",
+        "rows": 16,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-80",
+        "rows": 80,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-129",
+        "rows": 129,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      },
+      {
+        "case": "synthetic-257",
+        "rows": 257,
+        "exact": true,
+        "changed_input_graph_replays": 2,
+        "alias_and_rejection_checks": true
+      }
+    ]
+  }
+}

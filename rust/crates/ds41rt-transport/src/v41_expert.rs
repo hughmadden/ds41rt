@@ -1,11 +1,13 @@
 //! Complete native backbone batches carried by revision-3 frames.
-//! A wire output row is six ordered FP32 [5120] expert partials for one token.
+//! A wire output row is one BF16 [5120] rank partial, after local route summation.
 use crate::{
     ExpertProtocolV2RequestView, ExpertProtocolV2ResponseHeader, ExpertProtocolV2ResponseRef,
     ExpertProtocolV2ResponseView, ExpertProtocolV2Status, ExpertV2Dtype,
     EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM,
 };
 use anyhow::{ensure, Context, Result};
+
+pub use crate::protocol_v2::EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16;
 
 mod chunks;
 pub use chunks::V41Tp4ChunkReceiver;
@@ -14,7 +16,7 @@ pub use tcp::{V41Tp4Pending, V41Tp4Tcp};
 
 pub const V41_HIDDEN: u32 = 5120;
 pub const V41_BACKBONE_TOPK: u32 = 6;
-pub const V41_ROUTE_ROW_BYTES: u32 = V41_HIDDEN * V41_BACKBONE_TOPK * 4;
+pub const V41_PARTIAL_ROW_BYTES: u32 = V41_HIDDEN * 2;
 
 /// Validated canonical row-major routing; the same request must reach every TP rank.
 pub struct V41BackboneRequest<'a> {
@@ -25,7 +27,14 @@ impl<'a> V41BackboneRequest<'a> {
         let view = ExpertProtocolV2RequestView::parse(frame)?;
         let header = &view.header;
         ensure!(
-            header.flags & !EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM == 0,
+            header.flags & EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16 != 0,
+            "native request requires compact BF16 response agreement"
+        );
+        ensure!(
+            header.flags
+                & !(EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM
+                    | EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16)
+                == 0,
             "native complete batches cannot use legacy reduction/compression or stream flags"
         );
         ensure!(
@@ -84,7 +93,7 @@ impl<'a> V41BackboneRequest<'a> {
     }
     pub fn plane_bytes(&self) -> Result<usize> {
         (self.rows() as usize)
-            .checked_mul(V41_ROUTE_ROW_BYTES as usize)
+            .checked_mul(V41_PARTIAL_ROW_BYTES as usize)
             .context("route plane byte overflow")
     }
     /// Fill caller-owned GPU-upload arrays without reordering or rounding routes.
@@ -121,9 +130,9 @@ impl<'a> V41BackboneRequest<'a> {
                 placement_version: header.placement_version,
                 layer_id: header.layer_id,
                 row_count: self.rows(),
-                output_dim: V41_HIDDEN * 6,
-                output_dtype: ExpertV2Dtype::F32,
-                output_row_stride_bytes: V41_ROUTE_ROW_BYTES,
+                output_dim: V41_HIDDEN,
+                output_dtype: ExpertV2Dtype::Bf16,
+                output_row_stride_bytes: V41_PARTIAL_ROW_BYTES,
                 output_payload_bytes: partials.len() as u64,
                 status: ExpertProtocolV2Status::Ok,
                 flags: header.flags,
@@ -172,7 +181,10 @@ impl<'a> V41Tp4Planes<'a> {
         let h = &response.header;
         let rank = self.response_rank(h)?;
         ensure!(
-            h.flags & !EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM == 0,
+            h.flags
+                & !(EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM
+                    | EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16)
+                == 0,
             "native route planes must be complete and unindexed"
         );
         ensure!(
@@ -185,6 +197,10 @@ impl<'a> V41Tp4Planes<'a> {
     }
     fn response_rank(&self, h: &ExpertProtocolV2ResponseHeader) -> Result<usize> {
         ensure!(
+            h.flags & EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16 != 0,
+            "native response lacks compact BF16 agreement"
+        );
+        ensure!(
             h.request_id == self.request_id
                 && h.placement_version == self.placement_version
                 && h.layer_id == self.layer,
@@ -195,9 +211,9 @@ impl<'a> V41Tp4Planes<'a> {
             "native expert execution failed"
         );
         ensure!(
-            h.output_dim == V41_HIDDEN * 6
-                && h.output_dtype == ExpertV2Dtype::F32
-                && h.output_row_stride_bytes == V41_ROUTE_ROW_BYTES,
+            h.output_dim == V41_HIDDEN
+                && h.output_dtype == ExpertV2Dtype::Bf16
+                && h.output_row_stride_bytes == V41_PARTIAL_ROW_BYTES,
             "native TP route plane geometry mismatch"
         );
         self.executors
@@ -225,7 +241,7 @@ mod tests {
         ExpertV2SourceKind, EXPERT_PROTOCOL_V2_FLAG_RESPONSE_FP8_E4M3_ROW_SCALED,
     };
     pub(super) fn request(rows: u32) -> ExpertProtocolV2Request {
-        ExpertProtocolV2Request::new(
+        let mut request = ExpertProtocolV2Request::new(
             91,
             17,
             39,
@@ -250,7 +266,9 @@ mod tests {
                 .collect(),
             vec![0; rows as usize * 5120 * 2],
         )
-        .unwrap()
+        .unwrap();
+        request.header.flags |= EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16;
+        request
     }
     #[test]
     fn native_routes_preserve_order_and_fp32_bits() {
@@ -266,7 +284,7 @@ mod tests {
         assert_eq!(&ids[96..], &[-1; 4]);
         assert_eq!(&weights[96..], &[-1.; 4]);
         assert_eq!(native.hidden(), owned.hidden_payload.as_ref());
-        assert_eq!(native.plane_bytes().unwrap(), 1_966_080);
+        assert_eq!(native.plane_bytes().unwrap(), 163_840);
         assert!(native
             .copy_routes_into(&mut ids[..95], &mut weights)
             .is_err());
@@ -274,7 +292,7 @@ mod tests {
     }
     #[test]
     fn native_request_rejects_invalid_routing_and_legacy_modes() {
-        for kind in 0..6 {
+        for kind in 0..7 {
             let mut owned = request(1);
             match kind {
                 0 => owned.routes[1].expert_id = owned.routes[0].expert_id,
@@ -282,6 +300,7 @@ mod tests {
                 2 => owned.routes[0].gate_weight = -0.5,
                 3 => owned.header.layer_id = 40,
                 4 => owned.header.flags |= EXPERT_PROTOCOL_V2_FLAG_RESPONSE_FP8_E4M3_ROW_SCALED,
+                6 => owned.header.flags = 0,
                 _ => {
                     owned.routes.pop();
                     owned.rows[0].route_count = 5;
@@ -325,7 +344,7 @@ mod tests {
         for (plane, expected) in collector.planes().unwrap().into_iter().zip(&payloads) {
             assert_eq!(plane, expected);
         }
-        for kind in 0..6 {
+        for kind in 0..7 {
             let mut bad = native
                 .response(11, &payloads[0])
                 .unwrap()
@@ -337,10 +356,11 @@ mod tests {
                 2 => bad.header.layer_id -= 1,
                 3 => bad.header.executor_id = 99,
                 4 => {
-                    bad.header.output_dtype = ExpertV2Dtype::Bf16;
+                    bad.header.output_dtype = ExpertV2Dtype::F16;
                 }
+                6 => bad.header.flags = 0,
                 _ => {
-                    bad.header.output_dim = 5120;
+                    bad.header.output_dim = 2560;
                 }
             }
             let frame = bad.encode().unwrap();

@@ -39,6 +39,71 @@ bool overlaps(const void* a, uint64_t a_bytes, const void* b, uint64_t b_bytes) 
   // Subtraction avoids overflow at the upper end of the address space.
   return av <= bv ? bv - av < a_bytes : av - bv < b_bytes;
 }
+
+__global__ void compact_routes(const float* routes, __nv_bfloat16* output,
+    uint64_t count) {
+  for (uint64_t offset = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+       offset < count; offset += uint64_t(gridDim.x) * blockDim.x) {
+    const uint64_t base = (offset / hidden) * 6 * hidden + offset % hidden;
+    float value = routes[base];
+#pragma unroll
+    for (int route = 1; route < 6; ++route)
+      value = __fadd_rn(value, routes[base + route * hidden]);
+    output[offset] = __float2bfloat16_rn(value);
+  }
+}
+
+__global__ void reduce_compact(const __nv_bfloat16* p0,
+    const __nv_bfloat16* p1, const __nv_bfloat16* p2,
+    const __nv_bfloat16* p3, const __nv_bfloat16* shared,
+    __nv_bfloat16* output, uint64_t count) {
+  for (uint64_t offset = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+       offset < count; offset += uint64_t(gridDim.x) * blockDim.x) {
+    float value = __bfloat162float(p0[offset]);
+    value = __fadd_rn(value, __bfloat162float(p1[offset]));
+    value = __fadd_rn(value, __bfloat162float(p2[offset]));
+    value = __fadd_rn(value, __bfloat162float(p3[offset]));
+    if (shared) value = __fadd_rn(value, __bfloat162float(shared[offset]));
+    output[offset] = __float2bfloat16_rn(value);
+  }
+}
+}
+
+extern "C" int32_t ds41rt_v41_compact_routes_bf16_async(const float* routes,
+    uint16_t* output, uint32_t rows, void* stream) {
+  const uint64_t count = uint64_t(rows) * hidden;
+  if (!rows || !routes || !output || reinterpret_cast<uintptr_t>(routes) % 4 ||
+      reinterpret_cast<uintptr_t>(output) % 2 ||
+      overlaps(routes, count * 6 * 4, output, count * 2))
+    return cudaErrorInvalidValue;
+  const unsigned blocks = static_cast<unsigned>(count / 256 < 4096 ? count / 256 : 4096);
+  compact_routes<<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(
+      routes, reinterpret_cast<__nv_bfloat16*>(output), count);
+  return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_reduce_compact_bf16_async(
+    const uint16_t* const planes[4], const uint16_t* shared, uint16_t* output,
+    uint32_t rows, void* stream) {
+  const uint64_t count = uint64_t(rows) * hidden;
+  if (!rows || !planes || !output || reinterpret_cast<uintptr_t>(output) % 2)
+    return cudaErrorInvalidValue;
+  for (int rank = 0; rank < 4; ++rank)
+    if (!planes[rank] || reinterpret_cast<uintptr_t>(planes[rank]) % 2 ||
+        overlaps(planes[rank], count * 2, output, count * 2))
+      return cudaErrorInvalidValue;
+  if (shared && (reinterpret_cast<uintptr_t>(shared) % 2 ||
+      (shared != output && overlaps(shared, count * 2, output, count * 2))))
+    return cudaErrorInvalidValue;
+  const unsigned blocks = static_cast<unsigned>(count / 256 < 4096 ? count / 256 : 4096);
+  reduce_compact<<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(planes[0]),
+      reinterpret_cast<const __nv_bfloat16*>(planes[1]),
+      reinterpret_cast<const __nv_bfloat16*>(planes[2]),
+      reinterpret_cast<const __nv_bfloat16*>(planes[3]),
+      reinterpret_cast<const __nv_bfloat16*>(shared),
+      reinterpret_cast<__nv_bfloat16*>(output), count);
+  return cudaGetLastError();
 }
 
 extern "C" int32_t ds41rt_v41_initialize_scratch_storage_async(void* storage,

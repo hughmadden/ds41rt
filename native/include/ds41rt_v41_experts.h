@@ -71,6 +71,18 @@ int32_t ds41rt_v41_expert_initialize_scratch_async(void* kernel, void* storage,
 int32_t ds41rt_v41_reduce_routes_async(const float* const planes[4],
     const uint16_t* shared, uint16_t* output, uint32_t rows,
     uint32_t ranks, uint32_t topk, void* stream);
+/* Compact backbone serving arithmetic: sum six local FP32 route vectors in
+ * slot order, then round once to a BF16 hidden-width partial. This differs
+ * from per-route TP reduction above. Input [rows,6,5120], output [rows,5120].
+ * Storage must not overlap and must remain alive through stream completion. */
+int32_t ds41rt_v41_compact_routes_bf16_async(const float* routes,
+    uint16_t* output, uint32_t rows, void* stream);
+/* Sum four compact BF16 partials in rank order in FP32, add optional BF16
+ * shared expert and round once to BF16. All planes are [rows,5120].
+ * Output must not overlap planes; exact output==shared is permitted, partial
+ * overlap is not. Both compact functions allocate nothing and do not sync. */
+int32_t ds41rt_v41_reduce_compact_bf16_async(const uint16_t* const planes[4],
+    const uint16_t* shared, uint16_t* output, uint32_t rows, void* stream);
 #ifdef __cplusplus
 }
 #endif

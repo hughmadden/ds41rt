@@ -29,8 +29,7 @@ impl V41Tp4Tcp {
             "native TCP timeout must be positive"
         );
         ensure!(
-            config.max_frame_bytes >= 128 + 122880 + 4
-                && config.max_frame_bytes <= 64 * 1024 * 1024,
+            config.max_frame_bytes >= 128 + 10240 + 40 + 6 * 12 && config.max_frame_bytes <= 64 * 1024 * 1024,
             "invalid native TCP frame budget"
         );
         for rank in 0..4 {
