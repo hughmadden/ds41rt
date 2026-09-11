@@ -32,10 +32,10 @@ __device__ float warp_sum(float x) {
 // Top two bits distinguish ring, private window, paged source and private source.
 // Invalid rows never dereference a value or scale pointer.
 __device__ __forceinline__ uint64_t locate(const ds41rt_v41_sparse_kv_t& v,const uint64_t* m,
-    const int32_t* selected,int key,int width) {
+    const int32_t* selected,int key,int width,uint64_t window_begin) {
   if(key<width) {
     const uint64_t begin=m[3]+1>128?m[3]+1-128:0,pos=begin+key;
-    if(pos>m[3])return UINT64_MAX;
+    if(pos<window_begin || pos>m[3])return UINT64_MAX;
     return pos<m[0]?pos%128:((1ull<<62)|(m[1]+pos-m[0]));
   }
   const int32_t id=selected[key-width];
@@ -53,7 +53,8 @@ __device__ __forceinline__ uint64_t locate(const ds41rt_v41_sparse_kv_t& v,const
 template<bool Split>
 __global__ void attend(const __nv_bfloat16* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,
-    int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v,float* partial) {
+    int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v,float* partial,
+    const uint64_t* window_begins) {
   // Zero width requests the exact former host maximum for this contiguous,
   // ascending request. Reading metadata keeps decode graph arguments stable.
   if(width==0) {
@@ -65,7 +66,8 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
   const int tid=threadIdx.x,warp=tid/32,lane=tid%32;
   const uint64_t base=(uint64_t(row)*64+group*16)*512;
   const uint64_t* m=metadata+uint64_t(row)*10;
-  bool valid=m[0]==*v.window_end && m[0]<=1048576 && m[2]>0 &&
+  const uint64_t window_begin=window_begins?window_begins[row]:0;
+  bool valid=window_begin<=m[0] && m[0]==*v.window_end && m[0]<=1048576 && m[2]>0 &&
     m[2]<=1048576-m[0] && m[1]<=v.window_proposal_capacity &&
     m[2]<=v.window_proposal_capacity-m[1] && m[3]>=m[0] && m[3]-m[0]<m[2] &&
     uint64_t(width)>=(m[3]+1<128?m[3]+1:128);
@@ -101,7 +103,7 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
   const int last=Split?min(count,int(blockIdx.z+1)*per_part*64):count;
   for(int start=first;start<last;start+=64) {
     if(tid<64)refs[tid]=start+tid<count?locate(v,m,
-      v.compressed?selected+uint64_t(row)*512:nullptr,start+tid,width):UINT64_MAX;
+      v.compressed?selected+uint64_t(row)*512:nullptr,start+tid,width,window_begin):UINT64_MAX;
     // An entirely masked tile contributes zero probability and leaves both
     // online-softmax state and accumulators unchanged. Vote over the same
     // resolved references used below; valid entries may occur after empty tiles.
@@ -260,7 +262,7 @@ extern "C" int32_t ds41rt_v41_sparse_attention_initialize(void) {
 }
 static int32_t launch_attention(const uint16_t* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
-    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,float* partial,uint64_t scratch_bytes,int parts) {
+    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,float* partial,uint64_t scratch_bytes,int parts,const uint64_t* window_begins=nullptr) {
   if(!view || rows<1 || rows>4096 || window_width<0 || window_width>128)return cudaErrorInvalidValue;
   const auto v=*view;
   if(v.compressed>1 || v.window_proposal_capacity<1 || v.window_proposal_capacity>4096 ||
@@ -273,6 +275,9 @@ static int32_t launch_attention(const uint16_t* query,const float* sink,
   if(partial && (scratch_bytes<required || !span(partial,required,4) ||
       !disjoint(partial,required,output,q)))return cudaErrorInvalidValue;
   if(!span(output,q,32))return cudaErrorInvalidValue;
+  if(window_begins && (!span(window_begins,uint64_t(rows)*8,8) ||
+      !disjoint(window_begins,uint64_t(rows)*8,output,q) ||
+      (partial && !disjoint(window_begins,uint64_t(rows)*8,partial,required))))return cudaErrorInvalidValue;
   const void* inputs[]={query,sink,metadata,v.window_end,selected,v.pages,v.source_end};
   const uint64_t sizes[]={q,256,uint64_t(rows)*80,8,uint64_t(rows)*2048,uint64_t(v.page_stride)*4,8};
   const uint32_t align[]={32,4,8,8,4,4,8};
@@ -289,7 +294,7 @@ static int32_t launch_attention(const uint16_t* query,const float* sink,
   if(partial) {
     attend<true><<<dim3(rows,4,parts),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
-      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,partial);
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,partial,window_begins);
     const auto status=cudaGetLastError();
     if(status!=cudaSuccess)return status;
     merge<<<dim3(rows,64),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
@@ -297,7 +302,7 @@ static int32_t launch_attention(const uint16_t* query,const float* sink,
   } else {
     attend<false><<<dim3(rows,4),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
-      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr);
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
   }
   return cudaGetLastError();
 }
@@ -312,4 +317,13 @@ extern "C" int32_t ds41rt_v41_sparse_attention_split(const uint16_t* query,const
     float* partial,uint64_t scratch_bytes,int32_t parts) {
   if(!partial)return cudaErrorInvalidValue;
   return launch_attention(query,sink,metadata,selected,output,rows,window_width,view,stream,partial,scratch_bytes,parts);
+}
+
+extern "C" int32_t ds41rt_v41_sparse_attention_bounded(const uint16_t* query,const float* sink,
+    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
+    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,
+    const uint64_t* window_begins,float* partial,uint64_t scratch_bytes,int32_t parts) {
+  if(!window_begins || (!partial && (parts!=1 || scratch_bytes!=0)))return cudaErrorInvalidValue;
+  return launch_attention(query,sink,metadata,selected,output,rows,window_width,view,stream,
+      partial,scratch_bytes,parts,window_begins);
 }

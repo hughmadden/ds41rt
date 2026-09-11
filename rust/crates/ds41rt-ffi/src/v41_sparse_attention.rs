@@ -1,6 +1,6 @@
 //! Direct FP8 window/paged-source sparse attention with private proposal overlays.
 use crate::{Ds41rtDeviceBuffer, NativeLibrary};
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use std::ffi::c_void;
 #[repr(C)]
 struct RawView {
@@ -34,6 +34,8 @@ pub struct V41SparseWindow {
     pub proposal_scales: Ds41rtDeviceBuffer,
     pub end: Ds41rtDeviceBuffer,
     pub proposal_capacity: usize,
+    /// Optional device U64 [rows] lower bounds for bounded decoder SWA replay.
+    pub replay_begins: Option<Ds41rtDeviceBuffer>,
 }
 type Launch = unsafe extern "C" fn(
     *const u16,
@@ -60,10 +62,15 @@ type SplitLaunch = unsafe extern "C" fn(
     u64,
     i32,
 ) -> i32;
+type BoundedLaunch = unsafe extern "C" fn(
+    *const u16, *const f32, *const u64, *const i32, *mut u16, i32, i32,
+    *const RawView, *mut c_void, *const u64, *mut f32, u64, i32,
+) -> i32;
 pub struct V41SparseAttention<'a> {
     _library: &'a NativeLibrary,
     launch: Launch,
     split_launch: SplitLaunch,
+    bounded_launch: Option<BoundedLaunch>,
 }
 impl NativeLibrary {
     pub fn v41_sparse_attention(&self) -> Result<V41SparseAttention<'_>> {
@@ -81,6 +88,7 @@ impl NativeLibrary {
             _library: self,
             launch: unsafe { *self.lib.get(b"ds41rt_v41_sparse_attention")? },
             split_launch: unsafe { *self.lib.get(b"ds41rt_v41_sparse_attention_split")? },
+            bounded_launch: unsafe { self.lib.get(b"ds41rt_v41_sparse_attention_bounded").ok().map(|symbol| *symbol) },
         })
     }
 }
@@ -204,7 +212,22 @@ impl V41SparseAttention<'_> {
             view.page_stride = s.page_stride as u32;
             view.compressed = 1;
         }
-        let status = if let Some((scratch, parts)) = split {
+        let status = if let Some(bounds) = window.replay_begins {
+            check(bounds, rows * 8)?;
+            let launch = self.bounded_launch.context("native library lacks bounded decoder attention")?;
+            let (partial, bytes, parts) = if let Some((scratch, parts)) = split {
+                check(scratch, Self::split_scratch_bytes(rows, parts)?)?;
+                (scratch.ptr.cast(), scratch.bytes as u64, parts as i32)
+            } else {
+                (std::ptr::null_mut(), 0, 1)
+            };
+            unsafe {
+                launch(query.ptr.cast(), sink.ptr.cast(), metadata.ptr.cast(),
+                    selected.map_or(std::ptr::null(), |b| b.ptr.cast()), output.ptr.cast(),
+                    rows as i32, window_width as i32, &view, stream, bounds.ptr.cast(),
+                    partial, bytes, parts)
+            }
+        } else if let Some((scratch, parts)) = split {
             check(scratch, Self::split_scratch_bytes(rows, parts)?)?;
             unsafe {
                 (self.split_launch)(

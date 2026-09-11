@@ -282,6 +282,7 @@ impl<'a> SparseAttentionWave<'a> {
                 proposal_scales: w.scales,
                 end: w.cache.device_end,
                 proposal_capacity: w.capacity,
+                replay_begins: None,
             };
             let source = r.source.map(|s| V41SparseSource {
                 values: s.kv_cache.values,

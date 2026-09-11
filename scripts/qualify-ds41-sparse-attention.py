@@ -86,6 +86,7 @@ def main():
     p.add_argument('--native-lib', type=Path, required=True)
     p.add_argument('--reference-dir', type=Path, required=True)
     p.add_argument('--large-only', action='store_true')
+    p.add_argument('--bounded-replay', action='store_true', help='Qualify mutable decoder SWA lower bounds')
     p.add_argument('--split-parts', type=int, choices=range(1, 11), default=None,
                    help='Exercise the split ABI for rows <=16, sequential ABI above16')
     p.add_argument('--device', type=int, required=True)
@@ -121,6 +122,19 @@ def main():
             if 1 <= args[5] <= 16:
                 return split_launch(*args, scratch.data_ptr(), scratch.numel() * 4, a.split_parts)
             return original_launch(*args)
+    if a.bounded_replay:
+        assert not a.large_only, 'bounded replay uses the ordinary reference corpus'
+        bounded_launch = lib.ds41rt_v41_sparse_attention_bounded
+        bounded_launch.argtypes = [C.c_void_p] * 5 + [C.c_int32, C.c_int32, C.POINTER(View), C.c_void_p,
+            C.c_void_p, C.c_void_p, C.c_uint64, C.c_int32]
+        bounded_launch.restype = C.c_int32
+        window_begins = torch.zeros(4096, dtype=torch.uint64, device=f'cuda:{a.device}')
+        def launch(*args):
+            split = a.split_parts is not None and 1 <= args[5] <= 16
+            return bounded_launch(*args, window_begins.data_ptr(),
+                scratch.data_ptr() if split else 0, scratch.numel() * 4 if split else 0,
+                a.split_parts if split else 1)
+    replay_begin = 0
     stream = torch.cuda.Stream()
     results = []
     with torch.device('cuda'), torch.cuda.stream(stream), tvm_ffi.use_torch_stream(), torch.no_grad():
@@ -129,6 +143,8 @@ def main():
         cases = [(1, 0, 1, False), (3, 0, 2, True), (16, 63, 2, True),
                  (80, 127, 1, True), (16, 255, 2, True), (3, 1023, 1, True),
                  (4096, 0, 1, True)]
+        if a.bounded_replay:
+            cases += [(1, 128, 1, False), (128, 1023, 2, True), (129, 255, 1, True)]
         if a.large_only:
             cases = []
             results.extend(large_pool(launch, stream))
@@ -160,6 +176,9 @@ def main():
                         we.data_ptr(), pages.data_ptr(), ce.data_ptr(), wc, cap, pc,
                         pages.numel(), int(compressed))
             def metadata(case):
+                nonlocal replay_begin
+                replay_begin = start if a.bounded_replay and case else 0
+                if a.bounded_replay: window_begins.fill_(replay_begin)
                 host = []
                 ids = []
                 for row in range(rows):
@@ -192,7 +211,7 @@ def main():
                     for row in range(begin, min(rows, begin + 8)):
                         m = host[row]
                         refs = []
-                        for pos in range(max(0, m[3] - 127), m[3] + 1):
+                        for pos in range(max(replay_begin, m[3] - 127), m[3] + 1):
                             refs.append((0, pos % 128) if pos < start else (1, m[1] + pos - start))
                         refs += [None] * (width - len(refs))
                         if compressed:
@@ -240,6 +259,21 @@ def main():
             stream.synchronize()
             assert torch.cuda.memory_allocated(a.device) == before
             error = max(error, check(host, ids))
+            if a.bounded_replay:
+                window_begins.fill_(start + 1)
+                graph.replay(); stream.synchronize()
+                assert (out == 0).all().item(), 'future replay boundary exposed cache'
+                window_begins.fill_(replay_begin)
+                graph.replay(); stream.synchronize()
+                error = max(error, check(host, ids))
+                rawargs = [q.data_ptr(), sink.data_ptr(), meta.data_ptr(),
+                    selected.data_ptr() if compressed else 0, out.data_ptr(), rows, width,
+                    C.byref(view), stream.cuda_stream]
+                for ptr in [0, window_begins.data_ptr() + 1, out.data_ptr()]:
+                    assert bounded_launch(*rawargs, ptr, 0, 0, 1) != 0
+                if a.split_parts is not None:
+                    assert bounded_launch(*rawargs, scratch.data_ptr(), scratch.data_ptr(),
+                        scratch.numel() * 4, a.split_parts) != 0
             # Device-side descriptor failures must not expose cache bytes.
             original = meta.clone()
             fields = [(0, 1048577), (1, 2**64 - 1), (2, 0), (3, start + tokens)]
@@ -277,7 +311,7 @@ def main():
             assert launch(*derived) == 0
             error = max(error, check(host, ids))
             results.append(dict(rows=rows, start=start, ratio=ratio, compressed=compressed,
-                                max_abs=error, official_reference_rows=min(rows, 8), changed_graph=True, metadata_guards=len(fields), span_guards=True))
+                                max_abs=error, bounded_replay=a.bounded_replay, official_reference_rows=min(rows, 8), changed_graph=True, metadata_guards=len(fields), span_guards=True))
             print('PASS', results[-1], flush=True)
         stream.synchronize()
         if a.split_parts is not None:

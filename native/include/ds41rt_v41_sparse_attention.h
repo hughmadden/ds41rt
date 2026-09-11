@@ -44,6 +44,18 @@ int32_t ds41rt_v41_sparse_attention_split(const uint16_t* query,const float* sin
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
     int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,
     float* partial,uint64_t scratch_bytes,int32_t parts);
+// Bounded decoder replay: device U64 window_begins[rows] masks local keys
+// before each row's replay boundary. Global compressed keys remain unchanged.
+// Bounds must be <= the committed window end (metadata column 0); invalid
+// bounds zero the whole query. Zero bounds reproduce the ordinary entry point.
+// Bounds may change between graph replays, must remain live through completion,
+// and may not overlap output or partial scratch. Null partial selects sequential
+// attention and requires scratch_bytes=0, parts=1; otherwise split rules apply.
+int32_t ds41rt_v41_sparse_attention_bounded(
+    const uint16_t* query,const float* sink,const uint64_t* metadata,
+    const int32_t* selected,uint16_t* output,int32_t rows,int32_t window_width,
+    const ds41rt_v41_sparse_kv_t* view,void* stream,const uint64_t* window_begins,
+    float* partial,uint64_t scratch_bytes,int32_t parts);
 #ifdef __cplusplus
 }
 #endif
