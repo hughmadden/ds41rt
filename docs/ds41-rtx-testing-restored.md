@@ -29,3 +29,7 @@ The router/cache/graph run reports eight Rust tests passing, but three planning 
 The index-query check compares captured/rebound execution to fresh uncaptured owners using the same official weights and capacity. It qualifies rebinding/capture equivalence, not a new independent reference arithmetic audit, full index candidate reuse or the combined model layer. Those integration checks are now available to run on RTX and remain open.
 
 All fixture processes exited successfully and no compute process remained after the tests. Logs: `/tmp/ds41-rtx-restored-tests.log` and `/tmp/ds41-index-reuse-rtx-test.log`. Package/library/source hashes are in [the evidence record](ds41-rtx-testing-restored.json).
+
+## Normal driver path restored by the user
+
+The user reloaded the NVIDIA modules. Subsequent checks show both RTX PRO 6000 GPUs through normal `nvidia-smi`, with loaded kernel module and driver version **595.91.07**. A normal `docker run --rm --gpus all --entrypoint python ds41rt-coordinator-dev:latest` sees two CUDA devices and computes `torch.arange(1024, device="cuda", dtype=torch.float32).sum()` as **523776.0**, then synchronizes successfully. Both commands exited zero. The isolated 595.71.05 libraries documented above remain historical development evidence and must no longer be injected into new runs against the reloaded kernel.

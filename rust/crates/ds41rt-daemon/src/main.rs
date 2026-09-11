@@ -28,6 +28,7 @@ mod v41_backbone_cache;
 mod v41_backbone_execution;
 mod v41_requests;
 mod v41_target_head;
+mod v41_target_pass;
 mod v41_target_embedding;
 mod v41_attention_output;
 mod v41_dspark_cache;
