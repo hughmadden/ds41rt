@@ -28,13 +28,15 @@ fn produce(
             ((x.to_bits() >> 16) as u16).to_ne_bytes()
         })
         .collect::<Vec<_>>();
-    for (layer, wave) in windows.iter_mut().enumerate() {
+    for layer in batch.stage.windows() {
+        let wave = &mut windows[layer];
         lib.copy_h2d(wave.input(), &input)?;
         unsafe {
             wave.execute(bank.window(batch, layer)?, &batch.window_chunks(layer)?)?;
         }
     }
-    for (i, wave) in sources.iter_mut().enumerate() {
+    for i in 0..batch.stage.source_count() {
+        let wave = &mut sources[i];
         lib.copy_h2d(wave.input(), &input)?;
         unsafe {
             wave.execute(
@@ -224,6 +226,67 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         eprintln!("PASS cache prefix cycle={cycle} proposed={tokens} all 44 owners, 16 requests, packed bytes and device histories");
     }
     bank.release(&leases)?;
+    // CED publishes all global sources during encoder work, then only decoder
+    // windows during replay. Reuse the same real-weight producers and bank.
+    let ced = (0..16).map(|slot| bank.begin_request(slot, 1000 + slot as u64))
+        .collect::<Result<Vec<_>>>()?;
+    let stale = bank.plan(&[CacheWork { lease: ced[0], tokens: 1, kind: ExpertV2SourceKind::Prefill }])?;
+    for &lease in &ced {
+        bank.begin_encoder(lease, 129)?;
+        assert!(bank.begin_encoder(lease, 129).is_err());
+        assert!(bank.begin_decoder_replay(lease).is_err());
+    }
+    assert!(bank.validate_batch(&stale).is_err());
+    for tokens in [64, 65] {
+        let work = ced.iter().map(|&lease| CacheWork { lease, tokens, kind: ExpertV2SourceKind::Prefill }).collect::<Vec<_>>();
+        assert!(bank.plan_replay(&work).is_err());
+        let batch = bank.plan(&work)?;
+        assert_eq!(batch.stage(), CacheStage::Encoder);
+        assert!(bank.window(&batch, 20).is_err());
+        produce(&lib, &bank, &batch, &mut windows, &mut sources, 10 + tokens as usize)?;
+        bank.commit(&batch, &mut windows, &mut sources, &vec![tokens; 16])?;
+        assert!(bank.validate_batch(&batch).is_err());
+    }
+    let r = bank.request(ced[0])?;
+    let preserved_windows = (0..20).map(|layer| {
+        let view = bank.windows[layer].view(r.windows[layer])?;
+        Ok((read(&lib, view.values)?, read(&lib, view.scales)?))
+    }).collect::<Result<Vec<_>>>()?;
+    let preserved_sources = (0..4).map(|i| {
+        let view = bank.sources[i].kv_cache(r.sources[i])?;
+        let idx = bank.sources[i].index_cache(r.sources[i])?;
+        Ok((read(&lib, view.values)?, read(&lib, view.scales)?,
+            read(&lib, idx.packed)?, read(&lib, idx.scales)?))
+    }).collect::<Result<Vec<_>>>()?;
+    for &lease in &ced { assert_eq!(bank.begin_decoder_replay(lease)?, 1); }
+    for tokens in [63, 65] {
+        let work = ced.iter().map(|&lease| CacheWork { lease, tokens, kind: ExpertV2SourceKind::Prefill }).collect::<Vec<_>>();
+        assert!(bank.plan(&work).is_err());
+        let batch = bank.plan_replay(&work)?;
+        assert_eq!(batch.stage(), CacheStage::Replay);
+        assert!(bank.window(&batch, 19).is_err());
+        produce(&lib, &bank, &batch, &mut windows, &mut sources, 100 + tokens as usize)?;
+        bank.commit(&batch, &mut windows, &mut sources, &vec![tokens; 16])?;
+        for &lease in &ced { assert_eq!(bank.committed_end(lease)?, 129); }
+        assert!(bank.validate_batch(&batch).is_err());
+    }
+    let r = bank.request(ced[0])?;
+    assert_eq!(r.phase, CachePhase::Full);
+    for layer in 0..20 {
+        let view = bank.windows[layer].view(r.windows[layer])?;
+        assert_eq!((read(&lib, view.values)?, read(&lib, view.scales)?), preserved_windows[layer]);
+    }
+    for i in 0..4 {
+        let view = bank.sources[i].kv_cache(r.sources[i])?;
+        let idx = bank.sources[i].index_cache(r.sources[i])?;
+        assert_eq!((read(&lib, view.values)?, read(&lib, view.scales)?,
+            read(&lib, idx.packed)?, read(&lib, idx.scales)?), preserved_sources[i]);
+    }
+    let next = bank.plan(&[CacheWork { lease: ced[0], tokens: 1, kind: ExpertV2SourceKind::Decode }])?;
+    assert_eq!(next.positions(), vec![129]);
+    assert_eq!(next.stage(), CacheStage::Full);
+    bank.release(&ced)?;
+    eprintln!("PASS 16 CED transactions: encoder 64+65, replay 63+65, untouched global/encoder bytes, full decode readiness");
     // Source 20 exhausts after all 40 windows and the first three sources write.
     let pages = [16, 16, 16, 1];
     let mut limited = BackboneCache::new(&lib, 16, pages, BackboneCache::device_bytes(16, pages)?)?;

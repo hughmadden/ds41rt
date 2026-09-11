@@ -11,6 +11,10 @@ use ds41rt_ffi::NativeLibrary;
 use ds41rt_transport::ExpertV2SourceKind;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod ced;
+use ced::CachePhase;
+pub(crate) use ced::CacheStage;
+
 const SOURCES: [usize; 4] = [2, 8, 14, 20];
 static NEXT_BATCH: AtomicU64 = AtomicU64::new(1);
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
@@ -24,6 +28,7 @@ struct Request {
     id: u64,
     version: u64,
     end: u64,
+    phase: CachePhase,
     windows: [WindowLease; 40],
     sources: [CompressorLease; 4],
 }
@@ -44,11 +49,13 @@ struct BatchRequest {
 /// Owned metadata can survive producer execution. Every cache access/commit
 /// revalidates it against the originating bank and live request versions.
 pub(crate) struct CacheBatch {
+    stage: CacheStage,
     identity: u64,
     owner: u64,
     requests: Vec<BatchRequest>,
 }
 impl CacheBatch {
+    pub fn stage(&self) -> CacheStage { self.stage }
     pub fn identity(&self) -> u64 {
         self.identity
     }
@@ -71,7 +78,7 @@ impl CacheBatch {
             .collect()
     }
     pub fn window_chunks(&self, layer: usize) -> Result<Vec<WindowChunk>> {
-        ensure!(layer < 40, "invalid batch window layer");
+        ensure!(self.stage.windows().contains(&layer), "invalid batch window layer for phase");
         Ok(self
             .requests
             .iter()
@@ -83,6 +90,7 @@ impl CacheBatch {
             .collect())
     }
     pub fn source_chunks(&self, layer: usize) -> Result<Vec<CompressorChunk>> {
+        ensure!(self.stage.source_count() != 0, "decoder replay cannot produce global sources");
         let source = SOURCES
             .iter()
             .position(|&l| l == layer)
@@ -267,6 +275,7 @@ impl<'a> BackboneCache<'a> {
             id,
             version: 0,
             end: 0,
+            phase: CachePhase::Full,
             windows: windows.try_into().ok().expect("40 windows"),
             sources: sources.try_into().ok().expect("four sources"),
         });
@@ -281,9 +290,9 @@ impl<'a> BackboneCache<'a> {
     }
     pub fn committed_end(&self, lease: CacheLease) -> Result<u64> {
         let r = self.request(lease)?;
-        for (state, &l) in self.windows.iter().zip(&r.windows) {
+        for (layer, (state, &l)) in self.windows.iter().zip(&r.windows).enumerate() {
             ensure!(
-                state.request_id(l)? == r.id && state.end(l)? == r.end,
+                state.request_id(l)? == r.id && state.end(l)? == r.phase.window_end(layer, r.end),
                 "window request history differs"
             );
         }
@@ -296,11 +305,18 @@ impl<'a> BackboneCache<'a> {
         Ok(r.end)
     }
     pub fn plan(&self, work: &[CacheWork]) -> Result<CacheBatch> {
+        self.plan_stage(work, false)
+    }
+    pub fn plan_replay(&self, work: &[CacheWork]) -> Result<CacheBatch> {
+        self.plan_stage(work, true)
+    }
+    fn plan_stage(&self, work: &[CacheWork], replay: bool) -> Result<CacheBatch> {
         self.healthy()?;
         ensure!(
             !work.is_empty() && work.len() <= 16,
             "invalid cache batch request count"
         );
+        let mut stage = None;
         let mut rows = 0usize;
         let mut requests = Vec::with_capacity(work.len());
         for (i, &item) in work.iter().enumerate() {
@@ -312,7 +328,16 @@ impl<'a> BackboneCache<'a> {
                 .checked_add(item.tokens as usize)
                 .context("cache batch rows overflow")?;
             ensure!(rows <= 4096, "cache batch exceeds lane capacity");
-            let position = self.committed_end(item.lease)?;
+            self.committed_end(item.lease)?;
+            let live = self.request(item.lease)?;
+            let current = live.phase.stage();
+            ensure!(current == CacheStage::Full || item.kind == ExpertV2SourceKind::Prefill,
+                "CED phase requires prefill work");
+            ensure!((current == CacheStage::Replay) == replay, "wrong cache planning phase");
+            ensure!(stage.is_none_or(|s| s == current), "mixed cache phases in batch");
+            stage = Some(current);
+            let position = live.phase.position(live.end);
+            live.phase.validate_tokens(position, item.tokens)?;
             ensure!(
                 position
                     .checked_add(u64::from(item.tokens))
@@ -333,6 +358,7 @@ impl<'a> BackboneCache<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .map_err(|_| anyhow::anyhow!("cache batch IDs exhausted"))?;
         Ok(CacheBatch {
+            stage: stage.context("empty cache batch")?,
             identity,
             owner: self.owner,
             requests,
@@ -342,11 +368,13 @@ impl<'a> BackboneCache<'a> {
         self.healthy()?;
         ensure!(batch.owner == self.owner, "foreign backbone cache batch");
         for r in &batch.requests {
+            self.committed_end(r.work.lease)?;
             let live = self.request(r.work.lease)?;
             ensure!(
                 live.id == r.id
                     && live.version == r.version
-                    && self.committed_end(r.work.lease)? == r.position,
+                    && live.phase.stage() == batch.stage
+                    && live.phase.position(live.end) == r.position,
                 "stale backbone cache batch"
             );
         }
@@ -354,6 +382,7 @@ impl<'a> BackboneCache<'a> {
     }
     pub fn window(&self, batch: &CacheBatch, layer: usize) -> Result<&WindowState<'a>> {
         self.validate_batch(batch)?;
+        ensure!(batch.stage.windows().contains(&layer), "window outside cache phase");
         self.windows
             .get(layer)
             .context("invalid backbone window layer")
@@ -475,7 +504,7 @@ impl<'a> BackboneCache<'a> {
         }
         Ok(())
     }
-    /// Commit exactly the same accepted prefix to every window/source. Any
+    /// Commit the accepted prefix to this phase’s window/source owners. Any
     /// execution failure revokes all participating requests; partial device
     /// changes are never published as a usable bank history. Engram/dSpark
     /// acceptance remains the enclosing scheduler transaction's responsibility.
@@ -500,18 +529,20 @@ impl<'a> BackboneCache<'a> {
                 .checked_add(1)
                 .context("backbone cache version exhausted")?;
         }
-        for (layer, wave) in windows.iter().enumerate() {
+        for layer in batch.stage.windows() {
+            let wave = &windows[layer];
             wave.validate_batch(&self.windows[layer], &batch.window_chunks(layer)?)?;
         }
-        for (i, wave) in sources.iter().enumerate() {
+        for i in 0..batch.stage.source_count() {
+            let wave = &sources[i];
             wave.validate_batch(&self.sources[i], &batch.source_chunks(SOURCES[i])?)?;
         }
         let committed = (|| -> Result<()> {
-            for (wave, state) in windows.iter_mut().zip(&mut self.windows) {
-                wave.commit(state, accepted)?;
+            for layer in batch.stage.windows() {
+                windows[layer].commit(&mut self.windows[layer], accepted)?;
             }
-            for (wave, state) in sources.iter_mut().zip(&mut self.sources) {
-                wave.commit(state, accepted)?;
+            for i in 0..batch.stage.source_count() {
+                sources[i].commit(&mut self.sources[i], accepted)?;
             }
             Ok(())
         })();
@@ -530,7 +561,7 @@ impl<'a> BackboneCache<'a> {
             let live = self.requests[r.work.lease.slot]
                 .as_mut()
                 .expect("validated live request");
-            live.end = r.position + u64::from(n);
+            live.phase.advance(&mut live.end, r.position + u64::from(n));
             live.version += 1;
         }
         Ok(())

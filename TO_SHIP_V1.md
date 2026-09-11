@@ -51,6 +51,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Model execution and state
 
+- [x] Add [separate encoder and decoder cache transactions](docs/ds41-ced-cache-transactions.md). State checks and sixteen real-weight GPU request transactions pass; target-pass, committed-source replay and API integration remain unfinished.
+
 - [x] Add native [decoder replay SWA bounds](docs/ds41-ced-window-bounds.md) and an optional Rust launch binding. This is a qualified attention primitive only; encoder/decoder cache transactions and live bounded prefill remain unfinished.
 
 - [ ] Complete the architecture and tensor-layout audit with explicit reference-to-production mappings.
