@@ -12,6 +12,7 @@ use timing::ExpertTiming;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ExpertExecutionBudget {
     pub scratch_bytes: usize,
+    pub decode_scratch_bytes: usize,
     pub hidden_bytes: usize,
     pub routing_bytes: usize,
     pub output_and_shared_bytes: usize,
@@ -20,6 +21,7 @@ impl ExpertExecutionBudget {
     pub fn total(self) -> Result<usize> {
         [
             self.scratch_bytes,
+            self.decode_scratch_bytes,
             self.hidden_bytes,
             self.routing_bytes,
             self.output_and_shared_bytes,
@@ -32,6 +34,14 @@ impl ExpertExecutionBudget {
     }
 }
 
+/// Dedicated decode state shares the wave's immutable weights and input buffers.
+/// Its arena and kernel are initialized before serving or graph capture.
+struct DecodeExecution<'library> {
+    kernel: V41ExpertKernel<'library>,
+    scratch: DeviceAllocation<'library>,
+    slots: [*mut c_void; 44],
+}
+
 /// One exclusive wave's buffers and graph borrow immutable resident weights.
 /// Upstream producers and transport must obey this owner's stream/lifetime contract.
 pub(crate) struct ExpertExecution<'weights, 'library> {
@@ -40,6 +50,7 @@ pub(crate) struct ExpertExecution<'weights, 'library> {
     _weights: &'weights ExpertWeights<'library>,
     library: &'library NativeLibrary,
     kernel: V41ExpertKernel<'library>,
+    decode: Option<DecodeExecution<'library>>,
     reducer: V41RouteReducer<'library>,
     timing: Option<ExpertTiming<'library>>,
     scratch: DeviceAllocation<'library>,
@@ -72,6 +83,11 @@ impl<'library> ExpertWeights<'library> {
             .context("routing buffer overflow")?;
         Ok(ExpertExecutionBudget {
             scratch_bytes: usize::try_from(info.scratch_bytes)?,
+            decode_scratch_bytes: if info.role == 1 && capacity > 1 {
+                usize::try_from(library.v41_expert_info(1)?.scratch_bytes)?
+            } else {
+                0
+            },
             hidden_bytes: hidden,
             routing_bytes: routing,
             output_and_shared_bytes: if info.role == 0 {
@@ -145,11 +161,42 @@ impl<'library> ExpertWeights<'library> {
             )?;
             library.cuda_stream_synchronize(stream.raw)?;
         }
+        let decode = if budget.decode_scratch_bytes > 0 {
+            let decode_kernel = library.v41_expert_kernel(1)?;
+            let decode_scratch = DeviceAllocation::new(library, budget.decode_scratch_bytes)?;
+            let mut decode_slots = slots;
+            unsafe {
+                decode_kernel.bind_scratch(
+                    decode_scratch.buffer.ptr,
+                    decode_scratch.buffer.bytes as u64,
+                    &mut decode_slots,
+                )?;
+            }
+            self.bind(&decode_kernel, &mut decode_slots)?;
+            unsafe {
+                let initialized = decode_kernel.initialize_scratch(
+                    decode_scratch.buffer.ptr,
+                    decode_scratch.buffer.bytes as u64,
+                    stream.raw,
+                );
+                // Drain even on initialization failure before releasing its arena.
+                let drained = library.cuda_stream_synchronize(stream.raw);
+                initialized.and(drained)?;
+            }
+            Some(DecodeExecution {
+                kernel: decode_kernel,
+                scratch: decode_scratch,
+                slots: decode_slots,
+            })
+        } else {
+            None
+        };
         Ok(ExpertExecution {
             stream,
             _weights: self,
             library,
             kernel,
+            decode,
             reducer,
             timing,
             compact_reducer,
@@ -179,7 +226,14 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
             "expert layer belongs to a different native library"
         );
         self.synchronize()?;
-        weights.bind(&self.kernel, &mut self.slots)?;
+        let mut slots = self.slots;
+        weights.bind(&self.kernel, &mut slots)?;
+        if let Some(decode) = &mut self.decode {
+            let mut decode_slots = decode.slots;
+            weights.bind(&decode.kernel, &mut decode_slots)?;
+            decode.slots = decode_slots;
+        }
+        self.slots = slots;
         self._weights = weights;
         Ok(())
     }
@@ -201,18 +255,37 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
     pub fn output(&self) -> Option<Ds41rtDeviceBuffer> {
         self.output.as_ref().map(|b| b.buffer)
     }
+    /// Borrow the output state selected for a launch of exactly `rows` rows.
+    /// A one-row view is not a prefix of the multi-row state's output.
     pub fn route_partials(&self, rows: u32) -> Result<Ds41rtDeviceBuffer> {
         ensure!(
             rows > 0 && rows <= self.kernel.info().capacity_rows,
             "invalid expert output row count"
         );
+        let (kernel, slots, scratch) = self.execution_state(rows);
         Ok(Ds41rtDeviceBuffer {
-            ptr: self.slots[41],
-            bytes: rows as usize * self.kernel.info().topk as usize * 5120 * 4,
-            device_id: self.scratch.buffer.device_id,
+            ptr: slots[41],
+            bytes: rows as usize * kernel.info().topk as usize * 5120 * 4,
+            device_id: scratch.buffer.device_id,
             flags: 0,
         })
     }
+    fn execution_state(
+        &self,
+        rows: u32,
+    ) -> (
+        &V41ExpertKernel<'library>,
+        &[*mut c_void; 44],
+        &DeviceAllocation<'library>,
+    ) {
+        if rows == 1 {
+            if let Some(decode) = &self.decode {
+                return (&decode.kernel, &decode.slots, &decode.scratch);
+            }
+        }
+        (&self.kernel, &self.slots, &self.scratch)
+    }
+
     pub fn synchronize(&self) -> Result<()> {
         unsafe { self.library.cuda_stream_synchronize(self.stream.raw) }
     }
@@ -338,15 +411,16 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
             !include_shared || self.shared.is_some(),
             "shared output belongs on coordinator RTX"
         );
-        let args = V41ExpertLaunchArgs::new(self.kernel.info(), self.slots, rows, stream)?;
+        let (kernel, slots, _) = self.execution_state(rows);
+        let args = V41ExpertLaunchArgs::new(kernel.info(), *slots, rows, stream)?;
         unsafe {
-            self.kernel.launch(&args)?;
+            kernel.launch(&args)?;
         }
         if let Some(output) = &self.output {
             unsafe {
                 self.reducer.launch(
                     [
-                        self.slots[41].cast(),
+                        slots[41].cast(),
                         std::ptr::null(),
                         std::ptr::null(),
                         std::ptr::null(),
@@ -578,6 +652,7 @@ impl ExpertExecution<'_, '_> {
                 self._weights.budget().resident_bytes / 384 * active_experts;
             tracing::debug!(target: "ds41rt::expert_timing",
                 layer, executor_id, rows=request.rows(), active_experts,
+                kernel_capacity=self.execution_state(request.rows()).0.info().capacity_rows,
                 max_expert_rows=histogram.iter().copied().max().unwrap_or(0),
                 unique_expert_weight_bytes, output_bytes=bytes,
                 upload_us=uploaded_us.unwrap(), kernel_us, compact_us,

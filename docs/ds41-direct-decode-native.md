@@ -13,8 +13,8 @@ Validation on ostrich GB10:
 
 [Artifact hashes, export metadata, complete qualifier and reproduction commands](ds41-direct-decode-native.json). Local logs are `/tmp/ds41-direct-{policy-tests,final-check,native-export,aot-qualification}.log` (the Python diagnostic is `/tmp/ds41-final-direct-check.log`). Remote source and artifacts are isolated under `/tmp/ds41-direct-native-source` and `/tmp/ds41-direct-native-export`.
 
-## Required serving integration
+## Serving integration
 
-`ExpertExecution::execution(capacity)` binds one kernel and scratch arena at startup; `launch_on` uses that kernel for every live row count. Current Spark worker waves have capacity eighty. Therefore exporting a faster capacity-one kernel alone does **not** change live decode.
+The dedicated one-row kernel and scratch state are now preinitialized alongside each backbone wave, included in memory accounting, and rebound with the same resident layer weights. One-row launches and compaction select that state; larger requests retain grouped execution. No allocation or compilation is added to request dispatch.
 
-Next preinitialize a dedicated one-row kernel/scratch state alongside each backbone wave, include it in memory accounting, bind/rebind the same resident layer weights, and select it for one-row launches without allocation or compilation. Compaction must consume the selected state's FP32 route plane. Verify graph/layer transitions and the Rust-owned scratch layout with official weights before rolling workers. Retain grouped execution for larger requests. Live workers remain on their previous frozen artifacts; no API speedup is claimed here.
+The [four-Spark rollout qualification](ds41-decode-dispatch-rollout.md) covers actual Rust ownership, official resident weights, row/layer transitions, changed-input graph replay and live API checks. It supersedes the component-only serving limitation above; the component experiment itself remains scoped as originally measured.

@@ -1,0 +1,5646 @@
+{
+  "scope": "One-row Rust dispatch rollout on four Sparks, 2026-09-11. Does not resolve the pre-existing compact-return numerical gap or qualify concurrency/long prefill.",
+  "b12x_revision": "f9ce62cab9e1ab9fa25cec34420e2a3335fcae98",
+  "checkpoint_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "decode_scratch_bytes_per_backbone_wave": 736440,
+  "artifacts": {
+    "worker": {
+      "path": "/tmp/ds41-decode-artifacts/worker",
+      "sha256": "b42af5897984893cab9de6673ffd21d728bf02bae4501e406fa7ef0a2edf5b1f"
+    },
+    "native_library": {
+      "path": "/tmp/ds41-decode-artifacts/cmake/libds41rt_native.so",
+      "sha256": "1fbd0f9c64b3a63e9079e74501dcb36e9cc1b2acb20eaaf0fc628449e2bbb2bd"
+    }
+  },
+  "owner_comparison": {
+    "files": [
+      {
+        "name": "v0-c0-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "5fe46a6d7d729bceb6041eacabae6ee0d3222b6763ebe04045d7fefb93374122",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "51b8e464af319ada7e30414876500bf2f5447fe024149db1510a9a417d6f509e",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "094d39b0d05a092df6b929c7095e04436020451e26efaf2b1c84fead2b36b2ec",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "2360acf172e2828fca99641ff224c0bca4eedef7d37260045527645963b8bff6",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "37225650da2c0dbe93d36c62b577a5983302cc9c14a9b466d23fb5369f088fb2",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "5cc738e4aa2fe4fc48949cff2ad415a3e493ad69a707aee190d400ed321b736a",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "cb1c4f0d3a64b5181ca03f8fe01d371ebce8f058fa6acd0e001b27567e398871",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "a6bed98fa5d6ba9260fb90c84567b5d0cfa58d14454fd49efcd095e6ac17d31c",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "9f934533b113554d41fc461aa53a6b46e165e991977d23be5e6d85c9ad5abc1c",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "cca8783ceb1cbe92f7e86aa6aa3704cc3fcf9c7e0ba256a2cd55e502e891882e",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "b3427fe75f062f0d23eaa1e1dd225148575b56206673207741e38138bbcfc4ef",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "f38fa4943049d17defa9c0895915081a921ad77d6314e754a67025f946cac35d",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "0192082162e5b5fdf5e2ed56d80b5873c5f3e657acdf2457d294c4b8aa3d64b4",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "eab013486d7941bec024dbbba53013c4824fde182cafdce65962f58b464bd895",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "caafb9438f241fe25abbcc4ece2dd06f34189dbfac7e439f0f5785b82499c9aa",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "249335b002324fb44215b5f8f3feafb4d3e6c941b92a9e97b751c81d5ddc2973",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "51546816ee3c9ef6bae7b918fc28b4d637c622f8c2f250dfd0804b7d10f6c2c9",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "db439275a80759d3686c88cda3a85bb9a6b2d43a0738f702826cf88ba790dc50",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "a22b99561f7cb67d2d36f7cfeda64eab6643b9dc733a35064b19872c96f6748b",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "bacb5646350b0b9493cd90baa326d9fabdc304075ab7515fd74c30ac6d6e4a01",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "7086ea5a16c1f5dfa2ee50218577988ab4cd7eaa915172cfaff543645fe669db",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "c2bee2348e8cf24625fb17ce80936d592304b3b13ebc360d7ddc7fb9f9c4520a",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "35efaaaf4703211aaff8bbf0f1ea2918f8be47a1d621c7153e289b9259912982",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "e5360f37791eaa33e9193515df5f51f203d0d0e855b3d2b34c518cde55a364d5",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "5fe46a6d7d729bceb6041eacabae6ee0d3222b6763ebe04045d7fefb93374122",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "51b8e464af319ada7e30414876500bf2f5447fe024149db1510a9a417d6f509e",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "094d39b0d05a092df6b929c7095e04436020451e26efaf2b1c84fead2b36b2ec",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "2360acf172e2828fca99641ff224c0bca4eedef7d37260045527645963b8bff6",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "37225650da2c0dbe93d36c62b577a5983302cc9c14a9b466d23fb5369f088fb2",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "5cc738e4aa2fe4fc48949cff2ad415a3e493ad69a707aee190d400ed321b736a",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "cb1c4f0d3a64b5181ca03f8fe01d371ebce8f058fa6acd0e001b27567e398871",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "a6bed98fa5d6ba9260fb90c84567b5d0cfa58d14454fd49efcd095e6ac17d31c",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "9f934533b113554d41fc461aa53a6b46e165e991977d23be5e6d85c9ad5abc1c",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "cca8783ceb1cbe92f7e86aa6aa3704cc3fcf9c7e0ba256a2cd55e502e891882e",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "b3427fe75f062f0d23eaa1e1dd225148575b56206673207741e38138bbcfc4ef",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "f38fa4943049d17defa9c0895915081a921ad77d6314e754a67025f946cac35d",
+        "exact": true
+      }
+    ],
+    "total_bytes": 77475840,
+    "all_exact": true,
+    "route_planes_finite_nonzero": true
+  },
+  "timing": {
+    "scope": "Instrumented development workload. GPU event intervals separate expert execution and compaction; host upload/download exclude socket transfer. Unique-expert packed bytes exclude repeated reads and are not measured DRAM traffic. Server execute time also includes queueing/staging; write time is host socket handling, not pure link time.",
+    "groups": [
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "active_experts": {
+            "median": 6.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "compact_us": {
+            "median": 3.9039998054504395,
+            "p95": 3.936000108718872,
+            "max": 23.007999420166016
+          },
+          "download_us": {
+            "median": 11.0,
+            "p95": 19.0,
+            "max": 146.0
+          },
+          "execution_host_us": {
+            "median": 252.0,
+            "p95": 278.0,
+            "max": 600.0
+          },
+          "kernel_us": {
+            "median": 240.38400268554688,
+            "p95": 261.88800048828125,
+            "max": 577.4400024414062
+          },
+          "max_expert_rows": {
+            "median": 1.0,
+            "p95": 1.0,
+            "max": 1.0
+          },
+          "output_bytes": {
+            "median": 10240.0,
+            "p95": 10240.0,
+            "max": 10240.0
+          },
+          "total_us": {
+            "median": 292.0,
+            "p95": 347.0,
+            "max": 676.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 31334400.0,
+            "p95": 31334400.0,
+            "max": 31334400.0
+          },
+          "upload_us": {
+            "median": 29.0,
+            "p95": 49.0,
+            "max": 213.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "compact_us": {
+            "median": 3.9039998054504395,
+            "p95": 3.936000108718872,
+            "max": 5.567999839782715
+          },
+          "download_us": {
+            "median": 10.0,
+            "p95": 15.0,
+            "max": 17.0
+          },
+          "execution_host_us": {
+            "median": 527.0,
+            "p95": 576.0,
+            "max": 724.0
+          },
+          "kernel_us": {
+            "median": 517.1520080566406,
+            "p95": 565.280029296875,
+            "max": 712.2560424804688
+          },
+          "max_expert_rows": {
+            "median": 2.0,
+            "p95": 3.0,
+            "max": 3.0
+          },
+          "output_bytes": {
+            "median": 30720.0,
+            "p95": 30720.0,
+            "max": 30720.0
+          },
+          "total_us": {
+            "median": 574.5,
+            "p95": 636.0,
+            "max": 789.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 78336000.0,
+            "p95": 88780800.0,
+            "max": 94003200.0
+          },
+          "upload_us": {
+            "median": 28.5,
+            "p95": 54.0,
+            "max": 100.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "active_experts": {
+            "median": 22.0,
+            "p95": 29.0,
+            "max": 35.0
+          },
+          "compact_us": {
+            "median": 3.9039998054504395,
+            "p95": 3.936000108718872,
+            "max": 20.832000732421875
+          },
+          "download_us": {
+            "median": 11.0,
+            "p95": 16.0,
+            "max": 51.0
+          },
+          "execution_host_us": {
+            "median": 653.5,
+            "p95": 923.0,
+            "max": 1215.0
+          },
+          "kernel_us": {
+            "median": 640.6880187988281,
+            "p95": 911.64794921875,
+            "max": 1204.511962890625
+          },
+          "max_expert_rows": {
+            "median": 5.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "output_bytes": {
+            "median": 61440.0,
+            "p95": 61440.0,
+            "max": 61440.0
+          },
+          "total_us": {
+            "median": 707.0,
+            "p95": 979.0,
+            "max": 1264.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 114892800.0,
+            "p95": 151449600.0,
+            "max": 182784000.0
+          },
+          "upload_us": {
+            "median": 33.0,
+            "p95": 64.0,
+            "max": 201.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 36.5,
+            "p95": 49.0,
+            "max": 53.0
+          },
+          "compact_us": {
+            "median": 4.04800009727478,
+            "p95": 5.983999729156494,
+            "max": 6.080000400543213
+          },
+          "download_us": {
+            "median": 12.0,
+            "p95": 17.0,
+            "max": 17.0
+          },
+          "execution_host_us": {
+            "median": 1298.0,
+            "p95": 1510.0,
+            "max": 1684.0
+          },
+          "kernel_us": {
+            "median": 1285.72802734375,
+            "p95": 1494.7840576171875,
+            "max": 1666.68798828125
+          },
+          "max_expert_rows": {
+            "median": 9.0,
+            "p95": 12.0,
+            "max": 13.0
+          },
+          "output_bytes": {
+            "median": 133120.0,
+            "p95": 133120.0,
+            "max": 133120.0
+          },
+          "total_us": {
+            "median": 1378.5,
+            "p95": 1605.0,
+            "max": 1775.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 190617600.0,
+            "p95": 255897600.0,
+            "max": 276787200.0
+          },
+          "upload_us": {
+            "median": 65.5,
+            "p95": 96.0,
+            "max": 101.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 44.0,
+            "p95": 62.0,
+            "max": 71.0
+          },
+          "compact_us": {
+            "median": 5.952000141143799,
+            "p95": 8.0,
+            "max": 25.40799903869629
+          },
+          "download_us": {
+            "median": 14.0,
+            "p95": 18.0,
+            "max": 26.0
+          },
+          "execution_host_us": {
+            "median": 1597.5,
+            "p95": 2019.0,
+            "max": 2174.0
+          },
+          "kernel_us": {
+            "median": 1582.4960327148438,
+            "p95": 2000.89599609375,
+            "max": 2137.31201171875
+          },
+          "max_expert_rows": {
+            "median": 13.5,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "output_bytes": {
+            "median": 184320.0,
+            "p95": 184320.0,
+            "max": 184320.0
+          },
+          "total_us": {
+            "median": 1694.5,
+            "p95": 2091.0,
+            "max": 3703.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 229785600.0,
+            "p95": 323788800.0,
+            "max": 370790400.0
+          },
+          "upload_us": {
+            "median": 51.0,
+            "p95": 105.0,
+            "max": 1512.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 47.0,
+            "p95": 64.0,
+            "max": 68.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 10.04800033569336
+          },
+          "download_us": {
+            "median": 15.0,
+            "p95": 19.0,
+            "max": 20.0
+          },
+          "execution_host_us": {
+            "median": 1659.5,
+            "p95": 2174.0,
+            "max": 2292.0
+          },
+          "kernel_us": {
+            "median": 1640.4960327148438,
+            "p95": 2158.65576171875,
+            "max": 2265.31201171875
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 19.0
+          },
+          "output_bytes": {
+            "median": 204800.0,
+            "p95": 204800.0,
+            "max": 204800.0
+          },
+          "total_us": {
+            "median": 1792.5,
+            "p95": 2231.0,
+            "max": 2519.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 245452800.0,
+            "p95": 334233600.0,
+            "max": 355123200.0
+          },
+          "upload_us": {
+            "median": 58.0,
+            "p95": 119.0,
+            "max": 207.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "active_experts": {
+            "median": 50.0,
+            "p95": 73.0,
+            "max": 79.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 9.920000076293945,
+            "max": 31.488000869750977
+          },
+          "download_us": {
+            "median": 14.0,
+            "p95": 19.0,
+            "max": 40.0
+          },
+          "execution_host_us": {
+            "median": 1784.5,
+            "p95": 2212.0,
+            "max": 2339.0
+          },
+          "kernel_us": {
+            "median": 1766.7200317382812,
+            "p95": 2191.871826171875,
+            "max": 2323.744140625
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 20.0,
+            "max": 21.0
+          },
+          "output_bytes": {
+            "median": 215040.0,
+            "p95": 215040.0,
+            "max": 215040.0
+          },
+          "total_us": {
+            "median": 1883.0,
+            "p95": 2311.0,
+            "max": 4201.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 261120000.0,
+            "p95": 381235200.0,
+            "max": 412569600.0
+          },
+          "upload_us": {
+            "median": 53.0,
+            "p95": 114.0,
+            "max": 1941.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 48.0,
+            "p95": 64.0,
+            "max": 66.0
+          },
+          "compact_us": {
+            "median": 5.952000141143799,
+            "p95": 8.031999588012695,
+            "max": 9.184000015258789
+          },
+          "download_us": {
+            "median": 16.0,
+            "p95": 21.0,
+            "max": 148.0
+          },
+          "execution_host_us": {
+            "median": 1771.5,
+            "p95": 2075.0,
+            "max": 2522.0
+          },
+          "kernel_us": {
+            "median": 1755.8399658203125,
+            "p95": 2056.320068359375,
+            "max": 2496.736083984375
+          },
+          "max_expert_rows": {
+            "median": 21.0,
+            "p95": 23.0,
+            "max": 23.0
+          },
+          "output_bytes": {
+            "median": 256000.0,
+            "p95": 256000.0,
+            "max": 256000.0
+          },
+          "total_us": {
+            "median": 1870.5,
+            "p95": 2151.0,
+            "max": 2796.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 250675200.0,
+            "p95": 334233600.0,
+            "max": 344678400.0
+          },
+          "upload_us": {
+            "median": 67.5,
+            "p95": 127.0,
+            "max": 152.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 63.0,
+            "p95": 84.0,
+            "max": 86.0
+          },
+          "compact_us": {
+            "median": 8.0,
+            "p95": 12.095999717712402,
+            "max": 14.144000053405762
+          },
+          "download_us": {
+            "median": 17.0,
+            "p95": 18.0,
+            "max": 18.0
+          },
+          "execution_host_us": {
+            "median": 2128.0,
+            "p95": 2420.0,
+            "max": 2807.0
+          },
+          "kernel_us": {
+            "median": 2112.27197265625,
+            "p95": 2399.968017578125,
+            "max": 2781.2158203125
+          },
+          "max_expert_rows": {
+            "median": 14.0,
+            "p95": 22.0,
+            "max": 25.0
+          },
+          "output_bytes": {
+            "median": 266240.0,
+            "p95": 266240.0,
+            "max": 266240.0
+          },
+          "total_us": {
+            "median": 2188.5,
+            "p95": 2476.0,
+            "max": 2877.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 329011200.0,
+            "p95": 438681600.0,
+            "max": 449126400.0
+          },
+          "upload_us": {
+            "median": 41.0,
+            "p95": 105.0,
+            "max": 110.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 69.5,
+            "p95": 96.0,
+            "max": 102.0
+          },
+          "compact_us": {
+            "median": 11.055999755859375,
+            "p95": 15.904000282287598,
+            "max": 16.384000778198242
+          },
+          "download_us": {
+            "median": 19.0,
+            "p95": 24.0,
+            "max": 31.0
+          },
+          "execution_host_us": {
+            "median": 2389.0,
+            "p95": 2923.0,
+            "max": 3221.0
+          },
+          "kernel_us": {
+            "median": 2371.8719482421875,
+            "p95": 2898.3359375,
+            "max": 3194.2080078125
+          },
+          "max_expert_rows": {
+            "median": 24.0,
+            "p95": 33.0,
+            "max": 35.0
+          },
+          "output_bytes": {
+            "median": 378880.0,
+            "p95": 378880.0,
+            "max": 378880.0
+          },
+          "total_us": {
+            "median": 2502.5,
+            "p95": 3032.0,
+            "max": 5010.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 362956800.0,
+            "p95": 501350400.0,
+            "max": 532684800.0
+          },
+          "upload_us": {
+            "median": 64.0,
+            "p95": 158.0,
+            "max": 2217.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 83.0,
+            "p95": 113.0,
+            "max": 126.0
+          },
+          "compact_us": {
+            "median": 15.168000221252441,
+            "p95": 18.239999771118164,
+            "max": 20.288000106811523
+          },
+          "download_us": {
+            "median": 21.0,
+            "p95": 26.0,
+            "max": 27.0
+          },
+          "execution_host_us": {
+            "median": 2758.0,
+            "p95": 3449.0,
+            "max": 3553.0
+          },
+          "kernel_us": {
+            "median": 2732.1759033203125,
+            "p95": 3421.43994140625,
+            "max": 3522.2080078125
+          },
+          "max_expert_rows": {
+            "median": 26.0,
+            "p95": 38.0,
+            "max": 40.0
+          },
+          "output_bytes": {
+            "median": 430080.0,
+            "p95": 430080.0,
+            "max": 430080.0
+          },
+          "total_us": {
+            "median": 2865.5,
+            "p95": 3620.0,
+            "max": 5663.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 433459200.0,
+            "p95": 590131200.0,
+            "max": 658022400.0
+          },
+          "upload_us": {
+            "median": 63.0,
+            "p95": 155.0,
+            "max": 2145.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "gpu_and_staging",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "active_experts": {
+            "median": 86.0,
+            "p95": 109.0,
+            "max": 158.0
+          },
+          "compact_us": {
+            "median": 25.40799903869629,
+            "p95": 31.58399772644043,
+            "max": 86.56000518798828
+          },
+          "download_us": {
+            "median": 28.0,
+            "p95": 32.0,
+            "max": 146.0
+          },
+          "execution_host_us": {
+            "median": 3174.0,
+            "p95": 3750.0,
+            "max": 4858.0
+          },
+          "kernel_us": {
+            "median": 3140.5279541015625,
+            "p95": 3710.303955078125,
+            "max": 4819.68017578125
+          },
+          "max_expert_rows": {
+            "median": 38.0,
+            "p95": 63.0,
+            "max": 80.0
+          },
+          "output_bytes": {
+            "median": 819200.0,
+            "p95": 819200.0,
+            "max": 819200.0
+          },
+          "total_us": {
+            "median": 3274.0,
+            "p95": 3854.0,
+            "max": 6499.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 449126400.0,
+            "p95": 569241600.0,
+            "max": 825139200.0
+          },
+          "upload_us": {
+            "median": 71.0,
+            "p95": 88.0,
+            "max": 2174.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.573,
+            "p95": 0.942,
+            "max": 1.772
+          },
+          "request_wire_bytes": {
+            "median": 10448.0,
+            "p95": 10448.0,
+            "max": 10448.0
+          },
+          "response_wire_bytes": {
+            "median": 10340.0,
+            "p95": 10340.0,
+            "max": 10340.0
+          },
+          "write_ms": {
+            "median": 0.034,
+            "p95": 0.105,
+            "max": 0.164
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.842,
+            "p95": 1.183,
+            "max": 1.333
+          },
+          "request_wire_bytes": {
+            "median": 31152.0,
+            "p95": 31152.0,
+            "max": 31152.0
+          },
+          "response_wire_bytes": {
+            "median": 30828.0,
+            "p95": 30828.0,
+            "max": 30828.0
+          },
+          "write_ms": {
+            "median": 0.026,
+            "p95": 0.035,
+            "max": 0.096
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.972,
+            "p95": 1.35,
+            "max": 2.034
+          },
+          "request_wire_bytes": {
+            "median": 62208.0,
+            "p95": 62208.0,
+            "max": 62208.0
+          },
+          "response_wire_bytes": {
+            "median": 61560.0,
+            "p95": 61560.0,
+            "max": 61560.0
+          },
+          "write_ms": {
+            "median": 0.03,
+            "p95": 0.136,
+            "max": 0.177
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 1.785,
+            "p95": 2.36,
+            "max": 2.595
+          },
+          "request_wire_bytes": {
+            "median": 134672.0,
+            "p95": 134672.0,
+            "max": 134672.0
+          },
+          "response_wire_bytes": {
+            "median": 133268.0,
+            "p95": 133268.0,
+            "max": 133268.0
+          },
+          "write_ms": {
+            "median": 0.087,
+            "p95": 0.188,
+            "max": 0.22
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.239,
+            "p95": 2.959,
+            "max": 4.256
+          },
+          "request_wire_bytes": {
+            "median": 186432.0,
+            "p95": 186432.0,
+            "max": 186432.0
+          },
+          "response_wire_bytes": {
+            "median": 184488.0,
+            "p95": 184488.0,
+            "max": 184488.0
+          },
+          "write_ms": {
+            "median": 0.13,
+            "p95": 0.203,
+            "max": 0.225
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.3129999999999997,
+            "p95": 2.745,
+            "max": 3.072
+          },
+          "request_wire_bytes": {
+            "median": 207136.0,
+            "p95": 207136.0,
+            "max": 207136.0
+          },
+          "response_wire_bytes": {
+            "median": 204976.0,
+            "p95": 204976.0,
+            "max": 204976.0
+          },
+          "write_ms": {
+            "median": 0.1315,
+            "p95": 0.21,
+            "max": 0.227
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.3834999999999997,
+            "p95": 2.957,
+            "max": 4.605
+          },
+          "request_wire_bytes": {
+            "median": 217488.0,
+            "p95": 217488.0,
+            "max": 217488.0
+          },
+          "response_wire_bytes": {
+            "median": 215220.0,
+            "p95": 215220.0,
+            "max": 215220.0
+          },
+          "write_ms": {
+            "median": 0.135,
+            "p95": 0.246,
+            "max": 0.27
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.3405,
+            "p95": 2.881,
+            "max": 3.541
+          },
+          "request_wire_bytes": {
+            "median": 258896.0,
+            "p95": 258896.0,
+            "max": 258896.0
+          },
+          "response_wire_bytes": {
+            "median": 256196.0,
+            "p95": 256196.0,
+            "max": 256196.0
+          },
+          "write_ms": {
+            "median": 0.125,
+            "p95": 0.256,
+            "max": 0.317
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.4539999999999997,
+            "p95": 2.747,
+            "max": 3.168
+          },
+          "request_wire_bytes": {
+            "median": 269248.0,
+            "p95": 269248.0,
+            "max": 269248.0
+          },
+          "response_wire_bytes": {
+            "median": 266440.0,
+            "p95": 266440.0,
+            "max": 266440.0
+          },
+          "write_ms": {
+            "median": 0.078,
+            "p95": 0.09,
+            "max": 0.103
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.0309999999999997,
+            "p95": 3.662,
+            "max": 5.395
+          },
+          "request_wire_bytes": {
+            "median": 383120.0,
+            "p95": 383120.0,
+            "max": 383120.0
+          },
+          "response_wire_bytes": {
+            "median": 379124.0,
+            "p95": 379124.0,
+            "max": 379124.0
+          },
+          "write_ms": {
+            "median": 0.207,
+            "p95": 0.346,
+            "max": 0.364
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.3615,
+            "p95": 4.064,
+            "max": 5.962
+          },
+          "request_wire_bytes": {
+            "median": 434880.0,
+            "p95": 434880.0,
+            "max": 434880.0
+          },
+          "response_wire_bytes": {
+            "median": 430344.0,
+            "p95": 430344.0,
+            "max": 430344.0
+          },
+          "write_ms": {
+            "median": 0.233,
+            "p95": 0.314,
+            "max": 0.318
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-dodo.log",
+        "kind": "server_boundary",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.6765,
+            "p95": 4.347,
+            "max": 6.785
+          },
+          "request_wire_bytes": {
+            "median": 828256.0,
+            "p95": 828256.0,
+            "max": 828256.0
+          },
+          "response_wire_bytes": {
+            "median": 819616.0,
+            "p95": 819616.0,
+            "max": 819616.0
+          },
+          "write_ms": {
+            "median": 0.158,
+            "p95": 0.195,
+            "max": 0.63
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "active_experts": {
+            "median": 6.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "compact_us": {
+            "median": 3.936000108718872,
+            "p95": 3.9679999351501465,
+            "max": 32.96000289916992
+          },
+          "download_us": {
+            "median": 10.0,
+            "p95": 18.0,
+            "max": 134.0
+          },
+          "execution_host_us": {
+            "median": 252.0,
+            "p95": 273.0,
+            "max": 575.0
+          },
+          "kernel_us": {
+            "median": 240.3520050048828,
+            "p95": 257.1519775390625,
+            "max": 563.3599853515625
+          },
+          "max_expert_rows": {
+            "median": 1.0,
+            "p95": 1.0,
+            "max": 1.0
+          },
+          "output_bytes": {
+            "median": 10240.0,
+            "p95": 10240.0,
+            "max": 10240.0
+          },
+          "total_us": {
+            "median": 288.0,
+            "p95": 338.0,
+            "max": 638.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 31334400.0,
+            "p95": 31334400.0,
+            "max": 31334400.0
+          },
+          "upload_us": {
+            "median": 26.0,
+            "p95": 47.0,
+            "max": 210.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "compact_us": {
+            "median": 3.936000108718872,
+            "p95": 3.9679999351501465,
+            "max": 4.0320000648498535
+          },
+          "download_us": {
+            "median": 11.0,
+            "p95": 19.0,
+            "max": 37.0
+          },
+          "execution_host_us": {
+            "median": 541.5,
+            "p95": 598.0,
+            "max": 749.0
+          },
+          "kernel_us": {
+            "median": 528.1600036621094,
+            "p95": 584.3200073242188,
+            "max": 735.4879760742188
+          },
+          "max_expert_rows": {
+            "median": 2.0,
+            "p95": 3.0,
+            "max": 3.0
+          },
+          "output_bytes": {
+            "median": 30720.0,
+            "p95": 30720.0,
+            "max": 30720.0
+          },
+          "total_us": {
+            "median": 590.5,
+            "p95": 673.0,
+            "max": 884.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 78336000.0,
+            "p95": 88780800.0,
+            "max": 94003200.0
+          },
+          "upload_us": {
+            "median": 38.0,
+            "p95": 66.0,
+            "max": 119.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "active_experts": {
+            "median": 22.0,
+            "p95": 29.0,
+            "max": 35.0
+          },
+          "compact_us": {
+            "median": 3.9039998054504395,
+            "p95": 3.9679999351501465,
+            "max": 11.231999397277832
+          },
+          "download_us": {
+            "median": 11.0,
+            "p95": 16.0,
+            "max": 47.0
+          },
+          "execution_host_us": {
+            "median": 662.0,
+            "p95": 940.0,
+            "max": 1082.0
+          },
+          "kernel_us": {
+            "median": 649.5680236816406,
+            "p95": 928.511962890625,
+            "max": 1060.7999267578125
+          },
+          "max_expert_rows": {
+            "median": 5.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "output_bytes": {
+            "median": 61440.0,
+            "p95": 61440.0,
+            "max": 61440.0
+          },
+          "total_us": {
+            "median": 715.0,
+            "p95": 991.0,
+            "max": 1144.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 114892800.0,
+            "p95": 151449600.0,
+            "max": 182784000.0
+          },
+          "upload_us": {
+            "median": 39.0,
+            "p95": 66.0,
+            "max": 193.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 36.5,
+            "p95": 49.0,
+            "max": 53.0
+          },
+          "compact_us": {
+            "median": 5.920000076293945,
+            "p95": 5.983999729156494,
+            "max": 8.031999588012695
+          },
+          "download_us": {
+            "median": 12.0,
+            "p95": 17.0,
+            "max": 20.0
+          },
+          "execution_host_us": {
+            "median": 1287.0,
+            "p95": 1545.0,
+            "max": 1681.0
+          },
+          "kernel_us": {
+            "median": 1274.3040771484375,
+            "p95": 1532.7039794921875,
+            "max": 1668.511962890625
+          },
+          "max_expert_rows": {
+            "median": 9.0,
+            "p95": 12.0,
+            "max": 13.0
+          },
+          "output_bytes": {
+            "median": 133120.0,
+            "p95": 133120.0,
+            "max": 133120.0
+          },
+          "total_us": {
+            "median": 1338.0,
+            "p95": 1591.0,
+            "max": 1729.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 190617600.0,
+            "p95": 255897600.0,
+            "max": 276787200.0
+          },
+          "upload_us": {
+            "median": 48.0,
+            "p95": 77.0,
+            "max": 84.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 44.0,
+            "p95": 62.0,
+            "max": 71.0
+          },
+          "compact_us": {
+            "median": 5.952000141143799,
+            "p95": 8.031999588012695,
+            "max": 24.416000366210938
+          },
+          "download_us": {
+            "median": 13.0,
+            "p95": 18.0,
+            "max": 54.0
+          },
+          "execution_host_us": {
+            "median": 1597.5,
+            "p95": 2017.0,
+            "max": 2136.0
+          },
+          "kernel_us": {
+            "median": 1581.4240112304688,
+            "p95": 2002.3360595703125,
+            "max": 2114.01611328125
+          },
+          "max_expert_rows": {
+            "median": 13.5,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "output_bytes": {
+            "median": 184320.0,
+            "p95": 184320.0,
+            "max": 184320.0
+          },
+          "total_us": {
+            "median": 1681.0,
+            "p95": 2084.0,
+            "max": 3738.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 229785600.0,
+            "p95": 323788800.0,
+            "max": 370790400.0
+          },
+          "upload_us": {
+            "median": 47.0,
+            "p95": 86.0,
+            "max": 1584.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 47.0,
+            "p95": 64.0,
+            "max": 68.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 10.079999923706055
+          },
+          "download_us": {
+            "median": 14.0,
+            "p95": 18.0,
+            "max": 22.0
+          },
+          "execution_host_us": {
+            "median": 1656.5,
+            "p95": 2158.0,
+            "max": 2241.0
+          },
+          "kernel_us": {
+            "median": 1638.2079467773438,
+            "p95": 2143.26416015625,
+            "max": 2226.176025390625
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 19.0
+          },
+          "output_bytes": {
+            "median": 204800.0,
+            "p95": 204800.0,
+            "max": 204800.0
+          },
+          "total_us": {
+            "median": 1748.5,
+            "p95": 2239.0,
+            "max": 2408.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 245452800.0,
+            "p95": 334233600.0,
+            "max": 355123200.0
+          },
+          "upload_us": {
+            "median": 69.0,
+            "p95": 102.0,
+            "max": 173.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "active_experts": {
+            "median": 50.0,
+            "p95": 73.0,
+            "max": 79.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.15999984741211,
+            "max": 12.095999717712402
+          },
+          "download_us": {
+            "median": 14.0,
+            "p95": 18.0,
+            "max": 22.0
+          },
+          "execution_host_us": {
+            "median": 1782.0,
+            "p95": 2224.0,
+            "max": 2787.0
+          },
+          "kernel_us": {
+            "median": 1767.5360107421875,
+            "p95": 2207.0400390625,
+            "max": 2768.608154296875
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 20.0,
+            "max": 21.0
+          },
+          "output_bytes": {
+            "median": 215040.0,
+            "p95": 215040.0,
+            "max": 215040.0
+          },
+          "total_us": {
+            "median": 1867.0,
+            "p95": 2306.0,
+            "max": 4386.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 261120000.0,
+            "p95": 381235200.0,
+            "max": 412569600.0
+          },
+          "upload_us": {
+            "median": 50.0,
+            "p95": 92.0,
+            "max": 2115.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 48.0,
+            "p95": 64.0,
+            "max": 66.0
+          },
+          "compact_us": {
+            "median": 5.952000141143799,
+            "p95": 8.031999588012695,
+            "max": 9.02400016784668
+          },
+          "download_us": {
+            "median": 16.0,
+            "p95": 21.0,
+            "max": 21.0
+          },
+          "execution_host_us": {
+            "median": 1789.0,
+            "p95": 2088.0,
+            "max": 2256.0
+          },
+          "kernel_us": {
+            "median": 1771.4400634765625,
+            "p95": 2072.639892578125,
+            "max": 2240.83203125
+          },
+          "max_expert_rows": {
+            "median": 21.0,
+            "p95": 23.0,
+            "max": 23.0
+          },
+          "output_bytes": {
+            "median": 256000.0,
+            "p95": 256000.0,
+            "max": 256000.0
+          },
+          "total_us": {
+            "median": 1853.0,
+            "p95": 2148.0,
+            "max": 2344.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 250675200.0,
+            "p95": 334233600.0,
+            "max": 344678400.0
+          },
+          "upload_us": {
+            "median": 68.5,
+            "p95": 99.0,
+            "max": 117.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 63.0,
+            "p95": 84.0,
+            "max": 86.0
+          },
+          "compact_us": {
+            "median": 8.0,
+            "p95": 14.04800033569336,
+            "max": 17.279998779296875
+          },
+          "download_us": {
+            "median": 17.5,
+            "p95": 22.0,
+            "max": 32.0
+          },
+          "execution_host_us": {
+            "median": 2141.5,
+            "p95": 2443.0,
+            "max": 2626.0
+          },
+          "kernel_us": {
+            "median": 2122.0,
+            "p95": 2417.7919921875,
+            "max": 2607.008056640625
+          },
+          "max_expert_rows": {
+            "median": 14.0,
+            "p95": 22.0,
+            "max": 25.0
+          },
+          "output_bytes": {
+            "median": 266240.0,
+            "p95": 266240.0,
+            "max": 266240.0
+          },
+          "total_us": {
+            "median": 2222.5,
+            "p95": 2550.0,
+            "max": 2687.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 329011200.0,
+            "p95": 438681600.0,
+            "max": 449126400.0
+          },
+          "upload_us": {
+            "median": 65.0,
+            "p95": 102.0,
+            "max": 116.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 69.5,
+            "p95": 96.0,
+            "max": 102.0
+          },
+          "compact_us": {
+            "median": 10.271999835968018,
+            "p95": 16.224000930786133,
+            "max": 17.279998779296875
+          },
+          "download_us": {
+            "median": 19.0,
+            "p95": 24.0,
+            "max": 26.0
+          },
+          "execution_host_us": {
+            "median": 2413.0,
+            "p95": 2905.0,
+            "max": 3222.0
+          },
+          "kernel_us": {
+            "median": 2392.7039794921875,
+            "p95": 2882.6240234375,
+            "max": 3196.192138671875
+          },
+          "max_expert_rows": {
+            "median": 24.0,
+            "p95": 33.0,
+            "max": 35.0
+          },
+          "output_bytes": {
+            "median": 378880.0,
+            "p95": 378880.0,
+            "max": 378880.0
+          },
+          "total_us": {
+            "median": 2518.5,
+            "p95": 3030.0,
+            "max": 4973.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 362956800.0,
+            "p95": 501350400.0,
+            "max": 532684800.0
+          },
+          "upload_us": {
+            "median": 77.0,
+            "p95": 122.0,
+            "max": 2159.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 83.0,
+            "p95": 113.0,
+            "max": 126.0
+          },
+          "compact_us": {
+            "median": 15.199999809265137,
+            "p95": 20.288000106811523,
+            "max": 22.560001373291016
+          },
+          "download_us": {
+            "median": 19.0,
+            "p95": 24.0,
+            "max": 46.0
+          },
+          "execution_host_us": {
+            "median": 2749.5,
+            "p95": 3435.0,
+            "max": 3551.0
+          },
+          "kernel_us": {
+            "median": 2729.4879150390625,
+            "p95": 3406.303955078125,
+            "max": 3520.800048828125
+          },
+          "max_expert_rows": {
+            "median": 26.0,
+            "p95": 38.0,
+            "max": 40.0
+          },
+          "output_bytes": {
+            "median": 430080.0,
+            "p95": 430080.0,
+            "max": 430080.0
+          },
+          "total_us": {
+            "median": 2830.0,
+            "p95": 3563.0,
+            "max": 5940.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 433459200.0,
+            "p95": 590131200.0,
+            "max": 658022400.0
+          },
+          "upload_us": {
+            "median": 51.5,
+            "p95": 127.0,
+            "max": 2419.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "gpu_and_staging",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "active_experts": {
+            "median": 86.0,
+            "p95": 109.0,
+            "max": 158.0
+          },
+          "compact_us": {
+            "median": 25.440000534057617,
+            "p95": 32.60799789428711,
+            "max": 58.2400016784668
+          },
+          "download_us": {
+            "median": 30.0,
+            "p95": 33.0,
+            "max": 60.0
+          },
+          "execution_host_us": {
+            "median": 3193.5,
+            "p95": 3765.0,
+            "max": 4819.0
+          },
+          "kernel_us": {
+            "median": 3156.35205078125,
+            "p95": 3721.823974609375,
+            "max": 4778.97607421875
+          },
+          "max_expert_rows": {
+            "median": 38.0,
+            "p95": 63.0,
+            "max": 80.0
+          },
+          "output_bytes": {
+            "median": 819200.0,
+            "p95": 819200.0,
+            "max": 819200.0
+          },
+          "total_us": {
+            "median": 3336.0,
+            "p95": 3947.0,
+            "max": 6706.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 449126400.0,
+            "p95": 569241600.0,
+            "max": 825139200.0
+          },
+          "upload_us": {
+            "median": 86.0,
+            "p95": 220.0,
+            "max": 2355.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.524,
+            "p95": 0.875,
+            "max": 1.496
+          },
+          "request_wire_bytes": {
+            "median": 10448.0,
+            "p95": 10448.0,
+            "max": 10448.0
+          },
+          "response_wire_bytes": {
+            "median": 10340.0,
+            "p95": 10340.0,
+            "max": 10340.0
+          },
+          "write_ms": {
+            "median": 0.026,
+            "p95": 0.087,
+            "max": 0.161
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.9444999999999999,
+            "p95": 1.526,
+            "max": 1.671
+          },
+          "request_wire_bytes": {
+            "median": 31152.0,
+            "p95": 31152.0,
+            "max": 31152.0
+          },
+          "response_wire_bytes": {
+            "median": 30828.0,
+            "p95": 30828.0,
+            "max": 30828.0
+          },
+          "write_ms": {
+            "median": 0.028999999999999998,
+            "p95": 0.101,
+            "max": 0.113
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.999,
+            "p95": 1.417,
+            "max": 2.101
+          },
+          "request_wire_bytes": {
+            "median": 62208.0,
+            "p95": 62208.0,
+            "max": 62208.0
+          },
+          "response_wire_bytes": {
+            "median": 61560.0,
+            "p95": 61560.0,
+            "max": 61560.0
+          },
+          "write_ms": {
+            "median": 0.032,
+            "p95": 0.133,
+            "max": 0.194
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 1.6625,
+            "p95": 2.098,
+            "max": 2.33
+          },
+          "request_wire_bytes": {
+            "median": 134672.0,
+            "p95": 134672.0,
+            "max": 134672.0
+          },
+          "response_wire_bytes": {
+            "median": 133268.0,
+            "p95": 133268.0,
+            "max": 133268.0
+          },
+          "write_ms": {
+            "median": 0.05,
+            "p95": 0.162,
+            "max": 0.187
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.1035,
+            "p95": 2.751,
+            "max": 4.536
+          },
+          "request_wire_bytes": {
+            "median": 186432.0,
+            "p95": 186432.0,
+            "max": 186432.0
+          },
+          "response_wire_bytes": {
+            "median": 184488.0,
+            "p95": 184488.0,
+            "max": 184488.0
+          },
+          "write_ms": {
+            "median": 0.066,
+            "p95": 0.186,
+            "max": 0.212
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.3055000000000003,
+            "p95": 2.71,
+            "max": 3.14
+          },
+          "request_wire_bytes": {
+            "median": 207136.0,
+            "p95": 207136.0,
+            "max": 207136.0
+          },
+          "response_wire_bytes": {
+            "median": 204976.0,
+            "p95": 204976.0,
+            "max": 204976.0
+          },
+          "write_ms": {
+            "median": 0.1065,
+            "p95": 0.249,
+            "max": 0.258
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.2705,
+            "p95": 2.855,
+            "max": 4.821
+          },
+          "request_wire_bytes": {
+            "median": 217488.0,
+            "p95": 217488.0,
+            "max": 217488.0
+          },
+          "response_wire_bytes": {
+            "median": 215220.0,
+            "p95": 215220.0,
+            "max": 215220.0
+          },
+          "write_ms": {
+            "median": 0.095,
+            "p95": 0.227,
+            "max": 0.278
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.2915,
+            "p95": 2.818,
+            "max": 3.193
+          },
+          "request_wire_bytes": {
+            "median": 258896.0,
+            "p95": 258896.0,
+            "max": 258896.0
+          },
+          "response_wire_bytes": {
+            "median": 256196.0,
+            "p95": 256196.0,
+            "max": 256196.0
+          },
+          "write_ms": {
+            "median": 0.16,
+            "p95": 0.233,
+            "max": 0.3
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.662,
+            "p95": 3.13,
+            "max": 3.286
+          },
+          "request_wire_bytes": {
+            "median": 269248.0,
+            "p95": 269248.0,
+            "max": 269248.0
+          },
+          "response_wire_bytes": {
+            "median": 266440.0,
+            "p95": 266440.0,
+            "max": 266440.0
+          },
+          "write_ms": {
+            "median": 0.1795,
+            "p95": 0.261,
+            "max": 0.291
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.982,
+            "p95": 3.624,
+            "max": 5.511
+          },
+          "request_wire_bytes": {
+            "median": 383120.0,
+            "p95": 383120.0,
+            "max": 383120.0
+          },
+          "response_wire_bytes": {
+            "median": 379124.0,
+            "p95": 379124.0,
+            "max": 379124.0
+          },
+          "write_ms": {
+            "median": 0.1745,
+            "p95": 0.316,
+            "max": 0.418
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.1675,
+            "p95": 3.971,
+            "max": 6.138
+          },
+          "request_wire_bytes": {
+            "median": 434880.0,
+            "p95": 434880.0,
+            "max": 434880.0
+          },
+          "response_wire_bytes": {
+            "median": 430344.0,
+            "p95": 430344.0,
+            "max": 430344.0
+          },
+          "write_ms": {
+            "median": 0.109,
+            "p95": 0.3,
+            "max": 0.346
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-emu.log",
+        "kind": "server_boundary",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.952,
+            "p95": 4.819,
+            "max": 7.025
+          },
+          "request_wire_bytes": {
+            "median": 828256.0,
+            "p95": 828256.0,
+            "max": 828256.0
+          },
+          "response_wire_bytes": {
+            "median": 819616.0,
+            "p95": 819616.0,
+            "max": 819616.0
+          },
+          "write_ms": {
+            "median": 0.2995,
+            "p95": 0.574,
+            "max": 0.721
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "active_experts": {
+            "median": 6.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "compact_us": {
+            "median": 3.936000108718872,
+            "p95": 3.9679999351501465,
+            "max": 32.736000061035156
+          },
+          "download_us": {
+            "median": 10.0,
+            "p95": 16.0,
+            "max": 76.0
+          },
+          "execution_host_us": {
+            "median": 247.0,
+            "p95": 266.0,
+            "max": 623.0
+          },
+          "kernel_us": {
+            "median": 236.63999938964844,
+            "p95": 251.10400390625,
+            "max": 610.14404296875
+          },
+          "max_expert_rows": {
+            "median": 1.0,
+            "p95": 1.0,
+            "max": 1.0
+          },
+          "output_bytes": {
+            "median": 10240.0,
+            "p95": 10240.0,
+            "max": 10240.0
+          },
+          "total_us": {
+            "median": 281.0,
+            "p95": 322.0,
+            "max": 667.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 31334400.0,
+            "p95": 31334400.0,
+            "max": 31334400.0
+          },
+          "upload_us": {
+            "median": 24.0,
+            "p95": 41.0,
+            "max": 168.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "compact_us": {
+            "median": 3.936000108718872,
+            "p95": 3.936000108718872,
+            "max": 4.191999912261963
+          },
+          "download_us": {
+            "median": 11.0,
+            "p95": 17.0,
+            "max": 22.0
+          },
+          "execution_host_us": {
+            "median": 532.0,
+            "p95": 575.0,
+            "max": 593.0
+          },
+          "kernel_us": {
+            "median": 519.52001953125,
+            "p95": 556.83203125,
+            "max": 579.3599853515625
+          },
+          "max_expert_rows": {
+            "median": 2.0,
+            "p95": 3.0,
+            "max": 3.0
+          },
+          "output_bytes": {
+            "median": 30720.0,
+            "p95": 30720.0,
+            "max": 30720.0
+          },
+          "total_us": {
+            "median": 579.0,
+            "p95": 647.0,
+            "max": 680.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 78336000.0,
+            "p95": 88780800.0,
+            "max": 94003200.0
+          },
+          "upload_us": {
+            "median": 35.5,
+            "p95": 62.0,
+            "max": 72.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "active_experts": {
+            "median": 22.0,
+            "p95": 29.0,
+            "max": 35.0
+          },
+          "compact_us": {
+            "median": 3.936000108718872,
+            "p95": 4.0320000648498535,
+            "max": 24.607999801635742
+          },
+          "download_us": {
+            "median": 10.0,
+            "p95": 16.0,
+            "max": 39.0
+          },
+          "execution_host_us": {
+            "median": 651.0,
+            "p95": 930.0,
+            "max": 1205.0
+          },
+          "kernel_us": {
+            "median": 638.4960021972656,
+            "p95": 918.7839965820312,
+            "max": 1146.239990234375
+          },
+          "max_expert_rows": {
+            "median": 5.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "output_bytes": {
+            "median": 61440.0,
+            "p95": 61440.0,
+            "max": 61440.0
+          },
+          "total_us": {
+            "median": 702.0,
+            "p95": 976.0,
+            "max": 1263.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 114892800.0,
+            "p95": 151449600.0,
+            "max": 182784000.0
+          },
+          "upload_us": {
+            "median": 32.0,
+            "p95": 61.0,
+            "max": 102.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 36.5,
+            "p95": 49.0,
+            "max": 53.0
+          },
+          "compact_us": {
+            "median": 5.807999849319458,
+            "p95": 5.983999729156494,
+            "max": 5.983999729156494
+          },
+          "download_us": {
+            "median": 12.0,
+            "p95": 15.0,
+            "max": 21.0
+          },
+          "execution_host_us": {
+            "median": 1278.5,
+            "p95": 1498.0,
+            "max": 1916.0
+          },
+          "kernel_us": {
+            "median": 1265.8240356445312,
+            "p95": 1485.5040283203125,
+            "max": 1902.5599365234375
+          },
+          "max_expert_rows": {
+            "median": 9.0,
+            "p95": 12.0,
+            "max": 13.0
+          },
+          "output_bytes": {
+            "median": 133120.0,
+            "p95": 133120.0,
+            "max": 133120.0
+          },
+          "total_us": {
+            "median": 1332.5,
+            "p95": 1592.0,
+            "max": 1964.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 190617600.0,
+            "p95": 255897600.0,
+            "max": 276787200.0
+          },
+          "upload_us": {
+            "median": 32.5,
+            "p95": 71.0,
+            "max": 112.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 44.0,
+            "p95": 62.0,
+            "max": 71.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 24.15999984741211
+          },
+          "download_us": {
+            "median": 13.0,
+            "p95": 19.0,
+            "max": 40.0
+          },
+          "execution_host_us": {
+            "median": 1585.5,
+            "p95": 2012.0,
+            "max": 2247.0
+          },
+          "kernel_us": {
+            "median": 1571.2159423828125,
+            "p95": 1995.7120361328125,
+            "max": 2230.94384765625
+          },
+          "max_expert_rows": {
+            "median": 13.5,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "output_bytes": {
+            "median": 184320.0,
+            "p95": 184320.0,
+            "max": 184320.0
+          },
+          "total_us": {
+            "median": 1648.5,
+            "p95": 2083.0,
+            "max": 3916.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 229785600.0,
+            "p95": 323788800.0,
+            "max": 370790400.0
+          },
+          "upload_us": {
+            "median": 40.0,
+            "p95": 90.0,
+            "max": 1660.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 47.0,
+            "p95": 64.0,
+            "max": 68.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 14.911999702453613
+          },
+          "download_us": {
+            "median": 14.0,
+            "p95": 19.0,
+            "max": 21.0
+          },
+          "execution_host_us": {
+            "median": 1666.0,
+            "p95": 2075.0,
+            "max": 2247.0
+          },
+          "kernel_us": {
+            "median": 1650.56005859375,
+            "p95": 2056.864013671875,
+            "max": 2221.7919921875
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 19.0
+          },
+          "output_bytes": {
+            "median": 204800.0,
+            "p95": 204800.0,
+            "max": 204800.0
+          },
+          "total_us": {
+            "median": 1735.5,
+            "p95": 2159.0,
+            "max": 2455.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 245452800.0,
+            "p95": 334233600.0,
+            "max": 355123200.0
+          },
+          "upload_us": {
+            "median": 59.5,
+            "p95": 97.0,
+            "max": 187.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "active_experts": {
+            "median": 50.0,
+            "p95": 73.0,
+            "max": 79.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.064000129699707,
+            "max": 13.504000663757324
+          },
+          "download_us": {
+            "median": 14.0,
+            "p95": 19.0,
+            "max": 65.0
+          },
+          "execution_host_us": {
+            "median": 1774.5,
+            "p95": 2213.0,
+            "max": 2442.0
+          },
+          "kernel_us": {
+            "median": 1757.10400390625,
+            "p95": 2197.119873046875,
+            "max": 2422.97607421875
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 20.0,
+            "max": 21.0
+          },
+          "output_bytes": {
+            "median": 215040.0,
+            "p95": 215040.0,
+            "max": 215040.0
+          },
+          "total_us": {
+            "median": 1841.5,
+            "p95": 2279.0,
+            "max": 4035.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 261120000.0,
+            "p95": 381235200.0,
+            "max": 412569600.0
+          },
+          "upload_us": {
+            "median": 41.0,
+            "p95": 95.0,
+            "max": 1796.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 48.0,
+            "p95": 64.0,
+            "max": 66.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 8.064000129699707
+          },
+          "download_us": {
+            "median": 15.0,
+            "p95": 18.0,
+            "max": 22.0
+          },
+          "execution_host_us": {
+            "median": 1760.0,
+            "p95": 2103.0,
+            "max": 2257.0
+          },
+          "kernel_us": {
+            "median": 1742.239990234375,
+            "p95": 2083.135986328125,
+            "max": 2237.248046875
+          },
+          "max_expert_rows": {
+            "median": 21.0,
+            "p95": 23.0,
+            "max": 23.0
+          },
+          "output_bytes": {
+            "median": 256000.0,
+            "p95": 256000.0,
+            "max": 256000.0
+          },
+          "total_us": {
+            "median": 1857.0,
+            "p95": 2211.0,
+            "max": 2356.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 250675200.0,
+            "p95": 334233600.0,
+            "max": 344678400.0
+          },
+          "upload_us": {
+            "median": 80.5,
+            "p95": 105.0,
+            "max": 108.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 63.0,
+            "p95": 84.0,
+            "max": 86.0
+          },
+          "compact_us": {
+            "median": 8.031999588012695,
+            "p95": 13.151999473571777,
+            "max": 16.31999969482422
+          },
+          "download_us": {
+            "median": 17.0,
+            "p95": 22.0,
+            "max": 108.0
+          },
+          "execution_host_us": {
+            "median": 2138.5,
+            "p95": 2433.0,
+            "max": 2634.0
+          },
+          "kernel_us": {
+            "median": 2122.47998046875,
+            "p95": 2409.823974609375,
+            "max": 2612.5439453125
+          },
+          "max_expert_rows": {
+            "median": 14.0,
+            "p95": 22.0,
+            "max": 25.0
+          },
+          "output_bytes": {
+            "median": 266240.0,
+            "p95": 266240.0,
+            "max": 266240.0
+          },
+          "total_us": {
+            "median": 2212.0,
+            "p95": 2533.0,
+            "max": 2738.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 329011200.0,
+            "p95": 438681600.0,
+            "max": 449126400.0
+          },
+          "upload_us": {
+            "median": 44.0,
+            "p95": 105.0,
+            "max": 131.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 69.5,
+            "p95": 96.0,
+            "max": 102.0
+          },
+          "compact_us": {
+            "median": 10.079999923706055,
+            "p95": 15.263999938964844,
+            "max": 21.40799903869629
+          },
+          "download_us": {
+            "median": 18.0,
+            "p95": 23.0,
+            "max": 25.0
+          },
+          "execution_host_us": {
+            "median": 2375.0,
+            "p95": 2915.0,
+            "max": 3353.0
+          },
+          "kernel_us": {
+            "median": 2356.6400146484375,
+            "p95": 2891.0400390625,
+            "max": 3329.535888671875
+          },
+          "max_expert_rows": {
+            "median": 24.0,
+            "p95": 33.0,
+            "max": 35.0
+          },
+          "output_bytes": {
+            "median": 378880.0,
+            "p95": 378880.0,
+            "max": 378880.0
+          },
+          "total_us": {
+            "median": 2465.0,
+            "p95": 2998.0,
+            "max": 4913.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 362956800.0,
+            "p95": 501350400.0,
+            "max": 532684800.0
+          },
+          "upload_us": {
+            "median": 44.0,
+            "p95": 105.0,
+            "max": 2130.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 83.0,
+            "p95": 113.0,
+            "max": 126.0
+          },
+          "compact_us": {
+            "median": 14.175999641418457,
+            "p95": 19.168001174926758,
+            "max": 20.31999969482422
+          },
+          "download_us": {
+            "median": 19.0,
+            "p95": 21.0,
+            "max": 25.0
+          },
+          "execution_host_us": {
+            "median": 2712.0,
+            "p95": 3375.0,
+            "max": 3558.0
+          },
+          "kernel_us": {
+            "median": 2690.5440673828125,
+            "p95": 3351.10400390625,
+            "max": 3531.552001953125
+          },
+          "max_expert_rows": {
+            "median": 26.0,
+            "p95": 38.0,
+            "max": 40.0
+          },
+          "output_bytes": {
+            "median": 430080.0,
+            "p95": 430080.0,
+            "max": 430080.0
+          },
+          "total_us": {
+            "median": 2794.5,
+            "p95": 3441.0,
+            "max": 5250.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 433459200.0,
+            "p95": 590131200.0,
+            "max": 658022400.0
+          },
+          "upload_us": {
+            "median": 45.0,
+            "p95": 113.0,
+            "max": 1732.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "gpu_and_staging",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "active_experts": {
+            "median": 86.0,
+            "p95": 109.0,
+            "max": 158.0
+          },
+          "compact_us": {
+            "median": 24.528000831604004,
+            "p95": 31.58399772644043,
+            "max": 44.86399841308594
+          },
+          "download_us": {
+            "median": 28.0,
+            "p95": 33.0,
+            "max": 120.0
+          },
+          "execution_host_us": {
+            "median": 3170.5,
+            "p95": 3733.0,
+            "max": 4807.0
+          },
+          "kernel_us": {
+            "median": 3134.800048828125,
+            "p95": 3691.584228515625,
+            "max": 4758.11181640625
+          },
+          "max_expert_rows": {
+            "median": 38.0,
+            "p95": 63.0,
+            "max": 80.0
+          },
+          "output_bytes": {
+            "median": 819200.0,
+            "p95": 819200.0,
+            "max": 819200.0
+          },
+          "total_us": {
+            "median": 3316.0,
+            "p95": 3911.0,
+            "max": 6799.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 449126400.0,
+            "p95": 569241600.0,
+            "max": 825139200.0
+          },
+          "upload_us": {
+            "median": 85.0,
+            "p95": 212.0,
+            "max": 2453.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.563,
+            "p95": 0.926,
+            "max": 1.487
+          },
+          "request_wire_bytes": {
+            "median": 10448.0,
+            "p95": 10448.0,
+            "max": 10448.0
+          },
+          "response_wire_bytes": {
+            "median": 10340.0,
+            "p95": 10340.0,
+            "max": 10340.0
+          },
+          "write_ms": {
+            "median": 0.026,
+            "p95": 0.055,
+            "max": 0.159
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.862,
+            "p95": 1.531,
+            "max": 2.001
+          },
+          "request_wire_bytes": {
+            "median": 31152.0,
+            "p95": 31152.0,
+            "max": 31152.0
+          },
+          "response_wire_bytes": {
+            "median": 30828.0,
+            "p95": 30828.0,
+            "max": 30828.0
+          },
+          "write_ms": {
+            "median": 0.032,
+            "p95": 0.106,
+            "max": 0.126
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "execute_ms": {
+            "median": 1.0175,
+            "p95": 1.465,
+            "max": 2.068
+          },
+          "request_wire_bytes": {
+            "median": 62208.0,
+            "p95": 62208.0,
+            "max": 62208.0
+          },
+          "response_wire_bytes": {
+            "median": 61560.0,
+            "p95": 61560.0,
+            "max": 61560.0
+          },
+          "write_ms": {
+            "median": 0.03,
+            "p95": 0.103,
+            "max": 0.226
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 1.7565,
+            "p95": 2.024,
+            "max": 2.332
+          },
+          "request_wire_bytes": {
+            "median": 134672.0,
+            "p95": 134672.0,
+            "max": 134672.0
+          },
+          "response_wire_bytes": {
+            "median": 133268.0,
+            "p95": 133268.0,
+            "max": 133268.0
+          },
+          "write_ms": {
+            "median": 0.051000000000000004,
+            "p95": 0.199,
+            "max": 0.237
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.1685,
+            "p95": 2.732,
+            "max": 4.663
+          },
+          "request_wire_bytes": {
+            "median": 186432.0,
+            "p95": 186432.0,
+            "max": 186432.0
+          },
+          "response_wire_bytes": {
+            "median": 184488.0,
+            "p95": 184488.0,
+            "max": 184488.0
+          },
+          "write_ms": {
+            "median": 0.0715,
+            "p95": 0.187,
+            "max": 0.207
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.2110000000000003,
+            "p95": 2.792,
+            "max": 3.028
+          },
+          "request_wire_bytes": {
+            "median": 207136.0,
+            "p95": 207136.0,
+            "max": 207136.0
+          },
+          "response_wire_bytes": {
+            "median": 204976.0,
+            "p95": 204976.0,
+            "max": 204976.0
+          },
+          "write_ms": {
+            "median": 0.138,
+            "p95": 0.213,
+            "max": 0.259
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.3600000000000003,
+            "p95": 2.868,
+            "max": 4.52
+          },
+          "request_wire_bytes": {
+            "median": 217488.0,
+            "p95": 217488.0,
+            "max": 217488.0
+          },
+          "response_wire_bytes": {
+            "median": 215220.0,
+            "p95": 215220.0,
+            "max": 215220.0
+          },
+          "write_ms": {
+            "median": 0.0745,
+            "p95": 0.207,
+            "max": 0.263
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.566,
+            "p95": 3.224,
+            "max": 3.608
+          },
+          "request_wire_bytes": {
+            "median": 258896.0,
+            "p95": 258896.0,
+            "max": 258896.0
+          },
+          "response_wire_bytes": {
+            "median": 256196.0,
+            "p95": 256196.0,
+            "max": 256196.0
+          },
+          "write_ms": {
+            "median": 0.213,
+            "p95": 0.354,
+            "max": 0.38
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.6215,
+            "p95": 3.283,
+            "max": 3.68
+          },
+          "request_wire_bytes": {
+            "median": 269248.0,
+            "p95": 269248.0,
+            "max": 269248.0
+          },
+          "response_wire_bytes": {
+            "median": 266440.0,
+            "p95": 266440.0,
+            "max": 266440.0
+          },
+          "write_ms": {
+            "median": 0.089,
+            "p95": 0.208,
+            "max": 0.245
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.9219999999999997,
+            "p95": 3.632,
+            "max": 5.469
+          },
+          "request_wire_bytes": {
+            "median": 383120.0,
+            "p95": 383120.0,
+            "max": 383120.0
+          },
+          "response_wire_bytes": {
+            "median": 379124.0,
+            "p95": 379124.0,
+            "max": 379124.0
+          },
+          "write_ms": {
+            "median": 0.084,
+            "p95": 0.279,
+            "max": 0.336
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.098,
+            "p95": 3.922,
+            "max": 5.727
+          },
+          "request_wire_bytes": {
+            "median": 434880.0,
+            "p95": 434880.0,
+            "max": 434880.0
+          },
+          "response_wire_bytes": {
+            "median": 430344.0,
+            "p95": 430344.0,
+            "max": 430344.0
+          },
+          "write_ms": {
+            "median": 0.077,
+            "p95": 0.106,
+            "max": 0.175
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-kiwi.log",
+        "kind": "server_boundary",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.907,
+            "p95": 4.826,
+            "max": 7.364
+          },
+          "request_wire_bytes": {
+            "median": 828256.0,
+            "p95": 828256.0,
+            "max": 828256.0
+          },
+          "response_wire_bytes": {
+            "median": 819616.0,
+            "p95": 819616.0,
+            "max": 819616.0
+          },
+          "write_ms": {
+            "median": 0.278,
+            "p95": 0.518,
+            "max": 0.685
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "active_experts": {
+            "median": 6.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "compact_us": {
+            "median": 3.936000108718872,
+            "p95": 3.936000108718872,
+            "max": 31.552001953125
+          },
+          "download_us": {
+            "median": 10.0,
+            "p95": 18.0,
+            "max": 61.0
+          },
+          "execution_host_us": {
+            "median": 248.0,
+            "p95": 273.0,
+            "max": 583.0
+          },
+          "kernel_us": {
+            "median": 237.31199645996094,
+            "p95": 256.4800109863281,
+            "max": 572.3839721679688
+          },
+          "max_expert_rows": {
+            "median": 1.0,
+            "p95": 1.0,
+            "max": 1.0
+          },
+          "output_bytes": {
+            "median": 10240.0,
+            "p95": 10240.0,
+            "max": 10240.0
+          },
+          "total_us": {
+            "median": 283.0,
+            "p95": 339.0,
+            "max": 648.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 31334400.0,
+            "p95": 31334400.0,
+            "max": 31334400.0
+          },
+          "upload_us": {
+            "median": 25.0,
+            "p95": 47.0,
+            "max": 191.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "compact_us": {
+            "median": 3.9039998054504395,
+            "p95": 3.936000108718872,
+            "max": 4.447999954223633
+          },
+          "download_us": {
+            "median": 12.0,
+            "p95": 19.0,
+            "max": 25.0
+          },
+          "execution_host_us": {
+            "median": 533.0,
+            "p95": 580.0,
+            "max": 610.0
+          },
+          "kernel_us": {
+            "median": 521.343994140625,
+            "p95": 562.719970703125,
+            "max": 591.552001953125
+          },
+          "max_expert_rows": {
+            "median": 2.0,
+            "p95": 3.0,
+            "max": 3.0
+          },
+          "output_bytes": {
+            "median": 30720.0,
+            "p95": 30720.0,
+            "max": 30720.0
+          },
+          "total_us": {
+            "median": 582.5,
+            "p95": 656.0,
+            "max": 690.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 78336000.0,
+            "p95": 88780800.0,
+            "max": 94003200.0
+          },
+          "upload_us": {
+            "median": 39.0,
+            "p95": 62.0,
+            "max": 99.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "active_experts": {
+            "median": 22.0,
+            "p95": 29.0,
+            "max": 35.0
+          },
+          "compact_us": {
+            "median": 3.936000108718872,
+            "p95": 3.9679999351501465,
+            "max": 28.86400032043457
+          },
+          "download_us": {
+            "median": 11.0,
+            "p95": 17.0,
+            "max": 79.0
+          },
+          "execution_host_us": {
+            "median": 650.0,
+            "p95": 930.0,
+            "max": 1137.0
+          },
+          "kernel_us": {
+            "median": 637.0240173339844,
+            "p95": 915.2000122070312,
+            "max": 1126.528076171875
+          },
+          "max_expert_rows": {
+            "median": 5.0,
+            "p95": 6.0,
+            "max": 6.0
+          },
+          "output_bytes": {
+            "median": 61440.0,
+            "p95": 61440.0,
+            "max": 61440.0
+          },
+          "total_us": {
+            "median": 702.0,
+            "p95": 987.0,
+            "max": 1184.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 114892800.0,
+            "p95": 151449600.0,
+            "max": 182784000.0
+          },
+          "upload_us": {
+            "median": 34.0,
+            "p95": 67.0,
+            "max": 95.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 36.5,
+            "p95": 49.0,
+            "max": 53.0
+          },
+          "compact_us": {
+            "median": 5.952000141143799,
+            "p95": 5.983999729156494,
+            "max": 5.983999729156494
+          },
+          "download_us": {
+            "median": 15.5,
+            "p95": 17.0,
+            "max": 20.0
+          },
+          "execution_host_us": {
+            "median": 1281.0,
+            "p95": 1488.0,
+            "max": 1691.0
+          },
+          "kernel_us": {
+            "median": 1263.3759765625,
+            "p95": 1475.0399169921875,
+            "max": 1677.50390625
+          },
+          "max_expert_rows": {
+            "median": 9.0,
+            "p95": 12.0,
+            "max": 13.0
+          },
+          "output_bytes": {
+            "median": 133120.0,
+            "p95": 133120.0,
+            "max": 133120.0
+          },
+          "total_us": {
+            "median": 1361.5,
+            "p95": 1592.0,
+            "max": 1736.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 190617600.0,
+            "p95": 255897600.0,
+            "max": 276787200.0
+          },
+          "upload_us": {
+            "median": 52.5,
+            "p95": 79.0,
+            "max": 106.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 44.0,
+            "p95": 62.0,
+            "max": 71.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 23.263999938964844
+          },
+          "download_us": {
+            "median": 13.0,
+            "p95": 18.0,
+            "max": 27.0
+          },
+          "execution_host_us": {
+            "median": 1607.5,
+            "p95": 2004.0,
+            "max": 2483.0
+          },
+          "kernel_us": {
+            "median": 1587.7119750976562,
+            "p95": 1985.407958984375,
+            "max": 2449.152099609375
+          },
+          "max_expert_rows": {
+            "median": 13.5,
+            "p95": 17.0,
+            "max": 18.0
+          },
+          "output_bytes": {
+            "median": 184320.0,
+            "p95": 184320.0,
+            "max": 184320.0
+          },
+          "total_us": {
+            "median": 1684.5,
+            "p95": 2095.0,
+            "max": 4383.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 229785600.0,
+            "p95": 323788800.0,
+            "max": 370790400.0
+          },
+          "upload_us": {
+            "median": 38.0,
+            "p95": 87.0,
+            "max": 1882.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 47.0,
+            "p95": 64.0,
+            "max": 68.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 15.199999809265137
+          },
+          "download_us": {
+            "median": 18.0,
+            "p95": 19.0,
+            "max": 39.0
+          },
+          "execution_host_us": {
+            "median": 1664.5,
+            "p95": 2107.0,
+            "max": 2230.0
+          },
+          "kernel_us": {
+            "median": 1646.0479736328125,
+            "p95": 2084.800048828125,
+            "max": 2206.14404296875
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 17.0,
+            "max": 19.0
+          },
+          "output_bytes": {
+            "median": 204800.0,
+            "p95": 204800.0,
+            "max": 204800.0
+          },
+          "total_us": {
+            "median": 1757.5,
+            "p95": 2222.0,
+            "max": 2424.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 245452800.0,
+            "p95": 334233600.0,
+            "max": 355123200.0
+          },
+          "upload_us": {
+            "median": 70.0,
+            "p95": 93.0,
+            "max": 173.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "active_experts": {
+            "median": 50.0,
+            "p95": 73.0,
+            "max": 79.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.383999824523926,
+            "max": 11.104000091552734
+          },
+          "download_us": {
+            "median": 13.5,
+            "p95": 19.0,
+            "max": 72.0
+          },
+          "execution_host_us": {
+            "median": 1779.0,
+            "p95": 2216.0,
+            "max": 2456.0
+          },
+          "kernel_us": {
+            "median": 1765.16796875,
+            "p95": 2198.14404296875,
+            "max": 2438.8798828125
+          },
+          "max_expert_rows": {
+            "median": 15.0,
+            "p95": 20.0,
+            "max": 21.0
+          },
+          "output_bytes": {
+            "median": 215040.0,
+            "p95": 215040.0,
+            "max": 215040.0
+          },
+          "total_us": {
+            "median": 1841.0,
+            "p95": 2273.0,
+            "max": 4381.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 261120000.0,
+            "p95": 381235200.0,
+            "max": 412569600.0
+          },
+          "upload_us": {
+            "median": 38.0,
+            "p95": 91.0,
+            "max": 2144.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 48.0,
+            "p95": 64.0,
+            "max": 66.0
+          },
+          "compact_us": {
+            "median": 5.983999729156494,
+            "p95": 8.031999588012695,
+            "max": 9.055999755859375
+          },
+          "download_us": {
+            "median": 16.0,
+            "p95": 21.0,
+            "max": 22.0
+          },
+          "execution_host_us": {
+            "median": 1767.0,
+            "p95": 2094.0,
+            "max": 2269.0
+          },
+          "kernel_us": {
+            "median": 1753.31201171875,
+            "p95": 2075.2958984375,
+            "max": 2254.431884765625
+          },
+          "max_expert_rows": {
+            "median": 21.0,
+            "p95": 23.0,
+            "max": 23.0
+          },
+          "output_bytes": {
+            "median": 256000.0,
+            "p95": 256000.0,
+            "max": 256000.0
+          },
+          "total_us": {
+            "median": 1836.0,
+            "p95": 2175.0,
+            "max": 2333.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 250675200.0,
+            "p95": 334233600.0,
+            "max": 344678400.0
+          },
+          "upload_us": {
+            "median": 39.0,
+            "p95": 84.0,
+            "max": 109.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 63.0,
+            "p95": 84.0,
+            "max": 86.0
+          },
+          "compact_us": {
+            "median": 8.031999588012695,
+            "p95": 12.095999717712402,
+            "max": 28.831998825073242
+          },
+          "download_us": {
+            "median": 17.0,
+            "p95": 22.0,
+            "max": 24.0
+          },
+          "execution_host_us": {
+            "median": 2142.0,
+            "p95": 2411.0,
+            "max": 2567.0
+          },
+          "kernel_us": {
+            "median": 2122.9759521484375,
+            "p95": 2390.11181640625,
+            "max": 2546.816162109375
+          },
+          "max_expert_rows": {
+            "median": 14.0,
+            "p95": 22.0,
+            "max": 25.0
+          },
+          "output_bytes": {
+            "median": 266240.0,
+            "p95": 266240.0,
+            "max": 266240.0
+          },
+          "total_us": {
+            "median": 2220.5,
+            "p95": 2509.0,
+            "max": 2666.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 329011200.0,
+            "p95": 438681600.0,
+            "max": 449126400.0
+          },
+          "upload_us": {
+            "median": 70.5,
+            "p95": 104.0,
+            "max": 132.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "active_experts": {
+            "median": 69.5,
+            "p95": 96.0,
+            "max": 102.0
+          },
+          "compact_us": {
+            "median": 10.111999988555908,
+            "p95": 15.231999397277832,
+            "max": 17.24799919128418
+          },
+          "download_us": {
+            "median": 21.0,
+            "p95": 25.0,
+            "max": 29.0
+          },
+          "execution_host_us": {
+            "median": 2372.5,
+            "p95": 2965.0,
+            "max": 3200.0
+          },
+          "kernel_us": {
+            "median": 2352.176025390625,
+            "p95": 2937.98388671875,
+            "max": 3173.02392578125
+          },
+          "max_expert_rows": {
+            "median": 24.0,
+            "p95": 33.0,
+            "max": 35.0
+          },
+          "output_bytes": {
+            "median": 378880.0,
+            "p95": 378880.0,
+            "max": 378880.0
+          },
+          "total_us": {
+            "median": 2480.0,
+            "p95": 3099.0,
+            "max": 5033.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 362956800.0,
+            "p95": 501350400.0,
+            "max": 532684800.0
+          },
+          "upload_us": {
+            "median": 98.5,
+            "p95": 126.0,
+            "max": 2262.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "active_experts": {
+            "median": 83.0,
+            "p95": 113.0,
+            "max": 126.0
+          },
+          "compact_us": {
+            "median": 14.175999641418457,
+            "p95": 18.27199935913086,
+            "max": 21.312000274658203
+          },
+          "download_us": {
+            "median": 22.5,
+            "p95": 28.0,
+            "max": 40.0
+          },
+          "execution_host_us": {
+            "median": 2725.5,
+            "p95": 3440.0,
+            "max": 3548.0
+          },
+          "kernel_us": {
+            "median": 2699.9681396484375,
+            "p95": 3408.19189453125,
+            "max": 3513.823974609375
+          },
+          "max_expert_rows": {
+            "median": 26.0,
+            "p95": 38.0,
+            "max": 40.0
+          },
+          "output_bytes": {
+            "median": 430080.0,
+            "p95": 430080.0,
+            "max": 430080.0
+          },
+          "total_us": {
+            "median": 2854.0,
+            "p95": 3577.0,
+            "max": 5827.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 433459200.0,
+            "p95": 590131200.0,
+            "max": 658022400.0
+          },
+          "upload_us": {
+            "median": 65.0,
+            "p95": 154.0,
+            "max": 2282.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "gpu_and_staging",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "active_experts": {
+            "median": 86.0,
+            "p95": 109.0,
+            "max": 158.0
+          },
+          "compact_us": {
+            "median": 25.375999450683594,
+            "p95": 31.58399772644043,
+            "max": 61.95199966430664
+          },
+          "download_us": {
+            "median": 30.0,
+            "p95": 34.0,
+            "max": 176.0
+          },
+          "execution_host_us": {
+            "median": 3178.0,
+            "p95": 3756.0,
+            "max": 4828.0
+          },
+          "kernel_us": {
+            "median": 3142.8319091796875,
+            "p95": 3711.776123046875,
+            "max": 4783.74365234375
+          },
+          "max_expert_rows": {
+            "median": 38.0,
+            "p95": 63.0,
+            "max": 80.0
+          },
+          "output_bytes": {
+            "median": 819200.0,
+            "p95": 819200.0,
+            "max": 819200.0
+          },
+          "total_us": {
+            "median": 3309.0,
+            "p95": 3928.0,
+            "max": 6646.0
+          },
+          "unique_expert_weight_bytes": {
+            "median": 449126400.0,
+            "p95": 569241600.0,
+            "max": 825139200.0
+          },
+          "upload_us": {
+            "median": 79.0,
+            "p95": 212.0,
+            "max": 2310.0
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 1,
+        "samples": 10560,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.574,
+            "p95": 0.956,
+            "max": 2.022
+          },
+          "request_wire_bytes": {
+            "median": 10448.0,
+            "p95": 10448.0,
+            "max": 10448.0
+          },
+          "response_wire_bytes": {
+            "median": 10340.0,
+            "p95": 10340.0,
+            "max": 10340.0
+          },
+          "write_ms": {
+            "median": 0.029,
+            "p95": 0.1,
+            "max": 0.172
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 3,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.861,
+            "p95": 1.31,
+            "max": 1.406
+          },
+          "request_wire_bytes": {
+            "median": 31152.0,
+            "p95": 31152.0,
+            "max": 31152.0
+          },
+          "response_wire_bytes": {
+            "median": 30828.0,
+            "p95": 30828.0,
+            "max": 30828.0
+          },
+          "write_ms": {
+            "median": 0.029,
+            "p95": 0.097,
+            "max": 0.153
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 6,
+        "samples": 2440,
+        "metrics": {
+          "execute_ms": {
+            "median": 0.9844999999999999,
+            "p95": 1.496,
+            "max": 2.309
+          },
+          "request_wire_bytes": {
+            "median": 62208.0,
+            "p95": 62208.0,
+            "max": 62208.0
+          },
+          "response_wire_bytes": {
+            "median": 61560.0,
+            "p95": 61560.0,
+            "max": 61560.0
+          },
+          "write_ms": {
+            "median": 0.029,
+            "p95": 0.133,
+            "max": 0.234
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 13,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 1.9315,
+            "p95": 2.34,
+            "max": 2.48
+          },
+          "request_wire_bytes": {
+            "median": 134672.0,
+            "p95": 134672.0,
+            "max": 134672.0
+          },
+          "response_wire_bytes": {
+            "median": 133268.0,
+            "p95": 133268.0,
+            "max": 133268.0
+          },
+          "write_ms": {
+            "median": 0.057,
+            "p95": 0.169,
+            "max": 0.189
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 18,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.1580000000000004,
+            "p95": 2.879,
+            "max": 5.155
+          },
+          "request_wire_bytes": {
+            "median": 186432.0,
+            "p95": 186432.0,
+            "max": 186432.0
+          },
+          "response_wire_bytes": {
+            "median": 184488.0,
+            "p95": 184488.0,
+            "max": 184488.0
+          },
+          "write_ms": {
+            "median": 0.063,
+            "p95": 0.178,
+            "max": 0.272
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 20,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.307,
+            "p95": 2.936,
+            "max": 3.133
+          },
+          "request_wire_bytes": {
+            "median": 207136.0,
+            "p95": 207136.0,
+            "max": 207136.0
+          },
+          "response_wire_bytes": {
+            "median": 204976.0,
+            "p95": 204976.0,
+            "max": 204976.0
+          },
+          "write_ms": {
+            "median": 0.111,
+            "p95": 0.208,
+            "max": 0.264
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 21,
+        "samples": 320,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.2430000000000003,
+            "p95": 2.823,
+            "max": 4.673
+          },
+          "request_wire_bytes": {
+            "median": 217488.0,
+            "p95": 217488.0,
+            "max": 217488.0
+          },
+          "response_wire_bytes": {
+            "median": 215220.0,
+            "p95": 215220.0,
+            "max": 215220.0
+          },
+          "write_ms": {
+            "median": 0.064,
+            "p95": 0.203,
+            "max": 0.234
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 25,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.316,
+            "p95": 2.757,
+            "max": 3.298
+          },
+          "request_wire_bytes": {
+            "median": 258896.0,
+            "p95": 258896.0,
+            "max": 258896.0
+          },
+          "response_wire_bytes": {
+            "median": 256196.0,
+            "p95": 256196.0,
+            "max": 256196.0
+          },
+          "write_ms": {
+            "median": 0.067,
+            "p95": 0.089,
+            "max": 0.102
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 26,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 2.658,
+            "p95": 3.09,
+            "max": 3.271
+          },
+          "request_wire_bytes": {
+            "median": 269248.0,
+            "p95": 269248.0,
+            "max": 269248.0
+          },
+          "response_wire_bytes": {
+            "median": 266440.0,
+            "p95": 266440.0,
+            "max": 266440.0
+          },
+          "write_ms": {
+            "median": 0.163,
+            "p95": 0.34,
+            "max": 0.346
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 37,
+        "samples": 160,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.0540000000000003,
+            "p95": 3.889,
+            "max": 5.907
+          },
+          "request_wire_bytes": {
+            "median": 383120.0,
+            "p95": 383120.0,
+            "max": 383120.0
+          },
+          "response_wire_bytes": {
+            "median": 379124.0,
+            "p95": 379124.0,
+            "max": 379124.0
+          },
+          "write_ms": {
+            "median": 0.237,
+            "p95": 0.361,
+            "max": 0.423
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 42,
+        "samples": 80,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.4210000000000003,
+            "p95": 4.259,
+            "max": 6.569
+          },
+          "request_wire_bytes": {
+            "median": 434880.0,
+            "p95": 434880.0,
+            "max": 434880.0
+          },
+          "response_wire_bytes": {
+            "median": 430344.0,
+            "p95": 430344.0,
+            "max": 430344.0
+          },
+          "write_ms": {
+            "median": 0.2465,
+            "p95": 0.389,
+            "max": 0.416
+          }
+        }
+      },
+      {
+        "source": "/tmp/ds41-decode-ostrich.log",
+        "kind": "server_boundary",
+        "rows": 80,
+        "samples": 1360,
+        "metrics": {
+          "execute_ms": {
+            "median": 3.7960000000000003,
+            "p95": 4.626,
+            "max": 6.931
+          },
+          "request_wire_bytes": {
+            "median": 828256.0,
+            "p95": 828256.0,
+            "max": 828256.0
+          },
+          "response_wire_bytes": {
+            "median": 819616.0,
+            "p95": 819616.0,
+            "max": 819616.0
+          },
+          "write_ms": {
+            "median": 0.158,
+            "p95": 0.472,
+            "max": 0.595
+          }
+        }
+      }
+    ]
+  },
+  "api": {
+    "target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-1bf1a92f-d3e0-4d48-ba51-78cc7fd90a41",
+        "object": "chat.completion",
+        "created": 1789111831,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.20384582900442183,
+          "finish_seconds": 5.277645463007502,
+          "observed_decode_tokens_per_second": 11.431275214594882,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.2054069829173386,
+          "finish_seconds": 5.401675078901462,
+          "observed_decode_tokens_per_second": 11.161856726527377,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.19820429396349937,
+          "finish_seconds": 5.1759380489820614,
+          "observed_decode_tokens_per_second": 11.651888761933938,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.17392203398048878,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-92d87185-e968-4218-b89e-704db8abd222",
+        "object": "chat.completion",
+        "created": 1789111848,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-f39e5e27-7255-4d2c-bd2f-62641c4d11d2",
+        "object": "chat.completion",
+        "created": 1789111898,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.20019695803057402,
+          "finish_seconds": 1.4322872679913417,
+          "observed_decode_tokens_per_second": 47.07447135254789,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.202427688986063,
+          "finish_seconds": 1.4151951470412314,
+          "observed_decode_tokens_per_second": 47.82450222816055,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.19901901006232947,
+          "finish_seconds": 1.4175257791066542,
+          "observed_decode_tokens_per_second": 47.59924316669116,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.1861564189894125,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-b41dd3cc-3d92-493f-ad44-d515d90b226d",
+        "object": "chat.completion",
+        "created": 1789111903,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    }
+  },
+  "quality_before": {
+    "scope": "Eight paired single-client greedy cases. Six objective checks and two open-ended comparisons; not broad model quality, stochastic equivalence or release performance.",
+    "cases": [
+      {
+        "case": {
+          "name": "arithmetic",
+          "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+          "expected": "575"
+        },
+        "runs": {
+          "target": {
+            "text": "575",
+            "first_content_seconds": 0.2196651380509138,
+            "finish_seconds": 0.33586930099409074,
+            "observed_decode_tokens_per_second": 8.60554367995399,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "575",
+            "first_content_seconds": 0.19973135797772557,
+            "finish_seconds": 0.339379113051109,
+            "observed_decode_tokens_per_second": 7.160874154221172,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "signed_sort",
+          "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+          "expected_json": [
+            -11,
+            -4,
+            0,
+            7,
+            7,
+            12
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.24998769105877727,
+            "finish_seconds": 1.8873862370382994,
+            "observed_decode_tokens_per_second": 10.99304750465139,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.23547474399674684,
+            "finish_seconds": 0.8396053330507129,
+            "observed_decode_tokens_per_second": 29.794882639839457,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "extraction",
+          "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+          "expected_json": {
+            "total": 40,
+            "names": [
+              "Alice",
+              "Bob"
+            ]
+          }
+        },
+        "runs": {
+          "target": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.2630604750011116,
+            "finish_seconds": 1.8499926540534943,
+            "observed_decode_tokens_per_second": 10.082346436225274,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.27206319791730493,
+            "finish_seconds": 0.8305973559617996,
+            "observed_decode_tokens_per_second": 28.646412702883225,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "logic",
+          "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+          "expected_json": [
+            "D",
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.2567631669808179,
+            "finish_seconds": 1.463158946018666,
+            "observed_decode_tokens_per_second": 9.946984404712117,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.26101570401806384,
+            "finish_seconds": 0.531948114046827,
+            "observed_decode_tokens_per_second": 44.291489522150705,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "unicode",
+          "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+          "expected": "36"
+        },
+        "runs": {
+          "target": {
+            "text": "36",
+            "first_content_seconds": 0.21583000803366303,
+            "finish_seconds": 0.33715597505215555,
+            "observed_decode_tokens_per_second": 8.242258640704508,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "36",
+            "first_content_seconds": 0.2101706169778481,
+            "finish_seconds": 0.3622776250122115,
+            "observed_decode_tokens_per_second": 6.57431904632615,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "translation",
+          "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+        },
+        "runs": {
+          "target": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.21273230505175889,
+            "finish_seconds": 0.9063403860200197,
+            "observed_decode_tokens_per_second": 10.092154621711101,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.20678026601672173,
+            "finish_seconds": 0.60394833504688,
+            "observed_decode_tokens_per_second": 17.624780403654423,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "explanation",
+          "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+        },
+        "runs": {
+          "target": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+            "first_content_seconds": 0.2281111739575863,
+            "finish_seconds": 2.9986052939202636,
+            "observed_decode_tokens_per_second": 10.106500424688576,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 29,
+              "total_tokens": 55,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+            "first_content_seconds": 0.22298207005951554,
+            "finish_seconds": 1.7491306429728866,
+            "observed_decode_tokens_per_second": 18.34683758642768,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 29,
+              "total_tokens": 55,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "long_retrieval",
+          "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+          "expected": "quartz-731"
+        },
+        "runs": {
+          "target": {
+            "text": "quartz-731",
+            "first_content_seconds": 5.807623795000836,
+            "finish_seconds": 6.424890091991983,
+            "observed_decode_tokens_per_second": 6.4801853260058495,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "quartz-731",
+            "first_content_seconds": 5.5084107290022075,
+            "finish_seconds": 5.701103747007437,
+            "observed_decode_tokens_per_second": 20.75840651315889,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      }
+    ]
+  },
+  "quality_after": {
+    "scope": "Eight paired single-client greedy cases. Six objective checks and two open-ended comparisons; not broad model quality, stochastic equivalence or release performance.",
+    "cases": [
+      {
+        "case": {
+          "name": "arithmetic",
+          "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+          "expected": "575"
+        },
+        "runs": {
+          "target": {
+            "text": "575",
+            "first_content_seconds": 0.21663096104748547,
+            "finish_seconds": 0.329486945993267,
+            "observed_decode_tokens_per_second": 8.860850405766444,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "575",
+            "first_content_seconds": 0.20350164198316634,
+            "finish_seconds": 0.34992552490439266,
+            "observed_decode_tokens_per_second": 6.82948696653526,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "signed_sort",
+          "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+          "expected_json": [
+            -11,
+            -4,
+            0,
+            7,
+            7,
+            12
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.2554444979177788,
+            "finish_seconds": 1.881371755967848,
+            "observed_decode_tokens_per_second": 11.070605964000453,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.23754747700877488,
+            "finish_seconds": 0.8549716729903594,
+            "observed_decode_tokens_per_second": 29.153376426046112,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "extraction",
+          "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+          "expected_json": {
+            "total": 40,
+            "names": [
+              "Alice",
+              "Bob"
+            ]
+          }
+        },
+        "runs": {
+          "target": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.2634213080164045,
+            "finish_seconds": 1.733606807072647,
+            "observed_decode_tokens_per_second": 10.882980420002031,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.25531768694054335,
+            "finish_seconds": 0.7633417890174314,
+            "observed_decode_tokens_per_second": 31.494568731265517,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "logic",
+          "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+          "expected_json": [
+            "D",
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.24508000002242625,
+            "finish_seconds": 1.2971527610206977,
+            "observed_decode_tokens_per_second": 11.406055212962325,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.2592030930100009,
+            "finish_seconds": 0.5242551199626178,
+            "observed_decode_tokens_per_second": 45.27413028290189,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "unicode",
+          "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+          "expected": "36"
+        },
+        "runs": {
+          "target": {
+            "text": "36",
+            "first_content_seconds": 0.20613753993529826,
+            "finish_seconds": 0.3163647470064461,
+            "observed_decode_tokens_per_second": 9.07217035223014,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "36",
+            "first_content_seconds": 0.2212390509666875,
+            "finish_seconds": 0.3686713769566268,
+            "observed_decode_tokens_per_second": 6.782772999648935,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "translation",
+          "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+        },
+        "runs": {
+          "target": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.205925760907121,
+            "finish_seconds": 0.8266693030018359,
+            "observed_decode_tokens_per_second": 11.276798750701975,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.20711045304778963,
+            "finish_seconds": 0.6131721610436216,
+            "observed_decode_tokens_per_second": 17.238759188965073,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "explanation",
+          "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+        },
+        "runs": {
+          "target": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+            "first_content_seconds": 0.22219026100356132,
+            "finish_seconds": 2.6582878419430926,
+            "observed_decode_tokens_per_second": 11.493792456869162,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 29,
+              "total_tokens": 55,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. So your skin loses heat quickly to the metal, making it feel colder.",
+            "first_content_seconds": 0.21675633802078664,
+            "finish_seconds": 1.704921089927666,
+            "observed_decode_tokens_per_second": 18.8151210839538,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 29,
+              "total_tokens": 55,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "long_retrieval",
+          "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+          "expected": "quartz-731"
+        },
+        "runs": {
+          "target": {
+            "text": "quartz-731",
+            "first_content_seconds": 5.647390958969481,
+            "finish_seconds": 6.196076932945289,
+            "observed_decode_tokens_per_second": 7.29014443546969,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "quartz-731",
+            "first_content_seconds": 5.400541770970449,
+            "finish_seconds": 5.582899304921739,
+            "observed_decode_tokens_per_second": 21.93493141373831,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      }
+    ]
+  },
+  "owner_fixture_source": "mod v41_requests;\nmod v41_backbone_execution;\nmod v41_index_lane;\nmod v41_backbone_cache;\nmod v41_backbone_router;\nmod v41_backbone_lane;\nmod v41_backbone_shared;\nmod v41_shared_ffn;\nmod v41_layer_graphs;\nmod v41_engram;\nmod v41_block;\nmod v41_backbone_hc;\nmod v41_hc;\nmod v41_attention_binding;\nmod v41_attention_query;\nmod v41_attention_output;\nmod v41_window;\nmod v41_compressor;\nmod v41_index_query;\nmod v41_index_selection;\nmod v41_sparse_attention;\nmod v41_target_embedding;\nmod v41_memory;\nmod v41_tensors;\nmod v41_experts;\nmod v41_target_head;\nmod v41_target_pass;\nmod v41_dspark_cache;\nmod cli {\n    pub struct NativeExpertDaemonArgs {\n        pub native_lib: std::path::PathBuf, pub snapshot: std::path::PathBuf,\n        pub rank: u32, pub capacity: u32, pub device_budget_bytes: usize,\n        pub max_frame_bytes: usize, pub listen: String,\n    }\n}\nfn main() -> anyhow::Result<()> {\n use ds41rt_loader::{read_official_v41_catalog, OFFICIAL_V41_MODEL_ID};\n use ds41rt_ffi::{NativeLibrary, Ds41rtDeviceBuffer};\n use v41_experts::{ExpertWeights, ExpertLayer};\n use std::{path::Path,fs,time::Instant};\n let args: Vec<_> = std::env::args().collect();\n let lib=unsafe{NativeLibrary::load(&args[1])?};\n let catalog=read_official_v41_catalog(OFFICIAL_V41_MODEL_ID,Path::new(\"/model\"))?;\n let mut weights=Vec::new();\n for layer in [0,1] {\n  let geometry=ExpertLayer::Backbone{layer,rank:0};\n  weights.push(ExpertWeights::load(&lib,&catalog,geometry,12*1024*1024*1024)?);\n }\n let budget=weights[0].execution_budget(80)?;\n assert!(budget.decode_scratch_bytes>0);\n assert!(weights[0].execution(80,budget.total()?-1).is_err());\n let mut wave=weights[0].execution(80,budget.total()?)?;\n let p1=wave.route_partials(1)?.ptr;\n let p80=wave.route_partials(80)?.ptr;\n assert_ne!(p1,p80);\n let compact=lib.v41_compact_reducer()?;\n let mut output=lib.alloc_device_buffer(80*5120*2)?;\n for (visit,layer) in [0,1,0].into_iter().enumerate() {\n  wave.bind_layer(&weights[layer])?;\n  for case in 0..2 {\n   for (buffer,name) in wave.inputs().into_iter().zip([\"hidden\",\"ids\",\"routing\"]) {\n    lib.copy_h2d(buffer,&fs::read(format!(\"/inputs/{case}-{name}.bin\"))?)?;\n   }\n   for rows in [1,16,1,80,1] {\n    let start=Instant::now();\n    for _ in 0..10 {unsafe{wave.launch(rows,false)?;}}\n    wave.synchronize()?;\n    let us=start.elapsed().as_secs_f64()*1e6/10.;\n    assert_eq!(wave.route_partials(1)?.ptr,p1);\n    assert_eq!(wave.route_partials(80)?.ptr,p80);\n    let partials=wave.route_partials(rows)?;\n    let mut data=vec![0;partials.bytes];lib.copy_d2h(&mut data,partials)?;\n    fs::write(format!(\"/output/v{visit}-c{case}-m{rows}-routes.bin\"),data)?;\n    unsafe{compact.compact(partials.ptr.cast(),output.ptr.cast(),rows,wave.stream())?;}\n    wave.synchronize()?;\n    let out=Ds41rtDeviceBuffer{bytes:rows as usize*5120*2,..output};\n    let mut data=vec![0;out.bytes];lib.copy_d2h(&mut data,out)?;\n    fs::write(format!(\"/output/v{visit}-c{case}-m{rows}-compact.bin\"),data)?;\n    println!(\"{{\\\"visit\\\":{visit},\\\"case\\\":{case},\\\"rows\\\":{rows},\\\"host_launch_and_drain_us\\\":{us}}}\");\n   }\n  }\n }\n unsafe{wave.capture(1,false)?;}\n assert!(wave.bind_layer(&weights[1]).is_err());\n for case in 0..2 {\n  for (buffer,name) in wave.inputs().into_iter().zip([\"hidden\",\"ids\",\"routing\"]) {\n   lib.copy_h2d(buffer,&fs::read(format!(\"/inputs/{case}-{name}.bin\"))?)?;\n  }\n  unsafe{wave.replay()?;}\n  wave.synchronize()?;\n  let partials=wave.route_partials(1)?;\n  let mut data=vec![0;partials.bytes];lib.copy_d2h(&mut data,partials)?;\n  assert_eq!(data,fs::read(format!(\"/output/v2-c{case}-m1-routes.bin\"))?);\n }\n lib.free_device_buffer(&mut output)?;\n println!(\"PASS official layers, budget rejection, stable decode/prefill pointers, rebind and changed-input decode graph\");\n Ok(())\n}\n",
+  "owner_cargo_manifest": "[package]\nname=\"ds41-decode-owner\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[dependencies]\nanyhow=\"1\"\ntracing=\"0.1\"\nds41rt-core={path=\"/workspace/ds41rt/rust/crates/ds41rt-core\"}\nds41rt-loader={path=\"/workspace/ds41rt/rust/crates/ds41rt-loader\"}\nds41rt-ffi={path=\"/workspace/ds41rt/rust/crates/ds41rt-ffi\"}\nds41rt-transport={path=\"/workspace/ds41rt/rust/crates/ds41rt-transport\"}\nserde_json=\"1\"\n\ntokio={version=\"1\",features=[\"rt\",\"net\",\"time\"]}\n\ntracing-subscriber={version=\"0.3\",features=[\"env-filter\"]}\n",
+  "dispatch_observations": {
+    "ostrich": {
+      "samples": 15480,
+      "row_capacity_pairs": [
+        [
+          1,
+          1
+        ],
+        [
+          3,
+          80
+        ],
+        [
+          6,
+          80
+        ],
+        [
+          13,
+          80
+        ],
+        [
+          18,
+          80
+        ],
+        [
+          20,
+          80
+        ],
+        [
+          21,
+          80
+        ],
+        [
+          25,
+          80
+        ],
+        [
+          26,
+          80
+        ],
+        [
+          37,
+          80
+        ],
+        [
+          42,
+          80
+        ],
+        [
+          80,
+          80
+        ]
+      ]
+    },
+    "dodo": {
+      "samples": 15480,
+      "row_capacity_pairs": [
+        [
+          1,
+          1
+        ],
+        [
+          3,
+          80
+        ],
+        [
+          6,
+          80
+        ],
+        [
+          13,
+          80
+        ],
+        [
+          18,
+          80
+        ],
+        [
+          20,
+          80
+        ],
+        [
+          21,
+          80
+        ],
+        [
+          25,
+          80
+        ],
+        [
+          26,
+          80
+        ],
+        [
+          37,
+          80
+        ],
+        [
+          42,
+          80
+        ],
+        [
+          80,
+          80
+        ]
+      ]
+    },
+    "emu": {
+      "samples": 15480,
+      "row_capacity_pairs": [
+        [
+          1,
+          1
+        ],
+        [
+          3,
+          80
+        ],
+        [
+          6,
+          80
+        ],
+        [
+          13,
+          80
+        ],
+        [
+          18,
+          80
+        ],
+        [
+          20,
+          80
+        ],
+        [
+          21,
+          80
+        ],
+        [
+          25,
+          80
+        ],
+        [
+          26,
+          80
+        ],
+        [
+          37,
+          80
+        ],
+        [
+          42,
+          80
+        ],
+        [
+          80,
+          80
+        ]
+      ]
+    },
+    "kiwi": {
+      "samples": 15480,
+      "row_capacity_pairs": [
+        [
+          1,
+          1
+        ],
+        [
+          3,
+          80
+        ],
+        [
+          6,
+          80
+        ],
+        [
+          13,
+          80
+        ],
+        [
+          18,
+          80
+        ],
+        [
+          20,
+          80
+        ],
+        [
+          21,
+          80
+        ],
+        [
+          25,
+          80
+        ],
+        [
+          26,
+          80
+        ],
+        [
+          37,
+          80
+        ],
+        [
+          42,
+          80
+        ],
+        [
+          80,
+          80
+        ]
+      ]
+    }
+  },
+  "owner_logs": {
+    "baseline": "{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":407.93950000000007}\n{\"visit\":0,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1776.4064999999998}\n{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":381.84360000000004}\n{\"visit\":0,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4711.8796999999995}\n{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":382.9508}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":378.2291}\n{\"visit\":0,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1467.5246}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":378.3971}\n{\"visit\":0,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4438.943499999999}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":380.1716}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":378.60360000000003}\n{\"visit\":1,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1737.2833000000003}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":378.4467}\n{\"visit\":1,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4770.5629}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":379.258}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":381.6004}\n{\"visit\":1,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1476.1182}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":383.3459}\n{\"visit\":1,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4446.6779}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":384.3732}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":380.8868}\n{\"visit\":2,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1809.8049000000003}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":381.3844}\n{\"visit\":2,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4640.1293000000005}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":383.6067}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":378.2244}\n{\"visit\":2,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1472.9117999999999}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":380.26599999999996}\n{\"visit\":2,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4398.569}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":381.5268}\nPASS official layers, budget rejection, stable decode/prefill pointers, rebind and changed-input decode graph\n",
+    "candidate": "{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":210.88019999999997}\n{\"visit\":0,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1719.9743999999998}\n{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":206.41140000000001}\n{\"visit\":0,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4582.6939999999995}\n{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":211.06900000000002}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":264.27059999999994}\n{\"visit\":0,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1494.395}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":210.2177}\n{\"visit\":0,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4475.9673999999995}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":212.73300000000003}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":213.6386}\n{\"visit\":1,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1721.7857}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":252.2898}\n{\"visit\":1,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4556.8219}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":267.44030000000004}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":268.5539}\n{\"visit\":1,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1507.6093999999998}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":217.2306}\n{\"visit\":1,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4438.1993}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":219.0595}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":207.60340000000002}\n{\"visit\":2,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1774.2496999999998}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":207.3346}\n{\"visit\":2,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4543.218699999999}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":208.37619999999998}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":210.84340000000003}\n{\"visit\":2,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1450.2332999999999}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":211.13939999999997}\n{\"visit\":2,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4389.1961}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":212.18579999999997}\nPASS official layers, budget rejection, stable decode/prefill pointers, rebind and changed-input decode graph\n"
+  },
+  "quality_text_and_usage_exact": true,
+  "raw_api_and_quality_logs": [
+    {
+      "path": "/tmp/ds41-decode-target-api.json",
+      "sha256": "d3c0d676d20e92fbb11dac55d098e91530e844b3d7e249878963a2a0327235d5"
+    },
+    {
+      "path": "/tmp/ds41-decode-spec-api.json",
+      "sha256": "05081b26131dd7e747a39e9bf5e0e9b3f2bb3f7509d3759f5b82b6dff4e188a1"
+    },
+    {
+      "path": "/tmp/ds41-decode-before-quality.json",
+      "sha256": "3111389d76501b2b218f9f9c000f706321094a0ab4d13098e53cf2fcee53b13e"
+    },
+    {
+      "path": "/tmp/ds41-decode-after-quality.json",
+      "sha256": "b736e89ea6859cfba46b98b15b6cfc2d79ef5ef285538f80ae9ffdeb0c7c28e6"
+    }
+  ],
+  "evidence_storage": "SSE event arrays omitted to avoid duplicating response text; raw local file hashes retained."
+}
