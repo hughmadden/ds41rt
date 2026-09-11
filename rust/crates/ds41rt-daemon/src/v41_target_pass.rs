@@ -223,3 +223,6 @@ mod tests {
         state.begin().unwrap();
     }
 }
+
+#[cfg(test)]
+mod distributed_tests;
