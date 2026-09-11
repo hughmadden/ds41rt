@@ -1,0 +1,1524 @@
+{
+  "baseline_commit": "101149d",
+  "scope": "Final-response receive-slot ownership, actual RoCE/GPU lifetime qualification and sequential C1 API status workloads; no GPU math or wire-format change.",
+  "raw_directory": "/tmp/ds41-receive-ownership",
+  "daemon_sha256": "df2295991f643b50035e04092ec64c9810a66ea1e0fd1304620452e7a6c826d0",
+  "native_sha256": "0aac3fd644b25369baa068947dba326d07134bad897a4912d8d484afc0678385",
+  "api-create-commands.json": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-receiveslots2048-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-receive-ownership/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-attention-rescale/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e5343cfb6874fecb9fe012a8c56e79ffdfca831f",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18041",
+      "--prefill-batch-tokens",
+      "2048"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-receiveslots2048-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-receive-ownership/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-attention-rescale/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e5343cfb6874fecb9fe012a8c56e79ffdfca831f",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18042",
+      "--prefill-batch-tokens",
+      "2048"
+    ]
+  ],
+  "copy-profile-summary.json": {
+    "warm_full_rows": 1280,
+    "summed_stage_ms": {
+      "copy_recv_ms": 1299.855,
+      "send_ms": 548.127,
+      "parse_ms": 15.106,
+      "poll_ms": 1806.905,
+      "total_ms": 22577.265
+    },
+    "response_bytes": 26854154240,
+    "stages": {
+      "target query preparation": {
+        "count": 360,
+        "sum_seconds": {
+          "total_us": 0.356827
+        }
+      },
+      "target attention stages": {
+        "count": 360,
+        "sum_seconds": {
+          "sparse_us": 3.184753,
+          "projection_us": 0.340014,
+          "ffn_prepare_us": 0.241818
+        }
+      },
+      "target collection": {
+        "count": 360,
+        "sum_seconds": {
+          "shared_copy_us": 0.0,
+          "upload_us": 0.006036,
+          "receive_us": 5.657115,
+          "reduce_us": 0.151955
+        }
+      },
+      "target experts": {
+        "count": 360,
+        "sum_seconds": {
+          "routed_us": 1.124052,
+          "dispatch_us": 0.599574,
+          "shared_us": 0.143244,
+          "collect_us": 5.817162
+        }
+      },
+      "target layer": {
+        "count": 360,
+        "sum_seconds": {
+          "produced_us": 0.041289,
+          "index_us": 0.191847,
+          "attention_us": 3.770907,
+          "experts_us": 7.685078,
+          "finish_us": 0.067563
+        }
+      },
+      "target layer preparation": {
+        "count": 351,
+        "sum_seconds": {
+          "advance_us": 0.030661,
+          "engram_us": 0.042946,
+          "taps_us": 0.000974,
+          "begin_us": 0.349325
+        }
+      },
+      "target step": {
+        "count": 9,
+        "sum_seconds": {
+          "prepared_us": 0.002471,
+          "execute_us": 12.201606,
+          "sample_us": 0.001017,
+          "commit_us": 0.006071,
+          "total_us": 12.211165
+        }
+      }
+    }
+  },
+  "spec-profile-summary.json": {
+    "control": [
+      {
+        "steps": 11,
+        "totals": {
+          "proposed": 55,
+          "accepted": 48,
+          "emitted": 58,
+          "draft_us": 88835,
+          "total_us": 592525
+        },
+        "records": [
+          {
+            "proposed": 5,
+            "accepted": 1,
+            "emitted": 2,
+            "draft_us": 15985,
+            "total_us": 73176
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7303,
+            "total_us": 47941
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7282,
+            "total_us": 50269
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7303,
+            "total_us": 50177
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7267,
+            "total_us": 50865
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7345,
+            "total_us": 50986
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7321,
+            "total_us": 51833
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7250,
+            "total_us": 51047
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7269,
+            "total_us": 50832
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7257,
+            "total_us": 51210
+          },
+          {
+            "proposed": 5,
+            "accepted": 2,
+            "emitted": 2,
+            "draft_us": 7253,
+            "total_us": 64189
+          }
+        ]
+      },
+      {
+        "steps": 11,
+        "totals": {
+          "proposed": 55,
+          "accepted": 48,
+          "emitted": 58,
+          "draft_us": 80464,
+          "total_us": 570476
+        },
+        "records": [
+          {
+            "proposed": 5,
+            "accepted": 1,
+            "emitted": 2,
+            "draft_us": 7396,
+            "total_us": 62978
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7336,
+            "total_us": 47745
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7288,
+            "total_us": 51111
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7354,
+            "total_us": 50356
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7220,
+            "total_us": 51599
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7428,
+            "total_us": 51268
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7327,
+            "total_us": 51445
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7314,
+            "total_us": 50626
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7271,
+            "total_us": 51067
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7305,
+            "total_us": 50673
+          },
+          {
+            "proposed": 5,
+            "accepted": 2,
+            "emitted": 2,
+            "draft_us": 7225,
+            "total_us": 51608
+          }
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "steps": 11,
+        "totals": {
+          "proposed": 55,
+          "accepted": 48,
+          "emitted": 58,
+          "draft_us": 89145,
+          "total_us": 594385
+        },
+        "records": [
+          {
+            "proposed": 5,
+            "accepted": 1,
+            "emitted": 2,
+            "draft_us": 16180,
+            "total_us": 75168
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7260,
+            "total_us": 47771
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7316,
+            "total_us": 50560
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7275,
+            "total_us": 50206
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7259,
+            "total_us": 51225
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7396,
+            "total_us": 51345
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7303,
+            "total_us": 52185
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7291,
+            "total_us": 50998
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7283,
+            "total_us": 51547
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7340,
+            "total_us": 50645
+          },
+          {
+            "proposed": 5,
+            "accepted": 2,
+            "emitted": 2,
+            "draft_us": 7242,
+            "total_us": 62735
+          }
+        ]
+      },
+      {
+        "steps": 11,
+        "totals": {
+          "proposed": 55,
+          "accepted": 48,
+          "emitted": 58,
+          "draft_us": 80276,
+          "total_us": 570164
+        },
+        "records": [
+          {
+            "proposed": 5,
+            "accepted": 1,
+            "emitted": 2,
+            "draft_us": 7361,
+            "total_us": 62643
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7326,
+            "total_us": 48535
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7271,
+            "total_us": 49927
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7256,
+            "total_us": 50350
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7291,
+            "total_us": 50406
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7341,
+            "total_us": 50040
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7245,
+            "total_us": 51647
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7260,
+            "total_us": 51662
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7314,
+            "total_us": 51054
+          },
+          {
+            "proposed": 5,
+            "accepted": 5,
+            "emitted": 6,
+            "draft_us": 7345,
+            "total_us": 50121
+          },
+          {
+            "proposed": 5,
+            "accepted": 2,
+            "emitted": 2,
+            "draft_us": 7266,
+            "total_us": 53779
+          }
+        ]
+      }
+    ]
+  },
+  "prefill-api.json": {
+    "scope": "Sequential C1 generated counting after repeated filler or supplied code; no prefix-cache hits expected, not a broad quality/performance benchmark.",
+    "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+    "context_sha256": "9fd051edae59a6b4263a690fbdd70816c78c9671a50d6976903b51b4386593b0",
+    "results": [
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 12.679158333921805,
+        "finish_seconds": 14.175869083963335,
+        "observed_decode_tokens_per_second": 38.75164255911883,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "target",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1294.24994686727
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 12.240998290944844,
+        "finish_seconds": 12.747582842013799,
+        "observed_decode_tokens_per_second": 114.49223999747534,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "speculative",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1340.57693743321
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 11.475436080945656,
+        "finish_seconds": 12.996375383925624,
+        "observed_decode_tokens_per_second": 38.13432915196609,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "target",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1430.0110152021082
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 11.343109117937274,
+        "finish_seconds": 11.913631316972896,
+        "observed_decode_tokens_per_second": 101.66125016351661,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "speculative",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1446.693303342226
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 10.109776276978664,
+        "finish_seconds": 11.593069883994758,
+        "observed_decode_tokens_per_second": 39.102170821512,
+        "usage": {
+          "prompt_tokens": 16411,
+          "completion_tokens": 59,
+          "total_tokens": 16470,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16411
+        },
+        "mode": "target",
+        "kind": "repeated",
+        "filler_tokens": 16384,
+        "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+        "effective_prompt_tokens_per_second": 1623.280233942474
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 10.107986749033444,
+        "finish_seconds": 10.608493900974281,
+        "observed_decode_tokens_per_second": 115.88245997103333,
+        "usage": {
+          "prompt_tokens": 16411,
+          "completion_tokens": 59,
+          "total_tokens": 16470,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16411
+        },
+        "mode": "speculative",
+        "kind": "repeated",
+        "filler_tokens": 16384,
+        "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+        "effective_prompt_tokens_per_second": 1623.5676210763997
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 10.096812554984353,
+        "finish_seconds": 11.58137992490083,
+        "observed_decode_tokens_per_second": 39.068621051036004,
+        "usage": {
+          "prompt_tokens": 16411,
+          "completion_tokens": 59,
+          "total_tokens": 16470,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16411
+        },
+        "mode": "target",
+        "kind": "repeated",
+        "filler_tokens": 16384,
+        "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+        "effective_prompt_tokens_per_second": 1625.3644316590396
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 10.018432102049701,
+        "finish_seconds": 10.518234846065752,
+        "observed_decode_tokens_per_second": 116.04578144960588,
+        "usage": {
+          "prompt_tokens": 16411,
+          "completion_tokens": 59,
+          "total_tokens": 16470,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16411
+        },
+        "mode": "speculative",
+        "kind": "repeated",
+        "filler_tokens": 16384,
+        "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+        "effective_prompt_tokens_per_second": 1638.0806729869862
+      }
+    ]
+  },
+  "spec-control-api.json": {
+    "scope": "Sequential C1 generated counting after repeated filler or supplied code; no prefix-cache hits expected, not a broad quality/performance benchmark.",
+    "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+    "context_sha256": "9fd051edae59a6b4263a690fbdd70816c78c9671a50d6976903b51b4386593b0",
+    "results": [
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 13.20745217509102,
+        "finish_seconds": 13.80001909704879,
+        "observed_decode_tokens_per_second": 97.87924005001005,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "speculative",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1242.4803650585172
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 12.181739230989479,
+        "finish_seconds": 12.752212896943092,
+        "observed_decode_tokens_per_second": 101.6698990005896,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "speculative",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1347.0982828342053
+      }
+    ]
+  },
+  "spec-candidate-api.json": {
+    "scope": "Sequential C1 generated counting after repeated filler or supplied code; no prefix-cache hits expected, not a broad quality/performance benchmark.",
+    "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+    "context_sha256": "9fd051edae59a6b4263a690fbdd70816c78c9671a50d6976903b51b4386593b0",
+    "results": [
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 12.416930873994716,
+        "finish_seconds": 13.011349005973898,
+        "observed_decode_tokens_per_second": 97.57441248786009,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "speculative",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1321.5826170352718
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 11.370425848988816,
+        "finish_seconds": 11.940649689990096,
+        "observed_decode_tokens_per_second": 101.71444234628177,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "speculative",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1443.2177139134467
+      }
+    ]
+  },
+  "candidate-copy-profile": {
+    "warm_full_rows": 1280,
+    "summed_stage_ms": {
+      "copy_recv_ms": 7.309,
+      "send_ms": 561.83,
+      "parse_ms": 12.89,
+      "poll_ms": 1926.938,
+      "total_ms": 20259.884
+    },
+    "response_bytes": 26854154240,
+    "stages": {
+      "target query preparation": {
+        "count": 360,
+        "sum_seconds": {
+          "total_us": 0.355734
+        }
+      },
+      "target attention stages": {
+        "count": 360,
+        "sum_seconds": {
+          "sparse_us": 3.184228,
+          "projection_us": 0.339855,
+          "ffn_prepare_us": 0.241716
+        }
+      },
+      "target collection": {
+        "count": 360,
+        "sum_seconds": {
+          "shared_copy_us": 0.0,
+          "upload_us": 0.004233,
+          "receive_us": 4.843354,
+          "reduce_us": 0.179596
+        }
+      },
+      "target experts": {
+        "count": 360,
+        "sum_seconds": {
+          "routed_us": 1.124444,
+          "dispatch_us": 0.616427,
+          "shared_us": 0.14338,
+          "collect_us": 5.028813
+        }
+      },
+      "target layer": {
+        "count": 360,
+        "sum_seconds": {
+          "produced_us": 0.041148,
+          "index_us": 0.191707,
+          "attention_us": 3.769221,
+          "experts_us": 6.91406,
+          "finish_us": 0.066778
+        }
+      },
+      "target layer preparation": {
+        "count": 351,
+        "sum_seconds": {
+          "advance_us": 0.029714,
+          "engram_us": 0.042082,
+          "taps_us": 0.000946,
+          "begin_us": 0.348196
+        }
+      },
+      "target step": {
+        "count": 9,
+        "sum_seconds": {
+          "prepared_us": 0.002651,
+          "execute_us": 11.424652,
+          "sample_us": 0.00103,
+          "commit_us": 0.006087,
+          "total_us": 11.43442
+        }
+      }
+    }
+  },
+  "logs": {
+    "build.log": "e6ad1392975c7732b93b9e5a0d546ac2c0bc59b45c8c3db123a1feb7d22cfb7a",
+    "check.log": "96511bd709bde6d0dbbe906828ded704d6f24062126bc5d2f4ef72163b836f36",
+    "transport-tests.log": "2165fafa8333ef8980f801ec9570762e6b2437c8760101a4d777c7cea07e72cb",
+    "pinned-subview-test.log": "f2ccea4e6cd525ae2b089a70bc75f8c39da9950f1446d2c2370f98e58b1968a9",
+    "build-tests.log": "658fa057704bc61907ae26bb8b5093a14e8da30df038e4e12b614c11b8fc09e5",
+    "live-upload-tests.log": "3bd5cd7b68b93131834b8233fc663d0bbf7b981835822a2bcaa33e2146a5b044",
+    "fixture-client.log": "8c6eb086b58096f473be9462cee9460e070c282717e339db577bcb0534907e52"
+  },
+  "target-api.json": {
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "base_url": "http://127.0.0.1:18041",
+    "first_json": {
+      "id": "chatcmpl-f2453609-effe-4e12-84a9-19aceecafd0e",
+      "object": "chat.completion",
+      "created": 1789157281,
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "system_fingerprint": "ds41rt-native-fp8-kv",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "4"
+          },
+          "logprobs": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 2,
+        "total_tokens": 20,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 18
+      }
+    },
+    "streaming_request": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+        }
+      ],
+      "thinking": {
+        "type": "disabled"
+      },
+      "temperature": 0,
+      "max_tokens": 96,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "streaming_runs": [
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 0.09147741494234651,
+        "finish_seconds": 1.5892701699631289,
+        "observed_decode_tokens_per_second": 38.72364838565081,
+        "usage": {
+          "prompt_tokens": 21,
+          "completion_tokens": 59,
+          "total_tokens": 80,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 21
+        }
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 0.08718341507483274,
+        "finish_seconds": 1.5307846510550007,
+        "observed_decode_tokens_per_second": 40.17730004270847,
+        "usage": {
+          "prompt_tokens": 21,
+          "completion_tokens": 59,
+          "total_tokens": 80,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 21
+        }
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 0.08549101196695119,
+        "finish_seconds": 1.5238570159999654,
+        "observed_decode_tokens_per_second": 40.323533674582556,
+        "usage": {
+          "prompt_tokens": 21,
+          "completion_tokens": 59,
+          "total_tokens": 80,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 21
+        }
+      }
+    ],
+    "cancellation": {
+      "cancelled_after_content": true,
+      "first_content_seconds": 0.07598772796336561,
+      "text": "I"
+    },
+    "post_cancellation_json": {
+      "id": "chatcmpl-d994383c-0211-44bb-b420-ebad5db6a0a8",
+      "object": "chat.completion",
+      "created": 1789157286,
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "system_fingerprint": "ds41rt-native-fp8-kv",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "4"
+          },
+          "logprobs": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 2,
+        "total_tokens": 20,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 18
+      }
+    },
+    "unsupported_sampling_status": 400,
+    "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+  },
+  "spec-api.json": {
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "base_url": "http://127.0.0.1:18042",
+    "first_json": {
+      "id": "chatcmpl-c552a544-344c-4fe5-ba9c-359a1f6b9267",
+      "object": "chat.completion",
+      "created": 1789157287,
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "4"
+          },
+          "logprobs": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 2,
+        "total_tokens": 20,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 18
+      }
+    },
+    "streaming_request": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+        }
+      ],
+      "thinking": {
+        "type": "disabled"
+      },
+      "temperature": 0,
+      "max_tokens": 96,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "streaming_runs": [
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 0.08915724896360189,
+        "finish_seconds": 0.5688037669751793,
+        "observed_decode_tokens_per_second": 120.92238309254239,
+        "usage": {
+          "prompt_tokens": 21,
+          "completion_tokens": 59,
+          "total_tokens": 80,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 21
+        }
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 0.08762391598429531,
+        "finish_seconds": 0.5673346209805459,
+        "observed_decode_tokens_per_second": 120.90620325108928,
+        "usage": {
+          "prompt_tokens": 21,
+          "completion_tokens": 59,
+          "total_tokens": 80,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 21
+        }
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 0.08765857806429267,
+        "finish_seconds": 0.5667015600483865,
+        "observed_decode_tokens_per_second": 121.07473062182517,
+        "usage": {
+          "prompt_tokens": 21,
+          "completion_tokens": 59,
+          "total_tokens": 80,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 21
+        }
+      }
+    ],
+    "cancellation": {
+      "cancelled_after_content": true,
+      "first_content_seconds": 0.06872183398809284,
+      "text": "I"
+    },
+    "post_cancellation_json": {
+      "id": "chatcmpl-975ed56d-7d0b-45a6-96e5-a1db4b16e7ac",
+      "object": "chat.completion",
+      "created": 1789157289,
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "4"
+          },
+          "logprobs": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 18,
+        "completion_tokens": 2,
+        "total_tokens": 20,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 18
+      }
+    },
+    "unsupported_sampling_status": 400,
+    "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+  },
+  "quality": [
+    {
+      "case": {
+        "name": "arithmetic",
+        "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+        "expected": "575"
+      },
+      "runs": {
+        "target": {
+          "text": "575",
+          "first_content_seconds": 0.10072697803843766,
+          "finish_seconds": 0.13565024395938963,
+          "observed_decode_tokens_per_second": 28.63420626992555,
+          "usage": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "575",
+          "first_content_seconds": 0.08658369409386069,
+          "finish_seconds": 0.14555710600689054,
+          "observed_decode_tokens_per_second": 16.956794046014075,
+          "usage": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "signed_sort",
+        "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+        "expected_json": [
+          -11,
+          -4,
+          0,
+          7,
+          7,
+          12
+        ]
+      },
+      "runs": {
+        "target": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "first_content_seconds": 0.16798483405727893,
+          "finish_seconds": 0.6399805609835312,
+          "observed_decode_tokens_per_second": 38.13593846965576,
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "first_content_seconds": 0.11554117989726365,
+          "finish_seconds": 0.362276642001234,
+          "observed_decode_tokens_per_second": 72.95262645470513,
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "extraction",
+        "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+        "expected_json": {
+          "total": 40,
+          "names": [
+            "Alice",
+            "Bob"
+          ]
+        }
+      },
+      "runs": {
+        "target": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "first_content_seconds": 0.13790494110435247,
+          "finish_seconds": 0.5761847330722958,
+          "observed_decode_tokens_per_second": 36.50636030504065,
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "first_content_seconds": 0.12802740500774235,
+          "finish_seconds": 0.34625654900446534,
+          "observed_decode_tokens_per_second": 73.31743005068223,
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "logic",
+        "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+        "expected_json": [
+          "D",
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "runs": {
+        "target": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "first_content_seconds": 0.1167414429364726,
+          "finish_seconds": 0.4442327539436519,
+          "observed_decode_tokens_per_second": 36.64219353818805,
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "first_content_seconds": 0.11543326801620424,
+          "finish_seconds": 0.2217006681021303,
+          "observed_decode_tokens_per_second": 112.9226836291939,
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "unicode",
+        "prompt": "請計算 18 加 27，再減去 9。只輸出阿拉伯數字答案。",
+        "expected": "36"
+      },
+      "runs": {
+        "target": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n36",
+          "first_content_seconds": 0.10028033703565598,
+          "finish_seconds": 0.535337068955414,
+          "observed_decode_tokens_per_second": 39.07536363127806,
+          "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 18,
+            "total_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "objective_pass": false
+        },
+        "speculative": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n36",
+          "first_content_seconds": 0.09036629507318139,
+          "finish_seconds": 0.3460969179868698,
+          "observed_decode_tokens_per_second": 66.47619986339167,
+          "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 18,
+            "total_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "objective_pass": false
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "translation",
+        "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+      },
+      "runs": {
+        "target": {
+          "text": "紅色的門是開著的。",
+          "first_content_seconds": 0.09193837700877339,
+          "finish_seconds": 0.2754254360916093,
+          "observed_decode_tokens_per_second": 38.14982939390742,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "objective_pass": null
+        },
+        "speculative": {
+          "text": "紅色的門是開著的。",
+          "first_content_seconds": 0.09065741300582886,
+          "finish_seconds": 0.1964105200022459,
+          "observed_decode_tokens_per_second": 66.19190867117656,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "explanation",
+        "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+      },
+      "runs": {
+        "target": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+          "first_content_seconds": 0.11000532493926585,
+          "finish_seconds": 0.9044352469500154,
+          "observed_decode_tokens_per_second": 39.02169233698694,
+          "usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 32,
+            "total_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "objective_pass": null
+        },
+        "speculative": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+          "first_content_seconds": 0.10320830496493727,
+          "finish_seconds": 0.8511354869697243,
+          "observed_decode_tokens_per_second": 41.44788522982387,
+          "usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 32,
+            "total_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "long_retrieval",
+        "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+        "expected": "quartz-731"
+      },
+      "runs": {
+        "target": {
+          "text": "quartz-731",
+          "first_content_seconds": 1.8606747459853068,
+          "finish_seconds": 1.9849541909061372,
+          "observed_decode_tokens_per_second": 32.185531586080984,
+          "usage": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "quartz-731",
+          "first_content_seconds": 1.8269910900853574,
+          "finish_seconds": 1.953503258060664,
+          "observed_decode_tokens_per_second": 31.61751208611607,
+          "usage": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "objective_pass": true
+        }
+      }
+    }
+  ]
+}

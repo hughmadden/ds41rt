@@ -6,6 +6,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
+- [x] Upload final expert responses from [retained registered receive slots](docs/ds41-registered-response-slots.md), with streamed-chunk fallback, reset-safe ownership and real RoCE/GPU qualification. Warm 16k prefill improves another 7–8% to about 1.43–1.45k code / 1.63–1.64k repeated tok/s; release performance and concurrency gates remain open.
+
 - [x] Qualify and deploy [sparse key partitions for small-row attention](docs/ds41-sparse-key-split.md), with preallocated FP32 partial scratch and explicit rounding checks. Warm 16k target decode improves from about 26.6 to 38.5–38.9 tok/s; dSpark reaches 113–115 tok/s. Prefill remains around 1.3k code / 1.5k repeated tok/s; broad quality, C16 scheduling and release performance gates remain open.
 
 - [ ] Serve only the official DeepSeek-V4.1-Flash checkpoint on one RTX coordinator and four Spark TP4 backbone-expert workers.

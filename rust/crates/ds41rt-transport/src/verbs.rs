@@ -1,3 +1,5 @@
+mod registered_response;
+use registered_response::{RegisteredResponseFrame, RegisteredResponseRing};
 mod local;
 mod local_client;
 pub(crate) use local_client::LocalTp4Client;
@@ -920,6 +922,7 @@ impl Drop for VerbsHostProtocolV2PinnedResponseFrame {
 enum VerbsHostProtocolV2ResponseFrame {
     Bytes(Vec<u8>),
     Pinned(VerbsHostProtocolV2PinnedResponseFrame),
+    Registered(RegisteredResponseFrame),
 }
 
 impl AsRef<[u8]> for VerbsHostProtocolV2ResponseFrame {
@@ -927,6 +930,7 @@ impl AsRef<[u8]> for VerbsHostProtocolV2ResponseFrame {
         match self {
             Self::Bytes(bytes) => bytes,
             Self::Pinned(frame) => frame.as_slice(),
+            Self::Registered(frame) => frame.as_slice(),
         }
     }
 }
@@ -936,6 +940,7 @@ impl AsMut<[u8]> for VerbsHostProtocolV2ResponseFrame {
         match self {
             Self::Bytes(bytes) => bytes,
             Self::Pinned(frame) => frame.as_mut_slice(),
+            Self::Registered(frame) => frame.as_mut_slice(),
         }
     }
 }
@@ -943,6 +948,7 @@ impl AsMut<[u8]> for VerbsHostProtocolV2ResponseFrame {
 pub struct VerbsHostProtocolV2ResponsePayload {
     bytes: Option<Vec<u8>>,
     pinned_frame: Option<VerbsHostProtocolV2PinnedResponseFrame>,
+    registered_frame: Option<RegisteredResponseFrame>,
     payload_start: usize,
     payload_end: usize,
     recycle_tx: Option<mpsc::Sender<Vec<u8>>>,
@@ -966,6 +972,7 @@ impl VerbsHostProtocolV2ResponsePayload {
         Ok(Self {
             bytes: Some(bytes),
             pinned_frame: None,
+            registered_frame: None,
             payload_start,
             payload_end,
             recycle_tx: Some(recycle_tx),
@@ -990,6 +997,7 @@ impl VerbsHostProtocolV2ResponsePayload {
             VerbsHostProtocolV2ResponseFrame::Bytes(bytes) => Self {
                 bytes: Some(bytes),
                 pinned_frame: None,
+                registered_frame: None,
                 payload_start,
                 payload_end,
                 recycle_tx: Some(recycle_tx),
@@ -998,10 +1006,15 @@ impl VerbsHostProtocolV2ResponsePayload {
             VerbsHostProtocolV2ResponseFrame::Pinned(frame) => Self {
                 bytes: None,
                 pinned_frame: Some(frame),
+                registered_frame: None,
                 payload_start,
                 payload_end,
                 recycle_tx: None,
                 pinned_recycle_tx: Some(pinned_recycle_tx),
+            },
+            VerbsHostProtocolV2ResponseFrame::Registered(frame) => Self {
+                bytes: None, pinned_frame: None, registered_frame: Some(frame),
+                payload_start, payload_end, recycle_tx: None, pinned_recycle_tx: None,
             },
         })
     }
@@ -1011,6 +1024,7 @@ impl VerbsHostProtocolV2ResponsePayload {
         Self {
             bytes: Some(bytes),
             pinned_frame: None,
+            registered_frame: None,
             payload_start: 0,
             payload_end,
             recycle_tx: None,
@@ -1019,13 +1033,20 @@ impl VerbsHostProtocolV2ResponsePayload {
     }
 
     /// Return the exact payload subview when the streamed response frame is
-    /// backed by CUDA-pinned host storage. The view remains valid only while
-    /// this payload object is alive.
+    /// backed by CUDA-pinned host storage (a copied frame or an owned receive
+    /// slot). The view remains valid only while this payload object is alive.
     pub fn pinned_host_buffer(&self) -> Option<Ds41rtHostBuffer> {
+        if let Some(frame) = &self.registered_frame {
+            return Some(frame.payload_host_buffer(self.payload_start, self.payload_end));
+        }
         self.pinned_frame
             .as_ref()?
             .payload_host_buffer(self.payload_start, self.payload_end)
     }
+
+    /// True when this owner retains an unposted receive slot, rather than a
+    /// copied response frame. Releasing it permits the next local dispatch.
+    pub fn retains_receive_slot(&self) -> bool { self.registered_frame.is_some() }
 
     pub fn into_vec(mut self) -> Vec<u8> {
         if self.recycle_tx.is_none()
@@ -1043,6 +1064,8 @@ impl AsRef<[u8]> for VerbsHostProtocolV2ResponsePayload {
         if let Some(bytes) = self.bytes.as_deref() {
             &bytes[self.payload_start..self.payload_end]
         } else if let Some(frame) = self.pinned_frame.as_ref() {
+            &frame.as_slice()[self.payload_start..self.payload_end]
+        } else if let Some(frame) = &self.registered_frame {
             &frame.as_slice()[self.payload_start..self.payload_end]
         } else {
             &[]
@@ -2129,7 +2152,8 @@ fn is_verbs_host_rdma_poll_timeout(error: &anyhow::Error) -> bool {
 struct VerbsHostProtocolV2PersistentClientSession {
     _stream: TcpStream,
     addr: SocketAddr,
-    endpoint: NativeRdmaEndpoint,
+    endpoint: Arc<NativeRdmaEndpoint>,
+    retained_response_ring: Option<RegisteredResponseRing>,
     cq_harvester: Option<Arc<VerbsHostProtocolV2CqHarvester>>,
     cq_waiter: Option<VerbsHostProtocolV2CqWaiter>,
     request_capacity_wire_bytes: usize,
@@ -2384,6 +2408,18 @@ impl VerbsHostProtocolV2PersistentClientSession {
         execution_lane: u32,
         cq_harvester: Option<Arc<VerbsHostProtocolV2CqHarvester>>,
     ) -> Result<Self> {
+        Self::connect_impl(addr, config, request, execution_lane, cq_harvester, false)
+    }
+
+    fn connect_local(addr: SocketAddr, config: &TcpTransportConfig,
+                     request: &ExpertProtocolV2Request) -> Result<Self> {
+        Self::connect_impl(addr, config, request, 0, None, true)
+    }
+
+    fn connect_impl(addr: SocketAddr, config: &TcpTransportConfig,
+                    request: &ExpertProtocolV2Request, execution_lane: u32,
+                    cq_harvester: Option<Arc<VerbsHostProtocolV2CqHarvester>>,
+                    retain_final_response: bool) -> Result<Self> {
         verbs_host_preflight()?;
         let native_path = verbs_host_native_library_path().context(
             "native library not found; set DS41RT_NATIVE_LIB or build native/libds41rt_native.so with RDMA",
@@ -2397,15 +2433,19 @@ impl VerbsHostProtocolV2PersistentClientSession {
         let response_capacity_wire_bytes = response_ring.slot_capacity_bytes;
         let request_registered_span_bytes = request_ring.registered_span_bytes;
         let response_registered_span_bytes = response_ring.registered_span_bytes;
-        let endpoint = NativeRdmaEndpoint::create_from_wire_bytes(
-            Arc::clone(&library),
-            "client",
-            request_capacity_wire_bytes,
-            response_capacity_wire_bytes,
-            request_registered_span_bytes,
-            response_registered_span_bytes,
-            next_local_psn("client"),
-        )?;
+        let endpoint = if retain_final_response {
+            NativeRdmaEndpoint::create_from_wire_bytes_mapped_for_ring(
+                Arc::clone(&library), "client", request_capacity_wire_bytes,
+                response_capacity_wire_bytes, request_registered_span_bytes,
+                response_registered_span_bytes, next_local_psn("client"), response_ring.depth,
+            )?
+        } else {
+            NativeRdmaEndpoint::create_from_wire_bytes(
+                Arc::clone(&library), "client", request_capacity_wire_bytes,
+                response_capacity_wire_bytes, request_registered_span_bytes,
+                response_registered_span_bytes, next_local_psn("client"),
+            )?
+        };
         let peer = addr.to_string();
         let mut stream = connect_control_stream(&peer, config.timeout)?;
         configure_control_stream(&stream, config.timeout)?;
@@ -2481,10 +2521,14 @@ impl VerbsHostProtocolV2PersistentClientSession {
         }
         let (response_frame_recycle_tx, response_frame_recycle_rx) = mpsc::channel();
         let (pinned_response_frame_recycle_tx, pinned_response_frame_recycle_rx) = mpsc::channel();
+        let retained_response_ring = if retain_final_response {
+            Some(RegisteredResponseRing::new(&endpoint, response_ring)?)
+        } else { None };
         Ok(Self {
             _stream: stream,
             addr,
-            endpoint,
+            endpoint: Arc::new(endpoint),
+            retained_response_ring,
             cq_waiter: cq_harvester
                 .as_ref()
                 .map(|_| VerbsHostProtocolV2CqWaiter::new()),
@@ -2551,6 +2595,7 @@ impl VerbsHostProtocolV2PersistentClientSession {
             VerbsHostProtocolV2ResponseFrame::Pinned(response_frame) => {
                 self.pinned_response_frame_pool.push(response_frame);
             }
+            VerbsHostProtocolV2ResponseFrame::Registered(frame) => drop(frame),
         }
     }
 
@@ -2566,6 +2611,9 @@ impl VerbsHostProtocolV2PersistentClientSession {
         request: &ExpertProtocolV2Request,
         config: &TcpTransportConfig,
     ) -> Result<VerbsHostProtocolV2ChunkSubmissionTiming> {
+        if let Some(ring) = &mut self.retained_response_ring {
+            ring.reclaim_before_request(&self.endpoint, self.response_ring)?;
+        }
         let timing_enabled = protocol_v2_transport_timing_enabled();
         let total_started = timing_enabled.then(Instant::now);
         let encode_started = timing_enabled.then(Instant::now);
@@ -2743,19 +2791,24 @@ impl VerbsHostProtocolV2PersistentClientSession {
                     .min(config.max_frame_bytes)
             );
         }
-        let mut response_frame = self.take_response_frame(response_wire_bytes, true)?;
-        self.endpoint.copy_recv_at(
-            response_frame.as_mut(),
-            response_recv_offset,
-            response_wire_bytes,
-        )?;
+        let retained = match &mut self.retained_response_ring {
+            Some(ring) => ring.try_retain_final(&self.endpoint, self.response_ring,
+                                              self.response_recv_sequence, response_wire_bytes)?,
+            None => None,
+        };
+        let response_frame = if let Some(frame) = retained {
+            VerbsHostProtocolV2ResponseFrame::Registered(frame)
+        } else {
+            let mut frame = self.take_response_frame(response_wire_bytes, true)?;
+            self.endpoint.copy_recv_at(frame.as_mut(), response_recv_offset, response_wire_bytes)?;
+            frame
+        };
         let copy_recv_ms = elapsed_ms_optional(copy_started);
         let post_recv_started = timing_enabled.then(Instant::now);
-        self.endpoint.post_recv_at(
-            response_recv_offset,
-            self.response_ring.slot_capacity_bytes,
-            VERBS_HOST_RECV_WR_ID + response_recv_slot as u64,
-        )?;
+        if !matches!(&response_frame, VerbsHostProtocolV2ResponseFrame::Registered(_)) {
+            self.endpoint.post_recv_at(response_recv_offset, self.response_ring.slot_capacity_bytes,
+                                      VERBS_HOST_RECV_WR_ID + response_recv_slot as u64)?;
+        }
         self.response_recv_sequence = self.response_recv_sequence.wrapping_add(1);
         let post_recv_ms = elapsed_ms_optional(post_recv_started);
 

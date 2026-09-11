@@ -54,12 +54,10 @@ impl LocalTp4Client {
                 self.sessions[rank] = None;
             }
             if self.sessions[rank].is_none() {
-                self.sessions[rank] = Some(VerbsHostProtocolV2PersistentClientSession::connect(
+                self.sessions[rank] = Some(VerbsHostProtocolV2PersistentClientSession::connect_local(
                     self.peers[rank],
                     &self.config,
                     request,
-                    0,
-                    None,
                 )?);
             }
             let timing = self.sessions[rank]

@@ -508,6 +508,7 @@ mod upload_tests {
                             planes: &planes, frames: &mut frames, rows, pending: false };
                         let result = client.dispatch(&request).await?.receive_owned(|rank, first, payload| {
                             ensure!(payload.pinned_host_buffer().is_some(), "live payload is not pinned");
+                            ensure!(payload.retains_receive_slot(), "final response is not a retained receive slot");
                             expected.push((rank, first, payload.as_ref().to_vec()));
                             uploads.copy(rank, first, payload)?;
                             ensure!(uploads.pending && !uploads.frames.is_empty(), "upload ownership missing");

@@ -114,7 +114,11 @@ fn main() -> Result<()> {
                     let rows = [1, 2, 6, 16, 80][(id as usize - 1) % 5];
                     let request = request(rows, id)?;
                     let mut count = 0;
-                    tp.execute(&request, |rank, start, bytes| {
+                    let mut held = Vec::new();
+                    tp.dispatch(&request).await?.receive_owned(|rank, start, payload| {
+                        ensure!(payload.retains_receive_slot() == (start + 1 == rows),
+                                "only the final streamed frame should retain its receive slot");
+                        let bytes = payload.as_ref();
                         ensure!(
                             bytes.len() == V41_PARTIAL_ROW_BYTES as usize,
                             "unexpected chunk size"
@@ -126,11 +130,22 @@ fn main() -> Result<()> {
                             "response corrupted"
                         );
                         count += 1;
+                        held.push((rank, start, payload));
                         Ok(())
                     })
                     .await?;
                     ensure!(count == rows * 4, "missing chunks");
-                    eprintln!("PASS id={id} rows={rows} chunks={count}");
+                    if id == 3 {
+                        ensure!(tp.dispatch(&request).await.is_err(),
+                                "dispatch must reject retained slots from the previous wave");
+                        // The reset must not unregister storage retained by payloads.
+                    }
+                    for (rank, start, payload) in &held {
+                        ensure!(payload.as_ref().iter().all(|&b| b == marker(id, *rank as u64 + 1, *start)),
+                                "retained payload changed before release");
+                    }
+                    drop(held);
+                    eprintln!("PASS id={id} rows={rows} chunks={count}: retained final slots, copied earlier chunks, stable bytes");
                     if id == 5 {
                         let abandoned = request_for_cancel()?;
                         drop(tp.dispatch(&abandoned).await?);
