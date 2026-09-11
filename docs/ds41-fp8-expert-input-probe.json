@@ -1,0 +1,86 @@
+{
+  "rtx": {
+    "source_sha256": "ed6be939633dbba38c3d1c9bdea169f2a4184a30984a43d0091a94de73c03a8f",
+    "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "capability": [
+      12,
+      0
+    ],
+    "cases": [
+      {
+        "rows": 1,
+        "sha256": "12d442d420ce7a679d87f2db30e1c4e9429c350b0eee2fb0fddddaed7cfcc92a",
+        "bytes": 5280
+      },
+      {
+        "rows": 16,
+        "sha256": "58c0460348c4985eed1f58a04405ab5c29d55e2b4ccc0c4ee2870985f9a9564f",
+        "bytes": 84480
+      },
+      {
+        "rows": 80,
+        "sha256": "19b96005fb7010a7e3e48a663dbc784778050ed688659315ce00399cc559b04d",
+        "bytes": 422400
+      },
+      {
+        "rows": 160,
+        "sha256": "3d5d03a26bfc246bd8b969a03a7da6111064d904c3baa47a6a54ae892de22cec",
+        "bytes": 844800
+      },
+      {
+        "rows": 1,
+        "sha256": "12d442d420ce7a679d87f2db30e1c4e9429c350b0eee2fb0fddddaed7cfcc92a",
+        "bytes": 5280
+      }
+    ],
+    "reference_bit_exact": true,
+    "tail_poison_preserved": true,
+    "changed_input_graph_and_stable_allocation": true
+  },
+  "spark": {
+    "source_sha256": "ed6be939633dbba38c3d1c9bdea169f2a4184a30984a43d0091a94de73c03a8f",
+    "device": "NVIDIA GB10",
+    "capability": [
+      12,
+      1
+    ],
+    "cases": [
+      {
+        "rows": 1,
+        "sha256": "12d442d420ce7a679d87f2db30e1c4e9429c350b0eee2fb0fddddaed7cfcc92a",
+        "bytes": 5280
+      },
+      {
+        "rows": 16,
+        "sha256": "58c0460348c4985eed1f58a04405ab5c29d55e2b4ccc0c4ee2870985f9a9564f",
+        "bytes": 84480
+      },
+      {
+        "rows": 80,
+        "sha256": "19b96005fb7010a7e3e48a663dbc784778050ed688659315ce00399cc559b04d",
+        "bytes": 422400
+      },
+      {
+        "rows": 160,
+        "sha256": "3d5d03a26bfc246bd8b969a03a7da6111064d904c3baa47a6a54ae892de22cec",
+        "bytes": 844800
+      },
+      {
+        "rows": 1,
+        "sha256": "12d442d420ce7a679d87f2db30e1c4e9429c350b0eee2fb0fddddaed7cfcc92a",
+        "bytes": 5280
+      }
+    ],
+    "reference_bit_exact": true,
+    "tail_poison_preserved": true,
+    "changed_input_graph_and_stable_allocation": true
+  },
+  "scope": "Standalone BF16-to-FP8 K32 component probe using the production quantization intrinsic and V4.1 floor. No live wire change, no integrated expert comparison or performance claim.",
+  "source": "import json,hashlib,pathlib\nimport torch,cutlass,cutlass.cute as cute\nimport cuda.bindings.driver as cuda\nfrom cutlass import Float32,Int32,Int64,Uint32,Uint8\nfrom cutlass.cute.runtime import from_dlpack\nfrom b12x._lib.intrinsics import quantize_block_fp8_mx,max_abs_32,fmax_f32,pow2_ceil_ue8m0_torch\nclass Quant:\n @cute.jit\n def __call__(self,x:cute.Tensor,y:cute.Tensor,s:cute.Tensor,blocks:Int32,stream:cuda.CUstream):\n  self.kernel(x,y,s,blocks).launch(grid=(cute.ceil_div(blocks,128),1,1),block=(128,1,1),stream=stream)\n @cute.kernel\n def kernel(self,x:cute.Tensor,y:cute.Tensor,s:cute.Tensor,blocks:Int32):\n  block=Int64(cute.arch.block_idx()[0])*Int64(128)+Int64(cute.arch.thread_idx()[0])\n  if block<Int64(blocks):\n   vals=cute.make_rmem_tensor((32,),Float32)\n   for j in cutlass.range_constexpr(32):vals[j]=Float32(x[block*Int64(32)+Int64(j)])\n   payload,scale=quantize_block_fp8_mx(vals,fmax_f32(max_abs_32(vals),Float32(1e-4)))\n   for j in cutlass.range_constexpr(8):y[block*Int64(8)+Int64(j)]=payload[j]\n   s[block]=Uint8(scale)\ndef tensor(x,dtype):\n t=from_dlpack(x,assumed_align=16);t.element_type=dtype;return t\n# CPU construction ensures identical BF16 source values on RTX and Spark.\ntorch.manual_seed(419)\nx=torch.randn(80,5120).to(torch.bfloat16)\nx[0].zero_();x[1]*=1e-7;x[2]*=1e-4;x[3]*=300;x[4,::32]=448\n# Include real captured model inputs.\nreal=torch.frombuffer(bytearray(pathlib.Path('/inputs/0-hidden.bin').read_bytes()),dtype=torch.bfloat16).reshape(80,5120)\nsource_path=pathlib.Path('/inputs/wire-source.bin')\nif source_path.exists():\n x=torch.frombuffer(bytearray(source_path.read_bytes()),dtype=torch.bfloat16)\nelse:\n x=torch.cat([x,real]).contiguous().flatten()\n source_path.write_bytes(x.view(torch.uint8).numpy().tobytes())\nsource_hash=hashlib.sha256(source_path.read_bytes()).hexdigest()\nx=x.cuda()\ny=torch.empty(x.numel()//4,dtype=torch.int32,device='cuda');s=torch.empty(x.numel()//32,dtype=torch.uint8,device='cuda')\nargs=(tensor(x,cutlass.BFloat16),tensor(y,Uint32),tensor(s,Uint8))\nstream=cuda.CUstream(torch.cuda.current_stream().cuda_stream)\nf=cute.compile(Quant(),*args,Int32(x.numel()//32),stream)\nrecords=[]\nfor rows in [1,16,80,160,1]:\n blocks=rows*160;y.fill_(-1);s.fill_(255);f(*args,Int32(blocks),stream)\n z=x[:rows*5120].float().reshape(-1,32)\n _,ref_s=pow2_ceil_ue8m0_torch(z.abs().amax(-1,keepdim=True).clamp_min(1e-4)*(1/448))\n inv=((254-ref_s.int()).clamp_min(0)<<23).view(torch.float32)\n ref_y=(z*inv).clamp(-448,448).to(torch.float8_e4m3fn).view(torch.uint8)\n torch.testing.assert_close(s[:blocks],ref_s.flatten().byte(),rtol=0,atol=0)\n torch.testing.assert_close(y[:blocks*8].view(torch.uint8),ref_y.flatten(),rtol=0,atol=0)\n assert (s[blocks:]==255).all() and (y[blocks*8:]==-1).all()\n raw=y[:blocks*8].view(torch.uint8).cpu().numpy().tobytes()+s[:blocks].cpu().numpy().tobytes()\n records.append({'rows':rows,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)})\n# Fixed compile, mutable source, graph replay; verify zero payload and floor scale.\nx[:5120].fill_(1)\ng=torch.cuda.CUDAGraph()\nside=torch.cuda.Stream();side.wait_stream(torch.cuda.current_stream())\nwith torch.cuda.graph(g,stream=side):f(*args,Int32(160),cuda.CUstream(side.cuda_stream))\ntorch.cuda.current_stream().wait_stream(side)\ng.replay();torch.cuda.synchronize()\nassert (y[:1280]!=0).all()\nx[:5120].zero_();before=torch.cuda.memory_allocated();g.replay();torch.cuda.synchronize();assert torch.cuda.memory_allocated()==before\nassert (y[:1280]==0).all() and (s[:160]==105).all()\nprint(json.dumps({'source_sha256':source_hash,'device':torch.cuda.get_device_name(),'capability':torch.cuda.get_device_capability(),'cases':records,'reference_bit_exact':True,'tail_poison_preserved':True,'changed_input_graph_and_stable_allocation':True}),flush=True)\n",
+  "source_sha256": "6eaeb8c38f57a8bfffd82ce6de0ac3aeeca286aeafe61468e07832ce6914b537",
+  "commands": {
+    "rtx": "docker run --rm --gpus '\"device=0\"' -v /home/tj/Developer/ds41rt/third_party/sparkinfer:/b12x:ro -v /tmp/ds41-fp8-wire-probe.py:/probe.py:ro -v /tmp/ds41-decode-inputs:/inputs:ro -e PYTHONPATH=/b12x --entrypoint python ds41rt-coordinator-dev:latest /probe.py",
+    "spark": "ssh ostrich 'docker run --rm --gpus all -v /tmp/ds41-direct-native-source/third_party/sparkinfer:/b12x:ro -v /tmp/ds41-fp8-wire-probe.py:/probe.py:ro -v /tmp/ds41-decode-inputs:/inputs:ro -e PYTHONPATH=/b12x --entrypoint python ds41rt-spark-expert-dev:latest /probe.py' "
+  },
+  "probe_corrections": "Initial graph check used the default launch stream while capture used a side stream and produced an empty graph. Corrected explicit side-stream launch, nonzero first replay, changed-input zero second replay. Separately seeded ARM/x86 CPU tensors differed, so final comparison uses the identical serialized BF16 source file on both hosts."
+}
