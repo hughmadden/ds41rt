@@ -66,6 +66,7 @@ cmake \
   -S "$source_dir/native" \
   -B "$build_dir/native" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DDS41RT_ENABLE_CUDA=ON \
   -DDS41RT_ENABLE_V41_EXPERT_AOT=ON \
   -DDS41RT_ENABLE_V41_FP8_AOT="$coordinator_aot" \

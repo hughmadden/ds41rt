@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.24)
 project(ds41rt_native LANGUAGES C CXX)
 
+# Single-config serving builds should optimize the native host path too.
+# Respect an explicitly selected Debug/RelWithDebInfo or multi-config generator.
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Native build configuration" FORCE)
+endif()
+
 option(DS41RT_ENABLE_CUDA "Build CUDA kernels and CUDA-backed ABI functions" OFF)
 option(DS41RT_ENABLE_V41_EXPERT_AOT "Build native V4.1 expert AOT kernels" OFF)
 option(DS41RT_ENABLE_V41_FP8_AOT "Build native V4.1 coordinator FP8 AOT kernels" OFF)

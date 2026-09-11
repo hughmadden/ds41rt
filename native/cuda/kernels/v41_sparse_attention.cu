@@ -7,7 +7,10 @@
 #include <math_constants.h>
 namespace {
 using namespace nvcuda;
-constexpr int kSharedBytes=65536+32768+2048+192+512;
+// Pad shared rows to distribute WMMA traffic across memory banks.
+constexpr int kKvStride=520, kOutputStride=516, kProbabilityStride=80;
+constexpr int kKvBytes=64*kKvStride*2, kOutputBytes=16*kOutputStride*4;
+constexpr int kSharedBytes=kKvBytes+kOutputBytes+192+512;
 
 __device__ float warp_max(float x) {
   for(int n=16;n;n>>=1)x=fmaxf(x,__shfl_xor_sync(0xffffffffu,x,n));
@@ -19,7 +22,7 @@ __device__ float warp_sum(float x) {
 }
 // Top two bits distinguish ring, private window, paged source and private source.
 // Invalid rows never dereference a value or scale pointer.
-__device__ uint64_t locate(ds41rt_v41_sparse_kv_t v,const uint64_t* m,
+__device__ __forceinline__ uint64_t locate(const ds41rt_v41_sparse_kv_t& v,const uint64_t* m,
     const int32_t* selected,int key,int width) {
   if(key<width) {
     const uint64_t begin=m[3]+1>128?m[3]+1-128:0,pos=begin+key;
@@ -37,9 +40,10 @@ __device__ uint64_t locate(ds41rt_v41_sparse_kv_t v,const uint64_t* m,
   const uint64_t physical=uint64_t(v.pages[pos/256])*256+pos%256;
   return physical<v.source_capacity?((2ull<<62)|physical):UINT64_MAX;
 }
+// Grid-constant descriptor avoids a per-thread copy for dynamic source indexing.
 __global__ void attend(const __nv_bfloat16* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,
-    int width,ds41rt_v41_sparse_kv_t v) {
+    int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v) {
   // Zero width requests the exact former host maximum for this contiguous,
   // ascending request. Reading metadata keeps decode graph arguments stable.
   if(width==0) {
@@ -64,15 +68,16 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
   }
   extern __shared__ __align__(32) unsigned char memory[];
   auto* kv=reinterpret_cast<__nv_bfloat16*>(memory);
-  auto* scratch=reinterpret_cast<float*>(memory+65536);
-  auto* probability=reinterpret_cast<__nv_bfloat16*>(memory+65536+32768);
-  auto* maximum=reinterpret_cast<float*>(memory+65536+32768+2048);
+  auto* scratch=reinterpret_cast<float*>(memory+kKvBytes);
+  // Scores, accumulator rescaling and PV probabilities have disjoint lifetimes.
+  auto* probability=reinterpret_cast<__nv_bfloat16*>(scratch);
+  auto* maximum=reinterpret_cast<float*>(memory+kKvBytes+kOutputBytes);
   float* sum=maximum+16;float* rescale=sum+16;
   if(tid<16){maximum[tid]=-1e30f;sum[tid]=0;}
   wmma::fragment<wmma::accumulator,16,16,16,float> acc[8];
 #pragma unroll
   for(int t=0;t<8;++t)wmma::fill_fragment(acc[t],0.0f);
-  auto* refs=reinterpret_cast<uint64_t*>(memory+65536+32768+2048+192);
+  auto* refs=reinterpret_cast<uint64_t*>(memory+kKvBytes+kOutputBytes+192);
   const int count=width+(v.compressed?512:0);
   for(int start=0;start<count;start+=64) {
     if(tid<64)refs[tid]=start+tid<count?locate(v,m,
@@ -105,7 +110,7 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
             packed|=uint64_t(__bfloat16_as_ushort(value))<<(j*16);
           }
         }
-        *reinterpret_cast<uint64_t*>(kv+key*512+col)=packed;
+        *reinterpret_cast<uint64_t*>(kv+key*kKvStride+col)=packed;
       }
     }
     __syncthreads();
@@ -117,49 +122,65 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
         wmma::fragment<wmma::matrix_a,16,16,16,__nv_bfloat16,wmma::row_major> a;
         wmma::fragment<wmma::matrix_b,16,16,16,__nv_bfloat16,wmma::col_major> b;
         wmma::load_matrix_sync(a,query+base+k,512);
-        wmma::load_matrix_sync(b,kv+warp*16*512+k,512);
+        wmma::load_matrix_sync(b,kv+warp*16*kKvStride+k,kKvStride);
         wmma::mma_sync(scores,a,b,scores);
       }
       wmma::store_matrix_sync(scratch+warp*16,scores,64,wmma::mem_row_major);
     }
     __syncthreads();
+    // Explicit carries avoid a dynamically indexed array spilling to local memory.
+    __nv_bfloat16 p0a{},p0b{},p1a{},p1b{},p2a{},p2b{},p3a{},p3b{};
     for(int h=warp;h<16;h+=4) {
       const float a=refs[lane]!=UINT64_MAX?scratch[h*64+lane]*0.04419417382415922f:-CUDART_INF_F;
       const float b=refs[lane+32]!=UINT64_MAX?scratch[h*64+lane+32]*0.04419417382415922f:-CUDART_INF_F;
       const float prev=maximum[h],m=fmaxf(prev,warp_max(fmaxf(a,b)));
       const float scale=expf(prev-m),pa=expf(a-m),pb=expf(b-m);
       const float total=warp_sum(pa+pb);
-      probability[h*64+lane]=__float2bfloat16_rn(pa);
-      probability[h*64+lane+32]=__float2bfloat16_rn(pb);
+      const auto a16=__float2bfloat16_rn(pa),b16=__float2bfloat16_rn(pb);
+      if(h<4){p0a=a16;p0b=b16;}
+      else if(h<8){p1a=a16;p1b=b16;}
+      else if(h<12){p2a=a16;p2b=b16;}
+      else {p3a=a16;p3b=b16;}
       if(lane==0){maximum[h]=m;rescale[h]=scale;sum[h]=fmaf(sum[h],scale,total);}
     }
     __syncthreads();
     // WMMA accumulator lane ownership is opaque: rescale through shared storage
     // instead of depending on an undocumented fragment-to-head mapping.
 #pragma unroll
-    for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],512,wmma::mem_row_major);
+    for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],kOutputStride,wmma::mem_row_major);
     __syncthreads();
-    for(int i=tid;i<16*512;i+=128)scratch[i]*=rescale[i/512];
+    for(int i=tid;i<16*512;i+=128)scratch[(i/512)*kOutputStride+i%512]*=rescale[i/512];
     __syncthreads();
 #pragma unroll
-    for(int t=0;t<8;++t)wmma::load_matrix_sync(acc[t],scratch+warp*128+t*16,512,wmma::mem_row_major);
+    for(int t=0;t<8;++t)wmma::load_matrix_sync(acc[t],scratch+warp*128+t*16,kOutputStride,wmma::mem_row_major);
+    __syncthreads();
+    // Every accumulator fragment is reloaded before probabilities reuse scratch.
+    probability[warp*kProbabilityStride+lane]=p0a;
+    probability[warp*kProbabilityStride+lane+32]=p0b;
+    probability[(warp+4)*kProbabilityStride+lane]=p1a;
+    probability[(warp+4)*kProbabilityStride+lane+32]=p1b;
+    probability[(warp+8)*kProbabilityStride+lane]=p2a;
+    probability[(warp+8)*kProbabilityStride+lane+32]=p2b;
+    probability[(warp+12)*kProbabilityStride+lane]=p3a;
+    probability[(warp+12)*kProbabilityStride+lane+32]=p3b;
+    __syncthreads();
     for(int k=0;k<64;k+=16) {
       wmma::fragment<wmma::matrix_a,16,16,16,__nv_bfloat16,wmma::row_major> p;
-      wmma::load_matrix_sync(p,probability+k,64);
+      wmma::load_matrix_sync(p,probability+k,kProbabilityStride);
 #pragma unroll
       for(int t=0;t<8;++t) {
         wmma::fragment<wmma::matrix_b,16,16,16,__nv_bfloat16,wmma::row_major> v;
-        wmma::load_matrix_sync(v,kv+k*512+warp*128+t*16,512);
+        wmma::load_matrix_sync(v,kv+k*kKvStride+warp*128+t*16,kKvStride);
         wmma::mma_sync(acc[t],p,v,acc[t]);
       }
     }
     __syncthreads();
   }
 #pragma unroll
-  for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],512,wmma::mem_row_major);
+  for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],kOutputStride,wmma::mem_row_major);
   if(tid<16)sum[tid]+=expf(sink[group*16+tid]-maximum[tid]);
   __syncthreads();
-  for(int i=tid;i<16*512;i+=128)output[base+i]=__float2bfloat16_rn(scratch[i]/sum[i/512]);
+  for(int i=tid;i<16*512;i+=128)output[base+i]=__float2bfloat16_rn(scratch[(i/512)*kOutputStride+i%512]/sum[i/512]);
 }
 bool span(const void* ptr,uint64_t n,uint32_t a) {
   const auto p=reinterpret_cast<uintptr_t>(ptr);return p&&p%a==0&&p<=UINTPTR_MAX-n;
