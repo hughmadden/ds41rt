@@ -1,0 +1,962 @@
+{
+  "scope": "Same coordinator binaries and expert native libraries; Spark worker ownership change. Short greedy diagnostic runs, not a release benchmark.",
+  "quality_exact_before_after": true,
+  "performance": {
+    "target": {
+      "rates": {
+        "queued": [
+          14.108527656691313,
+          13.59669296157996,
+          15.059413145570083
+        ],
+        "local": [
+          20.31698342488026,
+          20.557173427408692,
+          20.561589497762633
+        ]
+      },
+      "median_ratio": 1.4570743260838384,
+      "runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.16422387200873345,
+          "finish_seconds": 3.0189783789683133,
+          "observed_decode_tokens_per_second": 20.31698342488026,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1605592779815197,
+          "finish_seconds": 2.9819588349200785,
+          "observed_decode_tokens_per_second": 20.557173427408692,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.15685983293224126,
+          "finish_seconds": 2.9776534299599007,
+          "observed_decode_tokens_per_second": 20.561589497762633,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.1449669529683888,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-b96360b9-505f-4399-8d71-ddfb1747c5d4",
+        "object": "chat.completion",
+        "created": 1789125669,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400
+    },
+    "spec": {
+      "rates": {
+        "queued": [
+          59.56834180784557,
+          64.97305271036926,
+          65.89937981250007
+        ],
+        "local": [
+          79.0933302550402,
+          79.39653171453884,
+          79.59028043264001
+        ]
+      },
+      "median_ratio": 1.221991708908387,
+      "runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.15751473710406572,
+          "finish_seconds": 0.890825622016564,
+          "observed_decode_tokens_per_second": 79.0933302550402,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.17127526202239096,
+          "finish_seconds": 0.9017857610015199,
+          "observed_decode_tokens_per_second": 79.39653171453884,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.16880304890219122,
+          "finish_seconds": 0.8975352469133213,
+          "observed_decode_tokens_per_second": 79.59028043264001,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.15205446700565517,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-bb8b0806-054a-4dd7-b9fe-c58e8c99dda2",
+        "object": "chat.completion",
+        "created": 1789125693,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400
+    }
+  },
+  "phases": {
+    "target": {
+      "experts_us": 328.0,
+      "attention_us": 579.0
+    },
+    "spec": {
+      "experts_us": 705.0,
+      "attention_us": 600.0
+    }
+  },
+  "workers": {
+    "ostrich": {
+      "kernel_us": 156.89599609375,
+      "total_us": 186.0,
+      "execute_ms": 0.192
+    },
+    "dodo": {
+      "kernel_us": 156.7679901123047,
+      "total_us": 186.0,
+      "execute_ms": 0.191
+    },
+    "emu": {
+      "kernel_us": 157.08799743652344,
+      "total_us": 187.0,
+      "execute_ms": 0.192
+    },
+    "kiwi": {
+      "execute_ms": 0.191,
+      "kernel_us": 156.7360076904297,
+      "total_us": 186.0
+    }
+  },
+  "quality": {
+    "scope": "Eight paired single-client greedy cases. Six objective checks and two open-ended comparisons; not broad model quality, stochastic equivalence or release performance.",
+    "cases": [
+      {
+        "case": {
+          "name": "arithmetic",
+          "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+          "expected": "575"
+        },
+        "runs": {
+          "target": {
+            "text": "575",
+            "first_content_seconds": 0.16524606698658317,
+            "finish_seconds": 0.23218358005397022,
+            "observed_decode_tokens_per_second": 14.93930614053863,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "575",
+            "first_content_seconds": 0.1576115629868582,
+            "finish_seconds": 0.2488853019895032,
+            "observed_decode_tokens_per_second": 10.956053854340524,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "signed_sort",
+          "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+          "expected_json": [
+            -11,
+            -4,
+            0,
+            7,
+            7,
+            12
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.21121646300889552,
+            "finish_seconds": 1.142101994017139,
+            "observed_decode_tokens_per_second": 19.33642687571282,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.1843316990416497,
+            "finish_seconds": 0.558408785960637,
+            "observed_decode_tokens_per_second": 48.11842432866839,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "extraction",
+          "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+          "expected_json": {
+            "total": 40,
+            "names": [
+              "Alice",
+              "Bob"
+            ]
+          }
+        },
+        "runs": {
+          "target": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.19748292793519795,
+            "finish_seconds": 1.0136196960229427,
+            "observed_decode_tokens_per_second": 19.604557257589214,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.1945079310098663,
+            "finish_seconds": 0.5078047219431028,
+            "observed_decode_tokens_per_second": 51.06978578471811,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "logic",
+          "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+          "expected_json": [
+            "D",
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.18517347297165543,
+            "finish_seconds": 0.8251527069369331,
+            "observed_decode_tokens_per_second": 18.750608399664205,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.19926173996645957,
+            "finish_seconds": 0.36303389293607324,
+            "observed_decode_tokens_per_second": 73.27253005110389,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "unicode",
+          "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+          "expected": "36"
+        },
+        "runs": {
+          "target": {
+            "text": "36",
+            "first_content_seconds": 0.15547960007097572,
+            "finish_seconds": 0.22376506798900664,
+            "observed_decode_tokens_per_second": 14.64440429990739,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "36",
+            "first_content_seconds": 0.16240608203224838,
+            "finish_seconds": 0.256221940042451,
+            "observed_decode_tokens_per_second": 10.659178748770257,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "translation",
+          "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+        },
+        "runs": {
+          "target": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.15696528204716742,
+            "finish_seconds": 0.5145452349679545,
+            "observed_decode_tokens_per_second": 19.576041505745923,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.15852326096501201,
+            "finish_seconds": 0.40874766395427287,
+            "observed_decode_tokens_per_second": 27.974889404773307,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "explanation",
+          "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+        },
+        "runs": {
+          "target": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.1812947179423645,
+            "finish_seconds": 1.6876604529097676,
+            "observed_decode_tokens_per_second": 20.579331619403053,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.16314077493734658,
+            "finish_seconds": 1.0608037339989096,
+            "observed_decode_tokens_per_second": 34.53411961256382,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "long_retrieval",
+          "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+          "expected": "quartz-731"
+        },
+        "runs": {
+          "target": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.489689187030308,
+            "finish_seconds": 3.851327924989164,
+            "observed_decode_tokens_per_second": 11.060761970845848,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.370441598002799,
+            "finish_seconds": 3.504456323920749,
+            "observed_decode_tokens_per_second": 29.847466184044404,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      }
+    ]
+  },
+  "concurrent_pair_checks": [
+    {
+      "cycle": 0,
+      "mode": "target",
+      "response": {
+        "id": "chatcmpl-ebc86f34-6dbf-4723-a633-27ccbf26b6d3",
+        "object": "chat.completion",
+        "created": 1789125791,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      }
+    },
+    {
+      "cycle": 0,
+      "mode": "spec",
+      "response": {
+        "id": "chatcmpl-4b4c7682-a723-4a65-ac45-cf5e03696dac",
+        "object": "chat.completion",
+        "created": 1789125791,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "36"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 25,
+          "completion_tokens": 2,
+          "total_tokens": 27,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 25
+        }
+      }
+    },
+    {
+      "cycle": 1,
+      "mode": "target",
+      "response": {
+        "id": "chatcmpl-5e0053c8-220f-41df-a2c1-6a8198bfd6b6",
+        "object": "chat.completion",
+        "created": 1789125792,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      }
+    },
+    {
+      "cycle": 1,
+      "mode": "spec",
+      "response": {
+        "id": "chatcmpl-b933d173-8806-4884-b3ac-9e67c62eb138",
+        "object": "chat.completion",
+        "created": 1789125792,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "36"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 25,
+          "completion_tokens": 2,
+          "total_tokens": 27,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 25
+        }
+      }
+    },
+    {
+      "cycle": 2,
+      "mode": "target",
+      "response": {
+        "id": "chatcmpl-3a421de9-6e09-418b-a4e3-52da44e0cec0",
+        "object": "chat.completion",
+        "created": 1789125792,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      }
+    },
+    {
+      "cycle": 2,
+      "mode": "spec",
+      "response": {
+        "id": "chatcmpl-01fa8fef-7a35-489d-9b9b-90f38e777483",
+        "object": "chat.completion",
+        "created": 1789125792,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "36"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 25,
+          "completion_tokens": 2,
+          "total_tokens": 27,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 25
+        }
+      }
+    }
+  ],
+  "worker_create_commands": {
+    "ostrich": [
+      "docker",
+      "create",
+      "--name",
+      "ds41-local-qp-worker",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-e",
+      "RUST_LOG=warn,ds41rt::expert_timing=debug,ds41_fp8_worker::v41_experts::service=info",
+      "-v",
+      "/tmp/ds41-wire-artifacts:/audit:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-v",
+      "/tmp/ds41-slice-artifacts/cmake:/audit/cmake:ro",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-v",
+      "/tmp/ds41-local-qp-worker/worker:/audit/worker:ro",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/audit/worker",
+      "ds41rt-spark-expert-dev:latest",
+      "0"
+    ],
+    "dodo": [
+      "docker",
+      "create",
+      "--name",
+      "ds41-local-qp-worker",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-e",
+      "RUST_LOG=warn,ds41rt::expert_timing=debug,ds41_fp8_worker::v41_experts::service=info",
+      "-v",
+      "/tmp/ds41-wire-artifacts:/audit:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-v",
+      "/tmp/ds41-slice-artifacts/cmake:/audit/cmake:ro",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-v",
+      "/tmp/ds41-local-qp-worker/worker:/audit/worker:ro",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/audit/worker",
+      "ds41rt-spark-expert-dev:latest",
+      "1"
+    ],
+    "emu": [
+      "docker",
+      "create",
+      "--name",
+      "ds41-local-qp-worker",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-e",
+      "RUST_LOG=warn,ds41rt::expert_timing=debug,ds41_fp8_worker::v41_experts::service=info",
+      "-v",
+      "/tmp/ds41-wire-artifacts:/audit:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-v",
+      "/tmp/ds41-slice-artifacts/cmake:/audit/cmake:ro",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-v",
+      "/tmp/ds41-local-qp-worker/worker:/audit/worker:ro",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/audit/worker",
+      "ds41rt-spark-expert-dev:latest",
+      "2"
+    ],
+    "kiwi": [
+      "docker",
+      "create",
+      "--name",
+      "ds41-local-qp-worker",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-e",
+      "RUST_LOG=warn,ds41rt::expert_timing=debug,ds41_fp8_worker::v41_experts::service=info",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-v",
+      "/tmp/ds41-wire-artifacts:/audit:ro",
+      "-v",
+      "/tmp/ds41-slice-artifacts/cmake:/audit/cmake:ro",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-v",
+      "/tmp/ds41-local-qp-worker/worker:/audit/worker:ro",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/audit/worker",
+      "ds41rt-spark-expert-dev:latest",
+      "3"
+    ]
+  },
+  "worker_sha256": "3b2d40d4f49f3694556d39c61ec8f7031b5bf1a037912db3ba13a4aa0700ecf7",
+  "log_hashes": {
+    "kiwi.log": "a6df5306ac32eb916a1d261ca2dc54b4db555cfaafd149f22b3f6f66ceee4862",
+    "emu.log": "1aee57cb9228040d38fbb0118fe74ac88e90a9d44261ecd8a35401e11ab43a50",
+    "dodo.log": "650a7c0ffbd60cf9f7e7599d82825fac9a52f5a1997f35ddfb67f4c4bb92b877",
+    "ostrich.log": "dae16def34f68f4c579cbbc27e72f8227d087f7ea363b4fdcbc93c4693c886de",
+    "spec-api.log": "69620171272c012558f8a82e5acd431e5afba65193dd1561b9dac9fa61c1b88d",
+    "target-api.log": "28afa5434b027e252803191aa4dcf65e05bbf662125a6d065c5a08aafaa84ca1",
+    "quality.log": "2b98864502fd9d76b832af0553a86525d7a6603ad8925626c22b06c2975cebff",
+    "spec.log": "78c2a0f73a6b0322163406ace76b91e56cc9633cb02df52413746e22cc82b25f",
+    "target.log": "a7a34566aabf54c879364ec4f79f2614590568e01a2df97d4af07a0bcd60b739"
+  },
+  "transport_fixture_log": "protocol_v2_verbs_persistent_client_connect addr=10.55.0.2:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370002 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_connect addr=10.55.0.1:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370001 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_connect addr=10.55.0.3:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370003 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_connect addr=10.55.0.4:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370004 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=1 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.012 expected_response_ms=0.000 post_recv_ms=0.004 send_ms=0.014 poll_ms=0.034 copy_recv_ms=118.447 parse_ms=0.044 assemble_ms=0.000 total_ms=118.581 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=1 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.007 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.004 poll_ms=0.027 copy_recv_ms=86.140 parse_ms=0.027 assemble_ms=0.000 total_ms=86.236 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=1 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.012 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.008 poll_ms=0.027 copy_recv_ms=105.543 parse_ms=0.017 assemble_ms=0.000 total_ms=105.642 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=1 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.008 expected_response_ms=0.000 post_recv_ms=0.003 send_ms=0.005 poll_ms=0.027 copy_recv_ms=45.961 parse_ms=0.020 assemble_ms=0.000 total_ms=46.054 pipelined=true\nPASS id=1 rows=1 chunks=4\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=2 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.003 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.001 poll_ms=0.012 copy_recv_ms=0.010 parse_ms=0.004 assemble_ms=0.000 total_ms=0.042 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=2 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.003 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.002 poll_ms=0.012 copy_recv_ms=0.012 parse_ms=0.013 assemble_ms=0.000 total_ms=0.053 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=2 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.005 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.003 poll_ms=0.012 copy_recv_ms=0.015 parse_ms=0.004 assemble_ms=0.000 total_ms=0.052 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=2 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.005 expected_response_ms=0.000 post_recv_ms=0.000 send_ms=0.006 poll_ms=0.026 copy_recv_ms=0.026 parse_ms=0.004 assemble_ms=0.000 total_ms=0.093 pipelined=true\nPASS id=2 rows=2 chunks=8\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=3 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.002 send_ms=0.002 poll_ms=0.022 copy_recv_ms=0.107 parse_ms=0.014 assemble_ms=0.000 total_ms=0.174 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=3 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.005 expected_response_ms=0.000 post_recv_ms=0.002 send_ms=0.002 poll_ms=0.024 copy_recv_ms=0.116 parse_ms=0.008 assemble_ms=0.000 total_ms=0.181 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=3 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.002 send_ms=0.003 poll_ms=0.029 copy_recv_ms=0.144 parse_ms=0.009 assemble_ms=0.000 total_ms=0.220 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=3 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.002 poll_ms=0.030 copy_recv_ms=0.153 parse_ms=0.010 assemble_ms=0.000 total_ms=0.233 pipelined=true\nPASS id=3 rows=6 chunks=24\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=4 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.010 expected_response_ms=0.000 post_recv_ms=0.005 send_ms=0.015 poll_ms=0.668 copy_recv_ms=0.176 parse_ms=0.025 assemble_ms=0.000 total_ms=1.524 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=4 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.015 expected_response_ms=0.000 post_recv_ms=0.005 send_ms=0.005 poll_ms=0.830 copy_recv_ms=0.173 parse_ms=0.028 assemble_ms=0.000 total_ms=1.836 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=4 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.010 expected_response_ms=0.000 post_recv_ms=0.009 send_ms=0.009 poll_ms=0.957 copy_recv_ms=0.063 parse_ms=0.031 assemble_ms=0.000 total_ms=1.966 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=4 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.014 expected_response_ms=0.000 post_recv_ms=0.005 send_ms=0.007 poll_ms=1.130 copy_recv_ms=0.142 parse_ms=0.026 assemble_ms=0.000 total_ms=2.280 pipelined=true\nPASS id=4 rows=16 chunks=64\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=5 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.082 expected_response_ms=0.000 post_recv_ms=0.025 send_ms=0.023 poll_ms=2.920 copy_recv_ms=0.236 parse_ms=0.112 assemble_ms=0.000 total_ms=6.187 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=5 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.083 expected_response_ms=0.000 post_recv_ms=0.024 send_ms=0.014 poll_ms=3.109 copy_recv_ms=0.246 parse_ms=0.111 assemble_ms=0.000 total_ms=6.291 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=5 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.082 expected_response_ms=0.000 post_recv_ms=0.020 send_ms=0.030 poll_ms=4.249 copy_recv_ms=0.238 parse_ms=0.113 assemble_ms=0.000 total_ms=8.770 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=5 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.088 expected_response_ms=0.000 post_recv_ms=0.021 send_ms=0.017 poll_ms=5.517 copy_recv_ms=0.245 parse_ms=0.107 assemble_ms=0.000 total_ms=11.076 pipelined=true\nPASS id=5 rows=80 chunks=320\ncancelled enqueued wave; next request must recover\nprotocol_v2_verbs_persistent_client_connect addr=10.55.0.3:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370003 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=6 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.013 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.008 poll_ms=0.072 copy_recv_ms=0.644 parse_ms=0.030 assemble_ms=0.000 total_ms=0.841 pipelined=true\nprotocol_v2_verbs_persistent_client_connect addr=10.55.0.4:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370004 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=6 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.005 expected_response_ms=0.000 post_recv_ms=0.000 send_ms=0.003 poll_ms=0.031 copy_recv_ms=0.022 parse_ms=0.016 assemble_ms=0.000 total_ms=0.110 pipelined=true\nprotocol_v2_verbs_persistent_client_connect addr=10.55.0.2:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370002 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_connect addr=10.55.0.1:19451 ring_depth=8 request_capacity=2097152 request_stride=2097152 request_span=16777216 response_capacity=2097152 response_stride=2097152 response_span=16777216 client_device=mlx5_0 client_gid=00000000000000000000ffff0a37000c client_status=\"RDMA RC endpoint created gid_index=3\" server_device=rocep1s0f0 server_gid=00000000000000000000ffff0a370001 server_status=\"RDMA RC endpoint created gid_index=3\"\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=6 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.005 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.004 poll_ms=0.026 copy_recv_ms=0.041 parse_ms=0.024 assemble_ms=0.000 total_ms=0.129 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=6 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.000 send_ms=0.002 poll_ms=0.027 copy_recv_ms=0.016 parse_ms=0.007 assemble_ms=0.000 total_ms=0.083 pipelined=true\nPASS id=6 rows=1 chunks=4\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=7 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.002 expected_response_ms=0.000 post_recv_ms=0.000 send_ms=0.001 poll_ms=0.011 copy_recv_ms=0.012 parse_ms=0.005 assemble_ms=0.000 total_ms=0.043 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=7 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.003 expected_response_ms=0.000 post_recv_ms=0.000 send_ms=0.001 poll_ms=0.016 copy_recv_ms=0.021 parse_ms=0.004 assemble_ms=0.000 total_ms=0.064 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=7 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.003 poll_ms=0.012 copy_recv_ms=0.041 parse_ms=0.007 assemble_ms=0.000 total_ms=0.081 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=7 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.005 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.002 poll_ms=0.049 copy_recv_ms=0.022 parse_ms=0.005 assemble_ms=0.000 total_ms=0.132 pipelined=true\nPASS id=7 rows=2 chunks=8\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=8 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.002 send_ms=0.002 poll_ms=0.017 copy_recv_ms=0.065 parse_ms=0.009 assemble_ms=0.000 total_ms=0.116 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=8 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.002 send_ms=0.002 poll_ms=0.016 copy_recv_ms=0.104 parse_ms=0.009 assemble_ms=0.000 total_ms=0.154 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=8 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.002 send_ms=0.002 poll_ms=0.025 copy_recv_ms=0.107 parse_ms=0.010 assemble_ms=0.000 total_ms=0.179 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=8 layer_id=0 rows=6 routes=36 request_wire_bytes=32448 response_frames=6 received_wire_bytes=62040 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.004 send_ms=0.002 poll_ms=0.031 copy_recv_ms=0.105 parse_ms=0.014 assemble_ms=0.000 total_ms=0.194 pipelined=true\nPASS id=8 rows=6 chunks=24\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=9 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.009 expected_response_ms=0.000 post_recv_ms=0.003 send_ms=0.003 poll_ms=0.708 copy_recv_ms=0.077 parse_ms=0.021 assemble_ms=0.000 total_ms=1.446 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=9 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.022 expected_response_ms=0.000 post_recv_ms=0.005 send_ms=0.006 poll_ms=0.838 copy_recv_ms=0.096 parse_ms=0.038 assemble_ms=0.000 total_ms=1.741 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=9 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.010 expected_response_ms=0.000 post_recv_ms=0.004 send_ms=0.003 poll_ms=1.055 copy_recv_ms=0.104 parse_ms=0.021 assemble_ms=0.000 total_ms=2.140 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=9 layer_id=0 rows=16 routes=96 request_wire_bytes=86368 response_frames=16 received_wire_bytes=165440 assembled_wire_bytes=0 encode_ms=0.020 expected_response_ms=0.000 post_recv_ms=0.006 send_ms=0.004 poll_ms=1.184 copy_recv_ms=0.109 parse_ms=0.030 assemble_ms=0.000 total_ms=2.408 pipelined=true\nPASS id=9 rows=16 chunks=64\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=10 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.083 expected_response_ms=0.000 post_recv_ms=0.019 send_ms=0.024 poll_ms=2.089 copy_recv_ms=0.216 parse_ms=0.107 assemble_ms=0.000 total_ms=4.514 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=10 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.167 expected_response_ms=0.000 post_recv_ms=0.025 send_ms=0.021 poll_ms=4.165 copy_recv_ms=0.426 parse_ms=0.127 assemble_ms=0.000 total_ms=8.799 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=10 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.082 expected_response_ms=0.000 post_recv_ms=0.018 send_ms=0.017 poll_ms=4.468 copy_recv_ms=0.383 parse_ms=0.106 assemble_ms=0.000 total_ms=8.906 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=10 layer_id=0 rows=80 routes=480 request_wire_bytes=431456 response_frames=80 received_wire_bytes=827200 assembled_wire_bytes=0 encode_ms=0.149 expected_response_ms=0.000 post_recv_ms=0.028 send_ms=0.023 poll_ms=4.469 copy_recv_ms=0.286 parse_ms=0.152 assemble_ms=0.000 total_ms=9.280 pipelined=true\nPASS id=10 rows=80 chunks=320\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=11 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.003 expected_response_ms=0.000 post_recv_ms=0.000 send_ms=0.002 poll_ms=0.012 copy_recv_ms=0.007 parse_ms=0.004 assemble_ms=0.000 total_ms=0.042 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=11 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.003 expected_response_ms=0.000 post_recv_ms=0.000 send_ms=0.001 poll_ms=0.012 copy_recv_ms=0.009 parse_ms=0.003 assemble_ms=0.000 total_ms=0.046 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=11 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.002 poll_ms=0.009 copy_recv_ms=0.013 parse_ms=0.006 assemble_ms=0.000 total_ms=0.048 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=11 layer_id=0 rows=1 routes=6 request_wire_bytes=5488 response_frames=1 received_wire_bytes=10340 assembled_wire_bytes=0 encode_ms=0.007 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.005 poll_ms=0.014 copy_recv_ms=0.017 parse_ms=0.005 assemble_ms=0.000 total_ms=0.071 pipelined=true\nPASS id=11 rows=1 chunks=4\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.1:19451 request_id=12 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.004 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.003 poll_ms=0.011 copy_recv_ms=0.004 parse_ms=0.007 assemble_ms=0.000 total_ms=0.041 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.2:19451 request_id=12 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.003 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.002 poll_ms=0.014 copy_recv_ms=0.004 parse_ms=0.005 assemble_ms=0.000 total_ms=0.043 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.4:19451 request_id=12 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.003 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.001 poll_ms=0.017 copy_recv_ms=0.005 parse_ms=0.005 assemble_ms=0.000 total_ms=0.052 pipelined=true\nprotocol_v2_verbs_persistent_client_roundtrip_timing addr=10.55.0.3:19451 request_id=12 layer_id=0 rows=2 routes=12 request_wire_bytes=10880 response_frames=2 received_wire_bytes=20680 assembled_wire_bytes=0 encode_ms=0.005 expected_response_ms=0.000 post_recv_ms=0.001 send_ms=0.002 poll_ms=0.015 copy_recv_ms=0.006 parse_ms=0.006 assemble_ms=0.000 total_ms=0.051 pipelined=true\nPASS id=12 rows=2 chunks=8\n"
+}
