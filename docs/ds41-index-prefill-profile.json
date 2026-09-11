@@ -1,0 +1,160 @@
+{
+  "baseline_commit": "edb1d38",
+  "trace": {
+    "counts": {
+      "query preparation": 680,
+      "attention stages": 680,
+      "collection": 680,
+      "experts": 680,
+      "layer": 680,
+      "layer preparation": 663,
+      "step": 17
+    },
+    "seconds": {
+      "query preparation": {
+        "total_us": 0.349446
+      },
+      "attention stages": {
+        "sparse_us": 3.285268,
+        "projection_us": 0.316665,
+        "ffn_prepare_us": 0.220874
+      },
+      "collection": {
+        "shared_copy_us": 0.0,
+        "upload_us": 1.025093,
+        "receive_us": 4.453002,
+        "reduce_us": 0.137804
+      },
+      "experts": {
+        "routed_us": 1.303835,
+        "dispatch_us": 1.391086,
+        "shared_us": 0.162375,
+        "collect_us": 5.621995
+      },
+      "layer": {
+        "produced_us": 0.135053,
+        "index_us": 3.613104,
+        "attention_us": 3.830003,
+        "experts_us": 8.481893,
+        "finish_us": 0.079054
+      },
+      "layer preparation": {
+        "advance_us": 0.028774,
+        "engram_us": 0.043617,
+        "taps_us": 0.001194,
+        "begin_us": 0.343573
+      },
+      "step": {
+        "prepared_us": 0.002604,
+        "execute_us": 16.594087,
+        "sample_us": 0.002177,
+        "commit_us": 0.010913,
+        "total_us": 16.609781
+      }
+    }
+  },
+  "components": {
+    "scope": "Synthetic all-valid committed-cache index scoring and top-512, separate captured kernels; no proposal reads, network, or API overhead.",
+    "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "capability": [
+      12,
+      0
+    ],
+    "native_sha256": "cf202558ee672d1c34a273e9c62d09b1ca8f6bad1367f1cae2c63ceedc5f3560",
+    "script_sha256": "1e9112e8839aecb9d0e470c00fa4c1f1303f285cc7c90450b4aa7e1bc3f21f8a",
+    "samples": 5,
+    "replays_per_sample": 5,
+    "results": [
+      {
+        "rows": 1,
+        "width": 512,
+        "score_us": 6.5407998859882355,
+        "top512_us": 29.88159954547882
+      },
+      {
+        "rows": 1,
+        "width": 4096,
+        "score_us": 19.020800292491913,
+        "top512_us": 49.535998702049255
+      },
+      {
+        "rows": 1,
+        "width": 16384,
+        "score_us": 65.92000126838684,
+        "top512_us": 69.0559983253479
+      },
+      {
+        "rows": 6,
+        "width": 512,
+        "score_us": 16.659200191497803,
+        "top512_us": 30.937600135803223
+      },
+      {
+        "rows": 6,
+        "width": 4096,
+        "score_us": 96.806401014328,
+        "top512_us": 49.510401487350464
+      },
+      {
+        "rows": 6,
+        "width": 16384,
+        "score_us": 371.41120433807373,
+        "top512_us": 69.43359971046448
+      },
+      {
+        "rows": 80,
+        "width": 512,
+        "score_us": 163.40479850769043,
+        "top512_us": 31.040000915527344
+      },
+      {
+        "rows": 80,
+        "width": 4096,
+        "score_us": 1236.4352226257324,
+        "top512_us": 55.635201930999756
+      },
+      {
+        "rows": 80,
+        "width": 16384,
+        "score_us": 5015.827178955078,
+        "top512_us": 139.5967960357666
+      },
+      {
+        "rows": 256,
+        "width": 512,
+        "score_us": 524.5952129364014,
+        "top512_us": 49.06879961490631
+      },
+      {
+        "rows": 256,
+        "width": 4096,
+        "score_us": 3994.0799713134766,
+        "top512_us": 117.09439754486084
+      },
+      {
+        "rows": 256,
+        "width": 16384,
+        "score_us": 16847.51434326172,
+        "top512_us": 346.47040367126465
+      },
+      {
+        "rows": 1024,
+        "width": 512,
+        "score_us": 2082.156753540039,
+        "top512_us": 131.5071940422058
+      },
+      {
+        "rows": 1024,
+        "width": 4096,
+        "score_us": 16855.148315429688,
+        "top512_us": 362.7392053604126
+      },
+      {
+        "rows": 1024,
+        "width": 16384,
+        "score_us": 68922.72338867188,
+        "top512_us": 1268.4096336364746
+      }
+    ]
+  }
+}
