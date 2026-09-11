@@ -1,0 +1,2319 @@
+{
+  "status": "Qualified prototype only; not deployed. Deferred behind missing CED prefill execution.",
+  "raw_directory": "/tmp/ds41-rescale-fragment",
+  "source_sha256": "435177bc125d8272a67e15972b85a3a6408448280138279d0041a764a45d1468",
+  "source": "#include \"ds41rt_v41_sparse_attention.h\"\n#include <cuda_runtime.h>\n#include <cuda_bf16.h>\n#include <cuda_fp8.h>\n#include <mma.h>\n#include <stdint.h>\n#include <math_constants.h>\nnamespace {\nusing namespace nvcuda;\n#if defined(__CUDA_ARCH_SPECIFIC__) && __CUDA_ARCH_SPECIFIC__ == 1200\n__device__ __forceinline__ uint32_t packed_fp8_pair(uint16_t input,uint32_t factors) {\n  uint32_t output;\n  asm(\"{ .reg .b32 values; cvt.rn.bf16x2.e4m3x2 values, %1; mul.bf16x2 %0, values, %2; }\"\n      : \"=r\"(output) : \"h\"(input), \"r\"(factors));\n  return output;\n}\n\n#endif\n// Pad shared rows to distribute WMMA traffic across memory banks.\nconstexpr int kKvStride=520, kOutputStride=516, kProbabilityStride=80;\nconstexpr int kKvBytes=64*kKvStride*2, kOutputBytes=16*kOutputStride*4;\nconstexpr int kSharedBytes=kKvBytes+kOutputBytes+192+512;\n\n__device__ float warp_max(float x) {\n  for(int n=16;n;n>>=1)x=fmaxf(x,__shfl_xor_sync(0xffffffffu,x,n));\n  return x;\n}\n__device__ float warp_sum(float x) {\n  for(int n=16;n;n>>=1)x=__fadd_rn(x,__shfl_xor_sync(0xffffffffu,x,n));\n  return x;\n}\n// Top two bits distinguish ring, private window, paged source and private source.\n// Invalid rows never dereference a value or scale pointer.\n__device__ __forceinline__ uint64_t locate(const ds41rt_v41_sparse_kv_t& v,const uint64_t* m,\n    const int32_t* selected,int key,int width) {\n  if(key<width) {\n    const uint64_t begin=m[3]+1>128?m[3]+1-128:0,pos=begin+key;\n    if(pos>m[3])return UINT64_MAX;\n    return pos<m[0]?pos%128:((1ull<<62)|(m[1]+pos-m[0]));\n  }\n  const int32_t id=selected[key-width];\n  if(id<0 || uint64_t(id)>=m[5])return UINT64_MAX;\n  const uint64_t pos=uint64_t(id);\n  if(pos>=m[6]) {\n    if(pos-m[6]>=m[7])return UINT64_MAX;\n    return (3ull<<62)|(m[8]+(pos-m[6])*m[9]);\n  }\n  if(pos>=uint64_t(v.page_stride)*256)return UINT64_MAX;\n  const uint64_t physical=uint64_t(v.pages[pos/256])*256+pos%256;\n  return physical<v.source_capacity?((2ull<<62)|physical):UINT64_MAX;\n}\n// Grid-constant descriptor avoids a per-thread copy for dynamic source indexing.\ntemplate<bool Split>\n__global__ void attend(const __nv_bfloat16* query,const float* sink,\n    const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,\n    int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v,float* partial) {\n  // Zero width requests the exact former host maximum for this contiguous,\n  // ascending request. Reading metadata keeps decode graph arguments stable.\n  if(width==0) {\n    const uint64_t last=metadata[(uint64_t(gridDim.x)-1)*10+3];\n    width=last<127?int(last+1):128;\n  }\n  const int row=blockIdx.x,group=blockIdx.y;\n  const uint64_t partial_base=((uint64_t(row)*gridDim.z+blockIdx.z)*64+group*16)*514;\n  const int tid=threadIdx.x,warp=tid/32,lane=tid%32;\n  const uint64_t base=(uint64_t(row)*64+group*16)*512;\n  const uint64_t* m=metadata+uint64_t(row)*10;\n  bool valid=m[0]==*v.window_end && m[0]<=1048576 && m[2]>0 &&\n    m[2]<=1048576-m[0] && m[1]<=v.window_proposal_capacity &&\n    m[2]<=v.window_proposal_capacity-m[1] && m[3]>=m[0] && m[3]-m[0]<m[2] &&\n    uint64_t(width)>=(m[3]+1<128?m[3]+1:128);\n  if(valid && v.compressed)valid=m[4]==0 && m[6]==*v.source_end && m[6]<=1048576 &&\n    m[7]<=1048576-m[6] && m[5]<=m[6]+m[7] && (m[9]==1 || m[9]==2) &&\n    m[8]<=v.source_proposal_capacity && (!m[7] || (m[8]<v.source_proposal_capacity &&\n      m[7]-1<=(v.source_proposal_capacity-1-m[8])/m[9]));\n  if(!valid) {\n    if constexpr(Split) {\n      for(int i=tid;i<16*514;i+=128)partial[partial_base+i]=i%514==513?-1.0f:0.0f;\n    } else {\n      for(int i=tid;i<16*512;i+=128)output[base+i]=__float2bfloat16(0);\n    }\n    return;\n  }\n  extern __shared__ __align__(32) unsigned char memory[];\n  auto* kv=reinterpret_cast<__nv_bfloat16*>(memory);\n  auto* scratch=reinterpret_cast<float*>(memory+kKvBytes);\n  // Scores, accumulator rescaling and PV probabilities have disjoint lifetimes.\n  auto* probability=reinterpret_cast<__nv_bfloat16*>(scratch);\n  auto* maximum=reinterpret_cast<float*>(memory+kKvBytes+kOutputBytes);\n  float* sum=maximum+16;float* rescale=sum+16;\n  if(tid<16){maximum[tid]=-1e30f;sum[tid]=0;}\n  wmma::fragment<wmma::accumulator,16,16,16,float> acc[8];\n#pragma unroll\n  for(int t=0;t<8;++t)wmma::fill_fragment(acc[t],0.0f);\n  auto* refs=reinterpret_cast<uint64_t*>(memory+kKvBytes+kOutputBytes+192);\n  const int count=width+(v.compressed?512:0);\n  // The first valid tile starts from zero accumulators; no rescale is needed.\n  bool empty=true;\n  const int tiles=(count+63)/64, per_part=Split?(tiles+gridDim.z-1)/gridDim.z:tiles;\n  const int first=Split?blockIdx.z*per_part*64:0;\n  const int last=Split?min(count,int(blockIdx.z+1)*per_part*64):count;\n  for(int start=first;start<last;start+=64) {\n    if(tid<64)refs[tid]=start+tid<count?locate(v,m,\n      v.compressed?selected+uint64_t(row)*512:nullptr,start+tid,width):UINT64_MAX;\n    // An entirely masked tile contributes zero probability and leaves both\n    // online-softmax state and accumulators unchanged. Vote over the same\n    // resolved references used below; valid entries may occur after empty tiles.\n    if(!__syncthreads_or(tid<64 && refs[tid]!=UINT64_MAX))continue;\n    // A warp stages four contiguous FP8 values per lane, reusing each\n    // resolved key pointer. Preserve unaligned byte-addressed ABI inputs.\n    for(int key=warp;key<64;key+=4) {\n      const uint64_t ref=refs[key];\n      for(int block=0;block<4;++block) {\n        const int col=block*128+lane*4;\n        uint64_t packed=0;\n        if(ref!=UINT64_MAX) {\n          const int tag=ref>>62;const uint64_t physical=ref&((1ull<<62)-1);\n          const uint8_t* source=v.values[tag]+physical*512+col;\n          uint32_t bytes;\n          if((reinterpret_cast<uintptr_t>(source)&3)==0)\n            bytes=*reinterpret_cast<const uint32_t*>(source);\n          else bytes=uint32_t(source[0])|(uint32_t(source[1])<<8)|\n              (uint32_t(source[2])<<16)|(uint32_t(source[3])<<24);\n          const uint8_t exponent=v.scales[tag][physical*16+col/32];\n#if defined(__CUDA_ARCH_SPECIFIC__) && __CUDA_ARCH_SPECIFIC__ == 1200\n          // Match the existing scale decoding, including zero and 255.\n          const uint32_t factor=exponent?(uint32_t(exponent)<<7):0x40;\n          const uint32_t factors=factor|(factor<<16);\n          packed=uint64_t(packed_fp8_pair(uint16_t(bytes),factors))|\n              (uint64_t(packed_fp8_pair(uint16_t(bytes>>16),factors))<<32);\n#else\n          const float scale=exponent==0?0x1p-127f:__uint_as_float(uint32_t(exponent)<<23);\n#pragma unroll\n          for(int j=0;j<4;++j) {\n            __nv_fp8_e4m3 f;f.__x=uint8_t(bytes>>(j*8));\n            const auto value=__float2bfloat16_rn(__fmul_rn(float(f),scale));\n            packed|=uint64_t(__bfloat16_as_ushort(value))<<(j*16);\n          }\n#endif\n        }\n        *reinterpret_cast<uint64_t*>(kv+key*kKvStride+col)=packed;\n      }\n    }\n    __syncthreads();\n    // Each warp computes one 16-key score tile in the original K order.\n    {\n      wmma::fragment<wmma::accumulator,16,16,16,float> scores;\n      wmma::fill_fragment(scores,0.0f);\n      for(int k=0;k<512;k+=16) {\n        wmma::fragment<wmma::matrix_a,16,16,16,__nv_bfloat16,wmma::row_major> a;\n        wmma::fragment<wmma::matrix_b,16,16,16,__nv_bfloat16,wmma::col_major> b;\n        wmma::load_matrix_sync(a,query+base+k,512);\n        wmma::load_matrix_sync(b,kv+warp*16*kKvStride+k,kKvStride);\n        wmma::mma_sync(scores,a,b,scores);\n      }\n      wmma::store_matrix_sync(scratch+warp*16,scores,64,wmma::mem_row_major);\n    }\n    __syncthreads();\n    // Explicit carries avoid a dynamically indexed array spilling to local memory.\n    __nv_bfloat16 p0a{},p0b{},p1a{},p1b{},p2a{},p2b{},p3a{},p3b{};\n    for(int h=warp;h<16;h+=4) {\n      const float a=refs[lane]!=UINT64_MAX?scratch[h*64+lane]*0.04419417382415922f:-CUDART_INF_F;\n      const float b=refs[lane+32]!=UINT64_MAX?scratch[h*64+lane+32]*0.04419417382415922f:-CUDART_INF_F;\n      const float prev=maximum[h],m=fmaxf(prev,warp_max(fmaxf(a,b)));\n      const float scale=expf(prev-m),pa=expf(a-m),pb=expf(b-m);\n      const float total=warp_sum(pa+pb);\n      const auto a16=__float2bfloat16_rn(pa),b16=__float2bfloat16_rn(pb);\n      if(h<4){p0a=a16;p0b=b16;}\n      else if(h<8){p1a=a16;p1b=b16;}\n      else if(h<12){p2a=a16;p2b=b16;}\n      else {p3a=a16;p3b=b16;}\n      if(lane==0){maximum[h]=m;rescale[h]=scale;sum[h]=fmaf(sum[h],scale,total);}\n    }\n    __syncthreads();\n    if(!empty) {\n      // Load a multiplier through the same accumulator layout. Matching\n      // fragment elements have matching coordinates without a lane-map assumption.\n      for(int i=tid;i<16*16;i+=128)scratch[i]=rescale[i/16];\n      __syncthreads();\n      wmma::fragment<wmma::accumulator,16,16,16,float> factors;\n      wmma::load_matrix_sync(factors,scratch,16,wmma::mem_row_major);\n#pragma unroll\n      for(int t=0;t<8;++t) {\n#pragma unroll\n        for(int i=0;i<acc[t].num_elements;++i)\n          acc[t].x[i]=__fmul_rn(acc[t].x[i],factors.x[i]);\n      }\n      __syncthreads();\n    }\n    empty=false;\n    // Accumulators are ready before probabilities reuse scratch.\n    probability[warp*kProbabilityStride+lane]=p0a;\n    probability[warp*kProbabilityStride+lane+32]=p0b;\n    probability[(warp+4)*kProbabilityStride+lane]=p1a;\n    probability[(warp+4)*kProbabilityStride+lane+32]=p1b;\n    probability[(warp+8)*kProbabilityStride+lane]=p2a;\n    probability[(warp+8)*kProbabilityStride+lane+32]=p2b;\n    probability[(warp+12)*kProbabilityStride+lane]=p3a;\n    probability[(warp+12)*kProbabilityStride+lane+32]=p3b;\n    __syncthreads();\n    for(int k=0;k<64;k+=16) {\n      wmma::fragment<wmma::matrix_a,16,16,16,__nv_bfloat16,wmma::row_major> p;\n      wmma::load_matrix_sync(p,probability+k,kProbabilityStride);\n#pragma unroll\n      for(int t=0;t<8;++t) {\n        wmma::fragment<wmma::matrix_b,16,16,16,__nv_bfloat16,wmma::row_major> v;\n        wmma::load_matrix_sync(v,kv+k*kKvStride+warp*128+t*16,kKvStride);\n        wmma::mma_sync(acc[t],p,v,acc[t]);\n      }\n    }\n    __syncthreads();\n  }\n#pragma unroll\n  for(int t=0;t<8;++t)wmma::store_matrix_sync(scratch+warp*128+t*16,acc[t],kOutputStride,wmma::mem_row_major);\n  if(tid<16) {\n    if constexpr(Split) {\n      partial[partial_base+tid*514+512]=maximum[tid];\n      partial[partial_base+tid*514+513]=sum[tid];\n    } else sum[tid]+=expf(sink[group*16+tid]-maximum[tid]);\n  }\n  __syncthreads();\n  for(int i=tid;i<16*512;i+=128) {\n    if constexpr(Split)partial[partial_base+(i/512)*514+i%512]=scratch[(i/512)*kOutputStride+i%512];\n    else output[base+i]=__float2bfloat16_rn(scratch[(i/512)*kOutputStride+i%512]/sum[i/512]);\n  }\n}\n__global__ void merge(const float* partial,const float* sink,__nv_bfloat16* output,int parts) {\n  const int row=blockIdx.x,head=blockIdx.y,col=threadIdx.x;\n  const uint64_t b=(uint64_t(row)*parts*64+head)*514;\n  const uint64_t dest=(uint64_t(row)*64+head)*512;\n  // Invalid proposal metadata must yield zero even for sinks whose exponential\n  // underflows. A negative normalizer is reserved for this whole-row failure.\n  if(partial[b+513]<0) {\n    output[dest+col]=__float2bfloat16(0);\n    output[dest+col+256]=__float2bfloat16(0);\n    return;\n  }\n  float maximum=-1e30f;\n  for(int p=0;p<parts;++p)maximum=fmaxf(maximum,partial[b+uint64_t(p)*64*514+512]);\n  float sum=0,a=0,c=0;\n  for(int p=0;p<parts;++p) {\n    const uint64_t i=b+uint64_t(p)*64*514;\n    const float factor=expf(partial[i+512]-maximum);\n    sum=fmaf(partial[i+513],factor,sum);\n    a=fmaf(partial[i+col],factor,a);\n    c=fmaf(partial[i+col+256],factor,c);\n  }\n  sum+=expf(sink[head]-maximum);\n  output[dest+col]=__float2bfloat16_rn(a/sum);\n  output[dest+col+256]=__float2bfloat16_rn(c/sum);\n}\nbool span(const void* ptr,uint64_t n,uint32_t a) {\n  const auto p=reinterpret_cast<uintptr_t>(ptr);return p&&p%a==0&&p<=UINTPTR_MAX-n;\n}\nbool disjoint(const void* a,uint64_t n,const void* b,uint64_t m) {\n  const auto x=reinterpret_cast<uintptr_t>(a),y=reinterpret_cast<uintptr_t>(b);return x+n<=y||y+m<=x;\n}\n}\nextern \"C\" int32_t ds41rt_v41_sparse_attention_initialize(void) {\n  const auto status=cudaFuncSetAttribute(attend<false>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);\n  if(status!=cudaSuccess)return status;\n  return cudaFuncSetAttribute(attend<true>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);\n}\nstatic int32_t launch_attention(const uint16_t* query,const float* sink,\n    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,\n    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,float* partial,uint64_t scratch_bytes,int parts) {\n  if(!view || rows<1 || rows>4096 || window_width<0 || window_width>128)return cudaErrorInvalidValue;\n  const auto v=*view;\n  if(v.compressed>1 || v.window_proposal_capacity<1 || v.window_proposal_capacity>4096 ||\n    (v.compressed && (v.source_capacity<1 || v.source_capacity>16777216ull ||\n     v.source_proposal_capacity<1 || v.source_proposal_capacity>4096 ||\n     v.page_stride<1 || v.page_stride>4096)))return cudaErrorInvalidValue;\n  if(parts<1 || parts>10)return cudaErrorInvalidValue;\n  const uint64_t required=uint64_t(rows)*parts*64*514*sizeof(float);\n  const uint64_t q=uint64_t(rows)*64*512*2;\n  if(partial && (scratch_bytes<required || !span(partial,required,4) ||\n      !disjoint(partial,required,output,q)))return cudaErrorInvalidValue;\n  if(!span(output,q,32))return cudaErrorInvalidValue;\n  const void* inputs[]={query,sink,metadata,v.window_end,selected,v.pages,v.source_end};\n  const uint64_t sizes[]={q,256,uint64_t(rows)*80,8,uint64_t(rows)*2048,uint64_t(v.page_stride)*4,8};\n  const uint32_t align[]={32,4,8,8,4,4,8};\n  for(int i=0;i<(v.compressed?7:4);++i)\n    if(!span(inputs[i],sizes[i],align[i]) || !disjoint(inputs[i],sizes[i],output,q) ||\n      (partial && !disjoint(inputs[i],sizes[i],partial,required)))return cudaErrorInvalidValue;\n  const uint64_t capacity[]={128,v.window_proposal_capacity,v.source_capacity,v.source_proposal_capacity};\n  for(int i=0;i<(v.compressed?4:2);++i) {\n    if(!span(v.values[i],capacity[i]*512,1) || !span(v.scales[i],capacity[i]*16,1) ||\n      !disjoint(v.values[i],capacity[i]*512,output,q) || !disjoint(v.scales[i],capacity[i]*16,output,q) ||\n      (partial && (!disjoint(v.values[i],capacity[i]*512,partial,required) ||\n                   !disjoint(v.scales[i],capacity[i]*16,partial,required))))return cudaErrorInvalidValue;\n  }\n  if(partial) {\n    attend<true><<<dim3(rows,4,parts),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(\n      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,\n      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,partial);\n    const auto status=cudaGetLastError();\n    if(status!=cudaSuccess)return status;\n    merge<<<dim3(rows,64),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(\n      partial,sink,reinterpret_cast<__nv_bfloat16*>(output),parts);\n  } else {\n    attend<false><<<dim3(rows,4),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(\n      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,\n      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr);\n  }\n  return cudaGetLastError();\n}\nextern \"C\" int32_t ds41rt_v41_sparse_attention(const uint16_t* query,const float* sink,\n    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,\n    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream) {\n  return launch_attention(query,sink,metadata,selected,output,rows,window_width,view,stream,nullptr,0,1);\n}\nextern \"C\" int32_t ds41rt_v41_sparse_attention_split(const uint16_t* query,const float* sink,\n    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,\n    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,\n    float* partial,uint64_t scratch_bytes,int32_t parts) {\n  if(!partial)return cudaErrorInvalidValue;\n  return launch_attention(query,sink,metadata,selected,output,rows,window_width,view,stream,partial,scratch_bytes,parts);\n}\n",
+  "build_log": "ptxas info    : 0 bytes gmem\nptxas info    : Compiling entry function '_ZN45_GLOBAL__N__b665cf18_12_candidate_cu_343749126attendILb1EEEvPK13__nv_bfloat16PKfPKmPKiPS1_i20ds41rt_v41_sparse_kvPf' for 'sm_120a'\nptxas info    : Function properties for _ZN45_GLOBAL__N__b665cf18_12_candidate_cu_343749126attendILb1EEEvPK13__nv_bfloat16PKfPKmPKiPS1_i20ds41rt_v41_sparse_kvPf\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 130 registers, used 1 barriers\nptxas info    : Compile time = 65.016 ms\nptxas info    : Compiling entry function '_ZN45_GLOBAL__N__b665cf18_12_candidate_cu_343749126attendILb0EEEvPK13__nv_bfloat16PKfPKmPKiPS1_i20ds41rt_v41_sparse_kvPf' for 'sm_120a'\nptxas info    : Function properties for _ZN45_GLOBAL__N__b665cf18_12_candidate_cu_343749126attendILb0EEEvPK13__nv_bfloat16PKfPKmPKiPS1_i20ds41rt_v41_sparse_kvPf\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 126 registers, used 1 barriers\nptxas info    : Compile time = 66.455 ms\nptxas info    : Compiling entry function '_ZN45_GLOBAL__N__b665cf18_12_candidate_cu_343749125mergeEPKfS1_P13__nv_bfloat16i' for 'sm_120a'\nptxas info    : Function properties for _ZN45_GLOBAL__N__b665cf18_12_candidate_cu_343749125mergeEPKfS1_P13__nv_bfloat16i\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 40 registers, used 0 barriers\nptxas info    : Compile time = 12.639 ms\n",
+  "cases": [
+    {
+      "rows": 1,
+      "pattern": "none",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          44.10719871520996,
+          43.086400628089905,
+          43.06400120258331,
+          43.06400120258331,
+          43.04960072040558,
+          43.04960072040558
+        ],
+        [
+          41.15999937057495,
+          40.95360040664673,
+          40.94879925251007,
+          40.99839925765991,
+          41.01920127868652,
+          41.02239906787872
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 43.06400120258331,
+      "candidate_us": 41.00880026817322
+    },
+    {
+      "rows": 1,
+      "pattern": "first5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.502400636672974,
+          51.23680233955383,
+          51.24639868736267,
+          51.24800205230713,
+          51.24639868736267,
+          51.24800205230713
+        ],
+        [
+          47.20959961414337,
+          47.20799922943115,
+          47.15360105037689,
+          47.19519913196564,
+          47.19200134277344,
+          47.148799896240234
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.2472003698349,
+      "candidate_us": 47.19360023736954
+    },
+    {
+      "rows": 1,
+      "pattern": "late5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.49120092391968,
+          51.30079984664917,
+          51.29280090332031,
+          51.286399364471436,
+          51.256000995635986,
+          51.25280022621155
+        ],
+        [
+          47.200000286102295,
+          47.27039933204651,
+          47.31200039386749,
+          47.20799922943115,
+          47.15200066566467,
+          47.19040095806122
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.289600133895874,
+      "candidate_us": 47.203999757766724
+    },
+    {
+      "rows": 1,
+      "pattern": "gaps",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          103.84000539779663,
+          103.42080593109131,
+          103.59679460525513,
+          103.42559814453125,
+          103.47360372543335,
+          103.06559801101685
+        ],
+        [
+          88.14560174942017,
+          88.09279799461365,
+          88.12000155448914,
+          88.11839818954468,
+          88.1488025188446,
+          88.13599944114685
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 103.4496009349823,
+      "candidate_us": 88.128000497818
+    },
+    {
+      "rows": 1,
+      "pattern": "full",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          192.7008032798767,
+          192.5503969192505,
+          192.5104022026062,
+          192.56800413131714,
+          192.56160259246826,
+          192.51680374145508
+        ],
+        [
+          176.1407971382141,
+          176.23039484024048,
+          176.18240118026733,
+          176.1728048324585,
+          176.19359493255615,
+          176.15679502487183
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 192.55599975585938,
+      "candidate_us": 176.17760300636292
+    },
+    {
+      "rows": 1,
+      "pattern": "stale",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          2.6847999542951584,
+          2.3151999339461327,
+          2.3072000592947006,
+          2.3135999217629433,
+          2.3231999948620796,
+          2.345599979162216
+        ],
+        [
+          2.3584000766277313,
+          2.3344000801444054,
+          2.4431999772787094,
+          2.356800064444542,
+          2.353600040078163,
+          2.304000034928322
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 2.319199964404106,
+      "candidate_us": 2.3552000522613525
+    },
+    {
+      "rows": 1,
+      "pattern": "private",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.29439830780029,
+          51.24959945678711,
+          51.24639868736267,
+          51.256000995635986,
+          51.25439763069153,
+          51.26240253448486
+        ],
+        [
+          47.09919989109039,
+          47.17920124530792,
+          47.16159999370575,
+          47.150400280952454,
+          47.15679883956909,
+          47.15360105037689
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.25519931316376,
+      "candidate_us": 47.15519994497299
+    },
+    {
+      "rows": 1,
+      "pattern": "private_stride2",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.41119956970215,
+          51.25439763069153,
+          51.25439763069153,
+          51.24800205230713,
+          51.183998584747314,
+          51.25120282173157
+        ],
+        [
+          47.16640114784241,
+          47.150400280952454,
+          47.16159999370575,
+          47.15520143508911,
+          47.15839922428131,
+          47.145599126815796
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.25280022621155,
+      "candidate_us": 47.15680032968521
+    },
+    {
+      "rows": 1,
+      "pattern": "scale_zero",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          67.74560213088989,
+          67.64000058174133,
+          67.63200163841248,
+          67.63039827346802,
+          67.61760115623474,
+          67.64479875564575
+        ],
+        [
+          63.55999708175659,
+          63.576000928878784,
+          63.547199964523315,
+          63.53600025177002,
+          63.53920102119446,
+          63.53600025177002
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 67.6360011100769,
+      "candidate_us": 63.54320049285889
+    },
+    {
+      "rows": 1,
+      "pattern": "mixed_scales",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          67.78560280799866,
+          67.68320202827454,
+          67.67359972000122,
+          67.64479875564575,
+          67.63359904289246,
+          67.63839721679688
+        ],
+        [
+          63.5919988155365,
+          63.53440284729004,
+          63.548797369003296,
+          63.53600025177002,
+          63.547199964523315,
+          63.54399919509888
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 67.65919923782349,
+      "candidate_us": 63.545599579811096
+    },
+    {
+      "rows": 6,
+      "pattern": "none",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          43.321600556373596,
+          43.10080111026764,
+          43.05280148983002,
+          43.06559860706329,
+          43.10399889945984,
+          43.07039976119995
+        ],
+        [
+          41.05440080165863,
+          41.01119935512543,
+          41.014400124549866,
+          41.05120003223419,
+          41.014400124549866,
+          41.01279973983765
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 43.085600435733795,
+      "candidate_us": 41.014400124549866
+    },
+    {
+      "rows": 6,
+      "pattern": "first5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          53.388798236846924,
+          53.30079793930054,
+          53.29440236091614,
+          53.303998708724976,
+          53.28959822654724,
+          53.307199478149414
+        ],
+        [
+          49.22559857368469,
+          49.23200011253357,
+          49.20800030231476,
+          49.19520020484924,
+          49.14720058441162,
+          49.14399981498718
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 53.302398324012756,
+      "candidate_us": 49.201600253582
+    },
+    {
+      "rows": 6,
+      "pattern": "late5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          53.379201889038086,
+          53.2975971698761,
+          53.2975971698761,
+          53.30079793930054,
+          53.2975971698761,
+          53.302401304244995
+        ],
+        [
+          49.22719895839691,
+          49.23360049724579,
+          49.20639991760254,
+          49.2031991481781,
+          49.20479953289032,
+          49.20159876346588
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 53.29919755458832,
+      "candidate_us": 49.20559972524643
+    },
+    {
+      "rows": 6,
+      "pattern": "gaps",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          106.15359544754028,
+          105.77600002288818,
+          105.77919483184814,
+          105.7360053062439,
+          106.09920024871826,
+          105.76159954071045
+        ],
+        [
+          90.34079909324646,
+          90.20320177078247,
+          90.21919965744019,
+          90.1632010936737,
+          90.24159908294678,
+          90.13599753379822
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 105.77759742736816,
+      "candidate_us": 90.21120071411133
+    },
+    {
+      "rows": 6,
+      "pattern": "full",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          196.87520265579224,
+          196.70720100402832,
+          196.7919945716858,
+          196.6928005218506,
+          196.70560359954834,
+          196.65759801864624
+        ],
+        [
+          180.40800094604492,
+          180.39519786834717,
+          180.4352045059204,
+          180.39840459823608,
+          180.7136058807373,
+          180.36320209503174
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 196.70640230178833,
+      "candidate_us": 180.4032027721405
+    },
+    {
+      "rows": 6,
+      "pattern": "stale",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          2.444799989461899,
+          2.460799925029278,
+          2.396799996495247,
+          2.292799949645996,
+          2.2752000018954277,
+          2.3231999948620796
+        ],
+        [
+          2.3552000522613525,
+          2.385599911212921,
+          2.3183999583125114,
+          2.271999977529049,
+          2.3312000557780266,
+          2.328000031411648
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 2.3599999956786633,
+      "candidate_us": 2.329600043594837
+    },
+    {
+      "rows": 6,
+      "pattern": "private",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.4352023601532,
+          51.27519965171814,
+          51.24319791793823,
+          51.29439830780029,
+          51.25439763069153,
+          51.259201765060425
+        ],
+        [
+          47.38880097866058,
+          47.19200134277344,
+          47.61439859867096,
+          47.26240038871765,
+          47.679999470710754,
+          47.305598855018616
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.26720070838928,
+      "candidate_us": 47.3471999168396
+    },
+    {
+      "rows": 6,
+      "pattern": "private_stride2",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.37280225753784,
+          51.25759840011597,
+          51.29439830780029,
+          51.24160051345825,
+          51.28160119056702,
+          51.259201765060425
+        ],
+        [
+          47.5055992603302,
+          47.3471999168396,
+          47.47360050678253,
+          47.56479859352112,
+          47.50399887561798,
+          47.502401471138
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.27040147781372,
+      "candidate_us": 47.50320017337799
+    },
+    {
+      "rows": 6,
+      "pattern": "scale_zero",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          69.78240013122559,
+          69.62720155715942,
+          69.62559819221497,
+          69.68799829483032,
+          69.68799829483032,
+          69.68960165977478
+        ],
+        [
+          65.59360027313232,
+          65.63360095024109,
+          65.53599834442139,
+          65.58719873428345,
+          65.59200286865234,
+          65.5888020992279
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 69.68799829483032,
+      "candidate_us": 65.59040248394012
+    },
+    {
+      "rows": 6,
+      "pattern": "mixed_scales",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          69.10719871520996,
+          68.70719790458679,
+          69.26720142364502,
+          69.07520294189453,
+          69.17759776115417,
+          69.07039880752563
+        ],
+        [
+          65.52799940109253,
+          65.5680000782013,
+          65.60479998588562,
+          65.52320122718811,
+          65.57760238647461,
+          65.52799940109253
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 69.09120082855225,
+      "candidate_us": 65.54799973964691
+    },
+    {
+      "rows": 16,
+      "pattern": "none",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          43.34399998188019,
+          44.332799315452576,
+          43.09279918670654,
+          43.059200048446655,
+          43.04800033569336,
+          43.113601207733154
+        ],
+        [
+          41.03519916534424,
+          41.040000319480896,
+          41.01119935512543,
+          41.00959897041321,
+          41.044801473617554,
+          41.01119935512543
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 43.10320019721985,
+      "candidate_us": 41.02319926023483
+    },
+    {
+      "rows": 16,
+      "pattern": "first5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          53.435200452804565,
+          53.30079793930054,
+          53.28959822654724,
+          53.29920053482056,
+          53.72160077095032,
+          53.251200914382935
+        ],
+        [
+          49.22719895839691,
+          49.18400049209595,
+          49.23200011253357,
+          49.2031991481781,
+          49.26559925079346,
+          49.14399981498718
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 53.29999923706055,
+      "candidate_us": 49.215199053287506
+    },
+    {
+      "rows": 16,
+      "pattern": "late5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          53.409600257873535,
+          53.307199478149414,
+          53.302401304244995,
+          53.307199478149414,
+          53.305602073669434,
+          53.26079726219177
+        ],
+        [
+          49.23999905586243,
+          49.14399981498718,
+          49.15359914302826,
+          49.20479953289032,
+          49.1567999124527,
+          49.217599630355835
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 53.306400775909424,
+      "candidate_us": 49.18079972267151
+    },
+    {
+      "rows": 16,
+      "pattern": "gaps",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          105.83679676055908,
+          105.4703950881958,
+          106.20160102844238,
+          106.08799457550049,
+          105.62880039215088,
+          106.0479998588562
+        ],
+        [
+          90.20159840583801,
+          90.15200138092041,
+          90.16799926757812,
+          90.1632010936737,
+          90.18239974975586,
+          90.16159772872925
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 105.94239830970764,
+      "candidate_us": 90.16560018062592
+    },
+    {
+      "rows": 16,
+      "pattern": "full",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          197.47519493103027,
+          197.7903962135315,
+          197.55680561065674,
+          197.0911979675293,
+          197.67999649047852,
+          197.32320308685303
+        ],
+        [
+          181.62399530410767,
+          181.59359693527222,
+          181.79199695587158,
+          181.59199953079224,
+          181.73439502716064,
+          181.58719539642334
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 197.5160002708435,
+      "candidate_us": 181.60879611968994
+    },
+    {
+      "rows": 16,
+      "pattern": "stale",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          2.4639999493956566,
+          2.3631999269127846,
+          2.276800014078617,
+          2.5919999927282333,
+          2.2943999618291855,
+          2.30880007147789
+        ],
+        [
+          2.3760000243782997,
+          2.2784000262618065,
+          2.2864000871777534,
+          2.30880007147789,
+          2.2864000871777534,
+          2.2943999618291855
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 2.3359999991953373,
+      "candidate_us": 2.2904000245034695
+    },
+    {
+      "rows": 16,
+      "pattern": "private",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.43839716911316,
+          51.24959945678711,
+          51.24800205230713,
+          51.25759840011597,
+          51.24959945678711,
+          51.256000995635986
+        ],
+        [
+          47.37760126590729,
+          47.43359982967377,
+          47.598400712013245,
+          47.66559898853302,
+          47.468799352645874,
+          47.55200147628784
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.25280022621155,
+      "candidate_us": 47.51040041446686
+    },
+    {
+      "rows": 16,
+      "pattern": "private_stride2",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          51.446402072906494,
+          51.256000995635986,
+          51.24800205230713,
+          51.256000995635986,
+          51.24800205230713,
+          51.259201765060425
+        ],
+        [
+          47.60479927062988,
+          47.703999280929565,
+          47.775998711586,
+          47.77120053768158,
+          47.56639897823334,
+          47.859200835227966
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 51.256000995635986,
+      "candidate_us": 47.73759990930557
+    },
+    {
+      "rows": 16,
+      "pattern": "scale_zero",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          69.78240013122559,
+          69.62720155715942,
+          69.6016013622284,
+          69.68160271644592,
+          69.65759992599487,
+          69.68479752540588
+        ],
+        [
+          65.64159989356995,
+          65.5680000782013,
+          65.52640199661255,
+          65.59680104255676,
+          65.62719941139221,
+          65.57440161705017
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 69.6696013212204,
+      "candidate_us": 65.58560132980347
+    },
+    {
+      "rows": 16,
+      "pattern": "mixed_scales",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          69.57280039787292,
+          69.6832001209259,
+          69.67840194702148,
+          69.68479752540588,
+          69.68479752540588,
+          69.68479752540588
+        ],
+        [
+          65.54080247879028,
+          65.556800365448,
+          65.58560132980347,
+          65.58719873428345,
+          65.53120017051697,
+          65.57919979095459
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 69.6839988231659,
+      "candidate_us": 65.5680000782013
+    },
+    {
+      "rows": 80,
+      "pattern": "none",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          82.23680257797241,
+          81.98400139808655,
+          82.014399766922,
+          81.9599986076355,
+          81.96960091590881,
+          81.97439908981323
+        ],
+        [
+          77.91680097579956,
+          77.88320183753967,
+          77.92320251464844,
+          77.91680097579956,
+          77.96159982681274,
+          77.87520289421082
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 81.97920024394989,
+      "candidate_us": 77.91680097579956
+    },
+    {
+      "rows": 80,
+      "pattern": "first5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          100.62079429626465,
+          100.40960311889648,
+          100.34559965133667,
+          100.33760070800781,
+          100.40639638900757,
+          100.39039850234985
+        ],
+        [
+          92.23999977111816,
+          92.23520159721375,
+          92.20799803733826,
+          92.23679900169373,
+          92.25599765777588,
+          92.24640130996704
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 100.39839744567871,
+      "candidate_us": 92.23839938640594
+    },
+    {
+      "rows": 80,
+      "pattern": "late5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          100.49599409103394,
+          100.35040378570557,
+          100.38720369338989,
+          100.4080057144165,
+          100.39520263671875,
+          100.43519735336304
+        ],
+        [
+          92.25280284881592,
+          92.20640063285828,
+          92.23520159721375,
+          92.19840168952942,
+          92.20799803733826,
+          92.19840168952942
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 100.40160417556763,
+      "candidate_us": 92.20719933509827
+    },
+    {
+      "rows": 80,
+      "pattern": "gaps",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          204.85599040985107,
+          204.48479652404785,
+          204.79040145874023,
+          204.94720935821533,
+          204.7935962677002,
+          204.638409614563
+        ],
+        [
+          173.65119457244873,
+          173.75359535217285,
+          173.95999431610107,
+          173.66559505462646,
+          173.72959852218628,
+          173.8592028617859
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 204.79199886322021,
+      "candidate_us": 173.74159693717957
+    },
+    {
+      "rows": 80,
+      "pattern": "full",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          378.48639488220215,
+          378.3087968826294,
+          378.45120429992676,
+          378.3776044845581,
+          378.4559965133667,
+          378.40960025787354
+        ],
+        [
+          346.0767984390259,
+          346.0815906524658,
+          346.02720737457275,
+          346.1024045944214,
+          346.0416078567505,
+          346.0864067077637
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 378.43040227890015,
+      "candidate_us": 346.07919454574585
+    },
+    {
+      "rows": 80,
+      "pattern": "stale",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          4.255999997258186,
+          4.153599962592125,
+          4.032000154256821,
+          4.153599962592125,
+          4.143999889492989,
+          4.145599901676178
+        ],
+        [
+          4.038399830460548,
+          4.135999828577042,
+          4.055999964475632,
+          4.047999903559685,
+          4.03360016644001,
+          4.047999903559685
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 4.1495999321341515,
+      "candidate_us": 4.047999903559685
+    },
+    {
+      "rows": 80,
+      "pattern": "private",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          98.53919744491577,
+          98.36000204086304,
+          98.3568012714386,
+          98.36320281028748,
+          98.3951985836029,
+          98.36159944534302
+        ],
+        [
+          90.40160179138184,
+          90.71040153503418,
+          90.47200083732605,
+          90.79840183258057,
+          90.57919979095459,
+          91.28320217132568
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 98.36240112781525,
+      "candidate_us": 90.64480066299438
+    },
+    {
+      "rows": 80,
+      "pattern": "private_stride2",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          98.5152006149292,
+          98.37759733200073,
+          98.39839935302734,
+          98.35360050201416,
+          98.334401845932,
+          98.36480021476746
+        ],
+        [
+          90.87839722633362,
+          91.21919870376587,
+          91.35040044784546,
+          90.6063973903656,
+          90.6719982624054,
+          91.19200110435486
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 98.3711987733841,
+      "candidate_us": 91.03519916534424
+    },
+    {
+      "rows": 80,
+      "pattern": "scale_zero",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          133.06879997253418,
+          132.97439813613892,
+          133.01119804382324,
+          132.90239572525024,
+          132.81439542770386,
+          132.8752040863037
+        ],
+        [
+          125.02239942550659,
+          125.01599788665771,
+          124.93599653244019,
+          124.98559951782227,
+          124.98400211334229,
+          124.98079538345337
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 132.93839693069458,
+      "candidate_us": 124.98480081558228
+    },
+    {
+      "rows": 80,
+      "pattern": "mixed_scales",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          132.24639892578125,
+          131.99039697647095,
+          132.1392059326172,
+          132.36000537872314,
+          133.86720418930054,
+          132.39200115203857
+        ],
+        [
+          125.01599788665771,
+          125.00959634780884,
+          124.98400211334229,
+          124.92640018463135,
+          125.16800165176392,
+          124.99840259552002
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 132.3032021522522,
+      "candidate_us": 125.00399947166443
+    },
+    {
+      "rows": 256,
+      "pattern": "none",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          241.37120246887207,
+          239.3455982208252,
+          239.39199447631836,
+          239.41919803619385,
+          239.69120979309082,
+          239.57440853118896
+        ],
+        [
+          227.3792028427124,
+          227.31359004974365,
+          227.68640518188477,
+          227.3616075515747,
+          227.36639976501465,
+          227.38239765167236
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 239.4968032836914,
+      "candidate_us": 227.37280130386353
+    },
+    {
+      "rows": 256,
+      "pattern": "first5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          292.94559955596924,
+          290.9600019454956,
+          290.9584045410156,
+          290.9600019454956,
+          290.98238945007324,
+          290.96319675445557
+        ],
+        [
+          268.44000816345215,
+          268.34399700164795,
+          268.34399700164795,
+          268.451189994812,
+          268.4015989303589,
+          268.4096097946167
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 290.9615993499756,
+      "candidate_us": 268.4056043624878
+    },
+    {
+      "rows": 256,
+      "pattern": "late5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          292.89441108703613,
+          290.9696102142334,
+          290.9183979034424,
+          290.95680713653564,
+          290.9071922302246,
+          290.9104108810425
+        ],
+        [
+          268.337607383728,
+          268.4175968170166,
+          268.337607383728,
+          268.393611907959,
+          268.3151960372925,
+          269.1119909286499
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 290.937602519989,
+      "candidate_us": 268.3656096458435
+    },
+    {
+      "rows": 256,
+      "pattern": "gaps",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          602.6080131530762,
+          601.0096073150635,
+          601.0767936706543,
+          601.3792037963867,
+          600.9920120239258,
+          601.036787033081
+        ],
+        [
+          509.3760013580322,
+          509.1504096984863,
+          509.6367835998535,
+          509.51199531555176,
+          509.7328186035156,
+          509.3520164489746
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 601.0567903518677,
+      "candidate_us": 509.443998336792
+    },
+    {
+      "rows": 256,
+      "pattern": "full",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          1116.590404510498,
+          1109.985637664795,
+          1109.718418121338,
+          1109.8511695861816,
+          1109.8640441894531,
+          1109.5855712890625
+        ],
+        [
+          1014.4687652587891,
+          1014.19677734375,
+          1014.2815589904785,
+          1014.140796661377,
+          1014.2928123474121,
+          1014.2671585083008
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 1109.8576068878174,
+      "candidate_us": 1014.2743587493896
+    },
+    {
+      "rows": 256,
+      "pattern": "stale",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          6.427200138568878,
+          6.203199923038483,
+          6.191999837756157,
+          6.207999959588051,
+          6.199999898672104,
+          6.204799935221672
+        ],
+        [
+          6.214400008320808,
+          6.232000142335892,
+          6.201599910855293,
+          6.199999898672104,
+          6.180800125002861,
+          6.191999837756157
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 6.203999929130077,
+      "candidate_us": 6.200799904763699
+    },
+    {
+      "rows": 256,
+      "pattern": "private",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          288.67359161376953,
+          286.8288040161133,
+          286.7680072784424,
+          286.6991996765137,
+          286.73760890960693,
+          286.72800064086914
+        ],
+        [
+          264.21918869018555,
+          264.31519985198975,
+          264.18559551239014,
+          264.34240341186523,
+          264.2944097518921,
+          264.19520378112793
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 286.75280809402466,
+      "candidate_us": 264.2567992210388
+    },
+    {
+      "rows": 256,
+      "pattern": "private_stride2",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          288.66560459136963,
+          286.66720390319824,
+          286.678409576416,
+          286.7664098739624,
+          286.66560649871826,
+          286.71839237213135
+        ],
+        [
+          264.2080068588257,
+          264.2159938812256,
+          264.1983985900879,
+          264.26239013671875,
+          264.1695976257324,
+          264.1727924346924
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 286.6984009742737,
+      "candidate_us": 264.2032027244568
+    },
+    {
+      "rows": 256,
+      "pattern": "scale_zero",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          389.7727966308594,
+          387.8432035446167,
+          388.22879791259766,
+          387.5375986099243,
+          388.0431890487671,
+          388.0320072174072
+        ],
+        [
+          366.17441177368164,
+          366.1616086959839,
+          366.2832021713257,
+          366.07840061187744,
+          366.38081073760986,
+          365.98079204559326
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 388.03759813308716,
+      "candidate_us": 366.16801023483276
+    },
+    {
+      "rows": 256,
+      "pattern": "mixed_scales",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          389.0496015548706,
+          387.4847888946533,
+          387.2607946395874,
+          387.24000453948975,
+          387.2704029083252,
+          387.23199367523193
+        ],
+        [
+          364.82880115509033,
+          365.0223970413208,
+          364.9104118347168,
+          365.2575969696045,
+          364.94719982147217,
+          365.04480838775635
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 387.2655987739563,
+      "candidate_us": 364.9847984313965
+    },
+    {
+      "rows": 1024,
+      "pattern": "none",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          925.9792327880859,
+          920.4784393310547,
+          919.5695877075195,
+          920.3295707702637,
+          919.3967819213867,
+          920.0351715087891
+        ],
+        [
+          888.4703636169434,
+          889.6783828735352,
+          889.0992164611816,
+          888.9072418212891,
+          889.0159606933594,
+          889.020824432373
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 920.1823711395264,
+      "candidate_us": 889.0183925628662
+    },
+    {
+      "rows": 1024,
+      "pattern": "first5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          1117.2991752624512,
+          1112.0863914489746,
+          1111.6991996765137,
+          1111.8271827697754,
+          1111.1807823181152,
+          1111.9536399841309
+        ],
+        [
+          1042.4927711486816,
+          1042.6511764526367,
+          1041.6655540466309,
+          1042.524814605713,
+          1042.4079895019531,
+          1042.9439544677734
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 1111.8904113769531,
+      "candidate_us": 1042.5087928771973
+    },
+    {
+      "rows": 1024,
+      "pattern": "late5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          1118.5279846191406,
+          1113.3407592773438,
+          1112.8560066223145,
+          1113.3567810058594,
+          1112.7519607543945,
+          1113.0720138549805
+        ],
+        [
+          1042.9984092712402,
+          1043.4063911437988,
+          1042.8400039672852,
+          1043.552017211914,
+          1043.3551788330078,
+          1043.5680389404297
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 1113.206386566162,
+      "candidate_us": 1043.3807849884033
+    },
+    {
+      "rows": 1024,
+      "pattern": "gaps",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          2257.676887512207,
+          2252.9951095581055,
+          2252.8831481933594,
+          2253.47843170166,
+          2257.5584411621094,
+          2258.3311080932617
+        ],
+        [
+          1931.8511962890625,
+          1932.4335098266602,
+          1931.9120407104492,
+          1932.259178161621,
+          1935.4976654052734,
+          1936.1455917358398
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 2255.5184364318848,
+      "candidate_us": 1932.3463439941406
+    },
+    {
+      "rows": 1024,
+      "pattern": "full",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          4179.731369018555,
+          4170.924758911133,
+          4170.347213745117,
+          4170.97282409668,
+          4170.707321166992,
+          4170.540618896484
+        ],
+        [
+          3826.233673095703,
+          3826.201629638672,
+          3825.8304595947266,
+          3826.1295318603516,
+          3825.406265258789,
+          3826.224136352539
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 4170.8160400390625,
+      "candidate_us": 3826.1655807495117
+    },
+    {
+      "rows": 1024,
+      "pattern": "stale",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          17.19679981470108,
+          16.58399999141693,
+          16.422399878501892,
+          16.681599617004395,
+          16.42560064792633,
+          16.582399606704712
+        ],
+        [
+          16.622400283813477,
+          16.417600214481354,
+          16.56319946050644,
+          16.419200599193573,
+          16.622400283813477,
+          16.42400026321411
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 16.58319979906082,
+      "candidate_us": 16.493599861860275
+    },
+    {
+      "rows": 1024,
+      "pattern": "private",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          1103.212833404541,
+          1096.9183921813965,
+          1096.2592124938965,
+          1097.1664428710938,
+          1096.350383758545,
+          1097.0735549926758
+        ],
+        [
+          1026.9743919372559,
+          1027.4640083312988,
+          1028.1984329223633,
+          1027.6016235351562,
+          1027.246379852295,
+          1027.8960227966309
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 1096.9959735870361,
+      "candidate_us": 1027.5328159332275
+    },
+    {
+      "rows": 1024,
+      "pattern": "private_stride2",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          1103.2079696655273,
+          1097.548770904541,
+          1096.6320037841797,
+          1097.9887962341309,
+          1096.8655586242676,
+          1097.878360748291
+        ],
+        [
+          1028.377628326416,
+          1028.603172302246,
+          1028.007984161377,
+          1029.0047645568848,
+          1027.7039527893066,
+          1028.9199829101562
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 1097.713565826416,
+      "candidate_us": 1028.490400314331
+    },
+    {
+      "rows": 1024,
+      "pattern": "scale_zero",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          1477.7520179748535,
+          1473.2687950134277,
+          1472.265625,
+          1473.3951568603516,
+          1472.5695610046387,
+          1473.6063957214355
+        ],
+        [
+          1402.8608322143555,
+          1403.9983749389648,
+          1402.9696464538574,
+          1403.4671783447266,
+          1403.4879684448242,
+          1403.3679962158203
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 1473.3319759368896,
+      "candidate_us": 1403.4175872802734
+    },
+    {
+      "rows": 1024,
+      "pattern": "mixed_scales",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          1475.111961364746,
+          1471.1503982543945,
+          1470.297622680664,
+          1471.4591979980469,
+          1470.4480171203613,
+          1471.2143898010254
+        ],
+        [
+          1399.1904258728027,
+          1400.1952171325684,
+          1399.3568420410156,
+          1399.723243713379,
+          1399.3023872375488,
+          1399.7119903564453
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 1471.18239402771,
+      "candidate_us": 1399.5344161987305
+    },
+    {
+      "rows": 4096,
+      "pattern": "none",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          4665.4144287109375,
+          4664.251327514648,
+          4664.574432373047,
+          4665.0848388671875,
+          4665.083312988281,
+          4664.179229736328
+        ],
+        [
+          4361.10725402832,
+          4362.499237060547,
+          4362.251281738281,
+          4362.4847412109375,
+          4361.708831787109,
+          4362.846374511719
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 4664.828872680664,
+      "candidate_us": 4362.368011474609
+    },
+    {
+      "rows": 4096,
+      "pattern": "first5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          5893.6767578125,
+          5893.388748168945,
+          5892.744064331055,
+          5893.393707275391,
+          5891.753768920898,
+          5897.339248657227
+        ],
+        [
+          5356.212615966797,
+          5356.7230224609375,
+          5355.944061279297,
+          5355.944061279297,
+          5356.208038330078,
+          5357.158279418945
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 5893.391227722168,
+      "candidate_us": 5356.2103271484375
+    },
+    {
+      "rows": 4096,
+      "pattern": "late5",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          5896.771240234375,
+          5897.574234008789,
+          5896.564865112305,
+          5897.385787963867,
+          5893.131256103516,
+          5899.395370483398
+        ],
+        [
+          5370.318222045898,
+          5370.686340332031,
+          5369.152069091797,
+          5370.257568359375,
+          5369.224166870117,
+          5370.339202880859
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 5897.078514099121,
+      "candidate_us": 5370.287895202637
+    },
+    {
+      "rows": 4096,
+      "pattern": "gaps",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          9384.785461425781,
+          9385.147094726562,
+          9384.815979003906,
+          9385.171508789062,
+          9385.084533691406,
+          9385.304260253906
+        ],
+        [
+          8024.687957763672,
+          8025.041961669922,
+          8024.2767333984375,
+          8025.611114501953,
+          8024.864196777344,
+          8025.351715087891
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 9385.115814208984,
+      "candidate_us": 8024.953079223633
+    },
+    {
+      "rows": 4096,
+      "pattern": "full",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          16867.85125732422,
+          16861.444091796875,
+          16861.88201904297,
+          16861.732482910156,
+          16861.56768798828,
+          16860.504150390625
+        ],
+        [
+          15424.452209472656,
+          15423.554992675781,
+          15424.1455078125,
+          15423.941040039062,
+          15424.766540527344,
+          15424.18212890625
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 16861.65008544922,
+      "candidate_us": 15424.163818359375
+    },
+    {
+      "rows": 4096,
+      "pattern": "stale",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          161.41279935836792,
+          162.50720024108887,
+          162.41919994354248,
+          162.57760524749756,
+          162.5872015953064,
+          162.40479946136475
+        ],
+        [
+          162.51519918441772,
+          162.51360177993774,
+          163.50079774856567,
+          162.62400150299072,
+          162.92959451675415,
+          163.6064052581787
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 162.46320009231567,
+      "candidate_us": 162.77679800987244
+    },
+    {
+      "rows": 4096,
+      "pattern": "private",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          5841.497421264648,
+          5841.198348999023,
+          5837.627029418945,
+          5838.616180419922,
+          5840.655899047852,
+          5840.163040161133
+        ],
+        [
+          5209.627151489258,
+          5210.313415527344,
+          5209.814453125,
+          5210.422515869141,
+          5210.019302368164,
+          5210.923385620117
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 5840.409469604492,
+      "candidate_us": 5210.166358947754
+    },
+    {
+      "rows": 4096,
+      "pattern": "private_stride2",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          5843.94416809082,
+          5843.135833740234,
+          5842.943954467773,
+          5843.625640869141,
+          5843.057632446289,
+          5844.98405456543
+        ],
+        [
+          5215.711975097656,
+          5216.080093383789,
+          5215.6097412109375,
+          5215.852737426758,
+          5215.766525268555,
+          5216.545486450195
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 5843.3807373046875,
+      "candidate_us": 5215.809631347656
+    },
+    {
+      "rows": 4096,
+      "pattern": "scale_zero",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          6346.022415161133,
+          6345.52001953125,
+          6347.192001342773,
+          6345.17936706543,
+          6345.647811889648,
+          6346.72966003418
+        ],
+        [
+          6055.131149291992,
+          6056.670379638672,
+          6054.137420654297,
+          6055.132675170898,
+          6053.18717956543,
+          6055.107116699219
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 6345.835113525391,
+      "candidate_us": 6055.1191329956055
+    },
+    {
+      "rows": 4096,
+      "pattern": "mixed_scales",
+      "bit_exact": true,
+      "split_parts": null,
+      "seed": 731,
+      "query_scale": 0.2,
+      "baseline_split": false,
+      "timing_samples_us": [
+        [
+          6335.795211791992,
+          6336.273574829102,
+          6335.976028442383,
+          6336.369705200195,
+          6335.528182983398,
+          6336.980819702148
+        ],
+        [
+          6058.7310791015625,
+          6059.108734130859,
+          6059.64469909668,
+          6062.211227416992,
+          6058.590316772461,
+          6060.198211669922
+        ]
+      ],
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "unaligned_values": false,
+      "window_only": false,
+      "baseline_us": 6336.124801635742,
+      "candidate_us": 6059.3767166137695
+    }
+  ]
+}

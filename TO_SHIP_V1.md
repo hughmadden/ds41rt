@@ -52,7 +52,7 @@ Completion means a working, qualified release with measured performance, not com
 ## Model execution and state
 
 - [ ] Complete the architecture and tensor-layout audit with explicit reference-to-production mappings.
-- [ ] Wire CED encoder/decoder execution, shared KV ownership, chunked prefill and exact replay with separately qualified bounded replay.
+- [ ] Wire CED encoder/decoder execution, shared KV ownership, chunked prefill and exact replay with separately qualified bounded replay. **Priority correction:** [fresh source/profile audit](docs/ds41-prefill-scheduling-gap.md) confirms `serve-native` still runs all 40 layers on every prompt row, so advertised 8B prefill savings are absent. Implement encoder-wide cache production plus final-128 decoder bounded replay before further small kernel tuning; qualify its intentional approximation and dSpark state.
 - [x] Implement native ratio-two compressor projection/pooling and ratio-one projection/norm; qualify all four real-weight sources on both RTX GPUs.
 - [x] Add and qualify compressor request leases, partial-group ownership, captured proposal execution and accepted-prefix commit across two competing waves.
 - [ ] Implement CSA2 ratio-2 and ratio-1 production and source/reindex/reuse modes under the FP8-only serving KV contract.
