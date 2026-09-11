@@ -76,7 +76,7 @@ impl<'library> ExpertWeights<'library> {
     ) -> Result<ExpertExecutionBudget> {
         let info = library.v41_expert_info(capacity)?;
         let hidden = (capacity as usize)
-            .checked_mul(5120 * 2)
+            .checked_mul(info.input_row_bytes()?)
             .context("hidden buffer overflow")?;
         let routing = (capacity as usize)
             .checked_mul(info.topk as usize * 8)
@@ -90,11 +90,9 @@ impl<'library> ExpertWeights<'library> {
             },
             hidden_bytes: hidden,
             routing_bytes: routing,
-            output_and_shared_bytes: if info.role == 0 {
-                hidden.checked_mul(2).context("output buffer overflow")?
-            } else {
-                hidden
-            },
+            output_and_shared_bytes: (capacity as usize)
+                .checked_mul(5120 * 2 * if info.role == 0 { 2 } else { 1 })
+                .context("output buffer overflow")?,
         })
     }
     pub fn execution(
@@ -127,7 +125,10 @@ impl<'library> ExpertWeights<'library> {
             None
         };
         let compact_output = if kernel.info().role == 1 {
-            Some(DeviceAllocation::new(library, budget.hidden_bytes)?)
+            Some(DeviceAllocation::new(
+                library,
+                budget.output_and_shared_bytes,
+            )?)
         } else {
             None
         };
@@ -163,6 +164,10 @@ impl<'library> ExpertWeights<'library> {
         }
         let decode = if budget.decode_scratch_bytes > 0 {
             let decode_kernel = library.v41_expert_kernel(1)?;
+            ensure!(
+                decode_kernel.info().input_dtype == kernel.info().input_dtype,
+                "decode and grouped expert input formats differ"
+            );
             let decode_scratch = DeviceAllocation::new(library, budget.decode_scratch_bytes)?;
             let mut decode_slots = slots;
             unsafe {
@@ -244,7 +249,8 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
     pub fn stream(&self) -> *mut c_void {
         self.stream.raw
     }
-    /// Borrowed BF16 hidden, I32 route IDs and FP32 route weights; never free these views.
+    /// Borrowed hidden in the native kernel's input format, I32 route IDs and
+    /// FP32 route weights; never free these views. dSpark always uses BF16.
     /// Enqueue producers on stream() or provide event ordering before launch/replay.
     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] {
         [self.hidden.buffer, self.ids.buffer, self.routing.buffer]
@@ -394,7 +400,8 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
     }
 
     /// # Safety
-    /// Initialize valid BF16 hidden, in-range I32 expert IDs and finite nonnegative
+    /// Initialize hidden in the kernel-advertised input format, in-range I32
+    /// expert IDs and finite nonnegative
     /// FP32 routing weights for `rows` before this operation, with stream ordering.
     /// Initialize shared BF16 output too if requested. External readers/writers must
     /// finish before storage is reused; all operations belong to this GPU worker.
@@ -573,6 +580,7 @@ impl ExpertExecution<'_, '_> {
             request.rows() <= self.kernel.info().capacity_rows,
             "request exceeds native execution capacity"
         );
+        request.require_input_dtype(self.kernel.info().input_dtype)?;
         let routes = request.rows() as usize * 6;
         let bytes = request.plane_bytes()?;
         ensure!(
@@ -648,12 +656,25 @@ impl ExpertExecution<'_, '_> {
                 histogram[expert as usize] += 1;
             }
             let active_experts = histogram.iter().filter(|&&count| count != 0).count();
+            // Exact expert-local M=1..16; final bin is M>=17. These counts
+            // describe routed rows before the kernel pads them to its M tile.
+            let mut expert_rows_histogram = [0u32; 17];
+            let mut expert_rows_tail_routes = 0u32;
+            for &count in &histogram {
+                if count > 0 {
+                    expert_rows_histogram[count.min(17) as usize - 1] += 1;
+                    if count > 16 {
+                        expert_rows_tail_routes += count;
+                    }
+                }
+            }
             let unique_expert_weight_bytes =
                 self._weights.budget().resident_bytes / 384 * active_experts;
             tracing::debug!(target: "ds41rt::expert_timing",
                 layer, executor_id, rows=request.rows(), active_experts,
                 kernel_capacity=self.execution_state(request.rows()).0.info().capacity_rows,
                 max_expert_rows=histogram.iter().copied().max().unwrap_or(0),
+                ?expert_rows_histogram, expert_rows_tail_routes,
                 unique_expert_weight_bytes, output_bytes=bytes,
                 upload_us=uploaded_us.unwrap(), kernel_us, compact_us,
                 execution_host_us=executed_us.unwrap()-uploaded_us.unwrap(),

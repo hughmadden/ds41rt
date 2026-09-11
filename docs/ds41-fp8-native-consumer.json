@@ -1,0 +1,2295 @@
+{
+  "scope": "FP8 K32 native consumer and official-weight Rust-owner qualification, not live serving or performance qualification.",
+  "b12x_revision": "b53ade5a1b84c90c5186084b0639580317928a12",
+  "native_library_sha256": "d5e6695dc573fef673ac4cb3e26edaab4d2614aade4ab4f7f4cb265d0dcc0063",
+  "owner_binary_sha256": "d4fee6c2e303a2463a33d06c5a314b2baf5aa27940d8d4934dc247d30cc76e5b",
+  "native_export": {
+    "schema": 1,
+    "role": "spark",
+    "input_format": "fp8_k32",
+    "sparkinfer_revision": "b53ade5a1b84c90c5186084b0639580317928a12",
+    "device": "NVIDIA GB10",
+    "capability": [
+      12,
+      1
+    ],
+    "physical_sms": 48,
+    "geometry": {
+      "experts": 384,
+      "hidden": 5120,
+      "intermediate": 576,
+      "kernel_intermediate": 640,
+      "topk": 6
+    },
+    "activation_quantization": {
+      "format": "FP8 E4M3 with UE8M0 K32 scales",
+      "input_amax_floor": 0.0001,
+      "intermediate_amax_floor": 0.0001,
+      "intermediate_boundary": "routing-weighted FP32 SwiGLU rounded to BF16"
+    },
+    "output": "FP32 token-major route planes; reduction is a separate launch",
+    "variants": [
+      {
+        "name": "v41_spark_m1",
+        "requested_rows": 1,
+        "capacity_rows": 1,
+        "max_rows": 16,
+        "route_mode": "direct",
+        "output_splits": 5,
+        "max_active_clusters": 48,
+        "physical_tiles": 6,
+        "task_capacity": 30,
+        "core_scratch_nbytes": 736440,
+        "scratch_tensors": [
+          {
+            "name": "row_counts",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 0,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_count",
+            "shape": [
+              6
+            ],
+            "dtype": "int32",
+            "offset": 1536,
+            "nbytes": 24,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_epoch",
+            "shape": [
+              6
+            ],
+            "dtype": "int32",
+            "offset": 1568,
+            "nbytes": 24,
+            "init": "zeros"
+          },
+          {
+            "name": "token_map",
+            "shape": [
+              96
+            ],
+            "dtype": "int32",
+            "offset": 1600,
+            "nbytes": 384,
+            "init": "zeros"
+          },
+          {
+            "name": "token_weights",
+            "shape": [
+              96
+            ],
+            "dtype": "float32",
+            "offset": 1984,
+            "nbytes": 384,
+            "init": "zeros"
+          },
+          {
+            "name": "route_output",
+            "shape": [
+              6,
+              5120
+            ],
+            "dtype": "float32",
+            "offset": 2368,
+            "nbytes": 122880,
+            "init": "empty"
+          },
+          {
+            "name": "materialized_intermediate",
+            "shape": [
+              7,
+              5120
+            ],
+            "dtype": "bfloat16",
+            "offset": 125248,
+            "nbytes": 71680,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input",
+            "shape": [
+              1,
+              96,
+              5120
+            ],
+            "dtype": "uint8",
+            "offset": 196928,
+            "nbytes": 491520,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input_scale",
+            "shape": [
+              128,
+              320
+            ],
+            "dtype": "uint8",
+            "offset": 688448,
+            "nbytes": 40960,
+            "init": "empty"
+          },
+          {
+            "name": "expert_write_rows",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 729408,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "expert_tile_base",
+            "shape": [
+              385
+            ],
+            "dtype": "int32",
+            "offset": 730944,
+            "nbytes": 1540,
+            "init": "zeros"
+          },
+          {
+            "name": "input_gs",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 732496,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "down_input_scale",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 734032,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "pair_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 735568,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "producers_done_count",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 735584,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "all_work_published",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 735600,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 735616,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_tail",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 735632,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_ready",
+            "shape": [
+              30
+            ],
+            "dtype": "int32",
+            "offset": 735648,
+            "nbytes": 120,
+            "init": "zeros"
+          },
+          {
+            "name": "task_expert",
+            "shape": [
+              30
+            ],
+            "dtype": "int32",
+            "offset": 735776,
+            "nbytes": 120,
+            "init": "zeros"
+          },
+          {
+            "name": "task_m_tile",
+            "shape": [
+              30
+            ],
+            "dtype": "int32",
+            "offset": 735904,
+            "nbytes": 120,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_begin",
+            "shape": [
+              30
+            ],
+            "dtype": "int32",
+            "offset": 736032,
+            "nbytes": 120,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_count",
+            "shape": [
+              30
+            ],
+            "dtype": "int32",
+            "offset": 736160,
+            "nbytes": 120,
+            "init": "zeros"
+          },
+          {
+            "name": "task_valid_rows",
+            "shape": [
+              30
+            ],
+            "dtype": "int32",
+            "offset": 736288,
+            "nbytes": 120,
+            "init": "zeros"
+          },
+          {
+            "name": "tile_write_count",
+            "shape": [
+              6
+            ],
+            "dtype": "int32",
+            "offset": 736416,
+            "nbytes": 24,
+            "init": "zeros"
+          }
+        ],
+        "files": {
+          ".h": {
+            "name": "v41_spark_m1.h",
+            "sha256": "e7f20f8ae4459c428a883e6a40c0b75cd8a2b5e730b20f93c3b1dd2c2bafd771"
+          },
+          ".o": {
+            "name": "v41_spark_m1.o",
+            "sha256": "7666c2fa6f3d5145e745af2b0e218824e4fe11be74c39e12f69099dac291d723"
+          }
+        },
+        "native_entry": "_mlir_ds41rt_v41_spark_m1__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+        "rows_padded": 96,
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          196928,
+          688448,
+          196928,
+          688448,
+          125248,
+          1536,
+          1568,
+          735568,
+          735584,
+          735600,
+          735616,
+          735632,
+          735648,
+          735776,
+          735904,
+          736032,
+          736160,
+          736288,
+          736416,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          729408,
+          730944,
+          732496,
+          null,
+          null,
+          734032,
+          2368,
+          1600,
+          1984
+        ]
+      },
+      {
+        "name": "v41_spark_m16",
+        "requested_rows": 16,
+        "capacity_rows": 16,
+        "max_rows": 96,
+        "route_mode": "grouped",
+        "output_splits": 1,
+        "max_active_clusters": 48,
+        "physical_tiles": 101,
+        "task_capacity": 505,
+        "core_scratch_nbytes": 11881748,
+        "scratch_tensors": [
+          {
+            "name": "row_counts",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 0,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_count",
+            "shape": [
+              96
+            ],
+            "dtype": "int32",
+            "offset": 1536,
+            "nbytes": 384,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_epoch",
+            "shape": [
+              96
+            ],
+            "dtype": "int32",
+            "offset": 1920,
+            "nbytes": 384,
+            "init": "zeros"
+          },
+          {
+            "name": "token_map",
+            "shape": [
+              1616
+            ],
+            "dtype": "int32",
+            "offset": 2304,
+            "nbytes": 6464,
+            "init": "zeros"
+          },
+          {
+            "name": "token_weights",
+            "shape": [
+              1616
+            ],
+            "dtype": "float32",
+            "offset": 8768,
+            "nbytes": 6464,
+            "init": "zeros"
+          },
+          {
+            "name": "route_output",
+            "shape": [
+              96,
+              5120
+            ],
+            "dtype": "float32",
+            "offset": 15232,
+            "nbytes": 1966080,
+            "init": "empty"
+          },
+          {
+            "name": "materialized_intermediate",
+            "shape": [
+              105,
+              5120
+            ],
+            "dtype": "bfloat16",
+            "offset": 1981312,
+            "nbytes": 1075200,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input",
+            "shape": [
+              1,
+              1616,
+              5120
+            ],
+            "dtype": "uint8",
+            "offset": 3056512,
+            "nbytes": 8273920,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input_scale",
+            "shape": [
+              1664,
+              320
+            ],
+            "dtype": "uint8",
+            "offset": 11330432,
+            "nbytes": 532480,
+            "init": "empty"
+          },
+          {
+            "name": "expert_write_rows",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 11862912,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "expert_tile_base",
+            "shape": [
+              385
+            ],
+            "dtype": "int32",
+            "offset": 11864448,
+            "nbytes": 1540,
+            "init": "zeros"
+          },
+          {
+            "name": "input_gs",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 11866000,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "down_input_scale",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 11867536,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "pair_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 11869072,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "producers_done_count",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 11869088,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "all_work_published",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 11869104,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 11869120,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_tail",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 11869136,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_ready",
+            "shape": [
+              505
+            ],
+            "dtype": "int32",
+            "offset": 11869152,
+            "nbytes": 2020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_expert",
+            "shape": [
+              505
+            ],
+            "dtype": "int32",
+            "offset": 11871184,
+            "nbytes": 2020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_m_tile",
+            "shape": [
+              505
+            ],
+            "dtype": "int32",
+            "offset": 11873216,
+            "nbytes": 2020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_begin",
+            "shape": [
+              505
+            ],
+            "dtype": "int32",
+            "offset": 11875248,
+            "nbytes": 2020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_count",
+            "shape": [
+              505
+            ],
+            "dtype": "int32",
+            "offset": 11877280,
+            "nbytes": 2020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_valid_rows",
+            "shape": [
+              505
+            ],
+            "dtype": "int32",
+            "offset": 11879312,
+            "nbytes": 2020,
+            "init": "zeros"
+          },
+          {
+            "name": "tile_write_count",
+            "shape": [
+              101
+            ],
+            "dtype": "int32",
+            "offset": 11881344,
+            "nbytes": 404,
+            "init": "zeros"
+          }
+        ],
+        "files": {
+          ".h": {
+            "name": "v41_spark_m16.h",
+            "sha256": "9457fec8a3535130f435ed97a2a0ea29f80f3be5d2bbab3e3f6ea1b483018557"
+          },
+          ".o": {
+            "name": "v41_spark_m16.o",
+            "sha256": "a54f576f035fdb076a357b2a769390f536afe8ac0d12b3f99b9620b915fc7738"
+          }
+        },
+        "native_entry": "_mlir_ds41rt_v41_spark_m16__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+        "rows_padded": 1616,
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          3056512,
+          11330432,
+          3056512,
+          11330432,
+          1981312,
+          1536,
+          1920,
+          11869072,
+          11869088,
+          11869104,
+          11869120,
+          11869136,
+          11869152,
+          11871184,
+          11873216,
+          11875248,
+          11877280,
+          11879312,
+          11881344,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          11862912,
+          11864448,
+          11866000,
+          null,
+          null,
+          11867536,
+          15232,
+          2304,
+          8768
+        ]
+      },
+      {
+        "name": "v41_spark_m80",
+        "requested_rows": 80,
+        "capacity_rows": 80,
+        "max_rows": 480,
+        "route_mode": "grouped",
+        "output_splits": 1,
+        "max_active_clusters": 48,
+        "physical_tiles": 413,
+        "task_capacity": 2065,
+        "core_scratch_nbytes": 50271284,
+        "scratch_tensors": [
+          {
+            "name": "row_counts",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 0,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_count",
+            "shape": [
+              480
+            ],
+            "dtype": "int32",
+            "offset": 1536,
+            "nbytes": 1920,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_epoch",
+            "shape": [
+              480
+            ],
+            "dtype": "int32",
+            "offset": 3456,
+            "nbytes": 1920,
+            "init": "zeros"
+          },
+          {
+            "name": "token_map",
+            "shape": [
+              6608
+            ],
+            "dtype": "int32",
+            "offset": 5376,
+            "nbytes": 26432,
+            "init": "zeros"
+          },
+          {
+            "name": "token_weights",
+            "shape": [
+              6608
+            ],
+            "dtype": "float32",
+            "offset": 31808,
+            "nbytes": 26432,
+            "init": "zeros"
+          },
+          {
+            "name": "route_output",
+            "shape": [
+              480,
+              5120
+            ],
+            "dtype": "float32",
+            "offset": 58240,
+            "nbytes": 9830400,
+            "init": "empty"
+          },
+          {
+            "name": "materialized_intermediate",
+            "shape": [
+              426,
+              5120
+            ],
+            "dtype": "bfloat16",
+            "offset": 9888640,
+            "nbytes": 4362240,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input",
+            "shape": [
+              1,
+              6608,
+              5120
+            ],
+            "dtype": "uint8",
+            "offset": 14250880,
+            "nbytes": 33832960,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input_scale",
+            "shape": [
+              6656,
+              320
+            ],
+            "dtype": "uint8",
+            "offset": 48083840,
+            "nbytes": 2129920,
+            "init": "empty"
+          },
+          {
+            "name": "expert_write_rows",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 50213760,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "expert_tile_base",
+            "shape": [
+              385
+            ],
+            "dtype": "int32",
+            "offset": 50215296,
+            "nbytes": 1540,
+            "init": "zeros"
+          },
+          {
+            "name": "input_gs",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 50216848,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "down_input_scale",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 50218384,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "pair_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 50219920,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "producers_done_count",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 50219936,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "all_work_published",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 50219952,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 50219968,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_tail",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 50219984,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_ready",
+            "shape": [
+              2065
+            ],
+            "dtype": "int32",
+            "offset": 50220000,
+            "nbytes": 8260,
+            "init": "zeros"
+          },
+          {
+            "name": "task_expert",
+            "shape": [
+              2065
+            ],
+            "dtype": "int32",
+            "offset": 50228272,
+            "nbytes": 8260,
+            "init": "zeros"
+          },
+          {
+            "name": "task_m_tile",
+            "shape": [
+              2065
+            ],
+            "dtype": "int32",
+            "offset": 50236544,
+            "nbytes": 8260,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_begin",
+            "shape": [
+              2065
+            ],
+            "dtype": "int32",
+            "offset": 50244816,
+            "nbytes": 8260,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_count",
+            "shape": [
+              2065
+            ],
+            "dtype": "int32",
+            "offset": 50253088,
+            "nbytes": 8260,
+            "init": "zeros"
+          },
+          {
+            "name": "task_valid_rows",
+            "shape": [
+              2065
+            ],
+            "dtype": "int32",
+            "offset": 50261360,
+            "nbytes": 8260,
+            "init": "zeros"
+          },
+          {
+            "name": "tile_write_count",
+            "shape": [
+              413
+            ],
+            "dtype": "int32",
+            "offset": 50269632,
+            "nbytes": 1652,
+            "init": "zeros"
+          }
+        ],
+        "files": {
+          ".h": {
+            "name": "v41_spark_m80.h",
+            "sha256": "b73df44e1d6802d9472b7d86146be11b1256f748f97a70c9545bf085de9f7c88"
+          },
+          ".o": {
+            "name": "v41_spark_m80.o",
+            "sha256": "292be1c4172685ef55a2e25f1c393bda072809fb97ff3d3de874752dc8611a03"
+          }
+        },
+        "native_entry": "_mlir_ds41rt_v41_spark_m80__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+        "rows_padded": 6608,
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          14250880,
+          48083840,
+          14250880,
+          48083840,
+          9888640,
+          1536,
+          3456,
+          50219920,
+          50219936,
+          50219952,
+          50219968,
+          50219984,
+          50220000,
+          50228272,
+          50236544,
+          50244816,
+          50253088,
+          50261360,
+          50269632,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          50213760,
+          50215296,
+          50216848,
+          null,
+          null,
+          50218384,
+          58240,
+          5376,
+          31808
+        ]
+      },
+      {
+        "name": "v41_spark_m256",
+        "requested_rows": 256,
+        "capacity_rows": 256,
+        "max_rows": 1536,
+        "route_mode": "grouped",
+        "output_splits": 1,
+        "max_active_clusters": 48,
+        "physical_tiles": 479,
+        "task_capacity": 2395,
+        "core_scratch_nbytes": 78353916,
+        "scratch_tensors": [
+          {
+            "name": "row_counts",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 0,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_count",
+            "shape": [
+              1536
+            ],
+            "dtype": "int32",
+            "offset": 1536,
+            "nbytes": 6144,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_epoch",
+            "shape": [
+              1536
+            ],
+            "dtype": "int32",
+            "offset": 7680,
+            "nbytes": 6144,
+            "init": "zeros"
+          },
+          {
+            "name": "token_map",
+            "shape": [
+              7664
+            ],
+            "dtype": "int32",
+            "offset": 13824,
+            "nbytes": 30656,
+            "init": "zeros"
+          },
+          {
+            "name": "token_weights",
+            "shape": [
+              7664
+            ],
+            "dtype": "float32",
+            "offset": 44480,
+            "nbytes": 30656,
+            "init": "zeros"
+          },
+          {
+            "name": "route_output",
+            "shape": [
+              1536,
+              5120
+            ],
+            "dtype": "float32",
+            "offset": 75136,
+            "nbytes": 31457280,
+            "init": "empty"
+          },
+          {
+            "name": "materialized_intermediate",
+            "shape": [
+              494,
+              5120
+            ],
+            "dtype": "bfloat16",
+            "offset": 31532416,
+            "nbytes": 5058560,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input",
+            "shape": [
+              1,
+              7664,
+              5120
+            ],
+            "dtype": "uint8",
+            "offset": 36590976,
+            "nbytes": 39239680,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input_scale",
+            "shape": [
+              7680,
+              320
+            ],
+            "dtype": "uint8",
+            "offset": 75830656,
+            "nbytes": 2457600,
+            "init": "empty"
+          },
+          {
+            "name": "expert_write_rows",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 78288256,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "expert_tile_base",
+            "shape": [
+              385
+            ],
+            "dtype": "int32",
+            "offset": 78289792,
+            "nbytes": 1540,
+            "init": "zeros"
+          },
+          {
+            "name": "input_gs",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 78291344,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "down_input_scale",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 78292880,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "pair_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 78294416,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "producers_done_count",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 78294432,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "all_work_published",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 78294448,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 78294464,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_tail",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 78294480,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_ready",
+            "shape": [
+              2395
+            ],
+            "dtype": "int32",
+            "offset": 78294496,
+            "nbytes": 9580,
+            "init": "zeros"
+          },
+          {
+            "name": "task_expert",
+            "shape": [
+              2395
+            ],
+            "dtype": "int32",
+            "offset": 78304080,
+            "nbytes": 9580,
+            "init": "zeros"
+          },
+          {
+            "name": "task_m_tile",
+            "shape": [
+              2395
+            ],
+            "dtype": "int32",
+            "offset": 78313664,
+            "nbytes": 9580,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_begin",
+            "shape": [
+              2395
+            ],
+            "dtype": "int32",
+            "offset": 78323248,
+            "nbytes": 9580,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_count",
+            "shape": [
+              2395
+            ],
+            "dtype": "int32",
+            "offset": 78332832,
+            "nbytes": 9580,
+            "init": "zeros"
+          },
+          {
+            "name": "task_valid_rows",
+            "shape": [
+              2395
+            ],
+            "dtype": "int32",
+            "offset": 78342416,
+            "nbytes": 9580,
+            "init": "zeros"
+          },
+          {
+            "name": "tile_write_count",
+            "shape": [
+              479
+            ],
+            "dtype": "int32",
+            "offset": 78352000,
+            "nbytes": 1916,
+            "init": "zeros"
+          }
+        ],
+        "files": {
+          ".h": {
+            "name": "v41_spark_m256.h",
+            "sha256": "f74dd95adf9658b253c2b187c0c2b7828bac81e6bd54e357a863eb93537292a5"
+          },
+          ".o": {
+            "name": "v41_spark_m256.o",
+            "sha256": "2d98fe37e0e6ab1e6a94a76baf1db03f2b262e2091554813b6e62ca7e2c16dd1"
+          }
+        },
+        "native_entry": "_mlir_ds41rt_v41_spark_m256__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+        "rows_padded": 7664,
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          36590976,
+          75830656,
+          36590976,
+          75830656,
+          31532416,
+          1536,
+          7680,
+          78294416,
+          78294432,
+          78294448,
+          78294464,
+          78294480,
+          78294496,
+          78304080,
+          78313664,
+          78323248,
+          78332832,
+          78342416,
+          78352000,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          78288256,
+          78289792,
+          78291344,
+          null,
+          null,
+          78292880,
+          75136,
+          13824,
+          44480
+        ]
+      },
+      {
+        "name": "v41_spark_m1024",
+        "requested_rows": 1024,
+        "capacity_rows": 1024,
+        "max_rows": 6144,
+        "route_mode": "grouped",
+        "output_splits": 1,
+        "max_active_clusters": 48,
+        "physical_tiles": 767,
+        "task_capacity": 3835,
+        "core_scratch_nbytes": 200943996,
+        "scratch_tensors": [
+          {
+            "name": "row_counts",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 0,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_count",
+            "shape": [
+              6144
+            ],
+            "dtype": "int32",
+            "offset": 1536,
+            "nbytes": 24576,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_epoch",
+            "shape": [
+              6144
+            ],
+            "dtype": "int32",
+            "offset": 26112,
+            "nbytes": 24576,
+            "init": "zeros"
+          },
+          {
+            "name": "token_map",
+            "shape": [
+              12272
+            ],
+            "dtype": "int32",
+            "offset": 50688,
+            "nbytes": 49088,
+            "init": "zeros"
+          },
+          {
+            "name": "token_weights",
+            "shape": [
+              12272
+            ],
+            "dtype": "float32",
+            "offset": 99776,
+            "nbytes": 49088,
+            "init": "zeros"
+          },
+          {
+            "name": "route_output",
+            "shape": [
+              6144,
+              5120
+            ],
+            "dtype": "float32",
+            "offset": 148864,
+            "nbytes": 125829120,
+            "init": "empty"
+          },
+          {
+            "name": "materialized_intermediate",
+            "shape": [
+              791,
+              5120
+            ],
+            "dtype": "bfloat16",
+            "offset": 125977984,
+            "nbytes": 8099840,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input",
+            "shape": [
+              1,
+              12272,
+              5120
+            ],
+            "dtype": "uint8",
+            "offset": 134077824,
+            "nbytes": 62832640,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input_scale",
+            "shape": [
+              12288,
+              320
+            ],
+            "dtype": "uint8",
+            "offset": 196910464,
+            "nbytes": 3932160,
+            "init": "empty"
+          },
+          {
+            "name": "expert_write_rows",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 200842624,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "expert_tile_base",
+            "shape": [
+              385
+            ],
+            "dtype": "int32",
+            "offset": 200844160,
+            "nbytes": 1540,
+            "init": "zeros"
+          },
+          {
+            "name": "input_gs",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 200845712,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "down_input_scale",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 200847248,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "pair_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 200848784,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "producers_done_count",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 200848800,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "all_work_published",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 200848816,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 200848832,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_tail",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 200848848,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_ready",
+            "shape": [
+              3835
+            ],
+            "dtype": "int32",
+            "offset": 200848864,
+            "nbytes": 15340,
+            "init": "zeros"
+          },
+          {
+            "name": "task_expert",
+            "shape": [
+              3835
+            ],
+            "dtype": "int32",
+            "offset": 200864208,
+            "nbytes": 15340,
+            "init": "zeros"
+          },
+          {
+            "name": "task_m_tile",
+            "shape": [
+              3835
+            ],
+            "dtype": "int32",
+            "offset": 200879552,
+            "nbytes": 15340,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_begin",
+            "shape": [
+              3835
+            ],
+            "dtype": "int32",
+            "offset": 200894896,
+            "nbytes": 15340,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_count",
+            "shape": [
+              3835
+            ],
+            "dtype": "int32",
+            "offset": 200910240,
+            "nbytes": 15340,
+            "init": "zeros"
+          },
+          {
+            "name": "task_valid_rows",
+            "shape": [
+              3835
+            ],
+            "dtype": "int32",
+            "offset": 200925584,
+            "nbytes": 15340,
+            "init": "zeros"
+          },
+          {
+            "name": "tile_write_count",
+            "shape": [
+              767
+            ],
+            "dtype": "int32",
+            "offset": 200940928,
+            "nbytes": 3068,
+            "init": "zeros"
+          }
+        ],
+        "files": {
+          ".h": {
+            "name": "v41_spark_m1024.h",
+            "sha256": "4f1dde4c3d588112d576613f1b7efa2a353a52852975495153688c03820290d4"
+          },
+          ".o": {
+            "name": "v41_spark_m1024.o",
+            "sha256": "5069b6af83c5582d4450ef61462d1132fc81aa23849bfee3fceadb8b2e0e4db8"
+          }
+        },
+        "native_entry": "_mlir_ds41rt_v41_spark_m1024__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+        "rows_padded": 12272,
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          134077824,
+          196910464,
+          134077824,
+          196910464,
+          125977984,
+          1536,
+          26112,
+          200848784,
+          200848800,
+          200848816,
+          200848832,
+          200848848,
+          200848864,
+          200864208,
+          200879552,
+          200894896,
+          200910240,
+          200925584,
+          200940928,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          200842624,
+          200844160,
+          200845712,
+          null,
+          null,
+          200847248,
+          148864,
+          50688,
+          99776
+        ]
+      },
+      {
+        "name": "v41_spark_m4096",
+        "requested_rows": 4096,
+        "capacity_rows": 4096,
+        "max_rows": 24576,
+        "route_mode": "grouped",
+        "output_splits": 1,
+        "max_active_clusters": 48,
+        "physical_tiles": 1151,
+        "task_capacity": 5755,
+        "core_scratch_nbytes": 728644348,
+        "scratch_tensors": [
+          {
+            "name": "row_counts",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 0,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_count",
+            "shape": [
+              24576
+            ],
+            "dtype": "int32",
+            "offset": 1536,
+            "nbytes": 98304,
+            "init": "zeros"
+          },
+          {
+            "name": "barrier_epoch",
+            "shape": [
+              24576
+            ],
+            "dtype": "int32",
+            "offset": 99840,
+            "nbytes": 98304,
+            "init": "zeros"
+          },
+          {
+            "name": "token_map",
+            "shape": [
+              36832
+            ],
+            "dtype": "int32",
+            "offset": 198144,
+            "nbytes": 147328,
+            "init": "zeros"
+          },
+          {
+            "name": "token_weights",
+            "shape": [
+              36832
+            ],
+            "dtype": "float32",
+            "offset": 345472,
+            "nbytes": 147328,
+            "init": "zeros"
+          },
+          {
+            "name": "route_output",
+            "shape": [
+              24576,
+              5120
+            ],
+            "dtype": "float32",
+            "offset": 492800,
+            "nbytes": 503316480,
+            "init": "empty"
+          },
+          {
+            "name": "materialized_intermediate",
+            "shape": [
+              2374,
+              5120
+            ],
+            "dtype": "bfloat16",
+            "offset": 503809280,
+            "nbytes": 24309760,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input",
+            "shape": [
+              1,
+              36832,
+              5120
+            ],
+            "dtype": "uint8",
+            "offset": 528119040,
+            "nbytes": 188579840,
+            "init": "empty"
+          },
+          {
+            "name": "packed_input_scale",
+            "shape": [
+              36864,
+              320
+            ],
+            "dtype": "uint8",
+            "offset": 716698880,
+            "nbytes": 11796480,
+            "init": "empty"
+          },
+          {
+            "name": "expert_write_rows",
+            "shape": [
+              384
+            ],
+            "dtype": "int32",
+            "offset": 728495360,
+            "nbytes": 1536,
+            "init": "zeros"
+          },
+          {
+            "name": "expert_tile_base",
+            "shape": [
+              385
+            ],
+            "dtype": "int32",
+            "offset": 728496896,
+            "nbytes": 1540,
+            "init": "zeros"
+          },
+          {
+            "name": "input_gs",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 728498448,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "down_input_scale",
+            "shape": [
+              384
+            ],
+            "dtype": "float32",
+            "offset": 728499984,
+            "nbytes": 1536,
+            "init": "empty"
+          },
+          {
+            "name": "pair_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 728501520,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "producers_done_count",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 728501536,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "all_work_published",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 728501552,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_head",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 728501568,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_tail",
+            "shape": [
+              1
+            ],
+            "dtype": "int32",
+            "offset": 728501584,
+            "nbytes": 4,
+            "init": "zeros"
+          },
+          {
+            "name": "task_ready",
+            "shape": [
+              5755
+            ],
+            "dtype": "int32",
+            "offset": 728501600,
+            "nbytes": 23020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_expert",
+            "shape": [
+              5755
+            ],
+            "dtype": "int32",
+            "offset": 728524624,
+            "nbytes": 23020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_m_tile",
+            "shape": [
+              5755
+            ],
+            "dtype": "int32",
+            "offset": 728547648,
+            "nbytes": 23020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_begin",
+            "shape": [
+              5755
+            ],
+            "dtype": "int32",
+            "offset": 728570672,
+            "nbytes": 23020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_slice_count",
+            "shape": [
+              5755
+            ],
+            "dtype": "int32",
+            "offset": 728593696,
+            "nbytes": 23020,
+            "init": "zeros"
+          },
+          {
+            "name": "task_valid_rows",
+            "shape": [
+              5755
+            ],
+            "dtype": "int32",
+            "offset": 728616720,
+            "nbytes": 23020,
+            "init": "zeros"
+          },
+          {
+            "name": "tile_write_count",
+            "shape": [
+              1151
+            ],
+            "dtype": "int32",
+            "offset": 728639744,
+            "nbytes": 4604,
+            "init": "zeros"
+          }
+        ],
+        "files": {
+          ".h": {
+            "name": "v41_spark_m4096.h",
+            "sha256": "ecad2b5bf2e0a0cf0b73467114780e403f62716d9ccfc1bb7a490e170e4c19a5"
+          },
+          ".o": {
+            "name": "v41_spark_m4096.o",
+            "sha256": "2aa79b5e7182afdbf799d65b4d00b727daed705dd3b7abb18338881c8531ae90"
+          }
+        },
+        "native_entry": "_mlir_ds41rt_v41_spark_m4096__mlir_ciface_cutlass___call___b12xmoefused_moe_impl_DynamicMoEW4A8Launch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_FakeTensorInt3211_FakeTensorInt3211_FakeTenso",
+        "rows_padded": 36832,
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          528119040,
+          716698880,
+          528119040,
+          716698880,
+          503809280,
+          1536,
+          99840,
+          728501520,
+          728501536,
+          728501552,
+          728501568,
+          728501584,
+          728501600,
+          728524624,
+          728547648,
+          728570672,
+          728593696,
+          728616720,
+          728639744,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          728495360,
+          728496896,
+          728498448,
+          null,
+          null,
+          728499984,
+          492800,
+          198144,
+          345472
+        ]
+      }
+    ],
+    "native_abi_version": 2,
+    "pointer_slots": [
+      "a_ptr",
+      "topk_ids_ptr",
+      "topk_weights_ptr",
+      "packed_a_ptr",
+      "sfa_ptr",
+      "packed_a_storage_ptr",
+      "scale_storage_ptr",
+      "intermediate_ptr",
+      "barrier_count",
+      "barrier_epoch",
+      "pair_head",
+      "producers_done_count",
+      "all_work_published",
+      "task_head",
+      "task_tail",
+      "task_ready_ptr",
+      "task_expert_ptr",
+      "task_m_tile_ptr",
+      "task_slice_begin_ptr",
+      "task_slice_count_ptr",
+      "task_valid_rows_ptr",
+      "tile_write_count_ptr",
+      "b_w13",
+      "sfb_w13_ptr",
+      "b_down",
+      "sfb_down_ptr",
+      "sfb_w13_mx_ptr",
+      "sfb_down_mx_ptr",
+      "w13_residual_ptr",
+      "down_residual_ptr",
+      "w13_rp_ptr",
+      "w13_sfb_rp_ptr",
+      "down_rp_ptr",
+      "down_sfb_rp_ptr",
+      "row_counts",
+      "expert_write_rows",
+      "expert_tile_base",
+      "input_global_scale",
+      "alpha",
+      "down_alpha",
+      "global_scale",
+      "scatter_ptr",
+      "token_map_ptr",
+      "token_weights_ptr"
+    ]
+  },
+  "comparison": {
+    "files": [
+      {
+        "name": "v0-c0-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "5fe46a6d7d729bceb6041eacabae6ee0d3222b6763ebe04045d7fefb93374122",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "51b8e464af319ada7e30414876500bf2f5447fe024149db1510a9a417d6f509e",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "094d39b0d05a092df6b929c7095e04436020451e26efaf2b1c84fead2b36b2ec",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "2360acf172e2828fca99641ff224c0bca4eedef7d37260045527645963b8bff6",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "37225650da2c0dbe93d36c62b577a5983302cc9c14a9b466d23fb5369f088fb2",
+        "exact": true
+      },
+      {
+        "name": "v0-c0-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "5cc738e4aa2fe4fc48949cff2ad415a3e493ad69a707aee190d400ed321b736a",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "cb1c4f0d3a64b5181ca03f8fe01d371ebce8f058fa6acd0e001b27567e398871",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "a6bed98fa5d6ba9260fb90c84567b5d0cfa58d14454fd49efcd095e6ac17d31c",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "9f934533b113554d41fc461aa53a6b46e165e991977d23be5e6d85c9ad5abc1c",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "cca8783ceb1cbe92f7e86aa6aa3704cc3fcf9c7e0ba256a2cd55e502e891882e",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "b3427fe75f062f0d23eaa1e1dd225148575b56206673207741e38138bbcfc4ef",
+        "exact": true
+      },
+      {
+        "name": "v0-c1-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "f38fa4943049d17defa9c0895915081a921ad77d6314e754a67025f946cac35d",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "0192082162e5b5fdf5e2ed56d80b5873c5f3e657acdf2457d294c4b8aa3d64b4",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "eab013486d7941bec024dbbba53013c4824fde182cafdce65962f58b464bd895",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "caafb9438f241fe25abbcc4ece2dd06f34189dbfac7e439f0f5785b82499c9aa",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "249335b002324fb44215b5f8f3feafb4d3e6c941b92a9e97b751c81d5ddc2973",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "51546816ee3c9ef6bae7b918fc28b4d637c622f8c2f250dfd0804b7d10f6c2c9",
+        "exact": true
+      },
+      {
+        "name": "v1-c0-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "db439275a80759d3686c88cda3a85bb9a6b2d43a0738f702826cf88ba790dc50",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "a22b99561f7cb67d2d36f7cfeda64eab6643b9dc733a35064b19872c96f6748b",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "bacb5646350b0b9493cd90baa326d9fabdc304075ab7515fd74c30ac6d6e4a01",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "7086ea5a16c1f5dfa2ee50218577988ab4cd7eaa915172cfaff543645fe669db",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "c2bee2348e8cf24625fb17ce80936d592304b3b13ebc360d7ddc7fb9f9c4520a",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "35efaaaf4703211aaff8bbf0f1ea2918f8be47a1d621c7153e289b9259912982",
+        "exact": true
+      },
+      {
+        "name": "v1-c1-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "e5360f37791eaa33e9193515df5f51f203d0d0e855b3d2b34c518cde55a364d5",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "5fe46a6d7d729bceb6041eacabae6ee0d3222b6763ebe04045d7fefb93374122",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "51b8e464af319ada7e30414876500bf2f5447fe024149db1510a9a417d6f509e",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "094d39b0d05a092df6b929c7095e04436020451e26efaf2b1c84fead2b36b2ec",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "2360acf172e2828fca99641ff224c0bca4eedef7d37260045527645963b8bff6",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "37225650da2c0dbe93d36c62b577a5983302cc9c14a9b466d23fb5369f088fb2",
+        "exact": true
+      },
+      {
+        "name": "v2-c0-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "5cc738e4aa2fe4fc48949cff2ad415a3e493ad69a707aee190d400ed321b736a",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m1-compact.bin",
+        "bytes": 10240,
+        "sha256": "cb1c4f0d3a64b5181ca03f8fe01d371ebce8f058fa6acd0e001b27567e398871",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m1-routes.bin",
+        "bytes": 122880,
+        "sha256": "a6bed98fa5d6ba9260fb90c84567b5d0cfa58d14454fd49efcd095e6ac17d31c",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m16-compact.bin",
+        "bytes": 163840,
+        "sha256": "9f934533b113554d41fc461aa53a6b46e165e991977d23be5e6d85c9ad5abc1c",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m16-routes.bin",
+        "bytes": 1966080,
+        "sha256": "cca8783ceb1cbe92f7e86aa6aa3704cc3fcf9c7e0ba256a2cd55e502e891882e",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m80-compact.bin",
+        "bytes": 819200,
+        "sha256": "b3427fe75f062f0d23eaa1e1dd225148575b56206673207741e38138bbcfc4ef",
+        "exact": true
+      },
+      {
+        "name": "v2-c1-m80-routes.bin",
+        "bytes": 9830400,
+        "sha256": "f38fa4943049d17defa9c0895915081a921ad77d6314e754a67025f946cac35d",
+        "exact": true
+      }
+    ],
+    "total_bytes": 77475840,
+    "all_exact": true,
+    "route_planes_finite_nonzero": true
+  },
+  "owner_log": "{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":219.75300000000001}\n{\"visit\":0,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1738.1058}\n{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":214.2875}\n{\"visit\":0,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4673.758}\n{\"visit\":0,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":251.2828}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":210.4154}\n{\"visit\":0,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1494.3911}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":286.0509}\n{\"visit\":0,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4436.907300000001}\n{\"visit\":0,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":214.28269999999998}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":222.7611}\n{\"visit\":1,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1791.0677}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":216.2107}\n{\"visit\":1,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4657.647599999999}\n{\"visit\":1,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":217.44580000000002}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":212.6266}\n{\"visit\":1,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1464.2373}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":213.31620000000004}\n{\"visit\":1,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4414.4592}\n{\"visit\":1,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":215.1482}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":211.82979999999998}\n{\"visit\":2,\"case\":0,\"rows\":16,\"host_launch_and_drain_us\":1726.3600999999999}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":210.48579999999998}\n{\"visit\":2,\"case\":0,\"rows\":80,\"host_launch_and_drain_us\":4547.013400000001}\n{\"visit\":2,\"case\":0,\"rows\":1,\"host_launch_and_drain_us\":210.97540000000004}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":209.42819999999998}\n{\"visit\":2,\"case\":1,\"rows\":16,\"host_launch_and_drain_us\":1474.8917}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":209.673}\n{\"visit\":2,\"case\":1,\"rows\":80,\"host_launch_and_drain_us\":4376.2782}\n{\"visit\":2,\"case\":1,\"rows\":1,\"host_launch_and_drain_us\":211.8554}\nPASS official layers, budget rejection, stable decode/prefill pointers, rebind and changed-input decode graph\n",
+  "owner_source": "mod v41_requests;\nmod v41_backbone_execution;\nmod v41_index_lane;\nmod v41_backbone_cache;\nmod v41_backbone_router;\nmod v41_backbone_lane;\nmod v41_backbone_shared;\nmod v41_shared_ffn;\nmod v41_layer_graphs;\nmod v41_engram;\nmod v41_block;\nmod v41_backbone_hc;\nmod v41_hc;\nmod v41_attention_binding;\nmod v41_attention_query;\nmod v41_attention_output;\nmod v41_window;\nmod v41_compressor;\nmod v41_index_query;\nmod v41_index_selection;\nmod v41_sparse_attention;\nmod v41_target_embedding;\nmod v41_memory;\nmod v41_tensors;\nmod v41_experts;\nmod v41_target_head;\nmod v41_target_pass;\nmod v41_dspark_cache;\nmod cli {\n    pub struct NativeExpertDaemonArgs {\n        pub native_lib: std::path::PathBuf, pub snapshot: std::path::PathBuf,\n        pub rank: u32, pub capacity: u32, pub device_budget_bytes: usize,\n        pub max_frame_bytes: usize, pub listen: String,\n    }\n}\nfn main() -> anyhow::Result<()> {\n use ds41rt_loader::{read_official_v41_catalog, OFFICIAL_V41_MODEL_ID};\n use ds41rt_ffi::{NativeLibrary, Ds41rtDeviceBuffer};\n use v41_experts::{ExpertWeights, ExpertLayer};\n use std::{path::Path,fs,time::Instant};\n let args: Vec<_> = std::env::args().collect();\n let lib=unsafe{NativeLibrary::load(&args[1])?};\n let catalog=read_official_v41_catalog(OFFICIAL_V41_MODEL_ID,Path::new(\"/model\"))?;\n let mut weights=Vec::new();\n for layer in [0,1] {\n  let geometry=ExpertLayer::Backbone{layer,rank:0};\n  weights.push(ExpertWeights::load(&lib,&catalog,geometry,12*1024*1024*1024)?);\n }\n let budget=weights[0].execution_budget(80)?;\n assert!(budget.decode_scratch_bytes>0);\n assert!(weights[0].execution(80,budget.total()?-1).is_err());\n let mut wave=weights[0].execution(80,budget.total()?)?;\n let p1=wave.route_partials(1)?.ptr;\n let p80=wave.route_partials(80)?.ptr;\n assert_ne!(p1,p80);\n let compact=lib.v41_compact_reducer()?;\n let mut output=lib.alloc_device_buffer(80*5120*2)?;\n for (visit,layer) in [0,1,0].into_iter().enumerate() {\n  wave.bind_layer(&weights[layer])?;\n  for case in 0..2 {\n   for (buffer,name) in wave.inputs().into_iter().zip([\"hidden\",\"ids\",\"routing\"]) {\n    lib.copy_h2d(buffer,&fs::read(format!(\"/inputs/{case}-{name}.bin\"))?)?;\n   }\n   for rows in [1,16,1,80,1] {\n    let start=Instant::now();\n    for _ in 0..10 {unsafe{wave.launch(rows,false)?;}}\n    wave.synchronize()?;\n    let us=start.elapsed().as_secs_f64()*1e6/10.;\n    assert_eq!(wave.route_partials(1)?.ptr,p1);\n    assert_eq!(wave.route_partials(80)?.ptr,p80);\n    let partials=wave.route_partials(rows)?;\n    let mut data=vec![0;partials.bytes];lib.copy_d2h(&mut data,partials)?;\n    fs::write(format!(\"/output/v{visit}-c{case}-m{rows}-routes.bin\"),data)?;\n    unsafe{compact.compact(partials.ptr.cast(),output.ptr.cast(),rows,wave.stream())?;}\n    wave.synchronize()?;\n    let out=Ds41rtDeviceBuffer{bytes:rows as usize*5120*2,..output};\n    let mut data=vec![0;out.bytes];lib.copy_d2h(&mut data,out)?;\n    fs::write(format!(\"/output/v{visit}-c{case}-m{rows}-compact.bin\"),data)?;\n    println!(\"{{\\\"visit\\\":{visit},\\\"case\\\":{case},\\\"rows\\\":{rows},\\\"host_launch_and_drain_us\\\":{us}}}\");\n   }\n  }\n }\n unsafe{wave.capture(1,false)?;}\n assert!(wave.bind_layer(&weights[1]).is_err());\n for case in 0..2 {\n  for (buffer,name) in wave.inputs().into_iter().zip([\"hidden\",\"ids\",\"routing\"]) {\n   lib.copy_h2d(buffer,&fs::read(format!(\"/inputs/{case}-{name}.bin\"))?)?;\n  }\n  unsafe{wave.replay()?;}\n  wave.synchronize()?;\n  let partials=wave.route_partials(1)?;\n  let mut data=vec![0;partials.bytes];lib.copy_d2h(&mut data,partials)?;\n  assert_eq!(data,fs::read(format!(\"/output/v2-c{case}-m1-routes.bin\"))?);\n }\n lib.free_device_buffer(&mut output)?;\n println!(\"PASS official layers, budget rejection, stable decode/prefill pointers, rebind and changed-input decode graph\");\n Ok(())\n}\n",
+  "encoder_source": "import json,hashlib,pathlib\nimport torch,cutlass,cutlass.cute as cute\nimport cuda.bindings.driver as cuda\nfrom cutlass import Float32,Int32,Int64,Uint32,Uint8\nfrom cutlass.cute.runtime import from_dlpack\nfrom b12x._lib.intrinsics import quantize_block_fp8_mx,max_abs_32,fmax_f32,pow2_ceil_ue8m0_torch\nclass Quant:\n @cute.jit\n def __call__(self,x:cute.Tensor,y:cute.Tensor,s:cute.Tensor,blocks:Int32,stream:cuda.CUstream):\n  self.kernel(x,y,s,blocks).launch(grid=(cute.ceil_div(blocks,128),1,1),block=(128,1,1),stream=stream)\n @cute.kernel\n def kernel(self,x:cute.Tensor,y:cute.Tensor,s:cute.Tensor,blocks:Int32):\n  block=Int64(cute.arch.block_idx()[0])*Int64(128)+Int64(cute.arch.thread_idx()[0])\n  if block<Int64(blocks):\n   vals=cute.make_rmem_tensor((32,),Float32)\n   for j in cutlass.range_constexpr(32):vals[j]=Float32(x[block*Int64(32)+Int64(j)])\n   payload,scale=quantize_block_fp8_mx(vals,fmax_f32(max_abs_32(vals),Float32(1e-4)))\n   for j in cutlass.range_constexpr(8):y[block*Int64(8)+Int64(j)]=payload[j]\n   s[block]=Uint8(scale)\ndef tensor(x,dtype):\n t=from_dlpack(x,assumed_align=16);t.element_type=dtype;return t\n\nfor case in [0,1]:\n raw=pathlib.Path(f'/inputs/{case}-hidden.bin').read_bytes()\n x=torch.frombuffer(bytearray(raw),dtype=torch.bfloat16).cuda()\n y=torch.empty(x.numel()//4,dtype=torch.int32,device='cuda')\n scales=torch.empty(x.numel()//32,dtype=torch.uint8,device='cuda')\n args=(tensor(x,cutlass.BFloat16),tensor(y,Uint32),tensor(scales,Uint8))\n stream=cuda.CUstream(torch.cuda.current_stream().cuda_stream)\n f=cute.compile(Quant(),*args,Int32(x.numel()//32),stream)\n f(*args,Int32(x.numel()//32),stream)\n wire=torch.cat([y.view(torch.uint8).reshape(80,5120),scales.reshape(80,160)],dim=1)\n torch.cuda.synchronize()\n raw=wire.cpu().numpy().tobytes()\n pathlib.Path(f'/encoded/{case}-hidden.bin').write_bytes(raw)\n for name in ['ids','routing']:\n  pathlib.Path(f'/encoded/{case}-{name}.bin').write_bytes(pathlib.Path(f'/inputs/{case}-{name}.bin').read_bytes())\n print(json.dumps({'case':case,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}),flush=True)\n",
+  "encoded_inputs": [
+    {
+      "case": 0,
+      "bytes": 422400,
+      "sha256": "1ce5eb351944c09fae09a9baa67670edaacd6c6d58df206530a6622d6c8bc242"
+    },
+    {
+      "case": 1,
+      "bytes": 422400,
+      "sha256": "c21d3a901009ccda61b6b00224d9a389d642a8774c9b7c6250f4b4288e269748"
+    }
+  ],
+  "root_source_hashes": {
+    "native/include/ds41rt_v41_experts.h": "e37a02577cd492b13cd73c80dd4a7565b64c2776971a9af45e9f707a4b9942ef",
+    "python/tools/export_b12x_v41_experts_aot.py": "c67e3103bc1bf3c71988af233ea529c123956f3c72b637e27215a5679b76daf3",
+    "rust/crates/ds41rt-ffi/src/v41_experts.rs": "a2c9ca256f4d5f851863c9f6ce9d9852cd72c6c4068206a0ce1eb7189d22a5e3",
+    "rust/crates/ds41rt-daemon/src/v41_experts/execution.rs": "76988f15b22103784a18a329de6825977a5fff4e1d8348def8656d83f6916589",
+    "rust/crates/ds41rt-transport/src/v41_expert.rs": "738430aeeb73e1f6449bfa88ca1cd74b1d7303a040eae19910b231afc80704b8"
+  },
+  "tests": {
+    "gpu": "...                                                                      [100%]\n3 passed in 12.47s\n",
+    "transport": "149 passed, 1 ignored",
+    "abi": "2 targeted tests passed",
+    "workspace": "passed with PYO3_PYTHON=/home/tj/.local/bin/python3.12",
+    "broad_ffi": "80 passed, 6 failed against local native/build stub/missing legacy CUDA capabilities; not claimed green. Targeted ABI tests and actual Spark owner qualification used for this change."
+  }
+}

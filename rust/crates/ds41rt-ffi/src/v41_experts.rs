@@ -73,6 +73,21 @@ pub struct V41ExpertInfo {
     pub max_tasks: i32,
     pub max_phys_tiles: i32,
     pub max_active_clusters: i32,
+    /// ABI 2: 1 for BF16, 7 for row E4M3 payload followed by UE8M0 K32 scales.
+    pub input_dtype: u32,
+}
+
+impl V41ExpertInfo {
+    pub fn input_row_bytes(&self) -> Result<usize> {
+        let hidden = self.hidden_size as usize;
+        match self.input_dtype {
+            1 => hidden.checked_mul(2).context("expert BF16 row overflow"),
+            7 if hidden > 0 && hidden % 32 == 0 => hidden
+                .checked_add(hidden / 32)
+                .context("expert FP8 K32 row overflow"),
+            _ => anyhow::bail!("unsupported expert input dtype or width"),
+        }
+    }
 }
 
 #[repr(C)]
@@ -338,8 +353,12 @@ impl NativeLibrary {
             "V4.1 expert metadata failed with CUDA status {status}"
         );
         ensure!(
-            info.abi_version == 1 && info.hidden_size == 5120,
+            info.abi_version == 2 && info.hidden_size == 5120,
             "unsupported V4.1 native expert ABI"
+        );
+        ensure!(
+            info.input_dtype == 1 || (info.role == 1 && info.input_dtype == 7),
+            "unsupported native expert input representation"
         );
         let expected = match info.role {
             0 => (128, 2304, 2304, 3),
@@ -462,9 +481,26 @@ impl V41ExpertKernel<'_> {
 mod tests {
     use super::*;
     #[test]
+    fn expert_input_storage_tracks_encoded_representation() {
+        let mut info = V41ExpertInfo {
+            hidden_size: 5120,
+            input_dtype: 1,
+            ..Default::default()
+        };
+        assert_eq!(info.input_row_bytes().unwrap(), 10240);
+        info.input_dtype = 7;
+        assert_eq!(info.input_row_bytes().unwrap(), 5280);
+        info.hidden_size = 5119;
+        assert!(info.input_row_bytes().is_err());
+        info.input_dtype = 3;
+        assert!(info.input_row_bytes().is_err());
+    }
+
+    #[test]
     fn native_abi_layout_and_capacity_checks() {
         assert_eq!(std::mem::size_of::<V41ExpertInfo>(), 64);
         assert_eq!(std::mem::offset_of!(V41ExpertInfo, scratch_bytes), 32);
+        assert_eq!(std::mem::offset_of!(V41ExpertInfo, input_dtype), 60);
         assert_eq!(std::mem::size_of::<V41ExpertLaunchArgs>(), 392);
         assert_eq!(std::mem::offset_of!(V41ExpertLaunchArgs, stream), 384);
         assert_eq!(

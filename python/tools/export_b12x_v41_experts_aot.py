@@ -141,7 +141,7 @@ def write_native_bridge(output_dir: Path, manifest: dict) -> None:
         )
         variant["rows_padded"] = packed["shape"][1]
         info = [
-            1,
+            2,
             int(manifest["role"] == "spark"),
             geometry["experts"],
             geometry["hidden"],
@@ -155,6 +155,7 @@ def write_native_bridge(output_dir: Path, manifest: dict) -> None:
             variant["task_capacity"],
             variant["physical_tiles"],
             variant["max_active_clusters"],
+            7 if manifest["input_format"] == "fp8_k32" else 1,
         ]
         scratch = {tensor["name"]: tensor for tensor in variant["scratch_tensors"]}
         if len(scratch) != len(variant["scratch_tensors"]) or set(scratch) != set(SCRATCH_SLOTS.values()):
@@ -192,7 +193,7 @@ def write_native_bridge(output_dir: Path, manifest: dict) -> None:
             + ", {" + ", ".join(offsets) + "}}"
         )
         includes.append(f'#include "{name}.h"')
-    manifest["native_abi_version"] = 1
+    manifest["native_abi_version"] = 2
     manifest["pointer_slots"] = list(POINTER_SLOTS)
     lines = [
         "#pragma once",
@@ -204,7 +205,9 @@ def write_native_bridge(output_dir: Path, manifest: dict) -> None:
     (output_dir / "v41_expert_variants.h").write_text("\n".join(lines) + "\n")
 
 
-def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
+def export(output_dir: Path, role: str, rows: tuple[int, ...], input_format: str = "bf16") -> None:
+    if input_format not in ("bf16", "fp8_k32") or (role != "spark" and input_format != "bf16"):
+        raise ValueError("FP8 K32 input is supported only for Spark backbone experts")
     # Export requires compiler IR, which executable-only cache entries omit.
     os.environ["SPARKINFER_COMPILE_DISK_CACHE"] = "0"
     os.environ["SPARKINFER_COMPILE_MEMORY_CACHE"] = "0"
@@ -236,6 +239,7 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
     manifest = {
         "schema": 1,
         "role": role,
+        "input_format": input_format,
         "sparkinfer_revision": _pinned_sparkinfer.REVISION,
         "device": properties.name,
         "capability": list(capability),
@@ -291,6 +295,7 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
             activation="silu_v41",
             quant_mode="w4a8_mx",
             w4a8_repacked=True,
+            prequantized_input=input_format == "fp8_k32",
             direct_routing=direct_routing,
             planned_tile_m=config.dynamic_tile_m,
             deterministic_output=True,
@@ -350,6 +355,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--role", choices=("spark", "coordinator"), required=True)
     parser.add_argument("--rows", default="1,16,80,256,1024,4096")
+    parser.add_argument("--input-format", choices=("bf16", "fp8_k32"), default="bf16")
     args = parser.parse_args()
     rows = tuple(int(value) for value in args.rows.split(","))
     if (
@@ -358,7 +364,7 @@ def main() -> None:
         or any(value < 1 or value > 4096 for value in rows)
     ):
         parser.error("--rows must contain distinct positive capacities up to 4096")
-    export(args.output_dir, args.role, rows)
+    export(args.output_dir, args.role, rows, args.input_format)
 
 
 if __name__ == "__main__":

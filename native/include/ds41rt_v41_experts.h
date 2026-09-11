@@ -43,6 +43,7 @@ typedef struct ds41rt_v41_expert_info_t {
   int32_t max_tasks;
   int32_t max_phys_tiles;
   int32_t max_active_clusters;
+  uint32_t input_dtype; /* ABI 2: 1 BF16; 7 row E4M3 + UE8M0 K32 scales */
 } ds41rt_v41_expert_info_t;
 
 /* These functions return CUDA runtime error codes (zero is success).

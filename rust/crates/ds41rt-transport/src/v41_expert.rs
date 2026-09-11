@@ -44,9 +44,13 @@ impl<'a> V41BackboneRequest<'a> {
         ensure!(header.layer_id < 40, "native backbone layer out of range");
         ensure!(
             header.hidden_dim == V41_HIDDEN
-                && header.hidden_dtype == ExpertV2Dtype::Bf16
-                && header.hidden_row_stride_bytes == V41_HIDDEN * 2,
-            "native backbone needs contiguous BF16 hidden rows"
+                && matches!(
+                    header.hidden_dtype,
+                    ExpertV2Dtype::Bf16 | ExpertV2Dtype::Fp8E4m3Ue8m0K32
+                )
+                && header.hidden_row_stride_bytes as usize
+                    == header.hidden_dtype.row_bytes(V41_HIDDEN as usize)?,
+            "native backbone needs contiguous BF16 or E4M3/UE8M0 K32 hidden rows"
         );
         ensure!(
             header.route_count
@@ -87,6 +91,15 @@ impl<'a> V41BackboneRequest<'a> {
     }
     pub fn layer(&self) -> u32 {
         self.view.header.layer_id
+    }
+    /// Require the representation advertised by the bound native kernel before
+    /// copying bytes into its input allocation. Wire parsing alone cannot do this.
+    pub fn require_input_dtype(&self, native_dtype: u32) -> Result<()> {
+        ensure!(
+            self.view.header.hidden_dtype as u32 == native_dtype,
+            "request input representation does not match native expert kernel"
+        );
+        Ok(())
     }
     pub fn hidden(&self) -> &'a [u8] {
         self.view.hidden_payload()
@@ -299,8 +312,10 @@ mod tests {
             assert_eq!(owned.header.hidden_row_stride_bytes, 5280);
             assert_eq!(view.hidden_payload(), payload);
             assert_eq!(owned.hidden_payload.as_ref(), payload);
-            // Do not accept the new representation before GPU binding supports it.
-            assert!(V41BackboneRequest::parse(&frame, rows).is_err());
+            let native = V41BackboneRequest::parse(&frame, rows).unwrap();
+            assert!(native.require_input_dtype(1).is_err());
+            native.require_input_dtype(7).unwrap();
+            assert_eq!(native.hidden(), payload);
             assert!(ExpertProtocolV2Request::decode(&frame[..frame.len() - 1]).is_err());
             assert!(ExpertProtocolV2RequestView::parse(&frame[..frame.len() - 1]).is_err());
         }
