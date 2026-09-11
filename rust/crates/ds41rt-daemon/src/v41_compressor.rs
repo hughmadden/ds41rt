@@ -12,6 +12,10 @@ mod source_cache;
 use source_cache::SourceCache;
 pub(crate) use source_cache::{IndexCacheView, KvCacheView};
 static NEXT_PROPOSAL: AtomicU64 = AtomicU64::new(1);
+pub(crate) fn reserve_source_snapshot() -> Result<u64> {
+    NEXT_PROPOSAL.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .map_err(|_| anyhow::anyhow!("compressor proposal IDs exhausted"))
+}
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 fn ratio(layer: usize) -> Result<usize> {
     match layer {
@@ -156,6 +160,27 @@ impl<'a> CompressorState<'a> {
         Ok(self
             .index
             .kv_view(slot, self.slots[slot].end as usize / ratio(self.layer)?))
+    }
+    /// Borrow committed global cache for a decoder replay range. No private
+    /// compressor rows are produced; causal counts still follow each query.
+    pub fn committed_proposal(&self, lease: CompressorLease, positions: std::ops::Range<u64>,
+        snapshot: u64) -> Result<IndexProposal<'_>> {
+        let end = self.committed_end(lease)?;
+        ensure!(self.layer == 20 && snapshot != 0 && positions.start < positions.end
+            && positions.end <= end, "invalid committed decoder source range");
+        let cache = self.index_cache(lease)?;
+        let kv_cache = self.kv_cache(lease)?;
+        // Valid read-only backing for zero-length private overlays. Their
+        // metadata count is zero, so no private entry can be selected.
+        Ok(IndexProposal {
+            binding: IndexBinding { snapshot, lease }, request: self.request_id(lease)?,
+            source_layer: self.layer,
+            kv_values: kv_cache.values, kv_scales: kv_cache.scales,
+            packed: cache.packed, scales: cache.scales, capacity: 1,
+            cache, kv_cache, first_token: positions.start, end_token: positions.end,
+            start: end, count: 0, offset: 0, step: 1,
+            _wave: std::marker::PhantomData,
+        })
     }
     /// All device consumers of this request's cache must have finished.
     pub fn release(&mut self, lease: CompressorLease) -> Result<()> {
@@ -434,9 +459,7 @@ impl CompressorWave<'_, '_> {
                 "compressor state device differs"
             );
         }
-        let snapshot = NEXT_PROPOSAL
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
-            .map_err(|_| anyhow::anyhow!("compressor proposal IDs exhausted"))?;
+        let snapshot = reserve_source_snapshot()?;
         let mut result = Prepared {
             snapshot,
             owner: state.owner,

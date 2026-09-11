@@ -259,6 +259,7 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
             read(&lib, idx.packed)?, read(&lib, idx.scales)?))
     }).collect::<Result<Vec<_>>>()?;
     for &lease in &ced { assert_eq!(bank.begin_decoder_replay(lease)?, 1); }
+    let mut prior_binding = None;
     for tokens in [63, 65] {
         let work = ced.iter().map(|&lease| CacheWork { lease, tokens, kind: ExpertV2SourceKind::Prefill }).collect::<Vec<_>>();
         assert!(bank.plan(&work).is_err());
@@ -266,6 +267,24 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         assert_eq!(batch.stage(), CacheStage::Replay);
         assert!(bank.window(&batch, 19).is_err());
         produce(&lib, &bank, &batch, &mut windows, &mut sources, 100 + tokens as usize)?;
+        let view = bank.attention(&batch, 20, &windows[20], None)?;
+        let reused = bank.attention(&batch, 24, &windows[24], None)?;
+        assert!(bank.attention(&batch, 20, &windows[20], Some(&sources[3])).is_err());
+        assert_ne!(prior_binding, Some(view.sources[0].binding()));
+        prior_binding = Some(view.sources[0].binding());
+        for (i, source) in view.sources.iter().enumerate() {
+            let start = batch.requests[i].position;
+            assert_eq!(source.binding(), reused.sources[i].binding());
+            assert_eq!(source.first_token(), start);
+            assert_eq!(source.cache.rows, 129);
+            for position in start..start + u64::from(tokens) {
+                assert_eq!(source.metadata(position)?, [0, position + 1, 129, 0, 0, 1]);
+            }
+            assert!(source.metadata(start - 1).is_err());
+            assert!(source.metadata(start + u64::from(tokens)).is_err());
+            assert_eq!(view.windows[i].cache.begin, 1);
+        }
+        drop(reused); drop(view);
         bank.commit(&batch, &mut windows, &mut sources, &vec![tokens; 16])?;
         for &lease in &ced { assert_eq!(bank.committed_end(lease)?, 129); }
         assert!(bank.validate_batch(&batch).is_err());

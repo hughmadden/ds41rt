@@ -86,6 +86,7 @@ def main():
     p.add_argument('--native-lib', type=Path, required=True)
     p.add_argument('--reference-dir', type=Path, required=True)
     p.add_argument('--large-only', action='store_true')
+    p.add_argument('--committed-source', action='store_true', help='Global cache includes the entire query range, with no private source rows')
     p.add_argument('--bounded-replay', action='store_true', help='Qualify mutable decoder SWA lower bounds')
     p.add_argument('--split-parts', type=int, choices=range(1, 11), default=None,
                    help='Exercise the split ABI for rows <=16, sequential ABI above16')
@@ -146,13 +147,14 @@ def main():
         if a.bounded_replay:
             cases += [(1, 128, 1, False), (128, 1023, 2, True), (129, 255, 1, True)]
         if a.large_only:
+            assert not a.committed_source, 'committed-source uses the ordinary reference corpus'
             cases = []
             results.extend(large_pool(launch, stream))
         for rows, start, ratio, compressed in cases:
             tokens = rows
             wc = min(4096, rows + 7)
             sc = (rows + 1) // ratio
-            committed = start // ratio
+            committed = (start + tokens) // ratio if a.committed_source else start // ratio
             # Count must include a prior incomplete ratio-two group.
             sc = (start + tokens) // ratio - committed
             pc = min(4096, max(1, 5 + sc * ratio))
@@ -311,7 +313,7 @@ def main():
             assert launch(*derived) == 0
             error = max(error, check(host, ids))
             results.append(dict(rows=rows, start=start, ratio=ratio, compressed=compressed,
-                                max_abs=error, bounded_replay=a.bounded_replay, official_reference_rows=min(rows, 8), changed_graph=True, metadata_guards=len(fields), span_guards=True))
+                                max_abs=error, bounded_replay=a.bounded_replay, committed_source=a.committed_source, official_reference_rows=min(rows, 8), changed_graph=True, metadata_guards=len(fields), span_guards=True))
             print('PASS', results[-1], flush=True)
         stream.synchronize()
         if a.split_parts is not None:

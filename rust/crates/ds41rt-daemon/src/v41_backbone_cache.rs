@@ -50,6 +50,7 @@ struct BatchRequest {
 /// revalidates it against the originating bank and live request versions.
 pub(crate) struct CacheBatch {
     stage: CacheStage,
+    replay_snapshot: Option<u64>,
     identity: u64,
     owner: u64,
     requests: Vec<BatchRequest>,
@@ -359,6 +360,7 @@ impl<'a> BackboneCache<'a> {
             .map_err(|_| anyhow::anyhow!("cache batch IDs exhausted"))?;
         Ok(CacheBatch {
             stage: stage.context("empty cache batch")?,
+            replay_snapshot: if replay { Some(crate::v41_compressor::reserve_source_snapshot()?) } else { None },
             identity,
             owner: self.owner,
             requests,
@@ -441,18 +443,23 @@ impl<'a> BackboneCache<'a> {
         window.validate_batch(state, &chunks)?;
         let source_layer = SOURCES.iter().copied().rev().find(|&n| n <= layer);
         ensure!(
-            source.is_some() == source_layer.is_some(),
+            source.is_some() == (source_layer.is_some() && batch.stage != CacheStage::Replay),
             "attention batch source presence differs"
         );
         let mut sources = Vec::new();
-        if let Some(source_layer) = source_layer {
+        if batch.stage == CacheStage::Replay {
+            ensure!(source_layer == Some(20), "decoder replay global source differs");
+            let state = self.source(batch, 20)?;
+            let snapshot = batch.replay_snapshot.context("missing decoder source snapshot")?;
+            sources = batch.requests.iter().map(|r| state.committed_proposal(
+                r.sources[3], r.position..r.position + u64::from(r.work.tokens), snapshot))
+                .collect::<Result<Vec<_>>>()?;
+        } else if let Some(source_layer) = source_layer {
             let wave = source.context("attention source absent")?;
             let state = self.source(batch, source_layer)?;
             let chunks = batch.source_chunks(source_layer)?;
             wave.validate_batch(state, &chunks)?;
-            sources = chunks
-                .iter()
-                .map(|c| wave.index_proposal(state, c.lease))
+            sources = chunks.iter().map(|c| wave.index_proposal(state, c.lease))
                 .collect::<Result<Vec<_>>>()?;
         }
         let windows = chunks
