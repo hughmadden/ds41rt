@@ -272,6 +272,12 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
         )
         plan = scratch_plan.launch_plan
         capacity = plan.routed_rows // topk
+        if plan.policy_resolution is None:
+            raise RuntimeError("V4.1 export requires a resolved b12x launch policy")
+        config = plan.policy_resolution.config
+        if config.backend != "dynamic" or config.route_planner != "internal":
+            raise ValueError("V4.1 native export requires internal dynamic routing")
+        direct_routing = config.dynamic_route_mode == "direct"
         core = scratch_plan._core_workspace_plan
         compiled, clusters = moe._get_dynamic_kernel(
             experts,
@@ -285,6 +291,8 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
             activation="silu_v41",
             quant_mode="w4a8_mx",
             w4a8_repacked=True,
+            direct_routing=direct_routing,
+            planned_tile_m=config.dynamic_tile_m,
             deterministic_output=True,
             swiglu_limit=10,
         )
@@ -314,6 +322,8 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...]) -> None:
                 "requested_rows": requested_rows,
                 "capacity_rows": capacity,
                 "max_rows": plan.max_rows,
+                "route_mode": config.dynamic_route_mode,
+                "output_splits": 5 if direct_routing else 1,
                 "max_active_clusters": clusters,
                 "physical_tiles": core.dynamic_physical_tiles,
                 "task_capacity": core.dynamic_task_capacity,

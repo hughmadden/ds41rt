@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "b12x_revision": "f9ce62cab9e1ab9fa25cec34420e2a3335fcae98",
+  "b12x_lock": {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+    "revision": "f9ce62cab9e1ab9fa25cec34420e2a3335fcae98",
+    "source_tree_sha256": "cd2c47d5b2809909062b92f43b3830ade385e08f76dbbf95dadf4366904b7f80"
+  },
+  "device": "NVIDIA GB10",
+  "capability": [
+    12,
+    1
+  ],
+  "physical_sms": 48,
+  "native_library_sha256": "28c8c69f53a6e3153900861a29606890e9b34747881b6a1d1f0adede98fde1fa",
+  "exporter_sha256": "45f89cc9f2182fe926cd1ff89deccee1740a25ca25416b005eb3d425b5e7cb06",
+  "variants": [
+    {
+      "name": "v41_spark_m1",
+      "capacity_rows": 1,
+      "route_mode": "direct",
+      "output_splits": 5,
+      "max_rows": 16,
+      "physical_tiles": 6,
+      "task_capacity": 30,
+      "core_scratch_nbytes": 736440,
+      "files": {
+        ".h": {
+          "name": "v41_spark_m1.h",
+          "sha256": "e7f20f8ae4459c428a883e6a40c0b75cd8a2b5e730b20f93c3b1dd2c2bafd771"
+        },
+        ".o": {
+          "name": "v41_spark_m1.o",
+          "sha256": "54c8c4e41d52477935afb990537cd50a98bd00a787df9be384b92515a0e68967"
+        }
+      }
+    },
+    {
+      "name": "v41_spark_m16",
+      "capacity_rows": 16,
+      "route_mode": "grouped",
+      "output_splits": 1,
+      "max_rows": 96,
+      "physical_tiles": 101,
+      "task_capacity": 505,
+      "core_scratch_nbytes": 11881748,
+      "files": {
+        ".h": {
+          "name": "v41_spark_m16.h",
+          "sha256": "9457fec8a3535130f435ed97a2a0ea29f80f3be5d2bbab3e3f6ea1b483018557"
+        },
+        ".o": {
+          "name": "v41_spark_m16.o",
+          "sha256": "a7e731058181e7959956691599d10dadd178e8b25849fc79a1c32cc8e9453199"
+        }
+      }
+    }
+  ],
+  "checks": {
+    "policy": "8 passed",
+    "python_spark": "oracle, changed-input graph, inactive-route recovery pass; median approximately 221 us synthetic diagnostic",
+    "native_aot": {
+      "rows_1": "oracle, changed-input graph and inactive-route recovery passed",
+      "rows_16": "oracle and changed-input graph passed; inactive-route case not run"
+    }
+  },
+  "qualification_source": "import ctypes as c, json, os\nimport torch\nfrom b12x.moe.fused_moe import _impl as impl\nfrom tests.moe.test_v41_expert_numerics import test_v41_native_expert_routing_and_graph\nclass Args(c.Structure):\n    _fields_=[('tensors',c.c_void_p*44)]+[(key,c.c_int32) for key in ('num_tokens','max_rows','scatter_rows','rows_padded','max_tasks','max_phys_tiles','max_active_clusters')]+[('stream',c.c_void_p)]\nassert c.sizeof(Args)==392\ntorch.empty(1,device='cuda')\nlib=c.CDLL('/export/libds41rt_direct_experts.so')\nlib.ds41rt_v41_expert_initialize.argtypes=[c.c_int32,c.POINTER(c.c_void_p)]\nlib.ds41rt_v41_expert_launch.argtypes=[c.c_void_p,c.POINTER(Args)]\nhandles={}\nfor cap in (1,16):\n    handle=c.c_void_p()\n    assert lib.ds41rt_v41_expert_initialize(cap,c.byref(handle))==0\n    handles[cap]=handle\nclass Native:\n    def __init__(self,cap):self.cap=cap\n    def __call__(self,*args):\n        assert len(args)==52,len(args)\n        pointers=[arg.data_ptr() if isinstance(arg,torch.Tensor) else int(arg) for arg in args[:44]]\n        launch=Args((c.c_void_p*44)(*pointers),*[int(v) for v in args[44:51]],int(args[51]))\n        status=lib.ds41rt_v41_expert_launch(handles[self.cap],c.byref(launch))\n        assert status==0,(status,list(args[44:51]))\n# Adapt only the compiled-call boundary: all compute is the exported native\n# object via the real C ABI; planning, resident packing and scratch stay b12x.\n# This is component qualification, not a replacement serving implementation.\ndef get(*args,**kwargs):\n    cap=1 if args[1]==1 else 16\n    assert args[0]==384 and args[2:5]==(5120,640,6),args[:5]\n    return Native(cap),kwargs['mac_override']\nimpl._get_dynamic_kernel=get\nimpl.make_ptr=lambda dtype,address,*args,**kwargs: address\nfor rows in (1,16):\n    test_v41_native_expert_routing_and_graph(rows,576,384)\n    print(json.dumps({'rows':rows,'path':'native C ABI/AOT with b12x-managed scratch','oracle_changed_graph_inactive_recovery':'pass'}),flush=True)\n",
+  "export_command": "python /workspace/ds41rt/python/tools/export_b12x_v41_experts_aot.py --output-dir /export --role spark --rows 1,16",
+  "native_build_command": "nvcc -shared -Xcompiler -fPIC -std=c++17 -arch=sm_121 -I/workspace/ds41rt/native/include -I/export /workspace/ds41rt/native/src/v41_experts.cc /workspace/ds41rt/native/cuda/kernels/v41_route_reduce.cu /workspace/ds41rt/native/cuda/kernels/v41_expert_pack.cu /export/v41_spark_m1.o /export/v41_spark_m16.o -lcuda -L/usr/local/lib/python3.12/dist-packages/nvidia_cutlass_dsl/cu13/lib -lcute_dsl_runtime -Xlinker -rpath -Xlinker /usr/local/lib/python3.12/dist-packages/nvidia_cutlass_dsl/cu13/lib -o /export/libds41rt_direct_experts.so",
+  "qualification_command": "docker run --rm --gpus all -v /tmp/ds41-direct-native-source/third_party/sparkinfer:/b12x:ro -v /tmp/ds41-direct-native-export:/export:ro -v /tmp/ds41-qualify-direct-aot.py:/probe.py:ro -e PYTHONPATH=/b12x --entrypoint python ds41rt-spark-expert-dev:latest /probe.py",
+  "limitations": [
+    "Synthetic native component qualification with Python/b12x-managed scratch; not the Rust worker owner or official resident weights.",
+    "The callable adapter replaces only JIT compiled dispatch with the real native ABI/AOT launch. It is qualification infrastructure, not a serving path.",
+    "No native timing or end-to-end performance claim.",
+    "Live ExpertExecution owns its startup capacity kernel (80 rows); requires preinitialized one-row handle/scratch and dispatch before benefiting.",
+    "First minimal link lacked cute_dsl_runtime; relink with the same runtime used by CMake resolved the missing symbol and qualification passed."
+  ]
+}
