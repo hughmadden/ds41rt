@@ -51,6 +51,8 @@ def dispatch_header(output: Path, manifest: dict) -> None:
         for kind in ('quant', 'gemm'):
             lines.append(f'#include "{label}_{kind}.h"')
         groups = variant.get('groups', 1)
+        if groups > 1:
+            lines.append(f'#include "{label}_quant_rope.h"')
         grids = [mxfp8_rows_quant_aot_grid(size_k=k, rows=rows, expected_m=capacity,
                                          sm_count=manifest['physical_sms']) for rows in range(1, capacity + 1)]
         if groups > 1:
@@ -60,10 +62,12 @@ def dispatch_header(output: Path, manifest: dict) -> None:
                 variant['activation_values_offset'], variant['activation_row_scales_offset'],
                 variant['activation_mma_scales_offset'], n * k // groups // 32]
         modules = []
-        for kind in ('quant', 'gemm'):
+        for kind in ('quant', 'gemm', *(['quant_rope'] if groups > 1 else [])):
             prefix = '_mlir_ds41rt_' + label + '_' + kind
             modules.append('{' + ','.join((prefix + '_cuda_init', prefix + '_cuda_load_to_device',
                                            variant[kind + '_abi']['symbol'])) + '}')
+        if groups == 1:
+            modules.append('{nullptr,nullptr,nullptr}')
         variants.append('{{' + ','.join(map(str, info)) + '},' + ','.join(modules) + ',' + label + '_grids,' + str(variant['split_k_offset']) + ',' + str(variant['split_k_slices']) + ',' + str(groups) + ',' + str(variant.get('grouped_output_offset', 0)) + '}')
     lines.append('#define DS41RT_V41_FP8_VARIANTS ' + ','.join(variants))
     (output / 'v41_fp8_variants.h').write_text('\n'.join(lines) + '\n')
@@ -100,6 +104,9 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
                      if groups > 1 else compile_mxfp8_rows_quant_aot(
                          size_k=k, scale_block_size=32, expected_m=capacity, amax_floor=1e-4))
             quant.export_to_c(str(output), label + '_quant', 'ds41rt_' + label + '_quant')
+            if groups > 1:
+                rope_quant = compile_wo_grouped_quant_aot(groups=groups, group_width=k // groups, row_frequencies=True)
+                rope_quant.export_to_c(str(output), label + '_quant_rope', 'ds41rt_' + label + '_quant_rope')
             gemm, split_k = compile_dense_gemm_mxfp8_aot(size_m=capacity, size_n=n // groups, size_k=k // groups, num_groups=groups,
                                               expected_m=capacity, sfb_k_replicated=False, device=device,
                                               return_split_k_metadata=True)
@@ -133,11 +140,13 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
                 'split_k_slices': split_k, 'gemm_output_dtype': 'FP32' if split_k > 1 else 'BF16', 'output_dtype': 'BF16', 'output_bytes': capacity * n * 2,
                 'quant_abi': validate_abi(output / (label + '_quant.h'), label + '_quant', 'group_quant' if groups > 1 else 'quant'),
                 'gemm_abi': validate_abi(output / (label + '_gemm.h'), label + '_gemm', 'gemm'), **group_layout})
+            if groups > 1:
+                manifest['variants'][-1]['quant_rope_abi'] = validate_abi(output / (label + '_quant_rope.h'), label + '_quant_rope', 'group_quant')
             print(f'exported {label}', flush=True)
     dispatch_header(output, manifest)
     artifacts = {"v41_fp8_variants.h": hashlib.sha256((output / "v41_fp8_variants.h").read_bytes()).hexdigest()}
     for variant in manifest['variants']:
-        for kind in ('quant', 'gemm'):
+        for kind in ('quant', 'gemm', *(['quant_rope'] if variant.get('groups', 1) > 1 else [])):
             for suffix in ('.h', '.o'):
                 path = output / (variant['label'] + '_' + kind + suffix)
                 artifacts[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()

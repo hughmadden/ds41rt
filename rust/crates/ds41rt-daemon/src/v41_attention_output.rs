@@ -10,7 +10,7 @@ use ds41rt_ffi::{
 };
 use ds41rt_loader::OfficialV41Catalog;
 use std::marker::PhantomData;
-const ROW_BYTES: [usize; 6] = [65536, 65536, 16384, 10240, 8, 256];
+const ROW_BYTES: [usize; 5] = [65536, 16384, 10240, 8, 256];
 pub(crate) struct AttentionOutputWeights<'a> {
     library: &'a NativeLibrary,
     layer: usize,
@@ -130,7 +130,6 @@ pub(crate) struct AttentionOutput<'a> {
     pub layer: usize,
     pub rows: usize,
     pub input: Ds41rtDeviceBuffer,
-    pub rotated: Ds41rtDeviceBuffer,
     pub grouped: Ds41rtDeviceBuffer,
     pub projected: Ds41rtDeviceBuffer,
     pub positions: Ds41rtDeviceBuffer,
@@ -196,7 +195,7 @@ impl AttentionOutputWave<'_, '_> {
         self.b(0)
     }
     pub fn positions(&self) -> Ds41rtDeviceBuffer {
-        self.b(4)
+        self.b(3)
     }
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
@@ -213,38 +212,30 @@ impl AttentionOutputWave<'_, '_> {
     unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
         unsafe {
             self.norm.backbone_frequencies(
+                self.b(3),
                 self.b(4),
-                self.b(5),
                 rows,
                 self.weights.layer as u32,
                 self.stream.raw,
             )?;
-            self.norm.rope(
+            self.grouped.launch_rope(
                 self.b(0),
-                self.b(5),
-                self.b(1),
-                rows,
-                64,
-                true,
-                self.stream.raw,
-            )?;
-            self.grouped.launch(
-                self.b(1),
+                self.b(4),
                 self.weights.tensors.get(&self.weights.names[0])?,
                 self.weights.grouped_scales.buffer,
                 self.grouped_scratch.buffer,
                 self.alpha.buffer,
-                self.b(2),
+                self.b(1),
                 rows,
                 self.stream.raw,
             )?;
             self.kernel.launch(
-                self.b(2),
+                self.b(1),
                 self.weights.tensors.get(&self.weights.names[2])?,
                 self.weights.scales.buffer,
                 self.scratch.buffer,
                 self.alpha.buffer,
-                self.b(3),
+                self.b(2),
                 rows,
                 self.stream.raw,
             )?;
@@ -378,11 +369,10 @@ impl AttentionOutputWave<'_, '_> {
             layer: self.weights.layer,
             rows,
             input: b(0),
-            rotated: b(1),
-            grouped: b(2),
-            projected: b(3),
-            positions: b(4),
-            frequencies: b(5),
+            grouped: b(1),
+            projected: b(2),
+            positions: b(3),
+            frequencies: b(4),
             _owner: PhantomData,
         })
     }

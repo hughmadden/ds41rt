@@ -35,6 +35,11 @@ int32_t ds41rt_v41_fp8_pack_scales(const uint8_t* source, uint8_t* destination, 
 int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, const uint8_t* weight,
     const uint8_t* packed_scales, void* scratch, uint64_t scratch_bytes,
     const float* alpha, uint16_t* output, int32_t rows, void* stream);
+/* Grouped WO-A may fuse inverse RoPE using interleaved FP32 [rows,32,2]
+ * frequencies; nullptr retains the ordinary launch behavior for all shapes. */
+int32_t ds41rt_v41_fp8_launch_rope(void* kernel, const uint16_t* source, const float* frequencies,
+    const uint8_t* weight, const uint8_t* packed_scales, void* scratch, uint64_t scratch_bytes,
+    const float* alpha, uint16_t* output, int32_t rows, void* stream);
 #ifdef __cplusplus
 }
 #endif

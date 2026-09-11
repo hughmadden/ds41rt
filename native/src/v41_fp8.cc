@@ -15,7 +15,7 @@ struct Module {
 };
 struct Variant {
   ds41rt_v41_fp8_info_t info;
-  Module quant, gemm;
+  Module quant, gemm, quant_rope;
   const uint32_t* grids;
   uint64_t split_offset;
   uint32_t split_slices;
@@ -68,7 +68,8 @@ extern "C" int32_t ds41rt_v41_fp8_matrix_initialize(int32_t rows, int32_t k, int
   } else {
     int result = load(v->quant, device);
     if (!result) result = load(v->gemm, device);
-    if (result) { v->quant.reset(); v->gemm.reset(); return result; }
+    if (!result && v->groups > 1) result = load(v->quant_rope, device);
+    if (result) { v->quant.reset(); v->gemm.reset(); v->quant_rope.reset(); return result; }
     v->device = device;
   }
   *out = v; return 0;
@@ -80,17 +81,19 @@ extern "C" int32_t ds41rt_v41_fp8_initialize_scratch(void* kernel, void* scratch
       !span(alpha,4,c,d) || (a<d && c<b)) return cudaErrorInvalidValue;
   return ds41rt_v41_fp8_initialize_storage(scratch, v->info.scratch_bytes, alpha, stream);
 }
-extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, const uint8_t* weight,
+extern "C" int32_t ds41rt_v41_fp8_launch_rope(void* kernel, const uint16_t* source, const float* frequencies, const uint8_t* weight,
     const uint8_t* packed_scales, void* scratch, uint64_t bytes, const float* alpha,
     uint16_t* output, int32_t rows, void* stream) {
   auto* v = handle(kernel); int status = device_matches(v); if (status) return status;
   if (rows <= 0 || uint32_t(rows) > v->info.capacity_rows || bytes < v->info.scratch_bytes) return cudaErrorInvalidValue;
-  const void* buffers[] = {source,weight,packed_scales,scratch,alpha,output};
-  uint64_t sizes[] = {uint64_t(rows)*v->info.input_dim*2,uint64_t(v->info.output_dim)*v->info.input_dim/v->groups,v->info.packed_weight_scale_bytes,v->info.scratch_bytes,4,uint64_t(rows)*v->info.output_dim*2};
-  uintptr_t starts[6], ends[6];
-  for (int i=0;i<6;++i) {
+  if (frequencies && v->groups != 8) return cudaErrorInvalidValue;
+  const void* buffers[] = {source,weight,packed_scales,scratch,alpha,output,frequencies};
+  uint64_t sizes[] = {uint64_t(rows)*v->info.input_dim*2,uint64_t(v->info.output_dim)*v->info.input_dim/v->groups,v->info.packed_weight_scale_bytes,v->info.scratch_bytes,4,uint64_t(rows)*v->info.output_dim*2,frequencies?uint64_t(rows)*256:0};
+  uintptr_t starts[7], ends[7];
+  for (int i=0;i<7;++i) {
+    if (!sizes[i]) continue;
     if (!span(buffers[i],sizes[i],starts[i],ends[i])) return cudaErrorInvalidValue;
-    for (int j=0;j<i;++j) if (starts[i]<ends[j] && starts[j]<ends[i]) return cudaErrorInvalidValue;
+    for (int j=0;j<i;++j) if (sizes[j] && starts[i]<ends[j] && starts[j]<ends[i]) return cudaErrorInvalidValue;
   }
   void* x = const_cast<uint16_t*>(source);
   void* a = static_cast<char*>(scratch)+v->info.values_offset;
@@ -100,9 +103,10 @@ extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, c
   void* quant_args[] = {&x,&a,&sr,&sm,&rows,&grid,&stream,&status};
   if (v->groups == 1) v->quant.launch(quant_args,8);
   else {
-    int unused_length=1;
-    void* group_args[] = {&x,&x,&x,&a,&sr,&sm,&rows,&unused_length,&grid,&stream,&status};
-    v->quant.launch(group_args,11);
+    int unused_length=frequencies?rows*64:1;
+    void* f=frequencies?const_cast<float*>(frequencies):x;
+    void* group_args[] = {&x,&x,&f,&a,&sr,&sm,&rows,&unused_length,&grid,&stream,&status};
+    (frequencies?v->quant_rope:v->quant).launch(group_args,11);
   }
   if (status) return status;
   void* w=const_cast<uint8_t*>(weight), *s=const_cast<uint8_t*>(packed_scales), *c=output, *one=const_cast<float*>(alpha);
@@ -116,6 +120,12 @@ extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, c
   if (v->split_slices == 1) return status;
   return ds41rt_v41_fp8_reduce_splits(static_cast<const float*>(c), output,
       rows, v->info.output_dim, v->split_slices, stream);
+}
+
+extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, const uint8_t* weight,
+    const uint8_t* packed_scales, void* scratch, uint64_t bytes, const float* alpha,
+    uint16_t* output, int32_t rows, void* stream) {
+  return ds41rt_v41_fp8_launch_rope(kernel,source,nullptr,weight,packed_scales,scratch,bytes,alpha,output,rows,stream);
 }
 
 // Existing engram entry points retain their explicit geometry.

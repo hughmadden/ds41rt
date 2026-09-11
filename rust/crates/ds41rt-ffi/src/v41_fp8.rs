@@ -26,6 +26,7 @@ type PackFn = unsafe extern "C" fn(*const u8, *mut u8, i32, i32, *mut c_void) ->
 type LaunchFn = unsafe extern "C" fn(
     *mut c_void,
     *const u16,
+    *const f32,
     *const u8,
     *const u8,
     *mut c_void,
@@ -108,7 +109,7 @@ impl NativeLibrary {
             let initialize: InitFn = *self.lib.get(b"ds41rt_v41_fp8_matrix_initialize")?;
             let scratch = *self.lib.get(b"ds41rt_v41_fp8_initialize_scratch")?;
             let pack = *self.lib.get(b"ds41rt_v41_fp8_matrix_pack_scales")?;
-            let launch = *self.lib.get(b"ds41rt_v41_fp8_launch")?;
+            let launch = *self.lib.get(b"ds41rt_v41_fp8_launch_rope")?;
             let mut handle = std::ptr::null_mut();
             let status = initialize(
                 i32::try_from(capacity)?,
@@ -219,10 +220,46 @@ impl V41Fp8Kernel<'_> {
         rows: u32,
         stream: *mut c_void,
     ) -> Result<()> {
+        unsafe { self.launch_inner(source, None, weight, scales, scratch, alpha, output, rows, stream) }
+    }
+    /// Fuse V4.1 inverse RoPE with grouped input quantization.
+    /// # Safety
+    /// Same ownership as launch; frequencies are initialized FP32 [rows,32,2]
+    /// on the current device and remain immutable through stream completion.
+    pub unsafe fn launch_rope(
+        &self,
+        source: Ds41rtDeviceBuffer,
+        frequencies: Ds41rtDeviceBuffer,
+        weight: Ds41rtDeviceBuffer,
+        scales: Ds41rtDeviceBuffer,
+        scratch: Ds41rtDeviceBuffer,
+        alpha: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        unsafe { self.launch_inner(source, Some(frequencies), weight, scales, scratch, alpha, output, rows, stream) }
+    }
+    unsafe fn launch_inner(
+        &self,
+        source: Ds41rtDeviceBuffer,
+        frequencies: Option<Ds41rtDeviceBuffer>,
+        weight: Ds41rtDeviceBuffer,
+        scales: Ds41rtDeviceBuffer,
+        scratch: Ds41rtDeviceBuffer,
+        alpha: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer,
+        rows: u32,
+        stream: *mut c_void,
+    ) -> Result<()> {
         ensure!(
             rows > 0 && rows <= self.info.capacity_rows,
             "native FP8 rows exceed capacity"
         );
+        if let Some(f) = frequencies {
+            ensure!((self.info.input_dim,self.info.output_dim)==(32768,8192), "inverse RoPE requires grouped WO-A");
+            require(f, rows as usize * 256)?;
+        }
         require(source, rows as usize * self.info.input_dim as usize * 2)?;
         require(
             weight,
@@ -239,6 +276,7 @@ impl V41Fp8Kernel<'_> {
             (self.launch)(
                 self.handle.as_ptr(),
                 source.ptr.cast(),
+                frequencies.map_or(std::ptr::null(), |f| f.ptr.cast()),
                 weight.ptr.cast(),
                 scales.ptr.cast(),
                 scratch.ptr,

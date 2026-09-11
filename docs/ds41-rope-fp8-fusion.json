@@ -1,0 +1,1816 @@
+{
+  "scope": "Fused inverse-RoPE/quantization development rollout. Native exact-output component checks; no end-to-end prefill or release-quality claim.",
+  "sparkinfer": {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+    "revision": "b3344c9c98c6ef6363a405cb7d8cad77fe09d13f",
+    "source_tree_sha256": "f98d78f626943bf91d8abea52142ab40144549a124ca040034cedc446de026c2"
+  },
+  "creation_commands": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-rope-fp8-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-rope-fp8-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-rope-fp8-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=b3344c9c98c6ef6363a405cb7d8cad77fe09d13f",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18041"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-rope-fp8-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-rope-fp8-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-rope-fp8-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=b3344c9c98c6ef6363a405cb7d8cad77fe09d13f",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18042"
+    ]
+  ],
+  "artifacts": {
+    "/tmp/ds41-rope-fp8-artifacts/daemon": "008a8d210e98eedc8cfb35aa259d5e6f06b0e157a8aab403cf0909b8dc972d3a",
+    "/tmp/ds41-rope-fp8-artifacts/cmake/libds41rt_native.so": "2d5dd6611b2eb34a7a11eaabb4a34b9096c41e297e28050d491141061949fe72",
+    "/tmp/ds41-rope-fp8-artifacts/qualification.json": "f9b9bd1d1223c84ad683ecb07de600bb4442bf3717c2249016f41846d0b1f290",
+    "/tmp/ds41-rope-fp8-rollout/quality.json": "1eebb9f92e2288b7c7ad0395868859763cce15e98184b853b11c9c612c05a2f1"
+  },
+  "qualification": {
+    "scope": "Native graph-replay component qualification; alternating 256 MiB flush timings without clock admission.",
+    "native_sha256": "2d5dd6611b2eb34a7a11eaabb4a34b9096c41e297e28050d491141061949fe72",
+    "qualifier_sha256": "46cf198b81ff78349ec8eed7601b38cb0d10db7bbf6665d21f6316059e1a2b3c",
+    "results": [
+      {
+        "rows": 1,
+        "case": "random",
+        "exact": true,
+        "before_us": 30.719999223947525,
+        "after_us": 30.719999223947525,
+        "samples_us": [
+          [
+            30.719999223947525,
+            30.719999223947525,
+            32.735999673604965,
+            32.76799991726875,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.751999467611313,
+            30.719999223947525,
+            32.76799991726875,
+            30.719999223947525,
+            30.751999467611313,
+            30.719999223947525,
+            32.76799991726875,
+            30.46399913728237,
+            32.76799991726875,
+            30.719999223947525,
+            30.46399913728237,
+            30.719999223947525
+          ],
+          [
+            30.688000842928886,
+            30.751999467611313,
+            30.688000842928886,
+            30.751999467611313,
+            30.719999223947525,
+            30.719999223947525,
+            30.751999467611313,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            32.76799991726875,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.751999467611313,
+            30.719999223947525,
+            30.719999223947525,
+            30.688000842928886,
+            28.672000393271446,
+            30.719999223947525
+          ]
+        ]
+      },
+      {
+        "rows": 1,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 1,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 1,
+        "case": "zero",
+        "exact": true
+      },
+      {
+        "rows": 2,
+        "case": "random",
+        "exact": true,
+        "before_us": 31.759999692440033,
+        "after_us": 30.719999223947525,
+        "samples_us": [
+          [
+            30.719999223947525,
+            30.751999467611313,
+            32.76799991726875,
+            32.76799991726875,
+            30.719999223947525,
+            30.719999223947525,
+            30.688000842928886,
+            32.76799991726875,
+            30.751999467611313,
+            32.76799991726875,
+            32.76799991726875,
+            32.76799991726875,
+            30.46399913728237,
+            30.688000842928886,
+            30.719999223947525,
+            32.80000016093254,
+            32.76799991726875,
+            32.76799991726875,
+            30.719999223947525,
+            32.76799991726875
+          ],
+          [
+            30.688000842928886,
+            30.719999223947525,
+            30.688000842928886,
+            30.719999223947525,
+            32.76799991726875,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.688000842928886,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.432000756263733,
+            30.46399913728237,
+            34.84800085425377
+          ]
+        ]
+      },
+      {
+        "rows": 2,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 2,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 2,
+        "case": "zero",
+        "exact": true
+      },
+      {
+        "rows": 6,
+        "case": "random",
+        "exact": true,
+        "before_us": 32.76799991726875,
+        "after_us": 30.719999223947525,
+        "samples_us": [
+          [
+            32.3840007185936,
+            32.51200169324875,
+            32.76799991726875,
+            32.76799991726875,
+            32.51200169324875,
+            32.76799991726875,
+            32.51200169324875,
+            32.76799991726875,
+            32.76799991726875,
+            32.76799991726875,
+            32.76799991726875,
+            34.81600061058998,
+            32.51200169324875,
+            32.76799991726875,
+            32.76799991726875,
+            32.76799991726875,
+            32.76799991726875,
+            32.76799991726875,
+            32.735999673604965,
+            32.735999673604965
+          ],
+          [
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.719999223947525,
+            30.30399978160858,
+            30.46399913728237,
+            30.719999223947525,
+            30.719999223947525,
+            32.76799991726875,
+            30.432000756263733,
+            32.76799991726875,
+            30.46399913728237,
+            30.400000512599945,
+            30.688000842928886,
+            30.751999467611313,
+            30.368000268936157,
+            32.48000144958496,
+            32.76799991726875
+          ]
+        ]
+      },
+      {
+        "rows": 6,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 6,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 6,
+        "case": "zero",
+        "exact": true
+      },
+      {
+        "rows": 16,
+        "case": "random",
+        "exact": true,
+        "before_us": 34.81600061058998,
+        "after_us": 32.76799991726875,
+        "samples_us": [
+          [
+            34.81600061058998,
+            32.735999673604965,
+            34.81600061058998,
+            32.735999673604965,
+            32.76799991726875,
+            34.81600061058998,
+            32.80000016093254,
+            34.81600061058998,
+            34.81600061058998,
+            34.81600061058998,
+            34.81600061058998,
+            34.81600061058998,
+            32.287999987602234,
+            34.81600061058998,
+            34.81600061058998,
+            34.78400036692619,
+            34.81600061058998,
+            34.81600061058998,
+            34.81600061058998,
+            34.81600061058998
+          ],
+          [
+            32.76799991726875,
+            32.76799991726875,
+            32.76799991726875,
+            30.688000842928886,
+            32.76799991726875,
+            32.76799991726875,
+            32.80000016093254,
+            32.76799991726875,
+            32.48000144958496,
+            32.735999673604965,
+            32.76799991726875,
+            34.78400036692619,
+            32.735999673604965,
+            32.76799991726875,
+            34.78400036692619,
+            34.52799841761589,
+            34.81600061058998,
+            34.81600061058998,
+            32.76799991726875,
+            32.76799991726875
+          ]
+        ]
+      },
+      {
+        "rows": 16,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 16,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 16,
+        "case": "zero",
+        "exact": true
+      },
+      {
+        "rows": 80,
+        "case": "random",
+        "exact": true,
+        "before_us": 51.19999870657921,
+        "after_us": 47.120001167058945,
+        "samples_us": [
+          [
+            55.296000093221664,
+            53.21599915623665,
+            50.75199902057648,
+            51.19999870657921,
+            51.19999870657921,
+            51.19999870657921,
+            51.16799846291542,
+            51.19999870657921,
+            51.19999870657921,
+            55.296000093221664,
+            51.19999870657921,
+            51.19999870657921,
+            55.296000093221664,
+            53.247999399900436,
+            51.19999870657921,
+            52.99200117588043,
+            50.11200159788132,
+            52.960000932216644,
+            51.19999870657921,
+            51.19999870657921
+          ],
+          [
+            47.10400104522705,
+            49.12000149488449,
+            47.07200080156326,
+            49.15200173854828,
+            49.15200173854828,
+            47.10400104522705,
+            49.15200173854828,
+            47.10400104522705,
+            49.18399825692177,
+            47.10400104522705,
+            46.84799909591675,
+            47.10400104522705,
+            46.84799909591675,
+            47.13600128889084,
+            48.70399832725525,
+            47.10400104522705,
+            49.15200173854828,
+            47.13600128889084,
+            48.895999789237976,
+            47.10400104522705
+          ]
+        ]
+      },
+      {
+        "rows": 80,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 80,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 80,
+        "case": "zero",
+        "exact": true
+      },
+      {
+        "rows": 256,
+        "case": "random",
+        "exact": true,
+        "before_us": 86.04799956083298,
+        "after_us": 76.59200206398964,
+        "samples_us": [
+          [
+            86.04799956083298,
+            88.06400001049042,
+            86.01599931716919,
+            85.75999736785889,
+            86.04799956083298,
+            86.04799956083298,
+            88.0960002541542,
+            86.04799956083298,
+            87.71199733018875,
+            86.04799956083298,
+            86.04799956083298,
+            85.75999736785889,
+            86.04799956083298,
+            85.79199761152267,
+            86.04799956083298,
+            88.0960002541542,
+            85.63199639320374,
+            86.01599931716919,
+            86.01599931716919,
+            85.79199761152267
+          ],
+          [
+            75.77600330114365,
+            75.80800354480743,
+            77.82399654388428,
+            75.77600330114365,
+            77.82399654388428,
+            75.80800354480743,
+            77.85599678754807,
+            75.77600330114365,
+            77.85599678754807,
+            75.77600330114365,
+            77.60000228881836,
+            75.77600330114365,
+            75.55200159549713,
+            77.37600058317184,
+            77.85599678754807,
+            77.82399654388428,
+            77.85599678754807,
+            75.77600330114365,
+            75.52000135183334,
+            77.85599678754807
+          ]
+        ]
+      },
+      {
+        "rows": 256,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 256,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 256,
+        "case": "zero",
+        "exact": true
+      },
+      {
+        "rows": 1024,
+        "case": "random",
+        "exact": true,
+        "before_us": 288.7679934501648,
+        "after_us": 242.70399659872055,
+        "samples_us": [
+          [
+            286.72000765800476,
+            288.8000011444092,
+            290.8160090446472,
+            288.7679934501648,
+            286.72000765800476,
+            290.8160090446472,
+            286.72000765800476,
+            286.72000765800476,
+            290.8160090446472,
+            290.8479869365692,
+            288.7679934501648,
+            288.7679934501648,
+            290.8160090446472,
+            288.7359857559204,
+            290.8160090446472,
+            286.72000765800476,
+            288.7679934501648,
+            290.8160090446472,
+            288.7679934501648,
+            286.72000765800476
+          ],
+          [
+            243.71199309825897,
+            241.66400730609894,
+            241.66400730609894,
+            243.71199309825897,
+            245.7599937915802,
+            241.66400730609894,
+            243.71199309825897,
+            241.66400730609894,
+            241.66400730609894,
+            245.7599937915802,
+            243.71199309825897,
+            243.71199309825897,
+            243.71199309825897,
+            243.71199309825897,
+            241.66400730609894,
+            245.7599937915802,
+            239.3600046634674,
+            241.69600009918213,
+            241.66400730609894,
+            241.66400730609894
+          ]
+        ]
+      },
+      {
+        "rows": 1024,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 1024,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 1024,
+        "case": "zero",
+        "exact": true
+      },
+      {
+        "rows": 4096,
+        "case": "random",
+        "exact": true,
+        "before_us": 1234.9439859390259,
+        "after_us": 868.3519959449768,
+        "samples_us": [
+          [
+            1234.9439859390259,
+            1230.847954750061,
+            1232.8959703445435,
+            1234.9439859390259,
+            1232.8959703445435,
+            1249.2799758911133,
+            1236.9920015335083,
+            1236.9920015335083,
+            1232.8959703445435,
+            1234.5919609069824,
+            1236.9920015335083,
+            1232.8959703445435,
+            1232.8959703445435,
+            1234.9439859390259,
+            1234.9439859390259,
+            1243.1360483169556,
+            1236.9920015335083,
+            1236.9920015335083,
+            1237.023949623108,
+            1239.0400171279907
+          ],
+          [
+            868.3519959449768,
+            868.3519959449768,
+            866.27197265625,
+            868.3519959449768,
+            868.3519959449768,
+            870.4000115394592,
+            870.0479865074158,
+            864.2560243606567,
+            872.4799752235413,
+            866.3039803504944,
+            864.2560243606567,
+            872.4480271339417,
+            872.4160194396973,
+            864.2560243606567,
+            868.3519959449768,
+            872.4480271339417,
+            866.3039803504944,
+            868.3519959449768,
+            874.4959831237793,
+            868.3519959449768
+          ]
+        ]
+      },
+      {
+        "rows": 4096,
+        "case": "changed",
+        "exact": true
+      },
+      {
+        "rows": 4096,
+        "case": "tiny",
+        "exact": true
+      },
+      {
+        "rows": 4096,
+        "case": "zero",
+        "exact": true
+      }
+    ]
+  },
+  "api": {
+    "before-target": {
+      "rates": [
+        30.827460850799046,
+        31.54968857009044,
+        31.47204321636476
+      ],
+      "median": 31.47204321636476,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      }
+    },
+    "before-spec": {
+      "rates": [
+        100.12980310080964,
+        103.99984051260249,
+        104.85916691996636
+      ],
+      "median": 103.99984051260249,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      }
+    },
+    "target": {
+      "rates": [
+        31.853083754839005,
+        32.082606506443454,
+        31.85048402234178
+      ],
+      "median": 31.853083754839005,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      }
+    },
+    "spec": {
+      "rates": [
+        100.86164818190001,
+        105.04565162736772,
+        104.35201388218175
+      ],
+      "median": 104.35201388218175,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      }
+    }
+  },
+  "quality": [
+    {
+      "case": {
+        "name": "arithmetic",
+        "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+        "expected": "575"
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "575",
+          "usage": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "575",
+          "usage": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "signed_sort",
+        "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+        "expected_json": [
+          -11,
+          -4,
+          0,
+          7,
+          7,
+          12
+        ]
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "extraction",
+        "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+        "expected_json": {
+          "total": 40,
+          "names": [
+            "Alice",
+            "Bob"
+          ]
+        }
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "logic",
+        "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+        "expected_json": [
+          "D",
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "unicode",
+        "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+        "expected": "36"
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n\n36",
+          "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 18,
+            "total_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "objective_pass": false
+        },
+        "speculative": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n\n36",
+          "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 18,
+            "total_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "objective_pass": false
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "translation",
+        "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "objective_pass": null
+        },
+        "speculative": {
+          "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "explanation",
+        "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+          "usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 32,
+            "total_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "objective_pass": null
+        },
+        "speculative": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+          "usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 32,
+            "total_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "long_retrieval",
+        "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+        "expected": "quartz-731"
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "quartz-731",
+          "usage": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "quartz-731",
+          "usage": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "objective_pass": true
+        }
+      }
+    }
+  ],
+  "timings": [
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/spec-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 54.32846153846154,
+          "median": 54.0,
+          "p95": 59.0,
+          "max": 91.0
+        },
+        "projection_us": {
+          "mean": 85.9223076923077,
+          "median": 73.0,
+          "p95": 141.0,
+          "max": 284.0
+        },
+        "sparse_us": {
+          "mean": 88.04961538461538,
+          "median": 79.0,
+          "p95": 116.0,
+          "max": 585.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/spec-api.log",
+      "kind": "coordinator_collection",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "receive_us": {
+          "mean": 573.3184615384615,
+          "median": 531.0,
+          "p95": 687.0,
+          "max": 13317.0
+        },
+        "reduce_us": {
+          "mean": 6.872307692307692,
+          "median": 7.0,
+          "p95": 8.0,
+          "max": 33.0
+        },
+        "shared_copy_us": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "upload_us": {
+          "mean": 13.186538461538461,
+          "median": 13.0,
+          "p95": 18.0,
+          "max": 68.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/spec-api.log",
+      "kind": "coordinator_experts",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "collect_us": {
+          "mean": 596.2484615384616,
+          "median": 554.0,
+          "p95": 711.0,
+          "max": 13344.0
+        },
+        "dispatch_us": {
+          "mean": 5.508076923076923,
+          "median": 5.0,
+          "p95": 8.0,
+          "max": 44.0
+        },
+        "routed_us": {
+          "mean": 56.29576923076923,
+          "median": 48.0,
+          "p95": 92.0,
+          "max": 166.0
+        },
+        "shared_us": {
+          "mean": 67.86115384615384,
+          "median": 54.0,
+          "p95": 127.0,
+          "max": 222.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/spec-api.log",
+      "kind": "coordinator_layer",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "attention_us": {
+          "mean": 231.03653846153847,
+          "median": 209.0,
+          "p95": 317.0,
+          "max": 779.0
+        },
+        "experts_us": {
+          "mean": 728.0242307692308,
+          "median": 682.0,
+          "p95": 843.0,
+          "max": 13454.0
+        },
+        "finish_us": {
+          "mean": 12.797307692307692,
+          "median": 13.0,
+          "p95": 14.0,
+          "max": 32.0
+        },
+        "index_us": {
+          "mean": 30.80423076923077,
+          "median": 1.0,
+          "p95": 178.0,
+          "max": 322.0
+        },
+        "produced_us": {
+          "mean": 49.78192307692308,
+          "median": 33.0,
+          "p95": 89.0,
+          "max": 1113.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/target-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 54.499028268551235,
+          "median": 54.0,
+          "p95": 56.0,
+          "max": 82.0
+        },
+        "projection_us": {
+          "mean": 74.73542402826855,
+          "median": 72.0,
+          "p95": 85.0,
+          "max": 183.0
+        },
+        "sparse_us": {
+          "mean": 80.3381625441696,
+          "median": 77.0,
+          "p95": 112.0,
+          "max": 642.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/target-api.log",
+      "kind": "coordinator_collection",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "receive_us": {
+          "mean": 213.34655477031802,
+          "median": 202.0,
+          "p95": 217.0,
+          "max": 16807.0
+        },
+        "reduce_us": {
+          "mean": 6.22773851590106,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 43.0
+        },
+        "shared_copy_us": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "upload_us": {
+          "mean": 7.147879858657244,
+          "median": 7.0,
+          "p95": 9.0,
+          "max": 55.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/target-api.log",
+      "kind": "coordinator_experts",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "collect_us": {
+          "mean": 229.40636042402826,
+          "median": 218.0,
+          "p95": 234.0,
+          "max": 16825.0
+        },
+        "dispatch_us": {
+          "mean": 4.38595406360424,
+          "median": 4.0,
+          "p95": 7.0,
+          "max": 57.0
+        },
+        "routed_us": {
+          "mean": 41.06174911660777,
+          "median": 39.0,
+          "p95": 68.0,
+          "max": 143.0
+        },
+        "shared_us": {
+          "mean": 56.29531802120141,
+          "median": 53.0,
+          "p95": 91.0,
+          "max": 216.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/target-api.log",
+      "kind": "coordinator_layer",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "attention_us": {
+          "mean": 212.14355123674912,
+          "median": 205.0,
+          "p95": 277.0,
+          "max": 859.0
+        },
+        "experts_us": {
+          "mean": 333.19964664310953,
+          "median": 316.0,
+          "p95": 358.0,
+          "max": 16924.0
+        },
+        "finish_us": {
+          "mean": 12.12517667844523,
+          "median": 12.0,
+          "p95": 13.0,
+          "max": 77.0
+        },
+        "index_us": {
+          "mean": 23.915636042402827,
+          "median": 1.0,
+          "p95": 113.0,
+          "max": 626.0
+        },
+        "produced_us": {
+          "mean": 39.408568904593636,
+          "median": 33.0,
+          "p95": 76.0,
+          "max": 804.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-rope-fp8-rollout/target-api.log",
+      "kind": "coordinator_step",
+      "rows": 1,
+      "samples": 282,
+      "metrics": {
+        "commit_us": {
+          "mean": 429.86170212765956,
+          "median": 423.0,
+          "p95": 467.0,
+          "max": 558.0
+        },
+        "execute_us": {
+          "mean": 31677.163120567377,
+          "median": 30334.5,
+          "p95": 42243.0,
+          "max": 61871.0
+        },
+        "prepared_us": {
+          "mean": 7.73758865248227,
+          "median": 7.0,
+          "p95": 13.0,
+          "max": 18.0
+        },
+        "sample_us": {
+          "mean": 119.81205673758865,
+          "median": 120.0,
+          "p95": 138.0,
+          "max": 207.0
+        },
+        "total_us": {
+          "mean": 32234.59574468085,
+          "median": 30879.0,
+          "p95": 42839.0,
+          "max": 62484.0
+        }
+      }
+    }
+  ],
+  "stage_probe": [
+    {
+      "rows": 80,
+      "quant_us": 12.28800043463707,
+      "gemm_us": 34.81600061058998,
+      "copy_us": 4.095999989658594,
+      "samples_us": [
+        [
+          12.28800043463707,
+          12.256000190973282,
+          12.28800043463707,
+          12.28800043463707,
+          12.28800043463707,
+          12.319999746978283,
+          14.336000196635723,
+          12.28800043463707,
+          12.28800043463707,
+          12.28800043463707,
+          12.28800043463707,
+          12.28800043463707,
+          12.28800043463707,
+          12.319999746978283,
+          16.383999958634377,
+          14.336000196635723,
+          14.303999952971935,
+          12.28800043463707,
+          12.256000190973282,
+          12.28800043463707
+        ],
+        [
+          34.78400036692619,
+          34.84800085425377,
+          34.81600061058998,
+          34.81600061058998,
+          34.81600061058998,
+          34.81600061058998,
+          34.81600061058998,
+          34.81600061058998,
+          34.78400036692619,
+          34.81600061058998,
+          34.78400036692619,
+          34.81600061058998,
+          34.81600061058998,
+          34.81600061058998,
+          34.78400036692619,
+          34.81600061058998,
+          34.84800085425377,
+          34.81600061058998,
+          32.76799991726875,
+          34.81600061058998
+        ],
+        [
+          4.127999767661095,
+          4.095999989658594,
+          4.064000211656094,
+          4.064000211656094,
+          4.095999989658594,
+          4.095999989658594,
+          4.095999989658594,
+          4.095999989658594,
+          4.127999767661095,
+          4.095999989658594,
+          4.127999767661095,
+          4.064000211656094,
+          4.095999989658594,
+          4.095999989658594,
+          4.127999767661095,
+          4.095999989658594,
+          4.095999989658594,
+          4.064000211656094,
+          4.127999767661095,
+          4.095999989658594
+        ]
+      ]
+    },
+    {
+      "rows": 256,
+      "quant_us": 30.719999223947525,
+      "gemm_us": 45.05600035190582,
+      "copy_us": 6.144000217318535,
+      "samples_us": [
+        [
+          30.719999223947525,
+          28.416000306606293,
+          26.623999699950218,
+          30.751999467611313,
+          30.719999223947525,
+          28.672000393271446,
+          30.719999223947525,
+          30.719999223947525,
+          30.719999223947525,
+          28.672000393271446,
+          30.719999223947525,
+          30.719999223947525,
+          30.751999467611313,
+          28.704000636935234,
+          30.719999223947525,
+          30.719999223947525,
+          30.719999223947525,
+          28.672000393271446,
+          30.719999223947525,
+          26.59199945628643
+        ],
+        [
+          45.05600035190582,
+          45.05600035190582,
+          45.05600035190582,
+          45.05600035190582,
+          43.007999658584595,
+          45.05600035190582,
+          43.007999658584595,
+          43.007999658584595,
+          43.007999658584595,
+          45.05600035190582,
+          45.05600035190582,
+          43.007999658584595,
+          43.007999658584595,
+          45.05600035190582,
+          45.05600035190582,
+          45.05600035190582,
+          45.05600035190582,
+          45.05600035190582,
+          45.05600035190582,
+          45.08800059556961
+        ],
+        [
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535,
+          6.175999995321035,
+          6.175999995321035,
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535,
+          6.175999995321035,
+          6.175999995321035,
+          6.175999995321035,
+          6.175999995321035,
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535,
+          6.144000217318535
+        ]
+      ]
+    },
+    {
+      "rows": 1024,
+      "quant_us": 92.19200164079666,
+      "gemm_us": 133.12000036239624,
+      "copy_us": 18.432000651955605,
+      "samples_us": [
+        [
+          92.19200164079666,
+          90.08000046014786,
+          94.2080020904541,
+          94.2080020904541,
+          94.2080020904541,
+          91.90399944782257,
+          90.11200070381165,
+          92.19200164079666,
+          94.17600184679031,
+          92.16000139713287,
+          92.16000139713287,
+          94.2080020904541,
+          90.11200070381165,
+          95.71199864149094,
+          90.11200070381165,
+          92.16000139713287,
+          90.11200070381165,
+          94.2080020904541,
+          94.2080020904541,
+          92.19200164079666
+        ],
+        [
+          133.12000036239624,
+          133.15199315547943,
+          133.12000036239624,
+          135.16800105571747,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          135.19999384880066,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624,
+          133.12000036239624
+        ],
+        [
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605,
+          18.432000651955605
+        ]
+      ]
+    },
+    {
+      "rows": 4096,
+      "quant_us": 311.2959861755371,
+      "gemm_us": 485.3760004043579,
+      "copy_us": 77.82399654388428,
+      "samples_us": [
+        [
+          313.34400177001953,
+          309.2480003833771,
+          311.2959861755371,
+          311.2959861755371,
+          311.2959861755371,
+          308.73599648475647,
+          311.2959861755371,
+          319.4560110569,
+          313.34400177001953,
+          309.2480003833771,
+          311.2959861755371,
+          311.2959861755371,
+          309.2480003833771,
+          311.0080063343048,
+          313.08799982070923,
+          309.2480003833771,
+          309.2480003833771,
+          311.2640082836151,
+          311.2959861755371,
+          313.34400177001953
+        ],
+        [
+          489.47200179100037,
+          483.3280146121979,
+          487.42398619651794,
+          483.3280146121979,
+          487.42398619651794,
+          485.3760004043579,
+          483.3280146121979,
+          487.45599389076233,
+          485.3760004043579,
+          487.42398619651794,
+          485.3760004043579,
+          485.3760004043579,
+          483.3280146121979,
+          481.27999901771545,
+          485.3760004043579,
+          487.42398619651794,
+          483.3280146121979,
+          487.45599389076233,
+          487.42398619651794,
+          487.42398619651794
+        ],
+        [
+          75.74400305747986,
+          77.82399654388428,
+          77.82399654388428,
+          77.82399654388428,
+          77.82399654388428,
+          77.82399654388428,
+          77.82399654388428,
+          75.77600330114365,
+          77.82399654388428,
+          77.82399654388428,
+          75.77600330114365,
+          77.82399654388428,
+          75.77600330114365,
+          77.82399654388428,
+          77.82399654388428,
+          75.74400305747986,
+          77.82399654388428,
+          77.82399654388428,
+          77.82399654388428,
+          77.82399654388428
+        ]
+      ]
+    }
+  ],
+  "tile_probe": [
+    {
+      "rows": 4096,
+      "tile": [
+        128,
+        64
+      ],
+      "bk": 128,
+      "median_us": 503.84002923965454,
+      "samples_us": [
+        505.5999755859375,
+        505.8559775352478,
+        501.76000595092773,
+        503.80802154541016,
+        499.7439980506897,
+        501.50400400161743,
+        505.8559775352478,
+        503.80802154541016,
+        501.76000595092773,
+        503.84002923965454,
+        503.80802154541016,
+        501.76000595092773,
+        507.9039931297302,
+        505.8559775352478,
+        505.8559775352478,
+        505.8559775352478,
+        503.84002923965454,
+        503.55201959609985,
+        505.5999755859375,
+        505.8559775352478
+      ]
+    },
+    {
+      "rows": 4096,
+      "tile": [
+        64,
+        64
+      ],
+      "bk": 128,
+      "median_us": 636.9280219078064,
+      "samples_us": [
+        634.880006313324,
+        636.9280219078064,
+        634.880006313324,
+        638.975977897644,
+        636.9280219078064,
+        634.880006313324,
+        634.880006313324,
+        634.880006313324,
+        634.880006313324,
+        638.975977897644,
+        638.975977897644,
+        636.9280219078064,
+        638.975977897644,
+        638.975977897644,
+        634.6240043640137,
+        634.880006313324,
+        639.0079855918884,
+        636.9280219078064,
+        636.9280219078064,
+        636.9280219078064
+      ]
+    },
+    {
+      "rows": 4096,
+      "tile": [
+        64,
+        128
+      ],
+      "bk": 128,
+      "median_us": 526.3360142707825,
+      "samples_us": [
+        524.2879986763,
+        526.3360142707825,
+        526.3360142707825,
+        524.2879986763,
+        530.1759839057922,
+        528.3839702606201,
+        524.2879986763,
+        528.3839702606201,
+        522.2399830818176,
+        526.3360142707825,
+        521.8240022659302,
+        526.3360142707825,
+        526.0800123214722,
+        523.8720178604126,
+        526.3360142707825,
+        526.3360142707825,
+        528.1280279159546,
+        528.3839702606201,
+        526.3360142707825,
+        526.3360142707825
+      ]
+    },
+    {
+      "rows": 4096,
+      "tile": [
+        128,
+        128
+      ],
+      "bk": 128,
+      "median_us": 544.7679758071899,
+      "samples_us": [
+        542.6880121231079,
+        544.7679758071899,
+        544.5119738578796,
+        544.7679758071899,
+        544.7679758071899,
+        544.7679758071899,
+        544.7679758071899,
+        544.7679758071899,
+        544.7679758071899,
+        546.8159914016724,
+        546.8159914016724,
+        546.5599894523621,
+        546.5279817581177,
+        544.7679758071899,
+        544.5119738578796,
+        542.7200198173523,
+        546.8159914016724,
+        544.7679758071899,
+        544.7679758071899,
+        544.7679758071899
+      ]
+    }
+  ],
+  "bk64_probe": {
+    "status": "Rejected; sanitizer found invalid global reads in an isolated 128x128/BK64 grouped GEMM. Production remains BK128.",
+    "log": "/tmp/ds41-grouped-prefill/bk64-sanitizer.log",
+    "sha256": "c162d3380472d06cf2c1d1bfc624a12f7207c24993f76f04d4c6fef7774aad1b"
+  }
+}

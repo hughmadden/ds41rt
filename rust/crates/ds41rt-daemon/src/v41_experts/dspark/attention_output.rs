@@ -3,7 +3,7 @@ use super::{DsparkProjection, DsparkWeights, ProjectionKind};
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel,
+    Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Kernel,
 };
 use std::ffi::c_void;
 pub(crate) struct DsparkAttentionOutput<'weights, 'library> {
@@ -12,11 +12,9 @@ pub(crate) struct DsparkAttentionOutput<'weights, 'library> {
     grouped_scratch: DeviceAllocation<'library>,
     alpha: DeviceAllocation<'library>,
     scales: Ds41rtDeviceBuffer,
-    ops: V41AttentionOps<'library>,
     projection: DsparkProjection<'weights, 'library>,
     weight: Ds41rtDeviceBuffer,
     input: DeviceAllocation<'library>,
-    rotated: DeviceAllocation<'library>,
     frequencies: DeviceAllocation<'library>,
     capacity: u32,
     graph: Option<(*mut c_void, u32)>,
@@ -52,11 +50,9 @@ impl<'library> DsparkWeights<'library> {
             grouped_scratch,
             alpha,
             scales: self.grouped_output_scales[stage].buffer,
-            ops: library.v41_attention_ops()?,
             projection,
             weight: self.auxiliary.get(&format!("mtp.{stage}.attn.wo_a.weight"))?,
             input: DeviceAllocation::new(library, capacity as usize * 65536)?,
-            rotated: DeviceAllocation::new(library, capacity as usize * 65536)?,
             frequencies: DeviceAllocation::new(library, capacity as usize * 256)?,
             capacity,
             graph: None,
@@ -71,7 +67,7 @@ impl DsparkAttentionOutput<'_, '_> {
             (1..=4096).contains(&capacity),
             "invalid dSpark attention output capacity"
         );
-        Ok(library.v41_fp8_matrix_info(capacity, 32768, 8192)?.scratch_bytes as usize + 4 + capacity as usize * (2 * 65536 + 256))
+        Ok(library.v41_fp8_matrix_info(capacity, 32768, 8192)?.scratch_bytes as usize + 4 + capacity as usize * (65536 + 256))
     }
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         DsparkProjection::device_bytes(library, ProjectionKind::OutputB(0), capacity)?
@@ -98,17 +94,9 @@ impl DsparkAttentionOutput<'_, '_> {
             "invalid dSpark attention output rows"
         );
         unsafe {
-            self.ops.rope(
+            self.grouped.launch_rope(
                 self.input.buffer,
                 self.frequencies.buffer,
-                self.rotated.buffer,
-                rows,
-                64,
-                true,
-                stream,
-            )?;
-            self.grouped.launch(
-                self.rotated.buffer,
                 self.weight,
                 self.scales,
                 self.grouped_scratch.buffer,
