@@ -85,12 +85,19 @@ impl<'w, 'a> IndexLane<'w, 'a> {
     }
     /// Begin a new batch after all consumers finish; also recovers failed work.
     pub fn restart(&mut self) -> Result<()> {
+        self.restart_at(0)
+    }
+    /// Replay begins at decoder source 20; earlier encoder selections are absent.
+    pub fn restart_decoder(&mut self) -> Result<()> {
+        self.restart_at(3)
+    }
+    fn restart_at(&mut self, first: usize) -> Result<()> {
         self.invalid = true;
         self.ready = None;
         self.source.clear_graph()?;
         self.reindex.clear_graph()?;
-        self.query.rebind(&self.weights.weights[0])?;
-        self.next = 0;
+        self.query.rebind(&self.weights.weights[first])?;
+        self.next = first;
         self.invalid = false;
         Ok(())
     }

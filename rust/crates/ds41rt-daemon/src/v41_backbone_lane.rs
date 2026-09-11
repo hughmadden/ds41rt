@@ -231,6 +231,19 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.phase = Phase::Idle;
         Ok(())
     }
+    pub fn restart_decoder(&mut self, encoder: &BlockOutput<'_>) -> Result<()> {
+        self.phase = Phase::Invalid;
+        self.block.reset();
+        let decoder = &self.weights.layers[20];
+        self.query.rebind(&decoder.query)?;
+        self.projection.rebind(&decoder.projection)?;
+        self.shared.rebind(&decoder.shared)?;
+        self.router.rebind(&decoder.router)?;
+        self.block.initialize_decoder(&decoder.hc, encoder)?;
+        self.layer = 20;
+        self.phase = Phase::Prepared;
+        Ok(())
+    }
     /// # Safety
     /// Same finite, completed embedding and exclusive-storage contract as the
     /// component owners. This text entry does not implement vision replacement.

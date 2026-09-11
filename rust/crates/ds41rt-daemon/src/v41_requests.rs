@@ -1,5 +1,5 @@
 //! One admission identity for persistent backbone caches and mapped engram history.
-use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheLease, CacheWork};
+use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheLease, CacheWork, CacheStage};
 use crate::v41_backbone_execution::BackboneExecution;
 use crate::v41_backbone_lane::BackboneLane;
 use crate::v41_engram::layer::EngramGate;
@@ -23,7 +23,7 @@ pub(crate) struct RequestTokens<'a> {
 }
 pub(crate) struct RequestBatch {
     cache: CacheBatch,
-    engram: EngramWave,
+    engram: Option<EngramWave>,
     leases: Vec<CacheLease>,
     tokens: Vec<u32>,
     image_mask: Vec<u8>,
@@ -39,12 +39,12 @@ impl RequestBatch {
     }
     pub fn cancel(&mut self) {
         self.finished = true;
-        self.engram.cancel();
+        if let Some(engram) = &mut self.engram { engram.cancel(); }
     }
 }
 impl Drop for RequestBatch {
     fn drop(&mut self) {
-        self.engram.cancel();
+        if let Some(engram) = &mut self.engram { engram.cancel(); }
     }
 }
 pub(crate) struct Requests<'a> {
@@ -112,6 +112,23 @@ impl<'a> Requests<'a> {
         }
         Ok(())
     }
+    pub fn begin_encoder(&mut self, lease: CacheLease, prompt_end: u64) -> Result<()> {
+        self.request(lease)?;
+        self.cache.begin_encoder(lease, prompt_end)
+    }
+    pub fn begin_decoder_replay(&mut self, lease: CacheLease) -> Result<u64> {
+        ensure!(self.request(lease)?.history.position() == self.cache.committed_end(lease)?,
+            "encoder history differs before replay");
+        self.cache.begin_decoder_replay(lease)
+    }
+    pub fn prepare_replay(&self, work: &[CacheWork]) -> Result<RequestBatch> {
+        let cache = self.cache.plan_replay(work)?;
+        let rows = cache.positions().len();
+        let batch = RequestBatch { cache, engram: None, leases: work.iter().map(|w| w.lease).collect(),
+            tokens: Vec::new(), image_mask: vec![0; rows], finished: false };
+        self.validate(&batch)?;
+        Ok(batch)
+    }
     /// Start hashes, prefetch and bounded gather as soon as token IDs are known.
     pub fn prepare(&self, requests: &[RequestTokens<'_>]) -> Result<RequestBatch> {
         let work = requests
@@ -149,7 +166,7 @@ impl<'a> Requests<'a> {
         let engram = self.pipeline.prepare(&inputs)?;
         Ok(RequestBatch {
             cache,
-            engram,
+            engram: Some(engram),
             leases: requests.iter().map(|r| r.lease).collect(),
             tokens,
             image_mask: mask,
@@ -202,7 +219,7 @@ impl<'a> Requests<'a> {
             .iter()
             .map(|&l| Ok(&self.request(l)?.history))
             .collect::<Result<Vec<_>>>()?;
-        match upload.poll_wave(&self.pipeline, &mut batch.engram, &histories, layer)? {
+        match upload.poll_wave(&self.pipeline, batch.engram.as_mut().context("decoder replay has no engram work")?, &histories, layer)? {
             EngramUploadPoll::Pending => Ok(false),
             EngramUploadPoll::Cancelled => anyhow::bail!("engram gather cancelled"),
             EngramUploadPoll::Ready(rows) => {
@@ -221,7 +238,14 @@ impl<'a> Requests<'a> {
             .iter()
             .map(|&l| Ok(&self.request(l)?.history))
             .collect::<Result<Vec<_>>>()?;
-        batch.engram.validate_commit(&histories, &counts)?;
+        if let Some(engram) = &batch.engram {
+            engram.validate_commit(&histories, &counts)?;
+        } else {
+            ensure!(batch.cache.stage() == CacheStage::Replay, "missing engram outside decoder replay");
+            let chunks = batch.cache.window_chunks(20)?;
+            ensure!(accepted.len() == chunks.len() && chunks.iter().zip(accepted).all(|(c, &n)| n <= c.tokens),
+                "decoder acceptance exceeds proposal");
+        }
         Ok(())
     }
     /// Invalidate every participant after a partially applied combined commit.
@@ -262,7 +286,7 @@ impl<'a> Requests<'a> {
                 .collect::<Vec<_>>();
             histories.sort_by_key(|(i, _)| *i);
             let mut histories = histories.into_iter().map(|(_, h)| h).collect::<Vec<_>>();
-            batch.engram.commit(&mut histories, &counts)
+            if let Some(engram) = &mut batch.engram { engram.commit(&mut histories, &counts) } else { Ok(()) }
         })();
         batch.cancel();
         if let Err(error) = result {
@@ -336,7 +360,7 @@ mod tests {
                 .collect::<Result<Vec<_>>>()?;
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
             loop {
-                match upload.poll_wave(&requests.pipeline, &mut batch.engram, &histories, layer)? {
+                match upload.poll_wave(&requests.pipeline, batch.engram.as_mut().context("decoder replay has no engram work")?, &histories, layer)? {
                     EngramUploadPoll::Ready(view) => {
                         assert_eq!(view.rows, 80);
                         assert_eq!(view.layer_index, layer);

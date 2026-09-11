@@ -1,13 +1,14 @@
 use super::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum CacheStage {
+    #[default]
     Full,
     Encoder,
     Replay,
 }
 impl CacheStage {
-    pub(super) fn windows(self) -> std::ops::Range<usize> {
+    pub(crate) fn windows(self) -> std::ops::Range<usize> {
         match self {
             Self::Full => 0..40,
             Self::Encoder => 0..20,

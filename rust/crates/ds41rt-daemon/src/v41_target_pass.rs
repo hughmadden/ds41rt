@@ -1,5 +1,7 @@
 //! One target text pass from request-owned tokens through layer 39 and logits.
 use crate::v41_backbone_execution::BackboneExecution;
+use crate::v41_backbone_cache::CacheStage;
+use crate::v41_block::{BlockOutput, EncoderSuffix};
 use crate::v41_backbone_lane::BackboneLane;
 use crate::v41_engram::{layer::EngramGate, EngramDeviceRows};
 use crate::v41_experts::coordinator::NativeTp4Wave;
@@ -7,7 +9,7 @@ use crate::v41_index_lane::IndexLane;
 use crate::v41_requests::{RequestBatch, Requests};
 use crate::v41_target_embedding::TargetEmbeddingWave;
 use crate::v41_target_head::{TargetHeadWave, TargetLogits};
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use std::time::{Duration, Instant};
 mod taps;
 pub(crate) use taps::{TargetTapWave, TargetTaps};
@@ -18,6 +20,7 @@ enum State {
     Idle,
     Running,
     Ready(u64),
+    Encoded(u64),
 }
 impl State {
     fn begin(&mut self) -> Result<()> {
@@ -107,11 +110,30 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         placement: u64,
         selected: &[usize],
     ) -> Result<TargetLogits<'_>> {
+        ensure!(batch.cache()?.stage() == CacheStage::Full, "ordinary target execute requires full phase");
+        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None).await?; }
+        self.head.output()
+    }
+    pub async unsafe fn execute_encoder(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>, placement: u64, suffix: &mut EncoderSuffix<'a>) -> Result<()> {
+        ensure!(batch.cache()?.stage() == CacheStage::Encoder, "encoder execute phase differs");
+        unsafe { self.execute_phase(requests, batch, transport, placement, &[], Some(suffix), None).await }
+    }
+    pub async unsafe fn execute_replay(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize], encoder: &BlockOutput<'_>) -> Result<TargetLogits<'_>> {
+        ensure!(batch.cache()?.stage() == CacheStage::Replay, "decoder execute phase differs");
+        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, Some(encoder)).await?; }
+        self.head.output()
+    }
+    async unsafe fn execute_phase(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize],
+        mut suffix: Option<&mut EncoderSuffix<'a>>, encoder: Option<&BlockOutput<'_>>) -> Result<()> {
         requests.validate(batch)?;
         let id = batch.cache()?.identity();
         let rows = batch.cache()?.positions().len();
+        let stage = batch.cache()?.stage();
         ensure!(
-            !selected.is_empty()
+            (stage == CacheStage::Encoder || !selected.is_empty())
                 && selected.len() <= 80
                 && selected.iter().all(|&i| i < rows)
                 && selected
@@ -126,15 +148,21 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             batch,
             completed: false,
         };
-        self.taps.begin(guard.batch.cache()?)?;
-        self.execution.restart();
-        self.lane.restart()?;
-        self.index.restart()?;
-        unsafe {
-            requests.begin_text(guard.batch, &mut self.embedding, &mut self.lane)?;
+        if stage != CacheStage::Encoder { self.taps.begin(guard.batch.cache()?)?; }
+        self.execution.restart_for(stage);
+        if stage == CacheStage::Replay {
+            let encoder = encoder.context("missing retained encoder suffix")?;
+            ensure!(encoder.tokens == guard.batch.cache()?.positions(), "encoder suffix/replay row order differs");
+            self.lane.restart_decoder(encoder)?;
+            self.index.restart_decoder()?;
+            unsafe { self.lane.begin_prepared()?; }
+        } else {
+            self.lane.restart()?;
+            self.index.restart()?;
+            unsafe { requests.begin_text(guard.batch, &mut self.embedding, &mut self.lane)?; }
         }
-        for layer in 0..40 {
-            if layer != 0 {
+        for layer in stage.windows() {
+            if layer != stage.windows().start {
                 let prepare_timing = Instant::now();
                 self.lane.advance()?;
                 let advance_us = prepare_timing.elapsed().as_micros() as u64;
@@ -182,14 +210,22 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                     .await?;
             }
         }
-        self.taps.output(guard.batch.cache()?)?;
-        let output = self.lane.output()?;
-        unsafe {
-            self.head.execute_block(&output, selected)?;
+        if stage == CacheStage::Encoder {
+            suffix.as_mut().context("missing encoder retention owner")?.capture(&self.lane.output()?)?;
+            self.lane.advance()?;
+            unsafe {
+                self.lane.begin_prepared()?;
+                self.execution.produce_decoder_source(requests.cache(), guard.batch.cache()?, &self.lane)?;
+            }
+            self.state = State::Encoded(id);
+        } else {
+            self.taps.output(guard.batch.cache()?)?;
+            let output = self.lane.output()?;
+            unsafe { self.head.execute_block(&output, selected)?; }
+            self.state = State::Ready(id);
         }
-        self.state = State::Ready(id);
         guard.completed = true;
-        self.head.output()
+        Ok(())
     }
     pub fn output(&self, batch: &RequestBatch) -> Result<TargetLogits<'_>> {
         self.state.ready(batch.cache()?.identity())?;
@@ -207,7 +243,8 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         batch: &mut RequestBatch,
         accepted: &[u32],
     ) -> Result<()> {
-        self.state.ready(batch.cache()?.identity())?;
+        let id = batch.cache()?.identity();
+        ensure!(self.state == State::Ready(id) || self.state == State::Encoded(id), "target commit phase incomplete");
         self.state = State::Running;
         self.taps.reset();
         requests.commit(batch, &mut self.execution, accepted)?;

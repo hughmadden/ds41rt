@@ -1,5 +1,5 @@
 //! Cache producers and the complete per-layer backbone execution handoff.
-use crate::v41_backbone_cache::{BackboneCache, CacheBatch};
+use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage};
 use crate::v41_backbone_lane::BackboneLane;
 use crate::v41_compressor::{CompressorWave, CompressorWeights};
 use crate::v41_experts::coordinator::NativeTp4Wave;
@@ -91,6 +91,8 @@ impl<'a> CacheProducerWeights<'a> {
 
 #[derive(Default)]
 struct PassProgress {
+    stage: CacheStage,
+    source_ready: bool,
     batch: Option<u64>,
     next: usize,
     invalid: bool,
@@ -99,11 +101,25 @@ impl PassProgress {
     fn begin(&mut self, batch: u64, layer: usize) -> Result<()> {
         let valid = !std::mem::replace(&mut self.invalid, true);
         ensure!(
-            valid && layer == self.next && layer < 40 && self.batch.is_none_or(|id| id == batch),
+            valid && layer == self.next && self.stage.windows().contains(&layer) && self.batch.is_none_or(|id| id == batch),
             "backbone pass batch or layer differs; restart required"
         );
         self.batch = Some(batch);
         Ok(())
+    }
+    fn for_stage(stage: CacheStage) -> Self {
+        Self { stage, next: stage.windows().start, ..Self::default() }
+    }
+    fn begin_decoder_source(&mut self, batch: u64) -> Result<()> {
+        let valid = !std::mem::replace(&mut self.invalid, true);
+        ensure!(valid && self.stage == CacheStage::Encoder && self.next == 20
+            && self.batch == Some(batch) && !self.source_ready,
+            "decoder source requires this batch's complete encoder pass");
+        Ok(())
+    }
+    fn finish_decoder_source(&mut self) {
+        self.source_ready = true;
+        self.invalid = false;
     }
     fn finish(&mut self) {
         self.next += 1;
@@ -112,8 +128,9 @@ impl PassProgress {
     fn commit(&mut self, batch: u64) -> Result<()> {
         let valid = !std::mem::replace(&mut self.invalid, true);
         ensure!(
-            valid && self.next == 40 && self.batch == Some(batch),
-            "cache commit requires this batch's complete backbone pass"
+            valid && self.next == self.stage.windows().end && self.batch == Some(batch)
+                && (self.stage != CacheStage::Encoder || self.source_ready),
+            "cache commit requires this batch's complete execution phase"
         );
         Ok(())
     }
@@ -186,6 +203,26 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         self.progress = PassProgress::default();
     }
 
+    pub fn restart_for(&mut self, stage: CacheStage) {
+        self.progress = PassProgress::for_stage(stage);
+    }
+    /// Produce global source 20 from the prepared encoder boundary, without
+    /// running decoder attention, routing, shared FFN or remote experts.
+    /// # Safety
+    /// The completed layer-20 query preparation belongs to this encoder batch;
+    /// its source input and all device owners remain exclusive through completion.
+    pub unsafe fn produce_decoder_source(&mut self, bank: &BackboneCache<'_>,
+        batch: &CacheBatch, lane: &BackboneLane<'_, '_>) -> Result<()> {
+        self.progress.begin_decoder_source(batch.identity())?;
+        ensure!(batch.stage() == CacheStage::Encoder, "decoder source batch phase differs");
+        bank.validate_batch(batch)?;
+        let query = lane.query_output()?;
+        ensure!(query.layer == 20, "decoder source requires layer-20 projection input");
+        unsafe { bank.produce_source(batch, &query, &mut self.sources[3])?; }
+        self.progress.finish_decoder_source();
+        Ok(())
+    }
+
     /// Execute one already-prepared layer through completed FFN/mHC output.
     /// # Safety
     /// Lane query rows, modality mask and cache batch identify the same requests.
@@ -206,6 +243,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         // Invalidate even if obtaining the completed query or bank check fails.
         let layer = self.progress.next;
         self.progress.begin(batch.identity(), layer)?;
+        ensure!(batch.stage() == self.progress.stage, "backbone execution/cache phase differs");
         bank.validate_batch(batch)?;
         let query = lane.query_output()?;
         ensure!(
@@ -215,7 +253,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         unsafe {
             bank.produce_window(batch, &query, &mut self.windows[layer])?;
         }
-        if let Some(i) = SOURCES.iter().position(|&l| l == layer) {
+        if let Some(i) = SOURCES.iter().position(|&l| l == layer).filter(|_| batch.stage() != CacheStage::Replay) {
             unsafe {
                 bank.produce_source(batch, &query, &mut self.sources[i])?;
             }
@@ -224,6 +262,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         let source = SOURCES
             .iter()
             .rposition(|&l| l <= layer)
+            .filter(|_| batch.stage() != CacheStage::Replay)
             .map(|i| &self.sources[i]);
         let cache = bank.attention(batch, layer, &self.windows[layer], source)?;
         if INDEX.contains(&layer) {
@@ -252,7 +291,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         self.progress.finish();
         Ok(())
     }
-    /// Commit only after the same batch completed all forty layers. The caller
+    /// Commit after the same batch completed its full or CED phase. The caller
     /// determines acceptance after target-head/sampling/verification and includes
     /// engram/dSpark history in the enclosing scheduler transaction.
     pub fn commit(
@@ -262,6 +301,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         accepted: &[u32],
     ) -> Result<()> {
         self.progress.commit(batch.identity())?;
+        ensure!(batch.stage() == self.progress.stage, "backbone commit/cache phase differs");
         bank.commit(batch, &mut self.windows, &mut self.sources, accepted)
     }
 }
@@ -298,6 +338,32 @@ mod tests {
         for capacity in [0, 4097, u32::MAX] {
             assert!(BackboneExecution::workspace_bytes(&library, capacity).is_err());
         }
+        Ok(())
+    }
+    #[test]
+    fn ced_pass_requires_encoder_source_and_exact_decoder_range() -> Result<()> {
+        let mut encoder = PassProgress::for_stage(CacheStage::Encoder);
+        for layer in 0..20 { encoder.begin(7, layer)?; encoder.finish(); }
+        let mut missing_source = PassProgress::for_stage(CacheStage::Encoder);
+        for layer in 0..20 { missing_source.begin(7, layer)?; missing_source.finish(); }
+        assert!(missing_source.commit(7).is_err());
+        encoder.begin_decoder_source(7)?;
+        assert!(encoder.invalid);
+        encoder.finish_decoder_source();
+        encoder.commit(7)?;
+        assert!(encoder.commit(7).is_err());
+        let mut interrupted = PassProgress::for_stage(CacheStage::Encoder);
+        for layer in 0..20 { interrupted.begin(7, layer)?; interrupted.finish(); }
+        interrupted.begin_decoder_source(7)?;
+        assert!(interrupted.commit(7).is_err());
+        let mut replay = PassProgress::for_stage(CacheStage::Replay);
+        assert_eq!(replay.next, 20);
+        for layer in 20..40 { replay.begin(8, layer)?; replay.finish(); }
+        replay.commit(8)?;
+        let mut wrong = PassProgress::for_stage(CacheStage::Replay);
+        assert!(wrong.begin(8, 0).is_err());
+        let mut wrong = PassProgress::for_stage(CacheStage::Encoder);
+        assert!(wrong.begin_decoder_source(7).is_err());
         Ok(())
     }
     #[test]

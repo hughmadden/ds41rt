@@ -75,7 +75,7 @@ fn prefill_capacity(batch_tokens: u32) -> Result<u32> {
     );
     [80, 256, 1024, 4096]
         .into_iter()
-        .find(|&capacity| capacity >= batch_tokens)
+        .find(|&capacity| capacity >= batch_tokens.max(128))
         .context("no prefill capacity covers the requested batch")
 }
 
@@ -86,7 +86,7 @@ mod prefill_capacity_tests {
     #[test]
     fn intermediate_batches_use_covering_preallocated_capacity() {
         for (batch, expected) in [
-            (80, 80),
+            (80, 256),
             (81, 256),
             (256, 256),
             (257, 1024),
@@ -324,21 +324,8 @@ fn generate<'a>(
             prompt_cache_hit_tokens: 0,
         },
     }))?;
-    let mut next = 0u32;
-    for chunk in prompt.chunks(prefill_batch_tokens) {
-        next = step(
-            lib,
-            runtime,
-            pass,
-            requests,
-            transport,
-            lease,
-            chunk,
-            ExpertV2SourceKind::Prefill,
-            job,
-            draft.as_deref_mut(),
-        )?;
-    }
+    let mut next = prefill(lib, runtime, pass, requests, transport, lease, &prompt,
+        prefill_batch_tokens, job, draft.as_deref_mut())?;
     let mut buffered = 0usize;
     let mut pending = std::collections::VecDeque::new();
     for generated in 0..job.max_tokens {
@@ -406,6 +393,55 @@ fn generate<'a>(
     }))?;
     Ok(())
 }
+fn prefill<'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    pass: &mut TargetPass<'_, 'a>, requests: &mut Requests<'a>, transport: &mut NativeTp4Wave<'a>,
+    lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
+    job: &NativeRequest, draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<u32> {
+    use crate::v41_block::EncoderSuffix;
+    use crate::v41_backbone_cache::CacheWork;
+    let end = tokens.len() as u64;
+    let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
+    requests.begin_encoder(lease, end)?;
+    for chunk in tokens.chunks(chunk_rows) {
+        ensure!(!job.events.is_closed(), "client disconnected");
+        let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
+            image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+        let started = Instant::now();
+        let result = (|| -> Result<()> {
+            runtime.block_on(unsafe { pass.execute_encoder(requests, &mut batch, transport, 0, &mut suffix) })?;
+            ensure!(!job.events.is_closed(), "client disconnected");
+            pass.commit(requests, &mut batch, &[chunk.len() as u32])
+        })();
+        if result.is_err() { pass.discard(&mut batch)?; }
+        result?;
+        tracing::debug!(target: "ds41rt::timing", rows=chunk.len(), total_us=started.elapsed().as_micros() as u64, "target encoder step");
+    }
+    ensure!(!job.events.is_closed(), "client disconnected");
+    let start = requests.begin_decoder_replay(lease)?;
+    let rows = (end - start) as u32;
+    let mut batch = requests.prepare_replay(&[CacheWork { lease, tokens: rows, kind: ExpertV2SourceKind::Prefill }])?;
+    let started = Instant::now();
+    let result = (|| -> Result<u32> {
+        let encoder = suffix.output()?;
+        let logits = runtime.block_on(unsafe { pass.execute_replay(requests, &mut batch,
+            transport, 0, &[rows as usize - 1], &encoder) })?;
+        let mut bytes = vec![0; logits.logits.bytes]; lib.copy_d2h(&mut bytes, logits.logits)?;
+        let mut best = (0u32, f32::NEG_INFINITY);
+        for (i, b) in bytes.chunks_exact(4).enumerate() {
+            let value = f32::from_ne_bytes(b.try_into().unwrap());
+            ensure!(value.is_finite(), "non-finite target logit");
+            if value > best.1 { best = (i as u32, value); }
+        }
+        ensure!(!job.events.is_closed(), "client disconnected");
+        if let Some(draft) = draft { draft.commit(pass, requests, &mut batch, rows)?; }
+        else { pass.commit(requests, &mut batch, &[rows])?; }
+        Ok(best.0)
+    })();
+    if result.is_err() { pass.discard(&mut batch)?; }
+    tracing::debug!(target: "ds41rt::timing", rows, total_us=started.elapsed().as_micros() as u64, "target decoder replay");
+    result
+}
+
 fn step<'a>(
     lib: &'a NativeLibrary,
     runtime: &tokio::runtime::Runtime,

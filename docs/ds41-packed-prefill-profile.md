@@ -1,6 +1,8 @@
 # Prefill profile after packed KV conversion
 
-The current packed-conversion native runtime and router daemon were profiled on
+This historical profile predates the [bounded CED rollout](ds41-ced-serving.md).
+
+The then-current packed-conversion native runtime and router daemon were profiled on
 the target API with two sequential 16,410-token code prompts, 59 generated tokens,
 2048-token chunks and four unchanged TP4 RoCE workers. The temporary instrumented
 API was stopped and the selected target API restored; the speculative API was

@@ -5,6 +5,8 @@ use crate::v41_attention_query::{AttentionQueryOutput, AttentionQueryWave};
 use crate::v41_hc::HcSublayer;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
+mod encoder_suffix;
+pub(crate) use encoder_suffix::EncoderSuffix;
 #[derive(Clone, Copy)]
 enum Phase {
     Idle,
@@ -110,6 +112,20 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
             self.layer = 0;
             self.reset();
             Ok(())
+        })();
+        if result.is_err() { self.reset(); }
+        result
+    }
+    /// Rebind an idle lane to decoder layer 20 and restore retained encoder rows.
+    pub fn initialize_decoder(&mut self, decoder: &'w crate::v41_backbone_hc::BackboneHcWeights<'a>,
+        encoder: &BlockOutput<'_>) -> Result<()> {
+        self.reset();
+        let result = (|| -> Result<()> {
+            ensure!(decoder.layer() == 20 && encoder.layer == 19, "invalid encoder/decoder boundary");
+            let [attention, ffn] = decoder.prepare_bindings(&self.attention, &self.ffn)?;
+            unsafe { self.attention.install_binding(attention); self.ffn.install_binding(ffn); }
+            self.layer = 20;
+            self.initialize_previous(encoder)
         })();
         if result.is_err() { self.reset(); }
         result

@@ -6,6 +6,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
+- [x] Deploy [bounded CED prefill](docs/ds41-ced-serving.md): full-prompt encoder plus final-128 decoder replay and dSpark seeding. Warm 16k prefill reaches 3.03–3.06k code / 3.49–3.51k repeated tok/s. Trace confirms 330,760 rather than 656,400 token-layer executions for 16,410 tokens. Broader approximation quality and C16 scheduling remain open. Earlier throughput entries below are historical checkpoints.
+
 - [x] Deploy [packed FP8 KV conversion](docs/ds41-attention-packed.md) with exhaustive bit-exact conversion and native attention qualification. Warm 16k prefill reaches 1.58–1.60k code / 1.83–1.84k repeated tok/s. Retain 2048-token chunks after a same-artifact 4096 trial regresses repeated-text prefill; adjacent-query KV sharing remains an unproven candidate.
 
 - [x] Upload final expert responses from [retained registered receive slots](docs/ds41-registered-response-slots.md), with streamed-chunk fallback, reset-safe ownership and real RoCE/GPU qualification. Warm 16k prefill improves another 7–8% to about 1.43–1.45k code / 1.63–1.64k repeated tok/s; release performance and concurrency gates remain open.
@@ -51,14 +53,14 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Model execution and state
 
-- [x] Bind [committed encoder global KV to decoder replay](docs/ds41-ced-committed-source.md), preserving per-query causality and source snapshot reuse. Sixteen-request owner checks and ten independent attention cases pass; target-pass and API CED integration remain open.
+- [x] Bind [committed encoder global KV to decoder replay](docs/ds41-ced-committed-source.md), preserving per-query causality and source snapshot reuse. Sixteen-request owner checks and ten independent attention cases pass; target-pass and API integration are now deployed in the bounded CED rollout.
 
-- [x] Add [separate encoder and decoder cache transactions](docs/ds41-ced-cache-transactions.md). State checks and sixteen real-weight GPU request transactions pass; target-pass, committed-source replay and API integration remain unfinished.
+- [x] Add [separate encoder and decoder cache transactions](docs/ds41-ced-cache-transactions.md). State checks and sixteen real-weight GPU request transactions pass; committed-source replay, target-pass and API integration are now deployed.
 
-- [x] Add native [decoder replay SWA bounds](docs/ds41-ced-window-bounds.md) and an optional Rust launch binding. This is a qualified attention primitive only; encoder/decoder cache transactions and live bounded prefill remain unfinished.
+- [x] Add native [decoder replay SWA bounds](docs/ds41-ced-window-bounds.md) and an optional Rust launch binding. Cache transactions and live bounded prefill are now integrated; broad approximation qualification remains open.
 
 - [ ] Complete the architecture and tensor-layout audit with explicit reference-to-production mappings.
-- [ ] Wire CED encoder/decoder execution, shared KV ownership, chunked prefill and exact replay with separately qualified bounded replay. **Priority correction:** [fresh source/profile audit](docs/ds41-prefill-scheduling-gap.md) confirms `serve-native` still runs all 40 layers on every prompt row, so advertised 8B prefill savings are absent. Implement encoder-wide cache production plus final-128 decoder bounded replay before further small kernel tuning; qualify its intentional approximation and dSpark state.
+- [ ] Complete exact replay and broad bounded-replay qualification, including multi-turn/prefix reuse. [Bounded CED execution](docs/ds41-ced-serving.md), shared KV ownership, chunked encoder prefill and dSpark suffix seeding are deployed; limited API regression checks preserve previous outputs. The earlier [scheduling audit](docs/ds41-prefill-scheduling-gap.md) documents the superseded full-forward path. Alternating-wave scheduling remains unfinished.
 - [x] Implement native ratio-two compressor projection/pooling and ratio-one projection/norm; qualify all four real-weight sources on both RTX GPUs.
 - [x] Add and qualify compressor request leases, partial-group ownership, captured proposal execution and accepted-prefix commit across two competing waves.
 - [ ] Implement CSA2 ratio-2 and ratio-1 production and source/reindex/reuse modes under the FP8-only serving KV contract.
