@@ -1,4 +1,4 @@
-# Distributed layer-0 integration smoke test
+# Distributed layer-0 integration and numerical qualification
 
 The retained `real_layer_zero_executes_embedding_attention_tp4_and_mhc` test executed the production `BackboneExecution::execute_layer` on RTX GPU 0 with real native layer-0 routed experts on ostrich, dodo, emu and kiwi. Two changed batches each contained 16 requests and five rows per request. Workers served both batches over one persistent connection per rank, returning seven-row chunks.
 
@@ -10,7 +10,7 @@ All four workers received byte-identical request frames within each batch. All e
 
 The coordinator loaded its selected owned weights in 2.492 seconds with uncontrolled, likely warm filesystem caches. The layer method took 0.237 and 0.177 seconds; these measurements exclude embedding/query initialization and are **not** full-model throughput, cold NVMe loading or overlap-efficiency qualifications. Total test runtime was 4.12 seconds.
 
-This is an integration smoke test, **not an independent numerical-reference qualification of the assembled layer**. It does not exercise compressed attention/index selection (layer 0 has neither), engram, decoder taps, target-head sampling, image inputs, a complete 40-layer pass, accepted model history, production RDMA or concurrent alternating passes. Component numerical evidence remains separate; broader composition and reference checks are still required.
+The Rust fixture alone is an integration smoke test. The complete reference comparison below supplies independent numerical evidence for these two layer-0 batches. It does not exercise compressed attention/index selection (layer 0 has neither), engram, decoder taps, target-head sampling, image inputs, a complete 40-layer pass, accepted model history, production RDMA or concurrent alternating passes. Component numerical evidence remains separate; broader composition and reference checks are still required.
 
 ## Reproduction inputs
 
@@ -29,8 +29,25 @@ The actual recorded request hidden rows, expert IDs and routing weights now pass
 | 0 | 154 | 0.0000154975 | 0.00048828125 |
 | 1 | 141 | 0.0000297121 | 0.0009765625 |
 
-The compared native values are rank-ordered FP32 sums rounded to BF16 per route, before summing the six routes and adding the shared expert. This numerical check covers routed expert execution from the actual distributed layer's FFN hidden inputs; it does not independently validate the upstream attention/mHC inputs, selection of expert IDs/routing weights, shared FFN or final mHC output. The complete assembled-layer numerical comparison remains open.
+The compared native values are rank-ordered FP32 sums rounded to BF16 per route, before summing the six routes and adding the shared expert. This numerical check covers routed expert execution from the actual distributed layer's FFN hidden inputs; it does not independently validate the upstream attention/mHC inputs, selection of expert IDs/routing weights, shared FFN or final mHC output. The subsequent complete assembled-layer comparison is recorded below.
 
 The qualifier's full mode also passed its existing real layer-0 shared/reduction fixture after this change. It now reads each case's own shared output rather than assuming case 0's output applies to both; the earlier fixture explicitly produced identical shared outputs, so that assumption did not invalidate its recorded result. The new routed-only mode makes no shared/reduction qualification claim. Both modes validate that fixture hidden rows, IDs and weights match recorded requests.
 
 Reference runtime: TileLang 0.1.8 and TVM FFI 0.1.6; the pinned reference activation-quantizer vectorization override remains enabled. See [the full per-expert results and payload hashes](ds41-layer0-routes-reference.json). Logs: `/tmp/ds41-layer0-routes-reference.log`, `/tmp/ds41-tp4-qualifier-default-regression.log`. Canonical request fields were extracted into `/tmp/ds41-layer0-reference-vectors/router`; all four original rank records remain in `/tmp/ds41-layer0-output`.
+
+## Complete assembled-layer numerical comparison
+
+`qualify-ds41-layer0.py` now compares both original distributed batches against a complete reference computation from token IDs to final residual and next pre-mix. It runs the pinned embedding, identity pre-mix, attention mHC, RMS normalization, FP8 query/KV projections, RoPE, whole-vector FP8 window quantization, causal attention with sink, inverse RoPE, grouped output projection, FFN mHC/normalization, gate, every selected FP4 expert, shared FP8 expert and final mHC. The final reference path uses **reference-produced hidden rows and routing throughout**; recorded native hidden rows are used only for a separate boundary comparison and gate check.
+
+| Batch | Embedding-to-FFN-input relative L2 | Final residual relative L2 | Final residual cosine | Final pre-mix relative L2 |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.000494542 | 0.00205977 | 0.99999797 | 0.0000111728 |
+| 1 | 0.000989715 | 0.00244348 | 0.99999702 | 0.0000599298 |
+
+All aggregate comparisons passed the predeclared end-to-end bounds: relative L2 below 0.01 and cosine above 0.9999. Final residual maximum absolute error was 0.015625 in both batches. Final pre-mix maximum absolute errors were 0.000053704 and 0.000451505; these are compounded end-to-end results, not the tighter identical-input mHC stage tolerance. Reference-derived expert IDs matched the recorded IDs despite upstream rounding differences. The official gate on actual native FFN inputs also matched all IDs exactly, with routing-weight maximum errors below 1.2e-7.
+
+The official sparse-attention kernel's 64-head shared-memory allocation exceeds SM120 capacity. As in the prior sparse-attention qualifier, the unchanged kernel runs in independent 16-head groups, whose results are concatenated before output projection. The pinned activation-quantizer compiler override remains enabled. The first exploratory run failed at the 64-head shared-memory limit; no tolerance was relaxed in response to numerical results.
+
+This extends the original smoke result to a bounded numerical qualification of **layer 0, two 16-request/five-token text batches**. It does not establish correctness for compressed/index attention, engram, vision, later layers, accepted history across full passes, dSpark or full-model output/performance.
+
+[Full reference results and weight/payload hashes](ds41-layer0-complete-reference.json), [exact token/position manifest](ds41-layer0-reference-inputs.json). The manifest reproduces the retained test's deterministic token formula at commit `800f745`; it is not inferred from generated outputs. Run the qualifier with `--reference-dir`, `--snapshot`, `--inputs`, `--rank-dir`, `--final-dir`, `--output` and `--device`. Original rank/final artifacts remain at `/tmp/ds41-layer0-output`; the successful log is `/tmp/ds41-layer0-complete-reference.log`.
