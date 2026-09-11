@@ -26,6 +26,9 @@ def main():
     p.add_argument('--rank', type=int, choices=range(4), default=0)
     p.add_argument('--experts', type=int, choices=[32, 384], default=384)
     p.add_argument('--capacity', type=int, choices=[1024,4096], default=1024)
+    p.add_argument('--only-case', help='Run a single rows:kind case from the qualification corpus')
+    p.add_argument('--force-largest-capacity', action='store_true', help='Use the largest planned native state, matching the deployed worker for prefill')
+    p.add_argument('--nvtx-candidate', action='store_true', help='Emit one qualified candidate replay in an NVTX range for hardware counters')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     torch.manual_seed(413264 + a.rank)
@@ -89,10 +92,16 @@ def main():
     cases = [(1, 'shared'), (6, 'shared'), (80, 'shared'), (81, 'shared'),
              (256, 'shared'), (1024, 'shared'), (1024, 'mixed'), (256, 'mixed'),
              (256, 'group_bound'), (256, 'zero'), (6, 'shared')]
+    cases.insert(8, (1024, 'skew'))
     if capacity == 4096:
+        cases.insert(9, (4096, 'skew'))
         cases[9:9] = [(1025,'shared'),(4096,'shared'),(4096,'mixed'),(4096,'group_bound')]
+    if a.only_case:
+        cases = [(rows, kind) for rows, kind in cases if f'{rows}:{kind}' == a.only_case]
+        if not cases:
+            p.error('requested case is not in this capacity corpus')
     for rows, kind in cases:
-        cap = next(cap for cap in capacities if rows <= cap)
+        cap = capacity if a.force_largest_capacity else next(cap for cap in capacities if rows <= cap)
         graphs = {}
         wire.zero_()
         wire[:, h:].fill_(127)
@@ -118,6 +127,17 @@ def main():
                 chosen = torch.arange(6, device='cuda').expand(capacity, 6)
                 if kind == 'mixed':
                     chosen = (torch.arange(capacity, device='cuda')[:, None]*7 + torch.arange(6, device='cuda')) % a.experts
+                if kind == 'skew':
+                    # Approximate the observed skew, not a replay of a real request:
+                    # hot experts carry most routes, with a long lightly used tail.
+                    pool = min(a.experts, 272)
+                    hot = min(64, pool // 2)
+                    mass = torch.empty(pool, device='cuda')
+                    rank = torch.arange(1, hot + 1, device='cuda').float()
+                    mass[:hot] = rank.pow(-0.70)
+                    mass[:hot] *= 0.84 / mass[:hot].sum()
+                    mass[hot:] = 0.16 / (pool-hot)
+                    chosen = torch.multinomial(mass.expand(capacity, -1), 6, replacement=False)
                 ids.copy_(chosen)
                 if kind == 'group_bound':
                     ids.zero_()
@@ -171,7 +191,19 @@ def main():
                 end.record()
                 end.synchronize()
                 samples[name].append(begin.elapsed_time(end)*1000/5)
-        record = dict(rows=rows, kind=kind, capacity=cap, metrics=metrics,
+        counts = torch.bincount(ids[:rows].flatten().long(), minlength=a.experts)
+        distribution = dict(active_experts=int((counts > 0).sum()),
+                            max_expert_rows=int(counts.max()),
+                            routes_above_m16_fraction=float(counts[counts > 16].sum())/(rows*6),
+                            m16_groups=int(((counts+15)//16).sum()),
+                            expert_rows=counts.cpu().tolist())
+        if a.nvtx_candidate:
+            torch.cuda.synchronize()
+            torch.cuda.nvtx.range_push(f'v41_{rows}_{kind}')
+            graphs['candidate'].replay()
+            torch.cuda.synchronize()
+            torch.cuda.nvtx.range_pop()
+        record = dict(rows=rows, kind=kind, capacity=cap, metrics=metrics, distribution=distribution,
                       graph_us=samples, median_us={k: statistics.median(v) for k,v in samples.items()})
         report['cases'].append(record)
         a.output.write_text(json.dumps(report, indent=2)+'\n')
