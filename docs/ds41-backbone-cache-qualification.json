@@ -1,0 +1,39 @@
+{
+  "scope": "Backbone cache bank admission, lease and batch lifecycle on actual Spark CUDA allocations; no model execution or multi-cache accepted-prefix execution",
+  "host": "ostrich",
+  "device": "GB10 / SM121",
+  "slots": 16,
+  "windows": 40,
+  "sources": [
+    2,
+    8,
+    14,
+    20
+  ],
+  "source_pages": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "cycles": 2,
+  "test": "v41_backbone_cache::tests::request_bank_lifecycle_and_batch_isolation",
+  "result": "passed",
+  "test_seconds": 0.37,
+  "production_daemon_build": "passed",
+  "native_library_sha256": "acea0f3bf08a25f92dea120bb2dd627a5a094af22468fce8c2a2436e955b67af",
+  "source_sha256": {
+    "v41_backbone_cache.rs": "95aa739885e9441abb841bd9e6c0027ed6376fb198cfde9ef8380ceb101cb409",
+    "v41_window.rs": "97c838fbaa833b53eb68ba7e05e347fba20ae4a5297d50bcbf78b290627e14e6",
+    "v41_compressor.rs": "c69578222d027c17f52138ce0ece51798a71de638d144d021dee5c238dcc9aef"
+  },
+  "logs": [
+    "/tmp/ds41-backbone-cache-test.log",
+    "/tmp/ds41-backbone-cache-final-build.log"
+  ],
+  "limitations": [
+    "Full 40-window/four-source accepted-prefix execution and induced device-failure recovery remain unqualified.",
+    "Request scheduler, engram/dSpark acceptance and lane/index composition remain separate unfinished work.",
+    "RTX unavailable: NVML 595.91 userspace mismatches loaded kernel driver."
+  ]
+}

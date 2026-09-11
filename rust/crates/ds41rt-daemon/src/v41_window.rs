@@ -569,6 +569,21 @@ impl WindowWave<'_, '_> {
             _wave: PhantomData,
         })
     }
+    /// Validate an enclosing cache transaction's exact request order/proposal.
+    pub(crate) fn validate_batch(
+        &self,
+        state: &WindowState<'_>,
+        chunks: &[WindowChunk],
+    ) -> Result<()> {
+        let prepared = self.validate_ready(state)?;
+        ensure!(
+            prepared.chunks.len() == chunks.len()
+                && prepared.chunks.iter().zip(chunks).all(|(a, b)|
+                    a.lease == b.lease && a.position == b.position && a.tokens == b.tokens),
+            "window transaction proposal differs"
+        );
+        Ok(())
+    }
     /// Consume a proposal once. Only the last 128 accepted rows per request are
     /// written, ensuring unique ring destinations even for large prefill chunks.
     pub fn commit(&mut self, state: &mut WindowState<'_>, accepted: &[u32]) -> Result<()> {

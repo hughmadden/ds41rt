@@ -773,6 +773,22 @@ impl CompressorWave<'_, '_> {
             _wave: std::marker::PhantomData,
         })
     }
+    /// Validate an enclosing cache transaction's exact request order/proposal.
+    pub(crate) fn validate_batch(
+        &self,
+        state: &CompressorState<'_>,
+        chunks: &[CompressorChunk],
+    ) -> Result<()> {
+        self.output(state)?;
+        let prepared = self.ready.as_ref().context("compressor output incomplete")?;
+        ensure!(
+            prepared.chunks.len() == chunks.len()
+                && prepared.chunks.iter().zip(chunks).all(|(a, b)|
+                    a.lease == b.lease && a.position == b.position && a.tokens == b.tokens),
+            "compressor transaction proposal differs"
+        );
+        Ok(())
+    }
     /// Consume this proposal once. Validate all requests before any GPU write;
     /// zero acceptance also invalidates competing proposals via version advance.
     /// Reserve paired index/KV pages before writes, drain all source writes before
