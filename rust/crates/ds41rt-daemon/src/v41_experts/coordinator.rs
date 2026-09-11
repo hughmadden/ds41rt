@@ -3,7 +3,7 @@ use super::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41RouteReducer};
 use ds41rt_transport::{
-    v41_expert::{V41Tp4Tcp, V41_ROUTE_ROW_BYTES},
+    v41_expert::{V41Tp4Pending, V41Tp4Tcp, V41_ROUTE_ROW_BYTES},
     ExpertProtocolV2Request,
 };
 
@@ -95,27 +95,45 @@ impl<'a> NativeTp4Wave<'a> {
         shared: &crate::v41_backbone_shared::SharedOutput<'_>,
     ) -> Result<NativeFfnOutput<'w>> {
         self.ready_rows = None;
+        validate_shared(
+            request,
+            shared,
+            self.shared.buffer,
+            self.transport.capacity(),
+        )?;
+        unsafe { self.dispatch_ffn(request).await?.finish(shared).await }
+    }
+    /// Write all four expert requests before returning. The caller can then run
+    /// shared FFN work on RTX while the Spark workers execute the routed experts.
+    pub async fn dispatch_ffn<'w, 'r>(
+        &'w mut self,
+        request: &'r crate::v41_backbone_router::BoundExpertRequest,
+    ) -> Result<NativePendingFfn<'w, 'a, 'r>> {
+        self.ready_rows = None;
         self.synchronize()?;
         let header = &request.request().header;
         ensure!(
-            request.binding() == shared.binding()?
-                && header.layer_id as usize == shared.layer
-                && header.row_count == shared.rows
+            header.layer_id as usize == request.binding().layer()
                 && header.row_count > 0
-                && header.row_count <= self.transport.capacity()
-                && shared.values.bytes == header.row_count as usize * 10240
-                && shared.values.device_id == self.shared.buffer.device_id,
-            "native TP shared contribution differs from routed request"
+                && header.row_count <= self.transport.capacity(),
+            "native dispatched FFN identity or rows differ"
         );
-        self.library
-            .copy_d2d(self.shared.buffer, shared.values, shared.values.bytes)?;
-        let values = self.execute_prepared(request.request(), true).await?;
-        Ok(NativeFfnOutput {
-            values,
-            binding: request.binding(),
-            _owner: std::marker::PhantomData,
+        let capacity = self.transport.capacity();
+        let pending = self.transport.dispatch(request.request()).await?;
+        Ok(NativePendingFfn {
+            pending,
+            request,
+            capacity,
+            library: self.library,
+            stream: &self.stream,
+            planes: &self.planes,
+            shared: self.shared.buffer,
+            output: self.output.buffer,
+            reducer: &self.reducer,
+            ready_rows: &mut self.ready_rows,
         })
     }
+
     async fn execute_prepared(
         &mut self,
         request: &ExpertProtocolV2Request,
@@ -126,40 +144,18 @@ impl<'a> NativeTp4Wave<'a> {
         let planes = &self.planes;
         self.transport
             .execute(request, |rank, first_row, bytes| {
-                let offset = (first_row as usize)
-                    .checked_mul(V41_ROUTE_ROW_BYTES as usize)
-                    .context("native route chunk offset overflow")?;
-                let end = offset
-                    .checked_add(bytes.len())
-                    .context("native route chunk extent overflow")?;
-                ensure!(
-                    end <= planes[rank].buffer.bytes,
-                    "native route chunk exceeds destination"
-                );
-                let mut destination = planes[rank].buffer;
-                // The receiver proved contiguous row coverage; the owned allocation
-                // and checked extent cover the entire synchronous H2D write.
-                destination.ptr = unsafe { destination.ptr.cast::<u8>().add(offset).cast() };
-                destination.bytes = bytes.len();
-                library.copy_h2d(destination, bytes)
+                copy_chunk(library, planes, rank, first_row, bytes)
             })
             .await?;
-        unsafe {
-            self.reducer.launch(
-                std::array::from_fn(|rank| self.planes[rank].buffer.ptr.cast::<f32>().cast_const()),
-                if has_shared {
-                    self.shared.buffer.ptr.cast()
-                } else {
-                    std::ptr::null()
-                },
-                self.output.buffer.ptr.cast(),
-                rows,
-                4,
-                6,
-                self.stream.raw,
-            )?;
-        }
-        self.synchronize()?;
+        reduce_planes(
+            self.library,
+            &self.reducer,
+            &self.stream,
+            &self.planes,
+            self.output.buffer,
+            has_shared.then_some(self.shared.buffer),
+            rows,
+        )?;
         self.ready_rows = Some(rows);
         self.output()
     }
@@ -193,5 +189,121 @@ pub(crate) struct NativeFfnOutput<'a> {
 impl NativeFfnOutput<'_> {
     pub fn binding(&self) -> crate::v41_attention_binding::QueryBinding {
         self.binding
+    }
+}
+
+fn validate_shared(
+    request: &crate::v41_backbone_router::BoundExpertRequest,
+    shared: &crate::v41_backbone_shared::SharedOutput<'_>,
+    destination: Ds41rtDeviceBuffer,
+    capacity: u32,
+) -> Result<()> {
+    let header = &request.request().header;
+    ensure!(
+        request.binding() == shared.binding()?
+            && header.layer_id as usize == shared.layer
+            && header.row_count == shared.rows
+            && header.row_count > 0
+            && header.row_count <= capacity
+            && shared.values.bytes == header.row_count as usize * 10240
+            && shared.values.device_id == destination.device_id,
+        "native TP shared contribution differs from routed request"
+    );
+    Ok(())
+}
+fn copy_chunk(
+    library: &NativeLibrary,
+    planes: &[DeviceAllocation<'_>; 4],
+    rank: usize,
+    first_row: u32,
+    bytes: &[u8],
+) -> Result<()> {
+    ensure!(rank < 4, "native route rank exceeds TP4");
+    let offset = (first_row as usize)
+        .checked_mul(V41_ROUTE_ROW_BYTES as usize)
+        .context("native route chunk offset overflow")?;
+    let end = offset
+        .checked_add(bytes.len())
+        .context("native route chunk extent overflow")?;
+    ensure!(
+        end <= planes[rank].buffer.bytes,
+        "native route chunk exceeds destination"
+    );
+    let mut destination = planes[rank].buffer;
+    destination.ptr = unsafe { destination.ptr.cast::<u8>().add(offset).cast() };
+    destination.bytes = bytes.len();
+    library.copy_h2d(destination, bytes)
+}
+fn reduce_planes(
+    library: &NativeLibrary,
+    reducer: &V41RouteReducer<'_>,
+    stream: &LoadStream<'_>,
+    planes: &[DeviceAllocation<'_>; 4],
+    output: Ds41rtDeviceBuffer,
+    shared: Option<Ds41rtDeviceBuffer>,
+    rows: u32,
+) -> Result<()> {
+    let launched = unsafe {
+        reducer.launch(
+            std::array::from_fn(|rank| planes[rank].buffer.ptr.cast::<f32>().cast_const()),
+            shared.map_or(std::ptr::null(), |b| b.ptr.cast()),
+            output.ptr.cast(),
+            rows,
+            4,
+            6,
+            stream.raw,
+        )
+    };
+    launched.and(unsafe { library.cuda_stream_synchronize(stream.raw) })
+}
+
+/// Borrows every mutable reduction buffer and owns all unread response sockets.
+/// Dropping before completion leaves the wave unpublished and closes the sockets.
+pub(crate) struct NativePendingFfn<'w, 'a, 'r> {
+    pending: V41Tp4Pending<'w, 'r>,
+    request: &'r crate::v41_backbone_router::BoundExpertRequest,
+    capacity: u32,
+    library: &'a NativeLibrary,
+    stream: &'w LoadStream<'a>,
+    planes: &'w [DeviceAllocation<'a>; 4],
+    shared: Ds41rtDeviceBuffer,
+    output: Ds41rtDeviceBuffer,
+    reducer: &'w V41RouteReducer<'a>,
+    ready_rows: &'w mut Option<u32>,
+}
+impl<'w> NativePendingFfn<'w, '_, '_> {
+    /// # Safety
+    /// Shared values hold the completed contribution for this exact request and
+    /// remain immutable through the copy. Producers must be drained.
+    pub async unsafe fn finish(
+        self,
+        shared: &crate::v41_backbone_shared::SharedOutput<'_>,
+    ) -> Result<NativeFfnOutput<'w>> {
+        validate_shared(self.request, shared, self.shared, self.capacity)?;
+        self.library
+            .copy_d2d(self.shared, shared.values, shared.values.bytes)?;
+        self.pending
+            .receive(|rank, first_row, bytes| {
+                copy_chunk(self.library, self.planes, rank, first_row, bytes)
+            })
+            .await?;
+        let rows = self.request.request().header.row_count;
+        reduce_planes(
+            self.library,
+            self.reducer,
+            self.stream,
+            self.planes,
+            self.output,
+            Some(self.shared),
+            rows,
+        )?;
+        *self.ready_rows = Some(rows);
+        let mut values = self.output;
+        values.bytes = rows as usize * 10240;
+        Ok(NativeFfnOutput {
+            values,
+            binding: self.request.binding(),
+            _owner: std::marker::PhantomData,
+        })
     }
 }

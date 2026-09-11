@@ -64,7 +64,7 @@ pub use protocol_v2_tcp::{
     serve_synthetic_protocol_v2_tcp, serve_synthetic_protocol_v2_tcp_listener,
     tcp_protocol_v2_expert_request_roundtrip, tcp_protocol_v2_roundtrip,
     tcp_protocol_v2_roundtrip_arena_response_view, tcp_protocol_v2_roundtrip_response_view,
-    TcpProtocolV2PersistentClient,
+    TcpProtocolV2PersistentClient, TcpProtocolV2PendingChunks,
 };
 pub use synthetic::{
     expert_response_from_protocol_v2_response, protocol_v2_echo_loopback_response,

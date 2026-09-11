@@ -194,17 +194,29 @@ impl TcpProtocolV2PersistentClient {
         &mut self,
         request: &ExpertProtocolV2Request,
         max_response_frames: usize,
-        mut sink: F,
+        sink: F,
     ) -> Result<()>
     where
         F: FnMut(&[u8]) -> Result<()>,
     {
+        self.dispatch_chunks(request, max_response_frames)
+            .await?
+            .receive(sink)
+            .await
+    }
+
+    /// Write the complete request and return ownership of the in-flight socket.
+    /// Dropping either this dispatch future or the returned guard closes the
+    /// socket. No partially delivered request is replayed automatically.
+    pub async fn dispatch_chunks<'c, 'r>(
+        &'c mut self,
+        request: &'r ExpertProtocolV2Request,
+        max_response_frames: usize,
+    ) -> Result<TcpProtocolV2PendingChunks<'c, 'r>> {
         anyhow::ensure!(
             max_response_frames > 0,
             "response frame limit must be positive"
         );
-        // Hold the socket in the future, not in self, until all frames are consumed.
-        // Dropping this future therefore closes a stream with unread response bytes.
         let mut stream = match self.stream.take() {
             Some(stream) => stream,
             None => connect_protocol_v2_stream(self.addr, self.config.clone()).await?,
@@ -217,24 +229,12 @@ impl TcpProtocolV2PersistentClient {
             &mut self.request_buffer,
         )
         .await?;
-        for _ in 0..max_response_frames {
-            read_protocol_v2_response_frame_with_timeout(
-                &mut stream,
-                self.config.timeout,
-                self.config.max_frame_bytes,
-                &mut self.response_buffer,
-            )
-            .await?;
-            let response = ExpertProtocolV2ResponseView::parse(self.response_buffer.as_slice())?;
-            validate_response_matches_request(&response.header, request)?;
-            let final_chunk = !response.more_chunks();
-            sink(self.response_buffer.as_slice())?;
-            if final_chunk {
-                self.stream = Some(stream);
-                return Ok(());
-            }
-        }
-        bail!("TCP response exceeded admitted frame count without a final chunk")
+        Ok(TcpProtocolV2PendingChunks {
+            client: self,
+            request,
+            stream,
+            max_response_frames,
+        })
     }
 
     async fn roundtrip_once(
@@ -320,6 +320,43 @@ impl TcpProtocolV2PersistentClient {
 
     pub fn reset(&mut self) {
         self.stream = None;
+    }
+}
+
+/// A fully written request whose bounded response stream has not been collected.
+/// Exclusive client ownership prevents another request from overtaking it.
+pub struct TcpProtocolV2PendingChunks<'c, 'r> {
+    client: &'c mut TcpProtocolV2PersistentClient,
+    request: &'r ExpertProtocolV2Request,
+    stream: TcpStream,
+    max_response_frames: usize,
+}
+impl TcpProtocolV2PendingChunks<'_, '_> {
+    /// The sink consumes each borrowed frame synchronously. Only a validated
+    /// final response returns the socket to the persistent client.
+    pub async fn receive<F>(mut self, mut sink: F) -> Result<()>
+    where
+        F: FnMut(&[u8]) -> Result<()>,
+    {
+        for _ in 0..self.max_response_frames {
+            read_protocol_v2_response_frame_with_timeout(
+                &mut self.stream,
+                self.client.config.timeout,
+                self.client.config.max_frame_bytes,
+                &mut self.client.response_buffer,
+            )
+            .await?;
+            let response =
+                ExpertProtocolV2ResponseView::parse(self.client.response_buffer.as_slice())?;
+            validate_response_matches_request(&response.header, self.request)?;
+            let final_chunk = !response.more_chunks();
+            sink(self.client.response_buffer.as_slice())?;
+            if final_chunk {
+                self.client.stream = Some(self.stream);
+                return Ok(());
+            }
+        }
+        bail!("TCP response exceeded admitted frame count without a final chunk")
     }
 }
 

@@ -1,0 +1,226 @@
+{
+  "date": "2026-09-11",
+  "checkpoint_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "scope": "Real four-Spark expert recomputation and split coordinator collection/reduction; prerecorded router and shared-FFN inputs, reconstructed typed bindings; coordinator on GB10, not RTX.",
+  "cases": [
+    {
+      "layer": 0,
+      "case": 0,
+      "rows": 80,
+      "split_dispatch": "true",
+      "shared_upload_after_dispatch": "true",
+      "real_four_rank_reduction_exact": "true",
+      "dispatch_seconds": "0.008827356",
+      "total_seconds": "0.225669068",
+      "final_output_sha256": "6881d0eb05a514cf5b34d01595a1aad962a79ca3a042caa17d161d5edc374785",
+      "shared_input_sha256": "4fe7377c8927884c796de4062a466ef382db53faa3700eb7593ff6b6869b7493",
+      "baseline_equal": true
+    },
+    {
+      "layer": 0,
+      "case": 1,
+      "rows": 80,
+      "split_dispatch": "true",
+      "shared_upload_after_dispatch": "true",
+      "real_four_rank_reduction_exact": "true",
+      "dispatch_seconds": "0.000921043",
+      "total_seconds": "0.199541513",
+      "final_output_sha256": "8d2833c76c9c6f4c071faeb80059df1d7c0cf8dbe260666986e3ebcb366feb96",
+      "shared_input_sha256": "4fe7377c8927884c796de4062a466ef382db53faa3700eb7593ff6b6869b7493",
+      "baseline_equal": true
+    },
+    {
+      "layer": 20,
+      "case": 0,
+      "rows": 80,
+      "split_dispatch": "true",
+      "shared_upload_after_dispatch": "true",
+      "real_four_rank_reduction_exact": "true",
+      "dispatch_seconds": "0.009732938",
+      "total_seconds": "0.183204803",
+      "final_output_sha256": "a7b2191d48128a4f270a4bf70f2d4493ff815ebbd73433d9e69a11469125f8cc",
+      "shared_input_sha256": "f437d10d5cf17cc5b98570c48d16123133a0ec2e6362d413f88c71de900cc5f9",
+      "baseline_equal": true
+    },
+    {
+      "layer": 20,
+      "case": 1,
+      "rows": 80,
+      "split_dispatch": "true",
+      "shared_upload_after_dispatch": "true",
+      "real_four_rank_reduction_exact": "true",
+      "dispatch_seconds": "0.004621488",
+      "total_seconds": "0.17637439",
+      "final_output_sha256": "c991822c68622db6c9892e0e80e2533da70bedca3e34174a8562bc551c8d2e60",
+      "shared_input_sha256": "f437d10d5cf17cc5b98570c48d16123133a0ec2e6362d413f88c71de900cc5f9",
+      "baseline_equal": true
+    },
+    {
+      "layer": 39,
+      "case": 0,
+      "rows": 80,
+      "split_dispatch": "true",
+      "shared_upload_after_dispatch": "true",
+      "real_four_rank_reduction_exact": "true",
+      "dispatch_seconds": "0.007353204",
+      "total_seconds": "0.194607955",
+      "final_output_sha256": "887d1b97fa77af1ff853c1f5b3492970847a2e834a8bc253c1f3f2ff3cc0dd30",
+      "shared_input_sha256": "1b442c51e4e28dedcf8702faea98c6fc658c666b2ff41f067bacdc5ac3f4a54a",
+      "baseline_equal": true
+    },
+    {
+      "layer": 39,
+      "case": 1,
+      "rows": 80,
+      "split_dispatch": "true",
+      "shared_upload_after_dispatch": "true",
+      "real_four_rank_reduction_exact": "true",
+      "dispatch_seconds": "0.000912685",
+      "total_seconds": "0.166429124",
+      "final_output_sha256": "f7e348df40df13d39d1f535c940b8a263ff712585833a7d68bc76e1e29bb9e62",
+      "shared_input_sha256": "1b442c51e4e28dedcf8702faea98c6fc658c666b2ff41f067bacdc5ac3f4a54a",
+      "baseline_equal": true
+    }
+  ],
+  "workers": [
+    {
+      "host": "ostrich",
+      "rank": 0,
+      "sha256": {
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-plane.bin": "4bc9ea3ac73c9c74be7ba32eec78b2bc16d5f03a32cabe2e870439068b4af45e",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-plane.bin": "7b45d495a42d64a8ffa6500b5b8e94ecaeb7eefd07a79abcf2763e1726fcc278",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-plane.bin": "989bc8503b837e520e1a8619c561186edf4e77bddace7375915b8c0ad86e3523",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-plane.bin": "2e58a8cc41966411d098453d12098e7d6b6a906a723204587ea79f7a1abd7af0",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-plane.bin": "36c0b4a5c4d72dd345c658eccddd608989abcc2980efbf11ab9f468366bc4817",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-plane.bin": "bdf3f48a3c33d1e6f505aa014ae3c2ea9aadf190aa1e753fca683a8ddb480c0b",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-request.bin": "13e1e797f0c1d510cbe21e162fd228ad46740076bbfce8b91aad2ba6c9ed1a60",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-request.bin": "3a4f9a274934e03538d2279d31bf861f199a59a73836ad11145c4ce7fddee34e",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-request.bin": "3be7b5a23b922f4626df4a15b94746d83f9f6e0cf5743bc403eac0c9a4c4416b",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-request.bin": "49be24199103b449fce69a21ba2bbda46275980feb95d2b9b4153ed73c79b874",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-request.bin": "29ea2bfcf787087fc8cdee1a61693f8b78b6212c544323a2fd03a9acbd24223b",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-request.bin": "0c2c49c4180ab33cce126117b6a2d53904150182fe955ae9bb8c0e4b765af30d",
+        "/tmp/ds41-real-tp4/artifacts/cmake/libds41rt_native.so": "565fa554ec934de9f7a8ea4d05dc43989291096e6b9b8cd610542e78b9a5f362",
+        "/tmp/ds41-real-tp4/artifacts/ds41-real-tp4-worker": "f197d134933d1b5b53a1df31720b8eb3518df2da0567f155fba1fb5c31ad2d89"
+      },
+      "process_exit_by_layer": {
+        "0": 0,
+        "20": 0,
+        "39": 0
+      }
+    },
+    {
+      "host": "dodo",
+      "rank": 1,
+      "sha256": {
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-plane.bin": "35bc3042ac5d00a1dfa251900fa610d0955894814654ef4f26d7be6d4cd68838",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-plane.bin": "162596c655a55f5f528bd80d1abd8909640e6ec88b6967dc27a60a033bdf6e75",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-plane.bin": "fe63e87ed51814cd62a8e6c239313fa7324f9f4ad30573efcf0a01572388071d",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-plane.bin": "63577639983031c27608015a3a84bc7d636b663aef09ebc889d8d7abe331a7a1",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-plane.bin": "bbe362070cd59aefe80bba3b4cf42921444f26c40155a06ec004a17c8db2db82",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-plane.bin": "30e3ba1a854cb0eacc22650772065be86126e0c261f1b0035004ef8cb77fc46c",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-request.bin": "13e1e797f0c1d510cbe21e162fd228ad46740076bbfce8b91aad2ba6c9ed1a60",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-request.bin": "3a4f9a274934e03538d2279d31bf861f199a59a73836ad11145c4ce7fddee34e",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-request.bin": "3be7b5a23b922f4626df4a15b94746d83f9f6e0cf5743bc403eac0c9a4c4416b",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-request.bin": "49be24199103b449fce69a21ba2bbda46275980feb95d2b9b4153ed73c79b874",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-request.bin": "29ea2bfcf787087fc8cdee1a61693f8b78b6212c544323a2fd03a9acbd24223b",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-request.bin": "0c2c49c4180ab33cce126117b6a2d53904150182fe955ae9bb8c0e4b765af30d",
+        "/tmp/ds41-real-tp4/artifacts/cmake/libds41rt_native.so": "565fa554ec934de9f7a8ea4d05dc43989291096e6b9b8cd610542e78b9a5f362",
+        "/tmp/ds41-real-tp4/artifacts/ds41-real-tp4-worker": "f197d134933d1b5b53a1df31720b8eb3518df2da0567f155fba1fb5c31ad2d89"
+      },
+      "process_exit_by_layer": {
+        "0": 0,
+        "20": 0,
+        "39": 0
+      }
+    },
+    {
+      "host": "emu",
+      "rank": 2,
+      "sha256": {
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-plane.bin": "120c52fa7890d816ee977a8529cdf89e242f1ef3e8781d87379e4e7ec4ee4b07",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-plane.bin": "5d5db609b61b7910e2e405ddce0e075b9495f301825e4f75a34704a1a1afa8bb",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-plane.bin": "82fe4cb765da93163b1a91500e6e0aaec04d7869ce6071630b68d1d20daf80cf",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-plane.bin": "a51e29bce6598e2447e5861a2725614cf1b582b1b07430a193f1e32b80bfb50c",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-plane.bin": "40c295bfebe8860b4af2ed09474e8a53157f50ca9f02e429a2cb52da4d367159",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-plane.bin": "e372d02e56c519dc535ad97e4616a5297db9935e885e581f870f2149ee62c501",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-request.bin": "13e1e797f0c1d510cbe21e162fd228ad46740076bbfce8b91aad2ba6c9ed1a60",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-request.bin": "3a4f9a274934e03538d2279d31bf861f199a59a73836ad11145c4ce7fddee34e",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-request.bin": "3be7b5a23b922f4626df4a15b94746d83f9f6e0cf5743bc403eac0c9a4c4416b",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-request.bin": "49be24199103b449fce69a21ba2bbda46275980feb95d2b9b4153ed73c79b874",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-request.bin": "29ea2bfcf787087fc8cdee1a61693f8b78b6212c544323a2fd03a9acbd24223b",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-request.bin": "0c2c49c4180ab33cce126117b6a2d53904150182fe955ae9bb8c0e4b765af30d",
+        "/tmp/ds41-real-tp4/artifacts/cmake/libds41rt_native.so": "565fa554ec934de9f7a8ea4d05dc43989291096e6b9b8cd610542e78b9a5f362",
+        "/tmp/ds41-real-tp4/artifacts/ds41-real-tp4-worker": "f197d134933d1b5b53a1df31720b8eb3518df2da0567f155fba1fb5c31ad2d89"
+      },
+      "process_exit_by_layer": {
+        "0": 0,
+        "20": 0,
+        "39": 0
+      }
+    },
+    {
+      "host": "kiwi",
+      "rank": 3,
+      "sha256": {
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-plane.bin": "b78fa0bad8b8150775af5284c2ff25e4e01e8a9f04d7c2c35dbd0a5a2f267164",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-plane.bin": "9fa0136d3ab77feb2f7a9525671854e09aef77aaff14a3b31d0dc3af44b65406",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-plane.bin": "7235cd5bfa6d4d3b105df1db8cfdaebd0398fcb5380fdcc57be8fe2b9a1791a0",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-plane.bin": "f89ebce055cba325dc7b6a7888a2be4ee59001246c203811448cecd3ed53a252",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-plane.bin": "29dc546aabe46b48602e63af4fc9ab740111128ce6f483eb00c9fda12e3f5162",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-plane.bin": "6535d0b6894de980e08675344aba0e343fa829d162b4251eea3013f7033d2143",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c0-request.bin": "13e1e797f0c1d510cbe21e162fd228ad46740076bbfce8b91aad2ba6c9ed1a60",
+        "/tmp/ds41-tp4-split-worker/l0/l0-c1-request.bin": "3a4f9a274934e03538d2279d31bf861f199a59a73836ad11145c4ce7fddee34e",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c0-request.bin": "3be7b5a23b922f4626df4a15b94746d83f9f6e0cf5743bc403eac0c9a4c4416b",
+        "/tmp/ds41-tp4-split-worker/l20/l20-c1-request.bin": "49be24199103b449fce69a21ba2bbda46275980feb95d2b9b4153ed73c79b874",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c0-request.bin": "29ea2bfcf787087fc8cdee1a61693f8b78b6212c544323a2fd03a9acbd24223b",
+        "/tmp/ds41-tp4-split-worker/l39/l39-c1-request.bin": "0c2c49c4180ab33cce126117b6a2d53904150182fe955ae9bb8c0e4b765af30d",
+        "/tmp/ds41-real-tp4/artifacts/cmake/libds41rt_native.so": "565fa554ec934de9f7a8ea4d05dc43989291096e6b9b8cd610542e78b9a5f362",
+        "/tmp/ds41-real-tp4/artifacts/ds41-real-tp4-worker": "f197d134933d1b5b53a1df31720b8eb3518df2da0567f155fba1fb5c31ad2d89"
+      },
+      "process_exit_by_layer": {
+        "0": 0,
+        "20": 0,
+        "39": 0
+      }
+    }
+  ],
+  "exact_baseline_comparisons": {
+    "rank_planes": 24,
+    "received_requests": 24,
+    "final_reductions": 6
+  },
+  "transport_tests": {
+    "passed": 146,
+    "failed": 0,
+    "ignored": 1,
+    "split_dispatch_tests": 3,
+    "log": "/tmp/ds41-tp4-split-transport-final-tests.log"
+  },
+  "daemon_build": {
+    "exit": 0,
+    "log": "/tmp/ds41-tp4-split-daemon-final-build.log"
+  },
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_experts/coordinator.rs": "724e6741841de7f183f7e1035016e6b696c3adf4e77e66f945a540ea859f460b",
+    "rust/crates/ds41rt-transport/src/protocol_v2_tcp.rs": "b09fb67b95f6327879a379f45eb8373dc1e328297001f73d2e37bf9bfae3409a",
+    "rust/crates/ds41rt-transport/src/v41_expert/tcp.rs": "30ff90aaec1de915a0595dbc9793f402ed4b8dd57e6d0cf5756587c601f937ac",
+    "rust/crates/ds41rt-transport/src/v41_expert/tcp_tests.rs": "ae7f4522f1a3867f056b21c71a3275dc25e9fd6bafd07362cd87a38ca9e724e6"
+  },
+  "coordinator_fixture_sha256": "10d7140091cbb839540f7298c414503b42f6136d70246546ca182ebb253d6ea9",
+  "coordinator_native_sha256": "acea0f3bf08a25f92dea120bb2dd627a5a094af22468fce8c2a2436e955b67af",
+  "artifacts": [
+    "/tmp/ds41-tp4-split",
+    "/tmp/ds41-tp4-split-fixture-build.log",
+    "/tmp/ds41-tp4-split-real-l0.log",
+    "/tmp/ds41-tp4-split-real-l20.log",
+    "/tmp/ds41-tp4-split-real-l39.log",
+    "/tmp/ds41-tp4-split-worker-{host}-l{layer}.log"
+  ],
+  "limits": [
+    "No assembled-lane execution",
+    "No shared FP8 recomputation in this fixture",
+    "No measured shared-compute overlap",
+    "No RTX execution",
+    "No full-model throughput claim"
+  ]
+}

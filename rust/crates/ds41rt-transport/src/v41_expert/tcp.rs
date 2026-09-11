@@ -1,6 +1,9 @@
 //! Concurrent TP4 TCP dispatch with bounded per-rank response storage.
 use super::{V41BackboneRequest, V41Tp4ChunkReceiver};
-use crate::{ExpertProtocolV2Request, TcpProtocolV2PersistentClient, TcpTransportConfig};
+use crate::{
+    ExpertProtocolV2Request, TcpProtocolV2PendingChunks, TcpProtocolV2PersistentClient,
+    TcpTransportConfig,
+};
 use anyhow::{ensure, Result};
 use std::{cell::RefCell, net::SocketAddr};
 
@@ -56,27 +59,55 @@ impl V41Tp4Tcp {
     /// It runs on the polling thread, allowing CUDA owners to stay thread-local.
     /// On error or cancellation the caller must discard partial destination state;
     /// no partially delivered request is automatically replayed.
-    pub async fn execute<F>(&mut self, request: &ExpertProtocolV2Request, mut sink: F) -> Result<()>
+    pub async fn execute<F>(&mut self, request: &ExpertProtocolV2Request, sink: F) -> Result<()>
     where
         F: FnMut(usize, u32, &[u8]) -> Result<()>,
     {
+        self.dispatch(request).await?.receive(sink).await
+    }
+
+    /// Return after all four complete requests have been written. Expert workers
+    /// can execute while the caller produces the coordinator's shared FFN result.
+    pub async fn dispatch<'c, 'r>(
+        &'c mut self,
+        request: &'r ExpertProtocolV2Request,
+    ) -> Result<V41Tp4Pending<'c, 'r>> {
         let frame = request.encode()?;
         ensure!(
             frame.len() <= self.max_frame_bytes,
             "native request exceeds TCP frame budget"
         );
         let native = V41BackboneRequest::parse(&frame, self.capacity)?;
-        let mut receiver = V41Tp4ChunkReceiver::new(&native, self.executors, self.max_frame_bytes)?;
-        // All futures are polled together on the caller's thread. Mutable assembly
-        // access exists only inside a synchronous callback, never across an await.
-        let state = RefCell::new((&mut receiver, &mut sink));
+        let receiver = V41Tp4ChunkReceiver::new(&native, self.executors, self.max_frame_bytes)?;
+        let pending = futures::future::try_join_all(
+            self.clients
+                .iter_mut()
+                .map(|client| client.dispatch_chunks(request, native.rows() as usize)),
+        )
+        .await?;
+        Ok(V41Tp4Pending { pending, receiver })
+    }
+}
+
+/// Owns four in-flight sockets and constant-size response coverage state.
+/// Dropping it abandons unread responses and prevents their reuse by later waves.
+pub struct V41Tp4Pending<'c, 'r> {
+    pending: Vec<TcpProtocolV2PendingChunks<'c, 'r>>,
+    receiver: V41Tp4ChunkReceiver,
+}
+impl V41Tp4Pending<'_, '_> {
+    pub async fn receive<F>(mut self, mut sink: F) -> Result<()>
+    where
+        F: FnMut(usize, u32, &[u8]) -> Result<()>,
+    {
+        let state = RefCell::new((&mut self.receiver, &mut sink));
         let responses = self
-            .clients
-            .iter_mut()
+            .pending
+            .into_iter()
             .enumerate()
-            .map(|(expected_rank, client)| {
+            .map(|(expected_rank, pending)| {
                 let state = &state;
-                client.roundtrip_chunks(request, native.rows() as usize, move |frame| {
+                pending.receive(move |frame| {
                     let mut state = state.borrow_mut();
                     let (receiver, sink) = &mut *state;
                     receiver.push(frame, |rank, start, bytes| {
@@ -91,7 +122,7 @@ impl V41Tp4Tcp {
             });
         futures::future::try_join_all(responses).await?;
         ensure!(
-            receiver.complete(),
+            self.receiver.complete(),
             "native TP4 response coverage is incomplete"
         );
         Ok(())

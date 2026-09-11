@@ -10,7 +10,7 @@ use anyhow::{ensure, Context, Result};
 mod chunks;
 pub use chunks::V41Tp4ChunkReceiver;
 mod tcp;
-pub use tcp::V41Tp4Tcp;
+pub use tcp::{V41Tp4Pending, V41Tp4Tcp};
 
 pub const V41_HIDDEN: u32 = 5120;
 pub const V41_BACKBONE_TOPK: u32 = 6;
@@ -215,13 +215,16 @@ impl<'a> V41Tp4Planes<'a> {
 }
 
 #[cfg(test)]
+mod tcp_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         ExpertProtocolV2Request, ExpertProtocolV2RouteEntry, ExpertProtocolV2RowDescriptor,
         ExpertV2SourceKind, EXPERT_PROTOCOL_V2_FLAG_RESPONSE_FP8_E4M3_ROW_SCALED,
     };
-    fn request(rows: u32) -> ExpertProtocolV2Request {
+    pub(super) fn request(rows: u32) -> ExpertProtocolV2Request {
         ExpertProtocolV2Request::new(
             91,
             17,
