@@ -408,3 +408,114 @@ impl Drop for IndexQueryWave<'_, '_> {
         }
     }
 }
+
+#[cfg(test)]
+mod reuse_tests {
+    use super::*;
+    fn download(library: &NativeLibrary, buffer: Ds41rtDeviceBuffer) -> Result<Vec<u8>> {
+        let mut bytes = vec![0; buffer.bytes];
+        library.copy_d2h(&mut bytes, buffer)?;
+        Ok(bytes)
+    }
+    #[test]
+    fn real_index_queries_rebind_like_fresh_owners() -> Result<()> {
+        let Some(path) = std::env::var_os("DS41RT_INDEX_REUSE_LIBRARY") else {
+            eprintln!("skip index reuse GPU test: DS41RT_INDEX_REUSE_LIBRARY unset");
+            return Ok(());
+        };
+        let model = std::env::var_os("DS41RT_INDEX_REUSE_MODEL")
+            .context("DS41RT_INDEX_REUSE_MODEL required")?;
+        let library = unsafe { NativeLibrary::load(path)? };
+        let catalog = ds41rt_loader::read_official_v41_catalog(
+            ds41rt_loader::OFFICIAL_V41_MODEL_ID,
+            std::path::Path::new(&model),
+        )?;
+        let weights = [2, 8, 14, 20, 24, 28, 32, 36]
+            .into_iter()
+            .map(|layer| IndexQueryWeights::load(&library, &catalog, layer, 5_739_520, 1024 * 1024))
+            .collect::<Result<Vec<_>>>()?;
+        let budget = IndexQueryWave::device_bytes(&library, 4096)?;
+        let mut reused = weights[0].wave(4096, budget)?;
+        let pointers = [
+            reused.query_rank().ptr,
+            reused.hidden().ptr,
+            reused.positions().ptr,
+        ];
+        let mut comparisons = 0;
+        for rows in [1u32, 80, 4096] {
+            for cycle in 0..2usize {
+                for (index, weight) in weights.iter().enumerate() {
+                    let mut fresh = weight.wave(4096, budget)?;
+                    reused.rebind(weight)?;
+                    assert!(reused.output().is_err());
+                    assert_eq!(
+                        pointers,
+                        [
+                            reused.query_rank().ptr,
+                            reused.hidden().ptr,
+                            reused.positions().ptr
+                        ]
+                    );
+                    for (a, b, width) in [
+                        (fresh.query_rank(), reused.query_rank(), 1280),
+                        (fresh.hidden(), reused.hidden(), 5120),
+                    ] {
+                        let bytes = (0..rows as usize * width)
+                            .flat_map(|i| {
+                                let x = (((i * 17 + index * 31 + cycle * 13) % 257) as f32 - 128.0)
+                                    / 256.0;
+                                ((x.to_bits() >> 16) as u16).to_ne_bytes()
+                            })
+                            .collect::<Vec<_>>();
+                        library.copy_h2d(a, &bytes)?;
+                        library.copy_h2d(b, &bytes)?;
+                    }
+                    let positions = (0..rows as u64)
+                        .flat_map(|i| (i + 8192 * cycle as u64).to_ne_bytes())
+                        .collect::<Vec<_>>();
+                    library.copy_h2d(fresh.positions(), &positions)?;
+                    library.copy_h2d(reused.positions(), &positions)?;
+                    let previous = reused.graphs.get(weight.layer, weight);
+                    if previous.is_none_or(|(_, n)| n != rows) {
+                        reused.clear_graph()?;
+                        unsafe {
+                            reused.capture(rows)?;
+                        }
+                    }
+                    let handle = reused.graphs.get(weight.layer, weight).unwrap().0;
+                    if cycle == 1 {
+                        assert_eq!(Some((handle, rows)), previous);
+                    }
+                    let expected = unsafe { fresh.execute(rows)? };
+                    let actual = unsafe { reused.replay(rows)? };
+                    for (a, b) in [
+                        (expected.packed, actual.packed),
+                        (expected.scales, actual.scales),
+                        (expected.head_weights, actual.head_weights),
+                    ] {
+                        assert_eq!(
+                            download(&library, a)?,
+                            download(&library, b)?,
+                            "index layer={} rows={rows} cycle={cycle}",
+                            weight.layer
+                        );
+                    }
+                    let head = download(&library, actual.head_weights)?;
+                    assert!(head
+                        .chunks_exact(4)
+                        .all(|b| f32::from_ne_bytes(b.try_into().unwrap()).is_finite()));
+                    comparisons += 1;
+                }
+            }
+        }
+        assert!(unsafe { reused.replay(0) }.is_err());
+        assert!(reused.output().is_err());
+        reused.rebind(&weights[0])?;
+        unsafe {
+            reused.replay(4096)?;
+        }
+        assert_eq!(comparisons, 48);
+        eprintln!("PASS 48 real index-query fresh/rebound comparisons, all eight layers, rows 1/80/4096, changed inputs, cached handles and invalid-row recovery");
+        Ok(())
+    }
+}

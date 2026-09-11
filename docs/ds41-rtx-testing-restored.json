@@ -1,0 +1,25 @@
+{
+  "loaded_kernel": "595.71.05",
+  "isolated_package": "libnvidia-compute-595-server 595.71.05-0ubuntu0.26.04.1 amd64",
+  "installed_libraries": "595.91.07",
+  "system_driver_changed": false,
+  "gpu": "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+  "checks": {
+    "torch_cuda_smoke": "passed",
+    "router_rebind_comparisons": 166,
+    "graph_captures": 240,
+    "graph_replays": 480,
+    "cache_lifecycle_16_requests_cycles": 2,
+    "index_rebind_comparisons": 48,
+    "index_rebind_seconds": 16.62
+  },
+  "sha256": {
+    "package": "8540b8c785a098a3d1da6c6a0df4921c0998805947ab88b4f86a842f4cda017c",
+    "libcuda": "76e0d9678d41cf6b6ae71d18549d88a963d3d434f08108baa12457eb53ca88d6",
+    "nvml": "9eb4358b7fea76556657670a6ae6b0017eaa4256b56c421a36626bf8c2b5f3f5",
+    "native": "854c317cf010bd20b54c22bc2be696b3b6c15586c0325caef18f585b0ed71a17",
+    "index_query_source": "50ef75e513fccec95912ae1fbe8c55d542230904e6c47d90e29bb977d786990a"
+  },
+  "normal_release_gpu_launch_repaired": false,
+  "combined_layer_qualified": false
+}

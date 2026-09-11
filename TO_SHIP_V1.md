@@ -10,7 +10,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Keep native vision, all three dSpark stages and their experts, shared experts, routing, attention, sampling and API execution on the RTX.
 - [x] Remove balanced/long/accuracy serving profiles and enforce FP8 target KV in launch settings.
 - [x] Store dSpark committed windows as packed E4M3/E8M0 K32, completing the fixed FP8 persistent-cache representation in the V4.1 components.
-- [ ] Requalify the packed dSpark windows and complete draft graphs on RTX. Spark cache-byte/ownership and attention checks pass; RTX driver repair is still required.
+- [ ] Requalify the packed dSpark windows and complete draft graphs on RTX. Spark cache-byte/ownership and attention checks pass; RTX development testing is restored with isolated matching libraries (see `docs/ds41-rtx-testing-restored.md`).
 - [ ] Preserve streaming, tools, structured constraints, cancellation, admission, error handling, prefix reuse and restart readiness.
 - [ ] Support concurrency 1 through 16 with request-safe state and qualified alternating-wave scheduling.
 - [ ] Measure at least 90 generated tokens/s for target-only decode with dSpark disabled under a documented workload.
@@ -79,6 +79,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Add an owned index lane with all eight weight owners, one reusable query workspace, retained source-20 candidates and a separate reindex selection workspace; connect selection production/reuse to the backbone lane. Production build and CPU-only official allocation gates pass; see `docs/ds41-index-lane.md`.
 - [x] Compose query-driven cache production, index selection, sparse attention, TP4/shared FFN and mHC completion into one per-layer method with owned cache-producer weights/sinks. Gate commits on one batch's full 40-layer progress; build, guard/budget tests and Spark batch-identity regression pass. See `docs/ds41-backbone-execution.md`.
 - [ ] GPU-qualify the combined per-layer execution and cancellation path, then drive all 40 layers with embedding, engram/taps, target head and scheduler-owned accepted-prefix transactions.
+- [x] Restore RTX development testing using matching user-space libraries extracted under `/tmp`, without a host driver change. Re-run cache lifecycle, router reuse and graph ownership on RTX; qualify 48 real index-query fresh/rebound comparisons at 1/80/4096 rows. See `docs/ds41-rtx-testing-restored.md`.
 - [ ] GPU-qualify owned index execution, rebound queries, source-20 candidate retention and attention reuse across all eight producers, changed shapes, failures and two lanes.
 - [ ] Execute query-derived cache production and bank-derived index/attention views on RTX, including source-20 reuse across reindex layers and invalid-input recovery.
 - [ ] Execute accepted-prefix commits through all 44 cache producers, qualify partial-failure invalidation, and integrate bank batches with lane/index execution plus engram/dSpark scheduler transactions.
