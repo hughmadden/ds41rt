@@ -1,0 +1,164 @@
+{
+  "device": {
+    "host": "ostrich",
+    "gpu": "NVIDIA GB10",
+    "uuid": "GPU-a7c503f0-bb16-4333-4f44-92e331dbcf2e",
+    "driver": "580.159.03",
+    "pstate": "P0",
+    "sm_clock_mhz": 2405,
+    "memory_clock": "unavailable"
+  },
+  "image": "sha256:a641a14143728cefc9989807c92b6aff59858adb64d835c7033183148894152d",
+  "b12x_revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "source_sha256": {
+    "b12x/moe/fused_moe/_impl.py": "1111764552e36b6f8c4d97a232a9ce05c7297822be6f258ebfc46c4a6714d684",
+    "b12x/moe/_shared/kernels/dynamic.py": "fa1ac900485e578d081904863fde658267c79789b09de0cb020ba1c8949084f4"
+  },
+  "schema": 1,
+  "root_revision": "a869159",
+  "classification": "isolated synthetic CuTeDSL diagnostic; not deployed",
+  "arms": {
+    "direct-shard1-m1": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        385.68480014801025,
+        365.75679779052734,
+        365.08960723876953,
+        365.67840576171875,
+        364.14239406585693,
+        388.69919776916504,
+        384.8992109298706,
+        366.05279445648193,
+        406.1744213104248,
+        366.91839694976807,
+        365.4911994934082,
+        365.5359983444214,
+        366.1328077316284,
+        365.0943994522095,
+        366.03360176086426
+      ],
+      "median_us": 366.03360176086426
+    },
+    "direct-shard5-m1": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        222.50399589538574,
+        221.5167999267578,
+        222.93119430541992,
+        223.90239238739014,
+        266.25120639801025,
+        221.61118984222412,
+        221.6320037841797,
+        223.25599193572998,
+        266.83359146118164,
+        223.7567901611328,
+        222.49279022216797,
+        223.16479682922363,
+        258.63521099090576,
+        230.28481006622314,
+        223.419189453125
+      ],
+      "median_us": 223.25599193572998
+    },
+    "direct-shard5-routes": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        217.84319877624512,
+        217.3327922821045,
+        217.99359321594238,
+        217.41280555725098,
+        217.8015947341919,
+        221.98081016540527,
+        259.5855951309204,
+        218.49119663238525,
+        217.97120571136475,
+        218.80159378051758,
+        261.9488000869751,
+        219.21119689941406,
+        218.38560104370117,
+        217.77119636535645,
+        249.8431921005249
+      ],
+      "median_us": 218.38560104370117
+    },
+    "grouped-shard1-routes": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        417.0127868652344,
+        414.353609085083,
+        416.2223815917969,
+        465.5104160308838,
+        412.0495796203613,
+        416.2799835205078,
+        411.87520027160645,
+        422.44319915771484,
+        416.84961318969727,
+        418.2352066040039,
+        463.61122131347656,
+        428.7055969238281,
+        425.4528045654297,
+        421.5951919555664,
+        421.2480068206787
+      ],
+      "median_us": 418.2352066040039
+    }
+  },
+  "comparison": {
+    "final.pt": {
+      "exact": true,
+      "max_abs": 0.0,
+      "shape": [
+        1,
+        5120
+      ]
+    },
+    "routes.pt": {
+      "exact": true,
+      "max_abs": 0.0,
+      "shape": [
+        1,
+        6,
+        5120
+      ]
+    }
+  },
+  "direct_impl_sha256": "2e0f844721d8dccef1b54ad6843d09b501141f71e1211843795caa98d578995b",
+  "direct_impl_patch": "--- a/b12x/moe/fused_moe/_impl.py\n+++ b/b12x/moe/fused_moe/_impl.py\n@@ -1857,6 +1857,11 @@\n     planned_tile_m: int | None = None,\n ) -> bool:\n     \"\"\"Whether tiny prepared W4A8 can bypass grouped route compaction.\"\"\"\n+\n+    if (activation == \"silu_v41\" and quant_mode == \"w4a8_mx\"\n+        and num_experts == 384 and n == 640 and 0 < routed_rows <= 6\n+        and planned_tile_m in (None, 16) and _dynamic_work_source() != \"ready_queue\"):\n+        return True\n \n     return bool(\n         activation == \"silu\"\n",
+  "output_split_patch_source": "docs/ds41-expert-output-split-probe.json:five_split_patch",
+  "probe_source": "import inspect, json, os, time\nimport torch\nfrom tests.moe import test_v41_expert_numerics as test\nsource = inspect.getsource(test.test_v41_native_expert_routing_and_graph)\nsource = source[source.index('def test_v41_native'):]\nsource += '''\n    torch.save(result.cpu(), \"/output/final.pt\")\n    partials = binding.run_route_partials()\n    torch.save(partials.cpu(), \"/output/routes.pt\")\n    saved_ids = ids.clone()\n    ids.fill_(-1)\n    graph.replay()\n    assert torch.count_nonzero(result) == 0\n    ids.copy_(saved_ids)\n    graph.replay()\n    check(result, expected_changed)\n    samples = []\n    for _ in range(5):\n        graph.replay()\n    for _ in range(15):\n        start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)\n        start.record()\n        for repeat in range(20):\n            graph.replay()\n        end.record()\n        end.synchronize()\n        samples.append(start.elapsed_time(end) * 1000 / 20)\n    print(json.dumps(dict(rows=m, experts=experts, intermediate=n, shared_input=os.environ.get(\"B12X_DYNAMIC_W4A8_SHARE_INPUT\"), correctness=\"oracle_and_changed_input_graph_pass\", graph_us=samples)), flush=True)\n'''\nns = dict(test.__dict__, os=os, json=json)\nexec(source, ns)\nns['test_v41_native_expert_routing_and_graph'](int(os.environ.get('PROBE_ROWS','1')), 576, 384)\n",
+  "command": "docker run --rm --gpus all -v /tmp/ds41-real-tp4/source/third_party/sparkinfer:/b12x:ro -v /tmp/ds41-direct-v41-impl.py:/b12x/b12x/moe/fused_moe/_impl.py:ro -v /tmp/ds41-output-shard-dynamic.py:/b12x/b12x/moe/_shared/kernels/dynamic.py:ro -v /tmp/ds41-direct-route-probe.py:/probe.py:ro -v /tmp/ds41-direct-shard5-routes:/output -e PROBE_ROWS=1 -e PYTHONPATH=/b12x -e B12X_DYNAMIC_W4A8_SHARE_INPUT=0 -e SPARKINFER_COMPILE_DISK_CACHE=0 --entrypoint python ds41rt-spark-expert-dev:latest /probe.py",
+  "qualification": [
+    "FP32 oracle relative L2 < 0.01, cosine > 0.9999, finite/nonzero output.",
+    "Changed input and expert IDs replay under stable allocated bytes.",
+    "All expert IDs -1 produce zero final output; restoring valid IDs recovers expected output.",
+    "Changed-input final BF16 [1,5120] and FP32 route planes [1,6,5120] exactly match pristine grouped baseline."
+  ],
+  "limitations": [
+    "Synthetic random weights and routing at full Spark geometry; fixed warm-cache replay, no official resident layer or native AOT comparison.",
+    "One-row baseline/candidates measured in separate processes; baseline repeated after candidates. Not interleaved exact-object benchmarking.",
+    "Graph includes final BF16 route reduction. Exact output comparison covers the final changed-input one-row BF16 tensor, not FP32 route planes.",
+    "Both tested row counts pass existing oracle, finite/nonzero and changed-input graph checks with stable allocated bytes.",
+    "Prototype assumes divisible output tiles and native repacked nonstreaming V4.1 geometry. It is deliberately not a general supported kernel API.",
+    "No profiler measurement of SM occupancy, traffic, throttle masks or exact compiled-object hashes.",
+    "Six-row routes are random and can differ from the active-expert sharing in API workloads.",
+    "Direct eligibility is a prototype restricted to Spark expert count/intermediate and at most six routes; native exporter still needs planner-selected direct routing and matching scratch qualification.",
+    "No compiled-object or real-weight native timing; source-based direct policy selection, not a profiler measurement of saved barriers."
+  ],
+  "decision": "Integrate the two orthogonal changes through validated b12x planning, then qualify native AOT route outputs and real-weight performance before worker rollout."
+}

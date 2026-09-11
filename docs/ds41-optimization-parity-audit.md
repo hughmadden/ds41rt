@@ -105,3 +105,11 @@ If preserving per-route rounding becomes necessary, reduction can instead occur 
 ## Intentional exclusions
 
 Do not restore serving profiles, BF16/NVFP4 persistent KV options, old EXL3/GPTQ conversion paths, old model-specific MLA/compression assumptions, GLM DFlash2/MTP architecture, or Spark placement of the old Pro dSpark experts. V4.1 uses its official native checkpoint, fixed FP8 persistent KV, its own attention/engram/vision architecture, and all dSpark stages and experts on RTX. Reuse transport, ownership, scheduling and measurement mechanisms; adapt their model-facing contracts.
+
+## Clarification: old packed batches and internal decode work
+
+The optimized packed W4A16 paths in both pinned sibling engines already formed contiguous expert runs and submitted an entire batch through one b12x call. In GLM, `plan_packed_topk8_prefill_flat_with_block_rows` counts routes per expert, computes padded expert offsets and fills `packed_route_indices` plus `block_expert_ids`; DS4's `plan_packed_w4a16_topk8_prefill_flat` does the corresponding work. Their optimized prefill branches call `cuda_b12x_spark_w4a16_prefill_topk8_nvfp4_async` (or the direct FP8 response variant). This does not assert that every fallback path or every backend uses one CUDA kernel internally.
+
+Both planners bypass that packing for single-row direct top-k execution. Their W4A16 GEMM scheduler computes `global_mn_tiles = route_blocks * n_tiles`, distributing output tiles as well as route blocks across the GPU. A single batched submission must not be confused with one compute task per expert. The current V4.1 deterministic fused task instead owns every intermediate slice and output column for its expert/M tile, which supplies only six compute tasks for one-row/top-six decode.
+
+The V4.1 [output-split and direct-routing prototypes](ds41-expert-cost-profile.md) address those internal scheduling differences while retaining its BF16/FP8/router-weight boundaries and shared-memory intermediate. They do not restore a missing batch-submission mechanism, nor establish that all old W4A16 arithmetic or intermediate-storage strategies are appropriate for V4.1. Preserve expert-grouped runs and weight reuse when tuning larger prefill separately.
