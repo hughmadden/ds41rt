@@ -70,7 +70,7 @@ impl<'a> BackboneRouterWeights<'a> {
                 .collect::<Result<Vec<_>>>()?,
             // Decode/verification benefits from batching small DMA transfers.
             // Large prefill retains direct downloads to avoid another host copy.
-            request_staging: HostAllocation::new(self.library, capacity.min(80) as usize * 5328)?,
+            request_staging: HostAllocation::new(self.library, capacity as usize * 5328)?,
             weights: self,
             tokens: Vec::new(),
             layer: self.layer,

@@ -20,7 +20,7 @@ pub(crate) enum Commands {
     Tokenize(TokenizeArgs),
     Coordinator(CoordinatorArgs),
     Expertd(ExpertDaemonArgs),
-    /// Serve official V4.1 native TP4 experts over bounded TCP responses.
+    /// Serve official V4.1 native TP4 experts over RoCE.
     ExpertdNative(NativeExpertDaemonArgs),
     /// Serve the official V4.1 target text path.
     ServeNative(NativeServeArgs),
@@ -428,6 +428,10 @@ mod tests {
 
 #[derive(Debug, Args)]
 pub(crate) struct NativeServeArgs {
+    /// Maximum tokens per prefill step; all expert peers must support this capacity.
+    #[arg(long, default_value_t = 80, value_parser = clap::value_parser!(u32).range(80..=4096))]
+    pub prefill_batch_tokens: u32,
+
     /// Total prompt plus generated tokens; compressed cache is reserved at startup.
     #[arg(long, default_value_t = 32768, value_parser = clap::value_parser!(u32).range(1..=1048576))]
     pub max_context_tokens: u32,

@@ -71,6 +71,8 @@ fn worker(
     mut receive: mpsc::Receiver<NativeRequest>,
     ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>,
 ) -> Result<()> {
+    let capacity = args.prefill_batch_tokens;
+    let rows = capacity as usize;
     let lib = unsafe { NativeLibrary::load(&args.native_lib)? };
     let catalog = ds41rt_loader::read_official_v41_catalog(
         ds41rt_loader::OFFICIAL_V41_MODEL_ID,
@@ -108,25 +110,25 @@ fn worker(
         start.elapsed().as_secs_f64()
     );
     let embedding =
-        TargetEmbeddingWave::new(&lib, &table, 80, TargetEmbeddingWave::device_bytes(80)?)?;
+        TargetEmbeddingWave::new(&lib, &table, rows, TargetEmbeddingWave::device_bytes(rows)?)?;
     let lane = BackboneLane::new(
         &weights,
-        80,
-        BackboneLane::workspace_bytes(&lib, 80)?.into_iter().sum(),
+        capacity,
+        BackboneLane::workspace_bytes(&lib, capacity)?.into_iter().sum(),
     )?;
     let index = IndexLane::new(
         &index_weights,
-        80,
-        IndexLane::workspace_bytes(&lib, 80)?.into_iter().sum(),
+        capacity,
+        IndexLane::workspace_bytes(&lib, capacity)?.into_iter().sum(),
     )?;
     let execution = BackboneExecution::new(
         &producers,
-        80,
-        BackboneExecution::workspace_bytes(&lib, 80)?,
+        capacity,
+        BackboneExecution::workspace_bytes(&lib, capacity)?,
     )?;
     let map = ds41rt_loader::EngramTokenMap::from_file(&&args.snapshot.join("tokenizer.json"))?;
     let pipeline =
-        unsafe { ds41rt_loader::EngramPipeline::new(&catalog, map, 80, 2, 8 * 1024 * 1024)? };
+        unsafe { ds41rt_loader::EngramPipeline::new(&catalog, map, rows, 2, rows * 64 * 1024)? };
     let source_pages = BackboneCache::pages_for_context(16, args.max_context_tokens as usize)?;
     let mut requests = Requests::new(
         &lib,
@@ -140,10 +142,10 @@ fn worker(
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
     let gates = [
-        EngramGate::new(&engram_weights[0], 80, 128 * 1024 * 1024)?,
-        EngramGate::new(&engram_weights[1], 80, 128 * 1024 * 1024)?,
+        EngramGate::new(&engram_weights[0], rows, 1024 * 1024 * 1024)?,
+        EngramGate::new(&engram_weights[1], rows, 1024 * 1024 * 1024)?,
     ];
-    let upload = EngramDeviceRows::new(&lib, 80, EngramDeviceRows::device_bytes(80)?)?;
+    let upload = EngramDeviceRows::new(&lib, rows, EngramDeviceRows::device_bytes(rows)?)?;
     let vocabulary = VocabularyHead::load(
         &lib,
         &catalog,
@@ -167,8 +169,8 @@ fn worker(
         head,
         crate::v41_target_pass::TargetTapWave::new(
             &lib,
-            80,
-            crate::v41_target_pass::TargetTapWave::device_bytes(80)?,
+            rows,
+            crate::v41_target_pass::TargetTapWave::device_bytes(rows)?,
         )?,
         Duration::from_secs(120),
     )?;
@@ -178,18 +180,18 @@ fn worker(
             .try_into()
             .map_err(|_| anyhow::anyhow!("four Spark peers required"))?,
         [1, 2, 3, 4],
-        80,
+        capacity,
         TcpTransportConfig {
             timeout: Duration::from_secs(120),
-            max_frame_bytes: 2 * 1024 * 1024,
+            max_frame_bytes: 64 * 1024 * 1024,
         },
     )?;
-    let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(80)?)?;
+    let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(capacity)?)?;
     let draft_weights = if args.dspark {
         Some(crate::v41_experts::dspark::DsparkWeights::load(
             &lib,
             &catalog,
-            80,
+            capacity,
             1,
             32 * 1024 * 1024 * 1024,
             16 * 1024 * 1024,
@@ -199,7 +201,7 @@ fn worker(
     };
     let mut draft = draft_weights
         .as_ref()
-        .map(|weights| DraftRuntime::new(&lib, weights, &table, &vocabulary))
+        .map(|weights| DraftRuntime::new(&lib, weights, &table, &vocabulary, capacity))
         .transpose()?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -225,6 +227,7 @@ fn worker(
             &lib,
             &args.snapshot,
             args.max_context_tokens as usize,
+            rows,
             &runtime,
             &mut pass,
             &mut requests,
@@ -252,6 +255,7 @@ fn generate<'a>(
     lib: &'a NativeLibrary,
     snapshot: &std::path::Path,
     max_context_tokens: usize,
+    prefill_batch_tokens: usize,
     runtime: &tokio::runtime::Runtime,
     pass: &mut TargetPass<'_, 'a>,
     requests: &mut Requests<'a>,
@@ -281,7 +285,7 @@ fn generate<'a>(
         },
     }))?;
     let mut next = 0u32;
-    for chunk in prompt.chunks(80) {
+    for chunk in prompt.chunks(prefill_batch_tokens) {
         next = step(
             lib,
             runtime,

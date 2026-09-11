@@ -58,7 +58,7 @@ impl<'a> NativeTp4Wave<'a> {
                 raw: library.cuda_stream_create()?,
             },
             planes,
-            upload_staging: HostAllocation::new(library, capacity.min(80) as usize * 4 * 10240)?,
+            upload_staging: HostAllocation::new(library, capacity as usize * 4 * 10240)?,
             shared: DeviceAllocation::new(library, hidden_bytes)?,
             output: DeviceAllocation::new(library, hidden_bytes)?,
             library,
@@ -390,15 +390,15 @@ mod upload_tests {
         let library = unsafe { NativeLibrary::load(path)? };
         let stream = LoadStream { library: &library, raw: library.cuda_stream_create()? };
         let planes = (0..4)
-            .map(|_| DeviceAllocation::new(&library, 81 * 10240))
+            .map(|_| DeviceAllocation::new(&library, 4096 * 10240))
             .collect::<Result<Vec<_>>>()?
             .try_into().ok().expect("four planes");
-        let mut staging = HostAllocation::new(&library, 80 * 4 * 10240)?;
-        let shared = DeviceAllocation::new(&library, 81 * 10240)?;
-        let output = DeviceAllocation::new(&library, 81 * 10240)?;
+        let mut staging = HostAllocation::new(&library, 4096 * 4 * 10240)?;
+        let shared = DeviceAllocation::new(&library, 4096 * 10240)?;
+        let output = DeviceAllocation::new(&library, 4096 * 10240)?;
         let reducer = library.v41_compact_reducer()?;
         let staging_address = staging.buffer.ptr;
-        for rows in [1u32, 6, 80, 81] {
+        for rows in [1u32, 6, 80, 81, 256, 1024, 4096, 6] {
             let bytes = rows as usize * 10240;
             let shared_bytes: Vec<u8> = (0..bytes / 2)
                 .flat_map(|_| 0x3f00u16.to_ne_bytes()).collect();

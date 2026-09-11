@@ -18,10 +18,11 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         weights: &'w DsparkWeights<'a>,
         table: &'w NativeRtxTensors<'a>,
         head: &'w VocabularyHead<'a>,
+        capacity: u32,
     ) -> Result<Self> {
-        let window = || DsparkWindow::new(lib, 16, 80, DsparkWindow::device_bytes(16, 80)?);
+        let window = || DsparkWindow::new(lib, 16, capacity, DsparkWindow::device_bytes(16, capacity)?);
         Ok(Self {
-            main: weights.main_context(80, DsparkMainContext::device_bytes(lib, 80)?)?,
+            main: weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?,
             chain: weights.draft(table, head, 1, weights.draft_bytes(1)?)?,
             windows: [window()?, window()?, window()?],
             leases: None,

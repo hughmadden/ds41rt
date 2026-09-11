@@ -159,6 +159,12 @@ mod tests {
             .collect::<std::result::Result<Vec<_>, _>>()?
             .try_into()
             .map_err(|_| anyhow::anyhow!("four peers required"))?;
+        let capacity: u32 = std::env::var("DS41RT_LIVE_ROCE_CAPACITY")
+            .unwrap_or_else(|_| "80".into()).parse()?;
+        ensure!([80, 256, 1024, 4096].contains(&capacity), "unsupported fixture capacity");
+        let mut shapes = vec![1, 6, 16, 80];
+        shapes.extend([256, 1024, 4096].into_iter().filter(|&rows| rows <= capacity));
+        shapes.extend([6, 1]);
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
@@ -166,13 +172,13 @@ mod tests {
             let mut client = V41Tp4Roce::new(
                 peers,
                 [1, 2, 3, 4],
-                80,
+                capacity,
                 TcpTransportConfig {
                     timeout: std::time::Duration::from_secs(10),
-                    max_frame_bytes: 2 * 1024 * 1024,
+                    max_frame_bytes: 64 * 1024 * 1024,
                 },
             )?;
-            for rows in [1, 6, 16, 80, 1] {
+            for rows in shapes {
                 let base = super::super::tests::request(rows);
                 let mut payload = Vec::new();
                 for row in 0..rows {

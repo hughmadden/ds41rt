@@ -13,6 +13,7 @@ use timing::ExpertTiming;
 pub(crate) struct ExpertExecutionBudget {
     pub scratch_bytes: usize,
     pub decode_scratch_bytes: usize,
+    pub small_scratch_bytes: usize,
     pub hidden_bytes: usize,
     pub routing_bytes: usize,
     pub output_and_shared_bytes: usize,
@@ -22,6 +23,7 @@ impl ExpertExecutionBudget {
         [
             self.scratch_bytes,
             self.decode_scratch_bytes,
+            self.small_scratch_bytes,
             self.hidden_bytes,
             self.routing_bytes,
             self.output_and_shared_bytes,
@@ -51,6 +53,7 @@ pub(crate) struct ExpertExecution<'weights, 'library> {
     library: &'library NativeLibrary,
     kernel: V41ExpertKernel<'library>,
     decode: Option<DecodeExecution<'library>>,
+    small: Option<DecodeExecution<'library>>,
     reducer: V41RouteReducer<'library>,
     timing: Option<ExpertTiming<'library>>,
     scratch: DeviceAllocation<'library>,
@@ -85,6 +88,11 @@ impl<'library> ExpertWeights<'library> {
             scratch_bytes: usize::try_from(info.scratch_bytes)?,
             decode_scratch_bytes: if info.role == 1 && capacity > 1 {
                 usize::try_from(library.v41_expert_info(1)?.scratch_bytes)?
+            } else {
+                0
+            },
+            small_scratch_bytes: if info.role == 1 && capacity > 80 {
+                usize::try_from(library.v41_expert_info(80)?.scratch_bytes)?
             } else {
                 0
             },
@@ -162,13 +170,14 @@ impl<'library> ExpertWeights<'library> {
             )?;
             library.cuda_stream_synchronize(stream.raw)?;
         }
-        let decode = if budget.decode_scratch_bytes > 0 {
-            let decode_kernel = library.v41_expert_kernel(1)?;
+        let prepare_small = |planned_capacity, scratch_bytes| -> Result<Option<DecodeExecution<'library>>> {
+            if scratch_bytes == 0 { return Ok(None); }
+            let decode_kernel = library.v41_expert_kernel(planned_capacity)?;
             ensure!(
                 decode_kernel.info().input_dtype == kernel.info().input_dtype,
                 "decode and grouped expert input formats differ"
             );
-            let decode_scratch = DeviceAllocation::new(library, budget.decode_scratch_bytes)?;
+            let decode_scratch = DeviceAllocation::new(library, scratch_bytes)?;
             let mut decode_slots = slots;
             unsafe {
                 decode_kernel.bind_scratch(
@@ -188,20 +197,21 @@ impl<'library> ExpertWeights<'library> {
                 let drained = library.cuda_stream_synchronize(stream.raw);
                 initialized.and(drained)?;
             }
-            Some(DecodeExecution {
+            Ok(Some(DecodeExecution {
                 kernel: decode_kernel,
                 scratch: decode_scratch,
                 slots: decode_slots,
-            })
-        } else {
-            None
+            }))
         };
+        let decode = prepare_small(1, budget.decode_scratch_bytes)?;
+        let small = prepare_small(80, budget.small_scratch_bytes)?;
         Ok(ExpertExecution {
             stream,
             _weights: self,
             library,
             kernel,
             decode,
+            small,
             reducer,
             timing,
             compact_reducer,
@@ -233,7 +243,7 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         self.synchronize()?;
         let mut slots = self.slots;
         weights.bind(&self.kernel, &mut slots)?;
-        if let Some(decode) = &mut self.decode {
+        for decode in [&mut self.decode, &mut self.small].into_iter().flatten() {
             let mut decode_slots = decode.slots;
             weights.bind(&decode.kernel, &mut decode_slots)?;
             decode.slots = decode_slots;
@@ -287,6 +297,11 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         if rows == 1 {
             if let Some(decode) = &self.decode {
                 return (&decode.kernel, &decode.slots, &decode.scratch);
+            }
+        }
+        if let Some(small) = &self.small {
+            if rows <= small.kernel.info().capacity_rows {
+                return (&small.kernel, &small.slots, &small.scratch);
             }
         }
         (&self.kernel, &self.slots, &self.scratch)
