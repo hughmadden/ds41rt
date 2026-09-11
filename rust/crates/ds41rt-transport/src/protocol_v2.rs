@@ -52,6 +52,11 @@ pub enum ExpertV2Dtype {
     Fp8E4m3RowScaled = 5,
     /// Unrounded native expert partial sums.
     F32 = 6,
+    /// Each row stores E4M3 payload bytes, then one UE8M0 scale byte per
+    /// contiguous 32 values. Distinct from FP32 row-scaled E4M3.
+    /// Native V4.1 producers quantize BF16-rounded values with an amax floor
+    /// of 1e-4; consumers must preserve the supplied payload and scales.
+    Fp8E4m3Ue8m0K32 = 7,
 }
 
 impl ExpertV2Dtype {
@@ -59,7 +64,10 @@ impl ExpertV2Dtype {
         match self {
             Self::F32 => 4,
             Self::Bf16 | Self::F16 => 2,
-            Self::Fp8Debug | Self::Nvfp4E2m1Fp8E4m3 | Self::Fp8E4m3RowScaled => 1,
+            Self::Fp8Debug
+            | Self::Nvfp4E2m1Fp8E4m3
+            | Self::Fp8E4m3RowScaled
+            | Self::Fp8E4m3Ue8m0K32 => 1,
         }
     }
 
@@ -72,6 +80,14 @@ impl ExpertV2Dtype {
                 .checked_mul(2)
                 .context("16-bit row byte count overflow"),
             Self::Fp8Debug => Ok(elements),
+            Self::Fp8E4m3Ue8m0K32 => {
+                if elements == 0 || elements % 32 != 0 {
+                    bail!("E4M3/UE8M0 K32 row width must be a nonzero multiple of 32");
+                }
+                elements
+                    .checked_add(elements / 32)
+                    .context("E4M3/UE8M0 K32 row byte count overflow")
+            }
             Self::Nvfp4E2m1Fp8E4m3 => {
                 if elements == 0 || elements % 16 != 0 {
                     bail!(
@@ -97,6 +113,7 @@ impl ExpertV2Dtype {
             4 => Ok(Self::Nvfp4E2m1Fp8E4m3),
             5 => Ok(Self::Fp8E4m3RowScaled),
             6 => Ok(Self::F32),
+            7 => Ok(Self::Fp8E4m3Ue8m0K32),
             other => bail!("unknown ExpertProtocolV2 dtype {other}"),
         }
     }

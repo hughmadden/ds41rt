@@ -271,6 +271,48 @@ mod tests {
         request
     }
     #[test]
+    fn fp8_k32_wire_roundtrip_preserves_rows_and_bf16_worker_rejects_it() {
+        for rows in [1, 16, 80] {
+            let base = request(rows);
+            let mut payload = Vec::new();
+            for row in 0..rows {
+                // Distinguish payload from scales and adjacent row boundaries.
+                payload.extend((0..5120).map(|i| ((i + row * 7) % 127) as u8));
+                payload.extend((0..160).map(|i| (105 + (i + row) % 20) as u8));
+            }
+            let mut input = ExpertProtocolV2Request::new(
+                base.header.request_id,
+                base.header.placement_version,
+                base.header.layer_id,
+                5120,
+                ExpertV2Dtype::Fp8E4m3Ue8m0K32,
+                base.rows,
+                base.routes,
+                payload.clone(),
+            )
+            .unwrap();
+            input.header.flags = base.header.flags;
+            let frame = input.with_debug_checksum().encode().unwrap();
+            let owned = ExpertProtocolV2Request::decode(&frame).unwrap();
+            let view = ExpertProtocolV2RequestView::parse(&frame).unwrap();
+            assert_eq!(owned.header.hidden_dtype, ExpertV2Dtype::Fp8E4m3Ue8m0K32);
+            assert_eq!(owned.header.hidden_row_stride_bytes, 5280);
+            assert_eq!(view.hidden_payload(), payload);
+            assert_eq!(owned.hidden_payload.as_ref(), payload);
+            // Do not accept the new representation before GPU binding supports it.
+            assert!(V41BackboneRequest::parse(&frame, rows).is_err());
+            assert!(ExpertProtocolV2Request::decode(&frame[..frame.len() - 1]).is_err());
+            assert!(ExpertProtocolV2RequestView::parse(&frame[..frame.len() - 1]).is_err());
+        }
+        let dtype = ExpertV2Dtype::Fp8E4m3Ue8m0K32;
+        assert_eq!(dtype.row_bytes(32).unwrap(), 33);
+        assert_eq!(dtype.row_bytes(5120).unwrap(), 5280);
+        for width in [0, 31, 33, usize::MAX, usize::MAX - 31] {
+            assert!(dtype.row_bytes(width).is_err());
+        }
+    }
+
+    #[test]
     fn native_routes_preserve_order_and_fp32_bits() {
         let owned = request(16).with_debug_checksum();
         let frame = owned.encode().unwrap();
