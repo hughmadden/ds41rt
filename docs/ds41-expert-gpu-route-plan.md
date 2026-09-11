@@ -16,3 +16,5 @@ docker run --rm --gpus 'device=0' --entrypoint bash \
 This is metadata-only correctness evidence on RTX, with no performance claim. Spark qualification, integration with the candidate inverse-map slice reduction, combined planner/compute timings, and native export/dispatch remain outstanding. Existing official comparison timings still exclude candidate route preparation. Serving binaries are unchanged.
 
 Tiling decisions should prioritize the observed speculative-decode distribution of expert-local M and active expert count, retaining prefill throughput as a separate guardrail. A dedicated prefill configuration remains possible; neither the current low-M results nor the 4096-row metadata test establish prefill GEMM performance. The initial prefix stage uses a simple per-expert prefix summation and the pack scratch scales as experts × route capacity; both need measured assessment before production use.
+
+The follow-up [GPU-planned official comparison](ds41-expert-gpu-planned-comparison.md) adds inverse-map reduction, qualifies the planner/reducer on Spark, and includes planning in candidate timings. Native serving integration remains open.

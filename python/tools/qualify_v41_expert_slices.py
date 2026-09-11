@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compare official TP4 expert slices with a deployed native FP8 consumer.
 
-Inputs are two captured capacity-80 wire/ID/routing files. Route planning for
-candidates runs outside timing; native timing includes its internal planner.
+Inputs are two captured capacity-80 wire/ID/routing files. GPU route planning and ordered slice reduction are included in candidate
+timing; native timing includes its internal planner.
 Only referenced expert shards are loaded, into full 384-expert GPU pools.
 """
 
@@ -10,7 +10,6 @@ import json, hashlib, statistics, time
 from pathlib import Path
 from contextlib import ExitStack
 import torch, cutlass, cutlass.cute as cute
-import cuda.bindings.driver as cuda
 from cutlass.cute.runtime import from_dlpack
 from safetensors import safe_open
 from _v41_expert_native import Native, library, check, P
@@ -18,43 +17,7 @@ import _pinned_sparkinfer
 from b12x._lib.utils import current_cuda_stream
 from b12x.moe._shared.kernels.w4a8_v41_slice import V41FusedSliceKernel
 from tests.moe.test_v41_grouped_slices import _metadata
-
-
-class Reduce:
-    def __init__(self, width):
-        self.slices = (576 + width - 1) // width
-
-    @cute.jit
-    def __call__(
-        self,
-        source: cute.Tensor,
-        dest: cute.Tensor,
-        pairs: cute.Tensor,
-        routes: cutlass.Int32,
-        stream: cuda.CUstream,
-    ):
-        self.kernel(source, dest, pairs, routes).launch(
-            grid=((routes * 5120 + 255) // 256, 1, 1), block=(256, 1, 1), stream=stream
-        )
-
-    @cute.kernel
-    def kernel(
-        self,
-        source: cute.Tensor,
-        dest: cute.Tensor,
-        pairs: cute.Tensor,
-        routes: cutlass.Int32,
-    ):
-        index = cutlass.Int64(cute.arch.block_idx()[0]) * 256 + cutlass.Int64(
-            cute.arch.thread_idx()[0]
-        )
-        row = index // 5120
-        col = index % 5120
-        if row < routes:
-            value = cutlass.Float32(0)
-            for plane in cutlass.range_constexpr(self.slices):
-                value += source[plane, row, col]
-            dest[cutlass.Int64(pairs[row]), col] = value
+from b12x.moe._shared.kernels.v41_route_plan import V41RoutePlan, V41SliceReduce
 
 
 def main():
@@ -87,6 +50,7 @@ def main():
             Path(__file__),
             Path(inspect.getsourcefile(Native)),
             Path(inspect.getsourcefile(V41FusedSliceKernel)),
+            Path(inspect.getsourcefile(V41RoutePlan)),
             options.snapshot / "model.safetensors.index.json",
             *[
                 options.inputs / f"{case}-{name}.bin"
@@ -192,12 +156,30 @@ def main():
         for capacity in [1, 80]
     }
     variants = {}
+    planners = {}
     for capacity in [1, 16, 80]:
         metadata = torch.full((capacity * 6, 19), -1, device="cuda", dtype=torch.int32)
         pairmap = torch.empty(capacity * 6, device="cuda", dtype=torch.int32)
         rw = torch.empty(capacity * 6, device="cuda")
         mv = from_dlpack(metadata, assumed_align=16)
         pv = from_dlpack(pairmap, assumed_align=16)
+        live = torch.empty(1, device="cuda", dtype=torch.int32)
+        planner_buffers = [
+            ids.flatten(),
+            routing.flatten(),
+            live,
+            torch.empty(384 * capacity * 6, device="cuda", dtype=torch.int32),
+            torch.empty(384, device="cuda", dtype=torch.int32),
+            torch.empty((384, 2), device="cuda", dtype=torch.int32),
+            metadata,
+            rw,
+            pairmap,
+        ]
+        planner_args = [from_dlpack(t, assumed_align=16) for t in planner_buffers]
+        planner = cute.compile(
+            V41RoutePlan(capacity), *planner_args, current_cuda_stream()
+        )
+        planners[capacity] = (planner, planner_args, planner_buffers)
         for width in [64, 128, 192]:
             output = torch.empty(
                 ((576 + width - 1) // width, capacity * 6, 5120), device="cuda"
@@ -216,11 +198,11 @@ def main():
                 cutlass.Int32(capacity * 6),
             )
             reduce = cute.compile(
-                Reduce(width),
+                V41SliceReduce(width, capacity),
                 args[-1],
                 rv,
                 pv,
-                cutlass.Int32(capacity * 6),
+                planner_args[2],
                 current_cuda_stream(),
             )
             variants[capacity, width] = (
@@ -284,19 +266,18 @@ def main():
             tasks, pairs = _metadata(ids_cpu[:rows])
             groups = len(tasks)
             routes = rows * 6
+            planner, planner_args, planner_buffers = planners[cap]
+            planner_buffers[2].fill_(rows)
             metrics = {}
             for width in [64, 128, 192]:
                 meta, pmap, rw, mv, pv, out, reduced, rv, args, fn, reduce = variants[
                     cap, width
                 ]
-                meta.fill_(-1)
-                meta[:groups].copy_(tasks)
-                pmap[:routes].copy_((pairs[:, 0] * 6 + pairs[:, 1]).int())
-                rw[:routes].copy_(rw_cpu[pairs[:, 0], pairs[:, 1]])
 
                 def run():
+                    planner(*planner_args, current_cuda_stream())
                     fn(*args, rows, current_cuda_stream(), mv, cap * 6)
-                    reduce(args[-1], rv, pv, routes, current_cuda_stream())
+                    reduce(args[-1], rv, pv, planner_args[2], current_cuda_stream())
 
                 run()
                 torch.cuda.synchronize()
@@ -306,6 +287,12 @@ def main():
                 before = torch.cuda.memory_allocated()
                 graph.replay()
                 assert before == torch.cuda.memory_allocated()
+                assert torch.equal(meta[:groups].cpu(), tasks)
+                expected_inverse = torch.empty(routes, dtype=torch.int32)
+                expected_inverse[pairs[:, 0] * 6 + pairs[:, 1]] = torch.arange(
+                    routes, dtype=torch.int32
+                )
+                assert torch.equal(pmap[:routes].cpu(), expected_inverse)
                 candidate = reduced[:routes]
                 diff = candidate - base
                 rel = (diff.norm() / base.norm()).item()
