@@ -22,6 +22,8 @@ pub(crate) enum Commands {
     Expertd(ExpertDaemonArgs),
     /// Serve official V4.1 native TP4 experts over bounded TCP responses.
     ExpertdNative(NativeExpertDaemonArgs),
+    /// Serve the official V4.1 target text path.
+    ServeNative(NativeServeArgs),
     BenchRdma(BenchRdmaArgs),
     BenchRdmaRing(BenchRdmaRingArgs),
     BenchCudaKernels(BenchCudaKernelsArgs),
@@ -422,4 +424,12 @@ mod tests {
         ])
         .is_err());
     }
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct NativeServeArgs {
+    #[arg(long)] pub snapshot: PathBuf,
+    #[arg(long)] pub native_lib: PathBuf,
+    #[arg(long,value_delimiter=',',num_args=1..)] pub peers: Vec<std::net::SocketAddr>,
+    #[arg(long,default_value="127.0.0.1:8000")] pub listen: String,
 }

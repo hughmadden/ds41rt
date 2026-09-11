@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Small live native-API smoke/latency run; not a release performance gate."""
+import argparse
+import json
+import time
+import urllib.request
+import urllib.error
+from pathlib import Path
+
+MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash'
+
+def payload(prompt, stream=False):
+    return dict(model=MODEL, messages=[dict(role='user', content=prompt)],
+                thinking=dict(type='disabled'), temperature=0, max_tokens=96,
+                stream=stream, **({'stream_options': {'include_usage': True}} if stream else {}))
+
+def open_request(base, body):
+    return urllib.request.urlopen(urllib.request.Request(base + '/v1/chat/completions',
+        data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'}), timeout=180)
+
+def stream_case(base, body, cancel=False):
+    start = time.perf_counter()
+    events, text, first, finish, usage = [], '', None, None, None
+    done = False
+    with open_request(base, body) as response:
+        for line in response:
+            if not line.startswith(b'data: '):
+                continue
+            elapsed = time.perf_counter() - start
+            data = line[6:].strip()
+            if data == b'[DONE]':
+                done = True
+                break
+            event = json.loads(data)
+            events.append(dict(seconds=elapsed, event=event))
+            if event.get('usage'):
+                usage = event['usage']
+            for choice in event.get('choices', []):
+                delta = choice.get('delta', {}).get('content', '') or ''
+                if delta:
+                    if first is None:
+                        first = elapsed
+                    text += delta
+                    if cancel:
+                        return dict(cancelled_after_content=True, first_content_seconds=first, text=text)
+                if choice.get('finish_reason'):
+                    finish = elapsed
+    assert done and first is not None and finish is not None and usage, 'incomplete SSE or missing requested usage'
+    # Includes EOS and HTTP overhead; excludes time through first content.
+    tps = (usage['completion_tokens'] - 1) / (finish - first) if finish > first else None
+    return dict(text=text, first_content_seconds=first, finish_seconds=finish,
+                observed_decode_tokens_per_second=tps, usage=usage, events=events)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--base-url', default='http://127.0.0.1:18041')
+    parser.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args()
+    simple = payload('What is 2 + 2? Answer with just the number.')
+    with open_request(args.base_url, simple) as response:
+        first = json.load(response)
+    assert first['choices'][0]['message']['content'].strip() == '4'
+    assert first['choices'][0]['finish_reason'] == 'stop'
+    long = payload('Count from 1 to 20, separated by commas. Output only the numbers.', True)
+    runs = [stream_case(args.base_url, long) for _ in range(3)]
+    expected = [str(i) for i in range(1, 21)]
+    for run in runs:
+        assert [s.strip() for s in run['text'].strip().split(',')] == expected, run['text']
+    cancelled = stream_case(args.base_url, payload('Count from 1 to 1000.', True), cancel=True)
+    with open_request(args.base_url, simple) as response:
+        recovered = json.load(response)
+    assert recovered['choices'][0]['message']['content'].strip() == '4'
+    bad = dict(simple, temperature=0.7)
+    try:
+        open_request(args.base_url, bad)
+        raise AssertionError('unsupported sampling accepted')
+    except urllib.error.HTTPError as error:
+        assert error.code == 400
+    record = dict(model=MODEL, base_url=args.base_url, first_json=first,
+                  streaming_request=long, streaming_runs=runs, cancellation=cancelled,
+                  post_cancellation_json=recovered, unsupported_sampling_status=400,
+                  scope='One client, target-only greedy text, tiny prompts, three same-shape streams; first run warms. Not release throughput or broad quality qualification.')
+    args.output.write_text(json.dumps(record, indent=2) + '\n')
+    print(json.dumps(dict(json_content=first['choices'][0]['message']['content'],
+                         stream_text=runs[-1]['text'], ttft_seconds=[r['first_content_seconds'] for r in runs],
+                         observed_decode_tps=[r['observed_decode_tokens_per_second'] for r in runs],
+                         cancellation_recovered=True), indent=2))
+
+if __name__ == '__main__':
+    main()

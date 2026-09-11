@@ -6,6 +6,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+deepseek-recipe = "=0.1.0"
+deepseek-recipe-encoding = "=0.1.0"
 anyhow.workspace = true
 async-stream.workspace = true
 axum.workspace = true

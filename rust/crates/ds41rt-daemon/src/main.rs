@@ -29,6 +29,7 @@ mod v41_backbone_execution;
 mod v41_requests;
 mod v41_target_head;
 mod v41_target_pass;
+mod v41_native_serve;
 mod v41_target_embedding;
 mod v41_attention_output;
 mod v41_dspark_cache;
@@ -73,6 +74,7 @@ async fn main() -> Result<()> {
         Commands::Coordinator(args) => run_coordinator(args).await,
         Commands::Expertd(args) => run_expertd(args).await,
         Commands::ExpertdNative(args) => v41_experts::service::run(args).await,
+        Commands::ServeNative(args) => v41_native_serve::run(args).await,
         Commands::BenchRdma(args) => run_bench_rdma(args),
         Commands::BenchRdmaRing(args) => run_bench_rdma_ring(args),
         Commands::BenchCudaKernels(args) => run_bench_cuda_kernels(args),
