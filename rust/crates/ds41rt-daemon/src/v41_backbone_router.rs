@@ -91,7 +91,6 @@ pub(crate) struct RouterOutput<'a> {
     pub ids: Ds41rtDeviceBuffer,
     pub routing: Ds41rtDeviceBuffer,
     pub tokens: &'a [u64],
-    stream: *mut std::ffi::c_void,
     request_staging: ds41rt_ffi::Ds41rtHostBuffer,
     origin: Option<QueryBinding>,
     _owner: PhantomData<&'a ()>,
@@ -129,8 +128,8 @@ mod reuse_tests {
             })
             .collect::<Result<Vec<_>>>()?;
         let mut comparisons = 0;
-        for rows in [1u32, 80, 4096] {
-            let layers: Vec<usize> = if rows == 4096 {
+        for rows in [1u32, 6, 16, 80, 81, 4096] {
+            let layers: Vec<usize> = if rows > 80 {
                 vec![0, 20, 39]
             } else {
                 (0..40).collect()
@@ -161,6 +160,18 @@ mod reuse_tests {
                     let [fresh_input, fresh_mask] = fresh.inputs();
                     library.copy_d2d(fresh_input, input, input.bytes)?;
                     library.copy_d2d(fresh_mask, modality, modality.bytes)?;
+                    // Poison both GPU inputs and the shared host arena before
+                    // staging from an independent completed device input.
+                    library.copy_h2d(input, &vec![0xff; input.bytes])?;
+                    library.copy_h2d(modality, &vec![0xff; modality.bytes])?;
+                    unsafe {
+                        std::ptr::write_bytes(
+                            lane.request_staging.buffer.ptr,
+                            0xa5,
+                            lane.request_staging.buffer.bytes,
+                        );
+                        lane.stage_inputs(fresh_input, &mask)?;
+                    }
                     let actual = unsafe { lane.execute_captured(rows)? };
                     let reference = unsafe { fresh.execute(rows)? };
                     assert_eq!(actual.layer, layer);
@@ -200,8 +211,8 @@ mod reuse_tests {
             lane.clear_graph()?;
             assert!(lane.output().is_err());
         }
-        assert_eq!(comparisons, 166);
-        eprintln!("PASS 166 real-weight router comparisons and invalid-row recovery");
+        assert_eq!(comparisons, 332);
+        eprintln!("PASS 332 real-weight router comparisons and invalid-row recovery");
         Ok(())
     }
 }
@@ -285,7 +296,21 @@ impl BackboneRouterWave<'_, '_> {
                 self.stream.raw,
             )?;
             self.input_quantizer
-                .launch(self.b(0), self.b(5), rows, self.stream.raw)
+                .launch(self.b(0), self.b(5), rows, self.stream.raw)?;
+            let bytes = rows as usize * 5328;
+            if bytes <= self.request_staging.buffer.bytes {
+                let staging = std::slice::from_raw_parts_mut(
+                    self.request_staging.buffer.ptr.cast::<u8>(),
+                    bytes,
+                );
+                let (hidden, routes) = staging.split_at_mut(rows as usize * 5280);
+                let (ids, weights) = routes.split_at_mut(rows as usize * 24);
+                let library = self.stream.library;
+                library.copy_d2h_async(hidden, self.b(5), self.stream.raw)?;
+                library.copy_d2h_async(ids, self.b(3), self.stream.raw)?;
+                library.copy_d2h_async(weights, self.b(4), self.stream.raw)?;
+            }
+            Ok(())
         }
     }
     /// # Safety
@@ -356,6 +381,42 @@ impl BackboneRouterWave<'_, '_> {
         self.ready = Some(rows);
         self.output()
     }
+    /// Stage completed input on the router stream. The mask uses the beginning
+    /// of the pinned request arena; H2D consumes it before graph D2H overwrites it.
+    /// The caller must drain even if subsequent graph preparation fails.
+    unsafe fn stage_inputs(&mut self, input: Ds41rtDeviceBuffer, mask: &[u8]) -> Result<()> {
+        ensure!(
+            !mask.is_empty()
+                && mask.len() <= self.capacity as usize
+                && input.bytes == mask.len() * 10240
+                && input.device_id == self.b(0).device_id
+                && mask.iter().all(|&v| v <= 1)
+                && mask.len() <= self.request_staging.buffer.bytes,
+            "invalid router staged input"
+        );
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                mask.as_ptr(),
+                self.request_staging.buffer.ptr.cast::<u8>(),
+                mask.len(),
+            );
+        }
+        let staged = (|| unsafe {
+            self.stream
+                .library
+                .copy_d2d_async(self.b(0), input, input.bytes, self.stream.raw)?;
+            self.stream.library.copy_host_buffer_h2d_async(
+                self.b(1),
+                self.request_staging.buffer,
+                mask.len(),
+                self.stream.raw,
+            )
+        })();
+        if staged.is_err() {
+            return staged.and(self.synchronize());
+        }
+        Ok(())
+    }
     /// # Safety
     /// The completed block input stays immutable through the copy. This wave has
     /// exclusive storage; image mask matches those tokens (0=text, 1=image).
@@ -376,13 +437,15 @@ impl BackboneRouterWave<'_, '_> {
                 && image_mask.iter().all(|&v| v <= 1),
             "backbone router block input differs"
         );
-        self.stream
-            .library
-            .copy_d2d(self.b(0), input.values, input.values.bytes)?;
-        self.stream.library.copy_h2d(self.b(1), image_mask)?;
         let rows = input.tokens.len() as u32;
-        unsafe {
-            self.execute_captured(rows)?;
+        let executed = (|| unsafe {
+            self.stage_inputs(input.values, image_mask)?;
+            self.execute_captured(rows).map(|_| ())
+        })();
+        if executed.is_err() {
+            // A staged copy may precede a graph preparation failure. Always
+            // drain before permitting the input or pinned arena to be reused.
+            return executed.and(self.synchronize()).and_then(|_| self.output());
         }
         self.origin = Some(input.binding());
         self.tokens.extend_from_slice(input.tokens);
@@ -421,7 +484,6 @@ impl BackboneRouterWave<'_, '_> {
             ids: b(3, 24),
             routing: b(4, 24),
             tokens: &self.tokens,
-            stream: self.stream.raw,
             request_staging: self.request_staging.buffer,
             origin: self.origin,
             _owner: PhantomData,
@@ -486,20 +548,12 @@ impl RouterOutput<'_> {
             library.copy_d2h(&mut weights, self.routing)?;
             return Ok((hidden, ids, weights));
         }
-        let staging = unsafe {
-            std::slice::from_raw_parts_mut(self.request_staging.ptr.cast::<u8>(), bytes)
-        };
-        let (hidden, routes) = staging.split_at_mut(self.rows as usize * 5280);
-        let (ids, weights) = routes.split_at_mut(self.rows as usize * 24);
-        let copied = (|| -> Result<()> {
-            unsafe {
-                library.copy_d2h_async(hidden, self.expert_input, self.stream)?;
-                library.copy_d2h_async(ids, self.ids, self.stream)?;
-                library.copy_d2h_async(weights, self.routing, self.stream)
-            }
-        })();
-        let drained = unsafe { library.cuda_stream_synchronize(self.stream) };
-        copied.and(drained)?;
+        // Successful execution already drained the graph's D2H copies. This
+        // borrow prevents another execution from reusing the pinned arena.
+        let staging =
+            unsafe { std::slice::from_raw_parts(self.request_staging.ptr.cast::<u8>(), bytes) };
+        let (hidden, routes) = staging.split_at(self.rows as usize * 5280);
+        let (ids, weights) = routes.split_at(self.rows as usize * 24);
         Ok((hidden.to_vec(), ids.to_vec(), weights.to_vec()))
     }
 
