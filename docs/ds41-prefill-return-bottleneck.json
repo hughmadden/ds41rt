@@ -1,0 +1,679 @@
+{
+  "scope": "Rejected pinned async return-copy experiment; current production code restored.",
+  "timing": {
+    "before": {
+      "upload_us": {
+        "n": 680,
+        "median": 1645.0
+      },
+      "receive_us": {
+        "n": 680,
+        "median": 7900.0
+      },
+      "reduce_us": {
+        "n": 680,
+        "median": 38.0
+      },
+      "total_us": {
+        "n": 17,
+        "median": 492939
+      }
+    },
+    "candidate": {
+      "upload_us": {
+        "n": 2040,
+        "median": 1087.0
+      },
+      "receive_us": {
+        "n": 2040,
+        "median": 8577.0
+      },
+      "reduce_us": {
+        "n": 2040,
+        "median": 59.0
+      },
+      "total_us": {
+        "n": 51,
+        "median": 501589
+      }
+    }
+  },
+  "baseline_retrieval": {
+    "text": "quartz-731",
+    "first_content_seconds": 8.596976874046959,
+    "finish_seconds": 9.223566589062102,
+    "observed_decode_tokens_per_second": 6.383762618739009,
+    "usage": {
+      "prompt_tokens": 1363,
+      "completion_tokens": 5,
+      "total_tokens": 1368,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 1363
+    },
+    "events": [
+      {
+        "seconds": 0.0023689280496910214,
+        "event": {
+          "id": "chatcmpl-6bdaebe2-38bd-4323-a73d-0071fa981998",
+          "object": "chat.completion.chunk",
+          "created": 1789105305,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": ""
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ],
+          "usage": null
+        }
+      },
+      {
+        "seconds": 8.596976874046959,
+        "event": {
+          "id": "chatcmpl-6bdaebe2-38bd-4323-a73d-0071fa981998",
+          "object": "chat.completion.chunk",
+          "created": 1789105305,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "quart"
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ],
+          "usage": null
+        }
+      },
+      {
+        "seconds": 8.789799793041311,
+        "event": {
+          "id": "chatcmpl-6bdaebe2-38bd-4323-a73d-0071fa981998",
+          "object": "chat.completion.chunk",
+          "created": 1789105305,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "z"
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ],
+          "usage": null
+        }
+      },
+      {
+        "seconds": 8.938825835008174,
+        "event": {
+          "id": "chatcmpl-6bdaebe2-38bd-4323-a73d-0071fa981998",
+          "object": "chat.completion.chunk",
+          "created": 1789105305,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "-"
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ],
+          "usage": null
+        }
+      },
+      {
+        "seconds": 9.087266168091446,
+        "event": {
+          "id": "chatcmpl-6bdaebe2-38bd-4323-a73d-0071fa981998",
+          "object": "chat.completion.chunk",
+          "created": 1789105305,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "731"
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ],
+          "usage": null
+        }
+      },
+      {
+        "seconds": 9.223566589062102,
+        "event": {
+          "id": "chatcmpl-6bdaebe2-38bd-4323-a73d-0071fa981998",
+          "object": "chat.completion.chunk",
+          "created": 1789105305,
+          "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "system_fingerprint": "ds41rt-native-fp8-kv",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": ""
+              },
+              "logprobs": null,
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          }
+        }
+      }
+    ],
+    "objective_pass": true
+  },
+  "candidate_retrieval": {
+    "case": {
+      "name": "long_retrieval",
+      "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+      "expected": "quartz-731"
+    },
+    "runs": [
+      {
+        "text": "quartz-731",
+        "first_content_seconds": 8.97103318106383,
+        "finish_seconds": 9.575952460058033,
+        "observed_decode_tokens_per_second": 6.612452502176468,
+        "usage": {
+          "prompt_tokens": 1363,
+          "completion_tokens": 5,
+          "total_tokens": 1368,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 1363
+        },
+        "events": [
+          {
+            "seconds": 0.08876057399902493,
+            "event": {
+              "id": "chatcmpl-6a6d0dd0-2d91-40fd-b565-47fe2bafaae7",
+              "object": "chat.completion.chunk",
+              "created": 1789105637,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "role": "assistant",
+                    "content": ""
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 8.97103318106383,
+            "event": {
+              "id": "chatcmpl-6a6d0dd0-2d91-40fd-b565-47fe2bafaae7",
+              "object": "chat.completion.chunk",
+              "created": 1789105637,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "quart"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.160368431010284,
+            "event": {
+              "id": "chatcmpl-6a6d0dd0-2d91-40fd-b565-47fe2bafaae7",
+              "object": "chat.completion.chunk",
+              "created": 1789105637,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "z"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.301375500974245,
+            "event": {
+              "id": "chatcmpl-6a6d0dd0-2d91-40fd-b565-47fe2bafaae7",
+              "object": "chat.completion.chunk",
+              "created": 1789105637,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "-"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.437853237963282,
+            "event": {
+              "id": "chatcmpl-6a6d0dd0-2d91-40fd-b565-47fe2bafaae7",
+              "object": "chat.completion.chunk",
+              "created": 1789105637,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "731"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.575952460058033,
+            "event": {
+              "id": "chatcmpl-6a6d0dd0-2d91-40fd-b565-47fe2bafaae7",
+              "object": "chat.completion.chunk",
+              "created": 1789105637,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": ""
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 1363,
+                "completion_tokens": 5,
+                "total_tokens": 1368,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 1363
+              }
+            }
+          }
+        ]
+      },
+      {
+        "text": "quartz-731",
+        "first_content_seconds": 8.726015198975801,
+        "finish_seconds": 9.31986060703639,
+        "observed_decode_tokens_per_second": 6.7357597544846115,
+        "usage": {
+          "prompt_tokens": 1363,
+          "completion_tokens": 5,
+          "total_tokens": 1368,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 1363
+        },
+        "events": [
+          {
+            "seconds": 0.002252503065392375,
+            "event": {
+              "id": "chatcmpl-b0c252cd-1a8e-478d-a7d1-aa9ebefbaecf",
+              "object": "chat.completion.chunk",
+              "created": 1789105647,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "role": "assistant",
+                    "content": ""
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 8.726015198975801,
+            "event": {
+              "id": "chatcmpl-b0c252cd-1a8e-478d-a7d1-aa9ebefbaecf",
+              "object": "chat.completion.chunk",
+              "created": 1789105647,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "quart"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 8.915865982999094,
+            "event": {
+              "id": "chatcmpl-b0c252cd-1a8e-478d-a7d1-aa9ebefbaecf",
+              "object": "chat.completion.chunk",
+              "created": 1789105647,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "z"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.05656940699555,
+            "event": {
+              "id": "chatcmpl-b0c252cd-1a8e-478d-a7d1-aa9ebefbaecf",
+              "object": "chat.completion.chunk",
+              "created": 1789105647,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "-"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.194286054000258,
+            "event": {
+              "id": "chatcmpl-b0c252cd-1a8e-478d-a7d1-aa9ebefbaecf",
+              "object": "chat.completion.chunk",
+              "created": 1789105647,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "731"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.31986060703639,
+            "event": {
+              "id": "chatcmpl-b0c252cd-1a8e-478d-a7d1-aa9ebefbaecf",
+              "object": "chat.completion.chunk",
+              "created": 1789105647,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": ""
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 1363,
+                "completion_tokens": 5,
+                "total_tokens": 1368,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 1363
+              }
+            }
+          }
+        ]
+      },
+      {
+        "text": "quartz-731",
+        "first_content_seconds": 8.73058370698709,
+        "finish_seconds": 9.313675404991955,
+        "observed_decode_tokens_per_second": 6.859984482177676,
+        "usage": {
+          "prompt_tokens": 1363,
+          "completion_tokens": 5,
+          "total_tokens": 1368,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 1363
+        },
+        "events": [
+          {
+            "seconds": 0.0022679660469293594,
+            "event": {
+              "id": "chatcmpl-fd4aae07-4eef-455c-a8b0-16ae82f53e23",
+              "object": "chat.completion.chunk",
+              "created": 1789105656,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "role": "assistant",
+                    "content": ""
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 8.73058370698709,
+            "event": {
+              "id": "chatcmpl-fd4aae07-4eef-455c-a8b0-16ae82f53e23",
+              "object": "chat.completion.chunk",
+              "created": 1789105656,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "quart"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 8.913191513973288,
+            "event": {
+              "id": "chatcmpl-fd4aae07-4eef-455c-a8b0-16ae82f53e23",
+              "object": "chat.completion.chunk",
+              "created": 1789105656,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "z"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.047343007056043,
+            "event": {
+              "id": "chatcmpl-fd4aae07-4eef-455c-a8b0-16ae82f53e23",
+              "object": "chat.completion.chunk",
+              "created": 1789105656,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "-"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.17982966999989,
+            "event": {
+              "id": "chatcmpl-fd4aae07-4eef-455c-a8b0-16ae82f53e23",
+              "object": "chat.completion.chunk",
+              "created": 1789105656,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "731"
+                  },
+                  "logprobs": null,
+                  "finish_reason": null
+                }
+              ],
+              "usage": null
+            }
+          },
+          {
+            "seconds": 9.313675404991955,
+            "event": {
+              "id": "chatcmpl-fd4aae07-4eef-455c-a8b0-16ae82f53e23",
+              "object": "chat.completion.chunk",
+              "created": 1789105656,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp8-kv",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": ""
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 1363,
+                "completion_tokens": 5,
+                "total_tokens": 1368,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 1363
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "gpu_test_log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.325s\nPASS full target cycle=0 requests=16 input_rows=80 finite_logits=true cache_and_engram_commit=true seconds=3.576\nPASS full target cycle=1 requests=16 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.181\nPASS full target cycle=2 requests=16 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.018\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 11.62s\n\n",
+  "target_logit_hashes": [
+    "f4578e2fa896543b34c9eff11b0ff2aa4cf4e3e0afd606f41de82b0065900bea",
+    "e779afbf7bcdd14e4b96b2de5652771ada70b5f44494f7ec904074ae4d7d0c1c",
+    "7f406f6e97055ae1241df87d6999b3fcaa0533f51a603f4ef32e431124d0f69e"
+  ],
+  "target_logits_byte_equal": true,
+  "additional_pinned_bytes": 39321600,
+  "wire_bytes_per_token": 19660800,
+  "required_bytes_per_second_at_8000": 157286400000,
+  "coordinator_link_mbps": 400000,
+  "restored_api_arithmetic": "Both modes returned 4 with stop and 2 completion tokens."
+}

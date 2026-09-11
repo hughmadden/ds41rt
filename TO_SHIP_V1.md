@@ -14,6 +14,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Preserve streaming, tools, structured constraints, cancellation, admission, error handling, prefix reuse and restart readiness.
 - [ ] Support concurrency 1 through 16 with request-safe state and qualified alternating-wave scheduling.
 - [ ] Measure at least 90 generated tokens/s for target-only decode with dSpark disabled under a documented workload.
+- [ ] Reduce expert return traffic before the 8k prefill gate. [Wire-volume analysis](docs/ds41-prefill-return-bottleneck.md) shows the current six-FP32-route TP4 response needs 157 GB/s at 8k tokens/s, exceeding the coordinator's 50 GB/s link. Qualify any changed reduction/rounding order against the reference and live outputs.
 - [ ] Measure approximately 270 generated tokens/s with optimized dSpark under documented sampling, acceptance and prompt conditions.
 - [ ] Measure at least 8,000 prefill tokens/s for prompts of 8,192 tokens or longer under a documented batching policy.
 - [ ] Publish latency, throughput, acceptance, memory, context length and concurrency together so performance results are reproducible.
