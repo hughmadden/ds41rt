@@ -1,0 +1,102 @@
+{
+  "date": "2026-09-11",
+  "checkpoint_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "scope": "Integrated lane FFN method builds; CPU completion-guard and aggregate budget tests; actual real-weight router capture/rebinding qualification on Spark. No integrated lane FFN GPU execution.",
+  "router_test": {
+    "host": "ostrich",
+    "gpu": "GB10 SM121",
+    "rows_1_and_80_layers": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39
+    ],
+    "rows_4096_layers": [
+      0,
+      20,
+      39
+    ],
+    "changed_input_and_mask_passes": 2,
+    "fresh_owner_comparisons": 166,
+    "scores_ids_routing": "byte-exact",
+    "finite_scores_routing": true,
+    "stable_input_addresses": true,
+    "second_pass_graph_handle_reuse": true,
+    "invalid_row_recovery": "pass",
+    "exit_code": 0,
+    "log": "/tmp/ds41-router-reuse-test.log",
+    "native_sha256": "acea0f3bf08a25f92dea120bb2dd627a5a094af22468fce8c2a2436e955b67af"
+  },
+  "cpu_tests": {
+    "cancellation_log": "/tmp/ds41-lane-ffn-cancel-test.log",
+    "budget_log": "/tmp/ds41-lane-ffn-budget-test.log",
+    "unpolled_future": "preparation retained",
+    "polled_cancelled_future": "invalid until restart",
+    "work_failure": "invalid until restart",
+    "invalid_phase": "work not polled",
+    "success": "readiness published",
+    "exit_codes": [
+      0,
+      0
+    ]
+  },
+  "weights_device_bytes": 8195346880,
+  "workspace_bytes": {
+    "1": 5059453,
+    "80": 62696284,
+    "4096": 2997686284
+  },
+  "router_bytes_saved_at_4096": 1888972800,
+  "build": {
+    "daemon": "pass",
+    "log": "/tmp/ds41-lane-ffn-final-build.log"
+  },
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs": "93b6d6f43e505cbfa6905c4f24085c52dcb34903948181b6b44686ed2c0d44b3",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_router.rs": "0b74bcd646e7c546dbb96f41390a2a41c5b477a8db90226e9b67b3c06afe835c"
+  },
+  "local_fixture_binary_sha256": "ffac0d67dc5d7be390ecf0a7ee70acbe6b5c74b5af9f6bdb23c07a70fd26621d",
+  "fixture": "/tmp/ds41-lane-ffn",
+  "limits": [
+    "No integrated lane FFN execution",
+    "No real shared projection overlap in this test",
+    "No end-to-end cancellation test",
+    "No full-model readiness/performance claim"
+  ]
+}

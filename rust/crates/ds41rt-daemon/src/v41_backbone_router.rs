@@ -1,12 +1,13 @@
 //! Official backbone routing with block-bound inputs and canonical TP4 requests.
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_block::FfnInput;
+use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Router};
 use ds41rt_loader::OfficialV41Catalog;
-use std::{ffi::c_void, marker::PhantomData};
+use std::marker::PhantomData;
 pub(crate) struct BackboneRouterWeights<'a> {
     library: &'a NativeLibrary,
     layer: usize,
@@ -70,7 +71,7 @@ impl<'a> BackboneRouterWeights<'a> {
             tokens: Vec::new(),
             layer: self.layer,
             capacity,
-            graph: None,
+            graphs: LayerGraphs::new(self.library),
             ready: None,
             origin: None,
         })
@@ -94,6 +95,104 @@ impl RouterOutput<'_> {
             .context("backbone router output has no block origin")
     }
 }
+
+#[cfg(test)]
+mod reuse_tests {
+    use super::*;
+    use ds41rt_loader::{read_official_v41_catalog, OFFICIAL_V41_MODEL_ID};
+    fn bytes(library: &NativeLibrary, buffer: Ds41rtDeviceBuffer) -> Result<Vec<u8>> {
+        let mut result = vec![0; buffer.bytes];
+        library.copy_d2h(&mut result, buffer)?;
+        Ok(result)
+    }
+    #[test]
+    fn real_router_rebinding_matches_fresh_owners() -> Result<()> {
+        let Some(path) = std::env::var_os("DS41RT_ROUTER_REUSE_LIBRARY") else {
+            eprintln!("skip router reuse GPU test: DS41RT_ROUTER_REUSE_LIBRARY unset");
+            return Ok(());
+        };
+        let model = std::env::var_os("DS41RT_ROUTER_REUSE_MODEL")
+            .context("DS41RT_ROUTER_REUSE_MODEL required")?;
+        let library = unsafe { NativeLibrary::load(path)? };
+        let catalog =
+            read_official_v41_catalog(OFFICIAL_V41_MODEL_ID, std::path::Path::new(&model))?;
+        let weights = (0..40)
+            .map(|layer| {
+                BackboneRouterWeights::load(&library, &catalog, layer, 3_935_232, 1024 * 1024)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut comparisons = 0;
+        for rows in [1u32, 80, 4096] {
+            let layers: Vec<usize> = if rows == 4096 {
+                vec![0, 20, 39]
+            } else {
+                (0..40).collect()
+            };
+            let mut lane = weights[0].wave(rows, BackboneRouterWave::device_bytes(rows)?)?;
+            let pointers = lane.inputs().map(|b| b.ptr);
+            let mut handles = std::collections::HashMap::new();
+            for cycle in 0..2usize {
+                for &layer in &layers {
+                    lane.rebind(&weights[layer])?;
+                    assert!(lane.output().is_err());
+                    assert_eq!(lane.inputs().map(|b| b.ptr), pointers);
+                    let hidden: Vec<u8> = (0..rows as usize * 5120)
+                        .flat_map(|i| {
+                            let value =
+                                (((i * 7 + cycle * 19 + layer * 3) % 31) as i32 - 15) as f32 / 128.;
+                            ((value.to_bits() >> 16) as u16).to_ne_bytes()
+                        })
+                        .collect();
+                    let mask: Vec<u8> = (0..rows as usize)
+                        .map(|i| ((i + cycle + layer) % 2) as u8)
+                        .collect();
+                    let [input, modality] = lane.inputs();
+                    library.copy_h2d(input, &hidden)?;
+                    library.copy_h2d(modality, &mask)?;
+                    let mut fresh =
+                        weights[layer].wave(rows, BackboneRouterWave::device_bytes(rows)?)?;
+                    let [fresh_input, fresh_mask] = fresh.inputs();
+                    library.copy_d2d(fresh_input, input, input.bytes)?;
+                    library.copy_d2d(fresh_mask, modality, modality.bytes)?;
+                    let actual = unsafe { lane.execute_captured(rows)? };
+                    let reference = unsafe { fresh.execute(rows)? };
+                    assert_eq!(actual.layer, layer);
+                    for (a, b) in [
+                        (actual.scores, reference.scores),
+                        (actual.ids, reference.ids),
+                        (actual.routing, reference.routing),
+                    ] {
+                        assert_eq!(bytes(&library, a)?, bytes(&library, b)?);
+                    }
+                    for buffer in [actual.scores, actual.routing] {
+                        assert!(bytes(&library, buffer)?
+                            .chunks_exact(4)
+                            .all(|b| f32::from_ne_bytes(b.try_into().unwrap()).is_finite()));
+                    }
+                    let handle = lane.graphs.get(layer, &weights[layer]).unwrap().0;
+                    if cycle == 0 {
+                        handles.insert(layer, handle);
+                    } else {
+                        assert_eq!(handles[&layer], handle);
+                    }
+                    comparisons += 1;
+                }
+                eprintln!("PASS real router rows={rows} cycle={cycle} layers={} scores/ids/routing exact; stable inputs and cached handles",layers.len());
+            }
+            assert!(unsafe { lane.execute_captured(0) }.is_err());
+            assert!(lane.output().is_err());
+            lane.rebind(&weights[0])?;
+            unsafe {
+                lane.execute_captured(rows)?;
+            }
+            lane.clear_graph()?;
+            assert!(lane.output().is_err());
+        }
+        assert_eq!(comparisons, 166);
+        eprintln!("PASS 166 real-weight router comparisons and invalid-row recovery");
+        Ok(())
+    }
+}
 pub(crate) struct BackboneRouterWave<'w, 'a> {
     stream: LoadStream<'a>,
     kernel: V41Router<'a>,
@@ -102,9 +201,28 @@ pub(crate) struct BackboneRouterWave<'w, 'a> {
     tokens: Vec<u64>,
     layer: usize,
     capacity: u32,
-    graph: Option<(*mut c_void, u32)>,
+    graphs: LayerGraphs<'w, 'a, BackboneRouterWeights<'a>>,
     ready: Option<u32>,
     origin: Option<QueryBinding>,
+}
+impl<'w, 'a> BackboneRouterWave<'w, 'a> {
+    pub fn rebind(&mut self, weights: &'w BackboneRouterWeights<'a>) -> Result<()> {
+        self.invalidate();
+        ensure!(
+            std::ptr::eq(self.stream.library, weights.library),
+            "router rebound library differs"
+        );
+        for name in BackboneRouterWeights::names(weights.layer)? {
+            ensure!(
+                weights.tensors.get(&name)?.device_id == self.b(0).device_id,
+                "router rebound weight device differs"
+            );
+        }
+        self.synchronize()?;
+        self.weights = weights;
+        self.layer = weights.layer;
+        Ok(())
+    }
 }
 impl BackboneRouterWave<'_, '_> {
     pub fn device_bytes(capacity: u32) -> Result<usize> {
@@ -169,7 +287,7 @@ impl BackboneRouterWave<'_, '_> {
     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
         self.invalidate();
         ensure!(
-            self.graph.is_none(),
+            self.graphs.get(self.layer, self.weights).is_none(),
             "backbone router graph already captured"
         );
         unsafe {
@@ -185,7 +303,14 @@ impl BackboneRouterWave<'_, '_> {
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graph = Some((graph, rows));
+                if let Err(error) =
+                    unsafe { self.graphs.insert(self.layer, self.weights, rows, graph) }
+                {
+                    unsafe {
+                        self.stream.library.cuda_graph_exec_destroy(graph)?;
+                    }
+                    return Err(error);
+                }
                 Ok(())
             }
             (Err(e), Ok(graph)) => {
@@ -201,7 +326,10 @@ impl BackboneRouterWave<'_, '_> {
     /// Same contract as execute; graph live row count must match.
     pub unsafe fn replay(&mut self, rows: u32) -> Result<RouterOutput<'_>> {
         self.validate(rows)?;
-        let (graph, count) = self.graph.context("backbone router graph missing")?;
+        let (graph, count) = self
+            .graphs
+            .get(self.layer, self.weights)
+            .context("backbone router graph missing")?;
         ensure!(count == rows, "backbone router captured rows differ");
         let launched = unsafe {
             self.stream
@@ -237,18 +365,28 @@ impl BackboneRouterWave<'_, '_> {
             .copy_d2d(self.b(0), input.values, input.values.bytes)?;
         self.stream.library.copy_h2d(self.b(1), image_mask)?;
         let rows = input.tokens.len() as u32;
-        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+        unsafe {
+            self.execute_captured(rows)?;
+        }
+        self.origin = Some(input.binding());
+        self.tokens.extend_from_slice(input.tokens);
+        self.output()
+    }
+    /// # Safety
+    /// Same initialized finite hidden and binary-mask contract as execute.
+    pub unsafe fn execute_captured(&mut self, rows: u32) -> Result<RouterOutput<'_>> {
+        self.invalidate();
+        if self
+            .graphs
+            .get(self.layer, self.weights)
+            .is_none_or(|(_, n)| n != rows)
+        {
             self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
             }
         }
-        unsafe {
-            self.replay(rows)?;
-        }
-        self.origin = Some(input.binding());
-        self.tokens.extend_from_slice(input.tokens);
-        self.output()
+        unsafe { self.replay(rows) }
     }
     pub fn output(&self) -> Result<RouterOutput<'_>> {
         let rows = self.ready.context("backbone router output unpublished")?;
@@ -270,20 +408,22 @@ impl BackboneRouterWave<'_, '_> {
             _owner: PhantomData,
         })
     }
+    /// Clear only this layer; other layers retain their captured shape.
     pub fn clear_graph(&mut self) -> Result<()> {
         self.invalidate();
         self.synchronize()?;
-        if let Some((graph, _)) = self.graph.take() {
-            unsafe {
-                self.stream.library.cuda_graph_exec_destroy(graph)?;
-            }
+        unsafe {
+            self.graphs.remove(self.layer)?;
         }
         Ok(())
     }
 }
 impl Drop for BackboneRouterWave<'_, '_> {
     fn drop(&mut self) {
-        if let Err(e) = self.clear_graph() {
+        if let Err(e) = self
+            .synchronize()
+            .and_then(|()| unsafe { self.graphs.clear() })
+        {
             tracing::error!(%e,"draining backbone router");
         }
     }

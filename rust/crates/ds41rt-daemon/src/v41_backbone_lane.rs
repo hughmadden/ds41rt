@@ -3,9 +3,11 @@ use crate::v41_attention_binding::QueryBinding;
 use crate::v41_attention_output::{AttentionOutputWave, AttentionOutputWeights};
 use crate::v41_attention_query::{AttentionQueryOutput, AttentionQueryWave, AttentionQueryWeights};
 use crate::v41_backbone_hc::BackboneHcWeights;
+use crate::v41_backbone_router::{BackboneRouterWave, BackboneRouterWeights, ExpertRow};
 use crate::v41_backbone_shared::{BackboneSharedWave, BackboneSharedWeights, SharedOutput};
 use crate::v41_block::{BackboneBlockWave, BlockOutput, FfnInput, PreparedBlockInput};
 use crate::v41_engram::{layer::EngramGate, EngramDeviceView};
+use crate::v41_experts::coordinator::{NativeFfnOutput, NativeTp4Wave};
 use crate::v41_index_selection::IndexSelectionOutput;
 use crate::v41_sparse_attention::{AttentionRequest, SparseAttentionWave};
 use crate::v41_target_embedding::TargetEmbedding;
@@ -18,10 +20,11 @@ struct LayerWeights<'a> {
     query: AttentionQueryWeights<'a>,
     projection: AttentionOutputWeights<'a>,
     shared: BackboneSharedWeights<'a>,
+    router: BackboneRouterWeights<'a>,
 }
 
-/// All 40 layers' mHC, query, output and shared-expert weights. This deliberately
-/// excludes window/compressor/index/router weights, engram, vision and dSpark.
+/// All 40 layers' mHC, query, output, shared-expert and router weights. This
+/// excludes window/compressor/index weights, engram, vision and dSpark.
 pub(crate) struct BackboneLaneWeights<'a> {
     library: &'a NativeLibrary,
     layers: Vec<LayerWeights<'a>>,
@@ -31,12 +34,13 @@ impl<'a> BackboneLaneWeights<'a> {
         library: &NativeLibrary,
         catalog: &OfficialV41Catalog,
         layer: usize,
-    ) -> Result<[usize; 4]> {
+    ) -> Result<[usize; 5]> {
         Ok([
             BackboneHcWeights::device_bytes(catalog, layer)?,
             AttentionQueryWeights::device_bytes(library, catalog, layer)?,
             AttentionOutputWeights::device_bytes(library, catalog, layer)?,
             BackboneSharedWeights::device_bytes(library, catalog, layer)?,
+            BackboneRouterWeights::device_bytes(catalog, layer)?,
         ])
     }
     /// Conservative device budget including each loader's transient peak.
@@ -62,7 +66,8 @@ impl<'a> BackboneLaneWeights<'a> {
         );
         let mut layers = Vec::with_capacity(40);
         for layer in 0..40 {
-            let [hc, query, projection, shared] = Self::layer_bytes(library, catalog, layer)?;
+            let [hc, query, projection, shared, router] =
+                Self::layer_bytes(library, catalog, layer)?;
             layers.push(LayerWeights {
                 hc: BackboneHcWeights::load(library, catalog, layer, hc, staging)?,
                 query: AttentionQueryWeights::load(library, catalog, layer, query, staging)?,
@@ -70,6 +75,7 @@ impl<'a> BackboneLaneWeights<'a> {
                     library, catalog, layer, projection, staging,
                 )?,
                 shared: BackboneSharedWeights::load(library, catalog, layer, shared, staging)?,
+                router: BackboneRouterWeights::load(library, catalog, layer, router, staging)?,
             });
         }
         Ok(Self { library, layers })
@@ -92,9 +98,34 @@ enum Phase {
 pub(crate) struct LaneFfn<'s, 'w, 'a> {
     pub input: FfnInput<'s>,
     shared: &'s mut BackboneSharedWave<'w, 'a>,
+    router: &'s mut BackboneRouterWave<'w, 'a>,
+    library: &'a NativeLibrary,
     phase: &'s mut Phase,
 }
 impl LaneFfn<'_, '_, '_> {
+    /// # Safety
+    /// Metadata and mask identify the actual requests/modality in input order.
+    /// All external producers are complete and no writes race this lane.
+    pub async unsafe fn execute_tp4<'t>(
+        &mut self,
+        transport: &'t mut NativeTp4Wave<'_>,
+        placement: u64,
+        image_mask: &[u8],
+        rows: &[ExpertRow],
+    ) -> Result<NativeFfnOutput<'t>> {
+        let input = &self.input;
+        let router = &mut self.router;
+        let shared = &mut self.shared;
+        let library = self.library;
+        complete_ffn(self.phase, async {
+            let routed = unsafe { router.execute_ffn(input, image_mask)? };
+            let request = unsafe { routed.expert_request(library, placement, rows)? };
+            let pending = transport.dispatch_ffn(&request).await?;
+            let contribution = unsafe { shared.execute_ffn(input)? };
+            unsafe { pending.finish(&contribution).await }
+        })
+        .await
+    }
     /// # Safety
     /// No external writes race the preserved FFN input or shared workspace.
     pub unsafe fn execute_shared(&mut self) -> Result<SharedOutput<'_>> {
@@ -106,18 +137,32 @@ impl LaneFfn<'_, '_, '_> {
     }
 }
 
+/// Invalidate before the first operation is polled. Dropping a polled future
+/// therefore requires lane restart; successful completion alone republishes it.
+async fn complete_ffn<T>(
+    phase: &mut Phase,
+    work: impl std::future::Future<Output = Result<T>>,
+) -> Result<T> {
+    let prior = std::mem::replace(phase, Phase::Invalid);
+    ensure!(prior == Phase::Ffn, "lane FFN work is not pending");
+    let result = work.await?;
+    *phase = Phase::SharedReady;
+    Ok(result)
+}
+
 pub(crate) struct BackboneLane<'w, 'a> {
     weights: &'w BackboneLaneWeights<'a>,
     block: BackboneBlockWave<'w, 'a>,
     query: AttentionQueryWave<'w, 'a>,
     projection: AttentionOutputWave<'w, 'a>,
     shared: BackboneSharedWave<'w, 'a>,
+    router: BackboneRouterWave<'w, 'a>,
     sparse: SparseAttentionWave<'a>,
     layer: usize,
     phase: Phase,
 }
 impl<'w, 'a> BackboneLane<'w, 'a> {
-    pub fn workspace_bytes(library: &NativeLibrary, capacity: u32) -> Result<[usize; 5]> {
+    pub fn workspace_bytes(library: &NativeLibrary, capacity: u32) -> Result<[usize; 6]> {
         ensure!(
             (1..=4096).contains(&capacity),
             "invalid backbone lane capacity"
@@ -128,6 +173,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             AttentionOutputWave::device_bytes(library, capacity)?,
             BackboneSharedWave::device_bytes(library, capacity)?,
             SparseAttentionWave::device_bytes(capacity as usize)?,
+            BackboneRouterWave::device_bytes(capacity)?,
         ])
     }
     /// One lane owns one allocation of each workspace group. Independent lanes
@@ -151,6 +197,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             projection: first.projection.wave(capacity, sizes[2])?,
             shared: first.shared.wave(capacity, sizes[3])?,
             sparse: SparseAttentionWave::new(weights.library, capacity as usize, sizes[4])?,
+            router: first.router.wave(capacity, sizes[5])?,
             layer: 0,
             phase: Phase::Idle,
         })
@@ -172,6 +219,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.query.rebind(&first.query)?;
         self.projection.rebind(&first.projection)?;
         self.shared.rebind(&first.shared)?;
+        self.router.rebind(&first.router)?;
         self.block.restart(&first.hc)?;
         self.layer = 0;
         self.phase = Phase::Idle;
@@ -253,6 +301,8 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         Ok(LaneFfn {
             input,
             shared: &mut self.shared,
+            router: &mut self.router,
+            library: self.weights.library,
             phase: &mut self.phase,
         })
     }
@@ -283,6 +333,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.query.rebind(&next.query)?;
         self.projection.rebind(&next.projection)?;
         self.shared.rebind(&next.shared)?;
+        self.router.rebind(&next.router)?;
         self.block.advance(&next.hc)?;
         self.layer += 1;
         self.phase = Phase::Prepared;
@@ -294,6 +345,56 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
 mod tests {
     use super::*;
     use ds41rt_loader::{read_official_v41_catalog, OFFICIAL_V41_MODEL_ID};
+
+    #[test]
+    fn lane_ffn_cancellation_and_failure_do_not_publish_completion() {
+        use std::{
+            future::Future,
+            task::{Context, Poll, Waker},
+        };
+        let mut context = Context::from_waker(Waker::noop());
+        let mut phase = Phase::Ffn;
+        // An unpolled future has dispatched nothing and leaves work available.
+        drop(complete_ffn(
+            &mut phase,
+            std::future::pending::<Result<()>>(),
+        ));
+        assert_eq!(phase, Phase::Ffn);
+        let mut work = Box::pin(complete_ffn(
+            &mut phase,
+            std::future::pending::<Result<()>>(),
+        ));
+        assert!(work.as_mut().poll(&mut context).is_pending());
+        drop(work);
+        assert_eq!(phase, Phase::Invalid);
+        let touched = std::cell::Cell::new(false);
+        let mut work = Box::pin(complete_ffn(&mut phase, async {
+            touched.set(true);
+            Ok(())
+        }));
+        assert!(matches!(
+            work.as_mut().poll(&mut context),
+            Poll::Ready(Err(_))
+        ));
+        drop(work);
+        assert!(!touched.get());
+        phase = Phase::Ffn;
+        let mut work = Box::pin(complete_ffn(&mut phase, async {
+            anyhow::bail!("shared/reduction failure")
+        }));
+        let result: Poll<Result<()>> = work.as_mut().poll(&mut context);
+        assert!(matches!(result, Poll::Ready(Err(_))));
+        drop(work);
+        assert_eq!(phase, Phase::Invalid);
+        phase = Phase::Ffn;
+        let mut work = Box::pin(complete_ffn(&mut phase, async { Ok(17) }));
+        assert!(matches!(
+            work.as_mut().poll(&mut context),
+            Poll::Ready(Ok(17))
+        ));
+        drop(work);
+        assert_eq!(phase, Phase::SharedReady);
+    }
 
     #[test]
     fn official_lane_budget_rejects_before_device_allocation() -> Result<()> {
@@ -308,7 +409,7 @@ mod tests {
             read_official_v41_catalog(OFFICIAL_V41_MODEL_ID, std::path::Path::new(&model))?;
         // Checkpoint payload extents plus the native AOT packed-scale metadata.
         let weight_bytes = BackboneLaneWeights::device_bytes(&library, &catalog)?;
-        assert_eq!(weight_bytes, 8_037_937_600);
+        assert_eq!(weight_bytes, 8_195_346_880);
         let rejected = BackboneLaneWeights::load(&library, &catalog, weight_bytes - 1, 1024 * 1024);
         assert!(rejected
             .err()
@@ -319,7 +420,7 @@ mod tests {
             library: &library,
             layers: vec![],
         };
-        for (capacity, expected) in [(1, 5_047_628usize), (80, 61_750_284), (4096, 2_949_251_084)] {
+        for (capacity, expected) in [(1, 5_059_453usize), (80, 62_696_284), (4096, 2_997_686_284)] {
             let groups = BackboneLane::workspace_bytes(&library, capacity)?;
             let total: usize = groups.iter().sum();
             assert_eq!(total, expected);

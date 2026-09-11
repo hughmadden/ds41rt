@@ -1,0 +1,19 @@
+# Bound lane routing and TP4 execution
+
+`LaneFfn::execute_tp4` connects the owned backbone lane to native routing and the split TP4 coordinator API. It routes the preserved FFN input with the supplied modality mask, constructs the canonical request using the supplied request metadata, writes all four expert requests, computes the shared FFN contribution, then collects and reduces the matching rank outputs. The result retains the native reduction wave's borrow and exact block binding for `BackboneLane::finish_ffn`.
+
+The lane becomes invalid before this asynchronous work is first polled. Only successful shared execution and complete reduction restore readiness. A dropped polled future, failed routing/dispatch/shared/reduction stage or invalid phase leaves it invalid until restart. An unpolled future has performed no work and leaves FFN preparation available. A retained CPU test verifies cancellation, failed work, success and rejection without polling work in an invalid phase. This tests the actual production completion guard; it does not execute CUDA or sockets. The prior [TP4 dispatch tests](ds41-tp4-dispatch-qualification.md) separately cover real socket cancellation and response isolation.
+
+## Reusable router
+
+The lane now owns its router alongside its other reusable workspaces. All 40 router parameter sets join the immutable weight owner. `rebind` validates library/device association, clears publication, drains the stream and selects another layer's weights without allocating buffers. The existing `LayerGraphs` cache retains one graph per layer, keyed to the exact weight owner and live shape. Graph clearing and destruction preserve the same per-layer/all-layer behavior as the other projection waves.
+
+On ostrich's GB10, the retained router test loaded all 40 real checkpoint gate/text-bias/vision-bias parameter sets. It compared reused captured execution against fresh uncaptured owners for two changed, finite BF16 inputs and changing text/vision masks. Every layer ran at row counts 1 and 80; layers 0, 20 and 39 additionally ran at 4,096 rows. All **166 comparisons** matched scores, selected expert IDs and routing weights byte-for-byte, and scores/routing values were finite. Input addresses remained stable across rebinding, second-pass graph handles were unchanged, and invalid-row publication/reset recovery passed. The fresh-owner comparison checks storage and capture reuse, not an independent mathematical reference; earlier router reference qualification remains separate evidence.
+
+At capacity 4,096, one router wave uses 48,435,200 bytes. Reusing it across 40 layers avoids 1,888,972,800 bytes of duplicated workspace. The updated lane's five weight groups total 8,195,346,880 bytes; its six workspace groups total 5,059,453 / 62,696,284 / 2,997,686,284 bytes at capacities 1 / 80 / 4,096. The retained allocation test passed against the official checkpoint headers and SM120 metadata in a container without GPU device access, including one-byte-short budgets, invalid capacities and missing-layer rejection. Other weights, caches and runtime allocations are still excluded.
+
+## Validation scope
+
+The production daemon builds, the CPU cancellation and revised budget tests pass, and the real-weight router test passes on Spark. The exact production modules were copied into the small external test harness; source hashes match. The integrated `execute_tp4` method and assembled lane **have not executed on RTX** because its driver/userspace mismatch remains unresolved. No shared-FP8 overlap, end-to-end cancellation, full-model numerical agreement or throughput claim follows from these component checks.
+
+Actual RTX execution, window/compressor/index ownership, CED replay, request history/engram association, dSpark scheduling, vision and API integration remain open. [Machine-readable evidence](ds41-lane-ffn-qualification.json) records scope, byte budgets, hashes and logs.
