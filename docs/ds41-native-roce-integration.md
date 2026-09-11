@@ -11,3 +11,11 @@ GPU integration remains incomplete: the worker currently copies the registered r
 Validation so far: transport library tests pass (150 passed, one ignored), including a new RDMA payload-owner test for interleaved rank chunks and stale, reordered and duplicate response rejection. These are CPU tests, not fabric qualification. Cross-host QP reuse, cancellation, native GPU execution and live API quality/performance must still be measured before rollout.
 
 The two old development API containers were stopped during integration because their frozen executables still use TCP inference. Spark weight/kernel artifacts remain intact. No new throughput result is available yet.
+
+## Four-host transport qualification
+
+The `v41_roce_qualify` transport example now runs against all four Spark hosts without loading a checkpoint. Twelve waves at 1/2/6/16/80 rows validated every FP8 input byte and all 852 returned BF16 row chunks. After wave five, the client dropped an enqueued 80-row wave; all seven subsequent checked waves passed. Logs show four initial QP connections and four replacement connections, using RTX `mlx5_0` / 10.55.0.12 and each Spark's `rocep1s0f0` / 10.55.0.1–4. Within each group the QPs were reused across row counts. The server logs include transport retry errors on abandoned connections; recovery succeeded through the replacement QPs. This does not cover mid-GPU cancellation, multiple simultaneous API clients, or GPU direct buffer ownership.
+
+The first attempt failed explicitly because the frozen RTX coordinator native library had `DS41RT_ENABLE_RDMA=OFF`. A separate CUDA/RDMA-enabled fixture library was built from the current native source, with expert/coordinator AOT disabled. The rerun exited zero. This fixture library cannot replace the full coordinator library: the full AOT coordinator build must be rebuilt with RDMA enabled before API rollout. Current release/WIP build scripts already request RDMA; the defect was in the frozen development artifact.
+
+[Raw client/server logs, connection descriptors, byte checks and binary hashes](ds41-native-roce-qualification.json) are retained. These diagnostic runs include first-use initialization and deliberately emit one response message per row. They are correctness evidence, not model performance measurements.
