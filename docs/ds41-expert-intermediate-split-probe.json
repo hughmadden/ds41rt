@@ -1,0 +1,557 @@
+{
+  "schema": 1,
+  "classification": "isolated synthetic CuTeDSL diagnostic; not deployed",
+  "root_revision": "1aceae027e34e78b228566b5769c14317431db30",
+  "b12x_revision": "6adffce7cec21908226d9dd9389cb9e497c4e4a2",
+  "device": {
+    "host": "ostrich",
+    "gpu": "NVIDIA GB10",
+    "uuid": "GPU-a7c503f0-bb16-4333-4f44-92e331dbcf2e",
+    "driver": "580.159.03",
+    "sm_count": 48,
+    "before": {
+      "pstate": "P0",
+      "sm_clock_mhz": 2405
+    },
+    "after": {
+      "pstate": "P8",
+      "sm_clock_mhz": 208
+    },
+    "during_bf16_sweep": {
+      "pstate": "P0",
+      "sm_clock_mhz": 2509
+    }
+  },
+  "image": "sha256:a641a14143728cefc9989807c92b6aff59858adb64d835c7033183148894152d",
+  "measurement": {
+    "warm_graph_replays": 5,
+    "samples_per_arm": 12,
+    "replays_per_sample": 20,
+    "ordering": "baseline/candidate on even samples, candidate/baseline on odd samples",
+    "scope": "route compute; candidate includes scratch clear and ordered FP32 CuTe reduction; excludes encoding, transport, compact BF16 return, coordinator",
+    "telemetry_limit": "No per-arm clock/throttle admission, cache-flush experiment, or DRAM counters. Diagnostic timings, not formal release evidence."
+  },
+  "geometry": {
+    "experts": 384,
+    "hidden": 5120,
+    "intermediate": 576,
+    "padded_intermediate": 640,
+    "topk": 6,
+    "slice_width": 128,
+    "slice_count": 5
+  },
+  "method": "Expand the existing consumer task domain fivefold while retaining grouped route metadata. Each task computes a single intermediate slice and all output columns, writing one of five separate FP32 route planes. Ordered CuTe reduction accumulates planes 0..4 into the existing route output. FC1/activation/FC2 remain fused within each slice. The extra materialization is partial FC2 output, not the FC1 activation intermediate.",
+  "qualification": "Each BF16 case runs the existing independent quantization-aware oracle before the callback. Candidate route planes after reduction are bit exact against baseline, including changed inputs/routes and invalid-route zero output. Graph replay uses stable allocation. FP8 cases additionally compare initial prequantized baseline to BF16 baseline. Synthetic weights; no official-owner or live API candidate qualification.",
+  "cases": {
+    "bf16-m1": {
+      "rows": 1,
+      "active_experts": 6,
+      "expert_m_histogram": [
+        0,
+        6
+      ],
+      "scratch_bytes": 614400,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          208.42878818511963,
+          207.5984001159668,
+          208.03039073944092,
+          246.22559547424316,
+          208.1439971923828,
+          208.25600624084473,
+          250.07519721984863,
+          207.99520015716553,
+          207.88159370422363,
+          209.22720432281494,
+          208.70559215545654,
+          208.20000171661377
+        ],
+        "candidate": [
+          139.58719968795776,
+          141.02400541305542,
+          140.08959531784058,
+          145.21759748458862,
+          139.79040384292603,
+          141.01120233535767,
+          139.4047975540161,
+          141.02879762649536,
+          158.98079872131348,
+          155.31359910964966,
+          140.20960330963135,
+          141.38400554656982
+        ]
+      },
+      "median_us": {
+        "baseline": 208.22800397872925,
+        "candidate": 141.01760387420654
+      },
+      "input": "BF16; slicing diagnostic, not live FP8 transport",
+      "baseline_over_candidate": 1.4766099994471409,
+      "latency_reduction_percent": 32.2773108421038,
+      "raw_log": "/tmp/ds41-intermediate-probe/m1.log",
+      "raw_log_sha256": "bb909448719ea1efe16d09c9a359dacc6f5d63bd764d40078b92154b2fc02c26"
+    },
+    "bf16-m2": {
+      "rows": 2,
+      "active_experts": 6,
+      "expert_m_histogram": [
+        0,
+        0,
+        6
+      ],
+      "scratch_bytes": 1228800,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          445.2256202697754,
+          450.3727912902832,
+          460.04638671875,
+          445.1695919036865,
+          495.01919746398926,
+          464.2127990722656,
+          445.6079959869385,
+          470.1375961303711,
+          455.1424026489258,
+          450.79522132873535,
+          458.5855960845947,
+          475.94079971313477
+        ],
+        "candidate": [
+          214.9343967437744,
+          216.6208028793335,
+          229.4271945953369,
+          230.2095890045166,
+          216.34399890899658,
+          219.16320323944092,
+          220.76640129089355,
+          217.10081100463867,
+          216.8368101119995,
+          218.28958988189697,
+          216.07999801635742,
+          218.11199188232422
+        ]
+      },
+      "median_us": {
+        "baseline": 456.86399936676025,
+        "candidate": 217.60640144348145
+      },
+      "input": "BF16; slicing diagnostic, not live FP8 transport",
+      "baseline_over_candidate": 2.099497056778547,
+      "latency_reduction_percent": 52.36954504073501,
+      "raw_log": "/tmp/ds41-intermediate-probe/m2.log",
+      "raw_log_sha256": "f5e412d4dd4117635a4ed50ab494fe3d38085f35eb2addd53dbc20456e7a41b4"
+    },
+    "bf16-m6": {
+      "rows": 6,
+      "active_experts": 22,
+      "expert_m_histogram": [
+        0,
+        12,
+        7,
+        2,
+        1
+      ],
+      "scratch_bytes": 3686400,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          760.5743885040283,
+          755.515193939209,
+          757.6655864715576,
+          801.6960144042969,
+          758.135986328125,
+          758.4959983825684,
+          791.2496089935303,
+          757.0672035217285,
+          759.3120098114014,
+          761.0112190246582,
+          759.4240188598633,
+          760.4559898376465
+        ],
+        "candidate": [
+          733.29758644104,
+          730.9696197509766,
+          724.7903823852539,
+          730.5823802947998,
+          717.3632144927979,
+          718.7935829162598,
+          717.2656059265137,
+          714.737606048584,
+          719.2336082458496,
+          714.6719932556152,
+          718.0592060089111,
+          717.2128200531006
+        ]
+      },
+      "median_us": {
+        "baseline": 759.3680143356323,
+        "candidate": 718.4263944625854
+      },
+      "input": "BF16; slicing diagnostic, not live FP8 transport",
+      "baseline_over_candidate": 1.0569879116199135,
+      "latency_reduction_percent": 5.391538634777304,
+      "raw_log": "/tmp/ds41-intermediate-probe/m6.log",
+      "raw_log_sha256": "6b318aeb8680287700bdb638462fc85913ee95e0c10e2305f8e46ac9ffd844cc"
+    },
+    "bf16-m80": {
+      "rows": 80,
+      "active_experts": 276,
+      "expert_m_histogram": [
+        0,
+        146,
+        79,
+        33,
+        13,
+        5
+      ],
+      "scratch_bytes": 49152000,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          7448.974609375,
+          7404.862213134766,
+          7411.224365234375,
+          7435.092926025391,
+          7381.871795654297,
+          7392.139434814453,
+          7380.976104736328,
+          7380.171203613281,
+          7380.913543701172,
+          7384.374237060547,
+          7387.368011474609,
+          7382.918548583984
+        ],
+        "candidate": [
+          7375.852966308594,
+          7380.850982666016,
+          7376.564788818359,
+          7398.590087890625,
+          7379.478454589844,
+          7398.8525390625,
+          7376.329803466797,
+          7401.529693603516,
+          7427.681732177734,
+          7374.687957763672,
+          7414.324951171875,
+          7407.478332519531
+        ]
+      },
+      "median_us": {
+        "baseline": 7385.871124267578,
+        "candidate": 7389.72053527832
+      },
+      "input": "BF16; slicing diagnostic, not live FP8 transport",
+      "baseline_over_candidate": 0.9994790857120557,
+      "latency_reduction_percent": -0.05211857810643039,
+      "raw_log": "/tmp/ds41-intermediate-probe/m80.log",
+      "raw_log_sha256": "45a08b3ee0253d11c260e92ff0581747d1bda600a8983866abb782fda8cf6947"
+    },
+    "fp8-m1": {
+      "rows": 1,
+      "active_experts": 6,
+      "expert_m_histogram": [
+        0,
+        6
+      ],
+      "scratch_bytes": 614400,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          211.9744062423706,
+          211.7408037185669,
+          212.1311902999878,
+          211.844801902771,
+          212.68320083618164,
+          215.28000831604004,
+          212.6528024673462,
+          211.79358959197998,
+          213.6847972869873,
+          211.9152069091797,
+          258.35840702056885,
+          212.29760646820068
+        ],
+        "candidate": [
+          150.89600086212158,
+          152.8175950050354,
+          151.64480209350586,
+          152.92479991912842,
+          171.2224006652832,
+          165.64480066299438,
+          151.04639530181885,
+          153.22400331497192,
+          151.2992024421692,
+          153.4208059310913,
+          150.68960189819336,
+          153.331196308136
+        ]
+      },
+      "median_us": {
+        "baseline": 212.21439838409424,
+        "candidate": 152.8711974620819
+      },
+      "input": "prequantized FP8 K32; encoding excluded, native consumer plus ordered CuTe reduction",
+      "baseline_over_candidate": 1.3881908554862454,
+      "latency_reduction_percent": 27.963795752729748,
+      "raw_log": "/tmp/ds41-intermediate-probe/fp8-m1.log",
+      "raw_log_sha256": "8df5f049c72cfdf14e99bea11d6067688edf48e4f0fc92ac7f906dcdf3b8764a"
+    },
+    "fp8-m2": {
+      "rows": 2,
+      "active_experts": 6,
+      "expert_m_histogram": [
+        0,
+        0,
+        6
+      ],
+      "scratch_bytes": 1228800,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          448.96960258483887,
+          471.51198387145996,
+          454.29439544677734,
+          445.5120086669922,
+          439.9600028991699,
+          453.8576126098633,
+          487.18719482421875,
+          461.59839630126953,
+          449.6767997741699,
+          449.8079776763916,
+          474.286413192749,
+          435.42399406433105
+        ],
+        "candidate": [
+          207.43680000305176,
+          209.95359420776367,
+          208.90719890594482,
+          209.58240032196045,
+          208.7183952331543,
+          210.18400192260742,
+          208.09919834136963,
+          210.99200248718262,
+          208.8927984237671,
+          209.7343921661377,
+          208.1808090209961,
+          209.8639965057373
+        ]
+      },
+      "median_us": {
+        "baseline": 451.83279514312744,
+        "candidate": 209.24479961395264
+      },
+      "input": "prequantized FP8 K32; encoding excluded, native consumer plus ordered CuTe reduction",
+      "baseline_over_candidate": 2.1593501772887014,
+      "latency_reduction_percent": 53.689771556385146,
+      "raw_log": "/tmp/ds41-intermediate-probe/fp8-m2.log",
+      "raw_log_sha256": "aa467138b142b8aca6a67ee68f9481215cfd4e9f01a4346036c80790ba29b3aa"
+    },
+    "fp8-m6": {
+      "rows": 6,
+      "active_experts": 22,
+      "expert_m_histogram": [
+        0,
+        12,
+        7,
+        2,
+        1
+      ],
+      "scratch_bytes": 3686400,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          725.544023513794,
+          724.1536140441895,
+          718.5103893280029,
+          686.3120079040527,
+          717.4736022949219,
+          684.7055912017822,
+          685.0895881652832,
+          681.3327789306641,
+          678.5408020019531,
+          679.9263954162598,
+          683.6495876312256,
+          690.0303840637207
+        ],
+        "candidate": [
+          728.1007766723633,
+          751.5679836273193,
+          713.6928081512451,
+          714.4591808319092,
+          713.428783416748,
+          739.3727779388428,
+          712.4207973480225,
+          714.2528057098389,
+          713.7296199798584,
+          712.5904083251953,
+          715.502405166626,
+          713.7775897979736
+        ]
+      },
+      "median_us": {
+        "baseline": 685.700798034668,
+        "candidate": 714.0151977539062
+      },
+      "input": "prequantized FP8 K32; encoding excluded, native consumer plus ordered CuTe reduction",
+      "baseline_over_candidate": 0.9603448220593798,
+      "latency_reduction_percent": -4.12926451309259,
+      "raw_log": "/tmp/ds41-intermediate-probe/fp8-m6.log",
+      "raw_log_sha256": "4e1371b8656270f24c297cb3074460436065bd03ced1ae63e94c23fa79556fc5"
+    },
+    "fp8-m80": {
+      "rows": 80,
+      "active_experts": 276,
+      "expert_m_histogram": [
+        0,
+        146,
+        79,
+        33,
+        13,
+        5
+      ],
+      "scratch_bytes": 49152000,
+      "correctness": "FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation",
+      "graph_us": {
+        "baseline": [
+          7425.4638671875,
+          7473.387145996094,
+          7442.609405517578,
+          7456.614685058594,
+          7422.245025634766,
+          7447.9888916015625,
+          7423.345947265625,
+          7416.255950927734,
+          7445.140838623047,
+          7420.203399658203,
+          7416.811370849609,
+          7417.2637939453125
+        ],
+        "candidate": [
+          7340.795135498047,
+          7348.772430419922,
+          7322.596740722656,
+          7327.710723876953,
+          7322.188568115234,
+          7324.857330322266,
+          7324.683380126953,
+          7375.142669677734,
+          7391.827392578125,
+          7344.376373291016,
+          7350.633239746094,
+          7326.081848144531
+        ]
+      },
+      "median_us": {
+        "baseline": 7424.4049072265625,
+        "candidate": 7334.2529296875
+      },
+      "input": "prequantized FP8 K32; encoding excluded, native consumer plus ordered CuTe reduction",
+      "baseline_over_candidate": 1.012291910083186,
+      "latency_reduction_percent": 1.214265367602907,
+      "raw_log": "/tmp/ds41-intermediate-probe/fp8-m80.log",
+      "raw_log_sha256": "6c88dd04d7b47b094d0c209116a27ecfbb8cb9fe3f8ca89a295168e36a914efc"
+    }
+  },
+  "source_artifacts": {
+    "b12x/moe/_shared/kernels/dynamic.py": {
+      "baseline_sha256": "c49aacaf382bb8e7804017ef209e2c16e33bb500ef2ce74d05f838bd57071dea",
+      "candidate_sha256": "6f2541734103370e8d0df78e312d57d495a1b9285576875896d078e3923404a4"
+    },
+    "b12x/moe/fused_moe/_impl.py": {
+      "baseline_sha256": "a21505ea12952698e4bc602517c619265eb2d86c9de477c1ea4bb6e70adfc328",
+      "candidate_sha256": "f0923a6020193636e434bc4aa795311c13b9d7afc92e7af812e0d6fa36d75660"
+    },
+    "tests/moe/test_v41_expert_numerics.py": {
+      "sha256": "2ca5b23ed01304a3b758610d6cb5d24ca7b2f33f9969181c0452344be1e5895f"
+    }
+  },
+  "patches": {
+    "b12x/moe/_shared/kernels/dynamic.py": "--- b12x/moe/_shared/kernels/dynamic.py\n+++ b12x/moe/_shared/kernels/dynamic.py\n@@ -698,6 +698,7 @@\n         direct_routing: bool = False,\n         external_route_plan: bool = False,\n         prequantized_input: bool = False,\n+        intermediate_split: bool = False,\n         materialize_intermediate: bool = False,\n         work_source: str = _WORK_SOURCE_MATERIALIZED_QUEUE,\n         swiglu_limit: float | None = None,\n@@ -745,7 +746,8 @@\n         # Direct V4.1 decode assigns disjoint N1024 ranges to five tasks per\n         # route. Each retains all K slices and the original accumulation order;\n         # repeated FC1 stays local to the CTA (no global intermediate).\n-        self.v41_output_shards = 5 if self.is_v41 and direct_routing else 1\n+        self.intermediate_split = intermediate_split\n+        self.v41_output_shards = 5 if self.is_v41 and (direct_routing or intermediate_split) else 1\n         if self.is_v41 and (\n             quant_recipe != \"w4a8_mx\"\n             or swap_ab\n@@ -4358,7 +4360,7 @@\n         if self.is_gated and not self.separate_w13_halves:\n             gate_tile_cnt = intermediate_tile_cnt // Int32(2)\n         output_tile_cnt = cute.size(gB_down, mode=[2])\n-        phase1_output_tile_cnt = output_tile_cnt // Int32(self.v41_output_shards)\n+        phase1_output_tile_cnt = output_tile_cnt // Int32(1 if self.intermediate_split else self.v41_output_shards)\n         if cutlass.const_expr(self.materialize_intermediate):\n             # Phase A stops after activation quantization.  Phase B below owns\n             # the full-K FC2 contraction with a finer (M, N256) work domain.\n@@ -4853,6 +4855,10 @@\n                 output_tile_base = output_shard * phase1_output_tile_cnt\n                 task_slice_begin_idx = work_item[_WORK_SLICE_BEGIN] % route_gate_tile_cnt\n                 task_slice_count_val = work_item[_WORK_SLICE_COUNT]\n+                if cutlass.const_expr(self.intermediate_split):\n+                    output_tile_base = Int32(0)\n+                    task_slice_begin_idx = output_shard\n+                    task_slice_count_val = Int32(1)\n                 task_valid_rows_val = work_item[_WORK_VALID_ROWS]\n \n                 alpha_value = alpha[task_expert_idx].to(cutlass.Float32)\n@@ -7735,6 +7741,8 @@\n                                                         scatter_tok_base_addr\n                                                         + v41_row * Int32(4)\n                                                     )\n+                                                    if cutlass.const_expr(self.intermediate_split):\n+                                                        v41_pair += output_shard * (Int32(scatter_output.shape[0]) // Int32(5))\n                                                     # One grouped task owns every intermediate\n                                                     # slice for this route and output column.\n                                                     scatter_output[\n@@ -8007,6 +8015,10 @@\n                 output_tile_base = output_shard * phase1_output_tile_cnt\n                 task_slice_begin_idx = work_item[_WORK_SLICE_BEGIN] % route_gate_tile_cnt\n                 task_slice_count_val = work_item[_WORK_SLICE_COUNT]\n+                if cutlass.const_expr(self.intermediate_split):\n+                    output_tile_base = Int32(0)\n+                    task_slice_begin_idx = output_shard\n+                    task_slice_count_val = Int32(1)\n                 task_valid_rows_val = work_item[_WORK_VALID_ROWS]\n \n                 # gA and gSFA are tiled in 128-row atoms; a sub-128 MMA tile maps\n",
+    "b12x/moe/fused_moe/_impl.py": "--- b12x/moe/fused_moe/_impl.py\n+++ b12x/moe/fused_moe/_impl.py\n@@ -10471,7 +10471,7 @@\n         )\n         scatter_output = cute.make_tensor(\n             scatter_ptr,\n-            layout=cute.make_layout((scatter_rows, self._k), stride=(self._k, 1)),\n+            layout=cute.make_layout((scatter_rows * (5 if self._kernel.intermediate_split else 1), self._k), stride=(self._k, 1)),\n         )\n         # E4M3 storage is one byte per element; the fp4-typed view spans 2k\n         # nibble positions so the byte footprint is k per row.\n@@ -10724,6 +10724,7 @@\n     direct_routing: bool = False,\n     external_route_plan: bool = False,\n     prequantized_input: bool = False,\n+    intermediate_split: bool = False,\n     share_input_across_experts: bool = False,\n     deterministic_output: bool = False,\n     swiglu_limit: float | None = None,\n@@ -10848,6 +10849,7 @@\n         bool(direct_routing),\n         bool(external_route_plan),\n         bool(prequantized_input),\n+        bool(intermediate_split),\n         materialize_intermediate,\n         int(trellis_bits),\n         bool(trellis_coupled),\n@@ -10900,6 +10902,7 @@\n     kernel_kwargs[\"swiglu_beta\"] = swiglu_beta\n     kernel_kwargs[\"direct_routing\"] = bool(direct_routing)\n     kernel_kwargs[\"prequantized_input\"] = bool(prequantized_input)\n+    kernel_kwargs[\"intermediate_split\"] = bool(intermediate_split)\n     if external_route_plan:\n         kernel_kwargs[\"external_route_plan\"] = True\n     if is_w4a8 and int(trellis_bits) > 0:\n"
+  },
+  "reproduction_files": {
+    "probe.py": {
+      "sha256": "41c551844327fa7bcb2a7904c6378a8bd107994b77d4ed6c2879b0207c443ae4",
+      "text": "import inspect,json,os,statistics\nimport torch,cutlass,cutlass.cute as cute\nimport cuda.bindings.driver as cuda\nfrom cutlass.cute.runtime import make_ptr\nfrom b12x._lib.utils import current_cuda_stream\nfrom b12x.moe.fused_moe import _impl as moe\nfrom tests.moe import test_v41_expert_numerics as test\n\nclass Reduce:\n @cute.jit\n def __call__(self, src:cute.Pointer, dst:cute.Pointer, count:cutlass.Int32, stream:cuda.CUstream):\n  self.kernel(src,dst,count).launch(grid=((count+255)//256,1,1),block=(256,1,1),stream=stream)\n @cute.kernel\n def kernel(self,src:cute.Pointer,dst:cute.Pointer,count:cutlass.Int32):\n  block,_,_=cute.arch.block_idx();thread,_,_=cute.arch.thread_idx()\n  idx=cutlass.Int64(block)*cutlass.Int64(256)+cutlass.Int64(thread)\n  a=cute.make_tensor(src,cute.make_layout((cutlass.Int64(count)*5,),stride=(1,)))\n  b=cute.make_tensor(dst,cute.make_layout((count,),stride=(1,)))\n  if idx<count:\n   total=cutlass.Float32(0)\n   for plane in cutlass.range_constexpr(5):\n    total=total+a[cutlass.Int64(plane)*cutlass.Int64(count)+idx]\n   b[idx]=total\n\ndef ptr(t):return make_ptr(cutlass.Float32,t.data_ptr(),cute.AddressSpace.gmem,assumed_align=16)\noriginal=moe._get_dynamic_kernel\nstate={'mode':'baseline','wire':None}\nwrappers={}\n# The W4A8 pointer ABI has no optional runtime operands for this recipe.\nnames=list(inspect.signature(moe._DynamicMoEW4A8Launch.__call__).parameters)[1:]\nscatter_index=names.index('scatter_ptr'); rows_index=names.index('scatter_rows');stream_index=names.index('stream')\n\ndef get(*args,**kwargs):\n baseline,mac=original(*args,**kwargs)\n candidate,cmac=original(*args,**kwargs,intermediate_split=True)\n native_baseline,nmac=original(*args,**kwargs,prequantized_input=True)\n native_candidate,ncmac=original(*args,**kwargs,prequantized_input=True,intermediate_split=True)\n assert mac==cmac==nmac==ncmac\n key=(id(baseline),id(candidate),args[:6])\n if key in wrappers:return wrappers[key]\n count=int(args[1])*int(args[4])*int(args[2])\n scratch=torch.empty(count*5,device='cuda',dtype=torch.float32)\n reduce=cute.compile(Reduce(),ptr(scratch),ptr(scratch),cutlass.Int32(count),current_cuda_stream())\n def run(*launch):\n  altered=list(launch)\n  base,split=baseline,candidate\n  if state['wire'] is not None:\n   altered[0]=make_ptr(cutlass.Uint8,state['wire'].data_ptr(),cute.AddressSpace.gmem,assumed_align=16)\n   base,split=native_baseline,native_candidate\n  if state['mode']=='baseline':return base(*altered)\n  altered[scatter_index]=ptr(scratch)\n  split(*altered)\n  reduce(ptr(scratch),launch[scatter_index],int(launch[rows_index])*5120,launch[stream_index])\n state['scratch']=scratch\n wrappers[key]=(run,mac)\n return wrappers[key]\nmoe._get_dynamic_kernel=get\n\ndef check(binding,x,ids,routing):\n wire=torch.empty((x.shape[0],5280),device='cuda',dtype=torch.uint8)\n def encode():\n  blocks=x.float().reshape(x.shape[0],160,32)\n  exponent=torch.ceil(torch.log2(blocks.abs().amax(-1).clamp_min(1e-4)/448))\n  wire[:,:5120].copy_((blocks/torch.exp2(exponent)[...,None]).to(torch.float8_e4m3fn).view(torch.uint8).reshape(x.shape[0],5120))\n  wire[:,5120:].copy_((exponent+127).to(torch.uint8))\n encode()\n def run(mode):\n  state['mode']=mode\n  return binding.run_route_partials()\n baseline=run('baseline').clone()\n state['wire']=wire\n assert torch.equal(run('baseline'),baseline)\n candidate=run('candidate')\n assert torch.equal(candidate,baseline),('initial', (candidate-baseline).abs().max().item())\n del baseline\n graphs={}\n for mode in ['baseline','candidate']:\n  run(mode);torch.cuda.synchronize()\n  graphs[mode]=torch.cuda.CUDAGraph()\n  with torch.cuda.graph(graphs[mode]): result=run(mode)\n before=torch.cuda.memory_allocated()\n for scale in [0.75,-0.5]:\n  x.mul_(scale);ids.add_(1).remainder_(384)\n  encode()\n  graphs['baseline'].replay();baseline=result.clone()\n  graphs['candidate'].replay()\n  assert torch.equal(result,baseline),('changed',(result-baseline).abs().max().item())\n  del baseline\n assert torch.cuda.memory_allocated()==before\n saved=ids.clone();ids.fill_(-1)\n graphs['candidate'].replay();assert torch.count_nonzero(result)==0\n ids.copy_(saved)\n for _ in range(5):\n  for g in graphs.values():g.replay()\n samples={mode:[] for mode in graphs}\n for iteration in range(12):\n  for mode in (['baseline','candidate'] if iteration%2==0 else ['candidate','baseline']):\n   start,end=torch.cuda.Event(enable_timing=True),torch.cuda.Event(enable_timing=True)\n   start.record()\n   for repeat in range(20):graphs[mode].replay()\n   end.record();end.synchronize()\n   samples[mode].append(start.elapsed_time(end)*1000/20)\n counts=torch.bincount(ids.flatten().long(),minlength=384)\n print(json.dumps({'rows':x.shape[0],'active_experts':int((counts>0).sum()),'expert_m_histogram':torch.bincount(counts[counts>0]).cpu().tolist(),'scratch_bytes':state['scratch'].numel()*4,'correctness':'FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation','graph_us':samples,'median_us':{k:statistics.median(v) for k,v in samples.items()},'input':'prequantized FP8 K32; encoding excluded, native consumer plus ordered CuTe reduction'}),flush=True)\n\nm=int(os.environ.get('PROBE_ROWS','1'))\nsource=inspect.getsource(test._check_v41_native_expert_routing_and_graph)\nif m==2:\n source=source.replace('ids = torch.rand(m, experts, device=\"cuda\").topk(topk, -1).indices.int()','ids = torch.arange(6,device=\"cuda\",dtype=torch.int32).expand(m,6).contiguous()')\nif m==6:\n source=source.replace('ids = torch.rand(m, experts, device=\"cuda\").topk(topk, -1).indices.int()','ids = torch.tensor([[0,1,2,3,4,5],[0,1,6,7,8,9],[0,2,6,10,11,12],[0,3,7,13,14,15],[1,4,8,16,17,18],[2,5,9,19,20,21]],device=\"cuda\",dtype=torch.int32)')\nns=dict(test.__dict__);exec(source,ns)\nns['_check_v41_native_expert_routing_and_graph'](m,576,384,check)\n"
+    },
+    "probe-bf16.py": {
+      "sha256": "9dc3e32a38032bf140de5ee150750de250c1a21870f3f3792ed7d85075eb3fff",
+      "text": "import inspect,json,os,statistics\nimport torch,cutlass,cutlass.cute as cute\nimport cuda.bindings.driver as cuda\nfrom cutlass.cute.runtime import make_ptr\nfrom b12x._lib.utils import current_cuda_stream\nfrom b12x.moe.fused_moe import _impl as moe\nfrom tests.moe import test_v41_expert_numerics as test\n\nclass Reduce:\n @cute.jit\n def __call__(self, src:cute.Pointer, dst:cute.Pointer, count:cutlass.Int32, stream:cuda.CUstream):\n  self.kernel(src,dst,count).launch(grid=((count+255)//256,1,1),block=(256,1,1),stream=stream)\n @cute.kernel\n def kernel(self,src:cute.Pointer,dst:cute.Pointer,count:cutlass.Int32):\n  block,_,_=cute.arch.block_idx();thread,_,_=cute.arch.thread_idx()\n  idx=cutlass.Int64(block)*cutlass.Int64(256)+cutlass.Int64(thread)\n  a=cute.make_tensor(src,cute.make_layout((cutlass.Int64(count)*5,),stride=(1,)))\n  b=cute.make_tensor(dst,cute.make_layout((count,),stride=(1,)))\n  if idx<count:\n   total=cutlass.Float32(0)\n   for plane in cutlass.range_constexpr(5):\n    total=total+a[cutlass.Int64(plane)*cutlass.Int64(count)+idx]\n   b[idx]=total\n\ndef ptr(t):return make_ptr(cutlass.Float32,t.data_ptr(),cute.AddressSpace.gmem,assumed_align=16)\noriginal=moe._get_dynamic_kernel\nstate={'mode':'baseline'}\nwrappers={}\n# The W4A8 pointer ABI has no optional runtime operands for this recipe.\nnames=list(inspect.signature(moe._DynamicMoEW4A8Launch.__call__).parameters)[1:]\nscatter_index=names.index('scatter_ptr'); rows_index=names.index('scatter_rows');stream_index=names.index('stream')\n\ndef get(*args,**kwargs):\n baseline,mac=original(*args,**kwargs)\n candidate,cmac=original(*args,**kwargs,intermediate_split=True)\n assert mac==cmac\n key=(id(baseline),id(candidate),args[:6])\n if key in wrappers:return wrappers[key]\n count=int(args[1])*int(args[4])*int(args[2])\n scratch=torch.empty(count*5,device='cuda',dtype=torch.float32)\n reduce=cute.compile(Reduce(),ptr(scratch),ptr(scratch),cutlass.Int32(count),current_cuda_stream())\n def run(*launch):\n  if state['mode']=='baseline':return baseline(*launch)\n  altered=list(launch);altered[scatter_index]=ptr(scratch)\n  candidate(*altered)\n  reduce(ptr(scratch),launch[scatter_index],int(launch[rows_index])*5120,launch[stream_index])\n state['scratch']=scratch\n wrappers[key]=(run,mac)\n return wrappers[key]\nmoe._get_dynamic_kernel=get\n\ndef check(binding,x,ids,routing):\n def run(mode):\n  state['mode']=mode\n  return binding.run_route_partials()\n baseline=run('baseline').clone()\n candidate=run('candidate')\n assert torch.equal(candidate,baseline),('initial', (candidate-baseline).abs().max().item())\n del baseline\n graphs={}\n for mode in ['baseline','candidate']:\n  run(mode);torch.cuda.synchronize()\n  graphs[mode]=torch.cuda.CUDAGraph()\n  with torch.cuda.graph(graphs[mode]): result=run(mode)\n before=torch.cuda.memory_allocated()\n for scale in [0.75,-0.5]:\n  x.mul_(scale);ids.add_(1).remainder_(384)\n  graphs['baseline'].replay();baseline=result.clone()\n  graphs['candidate'].replay()\n  assert torch.equal(result,baseline),('changed',(result-baseline).abs().max().item())\n  del baseline\n assert torch.cuda.memory_allocated()==before\n saved=ids.clone();ids.fill_(-1)\n graphs['candidate'].replay();assert torch.count_nonzero(result)==0\n ids.copy_(saved)\n for _ in range(5):\n  for g in graphs.values():g.replay()\n samples={mode:[] for mode in graphs}\n for iteration in range(12):\n  for mode in (['baseline','candidate'] if iteration%2==0 else ['candidate','baseline']):\n   start,end=torch.cuda.Event(enable_timing=True),torch.cuda.Event(enable_timing=True)\n   start.record()\n   for repeat in range(20):graphs[mode].replay()\n   end.record();end.synchronize()\n   samples[mode].append(start.elapsed_time(end)*1000/20)\n counts=torch.bincount(ids.flatten().long(),minlength=384)\n print(json.dumps({'rows':x.shape[0],'active_experts':int((counts>0).sum()),'expert_m_histogram':torch.bincount(counts[counts>0]).cpu().tolist(),'scratch_bytes':state['scratch'].numel()*4,'correctness':'FP32 routes bit exact, changed inputs/routes graph, invalid routes zero, stable allocation','graph_us':samples,'median_us':{k:statistics.median(v) for k,v in samples.items()},'input':'BF16; slicing diagnostic, not live FP8 transport'}),flush=True)\n\nm=int(os.environ.get('PROBE_ROWS','1'))\nsource=inspect.getsource(test._check_v41_native_expert_routing_and_graph)\nif m==2:\n source=source.replace('ids = torch.rand(m, experts, device=\"cuda\").topk(topk, -1).indices.int()','ids = torch.arange(6,device=\"cuda\",dtype=torch.int32).expand(m,6).contiguous()')\nif m==6:\n source=source.replace('ids = torch.rand(m, experts, device=\"cuda\").topk(topk, -1).indices.int()','ids = torch.tensor([[0,1,2,3,4,5],[0,1,6,7,8,9],[0,2,6,10,11,12],[0,3,7,13,14,15],[1,4,8,16,17,18],[2,5,9,19,20,21]],device=\"cuda\",dtype=torch.int32)')\nns=dict(test.__dict__);exec(source,ns)\nns['_check_v41_native_expert_routing_and_graph'](m,576,384,check)\n"
+    },
+    "run.sh": {
+      "sha256": "ac7acfb32de7a3fdc0ac540df75440400f80c4ee73fd0fde814bcadb6ea3c1d2",
+      "text": "#!/bin/bash\nset -euo pipefail\nfor probe_rows in 1 2 6 80; do\n ssh ostrich \"docker run --rm --gpus all -v /tmp/ds41-wire-native-source:/workspace/ds41rt:ro -v /tmp/ds41-intermediate-probe:/probe:ro -v /tmp/ds41-intermediate-probe/dynamic.py:/workspace/ds41rt/third_party/sparkinfer/b12x/moe/_shared/kernels/dynamic.py:ro -v /tmp/ds41-intermediate-probe/_impl.py:/workspace/ds41rt/third_party/sparkinfer/b12x/moe/fused_moe/_impl.py:ro -e PYTHONPATH=/workspace/ds41rt/third_party/sparkinfer -e PROBE_ROWS=$probe_rows --entrypoint python ds41rt-spark-expert-dev:latest /probe/probe.py\" > \"/tmp/ds41-intermediate-probe/fp8-m$probe_rows.log\" 2>&1\n tail -1 \"/tmp/ds41-intermediate-probe/fp8-m$probe_rows.log\"\ndone\n"
+    },
+    "run-bf16.sh": {
+      "sha256": "24189e6014261122198362b3ccf7e3da6972efca39f4b0f3ad504d0256c30568",
+      "text": "#!/bin/bash\nset -euo pipefail\nfor probe_rows in 1 2 6 80; do\n ssh ostrich \"docker run --rm --gpus all -v /tmp/ds41-wire-native-source:/workspace/ds41rt:ro -v /tmp/ds41-intermediate-probe:/probe:ro -v /tmp/ds41-intermediate-probe/dynamic.py:/workspace/ds41rt/third_party/sparkinfer/b12x/moe/_shared/kernels/dynamic.py:ro -v /tmp/ds41-intermediate-probe/_impl.py:/workspace/ds41rt/third_party/sparkinfer/b12x/moe/fused_moe/_impl.py:ro -e PYTHONPATH=/workspace/ds41rt/third_party/sparkinfer -e PROBE_ROWS=$probe_rows --entrypoint python ds41rt-spark-expert-dev:latest /probe/probe.py\" > \"/tmp/ds41-intermediate-probe/m$probe_rows.log\" 2>&1\n tail -1 \"/tmp/ds41-intermediate-probe/m$probe_rows.log\"\ndone\n"
+    }
+  },
+  "reproduction_note": "Apply patches to an isolated copy of the pinned b12x source, keep serving source unchanged. run.sh uses FP8 probe.py; to reproduce the BF16 run, use probe-bf16.py at /probe/probe.py. Both historical scripts resolve that same container entrypoint. Full model worker on ostrich was stopped to release GPU allocation capacity. Source diffs and exact probe bodies are embedded to avoid retaining temporary overlays in the serving tree.",
+  "restored_api_smoke": [
+    {
+      "port": 18041,
+      "elapsed_seconds": 0.4837030079215765,
+      "response": {
+        "id": "chatcmpl-14d59f71-5e22-41bc-b8b8-39171f081fb6",
+        "object": "chat.completion",
+        "created": 1789116230,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "ready"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 2,
+          "total_tokens": 11,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 9
+        }
+      }
+    },
+    {
+      "port": 18042,
+      "elapsed_seconds": 0.520492656971328,
+      "response": {
+        "id": "chatcmpl-12d7bd53-b9c4-43af-9843-118508626754",
+        "object": "chat.completion",
+        "created": 1789116230,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "ready"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 9,
+          "completion_tokens": 2,
+          "total_tokens": 11,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 9
+        }
+      }
+    }
+  ]
+}
