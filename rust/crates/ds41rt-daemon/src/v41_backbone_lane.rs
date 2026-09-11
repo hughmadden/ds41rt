@@ -301,12 +301,19 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     ) -> Result<LaneFfn<'_, 'w, 'a>> {
         self.enter(Phase::Query)?;
         let query = self.query.output()?;
+        let timing = std::time::Instant::now();
         let attention = unsafe {
             self.sparse
                 .execute_query(&query, sink, requests, selection)?
         };
+        let sparse_us = timing.elapsed().as_micros() as u64;
         let projected = unsafe { self.projection.execute_attention(&attention)? };
+        let projected_us = timing.elapsed().as_micros() as u64;
         let input = unsafe { self.block.begin_ffn(&projected)? };
+        tracing::debug!(target: "ds41rt::timing", layer=self.layer, rows=projected.rows,
+            sparse_us, projection_us=projected_us-sparse_us,
+            ffn_prepare_us=timing.elapsed().as_micros() as u64-projected_us,
+            "target attention stages");
         self.phase = Phase::Ffn;
         Ok(LaneFfn {
             input,

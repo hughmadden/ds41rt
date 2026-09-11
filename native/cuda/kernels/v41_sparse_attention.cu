@@ -77,7 +77,10 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
   for(int start=0;start<count;start+=64) {
     if(tid<64)refs[tid]=start+tid<count?locate(v,m,
       v.compressed?selected+uint64_t(row)*512:nullptr,start+tid,width):UINT64_MAX;
-    __syncthreads();
+    // An entirely masked tile contributes zero probability and leaves both
+    // online-softmax state and accumulators unchanged. Vote over the same
+    // resolved references used below; valid entries may occur after empty tiles.
+    if(!__syncthreads_or(tid<64 && refs[tid]!=UINT64_MAX))continue;
     for(int i=tid;i<64*512;i+=128) {
       const uint64_t ref=refs[i/512];const int col=i%512;
       __nv_bfloat16 value=__float2bfloat16(0);
