@@ -118,6 +118,68 @@ __global__ void mixes_kernel(const __nv_bfloat16* residual, const float* fn,
     if(lane<16) comb[row*16+lane]=value;
   }
 }
+// Small batches spread the 24 projections across SMs. Each lane retains the
+// original sequential FMA/reduction order, including the residual norm. The
+// normalized projections temporarily occupy the disjoint output arrays; the
+// next kernel consumes all of them before publishing the final coefficients.
+__global__ void project_kernel(const __nv_bfloat16* residual, const float* fn,
+    float* pre, float* post, float* comb) {
+  const uint64_t row=blockIdx.x;
+  const int projection=blockIdx.y, lane=threadIdx.x;
+  float dot=0, square=0;
+#pragma unroll 32
+  for(int col=lane;col<20480;col+=32) {
+    const float x=__bfloat162float(residual[row*20480+col]);
+    dot=fmaf(x,fn[uint64_t(projection)*20480+col],dot);
+    square=fmaf(x,x,square);
+  }
+  dot=warp_sum(dot);
+  square=warp_sum(square);
+  if(lane==0) {
+    dot *= rsqrtf(square/20480.0f+1e-20f);
+    if(projection<4) pre[row*4+projection]=dot;
+    else if(projection<8) post[row*4+projection-4]=dot;
+    else comb[row*16+projection-8]=dot;
+  }
+}
+__global__ void finish_mixes_kernel(const __nv_bfloat16* residual,
+    const float* scale, const float* base, float* pre, float* post, float* comb) {
+  const uint64_t row=blockIdx.x;
+  const int lane=threadIdx.x, warp=0;
+  __shared__ float projected[24];
+  if(lane<24) projected[lane]=lane<4 ? pre[row*4+lane] :
+      lane<8 ? post[row*4+lane-4] : comb[row*16+lane-8];
+  __syncthreads();
+  if(threadIdx.x<4) {
+    const int j=threadIdx.x;
+    const float a=fmaf(projected[j],scale[0],base[j]);
+    const float b=fmaf(projected[j+4],scale[1],base[j+4]);
+    pre[row*4+j]=1.0f/(1.0f+expf(-a))+1e-6f;
+    post[row*4+j]=2.0f/(1.0f+expf(-b));
+  }
+  if(warp==0) {
+    float value=lane<16 ? fmaf(projected[8+lane],scale[2],base[8+lane]) : 0;
+    float maximum=fmaxf(value,__shfl_xor_sync(0xffffffffu,value,1));
+    maximum=fmaxf(maximum,__shfl_xor_sync(0xffffffffu,maximum,2));
+    value=expf(value-maximum);
+    float sum=value+__shfl_xor_sync(0xffffffffu,value,1);
+    sum+=__shfl_xor_sync(0xffffffffu,sum,2);
+    value=value/sum+1e-6f;
+    sum=value+__shfl_xor_sync(0xffffffffu,value,4);
+    sum+=__shfl_xor_sync(0xffffffffu,sum,8);
+    value/=sum+1e-6f;
+    for(int iteration=1;iteration<20;++iteration) {
+      sum=value+__shfl_xor_sync(0xffffffffu,value,1);
+      sum+=__shfl_xor_sync(0xffffffffu,sum,2);
+      value/=sum+1e-6f;
+      sum=value+__shfl_xor_sync(0xffffffffu,value,4);
+      sum+=__shfl_xor_sync(0xffffffffu,sum,8);
+      value/=sum+1e-6f;
+    }
+    if(lane<16) comb[row*16+lane]=value;
+  }
+}
+
 }
 extern "C" int32_t ds41rt_v41_hc_mixes(const uint16_t* residual, const float* fn,
     const float* scale, const float* base, float* pre, float* post, float* comb,
@@ -129,7 +191,16 @@ extern "C" int32_t ds41rt_v41_hc_mixes(const uint16_t* residual, const float* fn
   for(int i=0;i<7;++i) if(!valid(pointers[i],sizes[i],i==0?2:4)) return cudaErrorInvalidValue;
   for(int i=4;i<7;++i) for(int j=0;j<i;++j)
     if(!disjoint(pointers[i],sizes[i],pointers[j],sizes[j])) return cudaErrorInvalidValue;
-  mixes_kernel<<<rows,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
-      reinterpret_cast<const __nv_bfloat16*>(residual),fn,scale,base,pre,post,comb);
+  if(rows<=16) {
+    project_kernel<<<dim3(rows,24),32,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+        reinterpret_cast<const __nv_bfloat16*>(residual),fn,pre,post,comb);
+    auto status=cudaGetLastError();
+    if(status!=cudaSuccess) return status;
+    finish_mixes_kernel<<<rows,32,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+        reinterpret_cast<const __nv_bfloat16*>(residual),scale,base,pre,post,comb);
+  } else {
+    mixes_kernel<<<rows,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+        reinterpret_cast<const __nv_bfloat16*>(residual),fn,scale,base,pre,post,comb);
+  }
   return cudaGetLastError();
 }
