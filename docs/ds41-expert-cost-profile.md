@@ -60,3 +60,20 @@ On ostrich, the existing `B12X_DYNAMIC_W4A8_SHARE_INPUT=1` path passed the FP32 
 Fifteen samples of twenty graph replays gave median 428.54 µs with sharing disabled and 438.96 µs enabled (candidate/baseline 1.0243). The sample distributions overlap. These sequential, warm-cache synthetic runs do **not** establish a regression, release throughput, or real-weight numerical equivalence; the graph also includes final route reduction. They provide no evidence to enable the switch for speed. Keep it disabled and prioritize structural decode task decomposition over this input-packing switch.
 
 [Raw timings, source hashes, exact probe source and reproduction command](ds41-expert-shared-input-probe.json). No direct-routing candidate was tested in this experiment.
+
+## Output-column split prototype
+
+Source inspection identified a small-row parallelism limit: deterministic fused tasks own all intermediate slices and all output columns for one expert/M tile. A one-row top-six request therefore supplies six compute tasks to the 48-SM Spark. This is the task domain derived from source, not a profiler measurement of occupancy.
+
+An isolated CuTeDSL prototype splits each task into five disjoint output-column ranges, expanding that request to thirty compute tasks. Each task repeats FC1 and the V4.1 activation/quantization boundary locally, then reads only its own FC2 columns. Intermediate activations remain in shared memory; FP32 accumulation across intermediate slices retains the original order and each output element has one owner. Queue metadata stays unchanged: the consumer expands and decodes the logical task domain.
+
+| Synthetic Spark graph | Baseline median | Five splits | Ten splits |
+| --- | ---: | ---: | ---: |
+| One row, 384 experts, top six | 432.39 µs | 288.11 µs | 288.86 µs |
+| Six rows, 384 experts, top six | 1,035.59 µs | 886.66 µs | Not tested |
+
+The one-row five-split result repeated at 286.81 and 288.11 µs: approximately 1.50× baseline/candidate speed in this diagnostic. Both row counts passed the existing FP32 oracle thresholds, finite/nonzero checks and changed-input/changed-routing graph replay with stable allocated bytes. Five and ten splits produced exactly the same final changed-input one-row BF16 tensor as the baseline. This exact comparison does not cover FP32 route planes.
+
+The six-row random-routing fixture has different sharing from the live API workload; its timings are not directly comparable to the live 658–664 µs kernel intervals. These graphs also include final route reduction, use synthetic weights and repeated warm-cache routing, and were measured in separate processes. No production speedup or end-to-end TPS change is established. The prototype is an isolated source overlay; live workers and b12x master remain unchanged.
+
+[Raw samples, patch, complete probe source and commands](ds41-expert-output-split-probe.json) preserve the candidate for the next integration step. Before deployment, replace its fixed prototype constant with a validated b12x plan-time configuration, reject unsupported geometry/work sources, preserve runtime-count reuse and scratch ownership, and qualify native AOT execution against real-weight route outputs. Larger verification and prefill capacities need their own selection evidence because repeated FC1 work can outweigh additional parallelism.

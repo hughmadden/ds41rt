@@ -1,0 +1,199 @@
+{
+  "device": {
+    "host": "ostrich",
+    "gpu": "NVIDIA GB10",
+    "uuid": "GPU-a7c503f0-bb16-4333-4f44-92e331dbcf2e",
+    "driver": "580.159.03",
+    "pstate": "P0",
+    "sm_clock_mhz": 2405,
+    "memory_clock": "unavailable"
+  },
+  "image": "sha256:a641a14143728cefc9989807c92b6aff59858adb64d835c7033183148894152d",
+  "b12x_revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "source_sha256": {
+    "b12x/moe/fused_moe/_impl.py": "1111764552e36b6f8c4d97a232a9ce05c7297822be6f258ebfc46c4a6714d684",
+    "b12x/moe/_shared/kernels/dynamic.py": "fa1ac900485e578d081904863fde658267c79789b09de0cb020ba1c8949084f4"
+  },
+  "schema": 1,
+  "root_revision": "5f72a57",
+  "classification": "isolated CuTeDSL prototype; synthetic diagnostic, not deployment or release performance evidence",
+  "arms": {
+    "baseline_m1": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        428.73120307922363,
+        433.2736015319824,
+        432.39359855651855,
+        431.70881271362305,
+        427.43520736694336,
+        429.0112018585205,
+        464.40958976745605,
+        428.3071994781494,
+        478.1504154205322,
+        442.1664237976074,
+        423.97918701171875,
+        452.7376174926758,
+        459.11359786987305,
+        408.40320587158203,
+        437.556791305542
+      ],
+      "median_us": 432.39359855651855
+    },
+    "five_m1": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        286.8112087249756,
+        281.97600841522217,
+        283.6688041687012,
+        285.40000915527344,
+        323.17919731140137,
+        286.2704038619995,
+        285.7311964035034,
+        289.04640674591064,
+        287.26720809936523,
+        285.6735944747925,
+        288.702392578125,
+        322.6464033126831,
+        290.228796005249,
+        286.33439540863037,
+        287.1551990509033
+      ],
+      "median_us": 286.8112087249756
+    },
+    "five_m1_repeat": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        287.8351926803589,
+        285.30399799346924,
+        284.38398838043213,
+        288.10880184173584,
+        324.2176055908203,
+        286.36159896850586,
+        286.64000034332275,
+        318.8927888870239,
+        289.21759128570557,
+        289.2047882080078,
+        290.3775930404663,
+        320.35839557647705,
+        287.8592014312744,
+        291.65759086608887,
+        287.78560161590576
+      ],
+      "median_us": 288.10880184173584
+    },
+    "ten_m1": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        286.18719577789307,
+        284.69600677490234,
+        285.24320125579834,
+        287.79358863830566,
+        324.88958835601807,
+        288.71679306030273,
+        289.2575979232788,
+        325.84640979766846,
+        290.7776117324829,
+        287.9040002822876,
+        310.152006149292,
+        301.52320861816406,
+        286.79680824279785,
+        288.8607978820801,
+        324.30078983306885
+      ],
+      "median_us": 288.8607978820801
+    },
+    "baseline_m6": {
+      "rows": 6,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        1029.3375968933105,
+        1094.5679664611816,
+        1030.4816246032715,
+        1078.4768104553223,
+        1069.6463584899902,
+        1033.0528259277344,
+        1030.1103591918945,
+        1035.5903625488281,
+        1035.7104301452637,
+        1033.2367897033691,
+        1066.1919593811035,
+        1038.4943962097168,
+        1028.6399841308594,
+        1033.4832191467285,
+        1063.9488220214844
+      ],
+      "median_us": 1035.5903625488281
+    },
+    "five_m6": {
+      "rows": 6,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        870.3984260559082,
+        875.3711700439453,
+        910.7935905456543,
+        912.4208450317383,
+        873.5983848571777,
+        910.2815628051758,
+        874.6159553527832,
+        906.2831878662109,
+        874.1439819335938,
+        897.1648216247559,
+        886.6640090942383,
+        874.2192268371582,
+        912.7344131469727,
+        873.2975959777832,
+        899.2992401123047
+      ],
+      "median_us": 886.6640090942383
+    }
+  },
+  "exact_final_bf16_m1": {
+    "five": {
+      "exact": true,
+      "max_abs": 0.0
+    },
+    "ten": {
+      "exact": true,
+      "max_abs": 0.0
+    }
+  },
+  "candidate_over_baseline_m1": 0.6663114412506199,
+  "candidate_over_baseline_m6": 0.8561918314032514,
+  "candidate_sha256": "3d25a780ba92587a8f774e18a14dd941ace58087fa62a26c30c8fda8f1c7c87c",
+  "five_split_patch": "--- a/b12x/moe/_shared/kernels/dynamic.py\n+++ b/b12x/moe/_shared/kernels/dynamic.py\n@@ -735,6 +735,7 @@\n         self.fast_math = fast_math\n         self.activation = activation\n         self.is_v41 = activation == \"silu_v41\"\n+        self.v41_output_shards = 5 if self.is_v41 else 1\n         if self.is_v41 and (\n             quant_recipe != \"w4a8_mx\"\n             or swap_ab\n@@ -2089,6 +2090,8 @@\n         coordinates are properties of the slot itself.\n         \"\"\"\n \n+        output_shard = slot % Int32(self.v41_output_shards)\n+        slot = slot // Int32(self.v41_output_shards)\n         m_tile = slot // num_groups\n         group = slot - m_tile * num_groups\n         slice_begin = group * slice_chunk\n@@ -2097,7 +2100,7 @@\n             slice_count = slice_chunk\n         work_item[_WORK_EXPERT] = task_expert[slot].to(Int32)\n         work_item[_WORK_M_TILE] = m_tile\n-        work_item[_WORK_SLICE_BEGIN] = slice_begin\n+        work_item[_WORK_SLICE_BEGIN] = slice_begin + output_shard * gate_tile_cnt\n         work_item[_WORK_SLICE_COUNT] = slice_count\n         work_item[_WORK_VALID_ROWS] = task_valid_rows[slot].to(Int32)\n \n@@ -4323,7 +4326,7 @@\n         if self.is_gated and not self.separate_w13_halves:\n             gate_tile_cnt = intermediate_tile_cnt // Int32(2)\n         output_tile_cnt = cute.size(gB_down, mode=[2])\n-        phase1_output_tile_cnt = output_tile_cnt\n+        phase1_output_tile_cnt = output_tile_cnt // Int32(self.v41_output_shards)\n         if cutlass.const_expr(self.materialize_intermediate):\n             # Phase A stops after activation quantization.  Phase B below owns\n             # the full-K FC2 contraction with a finer (M, N256) work domain.\n@@ -4639,6 +4642,7 @@\n             materialized_tail = _ld_global_acquire_i32(\n                 get_ptr_as_int64(task_tail, Int32(0))\n             )\n+        materialized_tail *= Int32(self.v41_output_shards)\n         consumer_live = (\n             Int32(0) if cutlass.const_expr(self.external_materialized_fc1) else Int32(1)\n         )\n@@ -4742,6 +4746,7 @@\n                         tail = _ld_global_acquire_i32(\n                             get_ptr_as_int64(task_tail, Int32(0))\n                         )\n+                        tail *= Int32(self.v41_output_shards)\n                         if slot < tail:\n                             self._decode_materialized_work_item(\n                                 work_item,\n@@ -4812,7 +4817,9 @@\n             elif warp_idx < self.num_mma_warps:\n                 task_expert_idx = work_item[_WORK_EXPERT]\n                 task_m_tile_idx = work_item[_WORK_M_TILE]\n-                task_slice_begin_idx = work_item[_WORK_SLICE_BEGIN]\n+                output_shard = work_item[_WORK_SLICE_BEGIN] // route_gate_tile_cnt\n+                output_tile_base = output_shard * phase1_output_tile_cnt\n+                task_slice_begin_idx = work_item[_WORK_SLICE_BEGIN] % route_gate_tile_cnt\n                 task_slice_count_val = work_item[_WORK_SLICE_COUNT]\n                 task_valid_rows_val = work_item[_WORK_VALID_ROWS]\n \n@@ -7645,7 +7652,7 @@\n \n                             # Scatter using precomputed metadata (no redundant\n                             # global metadata loads).\n-                            output_tile_idx_cur = output_tile_idx + Int32(_fc2_out)\n+                            output_tile_idx_cur = output_tile_base + output_tile_idx + Int32(_fc2_out)\n                             tile_n_base_cur = output_tile_idx_cur * Int32(\n                                 self.tile_shape_mnk[1]\n                             )\n@@ -7964,7 +7971,9 @@\n             elif warp_idx < self.num_mma_warps + self.num_dma_warps:\n                 task_expert_idx = work_item[_WORK_EXPERT]\n                 task_m_tile_idx = work_item[_WORK_M_TILE]\n-                task_slice_begin_idx = work_item[_WORK_SLICE_BEGIN]\n+                output_shard = work_item[_WORK_SLICE_BEGIN] // route_gate_tile_cnt\n+                output_tile_base = output_shard * phase1_output_tile_cnt\n+                task_slice_begin_idx = work_item[_WORK_SLICE_BEGIN] % route_gate_tile_cnt\n                 task_slice_count_val = work_item[_WORK_SLICE_COUNT]\n                 task_valid_rows_val = work_item[_WORK_VALID_ROWS]\n \n@@ -8561,7 +8570,7 @@\n                                         w4a8_pipe_addr + Int32(16) + (par2 << Int32(2)),\n                                         need2,\n                                     )\n-                                row_off_p = Int64(_pt) * Int64(128)\n+                                row_off_p = Int64(output_tile_base + _pt) * Int64(128)\n                                 if cutlass.const_expr(self.w4a8_trellis):\n                                     # Down payload is expert-major [E][K16][N16]\n                                     # (K = intermediate, N = hidden). Stage the\n@@ -8612,7 +8621,7 @@\n                                     rp_tile2 = (\n                                         task_expert_idx\n                                         * Int32(b_down_u32.shape[0] // 256)\n-                                        + (_pt >> Int32(1))\n+                                        + ((output_tile_base + _pt) >> Int32(1))\n                                     ) * gate_tile_cnt + cur_slice_p\n                                     _w4a8_stage_repacked_b_full(\n                                         down_rp,\n",
+  "probe_source": "import inspect, json, os, time\nimport torch\nfrom tests.moe import test_v41_expert_numerics as test\nsource = inspect.getsource(test.test_v41_native_expert_routing_and_graph)\nsource = source[source.index('def test_v41_native'):]\nsource += '''\n    torch.save(result.cpu(), \"/output/final.pt\")\n    samples = []\n    for _ in range(5):\n        graph.replay()\n    for _ in range(15):\n        start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)\n        start.record()\n        for repeat in range(20):\n            graph.replay()\n        end.record()\n        end.synchronize()\n        samples.append(start.elapsed_time(end) * 1000 / 20)\n    print(json.dumps(dict(rows=m, experts=experts, intermediate=n, shared_input=os.environ.get(\"B12X_DYNAMIC_W4A8_SHARE_INPUT\"), correctness=\"oracle_and_changed_input_graph_pass\", graph_us=samples)), flush=True)\n'''\nns = dict(test.__dict__, os=os, json=json)\nexec(source, ns)\nns['test_v41_native_expert_routing_and_graph'](int(os.environ.get('PROBE_ROWS','1')), 576, 384)\n",
+  "reproduction": "Apply five_split_patch to an isolated copy of pinned b12x. Save probe_source as /tmp/ds41-output-shard-probe.py. For ten splits replace self.v41_output_shards = 5 if with self.v41_output_shards = 10 if. Use pristine b12x for baseline. Mount candidate file over /b12x/b12x/moe/_shared/kernels/dynamic.py in a separate docker run, never modify the serving artifacts.",
+  "command": "docker run --rm --gpus all -v /tmp/ds41-real-tp4/source/third_party/sparkinfer:/b12x:ro -v /tmp/ds41-output-shard-dynamic.py:/b12x/b12x/moe/_shared/kernels/dynamic.py:ro -v /tmp/ds41-output-shard-probe.py:/probe.py:ro -v /tmp/ds41-shard5-m1:/output -e PROBE_ROWS=1 -e PYTHONPATH=/b12x -e B12X_DYNAMIC_W4A8_SHARE_INPUT=0 -e SPARKINFER_COMPILE_DISK_CACHE=0 --entrypoint python ds41rt-spark-expert-dev:latest /probe.py",
+  "limitations": [
+    "Synthetic random weights and routing at full Spark geometry; fixed warm-cache replay, no official resident layer or native AOT comparison.",
+    "One-row baseline/candidates measured in separate processes; baseline repeated after candidates. Not interleaved exact-object benchmarking.",
+    "Graph includes final BF16 route reduction. Exact output comparison covers the final changed-input one-row BF16 tensor, not FP32 route planes.",
+    "Both tested row counts pass existing oracle, finite/nonzero and changed-input graph checks with stable allocated bytes.",
+    "Prototype assumes divisible output tiles and native repacked nonstreaming V4.1 geometry. It is deliberately not a general supported kernel API.",
+    "No profiler measurement of SM occupancy, traffic, throttle masks or exact compiled-object hashes.",
+    "Six-row routes are random and can differ from the active-expert sharing in API workloads."
+  ],
+  "decision": "Promising single-row candidate; integrate only through validated b12x plan-time policy with qualified geometry, stable runtime counts and native AOT/real-weight checks. Do not globally enable for verification or prefill."
+}
