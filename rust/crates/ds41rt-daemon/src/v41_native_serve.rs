@@ -66,12 +66,49 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
         .map_err(|_| anyhow::anyhow!("native CUDA worker panicked during shutdown"))?;
     Ok(())
 }
+// Reserve a supported AOT capacity once; live prefill chunks retain the user's
+// requested size. All backbone/draft workspaces and transport share this bound.
+fn prefill_capacity(batch_tokens: u32) -> Result<u32> {
+    anyhow::ensure!(
+        (80..=4096).contains(&batch_tokens),
+        "prefill batch must be in 80..=4096"
+    );
+    [80, 256, 1024, 4096]
+        .into_iter()
+        .find(|&capacity| capacity >= batch_tokens)
+        .context("no prefill capacity covers the requested batch")
+}
+
+#[cfg(test)]
+mod prefill_capacity_tests {
+    use super::prefill_capacity;
+
+    #[test]
+    fn intermediate_batches_use_covering_preallocated_capacity() {
+        for (batch, expected) in [
+            (80, 80),
+            (81, 256),
+            (256, 256),
+            (257, 1024),
+            (1024, 1024),
+            (1025, 4096),
+            (2048, 4096),
+            (4096, 4096),
+        ] {
+            assert_eq!(prefill_capacity(batch).unwrap(), expected);
+        }
+        for invalid in [0, 79, 4097, u32::MAX] {
+            assert!(prefill_capacity(invalid).is_err());
+        }
+    }
+}
+
 fn worker(
     args: crate::cli::NativeServeArgs,
     mut receive: mpsc::Receiver<NativeRequest>,
     ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>,
 ) -> Result<()> {
-    let capacity = args.prefill_batch_tokens;
+    let capacity = prefill_capacity(args.prefill_batch_tokens)?;
     let rows = capacity as usize;
     let lib = unsafe { NativeLibrary::load(&args.native_lib)? };
     let catalog = ds41rt_loader::read_official_v41_catalog(
@@ -227,7 +264,7 @@ fn worker(
             &lib,
             &args.snapshot,
             args.max_context_tokens as usize,
-            rows,
+            args.prefill_batch_tokens as usize,
             &runtime,
             &mut pass,
             &mut requests,

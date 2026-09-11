@@ -1,6 +1,6 @@
 # Gate/up staging and shared-memory layout diagnostics
 
-The deployed expert kernel is unchanged. Full K128 gate/up double-buffering loses on prefill. K64 staging and a weight permutation expose useful structural opportunities, but their gains are too small or inconsistent at the serving batch of 1024 to justify a rollout. The follow-up should reduce activation conversion's shared-memory round trips, preserving the established quantization contract.
+The deployed expert kernel is unchanged. Full K128 gate/up double-buffering loses on prefill. K64 staging, weight permutation and register-based activation conversion expose structural opportunities, but their gains are too small or inconsistent at the serving batch of 1024 to justify a rollout. The next end-to-end comparison revisits coordinator batch size after the copy/admission fixes.
 
 All measurements use ostrich, official layer 39/rank 0/all 384 experts, generated activations and skewed/mixed/shared routes, and planned capacity 4096. The native comparator is the deployed atomic library with SHA256 `ca4d7174e0b83eba9d1e06933c61e4a3290e6c48ed1bd4de909a97e275d03628`. Every candidate passes rtol 2e-6 / atol 2e-5, finite/nonzero oracle checks, poisoned output and tail, and graph replay without allocation. This is a bounded component gate, not full-model quality qualification. Six-row results use the large atomic state and must not be reported as serving decode performance.
 
@@ -45,6 +45,16 @@ Nsight Compute 2026.1.1 profiles one qualified 1024-row skewed replay per arm, s
 | Profiled fused-kernel duration | 7.633 ms | 7.388 ms |
 
 The conflict reduction is substantial, but unprofiled graph timings do not reproduce a substantial 1024-row speedup. The remaining conflicts and conversion schedule deserve investigation; they are not proven to be the sole bottleneck. The activation-layout follow-up permutes FP32 intermediate storage within each 32-value block and pads the quantized activation row stride by eight words. It passes the same numerical gate but adds little performance beyond the weight permutation.
+
+## Register-based activation conversion follow-up
+
+The next prototype retains the post-SiLU/routing/BF16-rounded values in the gate registers. Four-lane shuffles reduce each warp's eight-channel maximum, shared memory combines the four warp maxima for each 32-channel block, and neighboring lanes supply pairs to the existing FP8 conversion primitive. The FP32 intermediate shrinks from 12,288 bytes to 1,536 bytes at M16/N192. It preserves the `1e-4` maximum clamp, power-of-two scale calculation and FP8 rounding, and passes all four existing diagnostic cases, graph replay and poison checks.
+
+This still does not establish a useful realistic-prefill win: 1024 skewed graph time is 7.631 ms control versus 7.648 ms register conversion, or 7.608 ms with weight permutation as well. At 4096 skewed it is 15.912 → 15.636/15.598 ms. Uniform mixed improves more, 12.180 → 11.142/11.066 ms, but cannot select the serving policy. Registers rise from 162 to 168 without permutation, or 164 with it; both have zero stack/local bytes. Source-derived dynamic shared allocation drops to 31,104 bytes. No native kernel or resident-format changes are deployed from this experiment.
+
+CUDA driver occupancy queries against the exported images on ostrich confirm maximum active blocks per SM rise from two to three at 128 threads with the declared dynamic shared allocation. This is a theoretical residency limit, not measured achieved occupancy. The numerical and timing results therefore do not support treating residency alone as the limiting factor.
+
+With these realistic-shape gains still small, the next end-to-end check revisits larger coordinator batches after the response-copy/admission fixes. This tests whether better expert sharing can now translate into API throughput, instead of continuing to select kernels using uniform-routing gains.
 
 ## Reproduction artifacts
 

@@ -428,7 +428,8 @@ mod tests {
 
 #[derive(Debug, Args)]
 pub(crate) struct NativeServeArgs {
-    /// Maximum tokens per prefill step; all expert peers must support this capacity.
+    /// Maximum tokens per prefill step. Storage rounds up to an AOT capacity
+    /// (80, 256, 1024, or 4096); all expert peers must support that capacity.
     #[arg(long, default_value_t = 80, value_parser = clap::value_parser!(u32).range(80..=4096))]
     pub prefill_batch_tokens: u32,
 
