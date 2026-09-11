@@ -17,6 +17,7 @@ def main():
     p.add_argument('--target-url', default='http://127.0.0.1:18041')
     p.add_argument('--speculative-url', default='http://127.0.0.1:18042')
     p.add_argument('--filler-tokens', type=int, nargs='+', default=[3950,16384])
+    p.add_argument('--modes', nargs='+', choices=['target','speculative'], default=['target','speculative'])
     p.add_argument('--kinds', nargs='+', choices=['repeated','code'], default=['repeated','code'])
     a = p.parse_args()
     if not a.filler_tokens or min(a.filler_tokens) < 1:
@@ -41,6 +42,8 @@ def main():
             prompt = tokenizer.decode(ids[:count], skip_special_tokens=False)
             prompt += '\nIgnore the filler above. Count from 1 to 20, separated by commas. Output only the numbers.'
             for mode, base in [('target',a.target_url),('speculative',a.speculative_url)]:
+                if mode not in a.modes:
+                    continue
                 body = api['payload'](prompt, stream=True)
                 body['max_tokens'] = 64
                 result = api['stream_case'](base, body)

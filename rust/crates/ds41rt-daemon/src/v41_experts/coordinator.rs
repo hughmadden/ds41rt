@@ -20,6 +20,10 @@ pub(crate) struct NativeTp4Wave<'a> {
     ready_rows: Option<u32>,
 }
 impl<'a> NativeTp4Wave<'a> {
+    /// Admission invalidates prior output; completed RoCE sessions remain reusable.
+    pub fn begin_request(&mut self) {
+        self.ready_rows = None;
+    }
     pub fn reset_connections(&mut self) {
         self.ready_rows = None;
         self.transport.reset_connections();

@@ -217,8 +217,8 @@ fn worker(
             continue;
         }
         id = id.checked_add(1).context("request ID exhausted")?;
-        // Reuse RoCE QPs across model steps; start each admission fresh.
-        transport.reset_connections();
+        // Keep healthy QPs across admissions; request/output ownership is fresh.
+        transport.begin_request();
         let lease = requests.admit(0, id)?;
         if let Some(draft) = &mut draft {
             draft.admit(id)?;
@@ -245,6 +245,9 @@ fn worker(
             draft.release()?;
         }
         if let Err(error) = result {
+            // Also reset failures outside a pending transport borrow (for example
+            // client cancellation between completed model steps).
+            transport.reset_connections();
             let _ = job.events.blocking_send(Err(format!("{error:#}")));
         }
         cleanup?;
