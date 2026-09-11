@@ -52,3 +52,11 @@ The output compactor is a small fraction of expert GPU time. Optimizing it alone
 Next compare V4.1-aware decode plans, input sharing and direct routing with the existing fused grouped path, while preserving V4.1's activation/router-weight/BF16 boundaries. The generic b12x direct/decode candidate predicates do not establish support for `silu_v41`; do not blindly enable old tactics. Extend and qualify the CuTeDSL implementation and plan-time policy where required.
 
 For prefill, increase planned capacity and measure expert occupancy, tile padding, actual DRAM/cache traffic and elapsed time under real routing. Keep coordinator-feed and server-boundary measurements beside kernel timings so improvements do not merely move the bottleneck. Track large-prefill and small-decode paths separately; their reuse and launch costs are different.
+
+## Shared-input decode diagnostic
+
+On ostrich, the existing `B12X_DYNAMIC_W4A8_SHARE_INPUT=1` path passed the FP32 oracle (relative L2 < 0.01, cosine > 0.9999), finite/nonzero output and changed-input/changed-routing CUDA graph replay with stable allocated bytes. This check used synthetic full Spark geometry: one row, 384 experts, top six, hidden 5120, local intermediate 576. The source matched pinned b12x master; no kernel source or live worker artifact changed.
+
+Fifteen samples of twenty graph replays gave median 428.54 µs with sharing disabled and 438.96 µs enabled (candidate/baseline 1.0243). The sample distributions overlap. These sequential, warm-cache synthetic runs do **not** establish a regression, release throughput, or real-weight numerical equivalence; the graph also includes final route reduction. They provide no evidence to enable the switch for speed. Keep it disabled and prioritize structural decode task decomposition over this input-packing switch.
+
+[Raw timings, source hashes, exact probe source and reproduction command](ds41-expert-shared-input-probe.json). No direct-routing candidate was tested in this experiment.

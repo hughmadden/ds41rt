@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "classification": "isolated synthetic diagnostic, not release performance evidence",
+  "root_revision": "a7e0a73",
+  "b12x_revision": "aeb1d8c18e99809797c76af6fbfaca1273c36ff6",
+  "device": {
+    "host": "ostrich",
+    "gpu": "NVIDIA GB10",
+    "uuid": "GPU-a7c503f0-bb16-4333-4f44-92e331dbcf2e",
+    "driver": "580.159.03",
+    "pstate": "P0",
+    "sm_clock_mhz": 2405,
+    "memory_clock": "unavailable"
+  },
+  "image": "sha256:a641a14143728cefc9989807c92b6aff59858adb64d835c7033183148894152d",
+  "source_sha256": {
+    "b12x/moe/fused_moe/_impl.py": "1111764552e36b6f8c4d97a232a9ce05c7297822be6f258ebfc46c4a6714d684",
+    "b12x/moe/_shared/kernels/dynamic.py": "fa1ac900485e578d081904863fde658267c79789b09de0cb020ba1c8949084f4"
+  },
+  "arms": {
+    "baseline": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "0",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        423.1071949005127,
+        428.542423248291,
+        409.5776081085205,
+        417.99678802490234,
+        496.57278060913086,
+        428.58238220214844,
+        454.11839485168457,
+        404.1520118713379,
+        463.53440284729004,
+        426.7263889312744,
+        429.2895793914795,
+        423.8080024719238,
+        420.11680603027344,
+        458.9183807373047,
+        434.47041511535645
+      ],
+      "median_us": 428.542423248291
+    },
+    "candidate": {
+      "rows": 1,
+      "experts": 384,
+      "intermediate": 576,
+      "shared_input": "1",
+      "correctness": "oracle_and_changed_input_graph_pass",
+      "graph_us": [
+        423.0031967163086,
+        439.4991874694824,
+        437.21117973327637,
+        434.3376159667969,
+        457.7792167663574,
+        462.0783805847168,
+        472.53761291503906,
+        420.42717933654785,
+        455.1424026489258,
+        435.05921363830566,
+        444.92640495300293,
+        430.20482063293457,
+        438.95840644836426,
+        467.39039421081543,
+        433.29601287841797
+      ],
+      "median_us": 438.95840644836426
+    }
+  },
+  "candidate_over_baseline": 1.024305605781387,
+  "probe_source": "import inspect, json, os, time\nimport torch\nfrom tests.moe import test_v41_expert_numerics as test\nsource = inspect.getsource(test.test_v41_native_expert_routing_and_graph)\nsource = source[source.index('def test_v41_native'):]\nsource += '''\n    samples = []\n    for _ in range(5):\n        graph.replay()\n    for _ in range(15):\n        start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)\n        start.record()\n        for repeat in range(20):\n            graph.replay()\n        end.record()\n        end.synchronize()\n        samples.append(start.elapsed_time(end) * 1000 / 20)\n    print(json.dumps(dict(rows=m, experts=experts, intermediate=n, shared_input=os.environ.get(\"B12X_DYNAMIC_W4A8_SHARE_INPUT\"), correctness=\"oracle_and_changed_input_graph_pass\", graph_us=samples)), flush=True)\n'''\nns = dict(test.__dict__, os=os, json=json)\nexec(source, ns)\nns['test_v41_native_expert_routing_and_graph'](1, 576, 384)\n",
+  "command": "docker run --rm --gpus all -v /tmp/ds41-real-tp4/source/third_party/sparkinfer:/b12x:ro -v /tmp/ds41-shared-input-probe.py:/probe.py:ro -e PYTHONPATH=/b12x -e B12X_DYNAMIC_W4A8_SHARE_INPUT={0,1} --entrypoint python ds41rt-spark-expert-dev:latest /probe.py",
+  "limitations": [
+    "Separate baseline then candidate processes; not interleaved.",
+    "Synthetic full expert geometry, repeated fixed routing with warm caches; not official resident weights.",
+    "Graph includes route partial reduction to BF16, unlike native worker kernel-only event.",
+    "Live workers remained resident; no API qualification traffic was issued during probe.",
+    "Exact compiled-object hashes, throttle masks and actual DRAM counters not collected.",
+    "No conclusion of regression or numerical equivalence for other row counts."
+  ],
+  "decision": "Leave shared input disabled; no demonstrated speedup. Investigate structural decode task decomposition next."
+}
