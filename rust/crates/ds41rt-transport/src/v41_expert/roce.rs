@@ -99,9 +99,18 @@ pub struct V41Tp4RocePending<'c, 'r> {
     complete: bool,
 }
 impl V41Tp4RocePending<'_, '_> {
-    pub async fn receive<F>(mut self, mut sink: F) -> Result<()>
+    pub async fn receive<F>(self, mut sink: F) -> Result<()>
     where
         F: FnMut(usize, u32, &[u8]) -> Result<()>,
+    {
+        self.receive_owned(|rank, start, payload| sink(rank, start, payload.as_ref())).await
+    }
+    /// Transfer validated payload ownership to the sink. Retain each payload
+    /// until any asynchronous consumer completes, including on failure. A sink
+    /// error abandons this whole wave and resets its QPs; it cannot be resumed.
+    pub async fn receive_owned<F>(mut self, mut sink: F) -> Result<()>
+    where
+        F: FnMut(usize, u32, crate::VerbsHostProtocolV2ResponsePayload) -> Result<()>,
     {
         // Progress all four QPs on the inference owner. Yield for cancellation
         // and other work after bounded polling; no blocking completion wait.
@@ -109,14 +118,17 @@ impl V41Tp4RocePending<'_, '_> {
         loop {
             let receiver = &mut self.receiver;
             if self.owner.clients.poll(|chunk| {
-                receiver.push_rdma(chunk, |rank, start, bytes| {
+                let mut location = None;
+                receiver.push_rdma(&chunk, |rank, start, _bytes| {
                     ensure!(
                         rank == chunk.stream_id,
                         "native executor identity does not match its RoCE peer"
                     );
-                    sink(rank, start, bytes)
+                    location = Some((rank, start));
+                    Ok(())
                 })?;
-                Ok(())
+                let (rank, start) = location.expect("validated chunk has a location");
+                sink(rank, start, chunk.partial_output_payload)
             })? {
                 break;
             }

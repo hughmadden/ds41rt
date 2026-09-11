@@ -79,8 +79,8 @@ impl LocalTp4Client {
             self.done.push(response_rx);
         }
         // The same-thread channels adapt the existing assembler; they never
-        // wake or hand off work to another thread. Each sink consumes its chunk
-        // before polling again, keeping receive-buffer lifetime bounded.
+        // wake or hand off work to another thread. Each sink takes ownership of its chunk; retained pinned frames
+        // return to the session pool only after the owner releases them.
         self.deadline = Some(
             Instant::now()
                 .checked_add(self.config.timeout)
@@ -90,7 +90,7 @@ impl LocalTp4Client {
     }
     pub(crate) fn poll<F>(&mut self, mut sink: F) -> Result<bool>
     where
-        F: FnMut(&VerbsHostProtocolV2ResponseChunk) -> Result<()>,
+        F: FnMut(VerbsHostProtocolV2ResponseChunk) -> Result<()>,
     {
         let deadline = self.deadline.context("local TP4 has no pending request")?;
         anyhow::ensure!(
@@ -109,7 +109,7 @@ impl LocalTp4Client {
                 .as_mut()
                 .context("local TP4 response queue missing")?;
             while let Ok(chunk) = chunks.try_recv() {
-                sink(&chunk)?;
+                sink(chunk)?;
             }
         }
         if self.pending.iter().any(|p| !p.is_empty()) {

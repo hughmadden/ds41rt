@@ -1,10 +1,10 @@
 //! One coordinator wave owns TP route planes through final native reduction.
-use super::{DeviceAllocation, HostAllocation, LoadStream};
+use super::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41CompactReducer};
 use ds41rt_transport::{
     v41_expert::{V41Tp4RocePending, V41Tp4Roce, V41_PARTIAL_ROW_BYTES},
-    ExpertProtocolV2Request,
+    ExpertProtocolV2Request, VerbsHostProtocolV2ResponsePayload,
 };
 
 pub(crate) struct NativeTp4Wave<'a> {
@@ -12,7 +12,7 @@ pub(crate) struct NativeTp4Wave<'a> {
     // Drop drains the stream before fields release any GPU allocations.
     stream: LoadStream<'a>,
     planes: [DeviceAllocation<'a>; 4],
-    upload_staging: HostAllocation<'a>,
+    upload_frames: Vec<VerbsHostProtocolV2ResponsePayload>,
     shared: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     library: &'a NativeLibrary,
@@ -62,7 +62,7 @@ impl<'a> NativeTp4Wave<'a> {
                 raw: library.cuda_stream_create()?,
             },
             planes,
-            upload_staging: HostAllocation::new(library, capacity as usize * 4 * 10240)?,
+            upload_frames: Vec::with_capacity(capacity as usize * 4),
             shared: DeviceAllocation::new(library, hidden_bytes)?,
             output: DeviceAllocation::new(library, hidden_bytes)?,
             library,
@@ -137,7 +137,7 @@ impl<'a> NativeTp4Wave<'a> {
             library: self.library,
             stream: &self.stream,
             planes: &self.planes,
-            upload_staging: &mut self.upload_staging,
+            upload_frames: &mut self.upload_frames,
             shared: self.shared.buffer,
             output: self.output.buffer,
             reducer: &self.reducer,
@@ -254,32 +254,31 @@ fn chunk_destination(
     Ok(destination)
 }
 
-/// A receive frame may be released after copying into this wave's pinned arena.
-/// Each validated chunk owns a disjoint rank/row range until the final drain.
-/// Cancellation and early errors must drain before the arena can be reused.
+/// Retain received pinned frames until uploads finish. Drop also drains on
+/// cancellation or errors, before recycling their host storage.
 struct PlaneUploads<'s, 'a> {
     library: &'a NativeLibrary,
     stream: &'s LoadStream<'a>,
     planes: &'s [DeviceAllocation<'a>; 4],
-    staging: &'s mut HostAllocation<'a>,
+    frames: &'s mut Vec<VerbsHostProtocolV2ResponsePayload>,
     rows: u32,
     pending: bool,
 }
 impl PlaneUploads<'_, '_> {
-    fn copy(&mut self, rank: usize, first_row: u32, bytes: &[u8]) -> Result<()> {
+    fn copy(&mut self, rank: usize, first_row: u32, payload: VerbsHostProtocolV2ResponsePayload) -> Result<()> {
+        let bytes = payload.as_ref();
         let destination = chunk_destination(self.planes, rank, first_row, bytes.len())?;
         let offset = first_row as usize * V41_PARTIAL_ROW_BYTES as usize;
         ensure!(offset + bytes.len() <= self.rows as usize * 10240,
             "native upload exceeds live rows");
-        let plane_bytes = self.staging.buffer.bytes / 4;
-        if self.rows as usize * 10240 > plane_bytes {
+        if payload.pinned_host_buffer().is_none() {
             return self.library.copy_h2d(destination, bytes);
         }
-        let start = rank * plane_bytes + offset;
-        let slice = &mut self.staging.bytes_mut()[start..start + bytes.len()];
-        slice.copy_from_slice(bytes);
+        ensure!(self.frames.len() < self.frames.capacity(), "native retained frame capacity exhausted");
+        // Transfer ownership before enqueue, including a possible partial enqueue error.
+        self.frames.push(payload);
         self.pending = true;
-        unsafe { self.library.copy_h2d_async(destination, slice, self.stream.raw) }
+        unsafe { self.library.copy_h2d_async(destination, self.frames.last().unwrap().as_ref(), self.stream.raw) }
     }
 }
 impl Drop for PlaneUploads<'_, '_> {
@@ -289,6 +288,7 @@ impl Drop for PlaneUploads<'_, '_> {
                 tracing::error!(%error, "draining interrupted native rank uploads");
             }
         }
+        self.frames.clear();
     }
 }
 fn reduce_planes(
@@ -321,7 +321,7 @@ pub(crate) struct NativePendingFfn<'w, 'a, 'r> {
     library: &'a NativeLibrary,
     stream: &'w LoadStream<'a>,
     planes: &'w [DeviceAllocation<'a>; 4],
-    upload_staging: &'w mut HostAllocation<'a>,
+    upload_frames: &'w mut Vec<VerbsHostProtocolV2ResponsePayload>,
     shared: Ds41rtDeviceBuffer,
     output: Ds41rtDeviceBuffer,
     reducer: &'w V41CompactReducer<'a>,
@@ -344,15 +344,15 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
             library: self.library,
             stream: self.stream,
             planes: self.planes,
-            staging: self.upload_staging,
+            frames: self.upload_frames,
             rows: self.request.request().header.row_count,
             pending: false,
         };
         let mut upload_us = 0u64;
         self.pending
-            .receive(|rank, first_row, bytes| {
+            .receive_owned(|rank, first_row, payload| {
                 let copy_start = std::time::Instant::now();
-                let result = uploads.copy(rank, first_row, bytes);
+                let result = uploads.copy(rank, first_row, payload);
                 upload_us += copy_start.elapsed().as_micros() as u64;
                 result
             })
@@ -386,7 +386,7 @@ mod upload_tests {
     use super::*;
 
     #[test]
-    fn pinned_rank_uploads_match_sync_and_drain_on_drop() -> Result<()> {
+    fn pageable_rank_upload_fallback_matches_sync_and_checks_bounds() -> Result<()> {
         let Some(path) = std::env::var_os("DS41RT_PLANE_UPLOAD_LIBRARY") else {
             eprintln!("skip GPU rank upload test: DS41RT_PLANE_UPLOAD_LIBRARY unset");
             return Ok(());
@@ -397,11 +397,11 @@ mod upload_tests {
             .map(|_| DeviceAllocation::new(&library, 4096 * 10240))
             .collect::<Result<Vec<_>>>()?
             .try_into().ok().expect("four planes");
-        let mut staging = HostAllocation::new(&library, 4096 * 4 * 10240)?;
+        let mut frames = Vec::with_capacity(4096 * 4);
         let shared = DeviceAllocation::new(&library, 4096 * 10240)?;
         let output = DeviceAllocation::new(&library, 4096 * 10240)?;
         let reducer = library.v41_compact_reducer()?;
-        let staging_address = staging.buffer.ptr;
+        let frames_address = frames.as_ptr();
         for rows in [1u32, 6, 80, 81, 256, 1024, 4096, 6] {
             let bytes = rows as usize * 10240;
             let shared_bytes: Vec<u8> = (0..bytes / 2)
@@ -424,13 +424,13 @@ mod upload_tests {
             {
                 let mut uploads = PlaneUploads {
                     library: &library, stream: &stream, planes: &planes,
-                    staging: &mut staging, rows, pending: false,
+                    frames: &mut frames, rows, pending: false,
                 };
                 for first in (0..rows).step_by(3) {
                     let end = (first + 3).min(rows);
                     for rank in [3, 1, 0, 2] {
                         uploads.copy(rank, first,
-                            &payloads[rank][first as usize * 10240..end as usize * 10240])?;
+                            VerbsHostProtocolV2ResponsePayload::from_owned(payloads[rank][first as usize * 10240..end as usize * 10240].to_vec()))?;
                     }
                 }
                 reduce_planes(&library, &reducer, &stream, &planes,
@@ -440,27 +440,102 @@ mod upload_tests {
             let mut actual = vec![0u8; bytes];
             library.copy_d2h(&mut actual, Ds41rtDeviceBuffer { bytes, ..output.buffer })?;
             assert_eq!(actual, expected, "rows={rows}");
-            assert_eq!(staging.buffer.ptr, staging_address);
-            // Emulate dropping a receive future after its first upload, including
-            // an early bounds error. The guard must drain before host reuse.
+            assert_eq!(frames.as_ptr(), frames_address);
+            assert!(frames.is_empty());
+            // Pageable fallback completes synchronously, including before a later bounds error.
             for error in [false, true] {
                 library.copy_h2d(planes[0].buffer, &vec![0; 10240])?;
                 {
                     let mut uploads = PlaneUploads {
                         library: &library, stream: &stream, planes: &planes,
-                        staging: &mut staging, rows: 1, pending: false,
+                        frames: &mut frames, rows: 1, pending: false,
                     };
-                    uploads.copy(0, 0, &payloads[0][..10240])?;
-                    if error { assert!(uploads.copy(4, 0, &payloads[0][..10240]).is_err()); }
+                    uploads.copy(0, 0, VerbsHostProtocolV2ResponsePayload::from_owned(payloads[0][..10240].to_vec()))?;
+                    if error { assert!(uploads.copy(4, 0, VerbsHostProtocolV2ResponsePayload::from_owned(payloads[0][..10240].to_vec())).is_err()); }
                 }
-                // Overwriting immediately is safe only after the guard drains.
-                staging.bytes_mut().fill(0);
+                assert!(frames.is_empty());
                 let mut actual = vec![0; 10240];
                 library.copy_d2h(&mut actual, Ds41rtDeviceBuffer { bytes: 10240, ..planes[0].buffer })?;
                 assert_eq!(actual, payloads[0][..10240]);
             }
-            eprintln!("PASS rows={rows}: interleaved chunks/reduction exact, stable staging, cancellation/error drain");
+            eprintln!("PASS rows={rows}: pageable interleaved chunks/reduction exact, stable owner capacity, bounds errors");
         }
         Ok(())
     }
+    #[test]
+    #[ignore = "requires four idle live Spark workers and CUDA native library"]
+    fn retained_roce_uploads_drain_before_recycling_live() -> Result<()> {
+        use ds41rt_transport::{ExpertProtocolV2RowDescriptor, ExpertProtocolV2RouteEntry,
+            ExpertV2SourceKind, ExpertV2Dtype, TcpTransportConfig};
+        let library = unsafe { NativeLibrary::load(std::env::var("DS41RT_PLANE_UPLOAD_LIBRARY")?)? };
+        let stream = LoadStream { library: &library, raw: library.cuda_stream_create()? };
+        let peers = std::env::var("DS41RT_LIVE_ROCE_PEERS")?.split(',')
+            .map(str::parse).collect::<std::result::Result<Vec<std::net::SocketAddr>, _>>()?
+            .try_into().map_err(|_| anyhow::anyhow!("four peers required"))?;
+        let mut client = V41Tp4Roce::new(peers, [1,2,3,4], 4096, TcpTransportConfig {
+            timeout: std::time::Duration::from_secs(30), max_frame_bytes: 64 << 20,
+        })?;
+        let planes = (0..4).map(|_| DeviceAllocation::new(&library, 4096 * 10240))
+            .collect::<Result<Vec<_>>>()?.try_into().ok().expect("four planes");
+        let mut frames = Vec::with_capacity(4096 * 4);
+        let frame_address = frames.as_ptr();
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        runtime.block_on(async {
+            let mut request_id = 900_000;
+            for rows in [1u32,6,80,81,256,1024,4096,6] {
+                let mut hidden = Vec::with_capacity(rows as usize * 5280);
+                for row in 0..rows {
+                    hidden.extend((0..5120).map(|i| 0x30 + ((i+row)%8) as u8));
+                    hidden.extend([120;160]);
+                }
+                let mut request = ExpertProtocolV2Request::new(request_id, 17, 39, 5120,
+                    ExpertV2Dtype::Fp8E4m3Ue8m0K32,
+                    (0..rows).map(|r| ExpertProtocolV2RowDescriptor {
+                        row_id: r as u64, source_kind: ExpertV2SourceKind::Prefill,
+                        source_request_id: request_id, token_position: r as u64,
+                        route_offset: r*6, route_count: 6,
+                    }).collect(),
+                    (0..rows).flat_map(|r| (0..6).map(move |j| ExpertProtocolV2RouteEntry {
+                        row_index: r, expert_id: (r*7+j)%384, gate_weight: 1.0/6.0,
+                    })).collect(), hidden)?;
+                request.header.flags = ds41rt_transport::v41_expert::EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16;
+                for fail in [false,true,false] {
+                    request_id += 1;
+                    request.header.request_id = request_id;
+                    let mut expected: Vec<(usize,u32,Vec<u8>)> = Vec::new();
+                    {
+                        let mut uploads = PlaneUploads { library: &library, stream: &stream,
+                            planes: &planes, frames: &mut frames, rows, pending: false };
+                        let result = client.dispatch(&request).await?.receive_owned(|rank, first, payload| {
+                            ensure!(payload.pinned_host_buffer().is_some(), "live payload is not pinned");
+                            expected.push((rank, first, payload.as_ref().to_vec()));
+                            uploads.copy(rank, first, payload)?;
+                            ensure!(uploads.pending && !uploads.frames.is_empty(), "upload ownership missing");
+                            if fail { anyhow::bail!("injected failure after pinned upload enqueue"); }
+                            Ok(())
+                        }).await;
+                        assert_eq!(result.is_err(), fail);
+                        // QP teardown must not free payloads owned by an active upload.
+                        if fail { client.reset_connections(); }
+                        // Drop simulates cancellation after enqueue and must synchronize
+                        // before returning retained storage to the transport pool.
+                    }
+                    assert!(frames.is_empty());
+                    assert_eq!(frames.as_ptr(), frame_address);
+                    assert!(!expected.is_empty());
+                    if !fail {
+                        assert_eq!(expected.iter().map(|(_,_,b)| b.len()).sum::<usize>(), rows as usize * 4 * 10240);
+                    }
+                    for (rank, first, bytes) in expected {
+                        let mut actual = vec![0;bytes.len()];
+                        library.copy_d2h(&mut actual, chunk_destination(&planes, rank, first, bytes.len())?)?;
+                        assert_eq!(actual, bytes, "rows={rows} fail={fail} rank={rank}");
+                    }
+                }
+                eprintln!("PASS retained rows={rows}: real pinned frames, exact device copies, failure/reset/drop drain and recovery");
+            }
+            Ok(())
+        })
+    }
+
 }
