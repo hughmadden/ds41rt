@@ -10,7 +10,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Keep native vision, all three dSpark stages and their experts, shared experts, routing, attention, sampling and API execution on the RTX.
 - [x] Remove balanced/long/accuracy serving profiles and enforce FP8 target KV in launch settings.
 - [x] Store dSpark committed windows as packed E4M3/E8M0 K32, completing the fixed FP8 persistent-cache representation in the V4.1 components.
-- [ ] Requalify the packed dSpark windows and complete draft graphs on RTX. Spark cache-byte/ownership and attention checks pass; RTX development testing is restored with isolated matching libraries (see `docs/ds41-rtx-testing-restored.md`).
+- [x] Requalify the packed dSpark windows and complete draft graphs on RTX. [Real prefix publication](docs/ds41-dspark-prefix-publication.md) and [complete real-context draft runs](docs/ds41-real-draft-chain.md) pass with the current driver and head/cache implementation.
 - [ ] Preserve streaming, tools, structured constraints, cancellation, admission, error handling, prefix reuse and restart readiness.
 - [ ] Support concurrency 1 through 16 with request-safe state and qualified alternating-wave scheduling.
 - [ ] Measure at least 90 generated tokens/s for target-only decode with dSpark disabled under a documented workload.
@@ -100,9 +100,9 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Execute request-owned text entry, actual distributed layer 0, mapped layer-1 engram gate and prepared layer-1 query on RTX/four Sparks for two changed 80-row batches. Layer-0 outputs remain byte-identical to prior reference-qualified outputs; new layer-1 arithmetic is not independently qualified.
 - [ ] Wire mapped engram tables/scales, bounded asynchronous prefetch, deduplicated gathers, staging and cancellation into execution.
 - [ ] Trigger engram work early for decode, verification and batched prefill and commit accepted-prefix history without stale-wave reuse.
-- [x] Serve real target-only text over native `/v1/chat/completions` with official V4.1 formatting and JSON/SSE parsing. Live response/usage/disconnect recovery pass; two smoke answers match hosted `deepseek-flash`. Repeated single-client short-prompt decode is about 5.8 TPS, well below target. See `docs/ds41-native-api.md`.
+- [x] Serve real target-only text over native `/v1/chat/completions` with official V4.1 formatting and JSON/SSE parsing. Live response/usage/disconnect recovery pass; two smoke answers match hosted `deepseek-flash`. The initial API measured about 5.8 TPS; the [current native API](docs/ds41-speculative-api.md) measures about 10 TPS target-only and 41–43 TPS with dSpark on short counting prompts, still below the release targets.
 - [x] Instrument decode phases and remove sparse-attention graph recapture across layers/token positions; three full-model logit arrays remain byte-exact. Initial repeated API rate improves to about 6.1 TPS; expert collection remains dominant. Idle SIGTERM shutdown drains cleanly. See `docs/ds41-sparse-graph-reuse.md`.
-- [ ] Extend the initial serial greedy 4096-context API path to complete sampling, concurrent batching, full context, vision/dSpark, release launchers and lifecycle/error gates; profile and optimize measured latency.
+- [ ] Extend the initial serial greedy 4096-context API path to complete sampling, concurrent batching, full context, native vision, release launchers and lifecycle/error gates; profile and optimize measured latency.
 - [x] Enable the greedy dSpark proposal/target-verification loop through `serve-native --dspark`, including combined context commits and request cleanup. [Live speculative API](docs/ds41-speculative-api.md) passes streaming, cancellation recovery, EOS/output limits and idle reconnection; concurrent serving and performance targets remain open.
 - [ ] Implement native image preprocessing, ViT, aligner, image-span embeddings and vision routing through the API.
 - [x] Qualify owned dSpark main projection, independent committed KV producers and draft attention with native rotary frequencies on both RTX GPUs.
@@ -113,7 +113,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Chain all three dSpark transformer stages in one graph with validated cross-stage cache bindings and exact residual/pre-mix handoff.
 - [x] Initialize dSpark seed/noise embeddings from the shared coordinator table inside the three-stage graph; qualify changed-token replay on both RTX GPUs.
 - [x] Compose and qualify the complete three-stage dSpark attention/mHC/FFN proposal graph with embedding, Markov, confidence and terminal sampling on both RTX GPUs.
-- [x] Requalify the complete chain with real committed target context and the current FP8 windows/head on RTX. [Real draft runs](docs/ds41-real-draft-chain.md) cover one and sixteen requests, changed-position replay equality and greedy consistency; target verification and acceptance remain open.
+- [x] Requalify the complete chain with real committed target context and the current FP8 windows/head on RTX. [Real draft runs](docs/ds41-real-draft-chain.md) cover one and sixteen requests, changed-position replay equality and greedy consistency; broad numerical and stochastic qualification remain open.
 - [ ] Wire proposal verification, acceptance, RNG ownership, cancellation and rollback across all caches and engram histories.
 - [ ] Complete concurrency-16 admission, mixed prefill/decode/verification scheduling, graph capacity management and alternating-wave overlap.
 
@@ -121,6 +121,7 @@ Completion means a working, qualified release with measured performance, not com
 
 - [ ] Validate real-checkpoint text logits and generation against the official reference with dSpark disabled first.
 - [ ] Validate dSpark proposal distributions, confidence policy, acceptance, rollback and generated-output correctness.
+- [x] Run eight paired live target/dSpark quality cases, including structured output, multilingual text and a 1,363-token retrieval prompt. [Paired results](docs/ds41-speculative-quality.md) match text and usage in every case, with all six objective checks passing; broad quality and independent-reference coverage remain open.
 - [x] Add greedy prefix verification and qualify real single-request full acceptance, forced rejection/resumption and EOS with combined cache/engram publication. [Greedy verification](docs/ds41-greedy-verification.md) matches sequential target tokens; broader quality, stochastic and concurrent acceptance remain open.
 - [ ] Validate single-image, multiple-image, interleaved text and multi-turn vision requests.
 - [ ] Validate long contexts, prefix reuse and exact/bounded CED replay across multi-turn conversations.
@@ -139,16 +140,16 @@ Component records establish their stated scopes, not full-model readiness or the
 
 | Area | Evidence | Remaining integration or qualification |
 | --- | --- | --- |
-| Official checkpoint on all hosts | [Inventory](docs/ds41-checkpoint-inventory.md) | Complete runtime load and execution; inventory is not an all-payload hash audit |
-| b12x master and native TP4 | [Master review](docs/ds41-b12x-master-review.md), [real four-Spark FFNs](docs/ds41-real-tp4-qualification.md) | All-layer startup, cold I/O and full-model scheduling |
-| Engram | [Pipeline](docs/ds41-engram-pipeline.md), [CUDA record](docs/ds41-engram-cuda-qualification.json) | Early prefetch, request histories and residual updates in the model driver |
-| FP8 backbone cache and attention | [KV ownership](docs/ds41-kv-qualification.md), [window](docs/ds41-window-qualification.md), [attention handoffs](docs/ds41-attention-handoff-qualification.md) | CED execution/replay and accepted-prefix scheduling across layers |
-| Backbone mHC and FFNs | [Block sequencing](docs/ds41-block-qualification.md), [shared experts](docs/ds41-backbone-shared-qualification.md), [routing](docs/ds41-backbone-router-qualification.md), [real TP4](docs/ds41-real-tp4-qualification.md) | Full 40-layer driver and numerical qualification |
-| Between-block preparation | [Transition checks](docs/ds41-block-transition-qualification.md), [real target taps and main context](docs/ds41-target-dspark-handoff.md) | Scheduler transactions and accepted context publication |
-| Target initialization | [Embedding and input handoff](docs/ds41-target-embedding-qualification.md) | RTX embedding-to-attention execution and vision replacement |
-| Final target head | [Partial qualification](docs/ds41-target-head-qualification.md) | Final RTX checks after accumulation correction; sampling integration |
-| dSpark | [Draft graph](docs/ds41-dspark-draft-qualification.md), [packed cache](docs/ds41-dspark-fp8-cache-qualification.md) | Full draft-chain RTX requalification after cache/head changes, accepted context publication, verification, acceptance and rollback |
-| Vision, serving and performance | Checklist above | Full native vision path, concurrency 16, API/restart gates and measured throughput |
+| Official checkpoint on all hosts | [Inventory](docs/ds41-checkpoint-inventory.md), [live model execution](docs/ds41-speculative-api.md) | Full release startup and payload integrity audit |
+| b12x master and native TP4 | [Master review](docs/ds41-b12x-master-review.md), [parallel loading](docs/ds41-parallel-expert-loading.md), [direct submission](docs/ds41-native-direct-submission.md) | Concurrent scheduling, transport optimization and release lifecycle |
+| Engram | [Pipeline](docs/ds41-engram-pipeline.md), [combined publication](docs/ds41-dspark-combined-commit.md) | Concurrent/cancelled waves and long-context qualification |
+| FP8 backbone cache and attention | [KV ownership](docs/ds41-kv-qualification.md), [greedy verification](docs/ds41-greedy-verification.md) | Concurrent accepted-prefix scheduling and broader fault coverage |
+| Backbone mHC and FFNs | [Block sequencing](docs/ds41-block-qualification.md), [real TP4](docs/ds41-real-tp4-qualification.md), [live full-model execution](docs/ds41-speculative-api.md) | Broader independent full-model numerical qualification and optimization |
+| Between-block preparation | [Real target taps](docs/ds41-target-dspark-handoff.md), [combined publication](docs/ds41-dspark-combined-commit.md) | Concurrent wave ownership and cancellation |
+| Target initialization | [Embedding handoff](docs/ds41-target-embedding-qualification.md), [live text API](docs/ds41-speculative-api.md) | Native vision replacement |
+| Final target head | [Component qualification](docs/ds41-target-head-qualification.md), [real greedy verification](docs/ds41-greedy-verification.md) | Stochastic sampling and broader numerical comparison |
+| dSpark | [Real draft chain](docs/ds41-real-draft-chain.md), [greedy verification](docs/ds41-greedy-verification.md), [speculative API](docs/ds41-speculative-api.md) | Concurrent/stochastic acceptance, confidence policy, broad quality and rollback faults |
+| Vision, serving and performance | Checklist above | Full native vision, concurrency 16/alternating waves, release launchers, sustained lifecycle gates and throughput targets |
 
 RTX validation is available again: kernel and userspace NVIDIA 595.91.07 match, and CUDA allocation, execution and readback pass on both RTX GPUs and in the coordinator container. Expert traffic uses the 10.55.0.x fabric; the [direct-submission rollout](docs/ds41-native-direct-submission.md) reaches 10.02–10.40 target-only API tokens/s with optimized coordinator and Spark builds. The [parallel loader](docs/ds41-parallel-expert-loading.md) reduces expert loading to 35.7–37.8 seconds per rank; [collection timing evidence](docs/ds41-expert-collection-timing.md) separates GPU work from service/transport overhead. The official checkpoint is available, so use the smallest relevant real-weight fixture or integration run for each change. `TO_DELETE_SCAFFOLDING.md` tracks temporary committed code, not a requirement to delete useful external test data.
 
