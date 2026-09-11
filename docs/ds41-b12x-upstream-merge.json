@@ -1,0 +1,155 @@
+{
+  "merge_revision": "ab88dde04baed1047bcd51f97cc72eaf7005249a",
+  "upstream_revision": "81544c5b76f869f2921b7f9f0438505846307f70",
+  "previous_revision": "b3344c9c98c6ef6363a405cb7d8cad77fe09d13f",
+  "source_lock": {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+    "revision": "ab88dde04baed1047bcd51f97cc72eaf7005249a",
+    "source_tree_sha256": "67bffe93f40424ca4bf062ed968ac9c1e210889e2c797d9fbc9bcbe96d1748e6"
+  },
+  "artifacts": {
+    "/tmp/ds41-upstream-artifacts/build.log": {
+      "sha256": "f0fe4b0037f98f784ceef071970f1ebcb683281e6e980e24ba6fe29392bd2219",
+      "bytes": 7027
+    },
+    "/tmp/ds41-upstream-artifacts/qualification.log": {
+      "sha256": "db444b2092a9f2abd9309c62f7f7adcd3ee84da80c12928fe0cd768c93de80e1",
+      "bytes": 48181
+    },
+    "/tmp/ds41-upstream-artifacts/rope-qualification.json": {
+      "sha256": "a81fd2d1c8f4d89b3ea7ed5b483762060b31ad1aee33f33f83ebe91186c32e0e",
+      "bytes": 13251
+    },
+    "/tmp/ds41-upstream-artifacts/grouped-qualification.json": {
+      "sha256": "0ceb5b45a32c776528c71ff67b1c623a3ec60905612a963cc6813d56838ead17",
+      "bytes": 56921
+    },
+    "/tmp/ds41-upstream-artifacts/target-api.json": {
+      "sha256": "34f140f82d8cc7a54642bd311741480f5e6e08ee42023aceeadbc5ed26548525",
+      "bytes": 119287
+    },
+    "/tmp/ds41-upstream-artifacts/spec-api.json": {
+      "sha256": "7d987e15953ef24a714938fb8510b99f7f3f2a992eba16385dbed26c8c3c4fca",
+      "bytes": 120599
+    },
+    "/tmp/ds41-upstream-artifacts/quality.json": {
+      "sha256": "b7f79f48824eec0aa25e96ffc6151ae45a6ac7d242bb77f2fec4fe7addf12d4e",
+      "bytes": 199769
+    },
+    "/tmp/ds41-upstream-artifacts/create-commands.json": {
+      "sha256": "d6f7f3fabdcb21ff399988f9cf417a552df6f01f1dbffa9058b34ece12428de4",
+      "bytes": 2219
+    },
+    "/tmp/ds41-upstream-artifacts/daemon": {
+      "sha256": "008a8d210e98eedc8cfb35aa259d5e6f06b0e157a8aab403cf0909b8dc972d3a",
+      "bytes": 26765360
+    },
+    "/tmp/ds41-upstream-artifacts/cmake/libds41rt_native.so": {
+      "sha256": "2d5dd6611b2eb34a7a11eaabb4a34b9096c41e297e28050d491141061949fe72",
+      "bytes": 13864264
+    },
+    "/tmp/ds41-upstream-merge/cpu-final.log": {
+      "sha256": "2ccf1c2dbc57caa2522307857d963b1927c2d1430310c5972c5db4313cfacd53",
+      "bytes": 432
+    },
+    "/tmp/ds41-upstream-merge/gpu-tests2.log": {
+      "sha256": "039677a1f60793706b99ef09ce3dec58461e87479f54d12ae24fbedf79ec28e7",
+      "bytes": 16424
+    },
+    "/tmp/ds41-upstream-merge/gpu-tests3.log": {
+      "sha256": "8e63c447287fea6d623e4e011e012e4efba760f238826c968a8f4f0db9317143",
+      "bytes": 21338
+    },
+    "/tmp/ds41-upstream-merge/attention-tests.log": {
+      "sha256": "c1cf776fca04d2365678e7fd72e1eee3728be55f146425f35ebcd0973f92a3fe",
+      "bytes": 100
+    }
+  },
+  "api": {
+    "target": {
+      "counting_tps_samples": [
+        31.04439798698179,
+        31.165000366783296,
+        31.229459092548375
+      ],
+      "median_tps": 31.165000366783296
+    },
+    "spec": {
+      "counting_tps_samples": [
+        101.51453029366441,
+        104.27899282000597,
+        103.42816320946102
+      ],
+      "median_tps": 103.42816320946102
+    }
+  },
+  "quality": [
+    {
+      "name": "arithmetic",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "name": "signed_sort",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "name": "extraction",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "name": "logic",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "name": "unicode",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": false,
+        "speculative": false
+      }
+    },
+    {
+      "name": "translation",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": null,
+        "speculative": null
+      }
+    },
+    {
+      "name": "explanation",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": null,
+        "speculative": null
+      }
+    },
+    {
+      "name": "long_retrieval",
+      "baseline_text_usage_equal": true,
+      "objective_pass": {
+        "target": true,
+        "speculative": true
+      }
+    }
+  ],
+  "rope_cases": 32,
+  "grouped_cases": 174
+}
