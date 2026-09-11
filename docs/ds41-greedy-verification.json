@@ -1,0 +1,140 @@
+{
+  "scope": "Single-request real greedy draft verification and combined accepted-prefix publication. No speculative API, batched acceptance, stochastic verification or throughput qualification.",
+  "checkpoint": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "baseline": [
+    19,
+    14,
+    223,
+    20,
+    14,
+    223,
+    21,
+    14
+  ],
+  "baseline_log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.103s\nPASS full target cycle=0 requests=1 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=0.885\nPASS full target cycle=1 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.156\nPASS full target cycle=2 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.123\nPASS full target cycle=3 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.122\nPASS full target cycle=4 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.121\nPASS full target cycle=5 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.121\nPASS full target cycle=6 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.121\nPASS full target cycle=7 requests=1 input_rows=1 finite_logits=true cache_and_engram_commit=true seconds=0.121\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 7.54s\n\n",
+  "cpu_log": "   Compiling ds41rt-core v0.1.0 (/home/tj/Developer/ds41rt/rust/crates/ds41rt-core)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.52s\n     Running unittests src/lib.rs (rust/target/debug/deps/ds41rt_core-b50514429905cc9c)\n\nrunning 1 test\ntest dspark_verify::tests::greedy_prefix_correction_bonus_and_stopping ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 122 filtered out; finished in 0.00s\n\n",
+  "runs": [
+    {
+      "case": "count",
+      "report": {
+        "inputs": [
+          19,
+          14,
+          223,
+          20,
+          14,
+          223
+        ],
+        "target_next": [
+          14,
+          223,
+          20,
+          14,
+          223,
+          21
+        ],
+        "accepted_inputs": 6,
+        "emitted": [
+          14,
+          223,
+          20,
+          14,
+          223,
+          21
+        ],
+        "eos": false,
+        "length_limit": false,
+        "accepted_end": 22,
+        "committed_end": 23,
+        "resumed_next": 14
+      },
+      "including_anchor_and_resumption": [
+        19,
+        14,
+        223,
+        20,
+        14,
+        223,
+        21,
+        14
+      ],
+      "target_only_match": true,
+      "log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.034s\nreal dSpark weights loaded in 0.615s resident_bytes=8148701064\nPASS real dSpark draft cycle=0 requests=1 end=16 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.049\nPASS real target draft verification {\"inputs\":[19,14,223,20,14,223],\"target_next\":[14,223,20,14,223,21],\"accepted_inputs\":6,\"emitted\":[14,223,20,14,223,21],\"eos\":false,\"length_limit\":false,\"accepted_end\":22,\"committed_end\":23,\"resumed_next\":14}\nPASS full target cycle=0 requests=1 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.402\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 7.33s\n\n"
+    },
+    {
+      "case": "count-rejection",
+      "report": {
+        "inputs": [
+          19,
+          14,
+          224,
+          20,
+          14,
+          223
+        ],
+        "target_next": [
+          14,
+          223,
+          20,
+          14,
+          224,
+          21
+        ],
+        "accepted_inputs": 2,
+        "emitted": [
+          14,
+          223
+        ],
+        "eos": false,
+        "length_limit": false,
+        "accepted_end": 18,
+        "committed_end": 19,
+        "resumed_next": 20
+      },
+      "including_anchor_and_resumption": [
+        19,
+        14,
+        223,
+        20
+      ],
+      "target_only_match": true,
+      "log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.087s\nreal dSpark weights loaded in 0.550s resident_bytes=8148701064\nPASS real dSpark draft cycle=0 requests=1 end=16 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.053\nPASS real target draft verification {\"inputs\":[19,14,224,20,14,223],\"target_next\":[14,223,20,14,224,21],\"accepted_inputs\":2,\"emitted\":[14,223],\"eos\":false,\"length_limit\":false,\"accepted_end\":18,\"committed_end\":19,\"resumed_next\":20}\nPASS full target cycle=0 requests=1 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.603\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 7.53s\n\n"
+    },
+    {
+      "case": "eos",
+      "report": {
+        "inputs": [
+          22,
+          1,
+          129276,
+          22663,
+          22,
+          1
+        ],
+        "target_next": [
+          1,
+          201,
+          22663,
+          22,
+          11621,
+          666
+        ],
+        "accepted_inputs": 2,
+        "emitted": [
+          1
+        ],
+        "eos": true,
+        "length_limit": false,
+        "accepted_end": 20,
+        "committed_end": 20,
+        "resumed_next": null
+      },
+      "including_anchor_and_resumption": [
+        22,
+        1
+      ],
+      "target_only_match": true,
+      "log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.345s\nreal dSpark weights loaded in 0.561s resident_bytes=8148701064\nPASS real dSpark draft cycle=0 requests=1 end=18 finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds=0.054\nPASS real target draft verification {\"inputs\":[22,1,129276,22663,22,1],\"target_next\":[1,201,22663,22,11621,666],\"accepted_inputs\":2,\"emitted\":[1],\"eos\":true,\"length_limit\":false,\"accepted_end\":20,\"committed_end\":20,\"resumed_next\":null}\nPASS full target cycle=0 requests=1 input_rows=18 finite_logits=true cache_and_engram_commit=true seconds=1.439\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 7.74s\n\n"
+    }
+  ]
+}

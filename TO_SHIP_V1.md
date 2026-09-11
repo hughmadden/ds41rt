@@ -120,6 +120,7 @@ Completion means a working, qualified release with measured performance, not com
 
 - [ ] Validate real-checkpoint text logits and generation against the official reference with dSpark disabled first.
 - [ ] Validate dSpark proposal distributions, confidence policy, acceptance, rollback and generated-output correctness.
+- [x] Add greedy prefix verification and qualify real single-request full acceptance, forced rejection/resumption and EOS with combined cache/engram publication. [Greedy verification](docs/ds41-greedy-verification.md) matches sequential target tokens; broader quality, stochastic and concurrent acceptance remain open.
 - [ ] Validate single-image, multiple-image, interleaved text and multi-turn vision requests.
 - [ ] Validate long contexts, prefix reuse and exact/bounded CED replay across multi-turn conversations.
 - [ ] Exercise serving regressions under mixed 16-request text, vision, prefill, decode and verification traffic.

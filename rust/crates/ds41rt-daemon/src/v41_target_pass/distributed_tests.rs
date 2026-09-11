@@ -594,6 +594,157 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                 }
             }
             eprintln!("PASS real dSpark draft cycle={cycle} requests={request_count} end={committed} finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds={:.3}", start.elapsed().as_secs_f64());
+            if std::env::var_os("DS41RT_TARGET_PASS_VERIFY").is_some() && cycle + 1 == cycles {
+                ensure!(
+                    request_count == 1,
+                    "initial verification fixture requires one request"
+                );
+                let mut input = ids.iter().map(|&id| id as u32).collect::<Vec<_>>();
+                if std::env::var_os("DS41RT_TARGET_PASS_VERIFY_CORRUPT").is_some() {
+                    input[2] = (input[2] + 1) % 129280;
+                }
+                let mut verify = requests.prepare(&[RequestTokens {
+                    lease: leases[0],
+                    tokens: &input,
+                    image_mask: None,
+                    kind: ExpertV2SourceKind::MtpVerify,
+                }])?;
+                let selected = (0..input.len()).collect::<Vec<_>>();
+                let output = runtime.block_on(unsafe {
+                    pass.execute(&requests, &mut verify, &mut transport, 0, &selected)
+                })?;
+                let mut bytes = vec![0; output.logits.bytes];
+                lib.copy_d2h(&mut bytes, output.logits)?;
+                let values = bytes
+                    .chunks_exact(4)
+                    .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
+                    .collect::<Vec<_>>();
+                assert!(values.iter().all(|v| v.is_finite()));
+                let next = values
+                    .chunks_exact(129280)
+                    .map(|row| {
+                        // Keep the lower token ID for ties, matching greedy sampling.
+                        row.iter()
+                            .enumerate()
+                            .fold((0, f32::NEG_INFINITY), |best, (i, &v)| {
+                                if v > best.1 {
+                                    (i, v)
+                                } else {
+                                    best
+                                }
+                            })
+                            .0 as u32
+                    })
+                    .collect::<Vec<_>>();
+                let acceptance =
+                    ds41rt_core::verify_dspark_greedy(&input, &next, eos.unwrap_or(1) as u32, 32)
+                        .map_err(anyhow::Error::msg)?;
+                let taps = pass.taps(&verify)?;
+                let mut proposal = unsafe {
+                    main_context.as_mut().unwrap().execute_rows(
+                        taps.values(),
+                        taps.batch_identity(),
+                        taps.rows(),
+                    )?
+                };
+                let [a, b, c] = transaction_windows.as_mut_slice() else {
+                    unreachable!()
+                };
+                unsafe {
+                    pass.commit_with_dspark(
+                        &mut requests,
+                        &mut verify,
+                        &mut proposal,
+                        &mut [a, b, c],
+                        [
+                            &transaction_leases[0],
+                            &transaction_leases[1],
+                            &transaction_leases[2],
+                        ],
+                        &[acceptance.accepted_inputs],
+                    )?;
+                }
+                committed += u64::from(acceptance.accepted_inputs);
+                assert_eq!(requests.cache().committed_end(leases[0])?, committed);
+                for (stage, window) in transaction_windows.iter().enumerate() {
+                    assert_eq!(
+                        window.committed_end(transaction_leases[stage][0])?,
+                        Some(committed)
+                    );
+                }
+                drop(proposal);
+                let accepted_end = committed;
+                let mut resumed_next = None;
+                if !acceptance.eos && !acceptance.length_limit {
+                    let pending = [*acceptance.emitted.last().unwrap()];
+                    let mut resumed = requests.prepare(&[RequestTokens {
+                        lease: leases[0],
+                        tokens: &pending,
+                        image_mask: None,
+                        kind: ExpertV2SourceKind::Decode,
+                    }])?;
+                    let output = runtime.block_on(unsafe {
+                        pass.execute(&requests, &mut resumed, &mut transport, 0, &[0])
+                    })?;
+                    let mut bytes = vec![0; output.logits.bytes];
+                    lib.copy_d2h(&mut bytes, output.logits)?;
+                    resumed_next = Some(
+                        bytes
+                            .chunks_exact(4)
+                            .enumerate()
+                            .map(|(i, b)| (i as u32, f32::from_ne_bytes(b.try_into().unwrap())))
+                            .fold((0, f32::NEG_INFINITY), |best, candidate| {
+                                if candidate.1 > best.1 {
+                                    candidate
+                                } else {
+                                    best
+                                }
+                            })
+                            .0,
+                    );
+                    let taps = pass.taps(&resumed)?;
+                    let mut proposal = unsafe {
+                        main_context.as_mut().unwrap().execute_rows(
+                            taps.values(),
+                            taps.batch_identity(),
+                            taps.rows(),
+                        )?
+                    };
+                    let [a, b, c] = transaction_windows.as_mut_slice() else {
+                        unreachable!()
+                    };
+                    unsafe {
+                        pass.commit_with_dspark(
+                            &mut requests,
+                            &mut resumed,
+                            &mut proposal,
+                            &mut [a, b, c],
+                            [
+                                &transaction_leases[0],
+                                &transaction_leases[1],
+                                &transaction_leases[2],
+                            ],
+                            &[1],
+                        )?;
+                    }
+                    committed += 1;
+                    assert_eq!(requests.cache().committed_end(leases[0])?, committed);
+                    for (stage, window) in transaction_windows.iter().enumerate() {
+                        assert_eq!(
+                            window.committed_end(transaction_leases[stage][0])?,
+                            Some(committed)
+                        );
+                    }
+                }
+                let report = serde_json::json!({"inputs":input,"target_next":next,"accepted_inputs":acceptance.accepted_inputs,"emitted":acceptance.emitted,"eos":acceptance.eos,"length_limit":acceptance.length_limit,"accepted_end":accepted_end,"committed_end":committed,"resumed_next":resumed_next});
+                eprintln!("PASS real target draft verification {report}");
+                if let Some(dir) = std::env::var_os("DS41RT_TARGET_PASS_OUTPUT") {
+                    std::fs::write(
+                        std::path::PathBuf::from(dir).join("verification.json"),
+                        serde_json::to_vec_pretty(&report)?,
+                    )?;
+                }
+            }
         }
         assert!(pass.output(&batch).is_err());
         assert!(pass.taps(&batch).is_err());
