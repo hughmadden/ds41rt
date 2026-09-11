@@ -122,6 +122,30 @@ impl V41Tp4ChunkReceiver {
             max_frame_bytes,
         })
     }
+    /// Validate the owned request without serializing its activation payload.
+    pub(crate) fn from_owned(
+        request: &crate::ExpertProtocolV2Request,
+        max_rows: u32,
+        executors: [u64; 4],
+        max_frame_bytes: usize,
+    ) -> Result<Self> {
+        V41BackboneRequest::validate_owned(request, max_rows)?;
+        ensure!(request.wire_stats().wire_bytes <= max_frame_bytes,
+            "native request exceeds RoCE frame budget");
+        let header_bytes = if request.header.flags & EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM != 0 {
+            EXPERT_PROTOCOL_V2_RESPONSE_DEBUG_HEADER_LEN
+        } else {
+            EXPERT_PROTOCOL_V2_RESPONSE_HEADER_LEN
+        };
+        ensure!(max_frame_bytes >= header_bytes + V41_PARTIAL_ROW_BYTES as usize + 4,
+            "response frame cannot fit one native token row");
+        Ok(Self {
+            identity: V41Tp4Planes::from_header(&request.header, executors)?,
+            received: [0; 4],
+            finished: [false; 4],
+            max_frame_bytes,
+        })
+    }
     pub fn complete(&self) -> bool {
         self.finished.iter().all(|value| *value)
     }

@@ -621,7 +621,7 @@ impl RouterOutput<'_> {
         request.header.flags |=
             ds41rt_transport::v41_expert::EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16;
         // Prove the same complete-batch contract used by every Spark receiver.
-        ds41rt_transport::v41_expert::V41BackboneRequest::parse(&request.encode()?, self.rows)?;
+        ds41rt_transport::v41_expert::V41BackboneRequest::validate_owned(&request, self.rows)?;
         Ok(BoundExpertRequest { request, binding })
     }
 }

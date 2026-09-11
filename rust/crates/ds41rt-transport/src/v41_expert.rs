@@ -20,6 +20,74 @@ pub const V41_HIDDEN: u32 = 5120;
 pub const V41_BACKBONE_TOPK: u32 = 6;
 pub const V41_PARTIAL_ROW_BYTES: u32 = V41_HIDDEN * 2;
 
+// Shared by wire parsing on workers and validation of owned coordinator requests.
+fn validate_canonical(
+    header: &crate::ExpertProtocolV2RequestHeader,
+    max_rows: u32,
+    row_at: impl Fn(usize) -> Result<crate::ExpertProtocolV2RowDescriptor>,
+    route_at: impl Fn(usize) -> Result<crate::ExpertProtocolV2RouteEntry>,
+) -> Result<()> {
+    ensure!(
+        header.flags & EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16 != 0,
+        "native request requires compact BF16 response agreement"
+    );
+    ensure!(
+        header.flags
+            & !(EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM
+                | EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16)
+            == 0,
+        "native complete batches cannot use legacy reduction/compression or stream flags"
+    );
+    ensure!(
+        header.row_count > 0 && header.row_count <= max_rows,
+        "native batch exceeds admitted row capacity"
+    );
+    ensure!(header.layer_id < 40, "native backbone layer out of range");
+    ensure!(
+        header.hidden_dim == V41_HIDDEN
+            && matches!(
+                header.hidden_dtype,
+                ExpertV2Dtype::Bf16 | ExpertV2Dtype::Fp8E4m3Ue8m0K32
+            )
+            && header.hidden_row_stride_bytes as usize
+                == header.hidden_dtype.row_bytes(V41_HIDDEN as usize)?,
+        "native backbone needs contiguous BF16 or E4M3/UE8M0 K32 hidden rows"
+    );
+    ensure!(
+        header.route_count
+            == header
+                .row_count
+                .checked_mul(6)
+                .context("route count overflow")?,
+        "native backbone needs six routes per token"
+    );
+    for row_index in 0..header.row_count {
+        let row = row_at(row_index as usize)?;
+        ensure!(
+            row.route_offset == row_index * 6 && row.route_count == 6,
+            "noncanonical native row route span"
+        );
+        let mut ids = [u32::MAX; 6];
+        for slot in 0..6usize {
+            let route = route_at(row_index as usize * 6 + slot)?;
+            ensure!(
+                route.row_index == row_index && route.expert_id < 384,
+                "invalid native expert route"
+            );
+            ensure!(
+                route.gate_weight.is_finite() && route.gate_weight >= 0.0,
+                "invalid native FP32 routing weight"
+            );
+            ensure!(
+                !ids[..slot].contains(&route.expert_id),
+                "duplicate native expert route in one row"
+            );
+            ids[slot] = route.expert_id;
+        }
+    }
+    Ok(())
+}
+
 /// Validated canonical row-major routing; the same request must reach every TP rank.
 pub struct V41BackboneRequest<'a> {
     view: ExpertProtocolV2RequestView<'a>,
@@ -27,66 +95,15 @@ pub struct V41BackboneRequest<'a> {
 impl<'a> V41BackboneRequest<'a> {
     pub fn parse(frame: &'a [u8], max_rows: u32) -> Result<Self> {
         let view = ExpertProtocolV2RequestView::parse(frame)?;
-        let header = &view.header;
-        ensure!(
-            header.flags & EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16 != 0,
-            "native request requires compact BF16 response agreement"
-        );
-        ensure!(
-            header.flags
-                & !(EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM
-                    | EXPERT_PROTOCOL_V2_FLAG_V41_COMPACT_BF16)
-                == 0,
-            "native complete batches cannot use legacy reduction/compression or stream flags"
-        );
-        ensure!(
-            header.row_count > 0 && header.row_count <= max_rows,
-            "native batch exceeds admitted row capacity"
-        );
-        ensure!(header.layer_id < 40, "native backbone layer out of range");
-        ensure!(
-            header.hidden_dim == V41_HIDDEN
-                && matches!(
-                    header.hidden_dtype,
-                    ExpertV2Dtype::Bf16 | ExpertV2Dtype::Fp8E4m3Ue8m0K32
-                )
-                && header.hidden_row_stride_bytes as usize
-                    == header.hidden_dtype.row_bytes(V41_HIDDEN as usize)?,
-            "native backbone needs contiguous BF16 or E4M3/UE8M0 K32 hidden rows"
-        );
-        ensure!(
-            header.route_count
-                == header
-                    .row_count
-                    .checked_mul(6)
-                    .context("route count overflow")?,
-            "native backbone needs six routes per token"
-        );
-        for row_index in 0..header.row_count {
-            let row = view.row(row_index as usize)?;
-            ensure!(
-                row.route_offset == row_index * 6 && row.route_count == 6,
-                "noncanonical native row route span"
-            );
-            let mut ids = [u32::MAX; 6];
-            for slot in 0..6usize {
-                let route = view.route(row_index as usize * 6 + slot)?;
-                ensure!(
-                    route.row_index == row_index && route.expert_id < 384,
-                    "invalid native expert route"
-                );
-                ensure!(
-                    route.gate_weight.is_finite() && route.gate_weight >= 0.0,
-                    "invalid native FP32 routing weight"
-                );
-                ensure!(
-                    !ids[..slot].contains(&route.expert_id),
-                    "duplicate native expert route in one row"
-                );
-                ids[slot] = route.expert_id;
-            }
-        }
+        validate_canonical(&view.header, max_rows, |i| view.row(i), |i| view.route(i))?;
         Ok(Self { view })
+    }
+    /// Check a locally owned request using the worker's canonical contract,
+    /// without serializing or copying its activation payload.
+    pub fn validate_owned(request: &crate::ExpertProtocolV2Request, max_rows: u32) -> Result<()> {
+        request.validate()?;
+        validate_canonical(&request.header, max_rows,
+            |i| Ok(request.rows[i].clone()), |i| Ok(request.routes[i].clone()))
     }
     pub fn rows(&self) -> u32 {
         self.view.header.row_count
@@ -174,13 +191,15 @@ pub struct V41Tp4Planes<'a> {
 }
 impl<'a> V41Tp4Planes<'a> {
     pub fn new(request: &V41BackboneRequest<'_>, executors: [u64; 4]) -> Result<Self> {
+        Self::from_header(&request.view.header, executors)
+    }
+    fn from_header(h: &crate::ExpertProtocolV2RequestHeader, executors: [u64; 4]) -> Result<Self> {
         for (rank, id) in executors.iter().enumerate() {
             ensure!(
                 *id != 0 && !executors[..rank].contains(id),
                 "TP4 requires four distinct executor identities"
             );
         }
-        let h = &request.view.header;
         Ok(Self {
             request_id: h.request_id,
             placement_version: h.placement_version,
@@ -367,10 +386,36 @@ mod tests {
                     owned.header.route_bytes = 60;
                 }
             }
+            assert!(V41Tp4ChunkReceiver::from_owned(&owned, 16, [11,22,33,44], 1 << 20).is_err());
             match owned.encode() {
                 Ok(frame) => assert!(V41BackboneRequest::parse(&frame, 16).is_err()),
                 Err(_) => {}
             }
+        }
+    }
+    #[test]
+    fn owned_receiver_validates_capacity_extent_and_response_identity() {
+        let executors = [11,22,33,44];
+        let budget = 64 << 20;
+        for rows in [1,80,1024,4096] {
+            let owned = request(rows);
+            let frame = owned.encode().unwrap();
+            let native = V41BackboneRequest::parse(&frame, 4096).unwrap();
+            let mut receiver = V41Tp4ChunkReceiver::from_owned(&owned, 4096, executors, budget).unwrap();
+            assert!(V41Tp4ChunkReceiver::from_owned(&owned, rows-1, executors, budget).is_err());
+            assert!(V41Tp4ChunkReceiver::from_owned(&owned, 4096, executors, frame.len()-1).is_err());
+            assert!(V41Tp4ChunkReceiver::from_owned(&owned, 4096, [11;4], budget).is_err());
+            let payload = vec![0; native.plane_bytes().unwrap()];
+            for rank in [3,0,2,1] {
+                let response = native.response(executors[rank], &payload).unwrap().to_owned().unwrap().encode().unwrap();
+                receiver.push(&response, |r, start, bytes| {
+                    assert_eq!((r,start,bytes.len()), (rank,0,payload.len())); Ok(())
+                }).unwrap();
+            }
+            assert!(receiver.complete());
+            let mut malformed = owned.clone();
+            malformed.hidden_payload = bytes::Bytes::new();
+            assert!(V41Tp4ChunkReceiver::from_owned(&malformed, 4096, executors, budget).is_err());
         }
     }
     #[test]

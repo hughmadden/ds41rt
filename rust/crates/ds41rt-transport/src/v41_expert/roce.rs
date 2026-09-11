@@ -1,5 +1,7 @@
 //! TP4 dispatch through persistent RoCE QPs; TCP is used only for bootstrap.
-use super::{V41BackboneRequest, V41Tp4ChunkReceiver};
+use super::V41Tp4ChunkReceiver;
+#[cfg(test)]
+use super::V41BackboneRequest;
 use crate::verbs::LocalTp4Client;
 use crate::{ExpertProtocolV2Request, TcpTransportConfig};
 use anyhow::{ensure, Result};
@@ -75,13 +77,9 @@ impl V41Tp4Roce {
         &'c mut self,
         request: &'r ExpertProtocolV2Request,
     ) -> Result<V41Tp4RocePending<'c, 'r>> {
-        let frame = request.encode()?;
-        ensure!(
-            frame.len() <= self.max_frame_bytes,
-            "native request exceeds RoCE frame budget"
-        );
-        let native = V41BackboneRequest::parse(&frame, self.capacity)?;
-        let receiver = V41Tp4ChunkReceiver::new(&native, self.executors, self.max_frame_bytes)?;
+        let receiver = V41Tp4ChunkReceiver::from_owned(
+            request, self.capacity, self.executors, self.max_frame_bytes,
+        )?;
         self.clients.dispatch(request)?;
         Ok(V41Tp4RocePending {
             receiver,
