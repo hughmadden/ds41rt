@@ -13,7 +13,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-lib", required=True)
     parser.add_argument("--width", type=int, choices=(64, 128, 192), required=True)
+    parser.add_argument(
+        "--capacities",
+        default="1,16,80",
+        help="Only check these native capacity variants",
+    )
     options = parser.parse_args()
+    capacities = {int(x) for x in options.capacities.split(",")}
+    if not capacities or not capacities <= {1, 16, 80}:
+        parser.error("capacities must be a nonempty subset of 1,16,80")
+    checked = set()
     lib = library(options.native_lib)
     owners = {}
 
@@ -21,6 +30,8 @@ def main():
         rows = case["rows"]
         weights, wire, ids_cpu, routing = case["native_inputs"]
         capacity = 1 if rows == 1 else 16 if rows <= 16 else 80
+        if capacity not in capacities:
+            return
         if capacity not in owners:
             ids = torch.empty(capacity, 6, dtype=torch.int32, device="cuda")
             rw = torch.empty(capacity, 6, device="cuda")
@@ -51,6 +62,7 @@ def main():
             summed += plane
         reference[pairs[:, 0] * 6 + pairs[:, 1]] = summed
         assert torch.equal(native.output, reference), case["case"]
+        checked.add(capacity)
         print(
             "NATIVE "
             + json.dumps(
@@ -66,6 +78,7 @@ def main():
         )
 
     _check_grouped_slices(options.width, after_case=check)
+    assert checked == capacities, (checked, capacities)
     for _, _, _, graph in owners.values():
         graph.reset()
 

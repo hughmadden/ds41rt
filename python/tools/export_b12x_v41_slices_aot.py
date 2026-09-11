@@ -44,8 +44,9 @@ def export(output, capacities, width):
     )
     includes, entries = [], []
     for capacity in capacities:
+        selected_width = width[capacity] if isinstance(width, dict) else width
         routes = capacity * 6
-        planes = (576 + width - 1) // width
+        planes = (576 + selected_width - 1) // selected_width
         specs = [
             (cutlass.Uint32, (capacity, 1280), (1320, 1)),
             (cutlass.Uint8, (capacity, 160), (5280, 1)),
@@ -69,9 +70,9 @@ def export(output, capacities, width):
             make_fake_tensor(dtype, shape, stride, assumed_align=16)
             for dtype, shape, stride in specs
         ]
-        label = f"v41_slices_m{capacity}_w{width}"
+        label = f"v41_slices_m{capacity}_w{selected_width}"
         compiled = cute.compile(
-            V41SlicePipeline(capacity, width),
+            V41SlicePipeline(capacity, selected_width),
             *args,
             cutlass.Int32(capacity),
             current_cuda_stream(),
@@ -198,6 +199,7 @@ def export(output, capacities, width):
         manifest["variants"].append(
             dict(
                 name=label,
+                width=selected_width,
                 capacity_rows=capacity,
                 core_scratch_nbytes=offset,
                 scratch=scratch,
@@ -230,7 +232,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--rows", default="1,16,80")
-    parser.add_argument("--width", type=int, choices=(64, 128, 192), required=True)
+    parser.add_argument(
+        "--width",
+        required=True,
+        help="64/128/192 or explicit capacity:width pairs, e.g. 1:64,16:192,80:192",
+    )
     args = parser.parse_args()
     capacities = tuple(int(x) for x in args.rows.split(","))
     if (
@@ -239,4 +245,18 @@ if __name__ == "__main__":
         or any(x < 1 or x > 4096 for x in capacities)
     ):
         parser.error("rows must be unique capacities in 1..4096")
-    export(args.output_dir, capacities, args.width)
+    try:
+        if ":" in args.width:
+            pairs = [tuple(map(int, x.split(":"))) for x in args.width.split(",")]
+            width = dict(pairs)
+            if len(width) != len(pairs) or set(width) != set(capacities):
+                raise ValueError("width map must cover every capacity exactly once")
+            widths = width.values()
+        else:
+            width = int(args.width)
+            widths = [width]
+        if any(w not in (64, 128, 192) for w in widths):
+            raise ValueError("width must be 64, 128 or 192")
+    except (ValueError, TypeError) as error:
+        parser.error(str(error))
+    export(args.output_dir, capacities, width)

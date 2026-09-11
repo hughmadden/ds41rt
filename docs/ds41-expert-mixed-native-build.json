@@ -1,0 +1,860 @@
+{
+  "manifest": {
+    "schema": 1,
+    "experimental": true,
+    "role": "spark",
+    "input_format": "fp8_k32",
+    "sparkinfer_revision": "c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+    "capability": [
+      12,
+      1
+    ],
+    "physical_sms": 48,
+    "width": {
+      "1": 64,
+      "16": 192,
+      "80": 192,
+      "256": 192,
+      "1024": 192,
+      "4096": 192
+    },
+    "variants": [
+      {
+        "name": "v41_slices_m1_w64",
+        "width": 64,
+        "capacity_rows": 1,
+        "core_scratch_nbytes": 1246240,
+        "scratch": [
+          {
+            "slot": 3,
+            "offset": 0,
+            "nbytes": 4,
+            "shape": [
+              1
+            ]
+          },
+          {
+            "slot": 4,
+            "offset": 16,
+            "nbytes": 9216,
+            "shape": [
+              2304
+            ]
+          },
+          {
+            "slot": 5,
+            "offset": 9232,
+            "nbytes": 1536,
+            "shape": [
+              384
+            ]
+          },
+          {
+            "slot": 6,
+            "offset": 10768,
+            "nbytes": 3072,
+            "shape": [
+              384,
+              2
+            ]
+          },
+          {
+            "slot": 7,
+            "offset": 13840,
+            "nbytes": 456,
+            "shape": [
+              6,
+              19
+            ]
+          },
+          {
+            "slot": 8,
+            "offset": 14304,
+            "nbytes": 24,
+            "shape": [
+              6
+            ]
+          },
+          {
+            "slot": 9,
+            "offset": 14336,
+            "nbytes": 24,
+            "shape": [
+              6
+            ]
+          },
+          {
+            "slot": 10,
+            "offset": 14368,
+            "nbytes": 1105920,
+            "shape": [
+              9,
+              6,
+              5120
+            ]
+          },
+          {
+            "slot": 41,
+            "offset": 1120288,
+            "nbytes": 122880,
+            "shape": [
+              6,
+              5120
+            ]
+          }
+        ],
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          0,
+          16,
+          9232,
+          10768,
+          13840,
+          14304,
+          14336,
+          14368,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          0,
+          1243168,
+          null,
+          null,
+          1244704,
+          1120288,
+          0,
+          0
+        ],
+        "native_entry": "_mlir_ds41rt_v41_slices_m1_w64__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint321128013201_FakeTensorUint8116052801_FakeTensorUint323145728001_FakeTensorUint321"
+      },
+      {
+        "name": "v41_slices_m16_w192",
+        "width": 192,
+        "capacity_rows": 16,
+        "core_scratch_nbytes": 8027536,
+        "scratch": [
+          {
+            "slot": 3,
+            "offset": 0,
+            "nbytes": 4,
+            "shape": [
+              1
+            ]
+          },
+          {
+            "slot": 4,
+            "offset": 16,
+            "nbytes": 147456,
+            "shape": [
+              36864
+            ]
+          },
+          {
+            "slot": 5,
+            "offset": 147472,
+            "nbytes": 1536,
+            "shape": [
+              384
+            ]
+          },
+          {
+            "slot": 6,
+            "offset": 149008,
+            "nbytes": 3072,
+            "shape": [
+              384,
+              2
+            ]
+          },
+          {
+            "slot": 7,
+            "offset": 152080,
+            "nbytes": 7296,
+            "shape": [
+              96,
+              19
+            ]
+          },
+          {
+            "slot": 8,
+            "offset": 159376,
+            "nbytes": 384,
+            "shape": [
+              96
+            ]
+          },
+          {
+            "slot": 9,
+            "offset": 159760,
+            "nbytes": 384,
+            "shape": [
+              96
+            ]
+          },
+          {
+            "slot": 10,
+            "offset": 160144,
+            "nbytes": 5898240,
+            "shape": [
+              3,
+              96,
+              5120
+            ]
+          },
+          {
+            "slot": 41,
+            "offset": 6058384,
+            "nbytes": 1966080,
+            "shape": [
+              96,
+              5120
+            ]
+          }
+        ],
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          0,
+          16,
+          147472,
+          149008,
+          152080,
+          159376,
+          159760,
+          160144,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          0,
+          8024464,
+          null,
+          null,
+          8026000,
+          6058384,
+          0,
+          0
+        ],
+        "native_entry": "_mlir_ds41rt_v41_slices_m16_w192__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint3216128013201_FakeTensorUint81616052801_FakeTensorUint323145728001_FakeTensorUint3"
+      },
+      {
+        "name": "v41_slices_m80_w192",
+        "width": 192,
+        "capacity_rows": 80,
+        "core_scratch_nbytes": 40106896,
+        "scratch": [
+          {
+            "slot": 3,
+            "offset": 0,
+            "nbytes": 4,
+            "shape": [
+              1
+            ]
+          },
+          {
+            "slot": 4,
+            "offset": 16,
+            "nbytes": 737280,
+            "shape": [
+              184320
+            ]
+          },
+          {
+            "slot": 5,
+            "offset": 737296,
+            "nbytes": 1536,
+            "shape": [
+              384
+            ]
+          },
+          {
+            "slot": 6,
+            "offset": 738832,
+            "nbytes": 3072,
+            "shape": [
+              384,
+              2
+            ]
+          },
+          {
+            "slot": 7,
+            "offset": 741904,
+            "nbytes": 36480,
+            "shape": [
+              480,
+              19
+            ]
+          },
+          {
+            "slot": 8,
+            "offset": 778384,
+            "nbytes": 1920,
+            "shape": [
+              480
+            ]
+          },
+          {
+            "slot": 9,
+            "offset": 780304,
+            "nbytes": 1920,
+            "shape": [
+              480
+            ]
+          },
+          {
+            "slot": 10,
+            "offset": 782224,
+            "nbytes": 29491200,
+            "shape": [
+              3,
+              480,
+              5120
+            ]
+          },
+          {
+            "slot": 41,
+            "offset": 30273424,
+            "nbytes": 9830400,
+            "shape": [
+              480,
+              5120
+            ]
+          }
+        ],
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          0,
+          16,
+          737296,
+          738832,
+          741904,
+          778384,
+          780304,
+          782224,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          0,
+          40103824,
+          null,
+          null,
+          40105360,
+          30273424,
+          0,
+          0
+        ],
+        "native_entry": "_mlir_ds41rt_v41_slices_m80_w192__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint3280128013201_FakeTensorUint88016052801_FakeTensorUint323145728001_FakeTensorUint3"
+      },
+      {
+        "name": "v41_slices_m256_w192",
+        "width": 192,
+        "capacity_rows": 256,
+        "core_scratch_nbytes": 128325136,
+        "scratch": [
+          {
+            "slot": 3,
+            "offset": 0,
+            "nbytes": 4,
+            "shape": [
+              1
+            ]
+          },
+          {
+            "slot": 4,
+            "offset": 16,
+            "nbytes": 2359296,
+            "shape": [
+              589824
+            ]
+          },
+          {
+            "slot": 5,
+            "offset": 2359312,
+            "nbytes": 1536,
+            "shape": [
+              384
+            ]
+          },
+          {
+            "slot": 6,
+            "offset": 2360848,
+            "nbytes": 3072,
+            "shape": [
+              384,
+              2
+            ]
+          },
+          {
+            "slot": 7,
+            "offset": 2363920,
+            "nbytes": 116736,
+            "shape": [
+              1536,
+              19
+            ]
+          },
+          {
+            "slot": 8,
+            "offset": 2480656,
+            "nbytes": 6144,
+            "shape": [
+              1536
+            ]
+          },
+          {
+            "slot": 9,
+            "offset": 2486800,
+            "nbytes": 6144,
+            "shape": [
+              1536
+            ]
+          },
+          {
+            "slot": 10,
+            "offset": 2492944,
+            "nbytes": 94371840,
+            "shape": [
+              3,
+              1536,
+              5120
+            ]
+          },
+          {
+            "slot": 41,
+            "offset": 96864784,
+            "nbytes": 31457280,
+            "shape": [
+              1536,
+              5120
+            ]
+          }
+        ],
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          0,
+          16,
+          2359312,
+          2360848,
+          2363920,
+          2480656,
+          2486800,
+          2492944,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          0,
+          128322064,
+          null,
+          null,
+          128323600,
+          96864784,
+          0,
+          0
+        ],
+        "native_entry": "_mlir_ds41rt_v41_slices_m256_w192__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint32256128013201_FakeTensorUint825616052801_FakeTensorUint323145728001_FakeTensorUin"
+      },
+      {
+        "name": "v41_slices_m1024_w192",
+        "width": 192,
+        "capacity_rows": 1024,
+        "core_scratch_nbytes": 513277456,
+        "scratch": [
+          {
+            "slot": 3,
+            "offset": 0,
+            "nbytes": 4,
+            "shape": [
+              1
+            ]
+          },
+          {
+            "slot": 4,
+            "offset": 16,
+            "nbytes": 9437184,
+            "shape": [
+              2359296
+            ]
+          },
+          {
+            "slot": 5,
+            "offset": 9437200,
+            "nbytes": 1536,
+            "shape": [
+              384
+            ]
+          },
+          {
+            "slot": 6,
+            "offset": 9438736,
+            "nbytes": 3072,
+            "shape": [
+              384,
+              2
+            ]
+          },
+          {
+            "slot": 7,
+            "offset": 9441808,
+            "nbytes": 466944,
+            "shape": [
+              6144,
+              19
+            ]
+          },
+          {
+            "slot": 8,
+            "offset": 9908752,
+            "nbytes": 24576,
+            "shape": [
+              6144
+            ]
+          },
+          {
+            "slot": 9,
+            "offset": 9933328,
+            "nbytes": 24576,
+            "shape": [
+              6144
+            ]
+          },
+          {
+            "slot": 10,
+            "offset": 9957904,
+            "nbytes": 377487360,
+            "shape": [
+              3,
+              6144,
+              5120
+            ]
+          },
+          {
+            "slot": 41,
+            "offset": 387445264,
+            "nbytes": 125829120,
+            "shape": [
+              6144,
+              5120
+            ]
+          }
+        ],
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          0,
+          16,
+          9437200,
+          9438736,
+          9441808,
+          9908752,
+          9933328,
+          9957904,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          0,
+          513274384,
+          null,
+          null,
+          513275920,
+          387445264,
+          0,
+          0
+        ],
+        "native_entry": "_mlir_ds41rt_v41_slices_m1024_w192__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint321024128013201_FakeTensorUint8102416052801_FakeTensorUint323145728001_FakeTensorU"
+      },
+      {
+        "name": "v41_slices_m4096_w192",
+        "width": 192,
+        "capacity_rows": 4096,
+        "core_scratch_nbytes": 2053086736,
+        "scratch": [
+          {
+            "slot": 3,
+            "offset": 0,
+            "nbytes": 4,
+            "shape": [
+              1
+            ]
+          },
+          {
+            "slot": 4,
+            "offset": 16,
+            "nbytes": 37748736,
+            "shape": [
+              9437184
+            ]
+          },
+          {
+            "slot": 5,
+            "offset": 37748752,
+            "nbytes": 1536,
+            "shape": [
+              384
+            ]
+          },
+          {
+            "slot": 6,
+            "offset": 37750288,
+            "nbytes": 3072,
+            "shape": [
+              384,
+              2
+            ]
+          },
+          {
+            "slot": 7,
+            "offset": 37753360,
+            "nbytes": 1867776,
+            "shape": [
+              24576,
+              19
+            ]
+          },
+          {
+            "slot": 8,
+            "offset": 39621136,
+            "nbytes": 98304,
+            "shape": [
+              24576
+            ]
+          },
+          {
+            "slot": 9,
+            "offset": 39719440,
+            "nbytes": 98304,
+            "shape": [
+              24576
+            ]
+          },
+          {
+            "slot": 10,
+            "offset": 39817744,
+            "nbytes": 1509949440,
+            "shape": [
+              3,
+              24576,
+              5120
+            ]
+          },
+          {
+            "slot": 41,
+            "offset": 1549767184,
+            "nbytes": 503316480,
+            "shape": [
+              24576,
+              5120
+            ]
+          }
+        ],
+        "scratch_pointer_offsets": [
+          null,
+          null,
+          null,
+          0,
+          16,
+          37748752,
+          37750288,
+          37753360,
+          39621136,
+          39719440,
+          39817744,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          0,
+          2053083664,
+          null,
+          null,
+          2053085200,
+          1549767184,
+          0,
+          0
+        ],
+        "native_entry": "_mlir_ds41rt_v41_slices_m4096_w192__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint324096128013201_FakeTensorUint8409616052801_FakeTensorUint323145728001_FakeTensorU"
+      }
+    ],
+    "input_quantizer": {
+      "format": "row E4M3 payload then UE8M0 K32 scales",
+      "row_bytes": 5280,
+      "max_rows": 4096,
+      "expected_m": 80,
+      "amax_floor": 0.0001,
+      "abi": {
+        "symbol": "_mlir_ds41rt_v41_expert_input_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+        "pointers": [
+          "source_ptr",
+          "values_ptr",
+          "scale_rows_ptr",
+          "scale_mma_ptr"
+        ],
+        "i32": [
+          "m",
+          "grid_x"
+        ],
+        "stream": "stream",
+        "argument_count": 8
+      },
+      "object_sha256": "6d7538346dc7f4291aceee1a12c27bb67ee5cc6aa4d5c3767d4c7d6a0bc96f36"
+    },
+    "artifact_sha256": {
+      "v41_slices_m16_w192.h": "7738790cb4f796455683496751b12d8c8f26dd5ee53a60d4b9a6cf25431a593f",
+      "v41_slices_m1024_w192.o": "376cf75bbb3991c60fba3668008a9a6f18572769be8592eb9a6b4a72256804a4",
+      "v41_slices_m80_w192.h": "f6af0337fcf4e4d29041dff2ecb54bafd3f5cb8b28563ad32f618bbcb728a4fe",
+      "v41_slices_m1024_w192.h": "12a164ec37ab7cffe3e60ca25227fcba51e8961502f1835163af06c0d16fd1bf",
+      "v41_slices_m1_w64.o": "93a81fa773ab7240433e6a71114dcf8e3ffa7effe7cd58ecffa43aaaf26e8291",
+      "v41_input_quant_dispatch.h": "a990aed3642a5dcd81499e6a8f840ae98b61545527faa2ea4e817ebca2a6d708",
+      "v41_slices_m4096_w192.o": "6b8d4c19930de4c4169d8daf2ffd0343c7dbd815c737cdbac1d372e37532d4d0",
+      "v41_expert_input_quant.h": "b49f6ddb662146a29827b02d0437a5dc18ed6eca1e1e4e63135ebc6e55d7a50f",
+      "v41_expert_input_quant.o": "6d7538346dc7f4291aceee1a12c27bb67ee5cc6aa4d5c3767d4c7d6a0bc96f36",
+      "v41_slices_m4096_w192.h": "1ce007277a9df70f528a871e3148c29183e48e26a759e23245514dac6aa3b266",
+      "v41_slices_m1_w64.h": "64a16a287cc0c617524a12a038385faa4809b973c80fd58a718e3e7145d8f52a",
+      "v41_expert_variants.h": "f0835415341c115a27060e513356c84325b5c467e66adbdea39a998f30e2d1a7",
+      "v41_slices_m256_w192.o": "8c5335f1700ac57e28a02860c8c5210fbe88bb8e83cd4f4ead4f887fc3a6417f",
+      "v41_slices_m16_w192.o": "8f93aa22f745fd2a867ccfa3584c1d790a28bd9b9fa9be4f623b41a1641de0b1",
+      "v41_slices_m256_w192.h": "955460da6eb3d1602f4994aedbb53300c155422cea1cf661f78eb40e6e5d6c7c",
+      "v41_slices_m80_w192.o": "643fac3392a8ce3702d5c9675f0004a520e7fd7e2180e6da76aa5c327f3356b1"
+    }
+  },
+  "build_log": "-- The C compiler identification is GNU 13.3.0\n-- The CXX compiler identification is GNU 13.3.0\n-- Detecting C compiler ABI info\n-- Detecting C compiler ABI info - done\n-- Check for working C compiler: /usr/bin/cc - skipped\n-- Detecting C compile features\n-- Detecting C compile features - done\n-- Detecting CXX compiler ABI info\n-- Detecting CXX compiler ABI info - done\n-- Check for working CXX compiler: /usr/bin/c++ - skipped\n-- Detecting CXX compile features\n-- Detecting CXX compile features - done\n-- Found Python3: /usr/bin/python3.12 (found version \"3.12.3\") found components: Interpreter\n-- verified SparkInfer revision=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e source_tree_sha256=36283734df3fc9c9dc912c15d20f7fbfd9ed480b176d171b49e6147d534ca587 source=/workspace/ds41rt/third_party/sparkinfer\n-- The CUDA compiler identification is NVIDIA 13.2.78 with host compiler GNU 13.3.0\n-- Detecting CUDA compiler ABI info\n-- Detecting CUDA compiler ABI info - done\n-- Check for working CUDA compiler: /usr/local/cuda/bin/nvcc - skipped\n-- Detecting CUDA compile features\n-- Detecting CUDA compile features - done\n-- Found CUDAToolkit: /usr/local/cuda/targets/sbsa-linux/include (found version \"13.2.78\")\n-- Performing Test CMAKE_HAVE_LIBC_PTHREAD\n-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success\n-- Found Threads: TRUE\n-- Configuring done (2.9s)\n-- Generating done (0.0s)\n-- Build files have been written to: /output/build\n[0/2] Re-checking globbed directories...\n[1/38] Verifying pinned SparkInfer source\nverified SparkInfer revision=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e source_tree_sha256=36283734df3fc9c9dc912c15d20f7fbfd9ed480b176d171b49e6147d534ca587 source=/workspace/ds41rt/third_party/sparkinfer\n[2/38] Exporting native V4.1 expert kernels and scratch layouts\nverified SparkInfer revision=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e source_tree_sha256=36283734df3fc9c9dc912c15d20f7fbfd9ed480b176d171b49e6147d534ca587 source=/workspace/ds41rt/third_party/sparkinfer\n[3/38] Building CXX object CMakeFiles/ds41rt_native.dir/src/ds41rt_native.cc.o\n[4/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_expert_pack.cu.o\n[5/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark_cache.cu.o\n[6/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_router.cu.o\n[7/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_route_reduce.cu.o\n[8/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_hc.cu.o\n[9/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/engram.cu.o\n[10/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark.cu.o\n[11/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_dspark_attention.cu.o\n[12/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_candidate_blocks.cu.o\n[13/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_compressor.cu.o\n[14/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_kv.cu.o\n[15/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_index_scores.cu.o\n[16/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/norm.cu.o\n[17/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_sparse_attention.cu.o\n[18/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_attention_ops.cu.o\n[19/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/mla_indexing.cu.o\n[20/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/mlp.cu.o\n[21/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/residual.cu.o\n[22/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/kv_cache.cu.o\n[23/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/embedding.cu.o\n[24/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/v41_index_topk.cu.o\n[25/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/nibbles.cu.o\n[26/38] Building CXX object CMakeFiles/ds41rt_native.dir/src/v41_experts.cc.o\n[27/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/ds4_flash_direct.cu.o\n[28/38] Building CXX object CMakeFiles/ds41rt_native_selftest.dir/tests/native_selftest.cc.o\n[29/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/attention.cu.o\n[30/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/nvfp4_payload.cu.o\n[31/38] Building CXX object CMakeFiles/ds41rt_cuda_selftest.dir/tests/cuda_selftest.cc.o\n[32/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/router.cu.o\n[33/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/sampling.cu.o\n[34/38] Building CUDA object CMakeFiles/ds41rt_native.dir/cuda/kernels/linear.cu.o\n/workspace/ds41rt/native/cuda/kernels/linear.cu(932): warning #177-D: function \"<unnamed>::triton_driver_kernel_data\" was declared but never referenced\n  ds41rt_status_t triton_driver_kernel_data(const char* cache_key,\n                  ^\n\nRemark: The warnings can be suppressed with \"-diag-suppress <warning-number>\"\n\n[35/38] Linking CXX shared library libds41rt_native.so\n[36/38] Linking CXX executable ds41rt_native_selftest\n[37/38] Linking CXX executable ds41rt_cuda_selftest\n{\"case\": \"one\", \"width\": 64, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896}\nNATIVE {\"case\": \"one\", \"rows\": 1, \"width\": 64, \"exact\": true, \"scratch_bytes\": 1246240}\n{\"case\": \"shared2\", \"width\": 64, \"rows\": 2, \"experts\": 6, \"groups\": 6, \"routes\": 12, \"rel_l2\": 0.0, \"cosine\": 1.0}\n{\"case\": \"mixed6\", \"width\": 64, \"rows\": 6, \"experts\": 22, \"groups\": 22, \"routes\": 36, \"rel_l2\": 0.0, \"cosine\": 0.9999999403953552}\n{\"case\": \"shared16\", \"width\": 64, \"rows\": 16, \"experts\": 6, \"groups\": 6, \"routes\": 96, \"rel_l2\": 4.0640996123997297e-10, \"cosine\": 0.9999998807907104}\n{\"case\": \"shared80\", \"width\": 64, \"rows\": 80, \"experts\": 6, \"groups\": 30, \"routes\": 480, \"rel_l2\": 4.821896126827596e-08, \"cosine\": 1.0}\n{\"case\": \"return_one\", \"width\": 64, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896}\nNATIVE {\"case\": \"return_one\", \"rows\": 1, \"width\": 64, \"exact\": true, \"scratch_bytes\": 1246240}\n{\"case\": \"one\", \"width\": 192, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896}\n{\"case\": \"shared2\", \"width\": 192, \"rows\": 2, \"experts\": 6, \"groups\": 6, \"routes\": 12, \"rel_l2\": 0.0, \"cosine\": 1.0}\nNATIVE {\"case\": \"shared2\", \"rows\": 2, \"width\": 192, \"exact\": true, \"scratch_bytes\": 8027536}\n{\"case\": \"mixed6\", \"width\": 192, \"rows\": 6, \"experts\": 22, \"groups\": 22, \"routes\": 36, \"rel_l2\": 0.0, \"cosine\": 0.9999999403953552}\nNATIVE {\"case\": \"mixed6\", \"rows\": 6, \"width\": 192, \"exact\": true, \"scratch_bytes\": 8027536}\n{\"case\": \"shared16\", \"width\": 192, \"rows\": 16, \"experts\": 6, \"groups\": 6, \"routes\": 96, \"rel_l2\": 4.0640996123997297e-10, \"cosine\": 0.9999998807907104}\nNATIVE {\"case\": \"shared16\", \"rows\": 16, \"width\": 192, \"exact\": true, \"scratch_bytes\": 8027536}\n{\"case\": \"shared80\", \"width\": 192, \"rows\": 80, \"experts\": 6, \"groups\": 30, \"routes\": 480, \"rel_l2\": 8.92772291649635e-08, \"cosine\": 1.0}\nNATIVE {\"case\": \"shared80\", \"rows\": 80, \"width\": 192, \"exact\": true, \"scratch_bytes\": 40106896}\n{\"case\": \"return_one\", \"width\": 192, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896}\n",
+  "ctest": "Internal ctest changing into directory: /output/build\nTest project /output/build\n    Start 1: ds41rt_native_selftest\n1/2 Test #1: ds41rt_native_selftest ...........   Passed    0.43 sec\n    Start 2: ds41rt_cuda_selftest\n2/2 Test #2: ds41rt_cuda_selftest .............   Passed    1.44 sec\n\n100% tests passed, 0 tests failed out of 2\n\nTotal Test time (real) =   1.87 sec\n",
+  "library_sha256": "872591810ab2d9f3ed1715c13d8207b3d715aabd7bf466bd33a661b64a5c29ad"
+}
