@@ -351,3 +351,19 @@ Serial CED remains selected. See [query overlap evidence](ds41-paired-query.md);
 worker queue/transfer overlap, wider scheduling, and attention integration remain
 open. The user's category-based decode comparison is queued after this prefill
 work, without treating counting output as a comparable category benchmark.
+
+## Independent progress selected for serving
+
+`TargetPass` now runs both encoder chunk futures through all twenty layers, with
+per-layer notification of leading KV publication. Expert completion is local to
+each chunk instead of a shared layer barrier. Cache/history borrows remain
+synchronous on the CUDA owner, and the enclosing guard revokes the participating admission
+on cancellation. The pair still joins before suffix/source-20 handoff.
+
+A real-model serving-method fixture matches serial suffix bytes for 65+65 and
+79+1 rows, including odd compressor carry and the retained-window boundary. It
+also cancels a suspended pair, verifies revocation and reuses both execution
+owners successfully. API output/lifecycle qualification and isolated 16k plus
+599-token decode comparisons support selecting this version on 18041/18042.
+See [encoder progress evidence](ds41-encoder-wavefront.md) for rates, artifacts
+and the still-open quality, wider scheduling and C16 requirements.

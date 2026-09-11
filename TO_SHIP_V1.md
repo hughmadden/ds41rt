@@ -163,7 +163,7 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Remaining prefill priorities
 
-- [ ] Finish and measure encoder scheduling overlap, including per-layer barriers,
+- [ ] Finish and measure encoder scheduling overlap, including boundaries between chunk pairs,
   worker queue ordering/batching, and output transfer overlap. Preserve ordered
   KV publication, Engram history, decoder replay and dSpark seeding.
 - [ ] Qualify the attention register-rescale prototype in serving; measure whether
@@ -178,7 +178,7 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Current evidence and integration gaps
 
-- [Paired prefill serving candidate](docs/ds41-paired-serving.md) is implemented and API-tested: warm 16k prefill reaches 3.31–3.32k code / 3.64–3.73k repeated tok/s. Candidate is stopped and not promoted because decode regressed. Isolated profiling attributes much of the code difference to one extra dSpark verification round; its cause remains open. [Query preparation overlap](docs/ds41-paired-query.md) adds a measured 2–4% on code and under 2% on repeated text in an isolated comparison; larger scheduling and attention work remains. Serial CED remains selected.
+- [Independent encoder progress](docs/ds41-encoder-wavefront.md) removes the per-layer pair barrier. Isolated warm 16k prefill reaches 3.78/3.86k code and 4.09/4.13k repeated tok/s, about 27% and 17–18% above serial CED. The 599-token decode check retains text and usage at 37.86 target / 119.74 dSpark tok/s versus 38.00 / 120.40 serial. Both API lifecycle checks and prior quality outputs are preserved; the inherited quality failures remain. This scheduler is selected on ports 18041/18042; serial CED is retained stopped for rollback. Wider scheduling, worker transfers and attention work remain open.
 
 Component records establish their stated scopes, not full-model readiness or the performance targets above. Historical records remain under `docs/ds41-*`; use the checklist for current completion status.
 

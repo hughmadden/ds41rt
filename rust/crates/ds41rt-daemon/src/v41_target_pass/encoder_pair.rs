@@ -1,4 +1,6 @@
 use super::*;
+use std::cell::RefCell;
+use tokio::sync::Notify;
 
 struct EncoderPairGuard<'r, 'a> {
     requests: &'r mut Requests<'a>,
@@ -33,25 +35,16 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             pass.lane.restart()?; pass.index.restart()?; pass.taps.reset();
             unsafe { guard.requests.begin_text(batch, &mut pass.embedding, &mut pass.lane)?; }
         }
-        for layer in 0..20 {
-            unsafe { self.prepare_encoder_query(guard.requests, first, layer).await?; }
-            let prepared = unsafe { guard.requests.prepare_encoder_layer(first,
-                &mut self.execution, &mut self.lane, &mut self.index)? };
-            let (done0, done1) = tokio::try_join!(
-                // Dispatch the leading chunk before preparing the following query.
+        {
+            // These futures are polled on the CUDA owner. Cache borrows are
+            // synchronous and never retained through an await or an FFN.
+            let requests = RefCell::new(&mut *guard.requests);
+            let published: [Notify; 20] = std::array::from_fn(|_| Notify::new());
+            tokio::try_join!(
                 biased;
-                unsafe { prepared.execute(transport0, 0, first.image_mask()) },
-                async {
-                    unsafe { other.prepare_encoder_query(guard.requests, second, layer).await?; }
-                    let prepared = unsafe { guard.requests.prepare_encoder_layer(second,
-                        &mut other.execution, &mut other.lane, &mut other.index)? };
-                    unsafe { prepared.execute(transport1, 0, second.image_mask()).await }
-                },
+                unsafe { self.execute_encoder_chunk(&requests, first, transport0, &published, true) },
+                unsafe { other.execute_encoder_chunk(&requests, second, transport1, &published, false) },
             )?;
-            unsafe {
-                self.execution.complete_layer(first.cache()?, &mut self.lane, done0)?;
-                other.execution.complete_layer(second.cache()?, &mut other.lane, done1)?;
-            }
         }
         for (pass, batch) in [(&mut *self, &mut **first), (&mut *other, &mut **second)] {
             suffix.capture(&pass.lane.output()?)?;
@@ -66,15 +59,38 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         Ok(())
     }
 
+    /// Each following attention waits for its predecessor's publication at that
+    /// layer, not for the predecessor's expert output. Completed chunks retain
+    /// their lane output until the caller captures and commits them in order.
+    async unsafe fn execute_encoder_chunk(&mut self,
+        requests: &RefCell<&mut Requests<'a>>, batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>, published: &[Notify; 20], leading: bool,
+    ) -> Result<()> {
+        for layer in 0..20 {
+            if !leading { published[layer].notified().await; }
+            unsafe { self.prepare_encoder_query(requests, batch, layer).await?; }
+            let prepared = unsafe { requests.borrow_mut().prepare_encoder_layer(batch,
+                &mut self.execution, &mut self.lane, &mut self.index)? };
+            // prepare_encoder_layer finishes the attention readers and publishes
+            // this layer's window/source before releasing the cache borrow.
+            if leading { published[layer].notify_one(); }
+            let done = unsafe { prepared.execute(transport, 0, batch.image_mask()).await? };
+            unsafe { self.execution.complete_layer(batch.cache()?, &mut self.lane, done)?; }
+        }
+        Ok(())
+    }
+
     /// Prepare a chunk's next query only when its execution lane is available.
-    async unsafe fn prepare_encoder_query(&mut self, requests: &Requests<'a>,
+    async unsafe fn prepare_encoder_query(&mut self, requests: &RefCell<&mut Requests<'a>>,
         batch: &mut RequestBatch, layer: usize) -> Result<()> {
         if layer == 0 { return Ok(()); }
         self.lane.advance()?;
         if let Some(gate) = [1, 14].iter().position(|&l| l == layer) {
             let start = Instant::now();
-            while !unsafe { requests.poll_engram(batch, &mut self.upload,
-                &mut self.gates[gate], &mut self.lane)? } {
+            loop {
+                let ready = unsafe { requests.borrow().poll_engram(batch, &mut self.upload,
+                    &mut self.gates[gate], &mut self.lane)? };
+                if ready { break; }
                 ensure!(start.elapsed() < self.engram_timeout, "paired engram gather timed out");
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }

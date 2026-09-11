@@ -146,6 +146,94 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
         },
     )?;
     let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(80)?)?;
+    if std::env::var_os("DS41RT_TARGET_PASS_ENCODER_PAIR").is_some() {
+        let mut other = TargetPass::new(
+            TargetEmbeddingWave::new(&lib, &table, 80, TargetEmbeddingWave::device_bytes(80)?)?,
+            BackboneLane::new(&weights, 80, BackboneLane::workspace_bytes(&lib, 80)?.into_iter().sum())?,
+            IndexLane::new(&index_weights, 80, IndexLane::workspace_bytes(&lib, 80)?.into_iter().sum())?,
+            BackboneExecution::new(&producers, 80, BackboneExecution::workspace_bytes(&lib, 80)?)?,
+            EngramDeviceRows::new(&lib, 80, EngramDeviceRows::device_bytes(80)?)?,
+            [EngramGate::new(&engram_weights[0], 80, 128 * 1024 * 1024)?,
+             EngramGate::new(&engram_weights[1], 80, 128 * 1024 * 1024)?],
+            head_weights.wave(&vocabulary, 16, TargetHeadWave::device_bytes(16)?)?,
+            TargetTapWave::new(&lib, 80, TargetTapWave::device_bytes(80)?)?,
+            Duration::from_secs(120),
+        )?;
+        let mut second_transport = NativeTp4Wave::new(&lib,
+            V41Tp4Roce::new(peers, [1, 2, 3, 4], 80, TcpTransportConfig {
+                timeout: Duration::from_secs(120), max_frame_bytes: 2 * 1024 * 1024,
+            })?, NativeTp4Wave::device_bytes(80)?)?;
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        // Drop after the first cooperative suspension, with dispatched work and
+        // potentially a follower waiting for KV. Both admissions must be revoked
+        // and the subsequent comparisons must reuse the same owners successfully.
+        {
+            use std::future::Future;
+            let tokens: Vec<u32> = (0..130).map(|i| ((i * 7919 + 17) % 129280) as u32).collect();
+            let lease = requests.admit(0, 6999)?;
+            requests.begin_encoder(lease, 130)?;
+            let mut first = requests.reserve_encoder(&[RequestTokens { lease, tokens: &tokens[..65],
+                image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+            let mut second = requests.reserve_encoder(&[RequestTokens { lease, tokens: &tokens[65..],
+                image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+            let mut suffix = EncoderSuffix::new(&lib, 130, EncoderSuffix::device_bytes(130)?)?;
+            {
+                let mut pending = Box::pin(unsafe { pass.execute_encoder_pair(&mut other, &mut requests,
+                    [&mut first, &mut second], [&mut transport, &mut second_transport], &mut suffix) });
+                runtime.block_on(std::future::poll_fn(|cx| {
+                    assert!(pending.as_mut().poll(cx).is_pending(), "expected a live encoder suspension");
+                    std::task::Poll::Ready(())
+                }));
+            }
+            assert!(requests.validate(&first).is_err());
+            assert!(requests.validate(&second).is_err());
+            assert!(requests.cache().request_id(lease).is_err());
+            pass.discard(&mut first)?; other.discard(&mut second)?;
+            transport.reset_connections(); second_transport.reset_connections();
+            eprintln!("PASS cancelled independent encoder: both batches revoked before owner reuse");
+        }
+        for (left, right) in [(65usize, 65usize), (79, 1)] {
+            let tokens: Vec<u32> = (0..left + right).map(|i| ((i * 7919 + 17) % 129280) as u32).collect();
+            let mut expected = None;
+            for paired in [false, true] {
+                let lease = requests.admit(0, 7000 + paired as u64)?;
+                let end = tokens.len() as u64;
+                requests.begin_encoder(lease, end)?;
+                let mut suffix = EncoderSuffix::new(&lib, end, EncoderSuffix::device_bytes(end)?)?;
+                if paired {
+                    let mut first = requests.reserve_encoder(&[RequestTokens { lease,
+                        tokens: &tokens[..left], image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+                    let mut second = requests.reserve_encoder(&[RequestTokens { lease,
+                        tokens: &tokens[left..], image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+                    runtime.block_on(unsafe { pass.execute_encoder_pair(&mut other, &mut requests,
+                        [&mut first, &mut second], [&mut transport, &mut second_transport], &mut suffix) })?;
+                    pass.commit(&mut requests, &mut first, &[left as u32])?;
+                    other.commit(&mut requests, &mut second, &[right as u32])?;
+                } else {
+                    for chunk in [&tokens[..left], &tokens[left..]] {
+                        let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
+                            image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+                        runtime.block_on(unsafe { pass.execute_encoder(&requests, &mut batch,
+                            &mut transport, 0, &mut suffix) })?;
+                        pass.commit(&mut requests, &mut batch, &[chunk.len() as u32])?;
+                    }
+                }
+                let output = suffix.output()?;
+                let mut bytes = Vec::new();
+                for buffer in [output.residual, output.pre] {
+                    let mut value = vec![0; buffer.bytes]; lib.copy_d2h(&mut value, buffer)?;
+                    bytes.extend_from_slice(&value);
+                }
+                if let Some(expected) = &expected { assert!(&bytes == expected, "encoder pair differs at {left}+{right}"); }
+                else { expected = Some(bytes); }
+                assert_eq!(requests.cache().committed_end(lease)?, end);
+                assert_eq!(requests.begin_decoder_replay(lease)?, end.saturating_sub(128));
+                requests.release(lease)?;
+            }
+            eprintln!("PASS independent encoder chunks {left}+{right}: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready");
+        }
+        return Ok(());
+    }
     let dspark_weights = if std::env::var_os("DS41RT_TARGET_PASS_DSPARK").is_some() {
         let start = Instant::now();
         let weights = crate::v41_experts::dspark::DsparkWeights::load(
