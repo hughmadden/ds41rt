@@ -81,36 +81,46 @@ __global__ void attend(const __nv_bfloat16* query,const float* sink,
     // online-softmax state and accumulators unchanged. Vote over the same
     // resolved references used below; valid entries may occur after empty tiles.
     if(!__syncthreads_or(tid<64 && refs[tid]!=UINT64_MAX))continue;
-    for(int i=tid;i<64*512;i+=128) {
-      const uint64_t ref=refs[i/512];const int col=i%512;
-      __nv_bfloat16 value=__float2bfloat16(0);
-      if(ref!=UINT64_MAX) {
-        const int tag=ref>>62;const uint64_t physical=ref&((1ull<<62)-1);
-        __nv_fp8_e4m3 f;f.__x=v.values[tag][physical*512+col];
-        const uint8_t exponent=v.scales[tag][physical*16+col/32];
-        // E8M0 exponent zero is 2^-127, unlike an IEEE zero exponent field.
-        const float scale=exponent==0?0x1p-127f:__uint_as_float(uint32_t(exponent)<<23);
-        value=__float2bfloat16_rn(__fmul_rn(float(f),scale));
+    // A warp stages four contiguous FP8 values per lane, reusing each
+    // resolved key pointer. Preserve unaligned byte-addressed ABI inputs.
+    for(int key=warp;key<64;key+=4) {
+      const uint64_t ref=refs[key];
+      for(int block=0;block<4;++block) {
+        const int col=block*128+lane*4;
+        uint64_t packed=0;
+        if(ref!=UINT64_MAX) {
+          const int tag=ref>>62;const uint64_t physical=ref&((1ull<<62)-1);
+          const uint8_t* source=v.values[tag]+physical*512+col;
+          uint32_t bytes;
+          if((reinterpret_cast<uintptr_t>(source)&3)==0)
+            bytes=*reinterpret_cast<const uint32_t*>(source);
+          else bytes=uint32_t(source[0])|(uint32_t(source[1])<<8)|
+              (uint32_t(source[2])<<16)|(uint32_t(source[3])<<24);
+          const uint8_t exponent=v.scales[tag][physical*16+col/32];
+          const float scale=exponent==0?0x1p-127f:__uint_as_float(uint32_t(exponent)<<23);
+#pragma unroll
+          for(int j=0;j<4;++j) {
+            __nv_fp8_e4m3 f;f.__x=uint8_t(bytes>>(j*8));
+            const auto value=__float2bfloat16_rn(__fmul_rn(float(f),scale));
+            packed|=uint64_t(__bfloat16_as_ushort(value))<<(j*16);
+          }
+        }
+        *reinterpret_cast<uint64_t*>(kv+key*512+col)=packed;
       }
-      kv[i]=value;
     }
     __syncthreads();
-    if(warp==0) {
-      wmma::fragment<wmma::accumulator,16,16,16,float> scores[4];
-#pragma unroll
-      for(int t=0;t<4;++t)wmma::fill_fragment(scores[t],0.0f);
+    // Each warp computes one 16-key score tile in the original K order.
+    {
+      wmma::fragment<wmma::accumulator,16,16,16,float> scores;
+      wmma::fill_fragment(scores,0.0f);
       for(int k=0;k<512;k+=16) {
         wmma::fragment<wmma::matrix_a,16,16,16,__nv_bfloat16,wmma::row_major> a;
+        wmma::fragment<wmma::matrix_b,16,16,16,__nv_bfloat16,wmma::col_major> b;
         wmma::load_matrix_sync(a,query+base+k,512);
-#pragma unroll
-        for(int t=0;t<4;++t) {
-          wmma::fragment<wmma::matrix_b,16,16,16,__nv_bfloat16,wmma::col_major> b;
-          wmma::load_matrix_sync(b,kv+t*16*512+k,512);
-          wmma::mma_sync(scores[t],a,b,scores[t]);
-        }
+        wmma::load_matrix_sync(b,kv+warp*16*512+k,512);
+        wmma::mma_sync(scores,a,b,scores);
       }
-#pragma unroll
-      for(int t=0;t<4;++t)wmma::store_matrix_sync(scratch+t*16,scores[t],64,wmma::mem_row_major);
+      wmma::store_matrix_sync(scratch+warp*16,scores,64,wmma::mem_row_major);
     }
     __syncthreads();
     for(int h=warp;h<16;h+=4) {
