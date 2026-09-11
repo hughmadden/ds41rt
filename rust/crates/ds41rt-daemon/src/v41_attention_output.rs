@@ -1,4 +1,4 @@
-//! Backbone inverse rotary, grouped BF16 wo_a and native FP8 wo_b.
+//! Backbone inverse rotary, grouped FP8 wo_a and native FP8 wo_b.
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
@@ -6,19 +6,17 @@ use crate::v41_sparse_attention::SparseAttentionOutput;
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel, V41GroupedOutput,
-    V41_GROUPED_OUTPUT_WORKSPACE,
+    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel,
 };
 use ds41rt_loader::OfficialV41Catalog;
 use std::marker::PhantomData;
 const ROW_BYTES: [usize; 6] = [65536, 65536, 16384, 10240, 8, 256];
-const GROUPED_WEIGHT: usize = 67108864;
 pub(crate) struct AttentionOutputWeights<'a> {
     library: &'a NativeLibrary,
     layer: usize,
     names: [String; 4],
     tensors: NativeRtxTensors<'a>,
-    grouped: DeviceAllocation<'a>,
+    grouped_scales: DeviceAllocation<'a>,
     scales: DeviceAllocation<'a>,
 }
 impl<'a> AttentionOutputWeights<'a> {
@@ -31,20 +29,16 @@ impl<'a> AttentionOutputWeights<'a> {
             format!("layers.{layer}.attn.wo_b.scale"),
         ])
     }
-    /// Maximum of transient dequantization allocation and final resident storage.
+    /// Official FP8 weights and packed scales for both output projections.
     pub fn device_bytes(
         library: &NativeLibrary,
         catalog: &OfficialV41Catalog,
         layer: usize,
     ) -> Result<usize> {
         let names = Self::names(layer)?;
-        let transient = NativeRtxTensors::plan(catalog, &names[..2])? + GROUPED_WEIGHT;
-        let resident = NativeRtxTensors::plan(catalog, &names[2..])?
-            + GROUPED_WEIGHT
-            + library
-                .v41_fp8_matrix_info(1, 8192, 5120)?
-                .packed_weight_scale_bytes as usize;
-        Ok(transient.max(resident))
+        Ok(NativeRtxTensors::plan(catalog, &names)?
+            + library.v41_fp8_matrix_info(1, 32768, 8192)?.packed_weight_scale_bytes as usize
+            + library.v41_fp8_matrix_info(1, 8192, 5120)?.packed_weight_scale_bytes as usize)
     }
     pub fn load(
         library: &'a NativeLibrary,
@@ -58,49 +52,30 @@ impl<'a> AttentionOutputWeights<'a> {
             "attention output weights exceed budget"
         );
         let names = Self::names(layer)?;
-        let grouped = DeviceAllocation::new(library, GROUPED_WEIGHT)?;
-        let stream = LoadStream {
-            library,
-            raw: library.cuda_stream_create()?,
-        };
-        {
-            let source = NativeRtxTensors::load(
-                library,
-                catalog,
-                &names[..2],
-                budget - GROUPED_WEIGHT,
-                staging,
-            )?;
-            let launched = unsafe {
-                library.v41_grouped_output_dequant(
-                    source.get(&names[0])?,
-                    source.get(&names[1])?,
-                    grouped.buffer,
-                    stream.raw,
-                )
-            };
-            launched.and(unsafe { library.cuda_stream_synchronize(stream.raw) })?;
-        }
-        // The FP8 wo_a source is released after dequantization drains, before wo_b loads.
+        let grouped_kernel = library.v41_fp8_matrix_kernel(1, 32768, 8192)?;
+        let grouped_scales = DeviceAllocation::new(library, grouped_kernel.info().packed_weight_scale_bytes as usize)?;
+        let stream = LoadStream { library, raw: library.cuda_stream_create()? };
         let kernel = library.v41_fp8_matrix_kernel(1, 8192, 5120)?;
         let scales =
             DeviceAllocation::new(library, kernel.info().packed_weight_scale_bytes as usize)?;
         let tensors = NativeRtxTensors::load(
             library,
             catalog,
-            &names[2..],
-            budget - GROUPED_WEIGHT - scales.buffer.bytes,
+            &names,
+            budget - grouped_scales.buffer.bytes - scales.buffer.bytes,
             staging,
         )?;
-        let launched =
-            unsafe { kernel.pack_scales(tensors.get(&names[3])?, scales.buffer, stream.raw) };
+        let launched = (|| unsafe {
+            grouped_kernel.pack_scales(tensors.get(&names[1])?, grouped_scales.buffer, stream.raw)?;
+            kernel.pack_scales(tensors.get(&names[3])?, scales.buffer, stream.raw)
+        })();
         launched.and(unsafe { library.cuda_stream_synchronize(stream.raw) })?;
         Ok(Self {
             library,
             layer,
             names,
             tensors,
-            grouped,
+            grouped_scales,
             scales,
         })
     }
@@ -114,12 +89,12 @@ impl<'a> AttentionOutputWeights<'a> {
             raw: self.library.cuda_stream_create()?,
         };
         let kernel = self.library.v41_fp8_matrix_kernel(capacity, 8192, 5120)?;
-        let workspace = DeviceAllocation::new(self.library, V41_GROUPED_OUTPUT_WORKSPACE)?;
-        let grouped = unsafe { self.library.v41_grouped_output(workspace.buffer)? };
+        let grouped = self.library.v41_fp8_matrix_kernel(capacity, 32768, 8192)?;
+        let grouped_scratch = DeviceAllocation::new(self.library, grouped.info().scratch_bytes as usize)?;
         let value = AttentionOutputWave {
             stream,
             grouped,
-            _workspace: workspace,
+            grouped_scratch,
             scratch: DeviceAllocation::new(self.library, kernel.info().scratch_bytes as usize)?,
             kernel,
             alpha: DeviceAllocation::new(self.library, 4)?,
@@ -135,16 +110,17 @@ impl<'a> AttentionOutputWeights<'a> {
             origin: None,
         };
         ensure!(
-            value.b(0).device_id == self.grouped.buffer.device_id,
+            value.b(0).device_id == self.grouped_scales.buffer.device_id,
             "output weight device differs"
         );
-        let launched = unsafe {
+        let launched = (|| unsafe {
+            value.grouped.initialize_scratch(value.grouped_scratch.buffer, value.alpha.buffer, value.stream.raw)?;
             value.kernel.initialize_scratch(
                 value.scratch.buffer,
                 value.alpha.buffer,
                 value.stream.raw,
             )
-        };
+        })();
         launched.and(value.synchronize())?;
         Ok(value)
     }
@@ -175,8 +151,8 @@ impl AttentionOutput<'_> {
 }
 pub(crate) struct AttentionOutputWave<'w, 'a> {
     stream: LoadStream<'a>,
-    grouped: V41GroupedOutput<'a>,
-    _workspace: DeviceAllocation<'a>,
+    grouped: V41Fp8Kernel<'a>,
+    grouped_scratch: DeviceAllocation<'a>,
     kernel: V41Fp8Kernel<'a>,
     scratch: DeviceAllocation<'a>,
     alpha: DeviceAllocation<'a>,
@@ -196,7 +172,7 @@ impl<'w, 'a> AttentionOutputWave<'w, 'a> {
         self.origin = None;
         ensure!(
             std::ptr::eq(self.stream.library, weights.library)
-                && weights.grouped.buffer.device_id == self.b(0).device_id,
+                && weights.grouped_scales.buffer.device_id == self.b(0).device_id,
             "attention rebound weight library or device differs"
         );
         self.synchronize()?;
@@ -206,7 +182,7 @@ impl<'w, 'a> AttentionOutputWave<'w, 'a> {
 }
 impl AttentionOutputWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
-        Ok(V41_GROUPED_OUTPUT_WORKSPACE
+        Ok(library.v41_fp8_matrix_info(capacity, 32768, 8192)?.scratch_bytes as usize
             + 4
             + capacity as usize * ROW_BYTES.iter().sum::<usize>()
             + library
@@ -254,7 +230,10 @@ impl AttentionOutputWave<'_, '_> {
             )?;
             self.grouped.launch(
                 self.b(1),
-                self.weights.grouped.buffer,
+                self.weights.tensors.get(&self.weights.names[0])?,
+                self.weights.grouped_scales.buffer,
+                self.grouped_scratch.buffer,
+                self.alpha.buffer,
                 self.b(2),
                 rows,
                 self.stream.raw,

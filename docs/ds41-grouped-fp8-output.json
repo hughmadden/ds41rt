@@ -1,0 +1,2441 @@
+{
+  "scope": "Development FP8 WO-A rollout, not release qualification. One strict formatting case regresses; 4096-row component performance remains worse.",
+  "b12x_revision": "af58018aab7aaf4e8374c7a01c92c8c5b6fb8dad",
+  "commands": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-grouped-fp8-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-grouped-fp8-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-grouped-fp8-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=af58018aab7aaf4e8374c7a01c92c8c5b6fb8dad",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18041"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-grouped-fp8-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-grouped-fp8-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-grouped-fp8-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=af58018aab7aaf4e8374c7a01c92c8c5b6fb8dad",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18042"
+    ]
+  ],
+  "artifacts": {
+    "/tmp/ds41-grouped-fp8-artifacts/daemon": "ba01a3babaad7adf17769b1438a73e7d98d9a1d6017b0b3bbac57eb895a38945",
+    "/tmp/ds41-grouped-fp8-artifacts/cmake/libds41rt_native.so": "b080822fd9a018a8aca0b96e64ab38c136c9cb2d3da02272f4ff538568e544ee",
+    "/tmp/ds41-grouped-fp8-artifacts/final-qualification.json": "19bf5c55e126875f202217d0d056c086e1db7880cf840e6af39a5fb9e61a33e7",
+    "/tmp/ds41-grouped-fp8-rollout/quality.json": "bed862419493461267f1aae0243c4e7a5af07009007acf4143aef54cebee1b0b"
+  },
+  "qualification": {
+    "scope": "Native component qualification; random inputs, not full-model quality. Alternating graph timings with 256 MiB zeroing before each launch; no clock admission.",
+    "native_sha256": "b080822fd9a018a8aca0b96e64ab38c136c9cb2d3da02272f4ff538568e544ee",
+    "qualifier_sha256": "6e2a9f9e1d51b279761341cc59ac1f5f8a1a0ccd0f459c0ea52ea8886ab91d5e",
+    "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition"
+  },
+  "cases": [
+    {
+      "layer": "layers.0",
+      "capacity": 1,
+      "rows": 1,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.03125,
+      "rel_l2": 0.026054594665765762,
+      "bf16_us": 51.19999870657921,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1,
+      "rows": 1,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.2014213502407074e-10,
+      "rel_l2": 0.02778766304254532
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1,
+      "rows": 1,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 1,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.033203125,
+      "rel_l2": 0.026719948276877403,
+      "bf16_us": 51.2159988284111,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 1,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.2741809263825417e-10,
+      "rel_l2": 0.026912640780210495
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 1,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.03564453125,
+      "rel_l2": 0.026732880622148514,
+      "bf16_us": 49.15200173854828,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.026939893141388893
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 16,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.037109375,
+      "rel_l2": 0.02656666189432144,
+      "bf16_us": 49.00800064206123,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 16,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.637978807091713e-10,
+      "rel_l2": 0.026914101094007492
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 16,
+      "rows": 16,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 1,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.029296875,
+      "rel_l2": 0.02579813450574875,
+      "bf16_us": 51.19999870657921,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 1,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.2014213502407074e-10,
+      "rel_l2": 0.026630418375134468
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 1,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.037109375,
+      "rel_l2": 0.02670123614370823,
+      "bf16_us": 49.15200173854828,
+      "fp8_us": 30.73599934577942
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.4941649573738687e-10,
+      "rel_l2": 0.027010757476091385
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 80,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0380859375,
+      "rel_l2": 0.026632681488990784,
+      "bf16_us": 55.296000093221664,
+      "fp8_us": 47.120001167058945
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 80,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.02697453461587429
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 80,
+      "rows": 80,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 1,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.033203125,
+      "rel_l2": 0.026389487087726593,
+      "bf16_us": 51.19999870657921,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 1,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.128661774098873e-10,
+      "rel_l2": 0.02632639929652214
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 1,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.03515625,
+      "rel_l2": 0.026567814871668816,
+      "bf16_us": 49.15200173854828,
+      "fp8_us": 32.76799991726875
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.346940502524376e-10,
+      "rel_l2": 0.027133096009492874
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 256,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.042236328125,
+      "rel_l2": 0.026667675003409386,
+      "bf16_us": 100.35199671983719,
+      "fp8_us": 75.77600330114365
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 256,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.2928149923682213e-10,
+      "rel_l2": 0.026995807886123657
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 256,
+      "rows": 256,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 1,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0302734375,
+      "rel_l2": 0.026778044179081917,
+      "bf16_us": 51.19999870657921,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 1,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.2014213502407074e-10,
+      "rel_l2": 0.027328960597515106
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 1,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0390625,
+      "rel_l2": 0.026774562895298004,
+      "bf16_us": 49.15200173854828,
+      "fp8_us": 32.62400068342686
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.7834979593753815e-10,
+      "rel_l2": 0.02710574120283127
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 1024,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.044921875,
+      "rel_l2": 0.026660162955522537,
+      "bf16_us": 391.1679983139038,
+      "fp8_us": 239.6160066127777
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 1024,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.874891601502895e-10,
+      "rel_l2": 0.027002276852726936
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 1024,
+      "rows": 1024,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 1,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.03515625,
+      "rel_l2": 0.027011564001441002,
+      "bf16_us": 51.19999870657921,
+      "fp8_us": 30.719999223947525
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 1,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 2.9103830456733704e-10,
+      "rel_l2": 0.026855824515223503
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 1,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.03564453125,
+      "rel_l2": 0.026224644854664803,
+      "bf16_us": 49.15200173854828,
+      "fp8_us": 32.75199979543686
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.601599019020796e-10,
+      "rel_l2": 0.026944475248456
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 4096,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.05078125,
+      "rel_l2": 0.02663729339838028,
+      "bf16_us": 706.5600156784058,
+      "fp8_us": 870.4000115394592
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 4096,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.511093720793724e-10,
+      "rel_l2": 0.02700740098953247
+    },
+    {
+      "layer": "layers.0",
+      "capacity": 4096,
+      "rows": 4096,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.1",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.03515625,
+      "rel_l2": 0.026694267988204956
+    },
+    {
+      "layer": "layers.1",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.8562575355172157e-10,
+      "rel_l2": 0.026822146028280258
+    },
+    {
+      "layer": "layers.1",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.2",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.03515625,
+      "rel_l2": 0.02670193277299404
+    },
+    {
+      "layer": "layers.2",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.601599019020796e-10,
+      "rel_l2": 0.026914548128843307
+    },
+    {
+      "layer": "layers.2",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.3",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.037109375,
+      "rel_l2": 0.02653089351952076
+    },
+    {
+      "layer": "layers.3",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0381564758718014e-10,
+      "rel_l2": 0.0271421130746603
+    },
+    {
+      "layer": "layers.3",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.4",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.036865234375,
+      "rel_l2": 0.026352470740675926
+    },
+    {
+      "layer": "layers.4",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.92901711165905e-10,
+      "rel_l2": 0.026782412081956863
+    },
+    {
+      "layer": "layers.4",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.5",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04022216796875,
+      "rel_l2": 0.02664148434996605
+    },
+    {
+      "layer": "layers.5",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.019966581836343e-10,
+      "rel_l2": 0.02715613879263401
+    },
+    {
+      "layer": "layers.5",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.6",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0390625,
+      "rel_l2": 0.026579663157463074
+    },
+    {
+      "layer": "layers.6",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.02708035707473755
+    },
+    {
+      "layer": "layers.6",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.7",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0390625,
+      "rel_l2": 0.026646504178643227
+    },
+    {
+      "layer": "layers.7",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.92901711165905e-10,
+      "rel_l2": 0.027102287858724594
+    },
+    {
+      "layer": "layers.7",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.8",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.044921875,
+      "rel_l2": 0.026574481278657913
+    },
+    {
+      "layer": "layers.8",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.027119573205709457
+    },
+    {
+      "layer": "layers.8",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.9",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0380859375,
+      "rel_l2": 0.02676200307905674
+    },
+    {
+      "layer": "layers.9",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.7834979593753815e-10,
+      "rel_l2": 0.027085119858384132
+    },
+    {
+      "layer": "layers.9",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.10",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.037109375,
+      "rel_l2": 0.026687175035476685
+    },
+    {
+      "layer": "layers.10",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.8562575355172157e-10,
+      "rel_l2": 0.02717594802379608
+    },
+    {
+      "layer": "layers.10",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.11",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.037109375,
+      "rel_l2": 0.026577558368444443
+    },
+    {
+      "layer": "layers.11",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.7834979593753815e-10,
+      "rel_l2": 0.026970233768224716
+    },
+    {
+      "layer": "layers.11",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.12",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.037109375,
+      "rel_l2": 0.026607628911733627
+    },
+    {
+      "layer": "layers.12",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.67435859516263e-10,
+      "rel_l2": 0.027160385623574257
+    },
+    {
+      "layer": "layers.12",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.13",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04296875,
+      "rel_l2": 0.026611536741256714
+    },
+    {
+      "layer": "layers.13",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.02705601416528225
+    },
+    {
+      "layer": "layers.13",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.14",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.05126953125,
+      "rel_l2": 0.026752576231956482
+    },
+    {
+      "layer": "layers.14",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.2928149923682213e-10,
+      "rel_l2": 0.02706853486597538
+    },
+    {
+      "layer": "layers.14",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.15",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0380859375,
+      "rel_l2": 0.026413554325699806
+    },
+    {
+      "layer": "layers.15",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.3655745685100555e-10,
+      "rel_l2": 0.0271124430000782
+    },
+    {
+      "layer": "layers.15",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.16",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.046875,
+      "rel_l2": 0.026705477386713028
+    },
+    {
+      "layer": "layers.16",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.511093720793724e-10,
+      "rel_l2": 0.027151789516210556
+    },
+    {
+      "layer": "layers.16",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.17",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.041015625,
+      "rel_l2": 0.026735056191682816
+    },
+    {
+      "layer": "layers.17",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.1518433135934174e-10,
+      "rel_l2": 0.027100693434476852
+    },
+    {
+      "layer": "layers.17",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.18",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.041015625,
+      "rel_l2": 0.026587000116705894
+    },
+    {
+      "layer": "layers.18",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.147295840084553e-10,
+      "rel_l2": 0.027033552527427673
+    },
+    {
+      "layer": "layers.18",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.19",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.048828125,
+      "rel_l2": 0.026646753773093224
+    },
+    {
+      "layer": "layers.19",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.783942131325603e-10,
+      "rel_l2": 0.027194058522582054
+    },
+    {
+      "layer": "layers.19",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.20",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04296875,
+      "rel_l2": 0.026973480358719826
+    },
+    {
+      "layer": "layers.20",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.2928149923682213e-10,
+      "rel_l2": 0.02732211723923683
+    },
+    {
+      "layer": "layers.20",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.21",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.041015625,
+      "rel_l2": 0.026738792657852173
+    },
+    {
+      "layer": "layers.21",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.3655745685100555e-10,
+      "rel_l2": 0.02705949917435646
+    },
+    {
+      "layer": "layers.21",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.22",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.048095703125,
+      "rel_l2": 0.026638777926564217
+    },
+    {
+      "layer": "layers.22",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.02694307081401348
+    },
+    {
+      "layer": "layers.22",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.23",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.046875,
+      "rel_l2": 0.026562653481960297
+    },
+    {
+      "layer": "layers.23",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.474713932722807e-10,
+      "rel_l2": 0.02715318650007248
+    },
+    {
+      "layer": "layers.23",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.24",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04296875,
+      "rel_l2": 0.02667604759335518
+    },
+    {
+      "layer": "layers.24",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.3655745685100555e-10,
+      "rel_l2": 0.027035344392061234
+    },
+    {
+      "layer": "layers.24",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.25",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04296875,
+      "rel_l2": 0.0267394557595253
+    },
+    {
+      "layer": "layers.25",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.3655745685100555e-10,
+      "rel_l2": 0.027234293520450592
+    },
+    {
+      "layer": "layers.25",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.26",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04052734375,
+      "rel_l2": 0.02657914161682129
+    },
+    {
+      "layer": "layers.26",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.656612873077393e-10,
+      "rel_l2": 0.026763003319501877
+    },
+    {
+      "layer": "layers.26",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.27",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.048828125,
+      "rel_l2": 0.026529887691140175
+    },
+    {
+      "layer": "layers.27",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.94765117764473e-10,
+      "rel_l2": 0.027171222493052483
+    },
+    {
+      "layer": "layers.27",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.28",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.041748046875,
+      "rel_l2": 0.026575623080134392
+    },
+    {
+      "layer": "layers.28",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.94765117764473e-10,
+      "rel_l2": 0.026864781975746155
+    },
+    {
+      "layer": "layers.28",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.29",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.041015625,
+      "rel_l2": 0.026650385931134224
+    },
+    {
+      "layer": "layers.29",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.027027925476431847
+    },
+    {
+      "layer": "layers.29",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.30",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0390625,
+      "rel_l2": 0.02660192735493183
+    },
+    {
+      "layer": "layers.30",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 3.7834979593753815e-10,
+      "rel_l2": 0.02687264233827591
+    },
+    {
+      "layer": "layers.30",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.31",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.046875,
+      "rel_l2": 0.02657327800989151
+    },
+    {
+      "layer": "layers.31",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.179128154646605e-10,
+      "rel_l2": 0.02716643363237381
+    },
+    {
+      "layer": "layers.31",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.32",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0439453125,
+      "rel_l2": 0.026714332401752472
+    },
+    {
+      "layer": "layers.32",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.3655745685100555e-10,
+      "rel_l2": 0.0272725448012352
+    },
+    {
+      "layer": "layers.32",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.33",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0458984375,
+      "rel_l2": 0.02677912637591362
+    },
+    {
+      "layer": "layers.33",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.0745362639427185e-10,
+      "rel_l2": 0.027013184502720833
+    },
+    {
+      "layer": "layers.33",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.34",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04296875,
+      "rel_l2": 0.02639639936387539
+    },
+    {
+      "layer": "layers.34",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 5.238689482212067e-10,
+      "rel_l2": 0.02703406661748886
+    },
+    {
+      "layer": "layers.34",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.35",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.04296875,
+      "rel_l2": 0.026551954448223114
+    },
+    {
+      "layer": "layers.35",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.3655745685100555e-10,
+      "rel_l2": 0.027017192915081978
+    },
+    {
+      "layer": "layers.35",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.36",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.046875,
+      "rel_l2": 0.02637508139014244
+    },
+    {
+      "layer": "layers.36",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 4.802132025361061e-10,
+      "rel_l2": 0.026869475841522217
+    },
+    {
+      "layer": "layers.36",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.37",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.046875,
+      "rel_l2": 0.026453053578734398
+    },
+    {
+      "layer": "layers.37",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 5.238689482212067e-10,
+      "rel_l2": 0.02696535922586918
+    },
+    {
+      "layer": "layers.37",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.38",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.05078125,
+      "rel_l2": 0.0265267975628376
+    },
+    {
+      "layer": "layers.38",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 5.820766091346741e-10,
+      "rel_l2": 0.026992207393050194
+    },
+    {
+      "layer": "layers.38",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "layers.39",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.046875,
+      "rel_l2": 0.026656994596123695
+    },
+    {
+      "layer": "layers.39",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 5.238689482212067e-10,
+      "rel_l2": 0.02703624777495861
+    },
+    {
+      "layer": "layers.39",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "mtp.0",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.12109375,
+      "rel_l2": 0.02678046002984047
+    },
+    {
+      "layer": "mtp.0",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 1.3969838619232178e-09,
+      "rel_l2": 0.026885472238063812
+    },
+    {
+      "layer": "mtp.0",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "mtp.1",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.12744140625,
+      "rel_l2": 0.02650139294564724
+    },
+    {
+      "layer": "mtp.1",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 1.3023964129388332e-09,
+      "rel_l2": 0.027014942839741707
+    },
+    {
+      "layer": "mtp.1",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    },
+    {
+      "layer": "mtp.2",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "random",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.125,
+      "rel_l2": 0.026840277016162872
+    },
+    {
+      "layer": "mtp.2",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "tiny",
+      "quantized_oracle_pass": true,
+      "max_abs": 1.3969838619232178e-09,
+      "rel_l2": 0.026983309537172318
+    },
+    {
+      "layer": "mtp.2",
+      "capacity": 16,
+      "rows": 6,
+      "pattern": "zero",
+      "quantized_oracle_pass": true,
+      "max_abs": 0.0,
+      "rel_l2": 0
+    }
+  ],
+  "api": {
+    "before-target": {
+      "rates": [
+        30.919639362565494,
+        31.185634362233905,
+        31.0114387248665
+      ],
+      "median": 31.0114387248665,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "before-spec": {
+      "rates": [
+        97.58043243621438,
+        102.26594246009057,
+        102.37179132543406
+      ],
+      "median": 102.26594246009057,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "target": {
+      "rates": [
+        31.72215843460445,
+        31.65043050180628,
+        31.527390570887658
+      ],
+      "median": 31.65043050180628,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "spec": {
+      "rates": [
+        101.20128929913041,
+        103.46021218014539,
+        105.42753146844481
+      ],
+      "median": 103.46021218014539,
+      "prompt": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    }
+  },
+  "quality": [
+    {
+      "case": {
+        "name": "arithmetic",
+        "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+        "expected": "575"
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "575",
+          "usage": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "575",
+          "usage": {
+            "prompt_tokens": 20,
+            "completion_tokens": 2,
+            "total_tokens": 22,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 20
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "signed_sort",
+        "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+        "expected_json": [
+          -11,
+          -4,
+          0,
+          7,
+          7,
+          12
+        ]
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "[-11, -4, 0, 7, 7, 12]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 19,
+            "total_tokens": 56,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "extraction",
+        "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+        "expected_json": {
+          "total": 40,
+          "names": [
+            "Alice",
+            "Bob"
+          ]
+        }
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 17,
+            "total_tokens": 59,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 42
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "logic",
+        "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+        "expected_json": [
+          "D",
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "[\"D\", \"A\", \"B\", \"C\"]",
+          "usage": {
+            "prompt_tokens": 37,
+            "completion_tokens": 13,
+            "total_tokens": 50,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 37
+          },
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "unicode",
+        "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+        "expected": "36"
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n\n36",
+          "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 18,
+            "total_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "objective_pass": false
+        },
+        "speculative": {
+          "text": "18 + 27 = 45  \n45 - 9 = 36  \n\n36",
+          "usage": {
+            "prompt_tokens": 25,
+            "completion_tokens": 18,
+            "total_tokens": 43,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 25
+          },
+          "objective_pass": false
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "translation",
+        "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "objective_pass": null
+        },
+        "speculative": {
+          "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 8,
+            "total_tokens": 29,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          },
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "explanation",
+        "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+          "usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 32,
+            "total_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "objective_pass": null
+        },
+        "speculative": {
+          "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+          "usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 32,
+            "total_tokens": 58,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 26
+          },
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": {
+        "name": "long_retrieval",
+        "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+        "expected": "quartz-731"
+      },
+      "text_equal": true,
+      "usage_equal": true,
+      "runs": {
+        "target": {
+          "text": "quartz-731",
+          "usage": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "objective_pass": true
+        },
+        "speculative": {
+          "text": "quartz-731",
+          "usage": {
+            "prompt_tokens": 1363,
+            "completion_tokens": 5,
+            "total_tokens": 1368,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 1363
+          },
+          "objective_pass": true
+        }
+      }
+    }
+  ],
+  "timings": [
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/spec-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 54.518076923076926,
+          "median": 54.0,
+          "p95": 58.0,
+          "max": 75.0
+        },
+        "projection_us": {
+          "mean": 87.28961538461539,
+          "median": 74.0,
+          "p95": 144.0,
+          "max": 188.0
+        },
+        "sparse_us": {
+          "mean": 88.18115384615385,
+          "median": 79.0,
+          "p95": 116.0,
+          "max": 590.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/spec-api.log",
+      "kind": "coordinator_collection",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "receive_us": {
+          "mean": 584.1069230769231,
+          "median": 533.0,
+          "p95": 690.0,
+          "max": 16215.0
+        },
+        "reduce_us": {
+          "mean": 6.880769230769231,
+          "median": 7.0,
+          "p95": 8.0,
+          "max": 69.0
+        },
+        "shared_copy_us": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "upload_us": {
+          "mean": 13.17153846153846,
+          "median": 13.0,
+          "p95": 18.0,
+          "max": 66.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/spec-api.log",
+      "kind": "coordinator_experts",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "collect_us": {
+          "mean": 607.2353846153846,
+          "median": 557.0,
+          "p95": 710.0,
+          "max": 16240.0
+        },
+        "dispatch_us": {
+          "mean": 5.981538461538461,
+          "median": 5.0,
+          "p95": 9.0,
+          "max": 46.0
+        },
+        "routed_us": {
+          "mean": 56.018076923076926,
+          "median": 48.0,
+          "p95": 90.0,
+          "max": 140.0
+        },
+        "shared_us": {
+          "mean": 68.45153846153846,
+          "median": 55.0,
+          "p95": 127.0,
+          "max": 243.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/spec-api.log",
+      "kind": "coordinator_layer",
+      "rows": 6,
+      "samples": 2600,
+      "metrics": {
+        "attention_us": {
+          "mean": 232.69346153846155,
+          "median": 210.0,
+          "p95": 316.0,
+          "max": 807.0
+        },
+        "experts_us": {
+          "mean": 739.7661538461539,
+          "median": 685.0,
+          "p95": 849.0,
+          "max": 16350.0
+        },
+        "finish_us": {
+          "mean": 12.731538461538461,
+          "median": 13.0,
+          "p95": 14.0,
+          "max": 50.0
+        },
+        "index_us": {
+          "mean": 30.779615384615386,
+          "median": 1.0,
+          "p95": 179.0,
+          "max": 302.0
+        },
+        "produced_us": {
+          "mean": 49.93730769230769,
+          "median": 33.0,
+          "p95": 87.0,
+          "max": 1102.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/target-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 54.51280918727915,
+          "median": 54.0,
+          "p95": 56.0,
+          "max": 84.0
+        },
+        "projection_us": {
+          "mean": 75.69054770318021,
+          "median": 72.0,
+          "p95": 87.0,
+          "max": 225.0
+        },
+        "sparse_us": {
+          "mean": 80.4482332155477,
+          "median": 77.0,
+          "p95": 112.0,
+          "max": 632.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/target-api.log",
+      "kind": "coordinator_collection",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "receive_us": {
+          "mean": 218.21757950530036,
+          "median": 205.0,
+          "p95": 220.0,
+          "max": 18555.0
+        },
+        "reduce_us": {
+          "mean": 6.132685512367491,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 37.0
+        },
+        "shared_copy_us": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "upload_us": {
+          "mean": 7.437632508833922,
+          "median": 7.0,
+          "p95": 10.0,
+          "max": 60.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/target-api.log",
+      "kind": "coordinator_experts",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "collect_us": {
+          "mean": 234.6221731448763,
+          "median": 221.0,
+          "p95": 238.0,
+          "max": 18583.0
+        },
+        "dispatch_us": {
+          "mean": 5.006272084805654,
+          "median": 4.0,
+          "p95": 7.0,
+          "max": 246.0
+        },
+        "routed_us": {
+          "mean": 41.10795053003534,
+          "median": 39.0,
+          "p95": 68.0,
+          "max": 168.0
+        },
+        "shared_us": {
+          "mean": 56.264840989399296,
+          "median": 53.0,
+          "p95": 89.0,
+          "max": 184.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/target-api.log",
+      "kind": "coordinator_layer",
+      "rows": 1,
+      "samples": 11320,
+      "metrics": {
+        "attention_us": {
+          "mean": 213.17305653710247,
+          "median": 206.0,
+          "p95": 283.0,
+          "max": 834.0
+        },
+        "experts_us": {
+          "mean": 339.07305653710245,
+          "median": 321.0,
+          "p95": 357.0,
+          "max": 18682.0
+        },
+        "finish_us": {
+          "mean": 12.13886925795053,
+          "median": 12.0,
+          "p95": 13.0,
+          "max": 33.0
+        },
+        "index_us": {
+          "mean": 23.9178445229682,
+          "median": 1.0,
+          "p95": 112.0,
+          "max": 636.0
+        },
+        "produced_us": {
+          "mean": 39.43436395759717,
+          "median": 33.0,
+          "p95": 76.0,
+          "max": 810.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-grouped-fp8-rollout/target-api.log",
+      "kind": "coordinator_step",
+      "rows": 1,
+      "samples": 282,
+      "metrics": {
+        "commit_us": {
+          "mean": 427.09929078014187,
+          "median": 422.0,
+          "p95": 455.0,
+          "max": 542.0
+        },
+        "execute_us": {
+          "mean": 31959.436170212764,
+          "median": 30451.5,
+          "p95": 44485.0,
+          "max": 65863.0
+        },
+        "prepared_us": {
+          "mean": 7.617021276595745,
+          "median": 7.0,
+          "p95": 12.0,
+          "max": 18.0
+        },
+        "sample_us": {
+          "mean": 122.00354609929079,
+          "median": 121.5,
+          "p95": 139.0,
+          "max": 210.0
+        },
+        "total_us": {
+          "mean": 32516.156028368794,
+          "median": 31004.0,
+          "p95": 45051.0,
+          "max": 66496.0
+        }
+      }
+    }
+  ]
+}

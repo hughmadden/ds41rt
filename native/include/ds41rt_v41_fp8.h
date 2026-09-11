@@ -4,7 +4,10 @@
 extern "C" {
 #endif
 /* All entry points return raw CUDA status; caller owns storage and stream ordering.
- * Weights remain contiguous FP8 [N,K]; native scales are UE8M0 [N/32,K/32]. */
+ * Dense weights remain contiguous FP8 [N,K], scales UE8M0 [N/32,K/32].
+ * WO-A geometry K=32768,N=8192 is block diagonal over eight groups:
+ * weights [8,1024,4096], scales [8,32,128], BF16 input [rows,8,4096],
+ * BF16 output [rows,8,1024]. Packed-scale bytes describe actual grouped storage. */
 typedef struct {
   uint32_t abi_version, capacity_rows, input_dim, output_dim;
   uint64_t scratch_bytes, values_offset, row_scales_offset, mma_scales_offset;

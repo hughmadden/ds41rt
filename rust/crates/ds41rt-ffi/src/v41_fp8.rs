@@ -1,4 +1,5 @@
 //! Library-borrowing native V4.1 block FP8 launch handle.
+//! Geometry (32768,8192) is grouped WO-A: eight independent [4096,1024] projections.
 use crate::{Ds41rtDeviceBuffer, NativeLibrary};
 use anyhow::{ensure, Result};
 use std::{ffi::c_void, ptr::NonNull};
@@ -64,6 +65,7 @@ impl NativeLibrary {
                     | (1280, 4096)
                     | (5120, 512)
                     | (8192, 5120)
+                    | (32768, 8192)
             ),
             "unsupported native FP8 matrix"
         );
@@ -81,7 +83,7 @@ impl NativeLibrary {
                 && info.input_dim == input_dim
                 && info.output_dim == output_dim
                 && info.packed_weight_scale_bytes
-                    == u64::from(input_dim) * u64::from(output_dim) / 32,
+                    == u64::from(input_dim) * u64::from(output_dim) / groups(input_dim, output_dim) / 32,
             "unsupported native V4.1 FP8 geometry/ABI"
         );
         ensure!(
@@ -169,7 +171,8 @@ impl V41Fp8Kernel<'_> {
         Ok(())
     }
     /// # Safety
-    /// Source is native UE8M0 [output_dim/32,input_dim/32]; destination is distinct current-device
+    /// Source is native UE8M0 [output_dim/32,input_dim/32], or [8,32,128]
+    /// for grouped WO-A. Destination is distinct current-device
     /// storage, with both allocations live and correctly ordered through completion.
     pub unsafe fn pack_scales(
         &self,
@@ -179,7 +182,7 @@ impl V41Fp8Kernel<'_> {
     ) -> Result<()> {
         require(
             source,
-            self.info.input_dim as usize * self.info.output_dim as usize / 1024,
+            self.info.packed_weight_scale_bytes as usize / 32,
         )?;
         require(
             destination,
@@ -223,7 +226,7 @@ impl V41Fp8Kernel<'_> {
         require(source, rows as usize * self.info.input_dim as usize * 2)?;
         require(
             weight,
-            self.info.input_dim as usize * self.info.output_dim as usize,
+            self.info.packed_weight_scale_bytes as usize * 32,
         )?;
         require(
             scales,
@@ -295,4 +298,9 @@ impl V41SharedSwiGlu<'_> {
         ensure!(status == 0, "native shared SwiGLU CUDA status {status}");
         Ok(())
     }
+}
+
+// The official WO-A projection is block diagonal over eight head groups.
+fn groups(input: u32, output: u32) -> u64 {
+    if (input, output) == (32768, 8192) { 8 } else { 1 }
 }

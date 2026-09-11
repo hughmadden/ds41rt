@@ -104,7 +104,7 @@ pub(crate) struct DsparkWeights<'library> {
     auxiliary: NativeRtxTensors<'library>,
     budget: DsparkBudget,
     shared_scales: [crate::v41_memory::DeviceAllocation<'library>; 9],
-    grouped_output_weights: [crate::v41_memory::DeviceAllocation<'library>; 3],
+    grouped_output_scales: [crate::v41_memory::DeviceAllocation<'library>; 3],
     projection_scales: [crate::v41_memory::DeviceAllocation<'library>; 13],
 }
 impl<'library> DsparkWeights<'library> {
@@ -142,11 +142,11 @@ impl<'library> DsparkWeights<'library> {
             auxiliary_resident_bytes,
             shared_packed_scale_bytes: shared::packed_scale_bytes(library)?,
             projection_packed_scale_bytes: projection::packed_bytes(library)?,
-            grouped_output_resident_bytes: 3 * 67108864,
+            grouped_output_resident_bytes: 3 * 1048576,
             projection_bytes_per_wave: projection::wave_bytes(library, capacity)?,
             draft_token_bytes_per_wave: 64,
             main_context_additional_bytes_per_wave: DsparkMainContext::additional_bytes(library, capacity)?,
-            attention_output_additional_bytes_per_wave: DsparkAttentionOutput::additional_bytes(capacity)? * 3,
+            attention_output_additional_bytes_per_wave: DsparkAttentionOutput::additional_bytes(library, capacity)? * 3,
             attention_wave_additional_bytes_per_wave: DsparkAttentionWave::additional_bytes(capacity)? * 3,
             shared_execution_bytes_per_wave: DsparkSharedFfn::device_bytes(library, capacity)? * 3,
             load_staging_bytes,
@@ -211,9 +211,9 @@ impl<'library> DsparkWeights<'library> {
             .context("dSpark requires three expert stages")?;
         let shared_scales = shared::pack_scales(library, &auxiliary)?;
         let projection_scales = projection::pack_scales(library, &auxiliary)?;
-        let grouped_output_weights = attention_output::dequant_weights(library, &auxiliary)?;
+        let grouped_output_scales = attention_output::pack_grouped_scales(library, &auxiliary)?;
         Ok(Self {
-            grouped_output_weights,
+            grouped_output_scales,
             shared_scales,
             projection_scales,
             experts,

@@ -19,6 +19,8 @@ struct Variant {
   const uint32_t* grids;
   uint64_t split_offset;
   uint32_t split_slices;
+  uint32_t groups;
+  uint64_t grouped_output_offset;
   int device = -1;
 };
 Variant variants[] = {DS41RT_V41_FP8_VARIANTS};
@@ -44,6 +46,7 @@ int device_matches(Variant* v) {
   return status ? int(status) : (device == v->device ? 0 : int(cudaErrorInvalidDevice));
 }
 }
+extern "C" int32_t ds41rt_v41_fp8_grouped_output(const uint16_t*, uint16_t*, int32_t, void*);
 extern "C" int32_t ds41rt_v41_fp8_reduce_splits(const float*, uint16_t*, int32_t, int32_t, int32_t, void*);
 extern "C" int32_t ds41rt_v41_fp8_initialize_storage(void*, uint64_t, float*, void*);
 extern "C" int32_t ds41rt_v41_fp8_matrix_info(int32_t rows, int32_t k, int32_t n, ds41rt_v41_fp8_info_t* out) {
@@ -83,7 +86,7 @@ extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, c
   auto* v = handle(kernel); int status = device_matches(v); if (status) return status;
   if (rows <= 0 || uint32_t(rows) > v->info.capacity_rows || bytes < v->info.scratch_bytes) return cudaErrorInvalidValue;
   const void* buffers[] = {source,weight,packed_scales,scratch,alpha,output};
-  uint64_t sizes[] = {uint64_t(rows)*v->info.input_dim*2,uint64_t(v->info.output_dim)*v->info.input_dim,v->info.packed_weight_scale_bytes,v->info.scratch_bytes,4,uint64_t(rows)*v->info.output_dim*2};
+  uint64_t sizes[] = {uint64_t(rows)*v->info.input_dim*2,uint64_t(v->info.output_dim)*v->info.input_dim/v->groups,v->info.packed_weight_scale_bytes,v->info.scratch_bytes,4,uint64_t(rows)*v->info.output_dim*2};
   uintptr_t starts[6], ends[6];
   for (int i=0;i<6;++i) {
     if (!span(buffers[i],sizes[i],starts[i],ends[i])) return cudaErrorInvalidValue;
@@ -95,13 +98,22 @@ extern "C" int32_t ds41rt_v41_fp8_launch(void* kernel, const uint16_t* source, c
   void* sm = static_cast<char*>(scratch)+v->info.mma_scales_offset;
   int grid = v->grids[rows-1];
   void* quant_args[] = {&x,&a,&sr,&sm,&rows,&grid,&stream,&status};
-  v->quant.launch(quant_args,8); if (status) return status;
+  if (v->groups == 1) v->quant.launch(quant_args,8);
+  else {
+    int unused_length=1;
+    void* group_args[] = {&x,&x,&x,&a,&sr,&sm,&rows,&unused_length,&grid,&stream,&status};
+    v->quant.launch(group_args,11);
+  }
+  if (status) return status;
   void* w=const_cast<uint8_t*>(weight), *s=const_cast<uint8_t*>(packed_scales), *c=output, *one=const_cast<float*>(alpha);
   if (v->split_slices > 1) c = static_cast<char*>(scratch) + v->split_offset;
+  if (v->groups > 1) c = static_cast<char*>(scratch) + v->grouped_output_offset;
   // Quantized-output slots are compile-time inactive for this BF16 projection.
   void* gemm_args[] = {&a,&w,&sm,&s,&c,&c,&c,&c,&one,&rows,&stream,&status};
   v->gemm.launch(gemm_args,12);
-  if (status || v->split_slices == 1) return status;
+  if (status) return status;
+  if (v->groups > 1) return ds41rt_v41_fp8_grouped_output(static_cast<const uint16_t*>(c),output,rows,stream);
+  if (v->split_slices == 1) return status;
   return ds41rt_v41_fp8_reduce_splits(static_cast<const float*>(c), output,
       rows, v->info.output_dim, v->split_slices, stream);
 }

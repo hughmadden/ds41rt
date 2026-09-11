@@ -1,16 +1,17 @@
-//! Inverse RoPE -> grouped BF16 wo_a -> native FP8 wo_b on one owned stream.
+//! Inverse RoPE -> grouped FP8 wo_a -> native FP8 wo_b on one owned stream.
 use super::{DsparkProjection, DsparkWeights, ProjectionKind};
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41GroupedOutput,
-    V41_GROUPED_OUTPUT_WORKSPACE,
+    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel,
 };
 use std::ffi::c_void;
 pub(crate) struct DsparkAttentionOutput<'weights, 'library> {
     stream: LoadStream<'library>,
-    grouped: V41GroupedOutput<'library>,
-    _workspace: DeviceAllocation<'library>,
+    grouped: V41Fp8Kernel<'library>,
+    grouped_scratch: DeviceAllocation<'library>,
+    alpha: DeviceAllocation<'library>,
+    scales: Ds41rtDeviceBuffer,
     ops: V41AttentionOps<'library>,
     projection: DsparkProjection<'weights, 'library>,
     weight: Ds41rtDeviceBuffer,
@@ -34,23 +35,26 @@ impl<'library> DsparkWeights<'library> {
             DsparkAttentionOutput::device_bytes(library, capacity)? <= budget,
             "dSpark attention output exceeds budget"
         );
-        let workspace = DeviceAllocation::new(library, V41_GROUPED_OUTPUT_WORKSPACE)?;
-        let grouped = unsafe { library.v41_grouped_output(workspace.buffer)? };
+        let grouped = library.v41_fp8_matrix_kernel(capacity, 32768, 8192)?;
+        let grouped_scratch = DeviceAllocation::new(library, grouped.info().scratch_bytes as usize)?;
+        let alpha = DeviceAllocation::new(library, 4)?;
+        let stream = LoadStream { library, raw: library.cuda_stream_create()? };
+        let initialized = unsafe { grouped.initialize_scratch(grouped_scratch.buffer, alpha.buffer, stream.raw) };
+        initialized.and(unsafe { library.cuda_stream_synchronize(stream.raw) })?;
         let projection = self.projection(
             ProjectionKind::OutputB(stage),
             capacity,
             DsparkProjection::device_bytes(library, ProjectionKind::OutputB(stage), capacity)?,
         )?;
         Ok(DsparkAttentionOutput {
-            stream: LoadStream {
-                library,
-                raw: library.cuda_stream_create()?,
-            },
+            stream,
             grouped,
-            _workspace: workspace,
+            grouped_scratch,
+            alpha,
+            scales: self.grouped_output_scales[stage].buffer,
             ops: library.v41_attention_ops()?,
             projection,
-            weight: self.grouped_output_weights[stage].buffer,
+            weight: self.auxiliary.get(&format!("mtp.{stage}.attn.wo_a.weight"))?,
             input: DeviceAllocation::new(library, capacity as usize * 65536)?,
             rotated: DeviceAllocation::new(library, capacity as usize * 65536)?,
             frequencies: DeviceAllocation::new(library, capacity as usize * 256)?,
@@ -62,16 +66,16 @@ impl<'library> DsparkWeights<'library> {
 }
 impl DsparkAttentionOutput<'_, '_> {
     // Extra storage beyond the already-budgeted OutputB projection owner.
-    pub fn additional_bytes(capacity: u32) -> Result<usize> {
+    pub fn additional_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         ensure!(
             (1..=4096).contains(&capacity),
             "invalid dSpark attention output capacity"
         );
-        Ok(V41_GROUPED_OUTPUT_WORKSPACE + capacity as usize * (2 * 65536 + 256))
+        Ok(library.v41_fp8_matrix_info(capacity, 32768, 8192)?.scratch_bytes as usize + 4 + capacity as usize * (2 * 65536 + 256))
     }
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         DsparkProjection::device_bytes(library, ProjectionKind::OutputB(0), capacity)?
-            .checked_add(Self::additional_bytes(capacity)?)
+            .checked_add(Self::additional_bytes(library, capacity)?)
             .context("dSpark attention output storage overflow")
     }
     pub(super) fn output_storage(&self)->Ds41rtDeviceBuffer {self.projection.output_storage()}
@@ -106,6 +110,9 @@ impl DsparkAttentionOutput<'_, '_> {
             self.grouped.launch(
                 self.rotated.buffer,
                 self.weight,
+                self.scales,
+                self.grouped_scratch.buffer,
+                self.alpha.buffer,
                 self.projection.input(),
                 rows,
                 stream,
@@ -204,7 +211,7 @@ impl Drop for DsparkAttentionOutput<'_, '_> {
     }
 }
 
-pub(super) fn dequant_weights<'a>(
+pub(super) fn pack_grouped_scales<'a>(
     library: &'a NativeLibrary,
     tensors: &crate::v41_tensors::NativeRtxTensors<'a>,
 ) -> Result<[DeviceAllocation<'a>; 3]> {
@@ -215,10 +222,9 @@ pub(super) fn dequant_weights<'a>(
         raw: library.cuda_stream_create()?,
     };
     for stage in 0..3 {
-        output.push(DeviceAllocation::new(library, 67108864)?);
+        output.push(DeviceAllocation::new(library, 1048576)?);
         unsafe {
-            library.v41_grouped_output_dequant(
-                tensors.get(&format!("mtp.{stage}.attn.wo_a.weight"))?,
+            library.v41_fp8_matrix_kernel(1, 32768, 8192)?.pack_scales(
                 tensors.get(&format!("mtp.{stage}.attn.wo_a.scale"))?,
                 output.last().unwrap().buffer,
                 stream.raw,
@@ -231,5 +237,5 @@ pub(super) fn dequant_weights<'a>(
     output
         .try_into()
         .ok()
-        .context("expected three grouped output weights")
+        .context("expected three grouped output scale allocations")
 }

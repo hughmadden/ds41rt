@@ -39,8 +39,11 @@ extern "C" int32_t ds41rt_v41_fp8_matrix_pack_scales(
     const uint8_t* source, uint8_t* destination, int32_t k, int32_t n, void* stream) {
   if (!((k == 6144 && n == 25600) || (k == 5120 && n == 2304) || (k == 2304 && n == 5120) ||
         (k == 15360 && n == 5120) || (k == 5120 && n == 1280) || (k == 1280 && n == 32768) ||
-        (k == 1280 && n == 4096) || (k == 5120 && n == 512) || (k == 8192 && n == 5120)))
+        (k == 1280 && n == 4096) || (k == 5120 && n == 512) || (k == 8192 && n == 5120) || (k == 32768 && n == 8192)))
     return cudaErrorInvalidValue;
+  // WO-A has eight independent groups, each [1024,4096]. The checkpoint
+  // stores groups consecutively, so ordinary packing applies to [8192,4096].
+  if (k == 32768 && n == 8192) k = 4096;
   const uint64_t src_bytes = uint64_t(k) * n / 1024, dst_bytes = src_bytes * 32;
   auto a = reinterpret_cast<uintptr_t>(source), b = reinterpret_cast<uintptr_t>(destination);
   if (!a || !b || a > UINTPTR_MAX - src_bytes || b > UINTPTR_MAX - dst_bytes ||
@@ -75,5 +78,20 @@ extern "C" int32_t ds41rt_v41_fp8_reduce_splits(const float* partials, uint16_t*
   const uint64_t elements = uint64_t(rows) * columns;
   reduce_splits<<<(elements + 255) / 256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       partials,reinterpret_cast<__nv_bfloat16*>(output),elements,slices);
+  return cudaGetLastError();
+}
+
+namespace {
+__global__ void grouped_output_rows(const uint16_t* input,uint16_t* output,uint64_t rows) {
+  const uint64_t i=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
+  if(i>=rows*8192)return;
+  const uint64_t row=i/8192,group=(i%8192)/1024,col=i%1024;
+  output[i]=input[(group*rows+row)*1024+col];
+}
+}
+extern "C" int32_t ds41rt_v41_fp8_grouped_output(const uint16_t* input,uint16_t* output,
+    int32_t rows,void* stream) {
+  if(rows<1 || rows>4096)return cudaErrorInvalidValue;
+  grouped_output_rows<<<(uint64_t(rows)*8192+255)/256,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(input,output,rows);
   return cudaGetLastError();
 }
