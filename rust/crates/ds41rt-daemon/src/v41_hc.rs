@@ -116,6 +116,11 @@ impl HcSublayer<'_, '_> {
     pub fn sublayer_result(&self) -> Ds41rtDeviceBuffer {
         self.sublayer.buffer
     }
+    /// A containing owner may enqueue a boundary chain on this stream, provided
+    /// it drains the stream before releasing any participating sublayer borrow.
+    pub(crate) fn stream_raw(&self) -> *mut c_void {
+        self.stream.raw
+    }
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }

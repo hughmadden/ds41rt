@@ -308,16 +308,23 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
                     && output.projected.device_id == self.inputs()[0].device_id,
                 "block attention result differs"
             );
-            self.library.copy_d2d(
-                self.attention.sublayer_result(),
-                output.projected,
-                rows * 10240,
-            )?;
-            let completed = unsafe { self.attention.finish()? };
-            for (dst, src) in self.ffn.inputs().into_iter().zip(completed) {
-                self.library.copy_d2d(dst, src, src.bytes)?;
-            }
-            let normalized = unsafe { self.ffn.begin(rows)? };
+            let stream = self.attention.stream_raw();
+            let enqueued = (|| -> Result<Ds41rtDeviceBuffer> {
+                unsafe { self.attention.enqueue_finish(Some(output.projected), stream)?; }
+                // Keep the existing residual/pre buffers, but copy on the same
+                // stream after attention post and before FFN pre/mixing.
+                for ((dst, src), bytes) in self.ffn.inputs().into_iter()
+                    .zip(self.attention.output_storage())
+                    .zip([rows * 40960, rows * 16]) {
+                    unsafe { self.library.copy_d2d_async(dst, src, bytes, stream)?; }
+                }
+                unsafe { self.ffn.enqueue_begin(rows, None, stream) }
+            })();
+            // Always drain, including partial enqueue failure: both mHC owners
+            // must be safe to reset/rebind when this function returns.
+            let drained = unsafe { self.library.cuda_stream_synchronize(stream) };
+            let normalized = enqueued.and_then(|value| drained.map(|()| value))?;
+            unsafe { self.attention.complete()?; }
             self.phase = Phase::Ffn(binding, rows);
             Ok((normalized, binding))
         })();

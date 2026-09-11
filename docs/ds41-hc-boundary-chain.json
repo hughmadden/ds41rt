@@ -1,0 +1,933 @@
+{
+  "scope": "Single-stream mHC boundary chain; diagnostic live measurements",
+  "quality_exact": true,
+  "quality": {
+    "scope": "Eight paired single-client greedy cases. Six objective checks and two open-ended comparisons; not broad model quality, stochastic equivalence or release performance.",
+    "cases": [
+      {
+        "case": {
+          "name": "arithmetic",
+          "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+          "expected": "575"
+        },
+        "runs": {
+          "target": {
+            "text": "575",
+            "first_content_seconds": 0.14611931098625064,
+            "finish_seconds": 0.20813657890539616,
+            "observed_decode_tokens_per_second": 16.124541334257763,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "575",
+            "first_content_seconds": 0.1425652039470151,
+            "finish_seconds": 0.2267055759439245,
+            "observed_decode_tokens_per_second": 11.884901103559795,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "signed_sort",
+          "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+          "expected_json": [
+            -11,
+            -4,
+            0,
+            7,
+            7,
+            12
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.1642269449075684,
+            "finish_seconds": 0.9457781459204853,
+            "observed_decode_tokens_per_second": 23.03112064401077,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.18116550403647125,
+            "finish_seconds": 0.5340113959973678,
+            "observed_decode_tokens_per_second": 51.013772329804574,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "extraction",
+          "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+          "expected_json": {
+            "total": 40,
+            "names": [
+              "Alice",
+              "Bob"
+            ]
+          }
+        },
+        "runs": {
+          "target": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.18014211696572602,
+            "finish_seconds": 0.8607600160175934,
+            "observed_decode_tokens_per_second": 23.508050585047425,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.19206191797275096,
+            "finish_seconds": 0.48254616698250175,
+            "observed_decode_tokens_per_second": 55.08043914444023,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "logic",
+          "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+          "expected_json": [
+            "D",
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.16913442499935627,
+            "finish_seconds": 0.6792966050561517,
+            "observed_decode_tokens_per_second": 23.52193178777788,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.16525578999426216,
+            "finish_seconds": 0.30440180900041014,
+            "observed_decode_tokens_per_second": 86.24034008094615,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "unicode",
+          "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+          "expected": "36"
+        },
+        "runs": {
+          "target": {
+            "text": "36",
+            "first_content_seconds": 0.14605064899660647,
+            "finish_seconds": 0.20698389795143157,
+            "observed_decode_tokens_per_second": 16.41140128177612,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "36",
+            "first_content_seconds": 0.14044187497347593,
+            "finish_seconds": 0.22476087498944253,
+            "observed_decode_tokens_per_second": 11.8597231918149,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "translation",
+          "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+        },
+        "runs": {
+          "target": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.137318393914029,
+            "finish_seconds": 0.43180622498039156,
+            "observed_decode_tokens_per_second": 23.770082365211746,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.162254874012433,
+            "finish_seconds": 0.3721007889835164,
+            "observed_decode_tokens_per_second": 33.35780923333482,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "explanation",
+          "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+        },
+        "runs": {
+          "target": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.15318539296276867,
+            "finish_seconds": 1.4084682220127434,
+            "observed_decode_tokens_per_second": 24.695629767724515,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.1476736149052158,
+            "finish_seconds": 0.9364241679431871,
+            "observed_decode_tokens_per_second": 39.3026665789325,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "long_retrieval",
+          "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+          "expected": "quartz-731"
+        },
+        "runs": {
+          "target": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.4406616509659216,
+            "finish_seconds": 3.7892682169331238,
+            "observed_decode_tokens_per_second": 11.474253185398494,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.268406410003081,
+            "finish_seconds": 3.406706157955341,
+            "observed_decode_tokens_per_second": 28.9226846702625,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      }
+    ]
+  },
+  "performance": {
+    "target": {
+      "rates": {
+        "before": [
+          24.51216390163997,
+          24.482935999608365,
+          24.423424017606187
+        ],
+        "after": [
+          24.65847939194967,
+          24.90802065958436,
+          24.920030675817987
+        ]
+      },
+      "median_ratio": 1.017362487080095,
+      "runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1446662190137431,
+          "finish_seconds": 2.496798281907104,
+          "observed_decode_tokens_per_second": 24.65847939194967,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14185648004058748,
+          "finish_seconds": 2.4704236830584705,
+          "observed_decode_tokens_per_second": 24.90802065958436,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14129148004576564,
+          "finish_seconds": 2.468736448092386,
+          "observed_decode_tokens_per_second": 24.920030675817987,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12829591403715312,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-32fff043-c1d2-4958-9d49-9e91b3f3475e",
+        "object": "chat.completion",
+        "created": 1789126861,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400
+    },
+    "spec": {
+      "rates": {
+        "before": [
+          88.29239199507447,
+          87.55497231477233,
+          87.99553381980674
+        ],
+        "after": [
+          89.0446757293678,
+          89.02116738464942,
+          89.96596556226349
+        ]
+      },
+      "median_ratio": 1.0119226722541332,
+      "runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14064322703052312,
+          "finish_seconds": 0.7920016549760476,
+          "observed_decode_tokens_per_second": 89.0446757293678,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1362943759886548,
+          "finish_seconds": 0.7878248119959608,
+          "observed_decode_tokens_per_second": 89.02116738464942,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1381961819715798,
+          "finish_seconds": 0.7828844219911844,
+          "observed_decode_tokens_per_second": 89.96596556226349,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12327997200191021,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-84936caf-b218-44a1-85f3-4bb860673243",
+        "object": "chat.completion",
+        "created": 1789126903,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400
+    }
+  },
+  "ffn_prepare_us": {
+    "target": 95.0,
+    "spec": 96.0
+  },
+  "fixture": {
+    "comparisons": [
+      {
+        "path": "l0/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "3a0e1c64e250f59ef74c9312e18fe2a301ddfa2af5ff32099d1ab2de218b359f",
+        "exact": true
+      },
+      {
+        "path": "l0/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "ecfc49412154db910e783b0b640da83f9514620aec4af71d2a63144aebff1409",
+        "exact": true
+      },
+      {
+        "path": "l0/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "e47139302133a8322168ba353d05cc6bc3556492d298a05e313b12951f8e864f",
+        "exact": true
+      },
+      {
+        "path": "l0/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "4cb358689e4996cbef4402eeabc4204bcbe5698fd6a77289e343b1faa52ed733",
+        "exact": true
+      },
+      {
+        "path": "l0/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "8688889afa4fcdf2ba5652a34f729ca6476c996b132da4f471b0c3b4a88422e8",
+        "exact": true
+      },
+      {
+        "path": "l2/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "d2052147ec7369773dc6a673bf1091938b93790121aa1d5bfe15dcdc00a2ef4a",
+        "exact": true
+      },
+      {
+        "path": "l2/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "7fea0d0824f22f526b22ea10644d648b9161bdd8e3ff624e67d7034e55c7f9ff",
+        "exact": true
+      },
+      {
+        "path": "l2/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "f1799f0be753aeeaad50c30fdaf30f09cfeb8f93a8b4e23ce3c4ef706481666c",
+        "exact": true
+      },
+      {
+        "path": "l2/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "19a11182ae7fd802da6ab6ef92864528fee5bcdd0765e9641c8c8550c8736803",
+        "exact": true
+      },
+      {
+        "path": "l2/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "222d39139f07902edbcb6293b476fa728a09d060bb9854fbe2039914aba13ecd",
+        "exact": true
+      },
+      {
+        "path": "l7/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "8e752418473c26a5d9060ecd787de1405d29cf060cbcdf31233553d425690c6f",
+        "exact": true
+      },
+      {
+        "path": "l7/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "09805c86745d098e4bf1fc4a2ed48219e409f34f780203e2f62677f0871830fd",
+        "exact": true
+      },
+      {
+        "path": "l7/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "6b77266a92ced5927e136324549a61282c1b1fbe37a0e3d17f30726875567106",
+        "exact": true
+      },
+      {
+        "path": "l7/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "58d70bd93a9c6b012bb8615f45c96a2abcb3996255804bcb4080e2219b5b4dcc",
+        "exact": true
+      },
+      {
+        "path": "l7/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "84f092a45d109ca11c3e5fed4f5d1bed41ed2610ab6e422de8496d755ee16bad",
+        "exact": true
+      },
+      {
+        "path": "l8/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "e112f4bd89b76073c9087ad9d7cc799fd2a653446575f2300fbbbaa2649194d1",
+        "exact": true
+      },
+      {
+        "path": "l8/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "6476e75108bf151caef0ecba80a0ee4fdfe4590e67a5b1c0daa76a85c19f1e28",
+        "exact": true
+      },
+      {
+        "path": "l8/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "719ad5694d2987621f55e4c1f37aaed23f5e208e84d6d6151d238d56c5e64a32",
+        "exact": true
+      },
+      {
+        "path": "l8/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "4427ceeb3bae0fb6053b3972be4e8036240a6b10bb85f01442b435fa17694c18",
+        "exact": true
+      },
+      {
+        "path": "l8/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "c42d846d040e1cf331febfb9fab6bb3bbb9391adb6a4191d3fa1cbf853d7d00e",
+        "exact": true
+      },
+      {
+        "path": "l14/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "fc9f44970cf5f7a4c12f9ac12cc22711a3cc37328b763767b903e312945a59a5",
+        "exact": true
+      },
+      {
+        "path": "l14/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "bfddfebb67171a8751e19c3ae22f8d806f89f732d3be91398980baefb02fff27",
+        "exact": true
+      },
+      {
+        "path": "l14/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "904bd29ab3b16a51f79fc53ad77040705e933f228e7aa53fdd8f504f862fb5c1",
+        "exact": true
+      },
+      {
+        "path": "l14/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "fe41ad926c75ea4b673993a1951b5bfcb7cc5725f3a83da39a91cc1ba90b3f83",
+        "exact": true
+      },
+      {
+        "path": "l14/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "8b873ea1eaf5c167799f0d9e7ae5cd904ec52e8317f7e539049ab34969bf5864",
+        "exact": true
+      },
+      {
+        "path": "l20/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "81828dcf498be70fa3be162f22615442e589e89a3dce6e4eed99ff8629ea79e8",
+        "exact": true
+      },
+      {
+        "path": "l20/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "0850376d15e753148dbdb1f1c112600b619bf812991d48e546224fcd7670c202",
+        "exact": true
+      },
+      {
+        "path": "l20/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "bb50a3ff64778d0cba0939fe6cce73950ac40c395e6b50d6d6dfa1a66020bf91",
+        "exact": true
+      },
+      {
+        "path": "l20/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "a8b2e97df7500d6e5cd6b363c7f1a36a62e730dab5023f7f0485729ba000ae3d",
+        "exact": true
+      },
+      {
+        "path": "l20/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "0f6a31748c654e7b8cab84dd156de2b79d21bf338cae1ab47808d59305f7a668",
+        "exact": true
+      },
+      {
+        "path": "l24/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "372a6c0be7619c4340fdc04807fc07ffc672d8b568acfce5f68fbd5410986b52",
+        "exact": true
+      },
+      {
+        "path": "l24/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "336089ce925c962e999971cb3e385574763dc64c3b67ad053ba5c40271d0537b",
+        "exact": true
+      },
+      {
+        "path": "l24/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "412cf1af5b5ec67e4bc4db3b61ba00346b4f8ad73fef4cd0425a7494cd337d1a",
+        "exact": true
+      },
+      {
+        "path": "l24/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "13e86a51c4204494f09b74bbb76d4c8e37b90e84665aa061b201948277ad8a51",
+        "exact": true
+      },
+      {
+        "path": "l24/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "70dd623aea35df2c258936017bd39e575ba8a3911b80d302cf0735be80ef075a",
+        "exact": true
+      },
+      {
+        "path": "l39/block-ffn_input.bin",
+        "bytes": 819200,
+        "sha256": "ed2855762f0ce097984f5f09776404f6bad7bbe55feb8166d006d623a2bd6efc",
+        "exact": true
+      },
+      {
+        "path": "l39/block-ffn_residual.bin",
+        "bytes": 3276800,
+        "sha256": "9bf08fe1c77027eeec21b6c040cb0b75a1fa021bc197269ad0d2b04549685cca",
+        "exact": true
+      },
+      {
+        "path": "l39/block-ffn_pre.bin",
+        "bytes": 1280,
+        "sha256": "bde39194f599b4f362cbf6ffc0932c3d740b7772a8a3464bf21500583142a521",
+        "exact": true
+      },
+      {
+        "path": "l39/block-output.bin",
+        "bytes": 3276800,
+        "sha256": "39e6b76cac74d743ebaae54325bcf9596d8dca4f50fb441cb7e3dcfc92818f55",
+        "exact": true
+      },
+      {
+        "path": "l39/block-next_pre.bin",
+        "bytes": 1280,
+        "sha256": "f6a1a1c48c95265aac037c1f8b13ec02e052c8ee089c57aabf78058729962c6c",
+        "exact": true
+      }
+    ],
+    "before_log": "PASS layer=0 source=2 index=2 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=2 source=2 index=2 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=7 source=2 index=2 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=8 source=8 index=8 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=14 source=14 index=14 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=20 source=20 index=20 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=24 source=20 index=24 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=39 source=20 index=36 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\n",
+    "after_log": "PASS layer=0 source=2 index=2 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=2 source=2 index=2 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=7 source=2 index=2 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=8 source=8 index=8 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=14 source=14 index=14 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=20 source=20 index=20 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=24 source=20 index=24 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\nPASS layer=39 source=20 index=36 requests=16 rows=80 replay_exact=true guards=true budget_bytes=10492160\n",
+    "source_note": "Existing block fixture with candidate begin_ffn extracted from repository and current HcSublayer; staged sources and outputs retained under /tmp/ds41-hc-chain-fixture."
+  },
+  "create_commands": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-hc-chain-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-hc-chain-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-sparse-skip-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18041"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-hc-chain-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-hc-chain-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-sparse-skip-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18042"
+    ]
+  ],
+  "daemon_sha256": "f3811a261641149eb1ad63a5aff26e9c15d63a6088623a483a6a01a9d5fcd5ba",
+  "log_hashes": {
+    "spec-api.log": "7761a8c33232fd21c2bf451b4b49a237afff44acbbe646b6291b88e2354ab001",
+    "target-api.log": "9571cd43e74db563b5ec8d2fdee948a0e4c2ac34de04ba33d9c41dff8e846a17",
+    "quality.log": "859d25a475bf33c60ab8374ba10bb9e75e27da0531b4a5850fe03f3a6bf8246f",
+    "spec.log": "17414f067bc3e0bce1d86497f5000df0748f5941aaf2bef5c8568a2d524c1571",
+    "target.log": "e8683ec27db3da378c61f9ca60e666129354a72bb91eeb9dcdf57ec1b8685543"
+  }
+}
