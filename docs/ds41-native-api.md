@@ -31,10 +31,12 @@ The current local server is at `http://127.0.0.1:18041`, with a `ds41-native-api
 ```sh
 ds41rt serve-native --native-lib /path/to/libds41rt_native.so \
   --snapshot /path/to/official/snapshot \
-  --peers 172.22.2.1:19441,172.22.2.2:19441,172.22.2.3:19441,172.22.2.4:19441 \
+  --peers 10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441 \
   --listen 127.0.0.1:18041
 python3 scripts/qualify-ds41-native-api.py --output /tmp/native-api-results.json
 ```
+
+Use the `10.55.0.x` fabric addresses for expert traffic. The original measurements above used the `172.22.2.x` management network; see [fabric and collection measurements](ds41-expert-collection-timing.md) for the corrected development run. Port 19441 belongs to these development workers, not the production CLI default.
 
 The qualifier issues short real requests, records three counting streams, tests disconnect recovery and rejects unsupported sampling. It is not a broad quality corpus.
 

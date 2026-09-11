@@ -280,13 +280,20 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
         shared: &crate::v41_backbone_shared::SharedOutput<'_>,
     ) -> Result<NativeFfnOutput<'w>> {
         validate_shared(self.request, shared, self.shared, self.capacity)?;
+        let timing = std::time::Instant::now();
         self.library
             .copy_d2d(self.shared, shared.values, shared.values.bytes)?;
+        let shared_copy_us = timing.elapsed().as_micros() as u64;
+        let mut upload_us = 0u64;
         self.pending
             .receive(|rank, first_row, bytes| {
-                copy_chunk(self.library, self.planes, rank, first_row, bytes)
+                let copy_start = std::time::Instant::now();
+                let result = copy_chunk(self.library, self.planes, rank, first_row, bytes);
+                upload_us += copy_start.elapsed().as_micros() as u64;
+                result
             })
             .await?;
+        let received_us = timing.elapsed().as_micros() as u64;
         let rows = self.request.request().header.row_count;
         reduce_planes(
             self.library,
@@ -297,6 +304,7 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
             Some(self.shared),
             rows,
         )?;
+        tracing::debug!(target: "ds41rt::timing", layer=self.request.request().header.layer_id, rows, shared_copy_us, upload_us, receive_us=received_us-shared_copy_us-upload_us, reduce_us=timing.elapsed().as_micros() as u64-received_us, "target collection");
         *self.ready_rows = Some(rows);
         let mut values = self.output;
         values.bytes = rows as usize * 10240;
