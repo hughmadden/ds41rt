@@ -235,3 +235,28 @@ Raw logs: `/tmp/ds41-ced-bounds/request-reservation-{build,gpu}.log`.
 Cache and mapped-I/O preparation are now connected at the request layer. Retained
 execution lanes/index state and scheduling these batches through the backbone
 remain outstanding; neither API has been switched to this path yet.
+
+## Implemented integration: split backbone layer execution
+
+`BackboneExecution::prepare_layer` performs cache production, index selection and
+attention, returning `PreparedLayer` with a borrowed FFN lane but no cache-bank
+or index borrow. Its async `execute` dispatches routed experts, computes the
+shared contribution and collects TP4 results. `complete_layer` validates the
+batch/phase/layer identity before final mHC and progress publication. Dropping
+prepared or completed work leaves execution progress invalid until restart.
+The existing sequential `execute_layer` delegates to these same three operations.
+
+The distributed real layer-zero test passes on RTX plus four existing RoCE Spark
+workers for two changed-input cycles of eighty rows across sixteen requests.
+It covers embedding, attention, TP4 experts/reduction, mHC, next-layer mapped
+Engram preparation and rejection/recovery of an incomplete model commit. Two
+pure execution-progress tests also pass; the optional allocation-plan test was
+skipped because its environment was not enabled. Build/state/distributed logs
+are `/tmp/ds41-ced-bounds/layer-split-{build,state,gpu}.log`.
+
+The initial distributed launch failed before inference because the transport
+loader needed `DS41RT_NATIVE_LIB`; rerunning with the existing frozen native
+library path passed. No GPU or worker restart was needed. Early encoder KV
+publication and multi-chunk task scheduling still need to be connected to this
+split execution interface. These are component results, not a new serving
+throughput measurement.

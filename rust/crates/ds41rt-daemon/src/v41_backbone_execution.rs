@@ -1,8 +1,9 @@
 //! Cache producers and the complete per-layer backbone execution handoff.
 use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage};
-use crate::v41_backbone_lane::BackboneLane;
+use crate::v41_backbone_lane::{BackboneLane, LaneFfn};
+use crate::v41_backbone_router::ExpertRow;
 use crate::v41_compressor::{CompressorWave, CompressorWeights};
-use crate::v41_experts::coordinator::NativeTp4Wave;
+use crate::v41_experts::coordinator::{NativeTp4Wave, NativeFfnOutput};
 use crate::v41_index_lane::IndexLane;
 use crate::v41_tensors::NativeRtxTensors;
 use crate::v41_window::{WindowWave, WindowWeights};
@@ -11,6 +12,42 @@ use ds41rt_ffi::NativeLibrary;
 use ds41rt_loader::OfficialV41Catalog;
 const SOURCES: [usize; 4] = [2, 8, 14, 20];
 const INDEX: [usize; 8] = [2, 8, 14, 20, 24, 28, 32, 36];
+
+/// Owns a prepared FFN borrow, but no cache-bank or index borrow. A scheduler
+/// may prepare another independent lane while this lane waits for remote work.
+pub(crate) struct PreparedLayer<'l, 'w, 'a> {
+    ffn: LaneFfn<'l, 'w, 'a>,
+    rows: Vec<ExpertRow>,
+    batch: u64,
+    layer: usize,
+    started: std::time::Instant,
+    produced_us: u64,
+    indexed_us: u64,
+    attended_us: u64,
+}
+pub(crate) struct CompletedLayer<'t> {
+    result: NativeFfnOutput<'t>,
+    batch: u64,
+    layer: usize,
+    rows: usize,
+    started: std::time::Instant,
+    produced_us: u64,
+    indexed_us: u64,
+    attended_us: u64,
+    experts_us: u64,
+}
+impl PreparedLayer<'_, '_, '_> {
+    /// # Safety
+    /// The modality mask and placement describe this prepared batch. Poll on
+    /// the CUDA owner; no external writes may race the borrowed lane.
+    pub async unsafe fn execute<'t>(mut self, transport: &'t mut NativeTp4Wave<'_>,
+        placement: u64, image_mask: &[u8]) -> Result<CompletedLayer<'t>> {
+        let result = unsafe { self.ffn.execute_tp4(transport, placement, image_mask, &self.rows).await? };
+        Ok(CompletedLayer { result, batch: self.batch, layer: self.layer, rows: self.rows.len(),
+            started: self.started, produced_us: self.produced_us, indexed_us: self.indexed_us,
+            attended_us: self.attended_us, experts_us: self.started.elapsed().as_micros() as u64 })
+    }
+}
 
 pub(crate) struct CacheProducerWeights<'a> {
     library: &'a NativeLibrary,
@@ -239,6 +276,18 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         placement: u64,
         image_mask: &[u8],
     ) -> Result<()> {
+        let prepared = unsafe { self.prepare_layer(bank, batch, lane, index)? };
+        let completed = unsafe { prepared.execute(transport, placement, image_mask).await? };
+        unsafe { self.complete_layer(batch, lane, completed) }
+    }
+    /// Finish all cache production, indexing and attention without holding the
+    /// bank across remote execution. Dropping prepared work leaves progress
+    /// invalid until restart, just as cancelling ordinary layer execution does.
+    /// # Safety
+    /// Same completed-query, cache ownership and device contract as execute_layer.
+    pub unsafe fn prepare_layer<'l, 'lw, 'la>(&mut self, bank: &BackboneCache<'_>,
+        batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
+        index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
         let timing = std::time::Instant::now();
         // Invalidate even if obtaining the completed query or bank check fails.
         let layer = self.progress.next;
@@ -276,18 +325,24 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             .sinks
             .get(&format!("layers.{layer}.attn.attn_sink"))?;
         let rows = batch.expert_rows();
-        let mut ffn = unsafe { lane.attention_indexed_ffn(sink, &cache, index)? };
-        let attended_us = timing.elapsed().as_micros() as u64;
-        let result = unsafe {
-            ffn.execute_tp4(transport, placement, image_mask, &rows)
-                .await?
-        };
-        let experts_us = timing.elapsed().as_micros() as u64;
-        drop(ffn);
-        unsafe {
-            lane.finish_ffn(result.binding(), result.values)?;
-        }
-        tracing::debug!(target: "ds41rt::timing", layer, rows=rows.len(), produced_us, index_us=indexed_us-produced_us, attention_us=attended_us-indexed_us, experts_us=experts_us-attended_us, finish_us=timing.elapsed().as_micros() as u64-experts_us, "target layer");
+        let ffn = unsafe { lane.attention_indexed_ffn(sink, &cache, index)? };
+        Ok(PreparedLayer { ffn, rows, batch: batch.identity(), layer, started: timing,
+            produced_us, indexed_us, attended_us: timing.elapsed().as_micros() as u64 })
+    }
+    /// # Safety
+    /// The completed transport output and lane belong to this prepared layer;
+    /// no external writes race the final mHC operation.
+    pub unsafe fn complete_layer(&mut self, batch: &CacheBatch,
+        lane: &mut BackboneLane<'_, '_>, completed: CompletedLayer<'_>) -> Result<()> {
+        ensure!(self.progress.invalid && self.progress.batch == Some(completed.batch)
+            && batch.identity() == completed.batch && self.progress.next == completed.layer
+            && self.progress.stage == batch.stage(), "completed backbone layer identity differs");
+        unsafe { lane.finish_ffn(completed.result.binding(), completed.result.values)?; }
+        tracing::debug!(target: "ds41rt::timing", layer=completed.layer, rows=completed.rows,
+            produced_us=completed.produced_us, index_us=completed.indexed_us-completed.produced_us,
+            attention_us=completed.attended_us-completed.indexed_us,
+            experts_us=completed.experts_us-completed.attended_us,
+            finish_us=completed.started.elapsed().as_micros() as u64-completed.experts_us, "target layer");
         self.progress.finish();
         Ok(())
     }
