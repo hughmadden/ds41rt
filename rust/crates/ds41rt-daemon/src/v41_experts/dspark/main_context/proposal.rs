@@ -103,6 +103,24 @@ impl MainProposal<'_, '_, '_> {
         leases: [&[WindowLease]; 3],
         accepted: &[u32],
     ) -> Result<()> {
+        let chunks = self.validate_commit(batch, windows, leases, accepted)?;
+        if chunks[0].is_empty() {
+            self.main.ready = None;
+            return Ok(());
+        }
+        unsafe {
+            self.main
+                .commit(windows, [&chunks[0], &chunks[1], &chunks[2]])
+        }
+    }
+    /// Check publication without consuming the proposal or changing a cache.
+    pub fn validate_commit(
+        &self,
+        batch: u64,
+        windows: &[&mut DsparkWindow<'_>; 3],
+        leases: [&[WindowLease]; 3],
+        accepted: &[u32],
+    ) -> Result<[Vec<WindowChunk>; 3]> {
         ensure!(self.batch == batch, "foreign main proposal batch");
         let rows = self
             .main
@@ -143,14 +161,7 @@ impl MainProposal<'_, '_, '_> {
                 windows[stage].validate_write(&chunks[stage], rows)?;
             }
         }
-        if chunks[0].is_empty() {
-            self.main.ready = None;
-            return Ok(());
-        }
-        unsafe {
-            self.main
-                .commit(windows, [&chunks[0], &chunks[1], &chunks[2]])
-        }
+        Ok(chunks)
     }
 }
 impl Drop for MainProposal<'_, '_, '_> {

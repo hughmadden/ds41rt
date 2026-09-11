@@ -33,4 +33,4 @@ The production release daemon builds. The tap-order/batch guard test passes, as 
 
 ## Remaining integration
 
-The three dSpark caches now have [request-bound accepted-prefix publication](ds41-dspark-prefix-publication.md), qualified separately from the target transaction. Coupling their publication with target-cache and engram commits remains open. Proposal generation, confidence policy, verification, acceptance, RNG ownership, cancellation/rollback and concurrent scheduling are not enabled by this change. The development API remains target-only at `127.0.0.1:18041`.
+The three dSpark caches now have [request-bound accepted-prefix publication](ds41-dspark-prefix-publication.md), qualified separately from the target transaction. A [combined commit path](ds41-dspark-combined-commit.md) now coordinates publication with target-cache and engram commits, revoking admissions on partial failure. Proposal generation, confidence policy, verification, acceptance, RNG ownership, cancellation/rollback and concurrent scheduling are not enabled by this change. The development API remains target-only at `127.0.0.1:18041`.

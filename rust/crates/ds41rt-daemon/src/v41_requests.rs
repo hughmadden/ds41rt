@@ -213,14 +213,7 @@ impl<'a> Requests<'a> {
             }
         }
     }
-    /// Preflight engram histories before any device commit. Publication failure
-    /// revokes participating requests; the enclosing scheduler still owns dSpark.
-    pub fn commit(
-        &mut self,
-        batch: &mut RequestBatch,
-        execution: &mut BackboneExecution<'_, '_>,
-        accepted: &[u32],
-    ) -> Result<()> {
+    pub fn validate_acceptance(&self, batch: &RequestBatch, accepted: &[u32]) -> Result<()> {
         self.validate(batch)?;
         let counts = accepted.iter().map(|&n| n as usize).collect::<Vec<_>>();
         let histories = batch
@@ -229,6 +222,30 @@ impl<'a> Requests<'a> {
             .map(|&l| Ok(&self.request(l)?.history))
             .collect::<Result<Vec<_>>>()?;
         batch.engram.validate_commit(&histories, &counts)?;
+        Ok(())
+    }
+    /// Invalidate every participant after a partially applied combined commit.
+    pub fn revoke_batch(&mut self, batch: &mut RequestBatch) {
+        batch.cancel();
+        for &lease in &batch.leases {
+            // An inner commit may have already released this participant.
+            if self.slots.iter().flatten().any(|r| r.lease == lease) {
+                if let Err(cleanup) = self.release(lease) {
+                    tracing::error!(%cleanup, "releasing failed combined transaction");
+                }
+            }
+        }
+    }
+    /// Preflight engram histories before any device commit. Publication failure
+    /// revokes participating requests; the enclosing scheduler still owns dSpark.
+    pub fn commit(
+        &mut self,
+        batch: &mut RequestBatch,
+        execution: &mut BackboneExecution<'_, '_>,
+        accepted: &[u32],
+    ) -> Result<()> {
+        self.validate_acceptance(batch, accepted)?;
+        let counts = accepted.iter().map(|&n| n as usize).collect::<Vec<_>>();
         let result = (|| -> Result<()> {
             execution.commit(&mut self.cache, &batch.cache, accepted)?;
             let mut histories = self

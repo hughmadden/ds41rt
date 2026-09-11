@@ -226,6 +226,24 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                 .collect::<Result<Vec<_>>>()
         })
         .collect::<Result<Vec<_>>>()?;
+    let mut transaction_windows = (0..draft_windows.len())
+        .map(|_| {
+            crate::v41_dspark_cache::DsparkWindow::new(
+                &lib,
+                16,
+                80,
+                crate::v41_dspark_cache::DsparkWindow::device_bytes(16, 80)?,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let transaction_leases = transaction_windows
+        .iter_mut()
+        .map(|window| {
+            (0..request_count)
+                .map(|slot| window.begin_request(slot, 1000 + slot as u64))
+                .collect::<Result<Vec<_>>>()
+        })
+        .collect::<Result<Vec<_>>>()?;
     let mut committed = 0u64;
     for cycle in 0..cycles {
         let count = if cycle == 0 { prompt_rows } else { 1 };
@@ -371,11 +389,110 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                 serde_json::to_vec(&tokens)?,
             )?;
         }
-        pass.commit(
-            &mut requests,
-            &mut batch,
-            &vec![count as u32; request_count],
-        )?;
+        if let Some(main) = &mut main_context {
+            let taps = pass.taps(&batch)?;
+            let mut proposal =
+                unsafe { main.execute_rows(taps.values(), taps.batch_identity(), taps.rows())? };
+            let [a, b, c] = transaction_windows.as_mut_slice() else {
+                unreachable!()
+            };
+            if cycle == 0 {
+                assert!(unsafe {
+                    pass.commit_with_dspark(
+                        &mut requests,
+                        &mut batch,
+                        &mut proposal,
+                        &mut [a, b, c],
+                        [
+                            &transaction_leases[0],
+                            &transaction_leases[1],
+                            &transaction_leases[2],
+                        ],
+                        &vec![count as u32 + 1; request_count],
+                    )
+                }
+                .is_err());
+                requests.validate(&batch)?;
+                pass.output(&batch)?;
+                proposal.output()?;
+            }
+            if cycle + 1 == cycles
+                && std::env::var_os("DS41RT_TARGET_PASS_COMMIT_FAILURE").is_some()
+            {
+                // Invalidate the completed target producer after successful model
+                // execution, forcing a failure after dSpark publication starts.
+                pass.execution.restart();
+                let accepted = (0..request_count)
+                    .map(|i| (i % 2) as u32)
+                    .collect::<Vec<_>>();
+                assert!(unsafe {
+                    pass.commit_with_dspark(
+                        &mut requests,
+                        &mut batch,
+                        &mut proposal,
+                        &mut [a, b, c],
+                        [
+                            &transaction_leases[0],
+                            &transaction_leases[1],
+                            &transaction_leases[2],
+                        ],
+                        &accepted,
+                    )
+                }
+                .is_err());
+                assert!(batch.cache().is_err());
+                assert!(proposal.output().is_err());
+                for &lease in &leases {
+                    assert!(requests.cache().request_id(lease).is_err());
+                }
+                for (window, leases) in transaction_windows.iter().zip(&transaction_leases) {
+                    for &lease in leases {
+                        assert!(window.request_id(lease).is_err());
+                    }
+                }
+                pass.discard(&mut batch)?;
+                for slot in 0..request_count {
+                    let fresh = requests.admit(slot, 1000 + slot as u64)?;
+                    assert_ne!(fresh, leases[slot]);
+                    assert_eq!(requests.cache().committed_end(fresh)?, 0);
+                    requests.release(fresh)?;
+                    for (stage, window) in transaction_windows.iter_mut().enumerate() {
+                        let fresh = window.begin_request(slot, 1000 + slot as u64)?;
+                        assert!(window.request_id(transaction_leases[stage][slot]).is_err());
+                        assert_eq!(window.committed_end(fresh)?, None);
+                        window.release(fresh)?;
+                    }
+                }
+                eprintln!("PASS combined commit failure: all target/engram/dSpark admissions revoked including zero acceptance; fresh generations recover");
+                return Ok(());
+            }
+            unsafe {
+                pass.commit_with_dspark(
+                    &mut requests,
+                    &mut batch,
+                    &mut proposal,
+                    &mut [a, b, c],
+                    [
+                        &transaction_leases[0],
+                        &transaction_leases[1],
+                        &transaction_leases[2],
+                    ],
+                    &vec![count as u32; request_count],
+                )?;
+            }
+            assert!(proposal.output().is_err());
+            for (window, leases) in transaction_windows.iter().zip(&transaction_leases) {
+                for &lease in leases {
+                    assert_eq!(window.committed_end(lease)?, Some(committed + count as u64));
+                }
+            }
+        } else {
+            pass.commit(
+                &mut requests,
+                &mut batch,
+                &vec![count as u32; request_count],
+            )?;
+        }
         committed += count as u64;
         assert!(pass.output(&batch).is_err());
         assert!(pass.taps(&batch).is_err());

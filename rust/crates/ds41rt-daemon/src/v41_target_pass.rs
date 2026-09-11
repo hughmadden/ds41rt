@@ -209,6 +209,49 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         self.state = State::Idle;
         Ok(())
     }
+    /// Publish the same accepted prefixes to dSpark, backbone and engram owners.
+    /// Preflight errors retain the pass; failures after publication starts revoke
+    /// every participating admission, including requests accepting zero rows.
+    /// # Safety
+    /// Proposal input belongs to this completed target batch. All windows and
+    /// producer outputs have exclusive use on this pass's CUDA device.
+    pub unsafe fn commit_with_dspark(
+        &mut self,
+        requests: &mut Requests<'a>,
+        batch: &mut RequestBatch,
+        proposal: &mut crate::v41_experts::dspark::MainProposal<'_, '_, '_>,
+        windows: &mut [&mut crate::v41_dspark_cache::DsparkWindow<'_>; 3],
+        leases: [&[crate::v41_dspark_cache::WindowLease]; 3],
+        accepted: &[u32],
+    ) -> Result<()> {
+        let id = batch.cache()?.identity();
+        self.state.ready(id)?;
+        requests.validate_acceptance(batch, accepted)?;
+        proposal.validate_commit(id, windows, leases, accepted)?;
+        self.state = State::Running;
+        self.taps.reset();
+        let result = (|| -> Result<()> {
+            unsafe {
+                proposal.commit(id, windows, leases, accepted)?;
+            }
+            requests.commit(batch, &mut self.execution, accepted)
+        })();
+        if let Err(error) = result {
+            requests.revoke_batch(batch);
+            for stage in 0..3 {
+                for &lease in leases[stage] {
+                    if windows[stage].request_id(lease).is_ok() {
+                        if let Err(cleanup) = windows[stage].release(lease) {
+                            tracing::error!(%cleanup, "releasing failed dSpark transaction");
+                        }
+                    }
+                }
+            }
+            return Err(error);
+        }
+        self.state = State::Idle;
+        Ok(())
+    }
     /// Call only after execution future/borrowed outputs and transport consumers
     /// have been dropped. Request admission survives discarded private proposals.
     pub fn discard(&mut self, batch: &mut RequestBatch) -> Result<()> {

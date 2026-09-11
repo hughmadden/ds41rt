@@ -4,7 +4,7 @@ pub(crate) use chain::DsparkChain;
 mod stage;
 pub(crate) use stage::DsparkStage;
 mod main_context;
-pub(crate) use main_context::DsparkMainContext;
+pub(crate) use main_context::{DsparkMainContext, MainProposal};
 mod attention_wave;
 pub(crate) use attention_wave::DsparkAttentionWave;
 mod attention_output;
