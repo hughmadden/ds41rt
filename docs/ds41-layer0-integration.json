@@ -1,0 +1,55 @@
+{
+  "case0": {
+    "request_sha256": "b71ee5d6bd52aee9290c5ddbc82fda081da664f12bfafa761fe8e585bf5a2a75",
+    "planes": [
+      "5cc738e4aa2fe4fc48949cff2ad415a3e493ad69a707aee190d400ed321b736a",
+      "4b634e66503af21527beeb2838289c3c058195fbb7446b8590b9a2ad89ad6e54",
+      "f8918bd02576cff11dc6e0b8f80b59f646c67384533754c94d8ce0756bf86e06",
+      "b4534310ac85860cfd370ece223d4c4f6c2c2f880d037fec0e6eb6be79782977"
+    ],
+    "residual_sha256": "ec99593b959b7f2a9124a00d432f0fd2db66974b248ffd8b2dbadfcbab55a9ef",
+    "pre_sha256": "bc58b1cf1fb7910cc871392b1926a7e51ea34c13231a6d26eb405b5d00cf62e2"
+  },
+  "case1": {
+    "request_sha256": "70a438ac5b9f5a3a06395caff5775ee19d50f54bfa99238e88a16b67689f3145",
+    "planes": [
+      "f38fa4943049d17defa9c0895915081a921ad77d6314e754a67025f946cac35d",
+      "74bd088296c359f18dfde836d3eb202409cbe5a76db752d53c9b0eac8b6075fa",
+      "f9a75c0e5cd00cc516cea5ebf83622c12043d14e55d0508f6b332ae589306a01",
+      "9b8a54d69d5fedd43b12470028d1236fa97bae6af237ef30fb029548e0738a26"
+    ],
+    "residual_sha256": "5a3cd6b560fe3de8d11131f291e8a948d0e50361f960b9274c3f42836b4939c3",
+    "pre_sha256": "a5ca0472e77d99a71d534edf34c53dcf0231fe399afc4e49ae3bd601dc0c6554"
+  },
+  "scope": "Real distributed layer0 integration smoke, two changed 80-row/16-request batches",
+  "independent_numerical_reference": false,
+  "full_model": false,
+  "coordinator_gpu": "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+  "spark_hosts": [
+    "ostrich",
+    "dodo",
+    "emu",
+    "kiwi"
+  ],
+  "test_seconds": 4.12,
+  "selected_coordinator_weight_load_seconds": 2.492,
+  "layer_call_seconds": [
+    0.237,
+    0.177
+  ],
+  "all_five_process_exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "worker_sha256": "f197d134933d1b5b53a1df31720b8eb3518df2da0567f155fba1fb5c31ad2d89",
+  "worker_native_sha256": "565fa554ec934de9f7a8ea4d05dc43989291096e6b9b8cd610542e78b9a5f362",
+  "coordinator_native_sha256": "854c317cf010bd20b54c22bc2be696b3b6c15586c0325caef18f585b0ed71a17",
+  "source_sha256": {
+    "v41_backbone_execution.rs": "b1038432661cdfbad9da8aeb838a5378b006e9645ef4ae653dc0d817fbdfa169",
+    "v41_backbone_execution/distributed_tests.rs": "85c35890e8149bd711628e963712168a2a6f7dc6317b3dde8b85ae8098c1e5c8",
+    "v41_backbone_lane.rs": "dda9560531fc8c0cbe2456a96a5572b2e5f1e638687de6d4e6d46340035862cb"
+  }
+}
