@@ -1,0 +1,81 @@
+{
+  "decision": "rejected; restore bf72ed0 query chain without mHC graph cache",
+  "reason": "Small stage differences and no established API throughput improvement do not justify another persistent graph owner.",
+  "scope": "Sequential development smoke runs, three predictable counting streams per arm; no clock admission or broad performance claim.",
+  "timings": {
+    "baseline": {
+      "target": {
+        "samples_tps": [
+          31.10128184696318,
+          31.384719583340704,
+          31.485703262440083
+        ],
+        "median_tps": 31.384719583340704
+      },
+      "spec": {
+        "samples_tps": [
+          99.23727410259029,
+          103.70126349278956,
+          102.99930222165311
+        ],
+        "median_tps": 102.99930222165311
+      }
+    },
+    "candidate": {
+      "target": {
+        "samples_tps": [
+          31.107705595573133,
+          31.273316195134726,
+          31.415241581309683
+        ],
+        "median_tps": 31.273316195134726
+      },
+      "spec": {
+        "samples_tps": [
+          99.10924625794553,
+          103.30851043758533,
+          103.89869275547075
+        ],
+        "median_tps": 103.30851043758533
+      }
+    }
+  },
+  "artifacts": {
+    "/tmp/ds41-hc-query-graph/daemon": {
+      "sha256": "1ea20ea6e7f2c51ebcef5fb2224d2631c3cb1a9d74867d0a8d0f69d9fb805241",
+      "bytes": 26756224
+    },
+    "/tmp/ds41-hc-query-graph/target-api.json": {
+      "sha256": "1d6ac6403293a61b52fa969c92b7f8259c03bb71445f620ab765beba01483da7",
+      "bytes": 119289
+    },
+    "/tmp/ds41-hc-query-graph/spec-api.json": {
+      "sha256": "546655ecc14e6309311d4103d735f76ee2c3c9d48cbadf3da577c40b6064161c",
+      "bytes": 120600
+    },
+    "/tmp/ds41-hc-query-graph/quality.json": {
+      "sha256": "4e95dec20ad8ba4dad9ad3f19554af18a4f3f120a7a443eb65d4318bce192206",
+      "bytes": 199765
+    },
+    "/tmp/ds41-hc-query-graph/timings.json": {
+      "sha256": "c9d95db450b99745292cab54cc8faa6bea040ed23f6c858767ec128ee2e56efc",
+      "bytes": 106566
+    },
+    "/tmp/ds41-hc-query-graph/v41_hc.rs": {
+      "sha256": "8b598973e14d37c4b390c74a564916304d4bb638c4104b762afce32b46c28d98",
+      "bytes": 14525
+    },
+    "/tmp/ds41-hc-query-graph/v41_block.rs": {
+      "sha256": "fcc098608d3935d6b2c08504f7f924657527b38d6fb0f14915a390039fa43726",
+      "bytes": 16696
+    },
+    "/tmp/ds41-hc-query-graph/graph-test-source.rs": {
+      "sha256": "9dec4b651c3306d224130c30a4d2665be0ac6428bb4f7d17182fe14ce7ec21ca",
+      "bytes": 6258
+    },
+    "/tmp/ds41-query-chain-fixture/graph-test2.log": {
+      "sha256": "ba39efa8915007336e5cdadb2f88bb45f551a5f37d55ab701296fb584ae01d1e",
+      "bytes": 260
+    }
+  }
+}

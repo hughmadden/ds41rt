@@ -28,6 +28,7 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
         std::path::Path::new(&std::env::var("DS41RT_V41_SNAPSHOT")?),
     )?;
     let mut cases = 0;
+    let mut layers = Vec::new();
     for layer in [0, 14, 39] {
         let qw = v41_attention_query::AttentionQueryWeights::load(
             &lib,
@@ -43,8 +44,22 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
             format!("layers.{layer}.attn_norm.weight"),
         ];
         let hw = v41_tensors::NativeRtxTensors::load(&lib, &cat, &names, usize::MAX, 1 << 20)?;
-        let mut hc = v41_hc::HcSublayer::new(&lib, &hw, names, 256, usize::MAX)?;
-        let mut q = qw.wave(256, usize::MAX)?;
+        layers.push((layer, qw, hw, names));
+    }
+    let mut hc = v41_hc::HcSublayer::new(&lib, &layers[0].2, layers[0].3.clone(), 256, usize::MAX)?;
+    let mut q = layers[0].1.wave(256, usize::MAX)?;
+    let mut alternate = layers[0].1.wave(256, usize::MAX)?;
+    for index in [0, 1, 2, 0] {
+        let (layer, qw, hw, names) = &layers[index];
+        // Every query call drained; discard the unfinished fixture sublayer
+        // before rebinding, as the fixture does not execute attention/FFN.
+        hc.invalidate();
+        let binding = hc.prepare_binding(hw, names.clone())?;
+        unsafe {
+            hc.install_binding(binding);
+        }
+        q.rebind(qw)?;
+        alternate.rebind(qw)?;
         for rows in [1, 6, 16, 80, 256, 6, 1] {
             for changed in [false, true] {
                 let vals = (0..256 * 4 * 5120)
@@ -76,6 +91,7 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
                 .into_iter()
                 .map(|b| read(&lib, b))
                 .collect::<Result<Vec<_>>>()?;
+                lib.copy_h2d(q.input(), &vec![0; q.input().bytes])?;
                 let o = unsafe {
                     q.execute_tokens_prepared(&tokens, |stream, input| {
                         hc.enqueue_begin(rows, Some(input), stream)?;
@@ -106,6 +122,7 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
                 };
                 ensure!(failed.is_err(), "producer error lost");
                 ensure!(q.output().is_err(), "failed output published");
+                lib.copy_h2d(q.input(), &vec![0; q.input().bytes])?;
                 let o = unsafe {
                     q.execute_tokens_prepared(&tokens, |stream, input| {
                         hc.enqueue_begin(rows, Some(input), stream)?;
@@ -113,6 +130,17 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
                     })?
                 };
                 ensure!(read(&lib, o.rotated)? == baseline[4], "recovery differs");
+                // Switch normalized destinations without changing weights/rows.
+                lib.copy_h2d(alternate.input(), &vec![0; alternate.input().bytes])?;
+                let alt = unsafe {
+                    alternate.execute_tokens_prepared(&tokens, |stream, input| {
+                        hc.enqueue_begin(rows, Some(input), stream).map(|_| ())
+                    })?
+                };
+                ensure!(
+                    read(&lib, alt.rotated)? == baseline[4],
+                    "destination switch differs"
+                );
                 cases += 1;
             }
         }

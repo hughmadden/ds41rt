@@ -188,3 +188,5 @@ Latest development deployment: [FP8 input transport](docs/ds41-fp8-transport-rol
 - Fully merged b12x upstream master through `81544c5b` into our master (`ab88dde0`), preserving native exports and full ancestry. Native objects/library remain byte-identical; selected GPU/API checks pass with the inherited formatting failure unchanged. See [upstream merge](docs/ds41-b12x-upstream-merge.md).
 
 - Chained backbone mHC preparation onto the query stream with direct normalized-output placement. The real-weight integration test passes 42 exact cases plus partial-producer error/reuse checks. Layer-begin medians fall 117→109 µs (one row), 120→113 µs (six rows); small API changes do not establish a throughput gain. See [query preparation](docs/ds41-query-preparation-chain.md).
+
+- Rejected an additional mHC preparation graph cache: 56 real-weight cases passed, but query-stage changes were small and API throughput stayed flat. Restored the streamed query chain and retained poison/destination/rebinding regression coverage. See [mHC graph trial](docs/ds41-mhc-query-graph-trial.md).
