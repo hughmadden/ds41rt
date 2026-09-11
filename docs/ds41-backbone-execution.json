@@ -1,0 +1,26 @@
+{
+  "scope": "Per-layer execution composition build, pass progress unit test, official CPU-only weight/workspace plan and actual Spark cache batch identity/lifecycle regression",
+  "gpu_layer_execution_qualified": false,
+  "weights_bytes": 145517568,
+  "workspace_bytes": {
+    "1": 18429768,
+    "80": 81507616,
+    "4096": 3314188448
+  },
+  "tests": {
+    "pass_commit_requires_all_layers_and_one_batch": "passed",
+    "official_cache_producer_allocation_plan": "passed (1.10 seconds)",
+    "request_bank_lifecycle_and_batch_isolation": "passed on Spark (0.37 seconds)"
+  },
+  "daemon_build": "passed",
+  "logs": [
+    "/tmp/ds41-backbone-execution-build.log",
+    "/tmp/ds41-backbone-execution-state-test.log",
+    "/tmp/ds41-backbone-execution-budget-test.log",
+    "/tmp/ds41-backbone-execution-batch-test.log"
+  ],
+  "source_sha256": {
+    "v41_backbone_execution.rs": "734af934944fdae3bbd2ea5d7ee047f07387e296de5598597b47725d06ff677a",
+    "v41_backbone_cache.rs": "647430cde9cd0e60b47e405909fc3c929042932ee5aeb544600bfca66987f290"
+  }
+}

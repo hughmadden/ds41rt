@@ -12,6 +12,7 @@ use ds41rt_transport::ExpertV2SourceKind;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const SOURCES: [usize; 4] = [2, 8, 14, 20];
+static NEXT_BATCH: AtomicU64 = AtomicU64::new(1);
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CacheLease {
@@ -43,10 +44,14 @@ struct BatchRequest {
 /// Owned metadata can survive producer execution. Every cache access/commit
 /// revalidates it against the originating bank and live request versions.
 pub(crate) struct CacheBatch {
+    identity: u64,
     owner: u64,
     requests: Vec<BatchRequest>,
 }
 impl CacheBatch {
+    pub fn identity(&self) -> u64 {
+        self.identity
+    }
     pub fn positions(&self) -> Vec<u64> {
         self.requests
             .iter()
@@ -316,7 +321,11 @@ impl<'a> BackboneCache<'a> {
                 sources: r.sources,
             });
         }
+        let identity = NEXT_BATCH
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .map_err(|_| anyhow::anyhow!("cache batch IDs exhausted"))?;
         Ok(CacheBatch {
+            identity,
             owner: self.owner,
             requests,
         })
@@ -557,6 +566,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
             let batch = bank.plan(&work)?;
+            assert_ne!(batch.identity(), bank.plan(&work)?.identity());
             bank.validate_batch(&batch)?;
             assert!(other.validate_batch(&batch).is_err());
             assert!(bank.request_id(foreign).is_err());
