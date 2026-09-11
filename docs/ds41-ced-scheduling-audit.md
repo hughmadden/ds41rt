@@ -117,3 +117,35 @@ Raw build and GPU logs are `/tmp/ds41-ced-bounds/encoder-source-{build,gpu}.log`
 This removes the decoder-only restriction from the committed-view primitive;
 per-layer publication, retained index consumers and native scheduling remain to
 be integrated. The running APIs still use the previous frozen CED artifacts.
+
+## Implemented prerequisite: per-owner encoder publication
+
+The cache bank now supports `publish_encoder_window` and
+`publish_encoder_source`. Each commits the full prompt proposal for that owner
+and records the batch identity, physical end and published-owner mask separately
+from logical request completion. Final chunk commit skips already-published
+owners and advances request completion only once. Mixed early/deferred window
+commits are supported; publishing any owner requires full acceptance afterward.
+Publication failure revokes every participating admission, including owners
+already written. No new GPU allocation is introduced.
+
+While publication is pending, validation checks physical histories against the
+recorded per-owner ends, rejects competing batch identities and duplicate writes,
+and preserves the prior logical request position. The ordinary planner still
+rejects a second chunk of the same request until completion: multi-chunk
+reservations/frontiers and Engram ordering remain the next scheduler work. This
+primitive does not by itself implement overlapping chunks.
+
+Attention views can consume a published source without its original private
+producer. Encoder batches now reserve a committed-source snapshot as decoder
+replay batches already did; later layers sharing that source retain the same
+binding and ratio-correct causal metadata. Existing window readers must drain
+before publication overwrites their ring; the caller contract remains explicit.
+
+The expanded real-weight GPU transaction test checks sixteen requests through
+64+65 encoder rows and decoder replay, mixed/all early window publication, all
+four sources, layer-3/layer-5 committed-source reuse, stale/duplicate/partial
+acceptance rejection, and both ordinary and early-publication late source
+exhaustion with complete admission recovery. Build/GPU logs are
+`/tmp/ds41-ced-bounds/publication-{build,gpu}.log`. Native serving has not been
+switched to early publication yet; no new API throughput result is claimed.

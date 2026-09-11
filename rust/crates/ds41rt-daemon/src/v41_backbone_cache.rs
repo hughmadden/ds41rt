@@ -12,6 +12,7 @@ use ds41rt_transport::ExpertV2SourceKind;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 mod ced;
+mod publication;
 use ced::CachePhase;
 pub(crate) use ced::CacheStage;
 
@@ -29,6 +30,7 @@ struct Request {
     version: u64,
     end: u64,
     phase: CachePhase,
+    publication: Option<publication::EncoderPublication>,
     windows: [WindowLease; 40],
     sources: [CompressorLease; 4],
 }
@@ -277,6 +279,7 @@ impl<'a> BackboneCache<'a> {
             version: 0,
             end: 0,
             phase: CachePhase::Full,
+            publication: None,
             windows: windows.try_into().ok().expect("40 windows"),
             sources: sources.try_into().ok().expect("four sources"),
         });
@@ -293,13 +296,15 @@ impl<'a> BackboneCache<'a> {
         let r = self.request(lease)?;
         for (layer, (state, &l)) in self.windows.iter().zip(&r.windows).enumerate() {
             ensure!(
-                state.request_id(l)? == r.id && state.end(l)? == r.phase.window_end(layer, r.end),
+                state.request_id(l)? == r.id && state.end(l)? == r.publication.as_ref().filter(|p| p.windows & (1u64 << layer) != 0)
+                    .map_or(r.phase.window_end(layer, r.end), |p| p.end),
                 "window request history differs"
             );
         }
-        for (state, &l) in self.sources.iter().zip(&r.sources) {
+        for (i, (state, &l)) in self.sources.iter().zip(&r.sources).enumerate() {
             ensure!(
-                state.request_id(l)? == r.id && state.committed_end(l)? == r.end,
+                state.request_id(l)? == r.id && state.committed_end(l)? == r.publication.as_ref()
+                    .filter(|p| p.sources & (1 << i) != 0).map_or(r.end, |p| p.end),
                 "source request history differs"
             );
         }
@@ -331,6 +336,7 @@ impl<'a> BackboneCache<'a> {
             ensure!(rows <= 4096, "cache batch exceeds lane capacity");
             self.committed_end(item.lease)?;
             let live = self.request(item.lease)?;
+            ensure!(live.publication.is_none(), "encoder chunk publication is still pending");
             let current = live.phase.stage();
             ensure!(current == CacheStage::Full || item.kind == ExpertV2SourceKind::Prefill,
                 "CED phase requires prefill work");
@@ -360,7 +366,7 @@ impl<'a> BackboneCache<'a> {
             .map_err(|_| anyhow::anyhow!("cache batch IDs exhausted"))?;
         Ok(CacheBatch {
             stage: stage.context("empty cache batch")?,
-            replay_snapshot: if replay { Some(crate::v41_compressor::reserve_source_snapshot()?) } else { None },
+            replay_snapshot: if replay || stage == Some(CacheStage::Encoder) { Some(crate::v41_compressor::reserve_source_snapshot()?) } else { None },
             identity,
             owner: self.owner,
             requests,
@@ -374,6 +380,7 @@ impl<'a> BackboneCache<'a> {
             let live = self.request(r.work.lease)?;
             ensure!(
                 live.id == r.id
+                    && live.publication.as_ref().is_none_or(|p| p.batch == batch.identity)
                     && live.version == r.version
                     && live.phase.stage() == batch.stage
                     && live.phase.position(live.end) == r.position,
@@ -442,17 +449,21 @@ impl<'a> BackboneCache<'a> {
         let chunks = batch.window_chunks(layer)?;
         window.validate_batch(state, &chunks)?;
         let source_layer = SOURCES.iter().copied().rev().find(|&n| n <= layer);
+        let source_index = source_layer.and_then(|l| SOURCES.iter().position(|&s| s == l));
+        let published_sources = self.publication_masks(batch)?.1;
+        let committed_source = batch.stage == CacheStage::Replay
+            || source_index.is_some_and(|i| published_sources & (1 << i) != 0);
         ensure!(
-            source.is_some() == (source_layer.is_some() && batch.stage != CacheStage::Replay),
+            source.is_some() == (source_layer.is_some() && !committed_source),
             "attention batch source presence differs"
         );
         let mut sources = Vec::new();
-        if batch.stage == CacheStage::Replay {
-            ensure!(source_layer == Some(20), "decoder replay global source differs");
-            let state = self.source(batch, 20)?;
-            let snapshot = batch.replay_snapshot.context("missing decoder source snapshot")?;
+        if committed_source {
+            let i = source_index.context("committed attention source absent")?;
+            let state = self.source(batch, SOURCES[i])?;
+            let snapshot = batch.replay_snapshot.context("missing committed source snapshot")?;
             sources = batch.requests.iter().map(|r| state.committed_proposal(
-                r.sources[3], r.position..r.position + u64::from(r.work.tokens), snapshot))
+                r.sources[i], r.position..r.position + u64::from(r.work.tokens), snapshot))
                 .collect::<Result<Vec<_>>>()?;
         } else if let Some(source_layer) = source_layer {
             let wave = source.context("attention source absent")?;
@@ -536,19 +547,28 @@ impl<'a> BackboneCache<'a> {
                 .checked_add(1)
                 .context("backbone cache version exhausted")?;
         }
+        let (published_windows, published_sources) = self.publication_masks(batch)?;
+        if published_windows != 0 || published_sources != 0 {
+            ensure!(batch.requests.iter().zip(accepted).all(|(r, &n)| n == r.work.tokens),
+                "published encoder chunk requires full acceptance");
+        }
         for layer in batch.stage.windows() {
+            if published_windows & (1u64 << layer) != 0 { continue; }
             let wave = &windows[layer];
             wave.validate_batch(&self.windows[layer], &batch.window_chunks(layer)?)?;
         }
         for i in 0..batch.stage.source_count() {
+            if published_sources & (1 << i) != 0 { continue; }
             let wave = &sources[i];
             wave.validate_batch(&self.sources[i], &batch.source_chunks(SOURCES[i])?)?;
         }
         let committed = (|| -> Result<()> {
             for layer in batch.stage.windows() {
+                if published_windows & (1u64 << layer) != 0 { continue; }
                 windows[layer].commit(&mut self.windows[layer], accepted)?;
             }
             for i in 0..batch.stage.source_count() {
+                if published_sources & (1 << i) != 0 { continue; }
                 sources[i].commit(&mut self.sources[i], accepted)?;
             }
             Ok(())
@@ -570,6 +590,7 @@ impl<'a> BackboneCache<'a> {
                 .expect("validated live request");
             live.phase.advance(&mut live.end, r.position + u64::from(n));
             live.version += 1;
+            live.publication = None;
         }
         Ok(())
     }

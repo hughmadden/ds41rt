@@ -250,6 +250,34 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         assert_eq!(batch.stage(), CacheStage::Encoder);
         assert!(bank.window(&batch, 20).is_err());
         produce(&lib, &bank, &batch, &mut windows, &mut sources, 10 + tokens as usize)?;
+        let competing = bank.plan(&work)?;
+        let old_end = bank.committed_end(ced[0])?;
+        assert!(bank.publish_encoder_window(&batch, 20, &mut windows[20]).is_err());
+        for layer in 0..20 {
+            if tokens == 64 && layer % 2 != 0 { continue; }
+            bank.publish_encoder_window(&batch, layer, &mut windows[layer])?;
+            bank.validate_batch(&batch)?;
+            assert!(bank.publish_encoder_window(&batch, layer, &mut windows[layer]).is_err());
+            for &lease in &ced { assert_eq!(bank.committed_end(lease)?, old_end); }
+        }
+        assert!(bank.validate_batch(&competing).is_err());
+        assert!(bank.plan(&work).is_err());
+        for (i, &layer) in SOURCES.iter().enumerate() {
+            bank.publish_encoder_source(&batch, layer, &mut sources[i])?;
+            bank.validate_batch(&batch)?;
+            assert!(bank.publish_encoder_source(&batch, layer, &mut sources[i]).is_err());
+        }
+        if tokens == 64 {
+            let a = bank.attention(&batch, 3, &windows[3], None)?;
+            let b = bank.attention(&batch, 5, &windows[5], None)?;
+            assert!(bank.attention(&batch, 3, &windows[3], Some(&sources[0])).is_err());
+            for (a, b) in a.sources.iter().zip(&b.sources) {
+                assert_eq!(a.binding(), b.binding());
+                assert_eq!(a.metadata(63)?, [0, 32, 32, 0, 0, 2]);
+            }
+        }
+        assert!(bank.commit(&batch, &mut windows, &mut sources, &[0; 16]).is_err());
+        bank.validate_batch(&batch)?;
         bank.commit(&batch, &mut windows, &mut sources, &vec![tokens; 16])?;
         assert!(bank.validate_batch(&batch).is_err());
         for (slot, &lease) in ced.iter().enumerate() {
@@ -335,11 +363,13 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
     bank.release(&ced)?;
     eprintln!("PASS 16 CED transactions: encoder 64+65, replay 63+65, untouched global/encoder bytes, full decode readiness");
     // Source 20 exhausts after all 40 windows and the first three sources write.
+    for early in [false, true] {
     let pages = [16, 16, 16, 1];
     let mut limited = BackboneCache::new(&lib, 16, pages, BackboneCache::device_bytes(16, pages)?)?;
     let leases = (0..16)
         .map(|s| limited.begin_request(s, 200 + s as u64))
         .collect::<Result<Vec<_>>>()?;
+    if early { for &lease in &leases { limited.begin_encoder(lease, 2)?; } }
     let batch = limited.plan(
         &leases
             .iter()
@@ -351,9 +381,17 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
             .collect::<Vec<_>>(),
     )?;
     produce(&lib, &limited, &batch, &mut windows, &mut sources, 4)?;
-    let error = limited
-        .commit(&batch, &mut windows, &mut sources, &[2; 16])
-        .unwrap_err();
+    let error = if early {
+        for layer in 0..20 {
+            limited.publish_encoder_window(&batch, layer, &mut windows[layer])?;
+        }
+        for i in 0..3 {
+            limited.publish_encoder_source(&batch, SOURCES[i], &mut sources[i])?;
+        }
+        limited.publish_encoder_source(&batch, 20, &mut sources[3]).unwrap_err()
+    } else {
+        limited.commit(&batch, &mut windows, &mut sources, &[2; 16]).unwrap_err()
+    };
     assert!(error.to_string().contains("index cache pool exhausted"));
     eprintln!("expected late source exhaustion: {error}");
     for lease in leases {
@@ -377,6 +415,8 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         assert_eq!(limited.committed_end(lease)?, 0);
     }
     limited.release(&recovered)?;
-    eprintln!("PASS late source failure revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered");
+    eprintln!("PASS late source failure early={early} revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered");
+    }
+    eprintln!("PASS early encoder publication: mixed/all windows, all sources, deferred logical end, stale/duplicate/partial guards");
     Ok(())
 }
