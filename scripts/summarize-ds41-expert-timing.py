@@ -73,7 +73,7 @@ def summarize(paths):
             group["expert_row_distribution"] = distribution
             group["expert_row_distribution_samples"] = len(histograms)
         output.append(group)
-    return {"scope": "Instrumented development workload. GPU event intervals separate expert execution and compaction; host upload/download exclude network transfer. Unique-expert packed bytes exclude repeated reads and are not measured DRAM traffic. Server callback includes staging and, for queued workers, queueing. Coordinator expert phase includes routing, shared FFN and response collection; shared FFN overlaps the dispatched remote request. Receive time includes waiting for remote compute and client handling. Dispatch measures enqueue, not NIC send completion. No interval isolates pure link latency. Component medians are not additive; nested coordinator stage groups must not be summed together.",
+    return {"scope": "Instrumented development workload. GPU event intervals separate expert execution and compaction; host upload/download exclude network transfer. Unique-expert packed bytes exclude repeated reads and are not measured DRAM traffic. Server callback includes staging and, for queued workers, queueing. Coordinator expert phase includes routing, shared FFN and response collection; shared FFN overlaps the dispatched remote request. Receive time includes waiting for remote compute and client handling. Coordinator upload_us measures host copy-call duration (staging/enqueue for async uploads), and reduce_us includes the final stream drain. Dispatch measures enqueue, not NIC send completion. No interval isolates pure link latency. Component medians are not additive; nested coordinator stage groups must not be summed together.",
             "groups": output}
 
 

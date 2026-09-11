@@ -1,0 +1,2199 @@
+{
+  "scope": "Pinned response upload qualification. Less host blocking; no established end-to-end throughput gain. Instrumented workloads and uncontrolled clocks.",
+  "quality_comparison": [
+    {
+      "case": "arithmetic",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "signed_sort",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "extraction",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "logic",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "unicode",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "translation",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "explanation",
+      "text_and_usage_exact": true
+    },
+    {
+      "case": "long_retrieval",
+      "text_and_usage_exact": true
+    }
+  ],
+  "quality": {
+    "scope": "Eight paired single-client greedy cases. Six objective checks and two open-ended comparisons; not broad model quality, stochastic equivalence or release performance.",
+    "cases": [
+      {
+        "case": {
+          "name": "arithmetic",
+          "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+          "expected": "575"
+        },
+        "runs": {
+          "target": {
+            "text": "575",
+            "first_content_seconds": 0.14190687204245478,
+            "finish_seconds": 0.18899197003338486,
+            "observed_decode_tokens_per_second": 21.238142059142113,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "575",
+            "first_content_seconds": 0.13649823900777847,
+            "finish_seconds": 0.20651977497618645,
+            "observed_decode_tokens_per_second": 14.281320541885508,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "signed_sort",
+          "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+          "expected_json": [
+            -11,
+            -4,
+            0,
+            7,
+            7,
+            12
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.16855477506760508,
+            "finish_seconds": 0.9002626370638609,
+            "observed_decode_tokens_per_second": 24.599981679699525,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.18183278699871153,
+            "finish_seconds": 0.4911629940615967,
+            "observed_decode_tokens_per_second": 58.1902432708122,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "extraction",
+          "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+          "expected_json": {
+            "total": 40,
+            "names": [
+              "Alice",
+              "Bob"
+            ]
+          }
+        },
+        "runs": {
+          "target": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.17926936701405793,
+            "finish_seconds": 0.8066944760503247,
+            "observed_decode_tokens_per_second": 25.501051471427736,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.18291205808054656,
+            "finish_seconds": 0.4583544690394774,
+            "observed_decode_tokens_per_second": 58.08836752589143,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "logic",
+          "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+          "expected_json": [
+            "D",
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.16700474789831787,
+            "finish_seconds": 0.6409307438880205,
+            "observed_decode_tokens_per_second": 25.320408885653812,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.171244453988038,
+            "finish_seconds": 0.30593934492208064,
+            "observed_decode_tokens_per_second": 89.09023881147918,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "unicode",
+          "prompt": "\u8acb\u8a08\u7b97 18 \u52a0 27\uff0c\u518d\u6e1b\u53bb 9\u3002\u53ea\u8f38\u51fa\u963f\u62c9\u4f2f\u6578\u5b57\u7b54\u6848\u3002",
+          "expected": "36"
+        },
+        "runs": {
+          "target": {
+            "text": "36",
+            "first_content_seconds": 0.15368675510399044,
+            "finish_seconds": 0.20384063210804015,
+            "observed_decode_tokens_per_second": 19.938638042264493,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "36",
+            "first_content_seconds": 0.14218074292875826,
+            "finish_seconds": 0.21476011094637215,
+            "observed_decode_tokens_per_second": 13.778020218601455,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 2,
+              "total_tokens": 27,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "translation",
+          "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+        },
+        "runs": {
+          "target": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.14676667202729732,
+            "finish_seconds": 0.42259402095805854,
+            "observed_decode_tokens_per_second": 25.37819410270718,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "\u7d05\u8272\u7684\u9580\u662f\u958b\u8457\u7684\u3002",
+            "first_content_seconds": 0.14434482296928763,
+            "finish_seconds": 0.34767878300044686,
+            "observed_decode_tokens_per_second": 34.42612340273759,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "explanation",
+          "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+        },
+        "runs": {
+          "target": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.15384655399248004,
+            "finish_seconds": 1.3503250929061323,
+            "observed_decode_tokens_per_second": 25.909365685862262,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.15066029806621373,
+            "finish_seconds": 0.8880647760815918,
+            "observed_decode_tokens_per_second": 42.03934329695448,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "long_retrieval",
+          "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+          "expected": "quartz-731"
+        },
+        "runs": {
+          "target": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.2698999400017783,
+            "finish_seconds": 3.5963725440669805,
+            "observed_decode_tokens_per_second": 12.252176599789461,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "quartz-731",
+            "first_content_seconds": 3.225237481063232,
+            "finish_seconds": 3.354994254070334,
+            "observed_decode_tokens_per_second": 30.826907199526747,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      }
+    ]
+  },
+  "api": {
+    "before-target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-58855f1d-7290-4220-9428-5f4ea300c725",
+        "object": "chat.completion",
+        "created": 1789128746,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13520237198099494,
+          "finish_seconds": 2.265925885993056,
+          "observed_decode_tokens_per_second": 27.220800642871062,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13624650007113814,
+          "finish_seconds": 2.2509001590078697,
+          "observed_decode_tokens_per_second": 27.427659255162837,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14153224998153746,
+          "finish_seconds": 2.2570742120733485,
+          "observed_decode_tokens_per_second": 27.41614254847992,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12210323801264167,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-3b1c02ae-34be-4ff9-a61a-4ca9c945f03e",
+        "object": "chat.completion",
+        "created": 1789128753,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "before-spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-27b4a249-0a92-426e-8bf7-dc645bf87df4",
+        "object": "chat.completion",
+        "created": 1789128754,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13452711899299175,
+          "finish_seconds": 0.7675110870040953,
+          "observed_decode_tokens_per_second": 91.62949289575465,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1411022540414706,
+          "finish_seconds": 0.749578403076157,
+          "observed_decode_tokens_per_second": 95.32008788185664,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13585795694962144,
+          "finish_seconds": 0.743531510932371,
+          "observed_decode_tokens_per_second": 95.4459834887705,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12306210899259895,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-c919130f-c7c9-44b5-a1a5-067f71117360",
+        "object": "chat.completion",
+        "created": 1789128756,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-210f589c-05ef-40da-9655-915fbb4f0eec",
+        "object": "chat.completion",
+        "created": 1789128814,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14221166900824755,
+          "finish_seconds": 2.303655082010664,
+          "observed_decode_tokens_per_second": 26.833920171628918,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14664813305716962,
+          "finish_seconds": 2.306427797069773,
+          "observed_decode_tokens_per_second": 26.854591218922383,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14751593593973666,
+          "finish_seconds": 2.305875746998936,
+          "observed_decode_tokens_per_second": 26.872257212543687,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.13000190199818462,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-63e09629-6a43-4a77-b1d7-0014b08b9551",
+        "object": "chat.completion",
+        "created": 1789128822,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-157c8ba9-e71e-4bd9-ab50-c73634c7e85d",
+        "object": "chat.completion",
+        "created": 1789128822,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1406580259790644,
+          "finish_seconds": 0.7801429179962724,
+          "observed_decode_tokens_per_second": 90.6979988487973,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14277879195287824,
+          "finish_seconds": 0.7582011939957738,
+          "observed_decode_tokens_per_second": 94.24421309245311,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1410736698890105,
+          "finish_seconds": 0.7610099009471014,
+          "observed_decode_tokens_per_second": 93.55800983111943,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.11938808101695031,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-fe057c46-4854-45a0-b02e-1b949348ef7f",
+        "object": "chat.completion",
+        "created": 1789128825,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "recheck-before-target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-502aafe5-3c44-4c05-8219-dcdb18c44c15",
+        "object": "chat.completion",
+        "created": 1789128935,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14268894703127444,
+          "finish_seconds": 2.3052198230288923,
+          "observed_decode_tokens_per_second": 26.82042630870806,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14943545998539776,
+          "finish_seconds": 2.311545974924229,
+          "observed_decode_tokens_per_second": 26.82564077981041,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14396028697956353,
+          "finish_seconds": 2.298253391054459,
+          "observed_decode_tokens_per_second": 26.92298456987661,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12926961097400635,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-52077690-bd24-435f-baef-ef11c2ee3424",
+        "object": "chat.completion",
+        "created": 1789128943,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "recheck-before-spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-43a3f7f2-7fb0-45a9-b324-47baa0a4874e",
+        "object": "chat.completion",
+        "created": 1789128943,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.13912365201395005,
+          "finish_seconds": 0.7749582009855658,
+          "observed_decode_tokens_per_second": 91.2186984708646,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1424422359559685,
+          "finish_seconds": 0.7526198499836028,
+          "observed_decode_tokens_per_second": 95.05429020438177,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1414553839713335,
+          "finish_seconds": 0.7560159019194543,
+          "observed_decode_tokens_per_second": 94.37638492243032,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.1224156180396676,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-291e4300-e157-40c7-b248-4788d7d8b587",
+        "object": "chat.completion",
+        "created": 1789128946,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "recheck-target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-d762a773-9062-4047-b47d-835134de6d8e",
+        "object": "chat.completion",
+        "created": 1789128995,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1457970750052482,
+          "finish_seconds": 2.2985076720360667,
+          "observed_decode_tokens_per_second": 26.94277627471059,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14447414805181324,
+          "finish_seconds": 2.3024629129795358,
+          "observed_decode_tokens_per_second": 26.87687764766588,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14183480304200202,
+          "finish_seconds": 2.297485256101936,
+          "observed_decode_tokens_per_second": 26.90603196713517,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.122903160052374,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-becc540d-7bd0-4652-8826-de983e34cbe6",
+        "object": "chat.completion",
+        "created": 1789129002,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "recheck-spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-0b3f03f3-b565-4e4b-94b8-4991bbac34a4",
+        "object": "chat.completion",
+        "created": 1789129002,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1370604339754209,
+          "finish_seconds": 0.7641081659821793,
+          "observed_decode_tokens_per_second": 92.49694567011824,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.14165637595579028,
+          "finish_seconds": 0.7521926190238446,
+          "observed_decode_tokens_per_second": 94.99845530633789,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.1423486260464415,
+          "finish_seconds": 0.7498731350060552,
+          "observed_decode_tokens_per_second": 95.46939941456033,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.12335197406355292,
+        "text": "1"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-db4b323e-6266-4a12-8355-34d3965946ae",
+        "object": "chat.completion",
+        "created": 1789129005,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    }
+  },
+  "timings": [
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-spec-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 55.15698924731183,
+          "median": 54.0,
+          "p95": 60.0,
+          "max": 139.0
+        },
+        "projection_us": {
+          "mean": 105.97338709677419,
+          "median": 92.0,
+          "p95": 167.0,
+          "max": 226.0
+        },
+        "sparse_us": {
+          "mean": 199.93924731182796,
+          "median": 181.0,
+          "p95": 295.0,
+          "max": 1557.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-spec-api.log",
+      "kind": "coordinator_collection",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "receive_us": {
+          "mean": 557.581182795699,
+          "median": 508.0,
+          "p95": 653.0,
+          "max": 16624.0
+        },
+        "reduce_us": {
+          "mean": 6.788709677419355,
+          "median": 7.0,
+          "p95": 8.0,
+          "max": 43.0
+        },
+        "shared_copy_us": {
+          "mean": 5.817204301075269,
+          "median": 6.0,
+          "p95": 6.0,
+          "max": 79.0
+        },
+        "upload_us": {
+          "mean": 31.89731182795699,
+          "median": 31.0,
+          "p95": 37.0,
+          "max": 136.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-spec-api.log",
+      "kind": "coordinator_experts",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "collect_us": {
+          "mean": 604.8247311827957,
+          "median": 554.0,
+          "p95": 704.0,
+          "max": 16693.0
+        },
+        "dispatch_us": {
+          "mean": 5.298118279569892,
+          "median": 5.0,
+          "p95": 9.0,
+          "max": 536.0
+        },
+        "routed_us": {
+          "mean": 56.026881720430104,
+          "median": 48.0,
+          "p95": 92.0,
+          "max": 180.0
+        },
+        "shared_us": {
+          "mean": 68.38387096774194,
+          "median": 55.0,
+          "p95": 129.0,
+          "max": 166.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-spec-api.log",
+      "kind": "coordinator_layer",
+      "rows": 6,
+      "samples": 3720,
+      "metrics": {
+        "attention_us": {
+          "mean": 363.81747311827957,
+          "median": 344.0,
+          "p95": 446.0,
+          "max": 1780.0
+        },
+        "experts_us": {
+          "mean": 736.5293010752688,
+          "median": 683.0,
+          "p95": 838.0,
+          "max": 16931.0
+        },
+        "finish_us": {
+          "mean": 12.78494623655914,
+          "median": 13.0,
+          "p95": 14.0,
+          "max": 33.0
+        },
+        "index_us": {
+          "mean": 30.386827956989247,
+          "median": 1.0,
+          "p95": 177.0,
+          "max": 279.0
+        },
+        "produced_us": {
+          "mean": 49.104032258064514,
+          "median": 33.0,
+          "p95": 88.0,
+          "max": 1096.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-target-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 55.99132882882883,
+          "median": 56.0,
+          "p95": 58.0,
+          "max": 145.0
+        },
+        "projection_us": {
+          "mean": 96.14915540540541,
+          "median": 93.0,
+          "p95": 98.0,
+          "max": 446.0
+        },
+        "sparse_us": {
+          "mean": 191.6920608108108,
+          "median": 181.0,
+          "p95": 291.0,
+          "max": 1738.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-target-api.log",
+      "kind": "coordinator_collection",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "receive_us": {
+          "mean": 194.93085585585587,
+          "median": 181.0,
+          "p95": 197.0,
+          "max": 17245.0
+        },
+        "reduce_us": {
+          "mean": 6.797691441441441,
+          "median": 7.0,
+          "p95": 8.0,
+          "max": 39.0
+        },
+        "shared_copy_us": {
+          "mean": 5.882713963963964,
+          "median": 6.0,
+          "p95": 7.0,
+          "max": 62.0
+        },
+        "upload_us": {
+          "mean": 21.480236486486486,
+          "median": 21.0,
+          "p95": 24.0,
+          "max": 99.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-target-api.log",
+      "kind": "coordinator_experts",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "collect_us": {
+          "mean": 231.65737612612614,
+          "median": 217.0,
+          "p95": 235.0,
+          "max": 17288.0
+        },
+        "dispatch_us": {
+          "mean": 4.041722972972973,
+          "median": 4.0,
+          "p95": 7.0,
+          "max": 241.0
+        },
+        "routed_us": {
+          "mean": 42.25822072072072,
+          "median": 41.0,
+          "p95": 50.0,
+          "max": 145.0
+        },
+        "shared_us": {
+          "mean": 57.96007882882883,
+          "median": 55.0,
+          "p95": 59.0,
+          "max": 247.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-target-api.log",
+      "kind": "coordinator_layer",
+      "rows": 1,
+      "samples": 17760,
+      "metrics": {
+        "attention_us": {
+          "mean": 346.357713963964,
+          "median": 336.0,
+          "p95": 444.0,
+          "max": 2064.0
+        },
+        "experts_us": {
+          "mean": 337.9038288288288,
+          "median": 318.0,
+          "p95": 354.0,
+          "max": 17394.0
+        },
+        "finish_us": {
+          "mean": 12.89831081081081,
+          "median": 13.0,
+          "p95": 14.0,
+          "max": 48.0
+        },
+        "index_us": {
+          "mean": 24.52972972972973,
+          "median": 1.0,
+          "p95": 118.0,
+          "max": 662.0
+        },
+        "produced_us": {
+          "mean": 40.92612612612613,
+          "median": 35.0,
+          "p95": 81.0,
+          "max": 870.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/before-target-api.log",
+      "kind": "coordinator_step",
+      "rows": 1,
+      "samples": 442,
+      "metrics": {
+        "commit_us": {
+          "mean": 440.24886877828055,
+          "median": 431.0,
+          "p95": 493.0,
+          "max": 585.0
+        },
+        "execute_us": {
+          "mean": 37224.57013574661,
+          "median": 36085.0,
+          "p95": 48331.0,
+          "max": 107875.0
+        },
+        "prepared_us": {
+          "mean": 7.461538461538462,
+          "median": 7.0,
+          "p95": 14.0,
+          "max": 20.0
+        },
+        "sample_us": {
+          "mean": 121.24886877828054,
+          "median": 120.0,
+          "p95": 137.0,
+          "max": 225.0
+        },
+        "total_us": {
+          "mean": 37793.56787330317,
+          "median": 36633.5,
+          "p95": 48973.0,
+          "max": 108505.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/spec-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 57.90245901639344,
+          "median": 57.0,
+          "p95": 62.0,
+          "max": 93.0
+        },
+        "projection_us": {
+          "mean": 110.425,
+          "median": 94.0,
+          "p95": 172.0,
+          "max": 267.0
+        },
+        "sparse_us": {
+          "mean": 206.90860655737706,
+          "median": 182.0,
+          "p95": 297.0,
+          "max": 1601.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/spec-api.log",
+      "kind": "coordinator_collection",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "receive_us": {
+          "mean": 572.9774590163935,
+          "median": 530.0,
+          "p95": 687.0,
+          "max": 15957.0
+        },
+        "reduce_us": {
+          "mean": 7.468442622950819,
+          "median": 7.0,
+          "p95": 9.0,
+          "max": 42.0
+        },
+        "shared_copy_us": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "upload_us": {
+          "mean": 13.029508196721311,
+          "median": 12.0,
+          "p95": 19.0,
+          "max": 64.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/spec-api.log",
+      "kind": "coordinator_experts",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "collect_us": {
+          "mean": 596.4073770491804,
+          "median": 552.0,
+          "p95": 709.0,
+          "max": 15986.0
+        },
+        "dispatch_us": {
+          "mean": 5.663114754098361,
+          "median": 5.0,
+          "p95": 9.0,
+          "max": 21.0
+        },
+        "routed_us": {
+          "mean": 59.674180327868854,
+          "median": 50.0,
+          "p95": 96.0,
+          "max": 258.0
+        },
+        "shared_us": {
+          "mean": 73.67827868852459,
+          "median": 58.0,
+          "p95": 137.0,
+          "max": 195.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/spec-api.log",
+      "kind": "coordinator_layer",
+      "rows": 6,
+      "samples": 2440,
+      "metrics": {
+        "attention_us": {
+          "mean": 378.0479508196721,
+          "median": 348.0,
+          "p95": 491.0,
+          "max": 1923.0
+        },
+        "experts_us": {
+          "mean": 737.5008196721311,
+          "median": 693.0,
+          "p95": 845.0,
+          "max": 16103.0
+        },
+        "finish_us": {
+          "mean": 14.152049180327868,
+          "median": 14.0,
+          "p95": 16.0,
+          "max": 71.0
+        },
+        "index_us": {
+          "mean": 32.49180327868852,
+          "median": 1.0,
+          "p95": 185.0,
+          "max": 309.0
+        },
+        "produced_us": {
+          "mean": 54.295491803278686,
+          "median": 36.0,
+          "p95": 94.0,
+          "max": 1107.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/target-api.log",
+      "kind": "coordinator_attention_stages",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "ffn_prepare_us": {
+          "mean": 56.99953183520599,
+          "median": 57.0,
+          "p95": 59.0,
+          "max": 81.0
+        },
+        "projection_us": {
+          "mean": 97.65243445692884,
+          "median": 93.0,
+          "p95": 167.0,
+          "max": 447.0
+        },
+        "sparse_us": {
+          "mean": 196.63548689138577,
+          "median": 181.0,
+          "p95": 293.0,
+          "max": 1738.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/target-api.log",
+      "kind": "coordinator_collection",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "receive_us": {
+          "mean": 215.06348314606743,
+          "median": 199.0,
+          "p95": 215.0,
+          "max": 16736.0
+        },
+        "reduce_us": {
+          "mean": 6.7027153558052435,
+          "median": 7.0,
+          "p95": 7.0,
+          "max": 51.0
+        },
+        "shared_copy_us": {
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "upload_us": {
+          "mean": 7.162359550561797,
+          "median": 7.0,
+          "p95": 9.0,
+          "max": 47.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/target-api.log",
+      "kind": "coordinator_experts",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "collect_us": {
+          "mean": 231.53623595505618,
+          "median": 215.0,
+          "p95": 233.0,
+          "max": 16755.0
+        },
+        "dispatch_us": {
+          "mean": 4.074719101123596,
+          "median": 4.0,
+          "p95": 7.0,
+          "max": 42.0
+        },
+        "routed_us": {
+          "mean": 43.446348314606745,
+          "median": 41.0,
+          "p95": 74.0,
+          "max": 144.0
+        },
+        "shared_us": {
+          "mean": 60.00898876404494,
+          "median": 56.0,
+          "p95": 121.0,
+          "max": 298.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/target-api.log",
+      "kind": "coordinator_layer",
+      "rows": 1,
+      "samples": 10680,
+      "metrics": {
+        "attention_us": {
+          "mean": 353.8756554307116,
+          "median": 336.0,
+          "p95": 448.0,
+          "max": 2084.0
+        },
+        "experts_us": {
+          "mean": 341.07677902621725,
+          "median": 319.0,
+          "p95": 359.0,
+          "max": 16858.0
+        },
+        "finish_us": {
+          "mean": 13.480898876404494,
+          "median": 13.0,
+          "p95": 15.0,
+          "max": 47.0
+        },
+        "index_us": {
+          "mean": 25.211704119850186,
+          "median": 1.0,
+          "p95": 120.0,
+          "max": 640.0
+        },
+        "produced_us": {
+          "mean": 42.70346441947566,
+          "median": 35.0,
+          "p95": 83.0,
+          "max": 844.0
+        }
+      }
+    },
+    {
+      "source": "/tmp/ds41-plane-upload-rollout/target-api.log",
+      "kind": "coordinator_step",
+      "rows": 1,
+      "samples": 266,
+      "metrics": {
+        "commit_us": {
+          "mean": 443.8421052631579,
+          "median": 434.0,
+          "p95": 493.0,
+          "max": 698.0
+        },
+        "execute_us": {
+          "mean": 38164.42105263158,
+          "median": 36439.0,
+          "p95": 49718.0,
+          "max": 107079.0
+        },
+        "prepared_us": {
+          "mean": 8.75187969924812,
+          "median": 8.0,
+          "p95": 14.0,
+          "max": 20.0
+        },
+        "sample_us": {
+          "mean": 122.66917293233082,
+          "median": 122.0,
+          "p95": 139.0,
+          "max": 224.0
+        },
+        "total_us": {
+          "mean": 38739.71428571428,
+          "median": 37028.5,
+          "p95": 50428.0,
+          "max": 107693.0
+        }
+      }
+    }
+  ],
+  "commands": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-plane-upload-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-plane-upload-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-hc-parallel-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18041"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-plane-upload-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-plane-upload-artifacts/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-hc-parallel-artifacts/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::timing=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=1",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18042"
+    ]
+  ],
+  "gpu_test_log": "\nrunning 1 test\nPASS rows=1: interleaved chunks/reduction exact, stable staging, cancellation/error drain\nPASS rows=6: interleaved chunks/reduction exact, stable staging, cancellation/error drain\nPASS rows=80: interleaved chunks/reduction exact, stable staging, cancellation/error drain\nPASS rows=81: interleaved chunks/reduction exact, stable staging, cancellation/error drain\ntest v41_experts::coordinator::upload_tests::pinned_rank_uploads_match_sync_and_drain_on_drop ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 760 filtered out; finished in 0.16s\n\n",
+  "sha256": {
+    "/tmp/ds41-plane-upload-artifacts/daemon": "56618123eb85ff6665f31f0fe860c7900fa9cb00230139fb7c3c626bb688d757",
+    "/tmp/ds41-hc-parallel-artifacts/cmake/libds41rt_native.so": "958bf1080f58b2d2d33dbbe4b38e4f5e9506c408191552c86c3b7a2fcb6ff4fb",
+    "/tmp/ds41-plane-upload-rollout/recheck-spec-api.log": "491308428cde979f9a03df1b1276a499847c12da0bc9b67876fae3ae55e5c8c9",
+    "/tmp/ds41-plane-upload-rollout/recheck-target-api.log": "76a10e163fbaf391b5f5aad45015b0fc7606bbdb81b9bb222c4ca8aef1852212",
+    "/tmp/ds41-plane-upload-rollout/recheck-spec.log": "2c3b89c93de9d47db9515af9e427b714d64112433e7f0108726e26aaddf68794",
+    "/tmp/ds41-plane-upload-rollout/recheck-target.log": "5bda775462e2633bb69e9c4ceaa4e26f3716c6866b9528e3650c25862ab1d42f",
+    "/tmp/ds41-plane-upload-rollout/recheck-before-spec.log": "c065f1685046a1919ac7dda67242cd7da1545f36bc6ed7f6d9ad2e123587148e",
+    "/tmp/ds41-plane-upload-rollout/recheck-before-target.log": "d1442b012f14ddbda49c9b8b0c50cfab98a794e55b27ce6bf460d31600e31e5f",
+    "/tmp/ds41-plane-upload-rollout/spec-api.log": "c910a2089c5915cc3b04f89a42ac5bcc7a29a0abcf923ef7add51e16bd21c4c7",
+    "/tmp/ds41-plane-upload-rollout/target-api.log": "5c282fc30ee32b304e49d989b3eccfbaf565791fa29cb675c358401c952164ef",
+    "/tmp/ds41-plane-upload-rollout/quality.log": "95c4ed699647ef27933b8dd70d83473aa3cf8a8b598cf468fcb3d7a7189c0eb1",
+    "/tmp/ds41-plane-upload-rollout/spec.log": "11fdee7ea2208aa79175e28bdd0ff609277aef1802f258c6394d784d0922934a",
+    "/tmp/ds41-plane-upload-rollout/target.log": "7fc0c6114b3afa5bd80e9d5283dc5f399578421001ae977e3fd76639d8fb32ee",
+    "/tmp/ds41-plane-upload-rollout/before-spec-api.log": "08e0e6e9cc7a45e596f6999f8e75ca781c074bedcaa17bf26d481d7a87a7f50a",
+    "/tmp/ds41-plane-upload-rollout/before-target-api.log": "9d6ce89abf4545894b7c3d24b22f688e93e082c9fad666c96dcfb044909b1920",
+    "/tmp/ds41-plane-upload-rollout/before-spec.log": "67756dfcc7402327a2203f8dae37b38892325b5d62bb9d50ba508ef57d8f1852",
+    "/tmp/ds41-plane-upload-rollout/before-target.log": "a3f296b819bbd6193752e0e126fb12012ba9e931193703b39783b53e410577a0"
+  }
+}
