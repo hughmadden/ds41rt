@@ -26,6 +26,8 @@ int32_t ds41rt_v41_sparse_attention_initialize(void);
 // source IDs. Negative, noncausal or unmapped source IDs are masked. Malformed
 // proposal metadata yields zero for the whole query. Compressed=0 ignores source
 // pointers/metadata/IDs. Width must cover every query's causal window (max128).
+// Width 0 derives that maximum from the last metadata row; the caller must
+// provide ascending request positions. Positive widths retain explicit control.
 // Values E4M3 and scales E8M0/K32 must dequantize to finite BF16; queries/sinks
 // finite. Same stream device, live immutable inputs, disjoint output through
 // completion/replay. Caller guarantees lease/snapshot/request correspondence,

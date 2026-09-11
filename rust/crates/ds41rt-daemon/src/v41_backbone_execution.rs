@@ -202,6 +202,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         placement: u64,
         image_mask: &[u8],
     ) -> Result<()> {
+        let timing = std::time::Instant::now();
         // Invalidate even if obtaining the completed query or bank check fails.
         let layer = self.progress.next;
         self.progress.begin(batch.identity(), layer)?;
@@ -219,6 +220,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
                 bank.produce_source(batch, &query, &mut self.sources[i])?;
             }
         }
+        let produced_us = timing.elapsed().as_micros() as u64;
         let source = SOURCES
             .iter()
             .rposition(|&l| l <= layer)
@@ -229,20 +231,24 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
                 lane.select_index(index, &cache)?;
             }
         }
+        let indexed_us = timing.elapsed().as_micros() as u64;
         let sink = self
             .weights
             .sinks
             .get(&format!("layers.{layer}.attn.attn_sink"))?;
         let rows = batch.expert_rows();
         let mut ffn = unsafe { lane.attention_indexed_ffn(sink, &cache, index)? };
+        let attended_us = timing.elapsed().as_micros() as u64;
         let result = unsafe {
             ffn.execute_tp4(transport, placement, image_mask, &rows)
                 .await?
         };
+        let experts_us = timing.elapsed().as_micros() as u64;
         drop(ffn);
         unsafe {
             lane.finish_ffn(result.binding(), result.values)?;
         }
+        tracing::debug!(target: "ds41rt::timing", layer, rows=rows.len(), produced_us, index_us=indexed_us-produced_us, attention_us=attended_us-indexed_us, experts_us=experts_us-attended_us, finish_us=timing.elapsed().as_micros() as u64-experts_us, "target layer");
         self.progress.finish();
         Ok(())
     }

@@ -76,6 +76,8 @@ impl V41SparseAttention<'_> {
     /// live window/source leases and proposal snapshots; causal source lengths
     /// and unique IDs are correct. Inputs remain immutable on the initialized
     /// stream device through completion/replay, with disjoint BF16 output.
+    /// Width zero derives the causal maximum from the last metadata row; this
+    /// mode requires ascending query positions within the request.
     pub unsafe fn launch(
         &self,
         query: Ds41rtDeviceBuffer,
@@ -90,7 +92,7 @@ impl V41SparseAttention<'_> {
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!(
-            (1..=4096).contains(&rows) && (1..=128).contains(&window_width),
+            (1..=4096).contains(&rows) && window_width <= 128,
             "invalid sparse attention shape"
         );
         ensure!(

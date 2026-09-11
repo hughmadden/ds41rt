@@ -118,11 +118,17 @@ impl LaneFfn<'_, '_, '_> {
         let shared = &mut self.shared;
         let library = self.library;
         complete_ffn(self.phase, async {
+            let timing = std::time::Instant::now();
             let routed = unsafe { router.execute_ffn(input, image_mask)? };
             let request = unsafe { routed.expert_request(library, placement, rows)? };
+            let routed_us = timing.elapsed().as_micros() as u64;
             let pending = transport.dispatch_ffn(&request).await?;
+            let dispatched_us = timing.elapsed().as_micros() as u64;
             let contribution = unsafe { shared.execute_ffn(input)? };
-            unsafe { pending.finish(&contribution).await }
+            let shared_us = timing.elapsed().as_micros() as u64;
+            let result = unsafe { pending.finish(&contribution).await }?;
+            tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us, dispatch_us=dispatched_us-routed_us, shared_us=shared_us-dispatched_us, collect_us=timing.elapsed().as_micros() as u64-shared_us, "target experts");
+            Ok(result)
         })
         .await
     }

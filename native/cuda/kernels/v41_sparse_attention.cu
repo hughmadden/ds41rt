@@ -40,6 +40,12 @@ __device__ uint64_t locate(ds41rt_v41_sparse_kv_t v,const uint64_t* m,
 __global__ void attend(const __nv_bfloat16* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,
     int width,ds41rt_v41_sparse_kv_t v) {
+  // Zero width requests the exact former host maximum for this contiguous,
+  // ascending request. Reading metadata keeps decode graph arguments stable.
+  if(width==0) {
+    const uint64_t last=metadata[(uint64_t(gridDim.x)-1)*10+3];
+    width=last<127?int(last+1):128;
+  }
   const int row=blockIdx.x,group=blockIdx.y;
   const int tid=threadIdx.x,warp=tid/32,lane=tid%32;
   const uint64_t base=(uint64_t(row)*64+group*16)*512;
@@ -155,7 +161,7 @@ extern "C" int32_t ds41rt_v41_sparse_attention_initialize(void) {
 extern "C" int32_t ds41rt_v41_sparse_attention(const uint16_t* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
     int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream) {
-  if(!view || rows<1 || rows>4096 || window_width<1 || window_width>128)return cudaErrorInvalidValue;
+  if(!view || rows<1 || rows>4096 || window_width<0 || window_width>128)return cudaErrorInvalidValue;
   const auto v=*view;
   if(v.compressed>1 || v.window_proposal_capacity<1 || v.window_proposal_capacity>4096 ||
     (v.compressed && (v.source_capacity<1 || v.source_capacity>16777216ull ||

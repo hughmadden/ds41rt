@@ -44,7 +44,9 @@ pub(crate) struct SparseAttentionWave<'a> {
     metadata: DeviceAllocation<'a>,
     staging: HostAllocation<'a>,
     capacity: usize,
-    graph: Option<(*mut c_void, Vec<usize>)>,
+    // Keep one live-shape graph per backbone layer; fingerprints still bind
+    // every external pointer and launch geometry before replay.
+    graphs: [Option<(*mut c_void, Vec<usize>)>; 40],
 }
 struct RequestLaunch {
     window: V41SparseWindow,
@@ -82,7 +84,7 @@ impl<'a> SparseAttentionWave<'a> {
             metadata: DeviceAllocation::new(library, capacity * 80)?,
             staging: HostAllocation::new(library, capacity * 80)?,
             capacity,
-            graph: None,
+            graphs: std::array::from_fn(|_| None),
         })
     }
     pub fn input(&self) -> Ds41rtDeviceBuffer {
@@ -93,10 +95,21 @@ impl<'a> SparseAttentionWave<'a> {
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.synchronize()?;
-        if let Some((g, _)) = self.graph.take() {
-            unsafe {
-                self.stream.library.cuda_graph_exec_destroy(g)?;
+        // Attempt every destruction even if one CUDA call reports an error.
+        let mut failure = None;
+        for graph in &mut self.graphs {
+            if let Some((g, _)) = graph.take() {
+                if let Err(error) = unsafe { self.stream.library.cuda_graph_exec_destroy(g) } {
+                    failure.get_or_insert(error);
+                }
             }
+        }
+        match failure { Some(error) => Err(error), None => Ok(()) }
+    }
+    fn clear_layer_graph(&mut self, layer: usize) -> Result<()> {
+        self.synchronize()?;
+        if let Some((g, _)) = self.graphs[layer].take() {
+            unsafe { self.stream.library.cuda_graph_exec_destroy(g)?; }
         }
         Ok(())
     }
@@ -222,10 +235,11 @@ impl<'a> SparseAttentionWave<'a> {
                 r.source.is_some() == (layer >= 2),
                 "attention source presence differs"
             );
-            let mut width = 0;
+            // Positions are checked ascending above; the kernel derives the
+            // same maximum width from the last live metadata row on replay.
+            let width = 0;
             for &position in r.positions {
                 let wm = w.metadata(position)?;
-                width = width.max((position + 1).min(128) as usize);
                 metadata.extend(wm);
                 if let Some(s) = r.source {
                     ensure!(
@@ -315,8 +329,9 @@ impl<'a> SparseAttentionWave<'a> {
         self.stream
             .library
             .copy_h2d(self.metadata.buffer, &self.staging.bytes_mut()[..rows * 80])?;
-        if self.graph.as_ref().is_none_or(|(_, f)| f != &fingerprint) {
-            self.clear_graph()?;
+        if self.graphs[layer].as_ref().is_none_or(|(_, f)| f != &fingerprint) {
+            tracing::debug!(target: "ds41rt::timing", layer, rows, "sparse graph capture");
+            self.clear_layer_graph(layer)?;
             let launched = unsafe { self.enqueue(sink, &launches, selected) };
             launched.and(self.synchronize())?;
             unsafe {
@@ -327,7 +342,7 @@ impl<'a> SparseAttentionWave<'a> {
             let launched = unsafe { self.enqueue(sink, &launches, selected) };
             let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
             match (launched, captured) {
-                (Ok(()), Ok(g)) => self.graph = Some((g, fingerprint)),
+                (Ok(()), Ok(g)) => self.graphs[layer] = Some((g, fingerprint)),
                 (Err(e), Ok(g)) => {
                     unsafe {
                         self.stream.library.cuda_graph_exec_destroy(g)?;
@@ -340,7 +355,7 @@ impl<'a> SparseAttentionWave<'a> {
         let launched = unsafe {
             self.stream
                 .library
-                .cuda_graph_launch(self.graph.as_ref().unwrap().0, self.stream.raw)
+                .cuda_graph_launch(self.graphs[layer].as_ref().unwrap().0, self.stream.raw)
         };
         launched.and(self.synchronize())?;
         Ok(SparseAttentionOutput {

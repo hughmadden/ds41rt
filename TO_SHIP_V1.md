@@ -101,6 +101,7 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Wire mapped engram tables/scales, bounded asynchronous prefetch, deduplicated gathers, staging and cancellation into execution.
 - [ ] Trigger engram work early for decode, verification and batched prefill and commit accepted-prefix history without stale-wave reuse.
 - [x] Serve real target-only text over native `/v1/chat/completions` with official V4.1 formatting and JSON/SSE parsing. Live response/usage/disconnect recovery pass; two smoke answers match hosted `deepseek-flash`. Repeated single-client short-prompt decode is about 5.8 TPS, well below target. See `docs/ds41-native-api.md`.
+- [x] Instrument decode phases and remove sparse-attention graph recapture across layers/token positions; three full-model logit arrays remain byte-exact. Initial repeated API rate improves to about 6.1 TPS; expert collection remains dominant. Idle SIGTERM shutdown drains cleanly. See `docs/ds41-sparse-graph-reuse.md`.
 - [ ] Extend the initial serial greedy 4096-context API path to complete sampling, concurrent batching, full context, vision/dSpark, release launchers and lifecycle/error gates; profile and optimize measured latency.
 - [ ] Implement native image preprocessing, ViT, aligner, image-span embeddings and vision routing through the API.
 - [x] Qualify owned dSpark main projection, independent committed KV producers and draft attention with native rotary frequencies on both RTX GPUs.

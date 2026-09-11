@@ -162,7 +162,7 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
     let cycles = case
         .as_ref()
         .and_then(|c| c["max_new_tokens"].as_u64())
-        .unwrap_or(2) as usize;
+        .unwrap_or(3) as usize;
     ensure!(
         (1..=128).contains(&cycles),
         "fixture generation must be 1..128 tokens"

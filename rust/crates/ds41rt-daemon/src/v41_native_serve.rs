@@ -29,7 +29,7 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
     let listen = args.listen.clone();
     let (send, receive) = mpsc::channel(16);
     let (ready, readiness) = oneshot::channel();
-    std::thread::Builder::new()
+    let worker_thread = std::thread::Builder::new()
         .name("v41-target-cuda".into())
         .spawn(move || {
             let mut ready = Some(ready);
@@ -51,7 +51,13 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
         .map_err(anyhow::Error::msg)?;
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     tracing::info!(%listen,"native V4.1 target API ready");
-    axum::serve(listener, ds41rt_api::native_v41::router(send)).await?;
+    axum::serve(listener, ds41rt_api::native_v41::router(send))
+        .with_graceful_shutdown(async {
+            let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).expect("install SIGTERM handler");
+            tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = term.recv() => {} }
+        }).await?;
+    tokio::task::spawn_blocking(move || worker_thread.join()).await?
+        .map_err(|_| anyhow::anyhow!("native CUDA worker panicked during shutdown"))?;
     Ok(())
 }
 fn worker(
@@ -295,16 +301,19 @@ fn step<'a>(
     job: &NativeRequest,
 ) -> Result<u32> {
     ensure!(!job.events.is_closed(), "client disconnected");
+    let timing = Instant::now();
     let mut batch = requests.prepare(&[RequestTokens {
         lease,
         tokens,
         image_mask: None,
         kind,
     }])?;
+    let prepared_us = timing.elapsed().as_micros() as u64;
     let result = (|| -> Result<u32> {
         let logits = runtime.block_on(unsafe {
             pass.execute(requests, &mut batch, transport, 0, &[tokens.len() - 1])
         })?;
+        let executed_us = timing.elapsed().as_micros() as u64;
         let mut bytes = vec![0; logits.logits.bytes];
         lib.copy_d2h(&mut bytes, logits.logits)?;
         let mut best = (0u32, f32::NEG_INFINITY);
@@ -316,7 +325,9 @@ fn step<'a>(
             }
         }
         ensure!(!job.events.is_closed(), "client disconnected");
+        let sampled_us = timing.elapsed().as_micros() as u64;
         pass.commit(requests, &mut batch, &[tokens.len() as u32])?;
+        tracing::debug!(target: "ds41rt::timing", rows=tokens.len(), prepared_us, execute_us=executed_us-prepared_us, sample_us=sampled_us-executed_us, commit_us=timing.elapsed().as_micros() as u64-sampled_us, total_us=timing.elapsed().as_micros() as u64, "target step");
         Ok(best.0)
     })();
     if result.is_err() {
