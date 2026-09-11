@@ -475,7 +475,7 @@ mod tests {
             library: &library,
             layers: vec![],
         };
-        for (capacity, expected) in [(1, 2_301_981usize), (80, 80_606_556), (4096, 2_985_230_348)] {
+        for (capacity, expected) in [(1, 2_301_989usize), (80, 80_607_196), (4096, 2_985_263_116)] {
             let groups = BackboneLane::workspace_bytes(&library, capacity)?;
             let total: usize = groups.iter().sum();
             assert_eq!(total, expected);

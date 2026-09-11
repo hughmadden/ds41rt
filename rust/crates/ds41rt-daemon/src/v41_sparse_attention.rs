@@ -42,6 +42,7 @@ pub(crate) struct SparseAttentionWave<'a> {
     query: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     split_scratch: DeviceAllocation<'a>,
+    replay_begins: DeviceAllocation<'a>,
     metadata: DeviceAllocation<'a>,
     staging: HostAllocation<'a>,
     capacity: usize,
@@ -67,7 +68,7 @@ impl<'a> SparseAttentionWave<'a> {
             (1..=4096).contains(&capacity),
             "invalid sparse attention capacity"
         );
-        Ok(capacity * 131152 + V41SparseAttention::split_scratch_bytes(capacity.min(16), 10)?)
+        Ok(capacity * 131160 + V41SparseAttention::split_scratch_bytes(capacity.min(16), 10)?)
     }
     pub fn new(library: &'a NativeLibrary, capacity: usize, budget: usize) -> Result<Self> {
         ensure!(
@@ -86,6 +87,7 @@ impl<'a> SparseAttentionWave<'a> {
                 library,
                 V41SparseAttention::split_scratch_bytes(capacity.min(16), 10)?,
             )?,
+            replay_begins: DeviceAllocation::new(library, capacity * 8)?,
             metadata: DeviceAllocation::new(library, capacity * 80)?,
             staging: HostAllocation::new(library, capacity * 80)?,
             capacity,
@@ -282,7 +284,8 @@ impl<'a> SparseAttentionWave<'a> {
                 proposal_scales: w.scales,
                 end: w.cache.device_end,
                 proposal_capacity: w.capacity,
-                replay_begins: None,
+                replay_begins: (w.cache.begin != 0).then(|| slice(self.replay_begins.buffer,
+                    (metadata.len() / 10 - r.positions.len()) * 8, r.positions.len() * 8)),
             };
             let source = r.source.map(|s| V41SparseSource {
                 values: s.kv_cache.values,
@@ -303,6 +306,8 @@ impl<'a> SparseAttentionWave<'a> {
                 window.proposal_scales,
                 window.end,
             ];
+            fingerprint.push(usize::from(window.replay_begins.is_some()));
+            if let Some(bounds) = window.replay_begins { buffers.push(bounds); }
             if let Some(s) = &source {
                 fingerprint.extend([s.capacity, s.proposal_capacity, s.page_stride]);
                 buffers.extend([
@@ -346,6 +351,18 @@ impl<'a> SparseAttentionWave<'a> {
         self.stream
             .library
             .copy_h2d(self.metadata.buffer, &self.staging.bytes_mut()[..rows * 80])?;
+        if requests.iter().any(|r| r.window.cache.begin != 0) {
+            let mut row = 0;
+            for request in requests {
+                for _ in request.positions {
+                    self.staging.bytes_mut()[row * 8..row * 8 + 8]
+                        .copy_from_slice(&request.window.cache.begin.to_ne_bytes());
+                    row += 1;
+                }
+            }
+            self.stream.library.copy_h2d(self.replay_begins.buffer,
+                &self.staging.bytes_mut()[..rows * 8])?;
+        }
         if self.graphs[layer]
             .as_ref()
             .is_none_or(|(_, f)| f != &fingerprint)

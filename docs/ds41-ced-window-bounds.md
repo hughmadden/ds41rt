@@ -18,8 +18,10 @@ are unchanged.
 Rust's `V41SparseWindow::replay_begins` carries the optional device buffer; the
 wrapper checks its device and size and calls the bounded entry point only when
 present. Loading an older native library remains possible for ordinary execution;
-requesting bounded execution against it fails explicitly. The native daemon still
-sets this field to `None` until request/cache progression is integrated.
+requesting bounded execution against it fails explicitly. The attention wave now derives this field from the window owner’s initialized
+interval, using a preallocated device-bound array and its existing staging buffer.
+Ordinary zero-origin windows avoid the extra upload. Request admission still uses
+ordinary windows until CED request/cache progression is integrated.
 
 The independent sparse-attention qualifier now supports `--bounded-replay`.
 It changes the bound from zero to the proposal start in a captured graph, compares
@@ -52,3 +54,30 @@ can increase explicit reuse; merely alternating layers may instead reduce cache
 locality. Keep the current measured M16 choice until larger groups and ordering
 show an end-to-end win on the new schedule. Earlier M32/M64 trials reject those
 implementations under the former workload, not all larger-group approaches.
+
+## Window owner integration
+
+`WindowState::begin_replay` initializes a fresh decoder lease as an empty interval
+`[position, position)`, advances its proposal version, and publishes the device
+end. It rejects encoder layers, reused leases and positions beyond model capacity.
+No ring bytes are declared valid before the new lower bound. A failed device update
+revokes the lease; release and reacquisition reset the lower bound with a new
+lease generation. Subsequent committed rows retain the replay floor.
+
+The GPU owner test `decoder_replay_window_lease_boundaries` passes across all
+sixteen slots, covering starts 0/1/127/128/16384/1048576, invalid/foreign/stale leases,
+version changes, device-end readback and slot reuse. It uses the frozen packed
+native library; this is window ownership qualification, not a complete bounded
+Rust attention pass. The first host test invocation could not load the CuTe runtime;
+the same compiled test passes in the CUDA development image (0.17 seconds).
+
+Attention now reserves eight device bytes per planned row for replay bounds. Total
+lane workspace budgets become 2,301,989 bytes at capacity 1, 80,607,196 at capacity
+80, and 2,985,263,116 at capacity 4096. Existing host staging is reused. Graph
+fingerprints include bound-buffer identity and entry-point choice; boundary values
+are uploaded without becoming graph keys. The Rust daemon check passes.
+
+Raw owner test and final compilation logs are under `/tmp/ds41-ced-bounds` as
+`window-test-container.log` and `window-final-check.log`. Live API artifacts are
+unchanged. Separate encoder/global-source and decoder commit progress is still
+required before bounded prefill can run through the API.

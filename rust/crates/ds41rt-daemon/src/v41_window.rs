@@ -34,12 +34,15 @@ struct Slot {
     generation: u64,
     version: u64,
     end: u64,
+    begin: u64,
 }
 pub(crate) struct WindowCacheView<'a> {
     pub values: Ds41rtDeviceBuffer,
     pub scales: Ds41rtDeviceBuffer,
     pub device_end: Ds41rtDeviceBuffer,
     pub end: u64,
+    /// Earliest initialized logical row; preceding ring bytes are inaccessible.
+    pub begin: u64,
     _owner: PhantomData<&'a ()>,
 }
 fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {
@@ -114,6 +117,24 @@ impl<'a> WindowState<'a> {
             generation,
         })
     }
+    /// Start a fresh decoder window at the retained encoder suffix. No ring rows
+    /// become valid: consumers must enforce the returned view's lower bound.
+    /// Existing consumers must be drained; version advancement revokes proposals.
+    pub fn begin_replay(&mut self, lease: WindowLease, position: u64) -> Result<()> {
+        let slot = self.validate(lease)?;
+        ensure!(self.layer >= 20 && position <= 1048576, "invalid decoder replay start");
+        ensure!(self.slots[slot].end == 0 && self.slots[slot].version == 0,
+            "decoder replay requires a fresh window lease");
+        if let Err(error) = self.ends.library.copy_h2d(
+            slice(self.ends.buffer, slot * 8, 8), &position.to_ne_bytes()) {
+            self.slots[slot].request = None;
+            return Err(error);
+        }
+        self.slots[slot].begin = position;
+        self.slots[slot].end = position;
+        self.slots[slot].version = 1;
+        Ok(())
+    }
     fn validate(&self, lease: WindowLease) -> Result<usize> {
         ensure!(
             lease.owner == self.owner && lease.slot < self.slot_count,
@@ -141,6 +162,7 @@ impl<'a> WindowState<'a> {
             scales: slice(self.scales.buffer, slot * 128 * 16, 128 * 16),
             device_end: slice(self.ends.buffer, slot * 8, 8),
             end: self.slots[slot].end,
+            begin: self.slots[slot].begin,
             _owner: PhantomData,
         })
     }
@@ -314,7 +336,7 @@ pub(crate) struct WindowProposal<'a> {
 }
 impl WindowProposal<'_> {
     /// Committed end, proposal offset/count and query position. Ring consumers
-    /// use logical positions max(0,query+1-128)..=query; rows >=end use proposals.
+    /// use positions max(cache.begin,query+1-128)..=query; rows >=end use proposals.
     pub fn metadata(&self, position: u64) -> Result<[u64; 4]> {
         ensure!(
             position >= self.first && position < self.first + self.tokens as u64,
@@ -703,5 +725,47 @@ impl Drop for WindowWave<'_, '_> {
         if let Err(error) = self.clear_graph() {
             tracing::error!(%error,"draining window graph");
         }
+    }
+}
+
+#[cfg(test)]
+mod replay_tests {
+    use super::*;
+
+    #[test]
+    fn decoder_replay_window_lease_boundaries() -> Result<()> {
+        let Some(path) = std::env::var_os("DS41RT_WINDOW_REPLAY_LIBRARY") else {
+            eprintln!("skip GPU window replay test: DS41RT_WINDOW_REPLAY_LIBRARY unset");
+            return Ok(());
+        };
+        let library = unsafe { NativeLibrary::load(path)? };
+        let mut state = WindowState::new(&library, 20, 16, WindowState::device_bytes(20, 16)?)?;
+        let mut encoder = WindowState::new(&library, 19, 1, WindowState::device_bytes(19, 1)?)?;
+        let encoder_lease = encoder.begin_request(0, 999)?;
+        assert!(encoder.begin_replay(encoder_lease, 128).is_err());
+        assert!(state.begin_replay(encoder_lease, 128).is_err());
+        for slot in 0..16 {
+            let lease = state.begin_request(slot, slot as u64 + 1)?;
+            let before = state.slots[slot].version;
+            let position = [0, 1, 127, 128, 16384, 1048576][slot % 6];
+            assert!(state.begin_replay(lease, 1048577).is_err());
+            assert_eq!(state.end(lease)?, 0);
+            state.begin_replay(lease, position)?;
+            assert_eq!(state.slots[slot].version, before + 1);
+            assert!(state.begin_replay(lease, position).is_err());
+            let view = state.view(lease)?;
+            assert_eq!((view.begin, view.end), (position, position));
+            let mut bytes = [0; 8];
+            library.copy_d2h(&mut bytes, view.device_end)?;
+            assert_eq!(u64::from_ne_bytes(bytes), position);
+            state.release(lease)?;
+            assert!(state.begin_replay(lease, 0).is_err());
+            let replacement = state.begin_request(slot, slot as u64 + 101)?;
+            assert!(state.view(lease).is_err());
+            assert_eq!((state.view(replacement)?.begin, state.end(replacement)?), (0, 0));
+            state.release(replacement)?;
+        }
+        eprintln!("PASS 16 decoder replay slots: bounds, device ends, versions, stale leases, encoder/foreign guards and reuse");
+        Ok(())
     }
 }
