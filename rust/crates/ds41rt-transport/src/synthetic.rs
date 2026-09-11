@@ -61,6 +61,18 @@ pub trait ProtocolV2ExpertExecutor: Send + Sync {
         false
     }
 
+    /// Submit to an existing execution thread without blocking the socket runtime.
+    /// Implementations must use a bounded channel, preserve executor identity, and
+    /// report execution failure as an error item. Closing without a final chunk is
+    /// an error. Dropping the receiver cancels response delivery, not GPU work.
+    /// Returning None selects the synchronous streaming adapter.
+    fn submit_tcp_chunks(
+        &self,
+        _request: &ExpertProtocolV2RequestView<'_>,
+    ) -> Option<Result<tokio::sync::mpsc::Receiver<Result<ExpertProtocolV2Response>>>> {
+        None
+    }
+
     fn execute_with_identity(
         &self,
         request: &ExpertProtocolV2RequestView<'_>,

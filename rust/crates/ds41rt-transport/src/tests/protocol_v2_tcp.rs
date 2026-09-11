@@ -1190,3 +1190,108 @@ async fn native_v41_fp32_routes_and_partial_planes_survive_persistent_tcp() -> R
     server.abort();
     Ok(())
 }
+
+struct DirectSubmitExecutor(u8);
+impl crate::ProtocolV2ExpertExecutor for DirectSubmitExecutor {
+    fn name(&self) -> &'static str {
+        "direct-submit-test"
+    }
+    fn execute(
+        &self,
+        _: &crate::ExpertProtocolV2RequestView<'_>,
+    ) -> Result<crate::ExpertProtocolV2Response> {
+        panic!("direct submission must bypass the blocking adapter")
+    }
+    fn tcp_response_chunks(&self) -> bool {
+        true
+    }
+    fn submit_tcp_chunks(
+        &self,
+        request: &crate::ExpertProtocolV2RequestView<'_>,
+    ) -> Option<Result<tokio::sync::mpsc::Receiver<Result<crate::ExpertProtocolV2Response>>>> {
+        Some((|| {
+            let (sender, receiver) = tokio::sync::mpsc::channel(1);
+            let mut response = crate::ProtocolV2ExpertExecutor::execute(&EchoExecutor, request)?;
+            let mode = self.0;
+            if mode == 2 {
+                response.header.request_id += 1;
+            }
+            tokio::spawn(async move {
+                match mode {
+                    1 => {} // Closing before a final frame must fail.
+                    3 => {
+                        let _ = sender
+                            .send(Err(anyhow::anyhow!("injected execution failure")))
+                            .await;
+                    }
+                    _ => {
+                        let _ = sender.send(Ok(response)).await;
+                    }
+                }
+            });
+            Ok(receiver)
+        })())
+    }
+}
+
+#[tokio::test]
+async fn protocol_v2_tcp_direct_submission_reuses_connection() -> Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?;
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await?;
+        crate::protocol_v2_tcp::handle_protocol_v2_connection_with_executor(
+            socket,
+            Arc::new(DirectSubmitExecutor(0)),
+        )
+        .await
+    });
+    let mut client = TcpProtocolV2PersistentClient::new(address, TcpTransportConfig::default());
+    for id in [123, 124] {
+        let request = protocol_v2_request(id, 1, ExpertV2SourceKind::Decode)?;
+        let expected = protocol_v2_echo_loopback_response(&request)?;
+        let mut actual = None;
+        client
+            .roundtrip_chunks(&request, 1, |bytes| {
+                actual = Some(crate::ExpertProtocolV2Response::decode(bytes)?);
+                Ok(())
+            })
+            .await?;
+        assert_eq!(
+            actual.unwrap().partial_output_payload,
+            expected.partial_output_payload
+        );
+    }
+    drop(client);
+    timeout(Duration::from_secs(2), server).await???;
+    Ok(())
+}
+
+#[tokio::test]
+async fn protocol_v2_tcp_direct_submission_rejects_invalid_completion() -> Result<()> {
+    for (mode, message) in [
+        (1, "without a final"),
+        (2, "different request"),
+        (3, "injected execution failure"),
+    ] {
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await?;
+            crate::protocol_v2_tcp::handle_protocol_v2_connection_with_executor(
+                socket,
+                Arc::new(DirectSubmitExecutor(mode)),
+            )
+            .await
+        });
+        let mut client = TcpProtocolV2PersistentClient::new(address, TcpTransportConfig::default());
+        let request = protocol_v2_request(125, 1, ExpertV2SourceKind::Decode)?;
+        assert!(client
+            .roundtrip_chunks(&request, 1, |_| Ok(()))
+            .await
+            .is_err());
+        let error = timeout(Duration::from_secs(2), server).await??.unwrap_err();
+        assert!(error.to_string().contains(message), "{error:#}");
+    }
+    Ok(())
+}

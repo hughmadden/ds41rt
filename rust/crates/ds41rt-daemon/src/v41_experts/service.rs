@@ -45,12 +45,35 @@ pub(crate) struct NativeExpertServiceConfig {
 
 struct Work {
     frame: Vec<u8>,
-    responses: mpsc::SyncSender<WorkerResponse>,
+    responses: Responses,
     queued_at: std::time::Instant,
 }
 enum WorkerResponse {
     Chunk(ExpertProtocolV2Response),
     Done(Result<()>),
+}
+
+// The GPU thread blocks only on bounded response backpressure. The async variant
+// lets TCP receive directly, without a second blocking execution adapter.
+enum Responses {
+    Blocking(mpsc::SyncSender<WorkerResponse>),
+    Async(tokio::sync::mpsc::Sender<Result<ExpertProtocolV2Response>>),
+}
+impl Responses {
+    fn send(&self, response: WorkerResponse) -> std::result::Result<(), ()> {
+        match self {
+            Self::Blocking(sender) => sender.send(response).map_err(|_| ()),
+            Self::Async(sender) => match response {
+                WorkerResponse::Chunk(response) => {
+                    sender.blocking_send(Ok(response)).map_err(|_| ())
+                }
+                WorkerResponse::Done(Err(error)) => {
+                    sender.blocking_send(Err(error)).map_err(|_| ())
+                }
+                WorkerResponse::Done(Ok(())) => Ok(()),
+            },
+        }
+    }
 }
 
 pub(crate) struct NativeExpertService {
@@ -60,6 +83,34 @@ pub(crate) struct NativeExpertService {
     max_frame_bytes: usize,
 }
 impl NativeExpertService {
+    fn submit(
+        &self,
+        request: &ExpertProtocolV2RequestView<'_>,
+        responses: Responses,
+    ) -> Result<()> {
+        ensure!(
+            request.frame_bytes().len() <= self.max_frame_bytes,
+            "native request exceeds admitted frame size"
+        );
+        V41BackboneRequest::parse(request.frame_bytes(), self.capacity)?;
+        self.requests
+            .as_ref()
+            .context("native expert service stopped")?
+            .try_send(Work {
+                frame: request.frame_bytes().to_vec(),
+                responses,
+                queued_at: std::time::Instant::now(),
+            })
+            .map_err(|error| match error {
+                mpsc::TrySendError::Full(_) => {
+                    anyhow::anyhow!("native expert request queue is full")
+                }
+                mpsc::TrySendError::Disconnected(_) => {
+                    anyhow::anyhow!("native expert worker stopped")
+                }
+            })?;
+        Ok(())
+    }
     /// Start with one visible CUDA device; all native allocations use logical GPU 0.
     /// Returns only after all forty backbone layers and shared wave workspace load.
     pub fn start(config: NativeExpertServiceConfig) -> Result<Self> {
@@ -123,28 +174,8 @@ impl ProtocolV2ExpertExecutor for NativeExpertService {
         request: &ExpertProtocolV2RequestView<'_>,
         emit: &mut dyn FnMut(ExpertProtocolV2ResponseRef<'_>) -> Result<()>,
     ) -> Result<()> {
-        ensure!(
-            request.frame_bytes().len() <= self.max_frame_bytes,
-            "native request exceeds admitted frame size"
-        );
-        V41BackboneRequest::parse(request.frame_bytes(), self.capacity)?;
         let (responses, receive) = mpsc::sync_channel(1);
-        self.requests
-            .as_ref()
-            .context("native expert service stopped")?
-            .try_send(Work {
-                frame: request.frame_bytes().to_vec(),
-                responses,
-                queued_at: std::time::Instant::now(),
-            })
-            .map_err(|error| match error {
-                mpsc::TrySendError::Full(_) => {
-                    anyhow::anyhow!("native expert request queue is full")
-                }
-                mpsc::TrySendError::Disconnected(_) => {
-                    anyhow::anyhow!("native expert worker stopped")
-                }
-            })?;
+        self.submit(request, Responses::Blocking(responses))?;
         loop {
             match receive
                 .recv()
@@ -154,6 +185,16 @@ impl ProtocolV2ExpertExecutor for NativeExpertService {
                 WorkerResponse::Done(result) => return result,
             }
         }
+    }
+    fn submit_tcp_chunks(
+        &self,
+        request: &ExpertProtocolV2RequestView<'_>,
+    ) -> Option<Result<tokio::sync::mpsc::Receiver<Result<ExpertProtocolV2Response>>>> {
+        Some((|| {
+            let (responses, receive) = tokio::sync::mpsc::channel(1);
+            self.submit(request, Responses::Async(responses))?;
+            Ok(receive)
+        })())
     }
     // Native TP identity is the configured rank plus one, not a hash of a shared name.
     fn execute_streaming_with_identity(

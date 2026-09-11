@@ -24,6 +24,8 @@ The user-authorized hosted API returned the same visible answers for both prompt
 - [Hosted requests and responses](ds41-native-api-hosted-comparison.json)
 - All 108 API unit tests pass, including new prompt/JSON/SSE and worker-failure checks; all three focused loader engram tests pass.
 
+The later [direct-submission rollout](ds41-native-direct-submission.md) uses optimized workers on the fabric and measures 10.02–10.40 target decode tokens/s, with the same short API checks passing. The initial table above is retained as historical evidence.
+
 ## Development entry point
 
 The current local server is at `http://127.0.0.1:18041`, with a `ds41-native-api-dev` container and four `ds41-full-target-worker` Spark containers. Recheck their live state before reuse. The daemon command is:
