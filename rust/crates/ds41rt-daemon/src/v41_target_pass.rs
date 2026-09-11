@@ -9,6 +9,8 @@ use crate::v41_target_embedding::TargetEmbeddingWave;
 use crate::v41_target_head::{TargetHeadWave, TargetLogits};
 use anyhow::{ensure, Result};
 use std::time::{Duration, Instant};
+mod taps;
+pub(crate) use taps::{TargetTapWave, TargetTaps};
 
 #[derive(Default, Debug, PartialEq, Eq)]
 enum State {
@@ -58,6 +60,7 @@ pub(crate) struct TargetPass<'w, 'a> {
     upload: EngramDeviceRows<'a>,
     gates: [EngramGate<'w, 'a>; 2],
     head: TargetHeadWave<'w, 'a>,
+    taps: TargetTapWave<'a>,
     engram_timeout: Duration,
     state: State,
 }
@@ -70,6 +73,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         upload: EngramDeviceRows<'a>,
         gates: [EngramGate<'w, 'a>; 2],
         head: TargetHeadWave<'w, 'a>,
+        taps: TargetTapWave<'a>,
         engram_timeout: Duration,
     ) -> Result<Self> {
         ensure!(
@@ -85,6 +89,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             upload,
             gates,
             head,
+            taps,
             engram_timeout,
             state: State::Idle,
         })
@@ -93,7 +98,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     /// All components belong to the same device, capacity and official model.
     /// The caller exclusively owns CUDA buffers and polls on the owning thread.
     /// Selected rows are in this batch's flattened request order, at most 80.
-    /// This target-only path does not produce dSpark taps or replace image tokens.
+    /// Produces private dSpark taps for every input row; image replacement is separate.
     pub async unsafe fn execute(
         &mut self,
         requests: &Requests<'a>,
@@ -121,6 +126,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             batch,
             completed: false,
         };
+        self.taps.begin(guard.batch.cache()?)?;
         self.execution.restart();
         self.lane.restart()?;
         self.index.restart()?;
@@ -147,6 +153,12 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                         tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                 }
+                if layer >= 37 {
+                    unsafe {
+                        self.taps
+                            .capture(guard.batch.cache()?, &self.lane.prepared_input()?)?;
+                    }
+                }
                 unsafe {
                     self.lane.begin_prepared()?;
                 }
@@ -165,6 +177,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                     .await?;
             }
         }
+        self.taps.output(guard.batch.cache()?)?;
         let output = self.lane.output()?;
         unsafe {
             self.head.execute_block(&output, selected)?;
@@ -177,6 +190,10 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         self.state.ready(batch.cache()?.identity())?;
         self.head.output()
     }
+    pub fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> {
+        self.state.ready(batch.cache()?.identity())?;
+        self.taps.output(batch.cache()?)
+    }
     /// The scheduler samples/validates logits before publishing accepted input
     /// prefixes. A failed commit consumes this pass; discard before reuse.
     pub fn commit(
@@ -187,6 +204,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     ) -> Result<()> {
         self.state.ready(batch.cache()?.identity())?;
         self.state = State::Running;
+        self.taps.reset();
         requests.commit(batch, &mut self.execution, accepted)?;
         self.state = State::Idle;
         Ok(())
@@ -195,6 +213,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     /// have been dropped. Request admission survives discarded private proposals.
     pub fn discard(&mut self, batch: &mut RequestBatch) -> Result<()> {
         batch.cancel();
+        self.taps.reset();
         self.state = State::Running;
         self.lane.restart()?;
         self.index.restart()?;

@@ -129,6 +129,11 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
         upload,
         gates,
         head,
+        crate::v41_target_pass::TargetTapWave::new(
+            &lib,
+            80,
+            crate::v41_target_pass::TargetTapWave::device_bytes(80)?,
+        )?,
         Duration::from_secs(120),
     )?;
     let tcp = V41Tp4Tcp::new(
@@ -141,6 +146,34 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
         },
     )?;
     let mut transport = NativeTp4Wave::new(&lib, tcp, NativeTp4Wave::device_bytes(80)?)?;
+    let dspark_weights = if std::env::var_os("DS41RT_TARGET_PASS_DSPARK").is_some() {
+        let start = Instant::now();
+        let weights = crate::v41_experts::dspark::DsparkWeights::load(
+            &lib,
+            &catalog,
+            80,
+            1,
+            32 * 1024 * 1024 * 1024,
+            16 * 1024 * 1024,
+        )?;
+        eprintln!(
+            "real dSpark weights loaded in {:.3}s resident_bytes={}",
+            start.elapsed().as_secs_f64(),
+            weights.budget().resident_bytes()?
+        );
+        Some(weights)
+    } else {
+        None
+    };
+    let mut main_context = dspark_weights
+        .as_ref()
+        .map(|weights| {
+            weights.main_context(
+                80,
+                crate::v41_experts::dspark::DsparkMainContext::device_bytes(&lib, 80)?,
+            )
+        })
+        .transpose()?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
@@ -220,10 +253,77 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                     .0 as u32
             })
             .collect();
+        let taps = pass.taps(&batch)?;
+        assert_eq!(taps.batch_identity(), batch.cache()?.identity());
+        assert_eq!(taps.rows().len(), count * request_count);
+        let expected_rows = batch.cache()?.expert_rows();
+        assert!(taps
+            .rows()
+            .iter()
+            .zip(&expected_rows)
+            .all(|(a, b)| a.request_id == b.request_id
+                && a.position == b.position
+                && a.kind == b.kind));
+        let mut tap_bytes = vec![0; taps.values().bytes];
+        lib.copy_d2h(&mut tap_bytes, taps.values())?;
+        assert!(tap_bytes.chunks_exact(2).all(|b| f32::from_bits(
+            (u16::from_le_bytes(b.try_into().unwrap()) as u32) << 16
+        )
+        .is_finite()));
+        let mut main_bytes = None;
+        if let Some(main) = &mut main_context {
+            let positions = taps.rows().iter().map(|r| r.position).collect::<Vec<_>>();
+            if cycle != 0 {
+                let mut invalid = taps.values();
+                invalid.bytes -= 2;
+                assert!(unsafe { main.execute_input(invalid, &positions) }.is_err());
+                assert!(main.output().is_err());
+            }
+            unsafe {
+                main.execute_input(taps.values(), &positions)?;
+            }
+            let output = main.output()?;
+            let mut bytes = vec![0; output.bytes];
+            lib.copy_d2h(&mut bytes, output)?;
+            assert!(bytes.chunks_exact(2).all(|b| f32::from_bits(
+                (u16::from_le_bytes(b.try_into().unwrap()) as u32) << 16
+            )
+            .is_finite()));
+            main_bytes = Some(bytes);
+            for stage in 0..3 {
+                let output = main.kv_output(stage)?;
+                let mut bytes = vec![0; output.bytes];
+                lib.copy_d2h(&mut bytes, output)?;
+                assert!(bytes.chunks_exact(2).all(|b| f32::from_bits(
+                    (u16::from_le_bytes(b.try_into().unwrap()) as u32) << 16
+                )
+                .is_finite()));
+                if let Some(dir) = std::env::var_os("DS41RT_TARGET_PASS_OUTPUT") {
+                    std::fs::write(
+                        std::path::PathBuf::from(dir)
+                            .join(format!("cycle{cycle}-stage{stage}-kv.bin")),
+                        bytes,
+                    )?;
+                }
+            }
+        }
         if let Some(dir) = std::env::var_os("DS41RT_TARGET_PASS_OUTPUT") {
             let dir = std::path::PathBuf::from(dir);
             std::fs::create_dir_all(&dir)?;
             std::fs::write(dir.join(format!("cycle{cycle}-logits.bin")), &bytes)?;
+            if let Some(bytes) = &main_bytes {
+                std::fs::write(dir.join(format!("cycle{cycle}-main-context.bin")), bytes)?;
+            }
+            std::fs::write(
+                dir.join(format!("batch{}-taps.bin", taps.batch_identity())),
+                &tap_bytes,
+            )?;
+            std::fs::write(
+                dir.join(format!("cycle{cycle}-tap-metadata.json")),
+                serde_json::to_vec(
+                    &serde_json::json!({"batch":taps.batch_identity(),"rows":taps.rows().len(),"positions":taps.rows().iter().map(|r|r.position).collect::<Vec<_>>(),"request_ids":taps.rows().iter().map(|r|r.request_id).collect::<Vec<_>>()}),
+                )?,
+            )?;
             std::fs::write(
                 dir.join(format!("cycle{cycle}-greedy.json")),
                 serde_json::to_vec(&tokens)?,
@@ -236,6 +336,7 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
         )?;
         committed += count as u64;
         assert!(pass.output(&batch).is_err());
+        assert!(pass.taps(&batch).is_err());
         for &lease in &leases {
             assert_eq!(requests.cache().committed_end(lease)?, committed);
         }

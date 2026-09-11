@@ -158,6 +158,7 @@ fn worker(
         upload,
         gates,
         head,
+        crate::v41_target_pass::TargetTapWave::new(&lib, 80, crate::v41_target_pass::TargetTapWave::device_bytes(80)?)?,
         Duration::from_secs(120),
     )?;
     let tcp = V41Tp4Tcp::new(

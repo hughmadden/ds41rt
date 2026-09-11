@@ -104,12 +104,20 @@ impl DsparkMainContext<'_, '_> {
         stream: *mut c_void,
     ) -> Result<()> {
         self.ready = None;
-        ensure!(input.previous_binding().layer() + 1 == input.layer
-            && input.residual.bytes == input.tokens.len() * 40960
-            && input.residual.device_id == self.input().device_id,
-            "prepared dSpark tap binding or extent differs");
-        unsafe { self.enqueue_tap(input.residual, input.layer as u32,
-            u32::try_from(input.tokens.len())?, stream) }
+        ensure!(
+            input.previous_binding().layer() + 1 == input.layer
+                && input.residual.bytes == input.tokens.len() * 40960
+                && input.residual.device_id == self.input().device_id,
+            "prepared dSpark tap binding or extent differs"
+        );
+        unsafe {
+            self.enqueue_tap(
+                input.residual,
+                input.layer as u32,
+                u32::try_from(input.tokens.len())?,
+                stream,
+            )
+        }
     }
     /// Enqueue a decoder attention-input tap directly into the stable main input.
     /// No intermediate allocation or copy; can be part of the backbone graph.
@@ -185,6 +193,36 @@ impl DsparkMainContext<'_, '_> {
         }
         Ok(())
     }
+    /// Produce shared main context and all three stage KV planes from completed
+    /// target taps, using the same flattened absolute positions for every stage.
+    /// # Safety
+    /// Input is finite BF16 [rows,15360], on this device, fully produced and
+    /// disjoint from this owner's storage. All owners have exclusive GPU use.
+    pub unsafe fn execute_input(
+        &mut self,
+        input: Ds41rtDeviceBuffer,
+        positions: &[u64],
+    ) -> Result<()> {
+        self.ready = None;
+        let rows = u32::try_from(positions.len())?;
+        self.prepare(rows)?;
+        ensure!(
+            input.bytes == positions.len() * 30720
+                && input.device_id == self.input().device_id
+                && input.ptr != self.input().ptr,
+            "target main-context input extent or device differs"
+        );
+        self.synchronize()?;
+        self.stream
+            .library
+            .copy_d2d(self.input(), input, input.bytes)?;
+        let bytes = positions
+            .iter()
+            .flat_map(|p| p.to_le_bytes())
+            .collect::<Vec<_>>();
+        self.stream.library.copy_h2d(self.positions(), &bytes)?;
+        unsafe { self.execute(rows) }
+    }
     /// # Safety
     /// Hidden inputs must be finite and positions initialized on this device;
     /// serialize writes and all borrowed outputs through completion/replay.
@@ -245,6 +283,14 @@ impl DsparkMainContext<'_, '_> {
         let rows = self.ready.context("main context is incomplete")?;
         let mut output = self.normalized.buffer;
         output.bytes = rows as usize * 10240;
+        Ok(output)
+    }
+    #[cfg(test)]
+    pub(crate) fn kv_output(&self, stage: usize) -> Result<Ds41rtDeviceBuffer> {
+        let rows = self.ready.context("main context is incomplete")?;
+        ensure!(stage < 3, "invalid dSpark KV stage");
+        let mut output = self.rotated[stage].buffer;
+        output.bytes = rows as usize * 1024;
         Ok(output)
     }
     /// Commit the same produced rows to each independently leased stage ring.
