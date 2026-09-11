@@ -1,17 +1,18 @@
 //! Native V4.1 expert residency; one GPU worker owns each layer and its buffers.
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
-mod execution;
-pub(crate) mod dspark;
-pub(crate) mod service;
 pub(crate) mod coordinator;
+pub(crate) mod dspark;
+mod execution;
+pub(crate) mod service;
 pub(crate) use execution::{ExpertExecution, ExpertExecutionBudget, HostExpertExchange};
 
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{
-    NativeLibrary, V41ExpertKernel, V41_EXPERT_POINTER_COUNT,
-};
+use ds41rt_ffi::{NativeLibrary, V41ExpertKernel, V41_EXPERT_POINTER_COUNT};
 use ds41rt_loader::{OfficialV41Catalog, V41ExpertSelection};
 use std::ffi::c_void;
+
+// Bound disk concurrency and pinned staging independently of model layer count.
+const EXPERT_READ_LANES: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ExpertLayer {
@@ -89,10 +90,13 @@ impl<'a> ExpertWeights<'a> {
         let budget = ExpertLoadBudget {
             resident_bytes,
             device_staging_bytes: first.staging_bytes(),
-            pinned_host_bytes: first.staging_bytes(),
+            pinned_host_bytes: first
+                .staging_bytes()
+                .checked_mul(EXPERT_READ_LANES)
+                .context("expert pinned staging overflow")?,
             read_scratch_bytes: first
                 .minimum_read_scratch_bytes()
-                .checked_mul(64)
+                .checked_mul(64 * EXPERT_READ_LANES)
                 .context("expert read scratch overflow")?,
         };
         Ok((budget, sizes, info.logical_intermediate, experts))
@@ -123,49 +127,72 @@ impl<'a> ExpertWeights<'a> {
         let buffers: [DeviceAllocation<'a>; 4] =
             owned.try_into().ok().expect("four packed buffers");
         let device_staging = DeviceAllocation::new(library, budget.device_staging_bytes)?;
-        let mut host = HostAllocation::new(library, budget.pinned_host_bytes)?;
-        let mut read_scratch = vec![0; budget.read_scratch_bytes];
+        let mut hosts = (0..EXPERT_READ_LANES)
+            .map(|_| HostAllocation::new(library, budget.pinned_host_bytes / EXPERT_READ_LANES))
+            .collect::<Result<Vec<_>>>()?;
+        let mut read_scratch = (0..EXPERT_READ_LANES)
+            .map(|_| vec![0; budget.read_scratch_bytes / EXPERT_READ_LANES])
+            .collect::<Vec<_>>();
         let stream = LoadStream {
             library,
             raw: library.cuda_stream_create()?,
         };
-        // Keep at most four future experts advised while current staging and
-        // GPU packing run; no unrelated layers or host-mapped engram data.
-        const PREFETCH_EXPERTS: usize = 4;
-        for expert in 0..PREFETCH_EXPERTS.min(experts) {
+        // Read one bounded group in parallel while advising only the next group.
+        // CPU readers borrow disjoint pinned byte slices; all CUDA calls remain
+        // on this owning thread, after the scoped readers have joined.
+        for expert in 0..EXPERT_READ_LANES.min(experts) {
             catalog.expert_staging(layer.expert(expert))?.prefetch()?;
         }
-        for expert in 0..experts {
-            if expert + PREFETCH_EXPERTS < experts {
-                catalog.expert_staging(layer.expert(expert + PREFETCH_EXPERTS))?.prefetch()?;
+        for first in (0..experts).step_by(EXPERT_READ_LANES) {
+            let end = (first + EXPERT_READ_LANES).min(experts);
+            for future in end..(end + EXPERT_READ_LANES).min(experts) {
+                catalog.expert_staging(layer.expert(future))?.prefetch()?;
             }
-            let plan = catalog.expert_staging(layer.expert(expert))?;
-            plan.read_into(host.bytes_mut(), &mut read_scratch)?;
-            unsafe {
-                library.copy_host_buffer_h2d_async(
-                    device_staging.buffer,
-                    host.buffer,
-                    plan.staging_bytes(),
-                    stream.raw,
-                )?;
-                let sources = std::array::from_fn(|i| {
-                    device_staging
-                        .buffer
-                        .ptr
-                        .cast::<u8>()
-                        .add(plan.tensor_ranges()[i].start)
-                        .cast_const()
-                });
-                let destinations = std::array::from_fn(|i| {
-                    buffers[i]
-                        .buffer
-                        .ptr
-                        .cast::<u8>()
-                        .add(expert * (sizes[i] / experts))
-                });
-                packer.pack(sources, destinations, stream.raw)?;
-                // Reuse pinned and device staging only after this expert finishes.
-                library.cuda_stream_synchronize(stream.raw)?;
+            let plans = (first..end)
+                .map(|expert| catalog.expert_staging(layer.expert(expert)))
+                .collect::<Result<Vec<_>>>()?;
+            std::thread::scope(|scope| -> Result<()> {
+                let mut readers = Vec::with_capacity(plans.len());
+                for ((plan, host), scratch) in plans.iter().zip(&mut hosts).zip(&mut read_scratch) {
+                    let bytes = host.bytes_mut();
+                    readers.push(scope.spawn(move || plan.read_into(bytes, scratch)));
+                }
+                for reader in readers {
+                    reader
+                        .join()
+                        .map_err(|_| anyhow::anyhow!("expert read thread panicked"))??;
+                }
+                Ok(())
+            })?;
+            for (offset, (plan, host)) in plans.iter().zip(&hosts).enumerate() {
+                let expert = first + offset;
+                unsafe {
+                    library.copy_host_buffer_h2d_async(
+                        device_staging.buffer,
+                        host.buffer,
+                        plan.staging_bytes(),
+                        stream.raw,
+                    )?;
+                    let sources = std::array::from_fn(|i| {
+                        device_staging
+                            .buffer
+                            .ptr
+                            .cast::<u8>()
+                            .add(plan.tensor_ranges()[i].start)
+                            .cast_const()
+                    });
+                    let destinations = std::array::from_fn(|i| {
+                        buffers[i]
+                            .buffer
+                            .ptr
+                            .cast::<u8>()
+                            .add(expert * (sizes[i] / experts))
+                    });
+                    packer.pack(sources, destinations, stream.raw)?;
+                    // Reuse device staging only after this expert finishes. Pinned
+                    // staging remains borrowed by this group until all packing drains.
+                    library.cuda_stream_synchronize(stream.raw)?;
+                }
             }
         }
         Ok(Self {
