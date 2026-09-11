@@ -34,23 +34,24 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             unsafe { guard.requests.begin_text(batch, &mut pass.embedding, &mut pass.lane)?; }
         }
         for layer in 0..20 {
-            if layer != 0 {
-                for (pass, batch) in [(&mut *self, &mut **first), (&mut *other, &mut **second)] {
-                    pass.lane.advance()?;
-                    if let Some(gate) = [1, 14].iter().position(|&l| l == layer) {
-                        let start = Instant::now();
-                        while !unsafe { guard.requests.poll_engram(batch, &mut pass.upload,
-                            &mut pass.gates[gate], &mut pass.lane)? } {
-                            ensure!(start.elapsed() < pass.engram_timeout, "paired engram gather timed out");
-                            tokio::time::sleep(Duration::from_millis(1)).await;
-                        }
-                    }
-                    unsafe { pass.lane.begin_prepared()?; }
-                }
+            unsafe { self.prepare_encoder_query(guard.requests, first, layer).await?; }
+            let prepared = unsafe { guard.requests.prepare_encoder_layer(first,
+                &mut self.execution, &mut self.lane, &mut self.index)? };
+            let (done0, done1) = tokio::try_join!(
+                // Dispatch the leading chunk before preparing the following query.
+                biased;
+                unsafe { prepared.execute(transport0, 0, first.image_mask()) },
+                async {
+                    unsafe { other.prepare_encoder_query(guard.requests, second, layer).await?; }
+                    let prepared = unsafe { guard.requests.prepare_encoder_layer(second,
+                        &mut other.execution, &mut other.lane, &mut other.index)? };
+                    unsafe { prepared.execute(transport1, 0, second.image_mask()).await }
+                },
+            )?;
+            unsafe {
+                self.execution.complete_layer(first.cache()?, &mut self.lane, done0)?;
+                other.execution.complete_layer(second.cache()?, &mut other.lane, done1)?;
             }
-            unsafe { guard.requests.execute_encoder_pair_layer([first, second],
-                [&mut self.execution, &mut other.execution], [&mut self.lane, &mut other.lane],
-                [&mut self.index, &mut other.index], [transport0, transport1]).await?; }
         }
         for (pass, batch) in [(&mut *self, &mut **first), (&mut *other, &mut **second)] {
             suffix.capture(&pass.lane.output()?)?;
@@ -64,4 +65,22 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         guard.complete = true;
         Ok(())
     }
+
+    /// Prepare a chunk's next query only when its execution lane is available.
+    async unsafe fn prepare_encoder_query(&mut self, requests: &Requests<'a>,
+        batch: &mut RequestBatch, layer: usize) -> Result<()> {
+        if layer == 0 { return Ok(()); }
+        self.lane.advance()?;
+        if let Some(gate) = [1, 14].iter().position(|&l| l == layer) {
+            let start = Instant::now();
+            while !unsafe { requests.poll_engram(batch, &mut self.upload,
+                &mut self.gates[gate], &mut self.lane)? } {
+                ensure!(start.elapsed() < self.engram_timeout, "paired engram gather timed out");
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        }
+        unsafe { self.lane.begin_prepared()?; }
+        Ok(())
+    }
+
 }

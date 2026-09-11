@@ -40,7 +40,27 @@ The paired component test previously established byte-identical final encoder
 residual/pre-state for a small two-chunk fixture. These long counting prompts and
 short quality cases are limited end-to-end evidence, not broad model equivalence.
 
-Next: run an isolated profile with the serial APIs stopped temporarily, compare
-expert waits/dispatch and attention overlap, record dSpark acceptance on the same
-code prompt, and address the decode regression before selecting a new deployment.
 Full results and artifact identity are in [the evidence JSON](ds41-paired-serving.json).
+
+## Follow-up isolation and acceptance
+
+Stopping both serial APIs did not remove the paired candidate's code decode
+regression. Separate instrumented spec-only runs show the warm serial request
+uses ten verification steps (49 accepted drafts / 50 proposals), while the warm
+paired request uses eleven (48 / 55). Their summed verification intervals are
+517,539 and 570,252 us respectively. The first round accepts five draft tokens
+for warm serial but only one for paired. Cold serial also accepts just one and
+uses eleven rounds. These observations explain much of the measured throughput
+difference, but do not establish its cause or determinism across repetitions.
+
+Warm host-timed prefill totals are 5.406 s serial versus 4.980 s paired. The paired
+trace includes more time attributed to attention and collection, with a barrier
+at each layer pair. These are overlapping host intervals, not additive GPU kernel
+costs; in particular `finish_us` includes waiting for the other chunk. A GPU/NIC
+timeline is still needed to quantify overlap and contention. Raw traces and the
+per-step summaries are under `/tmp/ds41-paired-serving/comparison`.
+
+The next scheduling experiment moves the following chunk's query preparation
+inside the leading chunk's pending expert execution and uses deterministic
+first-branch polling. See [query overlap](ds41-paired-query.md) for its measurements.
+Serial CED remains the selected deployment.

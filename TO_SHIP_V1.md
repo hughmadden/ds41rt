@@ -161,9 +161,24 @@ Completion means a working, qualified release with measured performance, not com
 - [ ] Remove tracked temporary scaffolding once replacement coverage exists and retain useful small component fixtures during development.
 - [ ] Finalize release commands, images, dependency pins, correctness/performance evidence and pushed commits after every required gate passes.
 
+## Remaining prefill priorities
+
+- [ ] Finish and measure encoder scheduling overlap, including per-layer barriers,
+  worker queue ordering/batching, and output transfer overlap. Preserve ordered
+  KV publication, Engram history, decoder replay and dSpark seeding.
+- [ ] Qualify the attention register-rescale prototype in serving; measure whether
+  adjacent-query KV reuse beats the existing cache behavior before adding complexity.
+- [ ] Revisit expert M grouping and ordering on the resulting real batch histogram;
+  retain M16 unless larger groups win measured end-to-end prefill.
+- [ ] After this prefill work, broaden decode to code, math, structured output,
+  reasoning and natural-language categories, recording acceptance and time per
+  verification round at C1 and higher concurrency. The user supplied strong
+  four-Spark-only category results; counting after code/filler is not a comparable
+  multi-category benchmark, and the supplied prompts/settings are not yet known.
+
 ## Current evidence and integration gaps
 
-- [Paired prefill serving candidate](docs/ds41-paired-serving.md) is implemented and API-tested: warm 16k prefill reaches 3.31–3.32k code / 3.64–3.73k repeated tok/s. Candidate is stopped and not promoted because decode regressed; isolated overlap/acceptance profiling is next. Serial CED remains selected.
+- [Paired prefill serving candidate](docs/ds41-paired-serving.md) is implemented and API-tested: warm 16k prefill reaches 3.31–3.32k code / 3.64–3.73k repeated tok/s. Candidate is stopped and not promoted because decode regressed. Isolated profiling attributes much of the code difference to one extra dSpark verification round; its cause remains open. [Query preparation overlap](docs/ds41-paired-query.md) adds a measured 2–4% on code and under 2% on repeated text in an isolated comparison; larger scheduling and attention work remains. Serial CED remains selected.
 
 Component records establish their stated scopes, not full-model readiness or the performance targets above. Historical records remain under `docs/ds41-*`; use the checklist for current completion status.
 

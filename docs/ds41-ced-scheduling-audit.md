@@ -333,3 +333,21 @@ at every in-flight transport stage. Native serving must instantiate the addition
 owners and route prefill through the pair loop, retain/capture the encoder suffix,
 and qualify large prompts plus target/dSpark decode before rollout. Wider
 wavefront scheduling and C16 API admission remain separate work.
+
+## Serving follow-up: overlap the following query
+
+Serving now constructs both passes and RoCE waves and runs reserved encoder pairs
+through the final suffix/source-20 handoff. The next change moves the following
+chunk's lane advance, Engram gate and query preparation into the interval after
+the leading expert dispatch, and polls the leading FFN first deterministically.
+The pair still waits at each layer boundary. The distributed sixteen-request
+fixture remains byte-identical to sequential at both chunk outputs (6.39 s), and
+both API lifecycle checks plus the prior eight per-mode quality outputs survive.
+
+The isolated 16k comparison observes roughly 2–4% additional code prefill and
+under 2% repeated-text prefill throughput. The earlier code decode slowdown is
+not stable across runs, with first-round dSpark acceptance an observed contributor.
+Serial CED remains selected. See [query overlap evidence](ds41-paired-query.md);
+worker queue/transfer overlap, wider scheduling, and attention integration remain
+open. The user's category-based decode comparison is queued after this prefill
+work, without treating counting output as a comparable category benchmark.

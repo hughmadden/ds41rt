@@ -102,6 +102,7 @@ impl Requests<'_> {
         guard.requests.validate(second)?;
         let prepared = unsafe { guard.requests.prepare_encoder_layer(first, exec0, lane0, index0)? };
         let (done0, done1) = tokio::try_join!(
+            biased;
             unsafe { prepared.execute(transport0, 0, first.image_mask()) },
             async {
                 let prepared = unsafe { guard.requests.prepare_encoder_layer(second, exec1, lane1, index1)? };
