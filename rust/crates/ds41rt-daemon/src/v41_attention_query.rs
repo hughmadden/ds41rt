@@ -348,6 +348,20 @@ impl AttentionQueryWave<'_, '_> {
     /// Hidden rows are finite attention inputs in the supplied token order, with
     /// producer writes drained. No external writes race this wave.
     pub unsafe fn execute_tokens(&mut self, tokens: &[u64]) -> Result<AttentionQueryOutput<'_>> {
+        unsafe { self.execute_tokens_prepared(tokens, |_, _| Ok(())) }
+    }
+    /// Enqueue an input producer before the query graph on its owned stream.
+    ///
+    /// # Safety
+    /// The producer must initialize finite hidden rows in token order, retain
+    /// its allocations through this call, and use only the supplied stream.
+    /// Success and producer/query errors both drain before releasing its borrow.
+    /// Preparation is outside capture; cached graphs contain query operations only.
+    pub(crate) unsafe fn execute_tokens_prepared(
+        &mut self,
+        tokens: &[u64],
+        prepare: impl FnOnce(*mut std::ffi::c_void, Ds41rtDeviceBuffer) -> Result<()>,
+    ) -> Result<AttentionQueryOutput<'_>> {
         self.ready = None;
         self.binding = None;
         self.tokens.clear();
@@ -365,19 +379,30 @@ impl AttentionQueryWave<'_, '_> {
                 .flat_map(|p| p.to_ne_bytes())
                 .collect::<Vec<_>>(),
         )?;
-        let rows = tokens.len() as u32;
-        if self
-            .graphs
-            .get(self.weights.layer, self.weights)
-            .is_none_or(|(_, n)| n != rows)
-        {
-            self.clear_graph()?;
-            unsafe {
-                self.capture(rows)?;
+        let prepared_and_executed = (|| -> Result<()> {
+            prepare(self.stream.raw, self.input())?;
+            let rows = tokens.len() as u32;
+            if self
+                .graphs
+                .get(self.weights.layer, self.weights)
+                .is_none_or(|(_, n)| n != rows)
+            {
+                self.clear_graph()?;
+                unsafe { self.capture(rows)?; }
             }
-        }
-        unsafe {
-            self.replay(rows)?;
+            unsafe { self.replay(rows)?; }
+            Ok(())
+        })();
+        if let Err(error) = prepared_and_executed {
+            // Even a partially submitted producer must finish before its owner
+            // can be reset or reused. Successful replay already drained.
+            let drained = self.synchronize();
+            self.ready = None;
+            self.binding = None;
+            if let Err(drain_error) = drained {
+                tracing::error!(%drain_error, "draining failed query preparation");
+            }
+            return Err(error);
         }
         self.tokens.extend_from_slice(tokens);
         self.binding = Some(binding);

@@ -20,7 +20,7 @@ def summarize(paths):
             elif "protocol_v2_expert_server_roundtrip_timing request_id=" in line:
                 kind = "server_boundary"
             else:
-                stage = re.search(r"\btarget (attention stages|collection|experts|layer|step) ", line)
+                stage = re.search(r"\btarget (attention stages|query preparation|layer preparation|collection|experts|layer|step) ", line)
                 if not stage:
                     continue
                 kind = "coordinator_" + stage[1].replace(" ", "_")

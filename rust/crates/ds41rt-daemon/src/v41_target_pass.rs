@@ -135,7 +135,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         }
         for layer in 0..40 {
             if layer != 0 {
+                let prepare_timing = Instant::now();
                 self.lane.advance()?;
+                let advance_us = prepare_timing.elapsed().as_micros() as u64;
                 if let Some(gate) = [1, 14].iter().position(|&l| l == layer) {
                     let start = Instant::now();
                     while !unsafe {
@@ -153,15 +155,18 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                         tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                 }
+                let engram_us = prepare_timing.elapsed().as_micros() as u64 - advance_us;
                 if layer >= 37 {
                     unsafe {
                         self.taps
                             .capture(guard.batch.cache()?, &self.lane.prepared_input()?)?;
                     }
                 }
+                let tapped_us = prepare_timing.elapsed().as_micros() as u64;
                 unsafe {
                     self.lane.begin_prepared()?;
                 }
+                tracing::debug!(target: "ds41rt::timing", layer, rows, advance_us, engram_us, taps_us=tapped_us-advance_us-engram_us, begin_us=prepare_timing.elapsed().as_micros() as u64-tapped_us, "target layer preparation");
             }
             unsafe {
                 self.execution

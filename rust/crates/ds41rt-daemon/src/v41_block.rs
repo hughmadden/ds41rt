@@ -273,15 +273,13 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
             query.input().device_id == self.inputs()[0].device_id,
             "block query device differs"
         );
-        let normalized = unsafe { self.attention.begin(tokens.len()) }?;
-        if let Err(e) = self
-            .library
-            .copy_d2d(query.input(), normalized, normalized.bytes)
-        {
-            self.reset();
-            return Err(e);
-        }
-        let out = match unsafe { query.execute_tokens(tokens) } {
+        let timing = std::time::Instant::now();
+        let out = match unsafe {
+            query.execute_tokens_prepared(tokens, |stream, input| {
+                self.attention.enqueue_begin(tokens.len(), Some(input), stream)?;
+                Ok(())
+            })
+        } {
             Ok(o) => o,
             Err(e) => {
                 self.reset();
@@ -289,6 +287,7 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
             }
         };
         self.tokens.extend_from_slice(tokens);
+        tracing::debug!(target: "ds41rt::timing", layer=self.layer, rows=tokens.len(), total_us=timing.elapsed().as_micros() as u64, "target query preparation");
         self.phase = Phase::Attention(out.binding()?, tokens.len());
         Ok(out)
     }

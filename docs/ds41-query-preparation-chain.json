@@ -1,0 +1,37 @@
+{
+  "scope": "Query-stream preparation change; small smoke timing comparison, not release throughput.",
+  "artifacts": {
+    "/tmp/ds41-query-chain/daemon": {
+      "sha256": "6bd4e322ee4e5f1cb20aca30a8ac8586bf677ab896e60b789f581834fa48b98e",
+      "bytes": 26779736
+    },
+    "/tmp/ds41-query-chain/create-commands.json": {
+      "sha256": "84401870a5dc64802aa81a135a4aab26765a20141ee67679ec5d1bb4aad20769",
+      "bytes": 2211
+    },
+    "/tmp/ds41-query-chain/target-api.json": {
+      "sha256": "f743442a55b4d79694ad662a7118ec9813d18f41c9db702be8dd897c90a470dd",
+      "bytes": 119273
+    },
+    "/tmp/ds41-query-chain/spec-api.json": {
+      "sha256": "1554b27bbc72e2e3ba67cc2737dd86a48a36fc5665013254bc8fbdff8c75237b",
+      "bytes": 120601
+    },
+    "/tmp/ds41-query-chain/quality.json": {
+      "sha256": "256c55b0dcd10f7ab17afc96d52b2108f16cda3043095d9cd342758a850f2313",
+      "bytes": 199766
+    },
+    "/tmp/ds41-query-chain/timings.json": {
+      "sha256": "9b39fd31bf5e6b2521959f05345362f380a0c2898104d6a1b2c2837b684173a6",
+      "bytes": 106048
+    },
+    "/tmp/ds41-query-chain-fixture/committed-test.log": {
+      "sha256": "5ea9a93fde78d33bb06fb2a6af746bdecd94919e33ceac833f0c8422dde0d0d7",
+      "bytes": 260
+    },
+    "/tmp/ds41-query-trace/timings.json": {
+      "sha256": "67a4e2a2277f5808f95d7b83f223bd653610f7e1d8dc7451f6ecc1f5259cd044",
+      "bytes": 40976
+    }
+  }
+}
