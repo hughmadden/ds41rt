@@ -145,6 +145,14 @@ pub(crate) struct BackboneCache<'a> {
     poisoned: bool,
 }
 impl<'a> BackboneCache<'a> {
+    pub fn pages_for_context(slots: usize, context: usize) -> Result<[usize; 4]> {
+        let mut pages = [0; 4];
+        for (i, layer) in SOURCES.into_iter().enumerate() {
+            pages[i] = CompressorState::pages_for_context(layer, slots, context)?;
+        }
+        Ok(pages)
+    }
+
     pub fn device_bytes(slots: usize, source_pages: [usize; 4]) -> Result<usize> {
         let mut total = 40 * WindowState::device_bytes(0, slots)?;
         for (layer, pages) in SOURCES.into_iter().zip(source_pages) {
@@ -671,3 +679,18 @@ mod tests {
 #[cfg(test)]
 #[path = "v41_backbone_cache/commit_tests.rs"]
 mod commit_tests;
+
+#[cfg(test)]
+mod context_geometry_tests {
+    use super::BackboneCache;
+    #[test]
+    fn context_pool_provisions_each_slot_and_compression_ratio() {
+        assert_eq!(BackboneCache::pages_for_context(16, 32768).unwrap(), [1024, 1024, 1024, 2048]);
+        assert_eq!(BackboneCache::pages_for_context(3, 513).unwrap(), [6, 6, 6, 9]);
+        assert_eq!(BackboneCache::pages_for_context(16, 1048576).unwrap(), [32768, 32768, 32768, 65536]);
+        assert!(BackboneCache::pages_for_context(0, 32768).is_err());
+        assert!(BackboneCache::pages_for_context(17, 32768).is_err());
+        assert!(BackboneCache::pages_for_context(1, 0).is_err());
+        assert!(BackboneCache::pages_for_context(1, 1048577).is_err());
+    }
+}

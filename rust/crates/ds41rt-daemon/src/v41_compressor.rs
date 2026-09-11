@@ -55,6 +55,15 @@ pub(crate) struct CompressorState<'a> {
     owner: u64,
 }
 impl<'a> CompressorState<'a> {
+    /// Fully provision every admitted slot, rounding each slot to physical pages.
+    pub fn pages_for_context(layer: usize, slots: usize, context: usize) -> Result<usize> {
+        ensure!((1..=16).contains(&slots), "invalid compressor slot count");
+        ensure!((1..=1048576).contains(&context), "invalid compressor context");
+        let pages = context.div_ceil(ratio(layer)?).div_ceil(source_cache::PAGE_ROWS) * slots;
+        SourceCache::device_bytes(pages, slots)?;
+        Ok(pages)
+    }
+
     pub fn device_bytes(layer: usize, slots: usize, index_pages: usize) -> Result<usize> {
         ensure!((1..=16).contains(&slots), "invalid compressor slot count");
         Ok(SourceCache::device_bytes(index_pages, slots)?

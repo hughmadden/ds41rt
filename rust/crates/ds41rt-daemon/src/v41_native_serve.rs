@@ -127,12 +127,13 @@ fn worker(
     let map = ds41rt_loader::EngramTokenMap::from_file(&&args.snapshot.join("tokenizer.json"))?;
     let pipeline =
         unsafe { ds41rt_loader::EngramPipeline::new(&catalog, map, 80, 2, 8 * 1024 * 1024)? };
+    let source_pages = BackboneCache::pages_for_context(16, args.max_context_tokens as usize)?;
     let mut requests = Requests::new(
         &lib,
         pipeline,
         16,
-        [16; 4],
-        BackboneCache::device_bytes(16, [16; 4])?,
+        source_pages,
+        BackboneCache::device_bytes(16, source_pages)?,
     )?;
     let engram_weights = [0, 1]
         .map(|i| EngramLayerWeights::load(&lib, &catalog, i, 256 * 1024 * 1024, 16 * 1024 * 1024))
@@ -214,8 +215,7 @@ fn worker(
             continue;
         }
         id = id.checked_add(1).context("request ID exhausted")?;
-        // Spark's TCP fallback closes idle connections after five seconds.
-        // Keep sockets across model steps, but start each admission fresh.
+        // Reuse RoCE QPs across model steps; start each admission fresh.
         transport.reset_connections();
         let lease = requests.admit(0, id)?;
         if let Some(draft) = &mut draft {
@@ -224,6 +224,7 @@ fn worker(
         let result = generate(
             &lib,
             &args.snapshot,
+            args.max_context_tokens as usize,
             &runtime,
             &mut pass,
             &mut requests,
@@ -250,6 +251,7 @@ fn worker(
 fn generate<'a>(
     lib: &'a NativeLibrary,
     snapshot: &std::path::Path,
+    max_context_tokens: usize,
     runtime: &tokio::runtime::Runtime,
     pass: &mut TargetPass<'_, 'a>,
     requests: &mut Requests<'a>,
@@ -260,8 +262,8 @@ fn generate<'a>(
 ) -> Result<()> {
     let prompt = ds41rt_loader::encode_tokenizer_text(snapshot, &job.prompt, false)?.token_ids;
     ensure!(
-        !prompt.is_empty() && prompt.len() + job.max_tokens <= 4096,
-        "native text request exceeds current 4096-token context limit"
+        !prompt.is_empty() && prompt.len().checked_add(job.max_tokens).is_some_and(|total| total <= max_context_tokens),
+        "native text request exceeds {max_context_tokens}-token context limit"
     );
     let mut decoder = ds41rt_loader::streaming_token_decoder(snapshot, false)?;
     job.events.blocking_send(Ok(InferenceChunk::Ready {

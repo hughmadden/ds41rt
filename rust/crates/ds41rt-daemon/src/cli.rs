@@ -428,6 +428,10 @@ mod tests {
 
 #[derive(Debug, Args)]
 pub(crate) struct NativeServeArgs {
+    /// Total prompt plus generated tokens; compressed cache is reserved at startup.
+    #[arg(long, default_value_t = 32768, value_parser = clap::value_parser!(u32).range(1..=1048576))]
+    pub max_context_tokens: u32,
+
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
 
