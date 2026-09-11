@@ -1,0 +1,888 @@
+{
+  "rtx": {
+    "log": "{\"case\": \"one\", \"width\": 128, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0}\nNATIVE {\"case\": \"one\", \"rows\": 1, \"width\": 128, \"exact\": true, \"scratch_bytes\": 754720}\n{\"case\": \"shared2\", \"width\": 128, \"rows\": 2, \"experts\": 6, \"groups\": 6, \"routes\": 12, \"rel_l2\": 0.0, \"cosine\": 0.9999999403953552}\nNATIVE {\"case\": \"shared2\", \"rows\": 2, \"width\": 128, \"exact\": true, \"scratch_bytes\": 11959696}\n{\"case\": \"mixed6\", \"width\": 128, \"rows\": 6, \"experts\": 22, \"groups\": 22, \"routes\": 36, \"rel_l2\": 9.563451142113877e-10, \"cosine\": 1.0}\nNATIVE {\"case\": \"mixed6\", \"rows\": 6, \"width\": 128, \"exact\": true, \"scratch_bytes\": 11959696}\n{\"case\": \"shared16\", \"width\": 128, \"rows\": 16, \"experts\": 6, \"groups\": 6, \"routes\": 96, \"rel_l2\": 2.960262868167973e-10, \"cosine\": 1.0000001192092896}\nNATIVE {\"case\": \"shared16\", \"rows\": 16, \"width\": 128, \"exact\": true, \"scratch_bytes\": 11959696}\n{\"case\": \"shared80\", \"width\": 128, \"rows\": 80, \"experts\": 6, \"groups\": 30, \"routes\": 480, \"rel_l2\": 7.460523310243161e-10, \"cosine\": 1.0}\nNATIVE {\"case\": \"shared80\", \"rows\": 80, \"width\": 128, \"exact\": true, \"scratch_bytes\": 59767696}\n{\"case\": \"return_one\", \"width\": 128, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 1.4922661994987152e-09, \"cosine\": 1.0000001192092896}\nNATIVE {\"case\": \"return_one\", \"rows\": 1, \"width\": 128, \"exact\": true, \"scratch_bytes\": 754720}\n",
+    "manifest": {
+      "schema": 1,
+      "experimental": true,
+      "role": "spark",
+      "input_format": "fp8_k32",
+      "sparkinfer_revision": "c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "capability": [
+        12,
+        0
+      ],
+      "physical_sms": 188,
+      "width": 128,
+      "variants": [
+        {
+          "name": "v41_slices_m1_w128",
+          "capacity_rows": 1,
+          "core_scratch_nbytes": 754720,
+          "scratch": [
+            {
+              "slot": 3,
+              "offset": 0,
+              "nbytes": 4,
+              "shape": [
+                1
+              ]
+            },
+            {
+              "slot": 4,
+              "offset": 16,
+              "nbytes": 9216,
+              "shape": [
+                2304
+              ]
+            },
+            {
+              "slot": 5,
+              "offset": 9232,
+              "nbytes": 1536,
+              "shape": [
+                384
+              ]
+            },
+            {
+              "slot": 6,
+              "offset": 10768,
+              "nbytes": 3072,
+              "shape": [
+                384,
+                2
+              ]
+            },
+            {
+              "slot": 7,
+              "offset": 13840,
+              "nbytes": 456,
+              "shape": [
+                6,
+                19
+              ]
+            },
+            {
+              "slot": 8,
+              "offset": 14304,
+              "nbytes": 24,
+              "shape": [
+                6
+              ]
+            },
+            {
+              "slot": 9,
+              "offset": 14336,
+              "nbytes": 24,
+              "shape": [
+                6
+              ]
+            },
+            {
+              "slot": 10,
+              "offset": 14368,
+              "nbytes": 614400,
+              "shape": [
+                5,
+                6,
+                5120
+              ]
+            },
+            {
+              "slot": 41,
+              "offset": 628768,
+              "nbytes": 122880,
+              "shape": [
+                6,
+                5120
+              ]
+            }
+          ],
+          "scratch_pointer_offsets": [
+            null,
+            null,
+            null,
+            0,
+            16,
+            9232,
+            10768,
+            13840,
+            14304,
+            14336,
+            14368,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            751648,
+            null,
+            null,
+            753184,
+            628768,
+            0,
+            0
+          ],
+          "native_entry": "_mlir_ds41rt_v41_slices_m1_w128__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint321128013201_FakeTensorUint8116052801_FakeTensorUint323145728001_FakeTensorUint321"
+        },
+        {
+          "name": "v41_slices_m16_w128",
+          "capacity_rows": 16,
+          "core_scratch_nbytes": 11959696,
+          "scratch": [
+            {
+              "slot": 3,
+              "offset": 0,
+              "nbytes": 4,
+              "shape": [
+                1
+              ]
+            },
+            {
+              "slot": 4,
+              "offset": 16,
+              "nbytes": 147456,
+              "shape": [
+                36864
+              ]
+            },
+            {
+              "slot": 5,
+              "offset": 147472,
+              "nbytes": 1536,
+              "shape": [
+                384
+              ]
+            },
+            {
+              "slot": 6,
+              "offset": 149008,
+              "nbytes": 3072,
+              "shape": [
+                384,
+                2
+              ]
+            },
+            {
+              "slot": 7,
+              "offset": 152080,
+              "nbytes": 7296,
+              "shape": [
+                96,
+                19
+              ]
+            },
+            {
+              "slot": 8,
+              "offset": 159376,
+              "nbytes": 384,
+              "shape": [
+                96
+              ]
+            },
+            {
+              "slot": 9,
+              "offset": 159760,
+              "nbytes": 384,
+              "shape": [
+                96
+              ]
+            },
+            {
+              "slot": 10,
+              "offset": 160144,
+              "nbytes": 9830400,
+              "shape": [
+                5,
+                96,
+                5120
+              ]
+            },
+            {
+              "slot": 41,
+              "offset": 9990544,
+              "nbytes": 1966080,
+              "shape": [
+                96,
+                5120
+              ]
+            }
+          ],
+          "scratch_pointer_offsets": [
+            null,
+            null,
+            null,
+            0,
+            16,
+            147472,
+            149008,
+            152080,
+            159376,
+            159760,
+            160144,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            11956624,
+            null,
+            null,
+            11958160,
+            9990544,
+            0,
+            0
+          ],
+          "native_entry": "_mlir_ds41rt_v41_slices_m16_w128__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint3216128013201_FakeTensorUint81616052801_FakeTensorUint323145728001_FakeTensorUint3"
+        },
+        {
+          "name": "v41_slices_m80_w128",
+          "capacity_rows": 80,
+          "core_scratch_nbytes": 59767696,
+          "scratch": [
+            {
+              "slot": 3,
+              "offset": 0,
+              "nbytes": 4,
+              "shape": [
+                1
+              ]
+            },
+            {
+              "slot": 4,
+              "offset": 16,
+              "nbytes": 737280,
+              "shape": [
+                184320
+              ]
+            },
+            {
+              "slot": 5,
+              "offset": 737296,
+              "nbytes": 1536,
+              "shape": [
+                384
+              ]
+            },
+            {
+              "slot": 6,
+              "offset": 738832,
+              "nbytes": 3072,
+              "shape": [
+                384,
+                2
+              ]
+            },
+            {
+              "slot": 7,
+              "offset": 741904,
+              "nbytes": 36480,
+              "shape": [
+                480,
+                19
+              ]
+            },
+            {
+              "slot": 8,
+              "offset": 778384,
+              "nbytes": 1920,
+              "shape": [
+                480
+              ]
+            },
+            {
+              "slot": 9,
+              "offset": 780304,
+              "nbytes": 1920,
+              "shape": [
+                480
+              ]
+            },
+            {
+              "slot": 10,
+              "offset": 782224,
+              "nbytes": 49152000,
+              "shape": [
+                5,
+                480,
+                5120
+              ]
+            },
+            {
+              "slot": 41,
+              "offset": 49934224,
+              "nbytes": 9830400,
+              "shape": [
+                480,
+                5120
+              ]
+            }
+          ],
+          "scratch_pointer_offsets": [
+            null,
+            null,
+            null,
+            0,
+            16,
+            737296,
+            738832,
+            741904,
+            778384,
+            780304,
+            782224,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            59764624,
+            null,
+            null,
+            59766160,
+            49934224,
+            0,
+            0
+          ],
+          "native_entry": "_mlir_ds41rt_v41_slices_m80_w128__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint3280128013201_FakeTensorUint88016052801_FakeTensorUint323145728001_FakeTensorUint3"
+        }
+      ],
+      "input_quantizer": {
+        "format": "row E4M3 payload then UE8M0 K32 scales",
+        "row_bytes": 5280,
+        "max_rows": 4096,
+        "expected_m": 80,
+        "amax_floor": 0.0001,
+        "abi": {
+          "symbol": "_mlir_ds41rt_v41_expert_input_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+          "pointers": [
+            "source_ptr",
+            "values_ptr",
+            "scale_rows_ptr",
+            "scale_mma_ptr"
+          ],
+          "i32": [
+            "m",
+            "grid_x"
+          ],
+          "stream": "stream",
+          "argument_count": 8
+        },
+        "object_sha256": "034f9a0cadbdad302e76908b495e48fb4f04c2b055b1a0d549716d130582a1a9"
+      }
+    }
+  },
+  "spark": {
+    "log": "{\"case\": \"one\", \"width\": 128, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896}\nNATIVE {\"case\": \"one\", \"rows\": 1, \"width\": 128, \"exact\": true, \"scratch_bytes\": 754720}\n{\"case\": \"shared2\", \"width\": 128, \"rows\": 2, \"experts\": 6, \"groups\": 6, \"routes\": 12, \"rel_l2\": 0.0, \"cosine\": 1.0}\nNATIVE {\"case\": \"shared2\", \"rows\": 2, \"width\": 128, \"exact\": true, \"scratch_bytes\": 11959696}\n{\"case\": \"mixed6\", \"width\": 128, \"rows\": 6, \"experts\": 22, \"groups\": 22, \"routes\": 36, \"rel_l2\": 0.0, \"cosine\": 0.9999999403953552}\nNATIVE {\"case\": \"mixed6\", \"rows\": 6, \"width\": 128, \"exact\": true, \"scratch_bytes\": 11959696}\n{\"case\": \"shared16\", \"width\": 128, \"rows\": 16, \"experts\": 6, \"groups\": 6, \"routes\": 96, \"rel_l2\": 4.0640996123997297e-10, \"cosine\": 0.9999998807907104}\nNATIVE {\"case\": \"shared16\", \"rows\": 16, \"width\": 128, \"exact\": true, \"scratch_bytes\": 11959696}\n{\"case\": \"shared80\", \"width\": 128, \"rows\": 80, \"experts\": 6, \"groups\": 30, \"routes\": 480, \"rel_l2\": 2.150638778175562e-08, \"cosine\": 1.0}\nNATIVE {\"case\": \"shared80\", \"rows\": 80, \"width\": 128, \"exact\": true, \"scratch_bytes\": 59767696}\n{\"case\": \"return_one\", \"width\": 128, \"rows\": 1, \"experts\": 6, \"groups\": 6, \"routes\": 6, \"rel_l2\": 0.0, \"cosine\": 1.0000001192092896}\nNATIVE {\"case\": \"return_one\", \"rows\": 1, \"width\": 128, \"exact\": true, \"scratch_bytes\": 754720}\n",
+    "manifest": {
+      "schema": 1,
+      "experimental": true,
+      "role": "spark",
+      "input_format": "fp8_k32",
+      "sparkinfer_revision": "c1b2b8f6410808cd9c7d28a5b0de28dd4dd8c17e",
+      "capability": [
+        12,
+        1
+      ],
+      "physical_sms": 48,
+      "width": 128,
+      "variants": [
+        {
+          "name": "v41_slices_m1_w128",
+          "capacity_rows": 1,
+          "core_scratch_nbytes": 754720,
+          "scratch": [
+            {
+              "slot": 3,
+              "offset": 0,
+              "nbytes": 4,
+              "shape": [
+                1
+              ]
+            },
+            {
+              "slot": 4,
+              "offset": 16,
+              "nbytes": 9216,
+              "shape": [
+                2304
+              ]
+            },
+            {
+              "slot": 5,
+              "offset": 9232,
+              "nbytes": 1536,
+              "shape": [
+                384
+              ]
+            },
+            {
+              "slot": 6,
+              "offset": 10768,
+              "nbytes": 3072,
+              "shape": [
+                384,
+                2
+              ]
+            },
+            {
+              "slot": 7,
+              "offset": 13840,
+              "nbytes": 456,
+              "shape": [
+                6,
+                19
+              ]
+            },
+            {
+              "slot": 8,
+              "offset": 14304,
+              "nbytes": 24,
+              "shape": [
+                6
+              ]
+            },
+            {
+              "slot": 9,
+              "offset": 14336,
+              "nbytes": 24,
+              "shape": [
+                6
+              ]
+            },
+            {
+              "slot": 10,
+              "offset": 14368,
+              "nbytes": 614400,
+              "shape": [
+                5,
+                6,
+                5120
+              ]
+            },
+            {
+              "slot": 41,
+              "offset": 628768,
+              "nbytes": 122880,
+              "shape": [
+                6,
+                5120
+              ]
+            }
+          ],
+          "scratch_pointer_offsets": [
+            null,
+            null,
+            null,
+            0,
+            16,
+            9232,
+            10768,
+            13840,
+            14304,
+            14336,
+            14368,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            751648,
+            null,
+            null,
+            753184,
+            628768,
+            0,
+            0
+          ],
+          "native_entry": "_mlir_ds41rt_v41_slices_m1_w128__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint321128013201_FakeTensorUint8116052801_FakeTensorUint323145728001_FakeTensorUint321"
+        },
+        {
+          "name": "v41_slices_m16_w128",
+          "capacity_rows": 16,
+          "core_scratch_nbytes": 11959696,
+          "scratch": [
+            {
+              "slot": 3,
+              "offset": 0,
+              "nbytes": 4,
+              "shape": [
+                1
+              ]
+            },
+            {
+              "slot": 4,
+              "offset": 16,
+              "nbytes": 147456,
+              "shape": [
+                36864
+              ]
+            },
+            {
+              "slot": 5,
+              "offset": 147472,
+              "nbytes": 1536,
+              "shape": [
+                384
+              ]
+            },
+            {
+              "slot": 6,
+              "offset": 149008,
+              "nbytes": 3072,
+              "shape": [
+                384,
+                2
+              ]
+            },
+            {
+              "slot": 7,
+              "offset": 152080,
+              "nbytes": 7296,
+              "shape": [
+                96,
+                19
+              ]
+            },
+            {
+              "slot": 8,
+              "offset": 159376,
+              "nbytes": 384,
+              "shape": [
+                96
+              ]
+            },
+            {
+              "slot": 9,
+              "offset": 159760,
+              "nbytes": 384,
+              "shape": [
+                96
+              ]
+            },
+            {
+              "slot": 10,
+              "offset": 160144,
+              "nbytes": 9830400,
+              "shape": [
+                5,
+                96,
+                5120
+              ]
+            },
+            {
+              "slot": 41,
+              "offset": 9990544,
+              "nbytes": 1966080,
+              "shape": [
+                96,
+                5120
+              ]
+            }
+          ],
+          "scratch_pointer_offsets": [
+            null,
+            null,
+            null,
+            0,
+            16,
+            147472,
+            149008,
+            152080,
+            159376,
+            159760,
+            160144,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            11956624,
+            null,
+            null,
+            11958160,
+            9990544,
+            0,
+            0
+          ],
+          "native_entry": "_mlir_ds41rt_v41_slices_m16_w128__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint3216128013201_FakeTensorUint81616052801_FakeTensorUint323145728001_FakeTensorUint3"
+        },
+        {
+          "name": "v41_slices_m80_w128",
+          "capacity_rows": 80,
+          "core_scratch_nbytes": 59767696,
+          "scratch": [
+            {
+              "slot": 3,
+              "offset": 0,
+              "nbytes": 4,
+              "shape": [
+                1
+              ]
+            },
+            {
+              "slot": 4,
+              "offset": 16,
+              "nbytes": 737280,
+              "shape": [
+                184320
+              ]
+            },
+            {
+              "slot": 5,
+              "offset": 737296,
+              "nbytes": 1536,
+              "shape": [
+                384
+              ]
+            },
+            {
+              "slot": 6,
+              "offset": 738832,
+              "nbytes": 3072,
+              "shape": [
+                384,
+                2
+              ]
+            },
+            {
+              "slot": 7,
+              "offset": 741904,
+              "nbytes": 36480,
+              "shape": [
+                480,
+                19
+              ]
+            },
+            {
+              "slot": 8,
+              "offset": 778384,
+              "nbytes": 1920,
+              "shape": [
+                480
+              ]
+            },
+            {
+              "slot": 9,
+              "offset": 780304,
+              "nbytes": 1920,
+              "shape": [
+                480
+              ]
+            },
+            {
+              "slot": 10,
+              "offset": 782224,
+              "nbytes": 49152000,
+              "shape": [
+                5,
+                480,
+                5120
+              ]
+            },
+            {
+              "slot": 41,
+              "offset": 49934224,
+              "nbytes": 9830400,
+              "shape": [
+                480,
+                5120
+              ]
+            }
+          ],
+          "scratch_pointer_offsets": [
+            null,
+            null,
+            null,
+            0,
+            16,
+            737296,
+            738832,
+            741904,
+            778384,
+            780304,
+            782224,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            59764624,
+            null,
+            null,
+            59766160,
+            49934224,
+            0,
+            0
+          ],
+          "native_entry": "_mlir_ds41rt_v41_slices_m80_w128__mlir_ciface_cutlass___call___b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__FakeTensorUint3280128013201_FakeTensorUint88016052801_FakeTensorUint323145728001_FakeTensorUint3"
+        }
+      ],
+      "input_quantizer": {
+        "format": "row E4M3 payload then UE8M0 K32 scales",
+        "row_bytes": 5280,
+        "max_rows": 4096,
+        "expected_m": 80,
+        "amax_floor": 0.0001,
+        "abi": {
+          "symbol": "_mlir_ds41rt_v41_expert_input_quant__mlir_ciface_cutlass___call___b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__Ptrgmem_Ptrgmem_Ptrgmem_Ptrgmem_1_1_CUstream0x0",
+          "pointers": [
+            "source_ptr",
+            "values_ptr",
+            "scale_rows_ptr",
+            "scale_mma_ptr"
+          ],
+          "i32": [
+            "m",
+            "grid_x"
+          ],
+          "stream": "stream",
+          "argument_count": 8
+        },
+        "object_sha256": "6d7538346dc7f4291aceee1a12c27bb67ee5cc6aa4d5c3767d4c7d6a0bc96f36"
+      },
+      "artifact_sha256": {
+        "v41_slices_m1_w128.o": "57d43b91d1e8fded2ea73f337c23c611c35bf81eea48d9f44e7dc9cbbdcdbb46",
+        "v41_input_quant_dispatch.h": "a990aed3642a5dcd81499e6a8f840ae98b61545527faa2ea4e817ebca2a6d708",
+        "v41_slices_m1_w128.h": "69fa6a2e8940a4e99878b778917e0dd2c549c9c043839b446bc69e26e906a2c7",
+        "v41_expert_input_quant.h": "b49f6ddb662146a29827b02d0437a5dc18ed6eca1e1e4e63135ebc6e55d7a50f",
+        "v41_expert_input_quant.o": "6d7538346dc7f4291aceee1a12c27bb67ee5cc6aa4d5c3767d4c7d6a0bc96f36",
+        "v41_slices_m16_w128.h": "a0dfe1285e2cd3fbfb57bc9256ff91c74ee17eaad10b351a0965f0d9c693dc84",
+        "v41_slices_m80_w128.o": "2595a977ee4e5eaf1a42f922664f44bb57ba70716b2c0669ca749f4a6ec17b73",
+        "v41_expert_variants.h": "f30b9068b3be67fc31c4ae7783cbb04b97541361578a559a34b9eb25d68cb08a",
+        "v41_slices_m80_w128.h": "9e43fefba1f8f86f85e9cdcefe41cce41b38ec57a9a7f5281310019e1bd1003c",
+        "v41_slices_m16_w128.o": "d0998fe7717034b34e4546bfa7ffead51766733724bd5b50db01afb3ab6f9c3b"
+      }
+    }
+  },
+  "source_sha256": {
+    "python/tools/export_b12x_v41_slices_aot.py": "7b5cfe2844f96c2627f708f909cefd26fa894202f1522b473663e4cfa77d7f5f",
+    "python/tools/qualify_v41_slice_native.py": "2f302f9bb26bb9de8eb2c73c76a4cc8b6f20670ca2b8c8757f2e4f3377d11987",
+    "native/src/v41_experts.cc": "4e0adfa578658e969a5f52bf38c477df5c8545eca6ca14396f20fa164701c2ad"
+  },
+  "rtx_library_sha256": "8b427cd0698c051253d5893979512381b813f5be212f45cd69e1c043c49aec78"
+}
