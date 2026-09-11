@@ -3,6 +3,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+// Optional coordinator AOT entry point: prewarm on the serving CUDA device
+// before graph capture. Direct scoring callers must prewarm their first launch.
+int32_t ds41rt_v41_index_scores_initialize(void);
+
 // Q: E2M1 [queries,32,64] / E8M0 [queries,32,4]; weights BF16 [queries,32].
 // Keys: E2M1 [capacity,64] / E8M0 [capacity,4]. Pages U32 [slots,stride],
 // committed lengths U64 [slots], query metadata U64 [queries,2]=(slot,causal_rows).

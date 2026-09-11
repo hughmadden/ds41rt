@@ -3,6 +3,14 @@
 #include <cuda_bf16.h>
 #include <stdint.h>
 #include "ds41rt_v41_index_scores.h"
+#if DS41RT_HAVE_V41_HC_AOT
+extern "C" int32_t ds41rt_v41_index_scores_overlay_aot(const uint8_t* q,const uint8_t* qs,const uint16_t* weights,
+    const uint8_t* keys,const uint8_t* ks,const uint32_t* pages,const uint64_t* lengths,
+    const uint64_t* metadata,const uint64_t* positions,float* output,
+    const uint8_t* proposals,const uint8_t* proposal_scales,
+    int32_t queries,int32_t candidates,int32_t slots,int32_t stride,uint64_t capacity,
+    uint64_t proposal_capacity,void* stream);
+#endif
 namespace {
 bool valid(const void* p,uint64_t bytes,uint64_t alignment) {
   const auto a=reinterpret_cast<uintptr_t>(p);
@@ -129,8 +137,14 @@ extern "C" int32_t ds41rt_v41_index_scores_overlay(const uint8_t* q,const uint8_
       uint64_t(slots)*stride*4,uint64_t(slots)*8,rows*48,count*8,proposal_capacity*64,proposal_capacity*4};
   const int align[]={1,1,2,1,1,4,8,8,8,1,1};
   for(int i=0;i<11;++i)if(!valid(ptrs[i],bytes[i],align[i]) || !disjoint(ptrs[i],bytes[i],output,out))return cudaErrorInvalidValue;
+#if DS41RT_HAVE_V41_HC_AOT
+  return ds41rt_v41_index_scores_overlay_aot(q,qs,weights,keys,ks,pages,lengths,
+      metadata,positions,output,proposals,proposal_scales,queries,candidates,slots,
+      stride,capacity,proposal_capacity,stream);
+#else
   scores_kernel<true><<<dim3(candidates,queries),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       q,qs,reinterpret_cast<const __nv_bfloat16*>(weights),keys,ks,pages,lengths,
       metadata,positions,output,candidates,slots,stride,capacity,proposals,proposal_scales,proposal_capacity);
   return cudaGetLastError();
+#endif
 }

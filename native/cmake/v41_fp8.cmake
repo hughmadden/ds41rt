@@ -39,3 +39,19 @@ add_custom_target(ds41rt_v41_fp8_export DEPENDS "${DS41RT_V41_FP8_DIR}/v41_fp8.j
 add_dependencies(ds41rt_v41_fp8_export ds41rt_verify_sparkinfer_source)
 set_source_files_properties(${DS41RT_V41_FP8_OBJECTS} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 list(APPEND DS41RT_NATIVE_SOURCES ${DS41RT_V41_FP8_OBJECTS} src/v41_fp8.cc cuda/kernels/v41_fp8.cu)
+
+# Independent scorer export keeps its pointer ABI auditable.
+set(DS41RT_V41_INDEX_DIR "${CMAKE_CURRENT_BINARY_DIR}/v41_index")
+add_custom_command(
+  OUTPUT "${DS41RT_V41_INDEX_DIR}/v41_index_score.json" "${DS41RT_V41_INDEX_DIR}/v41_index_score.h" "${DS41RT_V41_INDEX_DIR}/v41_index_score.o"
+  COMMAND ${DS41RT_SPARKINFER_VERIFY_COMMAND}
+  COMMAND "${CMAKE_COMMAND}" -E env ${DS41RT_SPARKINFER_PYTHON_ENV}
+    "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_index_aot.py"
+    --output-dir "${DS41RT_V41_INDEX_DIR}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../python/tools/export_b12x_v41_index_aot.py"
+    ${DS41RT_SPARKINFER_PROVENANCE_INPUTS} ${DS41RT_SPARKINFER_EXPORT_INPUTS}
+  VERBATIM)
+add_custom_target(ds41rt_v41_index_export DEPENDS "${DS41RT_V41_INDEX_DIR}/v41_index_score.json")
+add_dependencies(ds41rt_v41_index_export ds41rt_verify_sparkinfer_source)
+set_source_files_properties("${DS41RT_V41_INDEX_DIR}/v41_index_score.o" PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+list(APPEND DS41RT_NATIVE_SOURCES "${DS41RT_V41_INDEX_DIR}/v41_index_score.o" src/v41_index_score.cc)

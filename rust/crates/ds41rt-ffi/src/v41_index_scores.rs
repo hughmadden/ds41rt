@@ -48,6 +48,11 @@ pub struct V41IndexScores<'a> {
 }
 impl NativeLibrary {
     pub fn v41_index_scores(&self) -> Result<V41IndexScores<'_>> {
+        // Optional in older ABI-compatible native libraries. Prewarm AOT before capture.
+        if let Ok(initialize) = unsafe { self.lib.get::<unsafe extern "C" fn() -> i32>(b"ds41rt_v41_index_scores_initialize") } {
+            let status = unsafe { initialize() };
+            anyhow::ensure!(status == 0, "V4.1 index scorer initialization failed: {status}");
+        }
         Ok(V41IndexScores {
             _library: self,
             scores: unsafe { *self.lib.get(b"ds41rt_v41_index_scores")? },

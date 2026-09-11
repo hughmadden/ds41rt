@@ -1,0 +1,964 @@
+{
+  "b12x": {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+    "revision": "e5343cfb6874fecb9fe012a8c56e79ffdfca831f",
+    "source_tree_sha256": "705b3f1adc0fd83174bec841c60d8dc7e85dae6a47b078954c5e53d52dccfe95"
+  },
+  "native_reference": {
+    "scope": "Committed history plus causal append-only proposals; no cache mutation",
+    "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "device": 0,
+    "reference_model_sha256": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+    "native_library_sha256": "83a9cd22319518952b03004566326077255a8ff5a0e94ce94510407a7d5fb4fd",
+    "cases": [
+      {
+        "queries": 1,
+        "candidates": 3,
+        "slots": 1,
+        "stride": 1,
+        "capacity": 256,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 2,
+        "changed_valid_scores": 1,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      },
+      {
+        "queries": 16,
+        "candidates": 255,
+        "slots": 16,
+        "stride": 4,
+        "capacity": 16384,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 3737,
+        "changed_valid_scores": 3729,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      },
+      {
+        "queries": 80,
+        "candidates": 511,
+        "slots": 16,
+        "stride": 8,
+        "capacity": 32768,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 37997,
+        "changed_valid_scores": 37957,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      },
+      {
+        "queries": 256,
+        "candidates": 64,
+        "slots": 16,
+        "stride": 8,
+        "capacity": 32768,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 14869,
+        "changed_valid_scores": 14741,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      },
+      {
+        "queries": 4096,
+        "candidates": 3,
+        "slots": 16,
+        "stride": 1,
+        "capacity": 4096,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 8190,
+        "changed_valid_scores": 6142,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      },
+      {
+        "queries": 1,
+        "candidates": 4096,
+        "slots": 16,
+        "stride": 4096,
+        "capacity": 16777216,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 4094,
+        "changed_valid_scores": 4093,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      },
+      {
+        "queries": 1,
+        "candidates": 16384,
+        "slots": 1,
+        "stride": 64,
+        "capacity": 16384,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 16382,
+        "changed_valid_scores": 16381,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      },
+      {
+        "queries": 16,
+        "candidates": 513,
+        "slots": 16,
+        "stride": 1,
+        "capacity": 4096,
+        "proposal_capacity": 4096,
+        "malformed_descriptors_masked": true,
+        "valid_scores": 5825,
+        "changed_valid_scores": 3800,
+        "reference_bf16_exact": true,
+        "all_masked_exact": true,
+        "guards": true
+      }
+    ]
+  },
+  "components": {
+    "scope": "Synthetic all-valid committed-cache index scoring and top-512, separate captured kernels; no proposal reads, network, or API overhead.",
+    "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "capability": [
+      12,
+      0
+    ],
+    "native_sha256": "83a9cd22319518952b03004566326077255a8ff5a0e94ce94510407a7d5fb4fd",
+    "script_sha256": "1e9112e8839aecb9d0e470c00fa4c1f1303f285cc7c90450b4aa7e1bc3f21f8a",
+    "samples": 5,
+    "replays_per_sample": 5,
+    "results": [
+      {
+        "rows": 1,
+        "width": 512,
+        "score_us": 6.560000032186508,
+        "top512_us": 30.643200874328613
+      },
+      {
+        "rows": 1,
+        "width": 4096,
+        "score_us": 6.489600241184235,
+        "top512_us": 49.452799558639526
+      },
+      {
+        "rows": 1,
+        "width": 16384,
+        "score_us": 6.560000032186508,
+        "top512_us": 68.19199919700623
+      },
+      {
+        "rows": 6,
+        "width": 512,
+        "score_us": 6.52799978852272,
+        "top512_us": 30.668801069259644
+      },
+      {
+        "rows": 6,
+        "width": 4096,
+        "score_us": 8.396799862384796,
+        "top512_us": 49.49119985103607
+      },
+      {
+        "rows": 6,
+        "width": 16384,
+        "score_us": 13.043199479579926,
+        "top512_us": 69.59999799728394
+      },
+      {
+        "rows": 80,
+        "width": 512,
+        "score_us": 8.473599702119827,
+        "top512_us": 30.700799822807312
+      },
+      {
+        "rows": 80,
+        "width": 4096,
+        "score_us": 33.132800459861755,
+        "top512_us": 56.723201274871826
+      },
+      {
+        "rows": 80,
+        "width": 16384,
+        "score_us": 119.50080394744873,
+        "top512_us": 137.8175973892212
+      },
+      {
+        "rows": 256,
+        "width": 512,
+        "score_us": 16.729600727558136,
+        "top512_us": 47.494399547576904
+      },
+      {
+        "rows": 256,
+        "width": 4096,
+        "score_us": 99.00799989700317,
+        "top512_us": 117.06880331039429
+      },
+      {
+        "rows": 256,
+        "width": 16384,
+        "score_us": 377.0944118499756,
+        "top512_us": 341.593599319458
+      },
+      {
+        "rows": 1024,
+        "width": 512,
+        "score_us": 49.46559965610504,
+        "top512_us": 130.0096035003662
+      },
+      {
+        "rows": 1024,
+        "width": 4096,
+        "score_us": 377.47199535369873,
+        "top512_us": 357.88800716400146
+      },
+      {
+        "rows": 1024,
+        "width": 16384,
+        "score_us": 1589.4847869873047,
+        "top512_us": 1263.5071754455566
+      }
+    ]
+  },
+  "api": [
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 4.019519670982845,
+      "finish_seconds": 6.297155761974864,
+      "observed_decode_tokens_per_second": 25.464998657769886,
+      "usage": {
+        "prompt_tokens": 3977,
+        "completion_tokens": 59,
+        "total_tokens": 4036,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 3977
+      },
+      "mode": "target",
+      "filler_tokens": 3950,
+      "effective_prompt_tokens_per_second": 989.4217034712389
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 3.9221110510407016,
+      "finish_seconds": 4.547642852063291,
+      "observed_decode_tokens_per_second": 92.72110531420529,
+      "usage": {
+        "prompt_tokens": 3977,
+        "completion_tokens": 59,
+        "total_tokens": 4036,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 3977
+      },
+      "mode": "speculative",
+      "filler_tokens": 3950,
+      "effective_prompt_tokens_per_second": 1013.9947462590928
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 13.066084859077819,
+      "finish_seconds": 15.345913743018173,
+      "observed_decode_tokens_per_second": 25.440505824171943,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "target",
+      "filler_tokens": 16384,
+      "effective_prompt_tokens_per_second": 1255.999802312493
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 12.922106120036915,
+      "finish_seconds": 13.539459715946577,
+      "observed_decode_tokens_per_second": 93.94940012382652,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "speculative",
+      "filler_tokens": 16384,
+      "effective_prompt_tokens_per_second": 1269.9942136021646
+    }
+  ],
+  "quality": {
+    "scope": "Eight paired single-client greedy cases. Six objective checks and two open-ended comparisons; not broad model quality, stochastic equivalence or release performance.",
+    "cases": [
+      {
+        "case": {
+          "name": "arithmetic",
+          "prompt": "Compute (37 * 19) - 128. Output only the integer.",
+          "expected": "575"
+        },
+        "runs": {
+          "target": {
+            "text": "575",
+            "first_content_seconds": 0.7530714869499207,
+            "finish_seconds": 0.7966481699841097,
+            "observed_decode_tokens_per_second": 22.948052269499907,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "575",
+            "first_content_seconds": 0.7234505959786475,
+            "finish_seconds": 0.8094813750358298,
+            "observed_decode_tokens_per_second": 11.623746884069556,
+            "usage": {
+              "prompt_tokens": 20,
+              "completion_tokens": 2,
+              "total_tokens": 22,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 20
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "signed_sort",
+          "prompt": "Sort [12, -4, 7, 7, 0, -11] in ascending order. Preserve duplicates. Output only a JSON array.",
+          "expected_json": [
+            -11,
+            -4,
+            0,
+            7,
+            7,
+            12
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.5999905560165644,
+            "finish_seconds": 1.140693582012318,
+            "observed_decode_tokens_per_second": 33.28999309158917,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[-11, -4, 0, 7, 7, 12]",
+            "first_content_seconds": 0.5858336830278859,
+            "finish_seconds": 0.9134024969534948,
+            "observed_decode_tokens_per_second": 54.95028596979872,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 19,
+              "total_tokens": 56,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "extraction",
+          "prompt": "Alice has 17 tickets and Bob has 23 tickets. Return only JSON with keys \"total\" (the total number of tickets) and \"names\" (the two names in order).",
+          "expected_json": {
+            "total": 40,
+            "names": [
+              "Alice",
+              "Bob"
+            ]
+          }
+        },
+        "runs": {
+          "target": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.6176709329010919,
+            "finish_seconds": 1.0952016229275614,
+            "observed_decode_tokens_per_second": 33.505699914518836,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "{\"total\": 40, \"names\": [\"Alice\", \"Bob\"]}",
+            "first_content_seconds": 0.5875843620160595,
+            "finish_seconds": 0.822465738048777,
+            "observed_decode_tokens_per_second": 68.11949193354222,
+            "usage": {
+              "prompt_tokens": 42,
+              "completion_tokens": 17,
+              "total_tokens": 59,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 42
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "logic",
+          "prompt": "A is before B. C is after B. D is before A. Output the resulting order as a JSON array of the four letters, with no other text.",
+          "expected_json": [
+            "D",
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "runs": {
+          "target": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.6205444199731573,
+            "finish_seconds": 0.9809675919823349,
+            "observed_decode_tokens_per_second": 33.29419674408293,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "[\"D\", \"A\", \"B\", \"C\"]",
+            "first_content_seconds": 0.5926586739951745,
+            "finish_seconds": 0.7083313069306314,
+            "observed_decode_tokens_per_second": 103.74104656799648,
+            "usage": {
+              "prompt_tokens": 37,
+              "completion_tokens": 13,
+              "total_tokens": 50,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 37
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "unicode",
+          "prompt": "請計算 18 加 27，再減去 9。只輸出阿拉伯數字答案。",
+          "expected": "36"
+        },
+        "runs": {
+          "target": {
+            "text": "18 + 27 = 45  \n45 - 9 = 36  \n36",
+            "first_content_seconds": 0.5870855040848255,
+            "finish_seconds": 1.0775003160815686,
+            "observed_decode_tokens_per_second": 34.664532114729234,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 18,
+              "total_tokens": 43,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": false
+          },
+          "speculative": {
+            "text": "18 + 27 = 45  \n45 - 9 = 36  \n\n36",
+            "first_content_seconds": 0.5557190589606762,
+            "finish_seconds": 0.7767425810452551,
+            "observed_decode_tokens_per_second": 76.91489050425423,
+            "usage": {
+              "prompt_tokens": 25,
+              "completion_tokens": 18,
+              "total_tokens": 43,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 25
+            },
+            "objective_pass": false
+          }
+        },
+        "text_equal": false,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "translation",
+          "prompt": "Translate into Traditional Chinese: \"The red door is open.\" Output only the translation."
+        },
+        "runs": {
+          "target": {
+            "text": "紅色的門是開著的。",
+            "first_content_seconds": 0.5981758220586926,
+            "finish_seconds": 0.811118675977923,
+            "observed_decode_tokens_per_second": 32.87266922164532,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "紅色的門是開著的。",
+            "first_content_seconds": 0.6027439440367743,
+            "finish_seconds": 0.7253640609560534,
+            "observed_decode_tokens_per_second": 57.08688081424767,
+            "usage": {
+              "prompt_tokens": 21,
+              "completion_tokens": 8,
+              "total_tokens": 29,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 21
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "explanation",
+          "prompt": "Explain why a metal spoon feels colder than a wooden spoon in the same room. Use exactly two short sentences."
+        },
+        "runs": {
+          "target": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.6067230510525405,
+            "finish_seconds": 1.4961958850035444,
+            "observed_decode_tokens_per_second": 34.85210432149929,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          },
+          "speculative": {
+            "text": "Metal conducts heat away from your hand much faster than wood does. This rapid heat loss makes the metal spoon feel colder even though both are at room temperature.",
+            "first_content_seconds": 0.5926501809153706,
+            "finish_seconds": 1.3293937440030277,
+            "observed_decode_tokens_per_second": 42.077055780549316,
+            "usage": {
+              "prompt_tokens": 26,
+              "completion_tokens": 32,
+              "total_tokens": 58,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 26
+            },
+            "objective_pass": null
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      },
+      {
+        "case": {
+          "name": "long_retrieval",
+          "prompt": "Read these records and return only the value for label ZEBRA.\nRecord 000: label=item0; value=3.\nRecord 001: label=item1; value=20.\nRecord 002: label=item2; value=37.\nRecord 003: label=item3; value=54.\nRecord 004: label=item4; value=71.\nRecord 005: label=item5; value=88.\nRecord 006: label=item6; value=105.\nRecord 007: label=item7; value=122.\nRecord 008: label=item8; value=139.\nRecord 009: label=item9; value=156.\nRecord 010: label=item10; value=173.\nRecord 011: label=item11; value=190.\nRecord 012: label=item12; value=207.\nRecord 013: label=item13; value=224.\nRecord 014: label=item14; value=241.\nRecord 015: label=item15; value=258.\nRecord 016: label=item16; value=275.\nRecord 017: label=item17; value=292.\nRecord 018: label=item18; value=309.\nRecord 019: label=item19; value=326.\nRecord 020: label=item20; value=343.\nRecord 021: label=item21; value=360.\nRecord 022: label=item22; value=377.\nRecord 023: label=item23; value=394.\nRecord 024: label=item24; value=411.\nRecord 025: label=item25; value=428.\nRecord 026: label=item26; value=445.\nRecord 027: label=item27; value=462.\nRecord 028: label=item28; value=479.\nRecord 029: label=item29; value=496.\nRecord 030: label=item30; value=513.\nRecord 031: label=item31; value=530.\nRecord 032: label=item32; value=547.\nRecord 033: label=item33; value=564.\nRecord 034: label=item34; value=581.\nRecord 035: label=item35; value=598.\nRecord 036: label=item36; value=615.\nRecord 037: label=item37; value=632.\nRecord 038: label=item38; value=649.\nRecord 039: label=item39; value=666.\nRecord 040: label=item40; value=683.\nRecord 041: label=item41; value=700.\nRecord 042: label=item42; value=717.\nRecord 043: label=item43; value=734.\nRecord 044: label=item44; value=751.\nRecord 045: label=item45; value=768.\nRecord 046: label=item46; value=785.\nRecord 047: label=ZEBRA; value=quartz-731.\nRecord 048: label=item48; value=819.\nRecord 049: label=item49; value=836.\nRecord 050: label=item50; value=853.\nRecord 051: label=item51; value=870.\nRecord 052: label=item52; value=887.\nRecord 053: label=item53; value=904.\nRecord 054: label=item54; value=921.\nRecord 055: label=item55; value=938.\nRecord 056: label=item56; value=955.\nRecord 057: label=item57; value=972.\nRecord 058: label=item58; value=989.\nRecord 059: label=item59; value=1006.\nRecord 060: label=item60; value=1023.\nRecord 061: label=item61; value=1040.\nRecord 062: label=item62; value=1057.\nRecord 063: label=item63; value=1074.\nRecord 064: label=item64; value=1091.\nRecord 065: label=item65; value=1108.\nRecord 066: label=item66; value=1125.\nRecord 067: label=item67; value=1142.\nRecord 068: label=item68; value=1159.\nRecord 069: label=item69; value=1176.\nRecord 070: label=item70; value=1193.\nRecord 071: label=item71; value=1210.\nRecord 072: label=item72; value=1227.\nRecord 073: label=item73; value=1244.\nRecord 074: label=item74; value=1261.\nRecord 075: label=item75; value=1278.\nRecord 076: label=item76; value=1295.\nRecord 077: label=item77; value=1312.\nRecord 078: label=item78; value=1329.\nRecord 079: label=item79; value=1346.\nRecord 080: label=item80; value=1363.\nRecord 081: label=item81; value=1380.\nRecord 082: label=item82; value=1397.\nRecord 083: label=item83; value=1414.\nRecord 084: label=item84; value=1431.\nRecord 085: label=item85; value=1448.\nRecord 086: label=item86; value=1465.\nRecord 087: label=item87; value=1482.\nRecord 088: label=item88; value=1499.\nRecord 089: label=item89; value=1516.\nRecord 090: label=item90; value=1533.\nRecord 091: label=item91; value=1550.\nRecord 092: label=item92; value=1567.\nRecord 093: label=item93; value=1584.\nRecord 094: label=item94; value=1601.\nRecord 095: label=item95; value=1618.\nRecord 096: label=item96; value=1635.\nRecord 097: label=item97; value=1652.\nRecord 098: label=item98; value=1669.\nRecord 099: label=item99; value=1686.",
+          "expected": "quartz-731"
+        },
+        "runs": {
+          "target": {
+            "text": "quartz-731",
+            "first_content_seconds": 2.019870582036674,
+            "finish_seconds": 2.2003914680099115,
+            "observed_decode_tokens_per_second": 22.158100867026583,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          },
+          "speculative": {
+            "text": "quartz-731",
+            "first_content_seconds": 2.0039167490322143,
+            "finish_seconds": 2.1614074329845607,
+            "observed_decode_tokens_per_second": 25.398327695435754,
+            "usage": {
+              "prompt_tokens": 1363,
+              "completion_tokens": 5,
+              "total_tokens": 1368,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 1363
+            },
+            "objective_pass": true
+          }
+        },
+        "text_equal": true,
+        "usage_equal": true
+      }
+    ]
+  },
+  "api_smoke": {
+    "target": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18041",
+      "first_json": {
+        "id": "chatcmpl-67416c23-ea53-40a5-9531-31cb54166434",
+        "object": "chat.completion",
+        "created": 1789144461,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.5941434840206057,
+          "finish_seconds": 2.2274808769579977,
+          "observed_decode_tokens_per_second": 35.51011582223858,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.5648292149417102,
+          "finish_seconds": 2.190310808015056,
+          "observed_decode_tokens_per_second": 35.68173287667792,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.5400931889889762,
+          "finish_seconds": 2.1602957230061293,
+          "observed_decode_tokens_per_second": 35.79799363490315,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.5354400100186467,
+        "text": "I"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-480cad25-29ea-48bd-a0f2-1df744e4cee7",
+        "object": "chat.completion",
+        "created": 1789144469,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    },
+    "spec": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "base_url": "http://127.0.0.1:18042",
+      "first_json": {
+        "id": "chatcmpl-b0c9bdb3-cca7-4784-a3b3-1b04a1d3074f",
+        "object": "chat.completion",
+        "created": 1789144470,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "streaming_request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 20, separated by commas. Output only the numbers."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 96,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "streaming_runs": [
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.5488519240170717,
+          "finish_seconds": 1.096138739027083,
+          "observed_decode_tokens_per_second": 105.97733840699057,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.5622369099874049,
+          "finish_seconds": 1.112456539995037,
+          "observed_decode_tokens_per_second": 105.41245138635908,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        },
+        {
+          "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+          "first_content_seconds": 0.5555460109608248,
+          "finish_seconds": 1.1035398979438469,
+          "observed_decode_tokens_per_second": 105.84059672511812,
+          "usage": {
+            "prompt_tokens": 21,
+            "completion_tokens": 59,
+            "total_tokens": 80,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 21
+          }
+        }
+      ],
+      "cancellation": {
+        "cancelled_after_content": true,
+        "first_content_seconds": 0.526323287980631,
+        "text": "I"
+      },
+      "post_cancellation_json": {
+        "id": "chatcmpl-b899e107-79e0-44fd-81fa-d5aa3bca02fd",
+        "object": "chat.completion",
+        "created": 1789144474,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      },
+      "unsupported_sampling_status": 400,
+      "scope": "One client, greedy text, tiny prompts, three same-shape streams; first run warms. Engine mode is identified by system_fingerprint. Not release throughput or broad quality qualification."
+    }
+  }
+}
