@@ -25,6 +25,7 @@ def main():
     p.add_argument('--layer', type=int, choices=range(40), default=0)
     p.add_argument('--rank', type=int, choices=range(4), default=0)
     p.add_argument('--experts', type=int, choices=[32, 384], default=384)
+    p.add_argument('--capacity', type=int, choices=[1024,4096], default=1024)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     torch.manual_seed(413264 + a.rank)
@@ -37,7 +38,8 @@ def main():
     query.restype = I
     invalid = U(99)
     assert query(3, C.byref(invalid)) != 0 and invalid.value == 99
-    capacity, h = 1024, 5120
+    capacity, h = a.capacity, 5120
+    capacities = [cap for cap in [1,80,256,1024,4096] if cap <= capacity]
     weights = [torch.empty((384, size), dtype=torch.uint8, device='cuda')
                for size in [3276800, 204800, 1638400, 102400]]
     index = json.loads((a.snapshot / 'model.safetensors.index.json').read_text())['weight_map']
@@ -67,7 +69,7 @@ def main():
     ids = torch.empty((capacity, 6), dtype=torch.int32, device='cuda')
     routing = torch.empty((capacity, 6), device='cuda')
     owners = {name: {cap: Native(lib, cap, weights, wire, ids, routing)
-                     for cap in [1, 80, 256, 1024]} for name, lib in libs.items()}
+                     for cap in capacities} for name, lib in libs.items()}
     for cap, owner in owners['candidate'].items():
         assert owner.token_accumulation == (cap >= 256)
     compact = torch.empty((capacity, h), dtype=torch.bfloat16, device='cuda')
@@ -87,8 +89,10 @@ def main():
     cases = [(1, 'shared'), (6, 'shared'), (80, 'shared'), (81, 'shared'),
              (256, 'shared'), (1024, 'shared'), (1024, 'mixed'), (256, 'mixed'),
              (256, 'group_bound'), (256, 'zero'), (6, 'shared')]
+    if capacity == 4096:
+        cases[9:9] = [(1025,'shared'),(4096,'shared'),(4096,'mixed'),(4096,'group_bound')]
     for rows, kind in cases:
-        cap = 1 if rows == 1 else 80 if rows <= 80 else 256 if rows <= 256 else 1024
+        cap = next(cap for cap in capacities if rows <= cap)
         graphs = {}
         wire.zero_()
         wire[:, h:].fill_(127)

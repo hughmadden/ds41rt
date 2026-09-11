@@ -153,6 +153,59 @@ mod tests {
     #[test]
     #[ignore = "requires four idle live V4.1 FP8 RoCE expert workers"]
     fn local_qps_replay_cancel_and_recover_live() -> Result<()> {
+        replay_live(false)
+    }
+
+    #[test]
+    #[ignore = "requires four idle ABI-3 V4.1 atomic-output RoCE expert workers"]
+    fn local_qps_atomic_prefill_cancel_and_recover_live() -> Result<()> {
+        replay_live(true)
+    }
+
+    // A separate numerical gate for atomic prefill outputs. Protocol identity,
+    // row/rank coverage and small ordered outputs keep their exact checks.
+    fn atomic_planes_close(previous: &[Vec<u8>], current: &[Vec<u8>]) -> Result<()> {
+        ensure!(previous.len() == current.len(), "rank count changed");
+        for (rank, (old, new)) in previous.iter().zip(current).enumerate() {
+            ensure!(!old.is_empty() && old.len() == new.len() && old.len() % 2 == 0,
+                "atomic plane extent changed");
+            let (mut error, mut energy, mut changed) = (0.0_f64, 0.0_f64, 0_usize);
+            for (a, b) in old.chunks_exact(2).zip(new.chunks_exact(2)) {
+                let decode = |v: &[u8]| f32::from_bits((u16::from_le_bytes([v[0],v[1]]) as u32) << 16) as f64;
+                let (a, b) = (decode(a), decode(b));
+                ensure!(a.is_finite() && b.is_finite(), "nonfinite atomic replay");
+                let delta = (a-b).abs();
+                ensure!(delta <= 2e-5 + a.abs().max(b.abs())/128.0,
+                    "atomic replay exceeds one BF16 rounding step plus absolute floor");
+                error += delta*delta;
+                energy += a*a;
+                changed += usize::from(a != b);
+            }
+            ensure!(changed*1000 <= old.len()/2, "too many atomic replay values changed");
+            ensure!(error <= energy.max(1e-30)*2.5e-7, "atomic replay relative L2 exceeds 5e-4");
+            eprintln!("atomic rank={rank}: changed={changed}/{} rel_l2={}", old.len()/2,
+                (error/energy.max(1e-30)).sqrt());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn atomic_replay_gate_rejects_corruption_and_broad_changes() {
+        let plane = |bits: u16| vec![bits.to_le_bytes();2000].concat();
+        let baseline = vec![plane(0x3f80)];
+        let mut rounded = baseline.clone();
+        rounded[0][..2].copy_from_slice(&0x3f81_u16.to_le_bytes());
+        assert!(atomic_planes_close(&baseline, &rounded).is_ok());
+        rounded[0][..2].copy_from_slice(&0x4080_u16.to_le_bytes());
+        assert!(atomic_planes_close(&baseline, &rounded).is_err());
+        let mut broad = baseline.clone();
+        broad[0][..6].copy_from_slice(&[0x81,0x3f,0x81,0x3f,0x81,0x3f]);
+        assert!(atomic_planes_close(&baseline, &broad).is_err());
+        assert!(atomic_planes_close(&baseline, &[plane(0x7fc0)]).is_err());
+        assert!(atomic_planes_close(&baseline, &[vec![0;2]]).is_err());
+    }
+
+    fn replay_live(atomic: bool) -> Result<()> {
         let peers: [SocketAddr; 4] = std::env::var("DS41RT_LIVE_ROCE_PEERS")?
             .split(',')
             .map(str::parse)
@@ -160,8 +213,9 @@ mod tests {
             .try_into()
             .map_err(|_| anyhow::anyhow!("four peers required"))?;
         let capacity: u32 = std::env::var("DS41RT_LIVE_ROCE_CAPACITY")
-            .unwrap_or_else(|_| "80".into()).parse()?;
+            .unwrap_or_else(|_| if atomic { "4096" } else { "80" }.into()).parse()?;
         ensure!([80, 256, 1024, 4096].contains(&capacity), "unsupported fixture capacity");
+        ensure!(!atomic || capacity >= 256, "atomic fixture requires prefill capacity");
         let mut shapes = vec![1, 6, 16, 80];
         shapes.extend([256, 1024, 4096].into_iter().filter(|&rows| rows <= capacity));
         shapes.extend([6, 1]);
@@ -200,7 +254,7 @@ mod tests {
                     payload,
                 )?;
                 request.header.flags = base.header.flags;
-                let mut expected = None;
+                let mut expected: Option<Vec<Vec<u8>>> = None;
                 for repetition in 0..3 {
                     request.header.request_id += 1;
                     let mut planes = vec![vec![0; rows as usize * 10240]; 4];
@@ -226,7 +280,11 @@ mod tests {
                         );
                     }
                     if let Some(ref previous) = expected {
-                        ensure!(previous == &planes, "replay changed rank planes");
+                        if atomic && rows > 80 {
+                            atomic_planes_close(previous, &planes)?;
+                        } else {
+                            ensure!(previous == &planes, "replay changed rank planes");
+                        }
                     }
                     expected = Some(planes);
                     if repetition == 0 {
@@ -242,7 +300,8 @@ mod tests {
                     }
                 }
                 eprintln!(
-                    "local QPs rows={rows}: exact replay after abandoned dispatch and sink failure"
+                    "local QPs rows={rows}: {} replay after abandoned dispatch and sink failure",
+                    if atomic && rows > 80 { "bounded numerical" } else { "exact" }
                 );
             }
             Ok(())
