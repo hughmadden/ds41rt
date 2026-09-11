@@ -1,0 +1,1305 @@
+{
+  "scope": "Instrumented C1 second 16410-token code request, 2048-token chunks. Nested host timings, not additive GPU kernel durations.",
+  "steps": [
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.064137
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.5719819999999999,
+            "projection_us": 0.07011800000000001,
+            "ffn_prepare_us": 0.029676999999999995
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0005890000000000004,
+            "receive_us": 0.5763059999999998,
+            "reduce_us": 0.028880000000000003
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.048471999999999994,
+            "dispatch_us": 0.8630180000000001,
+            "shared_us": 0.031795,
+            "collect_us": 0.60604
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.08221200000000004,
+            "index_us": 0.015596,
+            "attention_us": 0.672312,
+            "experts_us": 1.5494480000000002,
+            "finish_us": 0.008311999999999996
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003612999999999999,
+            "engram_us": 0.007690000000000001,
+            "taps_us": 0.00015000000000000001,
+            "begin_us": 0.062538
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000538,
+            "execute_us": 2.411999,
+            "sample_us": 0.000212,
+            "commit_us": 0.000834,
+            "total_us": 2.413583
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040425
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.335855,
+            "projection_us": 0.03874500000000001,
+            "ffn_prepare_us": 0.029761000000000003
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0005750000000000003,
+            "receive_us": 0.5937080000000002,
+            "reduce_us": 0.029965
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.029805999999999996,
+            "dispatch_us": 0.071654,
+            "shared_us": 0.015368999999999999,
+            "collect_us": 0.6244759999999998
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.0041649999999999986,
+            "index_us": 0.011494,
+            "attention_us": 0.40484800000000004,
+            "experts_us": 0.7414229999999997,
+            "finish_us": 0.008331999999999997
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003678000000000002,
+            "engram_us": 0.015181999999999998,
+            "taps_us": 0.00012200000000000001,
+            "begin_us": 0.03956699999999999
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000461,
+            "execute_us": 1.231246,
+            "sample_us": 0.000119,
+            "commit_us": 0.00074,
+            "total_us": 1.232566
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.04034
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.3361110000000001,
+            "projection_us": 0.037712,
+            "ffn_prepare_us": 0.029651000000000007
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0005010000000000001,
+            "receive_us": 0.590731,
+            "reduce_us": 0.025255
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027340000000000003,
+            "dispatch_us": 0.078595,
+            "shared_us": 0.015277,
+            "collect_us": 0.6166650000000001
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004078,
+            "index_us": 0.016673999999999998,
+            "attention_us": 0.40391000000000005,
+            "experts_us": 0.7379840000000001,
+            "finish_us": 0.008276999999999996
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003615999999999999,
+            "engram_us": 0.017202000000000002,
+            "taps_us": 0.00011899999999999999,
+            "begin_us": 0.039482
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000322,
+            "execute_us": 1.23373,
+            "sample_us": 0.000111,
+            "commit_us": 0.000701,
+            "total_us": 1.234864
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040338000000000006
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.3366370000000001,
+            "projection_us": 0.03766100000000001,
+            "ffn_prepare_us": 0.029648
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.00035599999999999987,
+            "receive_us": 0.5976290000000001,
+            "reduce_us": 0.024175999999999996
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027342999999999996,
+            "dispatch_us": 0.08216299999999999,
+            "shared_us": 0.015201,
+            "collect_us": 0.6223309999999999
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004135000000000001,
+            "index_us": 0.020814,
+            "attention_us": 0.4043469999999999,
+            "experts_us": 0.7471329999999999,
+            "finish_us": 0.008262
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0035819999999999975,
+            "engram_us": 0.009012999999999998,
+            "taps_us": 0.000116,
+            "begin_us": 0.03950899999999999
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000282,
+            "execute_us": 1.23924,
+            "sample_us": 0.000125,
+            "commit_us": 0.000748,
+            "total_us": 1.240395
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.04039700000000001
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.3366399999999999,
+            "projection_us": 0.037709999999999994,
+            "ffn_prepare_us": 0.029742000000000008
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0004369999999999997,
+            "receive_us": 0.5919030000000001,
+            "reduce_us": 0.028499999999999987
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027650999999999995,
+            "dispatch_us": 0.08082,
+            "shared_us": 0.015324999999999998,
+            "collect_us": 0.621018
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004109,
+            "index_us": 0.026615999999999997,
+            "attention_us": 0.40453699999999987,
+            "experts_us": 0.744916,
+            "finish_us": 0.008270999999999999
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003609999999999999,
+            "engram_us": 0.0068790000000000006,
+            "taps_us": 0.00011200000000000001,
+            "begin_us": 0.039518
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000335,
+            "execute_us": 1.240923,
+            "sample_us": 0.000106,
+            "commit_us": 0.000706,
+            "total_us": 1.24207
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040322
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.33690099999999995,
+            "projection_us": 0.03769299999999999,
+            "ffn_prepare_us": 0.029682
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.00038699999999999987,
+            "receive_us": 0.5967299999999999,
+            "reduce_us": 0.025552000000000002
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027082000000000002,
+            "dispatch_us": 0.08200500000000001,
+            "shared_us": 0.015299000000000002,
+            "collect_us": 0.6228279999999999
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004052,
+            "index_us": 0.030673999999999993,
+            "attention_us": 0.4046739999999999,
+            "experts_us": 0.7473139999999999,
+            "finish_us": 0.008237000000000003
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0035739999999999986,
+            "engram_us": 0.004799000000000001,
+            "taps_us": 0.000116,
+            "begin_us": 0.03944900000000001
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000282,
+            "execute_us": 1.245206,
+            "sample_us": 0.000117,
+            "commit_us": 0.000702,
+            "total_us": 1.246307
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.04029899999999999
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.33726100000000014,
+            "projection_us": 0.037732,
+            "ffn_prepare_us": 0.029641
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.00048800000000000015,
+            "receive_us": 0.601866,
+            "reduce_us": 0.025230000000000002
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027178000000000004,
+            "dispatch_us": 0.082407,
+            "shared_us": 0.015337,
+            "collect_us": 0.6277569999999998
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004058,
+            "index_us": 0.03533399999999999,
+            "attention_us": 0.40506400000000004,
+            "experts_us": 0.7527810000000001,
+            "finish_us": 0.008262
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0036149999999999993,
+            "engram_us": 0.004801000000000001,
+            "taps_us": 0.000116,
+            "begin_us": 0.039425999999999996
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000286,
+            "execute_us": 1.255795,
+            "sample_us": 0.000104,
+            "commit_us": 0.000714,
+            "total_us": 1.256899
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040375999999999995
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.33714400000000005,
+            "projection_us": 0.037732999999999996,
+            "ffn_prepare_us": 0.029724000000000007
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.000506,
+            "receive_us": 0.6069680000000001,
+            "reduce_us": 0.026437999999999996
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027315000000000002,
+            "dispatch_us": 0.074196,
+            "shared_us": 0.015386999999999998,
+            "collect_us": 0.6340919999999999
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004067,
+            "index_us": 0.039426,
+            "attention_us": 0.40502299999999997,
+            "experts_us": 0.7510930000000001,
+            "finish_us": 0.008282999999999997
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0036139999999999983,
+            "engram_us": 0.0048,
+            "taps_us": 0.000116,
+            "begin_us": 0.039520999999999994
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000285,
+            "execute_us": 1.258268,
+            "sample_us": 0.000111,
+            "commit_us": 0.000685,
+            "total_us": 1.259349
+          }
+        }
+      }
+    },
+    {
+      "rows": 26,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.008985999999999996
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.019436000000000005,
+            "projection_us": 0.005751000000000001,
+            "ffn_prepare_us": 0.004065
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.000208,
+            "receive_us": 0.057976999999999994,
+            "reduce_us": 0.0005030000000000001
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.004312999999999999,
+            "dispatch_us": 0.0009869999999999998,
+            "shared_us": 0.005317000000000001,
+            "collect_us": 0.058786
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.006019999999999997,
+            "index_us": 0.0032190000000000005,
+            "attention_us": 0.02936000000000001,
+            "experts_us": 0.06948499999999999,
+            "finish_us": 0.0005690000000000002
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0006889999999999997,
+            "engram_us": 0.00074,
+            "taps_us": 2.2e-05,
+            "begin_us": 0.008771999999999999
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 2.3e-05,
+            "execute_us": 0.120355,
+            "sample_us": 0.000114,
+            "commit_us": 0.000545,
+            "total_us": 0.121037
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.06358400000000002
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.571372,
+            "projection_us": 0.06989700000000001,
+            "ffn_prepare_us": 0.029626000000000003
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0004119999999999998,
+            "receive_us": 0.578528,
+            "reduce_us": 0.027882000000000004
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.04239499999999998,
+            "dispatch_us": 0.071378,
+            "shared_us": 0.03088,
+            "collect_us": 0.6069959999999999
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.007875999999999998,
+            "index_us": 0.007576000000000003,
+            "attention_us": 0.671276,
+            "experts_us": 0.7517490000000001,
+            "finish_us": 0.008235000000000001
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0035739999999999986,
+            "engram_us": 0.007698,
+            "taps_us": 0.000115,
+            "begin_us": 0.06210900000000002
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000267,
+            "execute_us": 1.523122,
+            "sample_us": 0.000122,
+            "commit_us": 0.000673,
+            "total_us": 1.524184
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040332999999999994
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.33577900000000005,
+            "projection_us": 0.037701,
+            "ffn_prepare_us": 0.029681999999999993
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0004279999999999998,
+            "receive_us": 0.5931180000000001,
+            "reduce_us": 0.025070999999999993
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027191999999999987,
+            "dispatch_us": 0.079103,
+            "shared_us": 0.015325000000000002,
+            "collect_us": 0.6187810000000001
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004076999999999999,
+            "index_us": 0.011380000000000001,
+            "attention_us": 0.403559,
+            "experts_us": 0.7404979999999999,
+            "finish_us": 0.008253
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003607999999999999,
+            "engram_us": 0.004823,
+            "taps_us": 0.000115,
+            "begin_us": 0.039464000000000006
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000295,
+            "execute_us": 1.218094,
+            "sample_us": 0.000108,
+            "commit_us": 0.000683,
+            "total_us": 1.21918
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040423999999999995
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.33610100000000004,
+            "projection_us": 0.037699,
+            "ffn_prepare_us": 0.029646
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.000448,
+            "receive_us": 0.590345,
+            "reduce_us": 0.024420999999999998
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027303000000000004,
+            "dispatch_us": 0.08327999999999999,
+            "shared_us": 0.015372000000000004,
+            "collect_us": 0.6153840000000002
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.0040880000000000005,
+            "index_us": 0.016640000000000002,
+            "attention_us": 0.40386000000000005,
+            "experts_us": 0.741439,
+            "finish_us": 0.008265000000000002
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003610999999999998,
+            "engram_us": 0.004848,
+            "taps_us": 0.00011999999999999999,
+            "begin_us": 0.039563000000000015
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000301,
+            "execute_us": 1.224771,
+            "sample_us": 0.000109,
+            "commit_us": 0.000684,
+            "total_us": 1.225865
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040413000000000004
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.336877,
+            "projection_us": 0.037757,
+            "ffn_prepare_us": 0.029708
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.000481,
+            "receive_us": 0.597647,
+            "reduce_us": 0.023815999999999993
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027187,
+            "dispatch_us": 0.082159,
+            "shared_us": 0.015368,
+            "collect_us": 0.622117
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.0040820000000000006,
+            "index_us": 0.020775,
+            "attention_us": 0.40473600000000004,
+            "experts_us": 0.7469259999999999,
+            "finish_us": 0.008274999999999998
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0036269999999999987,
+            "engram_us": 0.0048460000000000005,
+            "taps_us": 0.00012200000000000001,
+            "begin_us": 0.03954700000000001
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.0003,
+            "execute_us": 1.235268,
+            "sample_us": 0.000111,
+            "commit_us": 0.000707,
+            "total_us": 1.236386
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040402999999999994
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.3368980000000001,
+            "projection_us": 0.037764000000000006,
+            "ffn_prepare_us": 0.02971000000000001
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0004930000000000002,
+            "receive_us": 0.6429349999999999,
+            "reduce_us": 0.024175999999999996
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.02721000000000001,
+            "dispatch_us": 0.082162,
+            "shared_us": 0.015347000000000003,
+            "collect_us": 0.6677710000000001
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004099,
+            "index_us": 0.02662499999999999,
+            "attention_us": 0.40478499999999995,
+            "experts_us": 0.7925939999999999,
+            "finish_us": 0.008258000000000003
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003630999999999999,
+            "engram_us": 0.004838,
+            "taps_us": 0.000115,
+            "begin_us": 0.03953999999999999
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000299,
+            "execute_us": 1.286828,
+            "sample_us": 0.000117,
+            "commit_us": 0.000712,
+            "total_us": 1.287956
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040324
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.33721600000000007,
+            "projection_us": 0.03775,
+            "ffn_prepare_us": 0.029637000000000004
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.00045299999999999974,
+            "receive_us": 0.5944999999999998,
+            "reduce_us": 0.026649
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027325,
+            "dispatch_us": 0.077626,
+            "shared_us": 0.015373999999999997,
+            "collect_us": 0.6217659999999999
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004104999999999999,
+            "index_us": 0.03073299999999999,
+            "attention_us": 0.405007,
+            "experts_us": 0.7421909999999998,
+            "finish_us": 0.008258000000000001
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.003618999999999999,
+            "engram_us": 0.004864,
+            "taps_us": 0.00011900000000000002,
+            "begin_us": 0.03945800000000001
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000293,
+            "execute_us": 1.2407,
+            "sample_us": 0.000107,
+            "commit_us": 0.000692,
+            "total_us": 1.241792
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.040407
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.33744499999999994,
+            "projection_us": 0.03772299999999999,
+            "ffn_prepare_us": 0.029702999999999997
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.00041199999999999966,
+            "receive_us": 0.6057570000000001,
+            "reduce_us": 0.028276000000000003
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027363000000000005,
+            "dispatch_us": 0.068793,
+            "shared_us": 0.015309,
+            "collect_us": 0.634614
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004064999999999999,
+            "index_us": 0.035401999999999996,
+            "attention_us": 0.40525600000000006,
+            "experts_us": 0.746172,
+            "finish_us": 0.008243999999999996
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0035839999999999995,
+            "engram_us": 0.004839,
+            "taps_us": 0.000115,
+            "begin_us": 0.039542999999999995
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000304,
+            "execute_us": 1.249534,
+            "sample_us": 0.000102,
+            "commit_us": 0.000704,
+            "total_us": 1.250644
+          }
+        }
+      }
+    },
+    {
+      "rows": 2048,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.04031900000000001
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.3374159999999999,
+            "projection_us": 0.037703,
+            "ffn_prepare_us": 0.029704000000000008
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.00039299999999999985,
+            "receive_us": 0.621869,
+            "reduce_us": 0.028984000000000006
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.027181000000000007,
+            "dispatch_us": 0.06910300000000001,
+            "shared_us": 0.015309,
+            "collect_us": 0.6514020000000001
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004066000000000001,
+            "index_us": 0.039471,
+            "attention_us": 0.4052220000000001,
+            "experts_us": 0.7630919999999999,
+            "finish_us": 0.008235000000000001
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0035859999999999993,
+            "engram_us": 0.004818000000000001,
+            "taps_us": 0.00011200000000000001,
+            "begin_us": 0.039444999999999994
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 0.000298,
+            "execute_us": 1.270365,
+            "sample_us": 0.000117,
+            "commit_us": 0.000681,
+            "total_us": 1.271461
+          }
+        }
+      }
+    },
+    {
+      "rows": 26,
+      "stages": {
+        "target query preparation": {
+          "count": 40,
+          "sum_seconds": {
+            "total_us": 0.008886000000000002
+          }
+        },
+        "target attention stages": {
+          "count": 40,
+          "sum_seconds": {
+            "sparse_us": 0.019476999999999994,
+            "projection_us": 0.005746,
+            "ffn_prepare_us": 0.004043999999999999
+          }
+        },
+        "target collection": {
+          "count": 40,
+          "sum_seconds": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.0001810000000000001,
+            "receive_us": 0.058563,
+            "reduce_us": 0.000532
+          }
+        },
+        "target experts": {
+          "count": 40,
+          "sum_seconds": {
+            "routed_us": 0.004254,
+            "dispatch_us": 0.0009689999999999999,
+            "shared_us": 0.005241000000000001,
+            "collect_us": 0.05937799999999999
+          }
+        },
+        "target layer": {
+          "count": 40,
+          "sum_seconds": {
+            "produced_us": 0.004111999999999999,
+            "index_us": 0.002363,
+            "attention_us": 0.029372999999999996,
+            "experts_us": 0.06991100000000001,
+            "finish_us": 0.0005670000000000001
+          }
+        },
+        "target layer preparation": {
+          "count": 39,
+          "sum_seconds": {
+            "advance_us": 0.0006749999999999997,
+            "engram_us": 0.0007980000000000001,
+            "taps_us": 2.4e-05,
+            "begin_us": 0.008716000000000002
+          }
+        },
+        "target step": {
+          "count": 1,
+          "sum_seconds": {
+            "prepared_us": 2.2e-05,
+            "execute_us": 0.118009,
+            "sample_us": 0.000124,
+            "commit_us": 0.000504,
+            "total_us": 0.118659
+          }
+        }
+      }
+    }
+  ],
+  "warm_stages": {
+    "target query preparation": {
+      "count": 360,
+      "sum_seconds": {
+        "total_us": 0.35509299999999994
+      }
+    },
+    "target attention stages": {
+      "count": 360,
+      "sum_seconds": {
+        "sparse_us": 2.948581,
+        "projection_us": 0.33974,
+        "ffn_prepare_us": 0.24146
+      }
+    },
+    "target collection": {
+      "count": 360,
+      "sum_seconds": {
+        "shared_copy_us": 0.0,
+        "upload_us": 0.0037009999999999994,
+        "receive_us": 4.883262000000001,
+        "reduce_us": 0.209807
+      }
+    },
+    "target experts": {
+      "count": 360,
+      "sum_seconds": {
+        "routed_us": 0.23740999999999998,
+        "dispatch_us": 0.614573,
+        "shared_us": 0.143525,
+        "collect_us": 5.098209
+      }
+    },
+    "target layer": {
+      "count": 360,
+      "sum_seconds": {
+        "produced_us": 0.04056999999999999,
+        "index_us": 0.19096499999999997,
+        "attention_us": 3.5330740000000005,
+        "experts_us": 6.0945719999999985,
+        "finish_us": 0.06659
+      }
+    },
+    "target layer preparation": {
+      "count": 351,
+      "sum_seconds": {
+        "advance_us": 0.029514999999999986,
+        "engram_us": 0.04237200000000001,
+        "taps_us": 0.0009570000000000001,
+        "begin_us": 0.34738500000000005
+      }
+    },
+    "target step": {
+      "count": 9,
+      "sum_seconds": {
+        "prepared_us": 0.002379,
+        "execute_us": 10.366691000000001,
+        "sample_us": 0.0010170000000000001,
+        "commit_us": 0.00604,
+        "total_us": 10.376127
+      }
+    }
+  },
+  "api": {
+    "scope": "Sequential C1 generated counting after repeated filler or supplied code; no prefix-cache hits expected, not a broad quality/performance benchmark.",
+    "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+    "context_sha256": "9fd051edae59a6b4263a690fbdd70816c78c9671a50d6976903b51b4386593b0",
+    "results": [
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 11.370044628973119,
+        "finish_seconds": 12.998735901084729,
+        "observed_decode_tokens_per_second": 35.611414510008764,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "target",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1443.2661027718466
+      },
+      {
+        "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+        "first_content_seconds": 10.38715489092283,
+        "finish_seconds": 12.022970694932155,
+        "observed_decode_tokens_per_second": 35.45631473778654,
+        "usage": {
+          "prompt_tokens": 16410,
+          "completion_tokens": 59,
+          "total_tokens": 16469,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 16410
+        },
+        "mode": "target",
+        "kind": "code",
+        "filler_tokens": 16384,
+        "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+        "effective_prompt_tokens_per_second": 1579.8358811747805
+      }
+    ]
+  }
+}
