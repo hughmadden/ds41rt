@@ -1,0 +1,146 @@
+{
+  "scope": "Request-bound accepted-prefix publication into three dSpark FP8 windows; not combined target/engram atomicity or speculative generation.",
+  "gpu": "RTX PRO 6000 Blackwell GPU 1",
+  "expert_hosts": [
+    "ostrich",
+    "dodo",
+    "emu",
+    "kiwi"
+  ],
+  "checkpoint_snapshot": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "requests": 16,
+  "cycle_rows": [
+    80,
+    16,
+    16
+  ],
+  "full_commit_ends": [
+    5,
+    6,
+    7
+  ],
+  "partial_acceptance": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    0,
+    1,
+    2,
+    3
+  ],
+  "ring_bytes_per_row": 528,
+  "ring_rows": 128,
+  "rejected_tail_sentinel": 90,
+  "guards": [
+    "overacceptance",
+    "foreign batch",
+    "wrong request lease",
+    "stale lease generation with zero acceptance",
+    "stale committed position with zero acceptance",
+    "duplicate commit",
+    "drop invalidates producer readiness"
+  ],
+  "checks": [
+    {
+      "file": "cycle0-logits.bin",
+      "bytes": 8273920,
+      "sha256": "f4578e2fa896543b34c9eff11b0ff2aa4cf4e3e0afd606f41de82b0065900bea",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle0-main-context.bin",
+      "bytes": 819200,
+      "sha256": "37ae700f57ea9f4023c48e8cb89150bb7f82d66409741a748c856499437780da",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle0-stage0-kv.bin",
+      "bytes": 81920,
+      "sha256": "5c4e53debc96fb2f4bc0cd917cd30c3805261d88bed053ffb5566e30a06115c5",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle0-stage1-kv.bin",
+      "bytes": 81920,
+      "sha256": "aced54abed93959a99b9ec24c28b450243103c888c4b80b1d8930c8d20807517",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle0-stage2-kv.bin",
+      "bytes": 81920,
+      "sha256": "53e9e25a1d0246f89b8925da57c128debe351e8cd428754a963a2325d1ec9933",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle1-logits.bin",
+      "bytes": 8273920,
+      "sha256": "e779afbf7bcdd14e4b96b2de5652771ada70b5f44494f7ec904074ae4d7d0c1c",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle1-main-context.bin",
+      "bytes": 163840,
+      "sha256": "67ae0e6b61d7b8c250449233b2573f8fe876bcafd00063053f2e35b41ac6e57d",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle1-stage0-kv.bin",
+      "bytes": 16384,
+      "sha256": "f5ceaa451c1161243cd714b7fb67db103e15f51e27f1ba3c63d768870224640d",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle1-stage1-kv.bin",
+      "bytes": 16384,
+      "sha256": "ae6060f483a012f06932200dfc78724a25737608252a10fa351cd54651f4fecd",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle1-stage2-kv.bin",
+      "bytes": 16384,
+      "sha256": "1c8941b09ee394ec4499cc4621a7feb3f3e499c4b593d4076b83d138e7d193c5",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle2-logits.bin",
+      "bytes": 8273920,
+      "sha256": "7f406f6e97055ae1241df87d6999b3fcaa0533f51a603f4ef32e431124d0f69e",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle2-main-context.bin",
+      "bytes": 163840,
+      "sha256": "2bb8f6d1ee475daa3a732aa6eabb198f011285052d1e66403d647160cf48c64c",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle2-stage0-kv.bin",
+      "bytes": 16384,
+      "sha256": "73ee8108b618e09e6ef4fde18683407ee4dfb7a72b159ea12f6c5bd4c9c7cecd",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle2-stage1-kv.bin",
+      "bytes": 16384,
+      "sha256": "d63fb5ce72161080a70135235a97244eac838edc08635c0d2c2cf2ad7c43f608",
+      "byte_equal_previous": true
+    },
+    {
+      "file": "cycle2-stage2-kv.bin",
+      "bytes": 16384,
+      "sha256": "84bb6eb769d41fb646f732679662fc700228a6526aa1e20f0b592e607aacb926",
+      "byte_equal_previous": true
+    }
+  ],
+  "test_log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 2.205s\nreal dSpark weights loaded in 0.656s resident_bytes=8148701064\nPASS dSpark accepted prefixes: all three FP8 rings exact; rejected tails untouched; zero/foreign/stale/duplicate-commit guards\nPASS full target cycle=0 requests=16 input_rows=80 finite_logits=true cache_and_engram_commit=true seconds=3.825\nPASS full target cycle=1 requests=16 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.097\nPASS full target cycle=2 requests=16 input_rows=16 finite_logits=true cache_and_engram_commit=true seconds=1.007\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 12.34s\n\n",
+  "cpu_test_log": "\nrunning 1 test\ntest v41_experts::dspark::main_context::proposal::tests::main_prefixes_keep_flattened_offsets_and_reject_ambiguous_rows ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s\n\n"
+}

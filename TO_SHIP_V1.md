@@ -107,6 +107,7 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Qualify owned dSpark main projection, independent committed KV producers and draft attention with native rotary frequencies on both RTX GPUs.
 - [x] Implement and qualify allocation-free decoder stream-mean gathering directly into the owned dSpark main input on both RTX GPUs.
 - [x] Gather dSpark taps from target-layer attention-input stream means after engram updates in layer order 37/38/39. [Real target handoff](docs/ds41-target-dspark-handoff.md): exact PyTorch means, unchanged target logits, and independently compared real dSpark main projection/norm.
+- [x] Bind produced dSpark context to target batch/request rows and publish accepted prefixes to all three FP8 windows. [Real prefix checks](docs/ds41-dspark-prefix-publication.md) cover sixteen requests, untouched rejected tails and stale/discard guards. Coupling with the target/engram transaction remains open.
 - [x] Compose and qualify each complete dSpark attention/mHC/shared-and-routed-FFN stage in one captured graph on both RTX GPUs.
 - [x] Chain all three dSpark transformer stages in one graph with validated cross-stage cache bindings and exact residual/pre-mix handoff.
 - [x] Initialize dSpark seed/noise embeddings from the shared coordinator table inside the three-stage graph; qualify changed-token replay on both RTX GPUs.

@@ -5,6 +5,8 @@ use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps};
 use std::ffi::c_void;
+mod proposal;
+pub(crate) use proposal::MainProposal;
 
 pub(crate) struct DsparkMainContext<'weights, 'library> {
     stream: LoadStream<'library>,

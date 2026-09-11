@@ -168,12 +168,18 @@ impl<'a> DsparkWindow<'a> {
         let slot = self.validate(lease)?;
         self.slots[slot].request.context("dSpark cache request missing")
     }
+    /// None denotes an admitted request with no published main context yet.
+    pub fn committed_end(&self, lease: WindowLease) -> Result<Option<u64>> {
+        Ok(self.slots[self.validate(lease)?].end)
+    }
     pub fn release(&mut self, lease: WindowLease) -> Result<()> {
         let slot = self.validate(lease)?;
         self.slots[slot].request = None;
         self.slots[slot].end = None;
         Ok(())
     }
+    #[cfg(test)]
+    pub(crate) fn ring_for_test(&self) -> Ds41rtDeviceBuffer { self.ring.buffer }
     /// Stable BF16 [source_rows,512] destination for normalized, RoPE-applied KV.
     pub fn source(&self) -> Ds41rtDeviceBuffer {
         self.source.buffer

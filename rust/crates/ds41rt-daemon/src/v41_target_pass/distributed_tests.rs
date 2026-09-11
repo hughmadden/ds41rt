@@ -204,6 +204,28 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
     let leases = (0..request_count)
         .map(|slot| requests.admit(slot, 1000 + slot as u64))
         .collect::<Result<Vec<_>>>()?;
+    let mut draft_windows = if main_context.is_some() {
+        (0..3)
+            .map(|_| {
+                crate::v41_dspark_cache::DsparkWindow::new(
+                    &lib,
+                    16,
+                    80,
+                    crate::v41_dspark_cache::DsparkWindow::device_bytes(16, 80)?,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?
+    } else {
+        Vec::new()
+    };
+    let draft_leases = draft_windows
+        .iter_mut()
+        .map(|window| {
+            (0..request_count)
+                .map(|slot| window.begin_request(slot, 1000 + slot as u64))
+                .collect::<Result<Vec<_>>>()
+        })
+        .collect::<Result<Vec<_>>>()?;
     let mut committed = 0u64;
     for cycle in 0..cycles {
         let count = if cycle == 0 { prompt_rows } else { 1 };
@@ -279,10 +301,9 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                 assert!(unsafe { main.execute_input(invalid, &positions) }.is_err());
                 assert!(main.output().is_err());
             }
-            unsafe {
-                main.execute_input(taps.values(), &positions)?;
-            }
-            let output = main.output()?;
+            let mut proposal =
+                unsafe { main.execute_rows(taps.values(), taps.batch_identity(), taps.rows())? };
+            let output = proposal.output()?;
             let mut bytes = vec![0; output.bytes];
             lib.copy_d2h(&mut bytes, output)?;
             assert!(bytes.chunks_exact(2).all(|b| f32::from_bits(
@@ -291,7 +312,7 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             .is_finite()));
             main_bytes = Some(bytes);
             for stage in 0..3 {
-                let output = main.kv_output(stage)?;
+                let output = proposal.kv_output(stage)?;
                 let mut bytes = vec![0; output.bytes];
                 lib.copy_d2h(&mut bytes, output)?;
                 assert!(bytes.chunks_exact(2).all(|b| f32::from_bits(
@@ -305,6 +326,27 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                         bytes,
                     )?;
                 }
+            }
+            let [a, b, c] = draft_windows.as_mut_slice() else {
+                unreachable!()
+            };
+            unsafe {
+                proposal.commit(
+                    taps.batch_identity(),
+                    &mut [a, b, c],
+                    [&draft_leases[0], &draft_leases[1], &draft_leases[2]],
+                    &vec![count as u32; request_count],
+                )?;
+            }
+            assert!(proposal.output().is_err());
+            drop(proposal);
+            for (window, leases) in draft_windows.iter().zip(&draft_leases) {
+                for &lease in leases {
+                    assert_eq!(window.committed_end(lease)?, Some(committed + count as u64));
+                }
+            }
+            if cycle == 0 && request_count == 16 {
+                qualify_main_prefixes(&lib, main, &taps, &draft_windows, count)?;
             }
         }
         if let Some(dir) = std::env::var_os("DS41RT_TARGET_PASS_OUTPUT") {
@@ -348,5 +390,183 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
     for lease in leases {
         requests.release(lease)?;
     }
+    Ok(())
+}
+
+fn qualify_main_prefixes(
+    lib: &NativeLibrary,
+    main: &mut crate::v41_experts::dspark::DsparkMainContext<'_, '_>,
+    taps: &TargetTaps<'_>,
+    full: &[crate::v41_dspark_cache::DsparkWindow<'_>],
+    count: usize,
+) -> Result<()> {
+    use crate::v41_dspark_cache::DsparkWindow;
+    let mut windows = (0..3)
+        .map(|_| DsparkWindow::new(lib, 16, 80, DsparkWindow::device_bytes(16, 80)?))
+        .collect::<Result<Vec<_>>>()?;
+    let mut leases = windows
+        .iter_mut()
+        .map(|window| {
+            (0..16)
+                .map(|slot| window.begin_request(slot, 1000 + slot as u64))
+                .collect::<Result<Vec<_>>>()
+        })
+        .collect::<Result<Vec<_>>>()?;
+    for window in &windows {
+        lib.copy_h2d(
+            window.ring_for_test(),
+            &vec![0x5a; window.ring_for_test().bytes],
+        )?;
+    }
+    let check_untouched = |windows: &[DsparkWindow<'_>]| -> Result<()> {
+        for window in windows {
+            let mut bytes = vec![0; window.ring_for_test().bytes];
+            lib.copy_d2h(&mut bytes, window.ring_for_test())?;
+            assert!(bytes.iter().all(|&b| b == 0x5a));
+        }
+        Ok(())
+    };
+    let batch = taps.batch_identity();
+    let mut proposal = unsafe { main.execute_rows(taps.values(), batch, taps.rows())? };
+    let mut too_many = vec![count as u32; 16];
+    too_many[3] += 1;
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    assert!(unsafe {
+        proposal.commit(
+            batch,
+            &mut [a, b, c],
+            [&leases[0], &leases[1], &leases[2]],
+            &too_many,
+        )
+    }
+    .is_err());
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    assert!(unsafe {
+        proposal.commit(
+            batch + 1,
+            &mut [a, b, c],
+            [&leases[0], &leases[1], &leases[2]],
+            &[0; 16],
+        )
+    }
+    .is_err());
+    let mut swapped = leases[1].clone();
+    swapped.swap(0, 1);
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    assert!(unsafe {
+        proposal.commit(
+            batch,
+            &mut [a, b, c],
+            [&leases[0], &swapped, &leases[2]],
+            &[0; 16],
+        )
+    }
+    .is_err());
+    windows[2].release(leases[2][0])?;
+    let replacement = windows[2].begin_request(0, 1000)?;
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    assert!(unsafe {
+        proposal.commit(
+            batch,
+            &mut [a, b, c],
+            [&leases[0], &leases[1], &leases[2]],
+            &[0; 16],
+        )
+    }
+    .is_err());
+    leases[2][0] = replacement;
+    proposal.output()?;
+    check_untouched(&windows)?;
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    unsafe {
+        proposal.commit(
+            batch,
+            &mut [a, b, c],
+            [&leases[0], &leases[1], &leases[2]],
+            &[0; 16],
+        )?;
+    }
+    assert!(proposal.output().is_err());
+    drop(proposal);
+    check_untouched(&windows)?;
+    for (window, leases) in windows.iter().zip(&leases) {
+        for &lease in leases {
+            assert_eq!(window.committed_end(lease)?, None);
+        }
+    }
+    let accepted = (0..16)
+        .map(|i| (i % (count + 1)) as u32)
+        .collect::<Vec<_>>();
+    let mut proposal = unsafe { main.execute_rows(taps.values(), batch, taps.rows())? };
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    unsafe {
+        proposal.commit(
+            batch,
+            &mut [a, b, c],
+            [&leases[0], &leases[1], &leases[2]],
+            &accepted,
+        )?;
+    }
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    assert!(unsafe {
+        proposal.commit(
+            batch,
+            &mut [a, b, c],
+            [&leases[0], &leases[1], &leases[2]],
+            &accepted,
+        )
+    }
+    .is_err());
+    drop(proposal);
+    let mut discarded = unsafe { main.execute_rows(taps.values(), batch, taps.rows())? };
+    let [a, b, c] = windows.as_mut_slice() else {
+        unreachable!()
+    };
+    // Even zero acceptance cannot publish a batch behind committed positions.
+    assert!(unsafe {
+        discarded.commit(
+            batch,
+            &mut [a, b, c],
+            [&leases[0], &leases[1], &leases[2]],
+            &[0; 16],
+        )
+    }
+    .is_err());
+    discarded.output()?;
+    drop(discarded);
+    assert!(main.output().is_err());
+    const STRIDE: usize = 128 * 528;
+    for stage in 0..3 {
+        let mut actual = vec![0; windows[stage].ring_for_test().bytes];
+        let mut expected = vec![0; full[stage].ring_for_test().bytes];
+        lib.copy_d2h(&mut actual, windows[stage].ring_for_test())?;
+        lib.copy_d2h(&mut expected, full[stage].ring_for_test())?;
+        for slot in 0..16 {
+            let n = accepted[slot] as usize;
+            let begin = slot * STRIDE;
+            let end = begin + n * 528;
+            assert_eq!(&actual[begin..end], &expected[begin..end]);
+            assert!(actual[end..begin + STRIDE].iter().all(|&b| b == 0x5a));
+            assert_eq!(
+                windows[stage].committed_end(leases[stage][slot])?,
+                if n == 0 { None } else { Some(n as u64) }
+            );
+        }
+    }
+    eprintln!("PASS dSpark accepted prefixes: all three FP8 rings exact; rejected tails untouched; zero/foreign/stale/duplicate-commit guards");
     Ok(())
 }
