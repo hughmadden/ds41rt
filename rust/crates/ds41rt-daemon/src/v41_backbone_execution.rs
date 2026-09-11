@@ -253,6 +253,22 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
     pub fn restart_for(&mut self, stage: CacheStage) {
         self.progress = PassProgress::for_stage(stage);
     }
+    /// Publish source 20 after a complete reserved encoder chunk.
+    /// # Safety
+    /// The layer-20 query belongs to this chunk and all earlier readers drained.
+    pub unsafe fn publish_encoder_boundary(&mut self, bank: &mut BackboneCache<'_>,
+        batch: &CacheBatch, lane: &BackboneLane<'_, '_>) -> Result<()> {
+        self.progress.begin_decoder_source(batch.identity())?;
+        ensure!(batch.is_reserved() && batch.stage() == CacheStage::Encoder,
+            "encoder boundary publication requires reserved prefill");
+        bank.validate_batch(batch)?;
+        let query = lane.query_output()?;
+        ensure!(query.layer == 20, "encoder boundary projection layer differs");
+        unsafe { bank.produce_source(batch, &query, &mut self.sources[3])?; }
+        bank.publish_encoder_source(batch, 20, &mut self.sources[3])?;
+        self.progress.finish_decoder_source();
+        Ok(())
+    }
     /// Produce global source 20 from the prepared encoder boundary, without
     /// running decoder attention, routing, shared FFN or remote experts.
     /// # Safety

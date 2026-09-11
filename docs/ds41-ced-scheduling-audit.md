@@ -285,3 +285,25 @@ The remaining integration is retaining/advancing independent chunk execution
 state, scheduling ready tasks, publishing the source-20 boundary, and handing the
 completed encoder suffix to decoder replay. Serving still uses the frozen serial
 CED deployment until that path is qualified end to end.
+
+## Implemented integration: complete reserved encoder transactions
+
+`Requests::publish_encoder_boundary` connects the prepared layer-20 query to
+source-20 production/publication. Execution marks the encoder source complete
+only after publication succeeds, allowing the ordinary combined cache/Engram
+commit to finish a fully published reserved chunk.
+
+The distributed test now completes two queued five-token chunks across all
+sixteen requests, executing all twenty encoder layers per chunk through the real
+RTX and four RoCE Spark workers. Both Engram layers, every learned encoder index,
+ratio-two carry across the odd chunk boundary and the ratio-one source-20 boundary
+execute. After the first combined commit, the successor remains valid and accepted
+history is five; after the second it is ten and decoder replay initialization
+succeeds for every request. Ordinary incomplete-pass rejection remains covered.
+The test passes in 5.94 s; logs are
+`/tmp/ds41-ced-bounds/reserved-encoder-{build,gpu}.log`.
+
+These chunks are queued ahead but still executed sequentially in this fixture.
+This qualifies the complete reserved encoder transaction and handoff readiness,
+not alternating execution, decoder output quality or serving performance. The
+next integration is the chunk task loop and retained independent execution state.

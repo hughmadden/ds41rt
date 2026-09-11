@@ -2,6 +2,14 @@
 use super::*;
 impl Requests<'_> {
     /// # Safety
+    /// The prepared layer-20 boundary and execution owner belong to this batch.
+    pub unsafe fn publish_encoder_boundary(&mut self, batch: &RequestBatch,
+        execution: &mut BackboneExecution<'_, '_>, lane: &BackboneLane<'_, '_>) -> Result<()> {
+        self.validate(batch)?;
+        unsafe { execution.publish_encoder_boundary(&mut self.cache, batch.cache()?, lane) }
+    }
+
+    /// # Safety
     /// The lane/query/index owners identify this batch and have completed their
     /// producers. Poll and complete the returned owner on the CUDA thread.
     pub unsafe fn prepare_encoder_layer<'l, 'lw, 'la>(&mut self, batch: &RequestBatch,

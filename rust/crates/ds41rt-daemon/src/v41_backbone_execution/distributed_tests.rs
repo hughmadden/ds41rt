@@ -94,7 +94,9 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
     )?;
     let engram_weights =
         EngramLayerWeights::load(&lib, &catalog, 0, 256 * 1024 * 1024, 16 * 1024 * 1024)?;
+    let engram14_weights = EngramLayerWeights::load(&lib, &catalog, 1, 256 * 1024 * 1024, 16 * 1024 * 1024)?;
     let mut gate = EngramGate::new(&engram_weights, 80, 128 * 1024 * 1024)?;
+    let mut gate14 = EngramGate::new(&engram14_weights, 80, 128 * 1024 * 1024)?;
     let mut upload = EngramDeviceRows::new(&lib, 80, EngramDeviceRows::device_bytes(80)?)?;
     let roce = V41Tp4Roce::new(
         peers,
@@ -219,9 +221,16 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             std::fs::write(dir.join(format!("layer1-c{cycle}-query.bin")), &rotated)?;
         }
         if cycle == 1 {
-            for layer in 1..=3 {
+            for layer in 1..20 {
                 if layer != 1 {
                     lane.advance()?;
+                    if layer == 14 {
+                        let deadline = Instant::now() + Duration::from_secs(120);
+                        while !unsafe { requests.poll_engram(&mut batch, &mut upload, &mut gate14, &mut lane)? } {
+                            ensure!(Instant::now() < deadline, "encoder layer-14 engram timed out");
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                    }
                     unsafe { lane.begin_prepared()?; }
                 }
                 let prepared = unsafe { requests.prepare_encoder_layer(&batch, &mut execution, &mut lane, &mut index)? };
@@ -229,7 +238,49 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
                 assert_eq!(lane.output()?.layer, layer);
             }
-            eprintln!("PASS reserved layers 0..3: early windows, ratio-two source publication, learned index reuse and queued successor");
+            lane.advance()?;
+            unsafe {
+                lane.begin_prepared()?;
+                requests.publish_encoder_boundary(&batch, &mut execution, &lane)?;
+            }
+            requests.commit(&mut batch, &mut execution, &[5; 16])?;
+            let mut successor = successor.take().context("queued encoder successor missing")?;
+            requests.validate(&successor)?;
+            for &lease in &leases { assert_eq!(requests.cache().committed_end(lease)?, 5); }
+            execution.restart_for(CacheStage::Encoder);
+            lane.restart()?; index.restart()?;
+            unsafe { requests.begin_text(&successor, &mut embedding, &mut lane)?; }
+            for layer in 0..20 {
+                if layer != 0 {
+                    lane.advance()?;
+                    if layer == 1 || layer == 14 {
+                        let current_gate = if layer == 1 { &mut gate } else { &mut gate14 };
+                        let deadline = Instant::now() + Duration::from_secs(120);
+                        while !unsafe { requests.poll_engram(&mut successor, &mut upload, current_gate, &mut lane)? } {
+                            ensure!(Instant::now() < deadline, "successor engram timed out");
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                    }
+                    unsafe { lane.begin_prepared()?; }
+                }
+                let prepared = unsafe { requests.prepare_encoder_layer(&successor, &mut execution, &mut lane, &mut index)? };
+                let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, successor.image_mask()) })?;
+                unsafe { execution.complete_layer(successor.cache()?, &mut lane, completed)?; }
+            }
+            lane.advance()?;
+            unsafe {
+                lane.begin_prepared()?;
+                requests.publish_encoder_boundary(&successor, &mut execution, &lane)?;
+            }
+            requests.commit(&mut successor, &mut execution, &[5; 16])?;
+            for &lease in &leases {
+                assert_eq!(requests.cache().committed_end(lease)?, 10);
+                assert_eq!(requests.begin_decoder_replay(lease)?, 0);
+                requests.release(lease)?;
+            }
+            eprintln!("PASS full reserved encoder: 16 requests, two queued chunks, all 20 layers, both Engrams, odd compressor carry, source-20 boundary and decoder readiness");
+            continue;
+
         }
         assert!(
             requests
