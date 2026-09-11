@@ -46,9 +46,24 @@ type Launch = unsafe extern "C" fn(
     *const RawView,
     *mut c_void,
 ) -> i32;
+type SplitLaunch = unsafe extern "C" fn(
+    *const u16,
+    *const f32,
+    *const u64,
+    *const i32,
+    *mut u16,
+    i32,
+    i32,
+    *const RawView,
+    *mut c_void,
+    *mut f32,
+    u64,
+    i32,
+) -> i32;
 pub struct V41SparseAttention<'a> {
     _library: &'a NativeLibrary,
     launch: Launch,
+    split_launch: SplitLaunch,
 }
 impl NativeLibrary {
     pub fn v41_sparse_attention(&self) -> Result<V41SparseAttention<'_>> {
@@ -65,10 +80,19 @@ impl NativeLibrary {
         Ok(V41SparseAttention {
             _library: self,
             launch: unsafe { *self.lib.get(b"ds41rt_v41_sparse_attention")? },
+            split_launch: unsafe { *self.lib.get(b"ds41rt_v41_sparse_attention_split")? },
         })
     }
 }
 impl V41SparseAttention<'_> {
+    pub fn split_scratch_bytes(rows: usize, parts: usize) -> Result<usize> {
+        ensure!(
+            (1..=4096).contains(&rows) && (1..=10).contains(&parts),
+            "invalid sparse attention split shape"
+        );
+        Ok(rows * parts * 64 * 514 * 4)
+    }
+
     /// # Safety
     /// Rotated BF16 queries [rows,64,512], finite FP32 sinks [64], U64 metadata
     /// [rows,10] and optional I32 source IDs [rows,512] follow the native header.
@@ -77,7 +101,9 @@ impl V41SparseAttention<'_> {
     /// and unique IDs are correct. Inputs remain immutable on the initialized
     /// stream device through completion/replay, with disjoint BF16 output.
     /// Width zero derives the causal maximum from the last metadata row; this
-    /// mode requires ascending query positions within the request.
+    /// mode requires ascending query positions within the request. Optional
+    /// split scratch is disjoint from all inputs/output and remains live through
+    /// replay; partitions alter softmax rounding and require separate qualification.
     pub unsafe fn launch(
         &self,
         query: Ds41rtDeviceBuffer,
@@ -89,6 +115,7 @@ impl V41SparseAttention<'_> {
         output: Ds41rtDeviceBuffer,
         rows: usize,
         window_width: usize,
+        split: Option<(Ds41rtDeviceBuffer, usize)>,
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!(
@@ -177,18 +204,38 @@ impl V41SparseAttention<'_> {
             view.page_stride = s.page_stride as u32;
             view.compressed = 1;
         }
-        let status = unsafe {
-            (self.launch)(
-                query.ptr.cast(),
-                sink.ptr.cast(),
-                metadata.ptr.cast(),
-                selected.map_or(std::ptr::null(), |b| b.ptr.cast()),
-                output.ptr.cast(),
-                rows as i32,
-                window_width as i32,
-                &view,
-                stream,
-            )
+        let status = if let Some((scratch, parts)) = split {
+            check(scratch, Self::split_scratch_bytes(rows, parts)?)?;
+            unsafe {
+                (self.split_launch)(
+                    query.ptr.cast(),
+                    sink.ptr.cast(),
+                    metadata.ptr.cast(),
+                    selected.map_or(std::ptr::null(), |b| b.ptr.cast()),
+                    output.ptr.cast(),
+                    rows as i32,
+                    window_width as i32,
+                    &view,
+                    stream,
+                    scratch.ptr.cast(),
+                    scratch.bytes as u64,
+                    parts as i32,
+                )
+            }
+        } else {
+            unsafe {
+                (self.launch)(
+                    query.ptr.cast(),
+                    sink.ptr.cast(),
+                    metadata.ptr.cast(),
+                    selected.map_or(std::ptr::null(), |b| b.ptr.cast()),
+                    output.ptr.cast(),
+                    rows as i32,
+                    window_width as i32,
+                    &view,
+                    stream,
+                )
+            }
         };
         ensure!(status == 0, "native sparse attention status {status}");
         Ok(())

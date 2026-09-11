@@ -86,6 +86,8 @@ def main():
     p.add_argument('--native-lib', type=Path, required=True)
     p.add_argument('--reference-dir', type=Path, required=True)
     p.add_argument('--large-only', action='store_true')
+    p.add_argument('--split-parts', type=int, choices=range(1, 11), default=None,
+                   help='Exercise the split ABI for rows <=16, sequential ABI above16')
     p.add_argument('--device', type=int, required=True)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
@@ -107,6 +109,18 @@ def main():
     launch = lib.ds41rt_v41_sparse_attention
     launch.argtypes = [C.c_void_p] * 5 + [C.c_int32, C.c_int32, C.POINTER(View), C.c_void_p]
     launch.restype = C.c_int32
+    if a.split_parts is not None:
+        original_launch = launch
+        split_launch = lib.ds41rt_v41_sparse_attention_split
+        split_launch.argtypes = launch.argtypes + [C.c_void_p, C.c_uint64, C.c_int32]
+        split_launch.restype = C.c_int32
+        scratch_storage = torch.full((16 * a.split_parts * 64 * 514 + 128,), 19.,
+                                     dtype=torch.float32, device=f'cuda:{a.device}')
+        scratch = scratch_storage[64:-64]
+        def launch(*args):
+            if 1 <= args[5] <= 16:
+                return split_launch(*args, scratch.data_ptr(), scratch.numel() * 4, a.split_parts)
+            return original_launch(*args)
     stream = torch.cuda.Stream()
     results = []
     with torch.device('cuda'), torch.cuda.stream(stream), tvm_ffi.use_torch_stream(), torch.no_grad():
@@ -219,7 +233,12 @@ def main():
             q.neg_()
             pages.copy_(pages.flip(0))
             host, ids = metadata(1)
+            if a.split_parts is not None:
+                scratch.fill_(float('nan'))
+            before = torch.cuda.memory_allocated(a.device)
             graph.replay()
+            stream.synchronize()
+            assert torch.cuda.memory_allocated(a.device) == before
             error = max(error, check(host, ids))
             # Device-side descriptor failures must not expose cache bytes.
             original = meta.clone()
@@ -229,6 +248,11 @@ def main():
                 meta.copy_(original); meta[:, field].copy_(torch.tensor([bad] * rows, dtype=torch.uint64))
                 graph.replay()
                 assert (out == 0).all().item(), (field, bad)
+            # Invalid rows must remain zero even if exp(sink) underflows.
+            saved_sink = sink.clone(); sink.fill_(-1000)
+            graph.replay()
+            assert (out == 0).all().item()
+            sink.copy_(saved_sink)
             meta.copy_(original)
             # All reads and output retain distinct spans, even during capture.
             args = [q.data_ptr(), sink.data_ptr(), meta.data_ptr(), selected.data_ptr() if compressed else 0,
@@ -237,13 +261,28 @@ def main():
                 bad = args.copy(); bad[field] = 0
                 assert launch(*bad) != 0
             bad = args.copy(); bad[4] = q.data_ptr(); assert launch(*bad) != 0
-            for field, badvalue in [(5, 0), (5, 4097), (6, 0), (6, 129)]:
+            for field, badvalue in [(5, 0), (5, 4097), (6, -1), (6, 129)]:
                 bad = args.copy(); bad[field] = badvalue; assert launch(*bad) != 0
+            if a.split_parts is not None and rows <= 16:
+                split_args = args + [scratch.data_ptr(), scratch.numel() * 4, a.split_parts]
+                required = rows * a.split_parts * 64 * 514 * 4
+                for field, value in [(9, 0), (10, required - 1), (11, 0), (11, 11),
+                                     (9, q.data_ptr()), (9, out.data_ptr()),
+                                     (9, values[0].data_ptr())]:
+                    bad = split_args.copy(); bad[field] = value
+                    assert split_launch(*bad) != 0
+            # Width zero is a supported graph-stable metadata-derived width.
+            host, ids = metadata(0)  # Width zero requires ascending positions.
+            derived = args.copy(); derived[6] = 0
+            assert launch(*derived) == 0
+            error = max(error, check(host, ids))
             results.append(dict(rows=rows, start=start, ratio=ratio, compressed=compressed,
                                 max_abs=error, official_reference_rows=min(rows, 8), changed_graph=True, metadata_guards=len(fields), span_guards=True))
             print('PASS', results[-1], flush=True)
         stream.synchronize()
-    a.output.write_text(json.dumps(dict(device=a.device, reference_lock=lock,
+        if a.split_parts is not None:
+            assert (scratch_storage[:64] == 19).all() and (scratch_storage[-64:] == 19).all()
+    a.output.write_text(json.dumps(dict(device=a.device, split_parts=a.split_parts, reference_lock=lock,
         oracle='Independent blockwise transcription for every row; actual pinned TileLang sparse attention for first min(rows,8) rows and all64 heads in independent16-head groups, before and after replay',
         native_library_sha256=hashlib.sha256(a.native_lib.read_bytes()).hexdigest(), cases=results), indent=2) + '\n')
 

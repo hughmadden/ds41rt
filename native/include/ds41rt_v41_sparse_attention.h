@@ -35,6 +35,15 @@ int32_t ds41rt_v41_sparse_attention_initialize(void);
 int32_t ds41rt_v41_sparse_attention(const uint16_t* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
     int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream);
+// Key partitions retain FP32 partial numerators/maxima/normalizers, then merge
+// into BF16 output. Rounding differs from sequential online softmax. Caller
+// owns disjoint scratch [rows,parts,64,514] FP32 through completion/replay;
+// every element is overwritten, so no scratch initialization is required.
+// Parts 1..10; no allocation, module resolution or synchronization at launch.
+int32_t ds41rt_v41_sparse_attention_split(const uint16_t* query,const float* sink,
+    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
+    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,
+    float* partial,uint64_t scratch_bytes,int32_t parts);
 #ifdef __cplusplus
 }
 #endif

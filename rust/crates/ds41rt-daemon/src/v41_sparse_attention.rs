@@ -41,6 +41,7 @@ pub(crate) struct SparseAttentionWave<'a> {
     kernel: V41SparseAttention<'a>,
     query: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
+    split_scratch: DeviceAllocation<'a>,
     metadata: DeviceAllocation<'a>,
     staging: HostAllocation<'a>,
     capacity: usize,
@@ -66,7 +67,7 @@ impl<'a> SparseAttentionWave<'a> {
             (1..=4096).contains(&capacity),
             "invalid sparse attention capacity"
         );
-        Ok(capacity * 131152)
+        Ok(capacity * 131152 + V41SparseAttention::split_scratch_bytes(capacity.min(16), 10)?)
     }
     pub fn new(library: &'a NativeLibrary, capacity: usize, budget: usize) -> Result<Self> {
         ensure!(
@@ -81,6 +82,10 @@ impl<'a> SparseAttentionWave<'a> {
             kernel: library.v41_sparse_attention()?,
             query: DeviceAllocation::new(library, capacity * 65536)?,
             output: DeviceAllocation::new(library, capacity * 65536)?,
+            split_scratch: DeviceAllocation::new(
+                library,
+                V41SparseAttention::split_scratch_bytes(capacity.min(16), 10)?,
+            )?,
             metadata: DeviceAllocation::new(library, capacity * 80)?,
             staging: HostAllocation::new(library, capacity * 80)?,
             capacity,
@@ -104,12 +109,17 @@ impl<'a> SparseAttentionWave<'a> {
                 }
             }
         }
-        match failure { Some(error) => Err(error), None => Ok(()) }
+        match failure {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
     fn clear_layer_graph(&mut self, layer: usize) -> Result<()> {
         self.synchronize()?;
         if let Some((g, _)) = self.graphs[layer].take() {
-            unsafe { self.stream.library.cuda_graph_exec_destroy(g)?; }
+            unsafe {
+                self.stream.library.cuda_graph_exec_destroy(g)?;
+            }
         }
         Ok(())
     }
@@ -132,6 +142,12 @@ impl<'a> SparseAttentionWave<'a> {
                     slice(self.output.buffer, offset * 65536, l.rows * 65536),
                     l.rows,
                     l.width,
+                    // All request launches share this arena on one stream;
+                    // each merge finishes before the next partial write.
+                    (l.rows <= 16).then_some((
+                        self.split_scratch.buffer,
+                        if l.source.is_some() { 10 } else { 2 },
+                    )),
                     self.stream.raw,
                 )?;
             }
@@ -329,7 +345,10 @@ impl<'a> SparseAttentionWave<'a> {
         self.stream
             .library
             .copy_h2d(self.metadata.buffer, &self.staging.bytes_mut()[..rows * 80])?;
-        if self.graphs[layer].as_ref().is_none_or(|(_, f)| f != &fingerprint) {
+        if self.graphs[layer]
+            .as_ref()
+            .is_none_or(|(_, f)| f != &fingerprint)
+        {
             tracing::debug!(target: "ds41rt::timing", layer, rows, "sparse graph capture");
             self.clear_layer_graph(layer)?;
             let launched = unsafe { self.enqueue(sink, &launches, selected) };
