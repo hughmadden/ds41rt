@@ -667,3 +667,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "v41_backbone_cache/commit_tests.rs"]
+mod commit_tests;

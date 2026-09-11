@@ -82,7 +82,8 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Restore RTX development testing using matching user-space libraries extracted under `/tmp`, without a host driver change. Re-run cache lifecycle, router reuse and graph ownership on RTX; qualify 48 real index-query fresh/rebound comparisons at 1/80/4096 rows. See `docs/ds41-rtx-testing-restored.md`.
 - [ ] GPU-qualify owned index execution, rebound queries, source-20 candidate retention and attention reuse across all eight producers, changed shapes, failures and two lanes.
 - [ ] Execute query-derived cache production and bank-derived index/attention views on RTX, including source-20 reuse across reindex layers and invalid-input recovery.
-- [ ] Execute accepted-prefix commits through all 44 cache producers, qualify partial-failure invalidation, and integrate bank batches with lane/index execution plus engram/dSpark scheduler transactions.
+- [x] Qualify accepted-prefix writes through all 44 real-weight cache producers on RTX: 16 requests, ring wrapping, ratio-two boundaries, zero acceptance, late source-page exhaustion and reclaimed-page commit recovery. See `docs/ds41-cache-commit-qualification.md`.
+- [ ] Integrate qualified cache-bank commits with the complete lane/index path and engram/dSpark scheduler transactions; qualify hardware/transport failure and competing-pass recovery.
 - [ ] Execute the integrated lane FFN method on RTX with real shared projection, verify failure/cancellation recovery across its components and measure actual Spark/shared overlap.
 - [ ] Execute the chained block/engram/prepared-query and owned dSpark tap paths on RTX, then connect them to scheduler-owned gather histories.
 - [x] Initialize target text residuals and identity pre-mix from the embedding table shared with dSpark, retaining token/position metadata and copying into layer-0 inputs; exact checkpoint comparisons and owner guards pass on Spark.

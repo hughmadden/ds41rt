@@ -1,0 +1,41 @@
+{
+  "scope": "All 44 real-weight cache producers, accepted-prefix persistent bytes/publication, and request invalidation/page reclamation after late source-pool exhaustion",
+  "gpu": "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+  "requests": 16,
+  "aot_capacity": 4096,
+  "proposal_tokens_per_request": [
+    9,
+    129,
+    3
+  ],
+  "live_rows": [
+    144,
+    2064,
+    48
+  ],
+  "success_source_pages": [
+    16,
+    16,
+    16,
+    16
+  ],
+  "failure_source_pages": [
+    16,
+    16,
+    16,
+    1
+  ],
+  "test": "real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure",
+  "result": "passed",
+  "seconds": 3.71,
+  "full_layer_execution": false,
+  "independent_reference_arithmetic": false,
+  "sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache.rs": "19ac976b8efc88a4420aa8603d8a25ec7c1995b48c6a8c612cb92c7346710b4a",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/commit_tests.rs": "ab1d29c5a17f67b0d6a5901a82654a3ca2059f07c661362e85863056f12463f9",
+    "rust/crates/ds41rt-daemon/src/v41_window.rs": "4dea84163d7f14f38ce4d506b1b20a588c41b22b9ae06d4327ab8c069073c88c",
+    "rust/crates/ds41rt-daemon/src/v41_compressor.rs": "cef2bc4149f682c0d2da4496db3ca6e9dadbe572d95802b4e239237ed846f034",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache.rs": "8455601262395da0bc679aa45583bdd308f97ad6b19c2998e539b442e90d1f19",
+    "/tmp/ds41-v41-aot/cmake/libds41rt_native.so": "854c317cf010bd20b54c22bc2be696b3b6c15586c0325caef18f585b0ed71a17"
+  }
+}
