@@ -5,7 +5,7 @@ use crate::{
     v41_tensors::NativeRtxTensors,
 };
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Kernel};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Plan};
 use ds41rt_loader::OfficialV41Catalog;
 
 pub(crate) struct EngramLayerWeights<'a> {
@@ -76,7 +76,7 @@ pub(crate) struct EngramGate<'weights, 'library> {
     projected: DeviceAllocation<'library>,
     scratch: DeviceAllocation<'library>,
     alpha: DeviceAllocation<'library>,
-    kernel: V41Fp8Kernel<'library>,
+    kernel: V41Fp8Plan<'library>,
     weights: &'weights EngramLayerWeights<'library>,
     capacity: usize,
     ready_rows: Option<usize>,
@@ -109,7 +109,7 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
             capacity > 0 && capacity <= 4096,
             "invalid engram gate capacity"
         );
-        let kernel = weights.library.v41_fp8_kernel(u32::try_from(capacity)?)?;
+        let kernel = weights.library.v41_fp8_matrix_plan(u32::try_from(capacity)?, 6144, 25600)?;
         let scratch_bytes = usize::try_from(kernel.info().scratch_bytes)?;
         let output_bytes = capacity * 4 * 5120 * 2;
         let projected_bytes = capacity * 5 * 5120 * 2;

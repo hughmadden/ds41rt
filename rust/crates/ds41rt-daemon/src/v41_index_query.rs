@@ -5,7 +5,7 @@ use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Compressor, V41Fp8Kernel};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Compressor, V41Fp8Plan};
 use ds41rt_loader::OfficialV41Catalog;
 use std::marker::PhantomData;
 
@@ -80,7 +80,7 @@ impl<'a> IndexQueryWeights<'a> {
             IndexQueryWave::device_bytes(self.library, capacity)? <= budget,
             "index query wave exceeds budget"
         );
-        let fp8 = self.library.v41_fp8_matrix_kernel(capacity, 1280, 4096)?;
+        let fp8 = self.library.v41_fp8_matrix_plan(capacity, 1280, 4096)?;
         let scratch = DeviceAllocation::new(self.library, fp8.info().scratch_bytes as usize)?;
         let workspace = DeviceAllocation::new(self.library, V41Compressor::WORKSPACE_BYTES)?;
         ensure!(
@@ -145,7 +145,7 @@ impl IndexQueryOutput<'_> {
 }
 pub(crate) struct IndexQueryWave<'w, 'a> {
     stream: LoadStream<'a>,
-    fp8: V41Fp8Kernel<'a>,
+    fp8: V41Fp8Plan<'a>,
     dense: V41Compressor<'a>,
     _workspace: DeviceAllocation<'a>,
     scratch: DeviceAllocation<'a>,
@@ -186,7 +186,7 @@ impl<'w, 'a> IndexQueryWave<'w, 'a> {
 }
 impl IndexQueryWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
-        let info = library.v41_fp8_matrix_info(capacity, 1280, 4096)?;
+        let info = library.v41_fp8_matrix_plan_info(capacity, 1280, 4096)?;
         Ok(V41Compressor::WORKSPACE_BYTES
             + info.scratch_bytes as usize
             + 4

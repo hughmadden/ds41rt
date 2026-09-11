@@ -26,6 +26,8 @@ mod v41_dspark;
 pub use v41_dspark::{V41DraftStep, V41DsparkConfidence, V41VocabularyProjection};
 mod v41_fp8;
 pub use v41_fp8::{V41Fp8Info, V41Fp8Kernel, V41SharedSwiGlu};
+mod v41_fp8_plan;
+pub use v41_fp8_plan::{V41Fp8Plan, V41Fp8PlanInfo};
 mod v41_experts;
 pub use v41_experts::{
     V41ExpertInfo, V41ExpertInputQuantizer, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPacker, V41ExpertPointer,

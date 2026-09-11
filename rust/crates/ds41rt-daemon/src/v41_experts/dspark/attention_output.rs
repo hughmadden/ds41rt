@@ -3,12 +3,12 @@ use super::{DsparkProjection, DsparkWeights, ProjectionKind};
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Kernel,
+    Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Plan,
 };
 use std::ffi::c_void;
 pub(crate) struct DsparkAttentionOutput<'weights, 'library> {
     stream: LoadStream<'library>,
-    grouped: V41Fp8Kernel<'library>,
+    grouped: V41Fp8Plan<'library>,
     grouped_scratch: DeviceAllocation<'library>,
     alpha: DeviceAllocation<'library>,
     scales: Ds41rtDeviceBuffer,
@@ -33,7 +33,7 @@ impl<'library> DsparkWeights<'library> {
             DsparkAttentionOutput::device_bytes(library, capacity)? <= budget,
             "dSpark attention output exceeds budget"
         );
-        let grouped = library.v41_fp8_matrix_kernel(capacity, 32768, 8192)?;
+        let grouped = library.v41_fp8_matrix_plan(capacity, 32768, 8192)?;
         let grouped_scratch = DeviceAllocation::new(library, grouped.info().scratch_bytes as usize)?;
         let alpha = DeviceAllocation::new(library, 4)?;
         let stream = LoadStream { library, raw: library.cuda_stream_create()? };
@@ -67,7 +67,7 @@ impl DsparkAttentionOutput<'_, '_> {
             (1..=4096).contains(&capacity),
             "invalid dSpark attention output capacity"
         );
-        Ok(library.v41_fp8_matrix_info(capacity, 32768, 8192)?.scratch_bytes as usize + 4 + capacity as usize * (65536 + 256))
+        Ok(library.v41_fp8_matrix_plan_info(capacity, 32768, 8192)?.scratch_bytes as usize + 4 + capacity as usize * (65536 + 256))
     }
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         DsparkProjection::device_bytes(library, ProjectionKind::OutputB(0), capacity)?

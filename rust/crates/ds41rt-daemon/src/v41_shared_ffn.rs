@@ -2,15 +2,15 @@
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Kernel, V41SharedSwiGlu};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Plan, V41SharedSwiGlu};
 use std::ffi::c_void;
 
 pub(crate) struct SharedFfn<'weights, 'library> {
     _weights: &'weights NativeRtxTensors<'library>,
     scales: &'weights [DeviceAllocation<'library>],
     tensors: [Ds41rtDeviceBuffer; 3],
-    up_kernel: V41Fp8Kernel<'library>,
-    down_kernel: V41Fp8Kernel<'library>,
+    up_kernel: V41Fp8Plan<'library>,
+    down_kernel: V41Fp8Plan<'library>,
     activation: V41SharedSwiGlu<'library>,
     up_scratch: DeviceAllocation<'library>,
     down_scratch: DeviceAllocation<'library>,
@@ -63,8 +63,8 @@ impl<'weights, 'library> SharedFfn<'weights, 'library> {
             Self::device_bytes(library, capacity)? <= budget,
             "shared FFN exceeds budget"
         );
-        let up_kernel = library.v41_fp8_matrix_kernel(capacity, 5120, 2304)?;
-        let down_kernel = library.v41_fp8_matrix_kernel(capacity, 2304, 5120)?;
+        let up_kernel = library.v41_fp8_matrix_plan(capacity, 5120, 2304)?;
+        let down_kernel = library.v41_fp8_matrix_plan(capacity, 2304, 5120)?;
         let value = SharedFfn {
             _weights: weights,
             scales,
@@ -109,8 +109,8 @@ impl<'weights, 'library> SharedFfn<'weights, 'library> {
 }
 impl SharedFfn<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
-        let up = library.v41_fp8_matrix_info(capacity, 5120, 2304)?;
-        let down = library.v41_fp8_matrix_info(capacity, 2304, 5120)?;
+        let up = library.v41_fp8_matrix_plan_info(capacity, 5120, 2304)?;
+        let down = library.v41_fp8_matrix_plan_info(capacity, 2304, 5120)?;
         usize::try_from(up.scratch_bytes + down.scratch_bytes + u64::from(capacity) * 2304 * 6 + 4)
             .context("shared FFN scratch budget overflow")
     }

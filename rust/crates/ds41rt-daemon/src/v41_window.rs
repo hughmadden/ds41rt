@@ -2,7 +2,7 @@
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel, V41Kv};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Plan, V41Kv};
 use ds41rt_loader::OfficialV41Catalog;
 use std::{
     ffi::c_void,
@@ -234,7 +234,7 @@ impl<'a> WindowWeights<'a> {
             WindowWave::device_bytes(self.library, capacity)? <= budget,
             "window wave exceeds budget"
         );
-        let fp8 = self.library.v41_fp8_matrix_kernel(capacity, 5120, 512)?;
+        let fp8 = self.library.v41_fp8_matrix_plan(capacity, 5120, 512)?;
         let rows = capacity as usize;
         let value = WindowWave {
             stream: LoadStream {
@@ -325,7 +325,7 @@ impl WindowProposal<'_> {
 }
 pub(crate) struct WindowWave<'w, 'a> {
     stream: LoadStream<'a>,
-    fp8: V41Fp8Kernel<'a>,
+    fp8: V41Fp8Plan<'a>,
     scratch: DeviceAllocation<'a>,
     alpha: DeviceAllocation<'a>,
     norm: V41AttentionOps<'a>,
@@ -347,7 +347,7 @@ pub(crate) struct WindowWave<'w, 'a> {
 impl WindowWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         Ok(library
-            .v41_fp8_matrix_info(capacity, 5120, 512)?
+            .v41_fp8_matrix_plan_info(capacity, 5120, 512)?
             .scratch_bytes as usize
             + 4
             + capacity as usize * 13088)

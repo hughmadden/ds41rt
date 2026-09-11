@@ -4,7 +4,7 @@ use crate::v41_layer_graphs::LayerGraphs;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Plan};
 use ds41rt_loader::OfficialV41Catalog;
 use std::marker::PhantomData;
 const MATRICES: [(u32, u32); 2] = [(5120, 1280), (1280, 32768)];
@@ -93,7 +93,7 @@ impl<'a> AttentionQueryWeights<'a> {
         };
         let kernels = MATRICES
             .into_iter()
-            .map(|(k, n)| self.library.v41_fp8_matrix_kernel(capacity, k, n))
+            .map(|(k, n)| self.library.v41_fp8_matrix_plan(capacity, k, n))
             .collect::<Result<Vec<_>>>()?;
         let scratch = kernels
             .iter()
@@ -158,7 +158,7 @@ impl AttentionQueryOutput<'_> {
 }
 pub(crate) struct AttentionQueryWave<'w, 'a> {
     stream: LoadStream<'a>,
-    kernels: Vec<V41Fp8Kernel<'a>>,
+    kernels: Vec<V41Fp8Plan<'a>>,
     scratch: Vec<DeviceAllocation<'a>>,
     alpha: DeviceAllocation<'a>,
     buffers: Vec<DeviceAllocation<'a>>,
@@ -191,7 +191,7 @@ impl AttentionQueryWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         let mut bytes = 4 + capacity as usize * ROW_BYTES.iter().sum::<usize>();
         for (k, n) in MATRICES {
-            bytes += library.v41_fp8_matrix_info(capacity, k, n)?.scratch_bytes as usize;
+            bytes += library.v41_fp8_matrix_plan_info(capacity, k, n)?.scratch_bytes as usize;
         }
         Ok(bytes)
     }

@@ -6,7 +6,7 @@ use crate::v41_sparse_attention::SparseAttentionOutput;
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Kernel,
+    Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Plan,
 };
 use ds41rt_loader::OfficialV41Catalog;
 use std::marker::PhantomData;
@@ -88,8 +88,8 @@ impl<'a> AttentionOutputWeights<'a> {
             library: self.library,
             raw: self.library.cuda_stream_create()?,
         };
-        let kernel = self.library.v41_fp8_matrix_kernel(capacity, 8192, 5120)?;
-        let grouped = self.library.v41_fp8_matrix_kernel(capacity, 32768, 8192)?;
+        let kernel = self.library.v41_fp8_matrix_plan(capacity, 8192, 5120)?;
+        let grouped = self.library.v41_fp8_matrix_plan(capacity, 32768, 8192)?;
         let grouped_scratch = DeviceAllocation::new(self.library, grouped.info().scratch_bytes as usize)?;
         let value = AttentionOutputWave {
             stream,
@@ -150,9 +150,9 @@ impl AttentionOutput<'_> {
 }
 pub(crate) struct AttentionOutputWave<'w, 'a> {
     stream: LoadStream<'a>,
-    grouped: V41Fp8Kernel<'a>,
+    grouped: V41Fp8Plan<'a>,
     grouped_scratch: DeviceAllocation<'a>,
-    kernel: V41Fp8Kernel<'a>,
+    kernel: V41Fp8Plan<'a>,
     scratch: DeviceAllocation<'a>,
     alpha: DeviceAllocation<'a>,
     norm: V41AttentionOps<'a>,
@@ -181,11 +181,11 @@ impl<'w, 'a> AttentionOutputWave<'w, 'a> {
 }
 impl AttentionOutputWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
-        Ok(library.v41_fp8_matrix_info(capacity, 32768, 8192)?.scratch_bytes as usize
+        Ok(library.v41_fp8_matrix_plan_info(capacity, 32768, 8192)?.scratch_bytes as usize
             + 4
             + capacity as usize * ROW_BYTES.iter().sum::<usize>()
             + library
-                .v41_fp8_matrix_info(capacity, 8192, 5120)?
+                .v41_fp8_matrix_plan_info(capacity, 8192, 5120)?
                 .scratch_bytes as usize)
     }
     fn b(&self, i: usize) -> Ds41rtDeviceBuffer {

@@ -3,7 +3,7 @@ use super::DsparkWeights;
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Kernel};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Fp8Plan};
 use std::ffi::c_void;
 
 #[derive(Clone, Copy, Debug)]
@@ -101,7 +101,7 @@ pub(super) fn pack_scales<'a>(
 }
 pub(crate) struct DsparkProjection<'weights, 'library> {
     stream: LoadStream<'library>,
-    kernel: V41Fp8Kernel<'library>,
+    kernel: V41Fp8Plan<'library>,
     _weights: &'weights DsparkWeights<'library>,
     weight: Ds41rtDeviceBuffer,
     scales: Ds41rtDeviceBuffer,
@@ -125,7 +125,7 @@ impl<'library> DsparkWeights<'library> {
             "dSpark projection exceeds budget"
         );
         let (index, name, k, n) = kind.binding()?;
-        let kernel = library.v41_fp8_matrix_kernel(capacity, k, n)?;
+        let kernel = library.v41_fp8_matrix_plan(capacity, k, n)?;
         let value = DsparkProjection {
             stream: LoadStream {
                 library,
@@ -160,7 +160,7 @@ impl DsparkProjection<'_, '_> {
         capacity: u32,
     ) -> Result<usize> {
         let (_, _, k, n) = kind.binding()?;
-        let info = library.v41_fp8_matrix_info(capacity, k, n)?;
+        let info = library.v41_fp8_matrix_plan_info(capacity, k, n)?;
         usize::try_from(
             info.scratch_bytes + u64::from(capacity) * (u64::from(k) + u64::from(n)) * 2 + 4,
         )

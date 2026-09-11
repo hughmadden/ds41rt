@@ -464,7 +464,7 @@ mod tests {
             read_official_v41_catalog(OFFICIAL_V41_MODEL_ID, std::path::Path::new(&model))?;
         // Checkpoint payload extents plus the native AOT packed-scale metadata.
         let weight_bytes = BackboneLaneWeights::device_bytes(&library, &catalog)?;
-        assert_eq!(weight_bytes, 8_195_346_880);
+        assert_eq!(weight_bytes, 6_896_423_360);
         let rejected = BackboneLaneWeights::load(&library, &catalog, weight_bytes - 1, 1024 * 1024);
         assert!(rejected
             .err()
@@ -475,7 +475,7 @@ mod tests {
             library: &library,
             layers: vec![],
         };
-        for (capacity, expected) in [(1, 5_059_453usize), (80, 62_696_284), (4096, 2_997_686_284)] {
+        for (capacity, expected) in [(1, 986_141usize), (80, 59_553_116), (4096, 2_964_176_908)] {
             let groups = BackboneLane::workspace_bytes(&library, capacity)?;
             let total: usize = groups.iter().sum();
             assert_eq!(total, expected);
