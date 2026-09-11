@@ -130,12 +130,25 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 kind: ExpertV2SourceKind::Prefill,
             })
             .collect::<Vec<_>>();
-        let mut batch = requests.prepare(&work)?;
+        if cycle == 1 {
+            for &lease in &leases { requests.begin_encoder(lease, 10)?; }
+            execution.restart_for(CacheStage::Encoder);
+        }
+        let mut batch = if cycle == 1 { requests.reserve_encoder(&work)? } else { requests.prepare(&work)? };
         let positions = batch.cache()?.positions();
         unsafe {
             requests.begin_text(&batch, &mut embedding, &mut lane)?;
         }
         let start = Instant::now();
+        let mut successor = None;
+        if cycle == 1 {
+            let prepared = unsafe { requests.prepare_encoder_layer(&batch, &mut execution, &mut lane, &mut index)? };
+            // The prepared FFN borrows the lane, but no request/cache owner.
+            successor = Some(requests.reserve_encoder(&work)?);
+            for &lease in &leases { assert_eq!(requests.cache().committed_end(lease)?, 0); }
+            let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, batch.image_mask()) })?;
+            unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
+        } else {
         runtime.block_on(unsafe {
             execution.execute_layer(
                 requests.cache(),
@@ -147,6 +160,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 batch.image_mask(),
             )
         })?;
+        }
         let output = lane.output()?;
         assert_eq!(output.layer, 0);
         assert_eq!(output.tokens, positions);
@@ -204,6 +218,19 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             std::fs::write(dir.join(format!("layer1-c{cycle}-gated.bin")), &gated)?;
             std::fs::write(dir.join(format!("layer1-c{cycle}-query.bin")), &rotated)?;
         }
+        if cycle == 1 {
+            for layer in 1..=3 {
+                if layer != 1 {
+                    lane.advance()?;
+                    unsafe { lane.begin_prepared()?; }
+                }
+                let prepared = unsafe { requests.prepare_encoder_layer(&batch, &mut execution, &mut lane, &mut index)? };
+                let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, batch.image_mask()) })?;
+                unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
+                assert_eq!(lane.output()?.layer, layer);
+            }
+            eprintln!("PASS reserved layers 0..3: early windows, ratio-two source publication, learned index reuse and queued successor");
+        }
         assert!(
             requests
                 .commit(&mut batch, &mut execution, &[5; 16])
@@ -213,6 +240,8 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         for &lease in &leases {
             assert!(requests.cache().committed_end(lease).is_err());
         }
+        if let Some(successor) = successor { assert!(requests.validate(&successor).is_err()); }
+
         eprintln!("PASS cycle={cycle} rows=80 requests=16 actual distributed layer0 -> mapped layer1 engram -> prepared query; incomplete commit revoked request histories; elapsed={:.3}s", start.elapsed().as_secs_f64());
     }
     Ok(())

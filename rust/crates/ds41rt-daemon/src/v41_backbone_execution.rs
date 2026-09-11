@@ -49,6 +49,16 @@ impl PreparedLayer<'_, '_, '_> {
     }
 }
 
+enum LayerCache<'b, 'a> {
+    Ordinary(&'b BackboneCache<'a>),
+    Encoder(&'b mut BackboneCache<'a>),
+}
+impl<'a> LayerCache<'_, 'a> {
+    fn bank(&self) -> &BackboneCache<'a> {
+        match self { Self::Ordinary(bank) => bank, Self::Encoder(bank) => bank }
+    }
+}
+
 pub(crate) struct CacheProducerWeights<'a> {
     library: &'a NativeLibrary,
     windows: Vec<WindowWeights<'a>>,
@@ -288,32 +298,52 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
     pub unsafe fn prepare_layer<'l, 'lw, 'la>(&mut self, bank: &BackboneCache<'_>,
         batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
         index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
+        unsafe { self.prepare_layer_with_cache(LayerCache::Ordinary(bank), batch, lane, index) }
+    }
+    /// Prepare a reserved encoder layer and publish source/window KV before
+    /// returning its FFN owner. Published sources feed all later index consumers.
+    /// # Safety
+    /// Same query/owner contract as prepare_layer; earlier readers have drained.
+    pub unsafe fn prepare_encoder_layer<'l, 'lw, 'la>(&mut self, bank: &mut BackboneCache<'_>,
+        batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
+        index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
+        ensure!(batch.is_reserved() && batch.stage() == CacheStage::Encoder,
+            "published execution requires a reserved encoder batch");
+        unsafe { self.prepare_layer_with_cache(LayerCache::Encoder(bank), batch, lane, index) }
+    }
+    unsafe fn prepare_layer_with_cache<'l, 'lw, 'la>(&mut self, mut bank: LayerCache<'_, '_>,
+        batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
+        index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
+        let publishing = matches!(&bank, LayerCache::Encoder(_));
         let timing = std::time::Instant::now();
         // Invalidate even if obtaining the completed query or bank check fails.
         let layer = self.progress.next;
         self.progress.begin(batch.identity(), layer)?;
         ensure!(batch.stage() == self.progress.stage, "backbone execution/cache phase differs");
-        bank.validate_batch(batch)?;
+        bank.bank().validate_batch(batch)?;
         let query = lane.query_output()?;
         ensure!(
             query.layer == layer,
             "backbone query layer differs from pass"
         );
         unsafe {
-            bank.produce_window(batch, &query, &mut self.windows[layer])?;
+            bank.bank().produce_window(batch, &query, &mut self.windows[layer])?;
         }
         if let Some(i) = SOURCES.iter().position(|&l| l == layer).filter(|_| batch.stage() != CacheStage::Replay) {
             unsafe {
-                bank.produce_source(batch, &query, &mut self.sources[i])?;
+                bank.bank().produce_source(batch, &query, &mut self.sources[i])?;
+            }
+            if let LayerCache::Encoder(bank) = &mut bank {
+                bank.publish_encoder_source(batch, layer, &mut self.sources[i])?;
             }
         }
         let produced_us = timing.elapsed().as_micros() as u64;
         let source = SOURCES
             .iter()
             .rposition(|&l| l <= layer)
-            .filter(|_| batch.stage() != CacheStage::Replay)
+            .filter(|_| batch.stage() != CacheStage::Replay && !publishing)
             .map(|i| &self.sources[i]);
-        let cache = bank.attention(batch, layer, &self.windows[layer], source)?;
+        let cache = bank.bank().attention(batch, layer, &self.windows[layer], source)?;
         if INDEX.contains(&layer) {
             unsafe {
                 lane.select_index(index, &cache)?;
@@ -326,6 +356,10 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             .get(&format!("layers.{layer}.attn.attn_sink"))?;
         let rows = batch.expert_rows();
         let ffn = unsafe { lane.attention_indexed_ffn(sink, &cache, index)? };
+        drop(cache);
+        if let LayerCache::Encoder(bank) = &mut bank {
+            bank.publish_encoder_window(batch, layer, &mut self.windows[layer])?;
+        }
         Ok(PreparedLayer { ffn, rows, batch: batch.identity(), layer, started: timing,
             produced_us, indexed_us, attended_us: timing.elapsed().as_micros() as u64 })
     }

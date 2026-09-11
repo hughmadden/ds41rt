@@ -1,6 +1,17 @@
 //! Bind reserved prompt rows to a private Engram preparation frontier.
 use super::*;
 impl Requests<'_> {
+    /// # Safety
+    /// The lane/query/index owners identify this batch and have completed their
+    /// producers. Poll and complete the returned owner on the CUDA thread.
+    pub unsafe fn prepare_encoder_layer<'l, 'lw, 'la>(&mut self, batch: &RequestBatch,
+        execution: &mut BackboneExecution<'_, '_>, lane: &'l mut BackboneLane<'lw, 'la>,
+        index: &mut crate::v41_index_lane::IndexLane<'_, '_>)
+        -> Result<crate::v41_backbone_execution::PreparedLayer<'l, 'lw, 'la>> {
+        self.validate(batch)?;
+        unsafe { execution.prepare_encoder_layer(&mut self.cache, batch.cache()?, lane, index) }
+    }
+
     pub fn reserve_encoder(&mut self, requests: &[RequestTokens<'_>]) -> Result<RequestBatch> {
         ensure!(!requests.is_empty() && requests.len() <= 16, "invalid encoder request count");
         let mut prepared = Vec::with_capacity(requests.len());

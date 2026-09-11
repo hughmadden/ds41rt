@@ -60,6 +60,7 @@ pub(crate) struct CacheBatch {
 }
 impl CacheBatch {
     pub fn stage(&self) -> CacheStage { self.stage }
+    pub fn is_reserved(&self) -> bool { self.reserved }
     pub fn identity(&self) -> u64 {
         self.identity
     }

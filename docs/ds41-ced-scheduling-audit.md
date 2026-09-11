@@ -260,3 +260,28 @@ library path passed. No GPU or worker restart was needed. Early encoder KV
 publication and multi-chunk task scheduling still need to be connected to this
 split execution interface. These are component results, not a new serving
 throughput measurement.
+
+## Implemented integration: reserved layer publication and execution
+
+`Requests::prepare_encoder_layer` now connects reserved request validation to
+`BackboneExecution::prepare_encoder_layer`. Source KV is committed immediately
+after production, before indexing/attention, so the first learned selection and
+subsequent consumers share the committed snapshot identity. Window KV is
+published only after synchronous attention consumers drain. The returned
+`PreparedLayer` borrows its lane, not the request/cache bank; another chunk can
+be reserved while that FFN owner remains alive. Ordinary execution uses the same
+preparation body with publication disabled.
+
+The expanded real distributed test passes in 5.59 s on RTX plus four RoCE Sparks.
+It executes reserved layers 0–3 over eighty rows/sixteen requests, covering
+mapped Engram, ratio-two source publication at layer 2, learned-index reuse at
+layer 3, and all four remote expert calls. A successor is reserved while layer
+zero's FFN owner is live, accepted history remains at zero, and incomplete-pass
+failure revokes both chunks. This proves interface ownership and actual reserved
+layer execution, not simultaneous execution of the two chunks or full-model
+numerical equivalence. Logs: `/tmp/ds41-ced-bounds/published-layer-{build,gpu}.log`.
+
+The remaining integration is retaining/advancing independent chunk execution
+state, scheduling ready tasks, publishing the source-20 boundary, and handing the
+completed encoder suffix to decoder replay. Serving still uses the frozen serial
+CED deployment until that path is qualified end to end.
