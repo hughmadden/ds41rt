@@ -362,6 +362,63 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
     assert_eq!(next.stage(), CacheStage::Full);
     bank.release(&ced)?;
     eprintln!("PASS 16 CED transactions: encoder 64+65, replay 63+65, untouched global/encoder bytes, full decode readiness");
+    // Reserve two chunks before any execution. Publish layer-major to model
+    // later chunks reaching an early layer while earlier chunks await FFN.
+    let queued = (0..16).map(|slot| bank.begin_request(slot, 4000 + slot as u64))
+        .collect::<Result<Vec<_>>>()?;
+    for &lease in &queued { bank.begin_encoder(lease, 129)?; }
+    let work = |tokens| queued.iter().map(|&lease| CacheWork {
+        lease, tokens, kind: ExpertV2SourceKind::Prefill,
+    }).collect::<Vec<_>>();
+    let first = bank.reserve_encoder(&work(64))?;
+    let second = bank.reserve_encoder(&work(65))?;
+    assert_eq!(first.requests[0].position, 0);
+    assert_eq!(second.requests[0].position, 64);
+    assert!(bank.reserve_encoder(&work(1)).is_err());
+    assert!(bank.plan(&work(1)).is_err());
+    assert!(bank.commit(&first, &mut windows, &mut sources, &[64; 16]).is_err());
+    for layer in 0..20 {
+        for batch in [&first, &second] {
+            let input = vec![0u8; batch.positions().len() * 5120 * 2];
+            lib.copy_h2d(windows[layer].input(), &input)?;
+            unsafe { windows[layer].execute(bank.window(batch, layer)?, &batch.window_chunks(layer)?)?; }
+            bank.publish_encoder_window(batch, layer, &mut windows[layer])?;
+            for &lease in &queued { assert_eq!(bank.committed_end(lease)?, 0); }
+        }
+    }
+    for (i, &layer) in SOURCES.iter().enumerate() {
+        for batch in [&first, &second] {
+            let input = vec![0u8; batch.positions().len() * 5120 * 2];
+            lib.copy_h2d(sources[i].input(), &input)?;
+            unsafe { sources[i].execute(bank.source(batch, layer)?, &batch.source_chunks(layer)?)?; }
+            bank.publish_encoder_source(batch, layer, &mut sources[i])?;
+        }
+    }
+    assert!(bank.commit(&second, &mut windows, &mut sources, &[65; 16]).is_err());
+    bank.commit(&first, &mut windows, &mut sources, &[64; 16])?;
+    bank.validate_batch(&second)?;
+    assert!(bank.validate_batch(&first).is_err());
+    for &lease in &queued { assert_eq!(bank.committed_end(lease)?, 64); }
+    bank.commit(&second, &mut windows, &mut sources, &[65; 16])?;
+    for &lease in &queued {
+        assert_eq!(bank.committed_end(lease)?, 129);
+        assert_eq!(bank.begin_decoder_replay(lease)?, 1);
+    }
+    bank.release(&queued)?;
+    assert!(bank.validate_batch(&second).is_err());
+    let queued = (0..16).map(|slot| bank.begin_request(slot, 5000 + slot as u64))
+        .collect::<Result<Vec<_>>>()?;
+    for &lease in &queued { bank.begin_encoder(lease, 32)?; }
+    let work = queued.iter().map(|&lease| CacheWork { lease, tokens: 1,
+        kind: ExpertV2SourceKind::Prefill }).collect::<Vec<_>>();
+    for position in 0..16 {
+        let batch = bank.reserve_encoder(&work)?;
+        assert_eq!(batch.requests[0].position, position);
+    }
+    assert!(bank.reserve_encoder(&work).is_err());
+    for &lease in &queued { assert_eq!(bank.request(lease)?.publication.len(), 16); }
+    bank.release(&queued)?;
+    eprintln!("PASS 16-request encoder reservations: layer-major 64+65, ordered completion, generation survival, capacity and release");
     // Source 20 exhausts after all 40 windows and the first three sources write.
     for early in [false, true] {
     let pages = [16, 16, 16, 1];

@@ -30,7 +30,7 @@ struct Request {
     version: u64,
     end: u64,
     phase: CachePhase,
-    publication: Option<publication::EncoderPublication>,
+    publication: std::collections::VecDeque<publication::EncoderPublication>,
     windows: [WindowLease; 40],
     sources: [CompressorLease; 4],
 }
@@ -53,6 +53,7 @@ struct BatchRequest {
 pub(crate) struct CacheBatch {
     stage: CacheStage,
     replay_snapshot: Option<u64>,
+    reserved: bool,
     identity: u64,
     owner: u64,
     requests: Vec<BatchRequest>,
@@ -279,7 +280,7 @@ impl<'a> BackboneCache<'a> {
             version: 0,
             end: 0,
             phase: CachePhase::Full,
-            publication: None,
+            publication: std::collections::VecDeque::new(),
             windows: windows.try_into().ok().expect("40 windows"),
             sources: sources.try_into().ok().expect("four sources"),
         });
@@ -296,27 +297,27 @@ impl<'a> BackboneCache<'a> {
         let r = self.request(lease)?;
         for (layer, (state, &l)) in self.windows.iter().zip(&r.windows).enumerate() {
             ensure!(
-                state.request_id(l)? == r.id && state.end(l)? == r.publication.as_ref().filter(|p| p.windows & (1u64 << layer) != 0)
+                state.request_id(l)? == r.id && state.end(l)? == r.publication.iter().rev().find(|p| p.windows & (1u64 << layer) != 0)
                     .map_or(r.phase.window_end(layer, r.end), |p| p.end),
                 "window request history differs"
             );
         }
         for (i, (state, &l)) in self.sources.iter().zip(&r.sources).enumerate() {
             ensure!(
-                state.request_id(l)? == r.id && state.committed_end(l)? == r.publication.as_ref()
-                    .filter(|p| p.sources & (1 << i) != 0).map_or(r.end, |p| p.end),
+                state.request_id(l)? == r.id && state.committed_end(l)? == r.publication.iter().rev()
+                    .find(|p| p.sources & (1 << i) != 0).map_or(r.end, |p| p.end),
                 "source request history differs"
             );
         }
         Ok(r.end)
     }
     pub fn plan(&self, work: &[CacheWork]) -> Result<CacheBatch> {
-        self.plan_stage(work, false)
+        self.plan_stage(work, false, false)
     }
     pub fn plan_replay(&self, work: &[CacheWork]) -> Result<CacheBatch> {
-        self.plan_stage(work, true)
+        self.plan_stage(work, true, false)
     }
-    fn plan_stage(&self, work: &[CacheWork], replay: bool) -> Result<CacheBatch> {
+    fn plan_stage(&self, work: &[CacheWork], replay: bool, reserve: bool) -> Result<CacheBatch> {
         self.healthy()?;
         ensure!(
             !work.is_empty() && work.len() <= 16,
@@ -336,14 +337,21 @@ impl<'a> BackboneCache<'a> {
             ensure!(rows <= 4096, "cache batch exceeds lane capacity");
             self.committed_end(item.lease)?;
             let live = self.request(item.lease)?;
-            ensure!(live.publication.is_none(), "encoder chunk publication is still pending");
             let current = live.phase.stage();
+            if reserve {
+                ensure!(current == CacheStage::Encoder && live.publication.len() < 16
+                    && live.publication.iter().all(|p| p.reserved),
+                    "encoder reservation capacity or phase differs");
+            } else {
+                ensure!(live.publication.is_empty(), "encoder chunk publication is still pending");
+            }
             ensure!(current == CacheStage::Full || item.kind == ExpertV2SourceKind::Prefill,
                 "CED phase requires prefill work");
             ensure!((current == CacheStage::Replay) == replay, "wrong cache planning phase");
             ensure!(stage.is_none_or(|s| s == current), "mixed cache phases in batch");
             stage = Some(current);
-            let position = live.phase.position(live.end);
+            let position = if reserve { live.publication.back().map_or(live.end, |p| p.end) }
+                else { live.phase.position(live.end) };
             live.phase.validate_tokens(position, item.tokens)?;
             ensure!(
                 position
@@ -365,6 +373,7 @@ impl<'a> BackboneCache<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .map_err(|_| anyhow::anyhow!("cache batch IDs exhausted"))?;
         Ok(CacheBatch {
+            reserved: reserve,
             stage: stage.context("empty cache batch")?,
             replay_snapshot: if replay || stage == Some(CacheStage::Encoder) { Some(crate::v41_compressor::reserve_source_snapshot()?) } else { None },
             identity,
@@ -378,14 +387,15 @@ impl<'a> BackboneCache<'a> {
         for r in &batch.requests {
             self.committed_end(r.work.lease)?;
             let live = self.request(r.work.lease)?;
-            ensure!(
-                live.id == r.id
-                    && live.publication.as_ref().is_none_or(|p| p.batch == batch.identity)
-                    && live.version == r.version
-                    && live.phase.stage() == batch.stage
-                    && live.phase.position(live.end) == r.position,
-                "stale backbone cache batch"
-            );
+            let position_valid = if batch.reserved {
+                live.publication.iter().any(|p| p.reserved && p.batch == batch.identity
+                    && p.start == r.position && p.end == r.position + u64::from(r.work.tokens))
+            } else {
+                live.publication.front().is_none_or(|p| !p.reserved && p.batch == batch.identity)
+                    && live.version == r.version && live.phase.position(live.end) == r.position
+            };
+            ensure!(live.id == r.id && live.phase.stage() == batch.stage && position_valid,
+                "stale backbone cache batch");
         }
         Ok(())
     }
@@ -548,6 +558,16 @@ impl<'a> BackboneCache<'a> {
                 .context("backbone cache version exhausted")?;
         }
         let (published_windows, published_sources) = self.publication_masks(batch)?;
+        if batch.reserved {
+            ensure!(published_windows == (1u64 << 20) - 1 && published_sources == 15,
+                "reserved encoder completion requires all KV published");
+            for r in &batch.requests {
+                let live = self.request(r.work.lease)?;
+                ensure!(live.publication.front().is_some_and(|p| p.batch == batch.identity)
+                    && live.end == r.position, "encoder chunks must complete in order");
+                live.version.checked_add(1).context("cache version exhausted")?;
+            }
+        }
         if published_windows != 0 || published_sources != 0 {
             ensure!(batch.requests.iter().zip(accepted).all(|(r, &n)| n == r.work.tokens),
                 "published encoder chunk requires full acceptance");
@@ -590,7 +610,7 @@ impl<'a> BackboneCache<'a> {
                 .expect("validated live request");
             live.phase.advance(&mut live.end, r.position + u64::from(n));
             live.version += 1;
-            live.publication = None;
+            if !live.publication.is_empty() { live.publication.pop_front(); }
         }
         Ok(())
     }

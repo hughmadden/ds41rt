@@ -176,3 +176,34 @@ the next token. It also rejects out-of-order, foreign, stale, partial-predecesso
 and equal-length divergent-predecessor batches. Results are in
 `/tmp/ds41-ced-bounds/engram-lookahead-tests.log`. This is preparation state support;
 serving does not yet schedule several chunks concurrently.
+
+## Implemented prerequisite: bounded encoder reservations
+
+`BackboneCache::reserve_encoder` now reserves contiguous prompt chunks before
+execution, capped at sixteen outstanding chunks per request. Planning validates
+all participants and the prompt extent before changing any reservation queue.
+Reservations retain admission identity and their exact token range; completing an
+earlier chunk no longer invalidates a later reserved chunk merely because the
+request completion version advanced.
+
+Physical KV validation follows the latest published reservation for each owner,
+while logical completion stays at the oldest unfinished chunk. Source/window
+producer validation still requires the expected physical starting position.
+Reserved chunks must publish all twenty windows and four sources before final
+completion; final completion is ordered and requires full acceptance. Request
+release revokes all queued chunks. The ordinary planner remains exclusive with
+reservations, preserving existing decode/speculative transaction behavior.
+
+The real-weight GPU test now reserves 64+65 rows for all sixteen requests before
+executing either chunk, publishes both chunks layer by layer, then finishes them
+in order. It verifies that logical completion remains zero throughout publication,
+advances to 64 then 129, and allows decoder replay only after completion. It also
+checks out-of-order/incomplete completion rejection, successor validity after
+predecessor completion, stale-batch release rejection, and the sixteen-chunk cap.
+The full cache test passes in 4.24 s, including existing ordinary and early-write
+failure/recovery cases. Logs are `/tmp/ds41-ced-bounds/reservation-{build,gpu}.log`.
+
+This supersedes the single-pending-chunk restriction described in the earlier
+publication section. Integration with request-owned Engram cursors, retained
+chunk execution state, task scheduling and the API remains unfinished. The
+running CED artifacts and measured throughput are unchanged.

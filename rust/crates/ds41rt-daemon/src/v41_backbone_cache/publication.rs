@@ -3,15 +3,32 @@ use super::*;
 
 pub(super) struct EncoderPublication {
     pub batch: u64,
+    pub start: u64,
     pub end: u64,
+    pub reserved: bool,
     pub windows: u64,
     pub sources: u8,
 }
 impl BackboneCache<'_> {
+    /// Reserve contiguous known prompt rows, with at most sixteen outstanding
+    /// chunks per request. Failed planning changes no participant. Releasing a
+    /// request cancels every reservation; completion must follow reservation order.
+    pub fn reserve_encoder(&mut self, work: &[CacheWork]) -> Result<CacheBatch> {
+        let batch = self.plan_stage(work, false, true)?;
+        for r in &batch.requests {
+            self.requests[r.work.lease.slot].as_mut().expect("validated request")
+                .publication.push_back(EncoderPublication {
+                    batch: batch.identity, start: r.position,
+                    end: r.position + u64::from(r.work.tokens), reserved: true,
+                    windows: 0, sources: 0,
+                });
+        }
+        Ok(batch)
+    }
     pub(super) fn publication_masks(&self, batch: &CacheBatch) -> Result<(u64, u8)> {
         let mut masks = None;
         for r in &batch.requests {
-            let current = self.request(r.work.lease)?.publication.as_ref()
+            let current = self.request(r.work.lease)?.publication.iter().find(|p| p.batch == batch.identity)
                 .map_or((0, 0), |p| (p.windows, p.sources));
             ensure!(masks.is_none_or(|prior| prior == current),
                 "encoder publication participants differ");
@@ -38,10 +55,15 @@ impl BackboneCache<'_> {
         }
         for r in &batch.requests {
             let live = self.requests[r.work.lease.slot].as_mut().expect("validated request");
-            let p = live.publication.get_or_insert(EncoderPublication {
-                batch: batch.identity, end: r.position + u64::from(r.work.tokens),
-                windows: 0, sources: 0,
-            });
+            if live.publication.is_empty() {
+                live.publication.push_back(EncoderPublication {
+                    batch: batch.identity, start: r.position,
+                    end: r.position + u64::from(r.work.tokens), reserved: false,
+                    windows: 0, sources: 0,
+                });
+            }
+            let p = live.publication.iter_mut().find(|p| p.batch == batch.identity)
+                .expect("validated publication reservation");
             p.windows |= window;
             p.sources |= source;
         }
