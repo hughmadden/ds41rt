@@ -1,4 +1,6 @@
 mod local;
+mod local_client;
+pub(crate) use local_client::LocalTp4Client;
 pub use local::LocalVerbsExpertConnection;
 use anyhow::{bail, Context, Result};
 use ds41rt_core::{ExpertRequest, ExpertResponse};

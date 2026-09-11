@@ -1,11 +1,12 @@
 //! TP4 dispatch through persistent RoCE QPs; TCP is used only for bootstrap.
 use super::{V41BackboneRequest, V41Tp4ChunkReceiver};
-use crate::{ExpertProtocolV2Request, TcpTransportConfig, VerbsHostProtocolV2PersistentClient};
+use crate::verbs::LocalTp4Client;
+use crate::{ExpertProtocolV2Request, TcpTransportConfig};
 use anyhow::{ensure, Result};
 use std::net::SocketAddr;
 
 pub struct V41Tp4Roce {
-    clients: [VerbsHostProtocolV2PersistentClient; 4],
+    clients: LocalTp4Client,
     executors: [u64; 4],
     capacity: u32,
     max_frame_bytes: usize,
@@ -41,12 +42,7 @@ impl V41Tp4Roce {
             );
         }
         Ok(Self {
-            clients: peers
-                .into_iter()
-                .map(|peer| VerbsHostProtocolV2PersistentClient::new(peer, config.clone()))
-                .collect::<Result<Vec<_>>>()?
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("four RoCE clients required"))?,
+            clients: LocalTp4Client::new(peers, config.clone()),
             executors,
             capacity,
             max_frame_bytes: config.max_frame_bytes,
@@ -58,9 +54,7 @@ impl V41Tp4Roce {
     /// Reset persistent QPs before a new admission. Pending dispatches borrow this
     /// owner exclusively, so an in-flight wave cannot be reset through this API.
     pub fn reset_connections(&mut self) {
-        for client in &mut self.clients {
-            client.reset();
-        }
+        self.clients.reset();
     }
 
     /// Send the same canonical request to all ranks and accept every route row.
@@ -75,8 +69,8 @@ impl V41Tp4Roce {
         self.dispatch(request).await?.receive(sink).await
     }
 
-    /// Enqueue all four requests on their QP owners. Network/GPU work overlaps
-    /// the coordinator shared FFN; enqueue completion is not send completion.
+    /// Post all four requests directly from the inference owner. Remote work
+    /// overlaps the shared FFN; dispatch completion is not send completion.
     pub async fn dispatch<'c, 'r>(
         &'c mut self,
         request: &'r ExpertProtocolV2Request,
@@ -88,21 +82,8 @@ impl V41Tp4Roce {
         );
         let native = V41BackboneRequest::parse(&frame, self.capacity)?;
         let receiver = V41Tp4ChunkReceiver::new(&native, self.executors, self.max_frame_bytes)?;
-        let (chunks_tx, chunks) = tokio::sync::mpsc::unbounded_channel();
-        let mut pending = Vec::with_capacity(4);
-        for (rank, client) in self.clients.iter().enumerate() {
-            match client.enqueue_response_chunks(request.clone(), rank, chunks_tx.clone()) {
-                Ok(done) => pending.push(done),
-                Err(error) => {
-                    self.reset_connections();
-                    return Err(error);
-                }
-            }
-        }
-        drop(chunks_tx);
+        self.clients.dispatch(request)?;
         Ok(V41Tp4RocePending {
-            pending,
-            chunks,
             receiver,
             owner: self,
             _request: std::marker::PhantomData,
@@ -114,9 +95,6 @@ impl V41Tp4Roce {
 /// Holds exclusive admission until all four rank planes have been consumed.
 /// Cancellation resets the QPs before another wave can reuse them.
 pub struct V41Tp4RocePending<'c, 'r> {
-    pending:
-        Vec<tokio::sync::oneshot::Receiver<Result<crate::VerbsHostProtocolV2ResponseStreamStats>>>,
-    chunks: tokio::sync::mpsc::UnboundedReceiver<crate::VerbsHostProtocolV2ResponseChunk>,
     receiver: V41Tp4ChunkReceiver,
     owner: &'c mut V41Tp4Roce,
     _request: std::marker::PhantomData<&'r ExpertProtocolV2Request>,
@@ -127,20 +105,29 @@ impl V41Tp4RocePending<'_, '_> {
     where
         F: FnMut(usize, u32, &[u8]) -> Result<()>,
     {
-        // One admitted wave and transport-side validation bound the channel to
-        // four rank planes. No next wave can enqueue while this owner is borrowed.
-        while let Some(chunk) = self.chunks.recv().await {
-            self.receiver.push_rdma(&chunk, |rank, start, bytes| {
-                ensure!(
-                    rank == chunk.stream_id,
-                    "native executor identity does not match its RoCE peer"
-                );
-                sink(rank, start, bytes)
-            })?;
-        }
-        for done in std::mem::take(&mut self.pending) {
-            done.await
-                .map_err(|_| anyhow::anyhow!("RoCE owner stopped before completion"))??;
+        // Progress all four QPs on the inference owner. Yield for cancellation
+        // and other work after bounded polling; no blocking completion wait.
+        let mut quantum = std::time::Instant::now();
+        loop {
+            let receiver = &mut self.receiver;
+            if self.owner.clients.poll(|chunk| {
+                receiver.push_rdma(chunk, |rank, start, bytes| {
+                    ensure!(
+                        rank == chunk.stream_id,
+                        "native executor identity does not match its RoCE peer"
+                    );
+                    sink(rank, start, bytes)
+                })?;
+                Ok(())
+            })? {
+                break;
+            }
+            if quantum.elapsed() >= std::time::Duration::from_micros(250) {
+                tokio::task::yield_now().await;
+                quantum = std::time::Instant::now();
+            } else {
+                std::hint::spin_loop();
+            }
         }
         ensure!(
             self.receiver.complete(),
@@ -162,6 +149,99 @@ impl Drop for V41Tp4RocePending<'_, '_> {
 mod tests {
     use super::*;
     use crate::{VerbsHostProtocolV2ResponseChunk, VerbsHostProtocolV2ResponsePayload};
+
+    #[test]
+    #[ignore = "requires four idle live V4.1 FP8 RoCE expert workers"]
+    fn local_qps_replay_cancel_and_recover_live() -> Result<()> {
+        let peers: [SocketAddr; 4] = std::env::var("DS41RT_LIVE_ROCE_PEERS")?
+            .split(',')
+            .map(str::parse)
+            .collect::<std::result::Result<Vec<_>, _>>()?
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("four peers required"))?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        runtime.block_on(async {
+            let mut client = V41Tp4Roce::new(
+                peers,
+                [1, 2, 3, 4],
+                80,
+                TcpTransportConfig {
+                    timeout: std::time::Duration::from_secs(10),
+                    max_frame_bytes: 2 * 1024 * 1024,
+                },
+            )?;
+            for rows in [1, 6, 16, 80, 1] {
+                let base = super::super::tests::request(rows);
+                let mut payload = Vec::new();
+                for row in 0..rows {
+                    payload.extend(
+                        (0..5120).map(|i| {
+                            0x30 + ((i + row) % 8) as u8 + if i % 2 == 0 { 0x80 } else { 0 }
+                        }),
+                    );
+                    payload.extend([120; 160]);
+                }
+                let mut request = ExpertProtocolV2Request::new(
+                    1000 + rows as u64,
+                    base.header.placement_version,
+                    39,
+                    5120,
+                    crate::ExpertV2Dtype::Fp8E4m3Ue8m0K32,
+                    base.rows,
+                    base.routes,
+                    payload,
+                )?;
+                request.header.flags = base.header.flags;
+                let mut expected = None;
+                for repetition in 0..3 {
+                    request.header.request_id += 1;
+                    let mut planes = vec![vec![0; rows as usize * 10240]; 4];
+                    client
+                        .execute(&request, |rank, start, bytes| {
+                            let offset = start as usize * 10240;
+                            planes[rank][offset..offset + bytes.len()].copy_from_slice(bytes);
+                            Ok(())
+                        })
+                        .await?;
+                    for plane in &planes {
+                        ensure!(
+                            plane
+                                .chunks_exact(2)
+                                .any(|b| u16::from_le_bytes([b[0], b[1]]) & 0x7fff != 0),
+                            "zero expert plane"
+                        );
+                        ensure!(
+                            plane
+                                .chunks_exact(2)
+                                .all(|b| u16::from_le_bytes([b[0], b[1]]) & 0x7f80 != 0x7f80),
+                            "nonfinite expert plane"
+                        );
+                    }
+                    if let Some(ref previous) = expected {
+                        ensure!(previous == &planes, "replay changed rank planes");
+                    }
+                    expected = Some(planes);
+                    if repetition == 0 {
+                        request.header.request_id += 1;
+                        // Abandon after posting all ranks, before receiving any.
+                        drop(client.dispatch(&request).await?);
+                    } else if repetition == 1 {
+                        request.header.request_id += 1;
+                        let failed = client
+                            .execute(&request, |_, _, _| anyhow::bail!("injected sink failure"))
+                            .await;
+                        ensure!(failed.is_err(), "sink failure was swallowed");
+                    }
+                }
+                eprintln!(
+                    "local QPs rows={rows}: exact replay after abandoned dispatch and sink failure"
+                );
+            }
+            Ok(())
+        })
+    }
 
     #[test]
     fn rdma_chunks_preserve_rank_rows_and_reject_stale_or_reordered_data() -> Result<()> {

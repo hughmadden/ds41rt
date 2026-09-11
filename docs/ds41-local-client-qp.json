@@ -1,0 +1,204 @@
+{
+  "daemon_sha256": "69c868eb530d14555d5fdddaab6fc66d7a9ec011112e078175b06eabd212062b",
+  "native_sha256": "cf202558ee672d1c34a273e9c62d09b1ca8f6bad1367f1cae2c63ceedc5f3560",
+  "baseline_root": "d0b1afb",
+  "b12x_revision": "907d5fd556fa729752e6c2c51c4bcf434196bbe0",
+  "qualification": {
+    "protocol_tests_passed": 8,
+    "live_fixture_rows": [
+      1,
+      6,
+      16,
+      80,
+      1
+    ],
+    "live_completed_waves": 15,
+    "abandoned_dispatches": 5,
+    "injected_sink_failures": 5,
+    "rank_planes_finite_nonzero": true,
+    "rank_planes_exact_after_recovery": true,
+    "quiet_quality_cases_exact_to_instrumented": 8,
+    "final_artifact_quality_cases_exact": 8
+  },
+  "api": {
+    "target": {
+      "baseline": {
+        "samples_tps": [
+          34.06469589422317,
+          33.99945840105917,
+          34.027209402491735
+        ],
+        "median_tps": 34.027209402491735
+      },
+      "candidate": {
+        "samples_tps": [
+          34.33317288605501,
+          35.07046634839691,
+          35.30756979673273
+        ],
+        "median_tps": 35.07046634839691
+      },
+      "candidate2": {
+        "samples_tps": [
+          34.63985903008811,
+          35.11715157160538,
+          35.30429259357752
+        ],
+        "median_tps": 35.11715157160538
+      },
+      "quiet_baseline": {
+        "samples_tps": [
+          35.59975651881959,
+          35.49315036182773,
+          35.69086753837664
+        ],
+        "median_tps": 35.59975651881959
+      },
+      "quiet_candidate": {
+        "samples_tps": [
+          36.215368082282225,
+          36.48166277577627,
+          36.46144999801456
+        ],
+        "median_tps": 36.46144999801456
+      },
+      "quiet_candidate_over_baseline": 1.024205038558043,
+      "final_quiet_candidate": {
+        "samples_tps": [
+          35.71779395217594,
+          36.28159920949223,
+          36.449215924354014
+        ],
+        "median_tps": 36.28159920949223
+      }
+    },
+    "spec": {
+      "baseline": {
+        "samples_tps": [
+          104.58895868455618,
+          109.08394358446562,
+          108.2932245194125
+        ],
+        "median_tps": 108.2932245194125
+      },
+      "candidate": {
+        "samples_tps": [
+          108.8217557086629,
+          111.77827152028058,
+          112.0039224934697
+        ],
+        "median_tps": 111.77827152028058
+      },
+      "candidate2": {
+        "samples_tps": [
+          111.60169011484967,
+          111.77349948679314,
+          111.81505304855594
+        ],
+        "median_tps": 111.77349948679314
+      },
+      "quiet_baseline": {
+        "samples_tps": [
+          110.28863404705974,
+          110.91225478691995,
+          110.196135504992
+        ],
+        "median_tps": 110.28863404705974
+      },
+      "quiet_candidate": {
+        "samples_tps": [
+          113.43310656836411,
+          113.39574404660635,
+          112.33979796798681
+        ],
+        "median_tps": 113.39574404660635
+      },
+      "quiet_candidate_over_baseline": 1.0281725313437178,
+      "final_quiet_candidate": {
+        "samples_tps": [
+          114.01798881196179,
+          113.52951466461576,
+          113.746275888046
+        ],
+        "median_tps": 113.746275888046
+      }
+    }
+  },
+  "quality": [
+    {
+      "case": "arithmetic",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": true,
+      "objective": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "case": "signed_sort",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": true,
+      "objective": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "case": "extraction",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": true,
+      "objective": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "case": "logic",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": true,
+      "objective": {
+        "target": true,
+        "speculative": true
+      }
+    },
+    {
+      "case": "unicode",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": false,
+      "objective": {
+        "target": false,
+        "speculative": false
+      }
+    },
+    {
+      "case": "translation",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": true,
+      "objective": {
+        "target": null,
+        "speculative": null
+      }
+    },
+    {
+      "case": "explanation",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": true,
+      "objective": {
+        "target": null,
+        "speculative": null
+      }
+    },
+    {
+      "case": "long_retrieval",
+      "text_and_usage_preserved": true,
+      "text_equal_between_modes": true,
+      "objective": {
+        "target": true,
+        "speculative": true
+      }
+    }
+  ],
+  "raw_artifacts": "/tmp/ds41-local-client",
+  "scope": "Sequential C1 short counting measurements on unchanged Spark workers. Quiet disables coordinator transport timing and debug tracing only. No formal clock admission, isolated link-latency result, broad quality, C16, or prefill qualification.",
+  "initial_daemon_sha256": "e1586ad4b346e701b71f9aaaeca94b1f29bb011ebf7343e82b8d720a2bc08c42"
+}
