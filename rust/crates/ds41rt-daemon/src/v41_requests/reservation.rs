@@ -65,3 +65,54 @@ impl Requests<'_> {
             leases: requests.iter().map(|r| r.lease).collect(), tokens, image_mask: mask, finished: false })
     }
 }
+
+struct PairGuard<'r, 'a> {
+    requests: &'r mut Requests<'a>,
+    batches: [&'r mut RequestBatch; 2],
+    complete: bool,
+}
+impl Drop for PairGuard<'_, '_> {
+    fn drop(&mut self) {
+        if !self.complete {
+            for batch in &mut self.batches { self.requests.revoke_batch(batch); }
+        }
+    }
+}
+impl Requests<'_> {
+    /// Run one layer of two ordered encoder chunks. The second attention is
+    /// prepared while the first remote FFN is pending; both lanes retain their
+    /// own query/index/residual storage. Cancellation revokes both admissions.
+    /// # Safety
+    /// Both prepared queries are on the owning CUDA thread/device; chunks are
+    /// ordered, and the two lanes, executions and transports are independent.
+    pub async unsafe fn execute_encoder_pair_layer(&mut self,
+        batches: [&mut RequestBatch; 2],
+        executions: [&mut BackboneExecution<'_, '_>; 2],
+        lanes: [&mut BackboneLane<'_, '_>; 2],
+        indices: [&mut crate::v41_index_lane::IndexLane<'_, '_>; 2],
+        transports: [&mut crate::v41_experts::coordinator::NativeTp4Wave<'_>; 2],
+    ) -> Result<()> {
+        let mut guard = PairGuard { requests: self, batches, complete: false };
+        let [first, second] = &mut guard.batches;
+        let [exec0, exec1] = executions;
+        let [lane0, lane1] = lanes;
+        let [index0, index1] = indices;
+        let [transport0, transport1] = transports;
+        guard.requests.validate(first)?;
+        guard.requests.validate(second)?;
+        let prepared = unsafe { guard.requests.prepare_encoder_layer(first, exec0, lane0, index0)? };
+        let (done0, done1) = tokio::try_join!(
+            unsafe { prepared.execute(transport0, 0, first.image_mask()) },
+            async {
+                let prepared = unsafe { guard.requests.prepare_encoder_layer(second, exec1, lane1, index1)? };
+                unsafe { prepared.execute(transport1, 0, second.image_mask()).await }
+            },
+        )?;
+        unsafe {
+            exec0.complete_layer(first.cache()?, lane0, done0)?;
+            exec1.complete_layer(second.cache()?, lane1, done1)?;
+        }
+        guard.complete = true;
+        Ok(())
+    }
+}

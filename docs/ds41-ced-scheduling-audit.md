@@ -307,3 +307,29 @@ These chunks are queued ahead but still executed sequentially in this fixture.
 This qualifies the complete reserved encoder transaction and handoff readiness,
 not alternating execution, decoder output quality or serving performance. The
 next integration is the chunk task loop and retained independent execution state.
+
+## Implemented integration: paired encoder task execution
+
+`Requests::execute_encoder_pair_layer` now runs two ordered chunks with independent
+lane/index/execution owners and TP4 RoCE connection sets. It prepares the first
+attention, then cooperatively polls its remote FFN alongside preparation and
+execution of the second chunk. The first request's published KV is therefore
+available before the second attention, while request history remains unaccepted.
+Both outputs complete before advancing the pair to the next layer. An enclosing
+RAII guard revokes both batches on returned error or future cancellation.
+
+The distributed fixture runs this loop through all twenty encoder layers for
+sixteen requests, two five-token chunks each. Both final residual and pre-state
+byte arrays exactly match an earlier sequential reserved-encoder run with the
+same token inputs and math. Both source-20 boundaries then publish, combined
+commits advance to ten tokens, and decoder replay initialization succeeds. The
+full test passes in 6.31 s. Logs:
+`/tmp/ds41-ced-bounds/paired-encoder-{build,gpu}.log`.
+
+This is actual paired task execution, not just reservation metadata. It is still
+a small component fixture with a barrier between layer pairs; the test does not
+measure GPU/NIC overlap duration, prove a throughput gain, or qualify cancellation
+at every in-flight transport stage. Native serving must instantiate the additional
+owners and route prefill through the pair loop, retain/capture the encoder suffix,
+and qualify large prompts plus target/dSpark decode before rollout. Wider
+wavefront scheduling and C16 API admission remain separate work.

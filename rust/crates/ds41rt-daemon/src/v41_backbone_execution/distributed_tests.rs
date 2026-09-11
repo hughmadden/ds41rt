@@ -14,6 +14,16 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn encoder_bytes(lib: &NativeLibrary, lane: &BackboneLane<'_, '_>) -> Result<Vec<u8>> {
+    let out = lane.output()?;
+    let mut bytes = Vec::new();
+    for buffer in [out.residual, out.pre] {
+        let start = bytes.len(); bytes.resize(start + buffer.bytes, 0);
+        lib.copy_d2h(&mut bytes[start..], buffer)?;
+    }
+    Ok(bytes)
+}
+
 #[test]
 fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
     let Some(path) = std::env::var_os("DS41RT_LAYER0_LIBRARY") else {
@@ -112,6 +122,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         .enable_all()
         .build()?;
     let mut previous = None;
+    let mut reference_encoder = Vec::new();
     for cycle in 0..2 {
         execution.restart();
         lane.restart()?;
@@ -238,6 +249,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
                 assert_eq!(lane.output()?.layer, layer);
             }
+            reference_encoder.push(encoder_bytes(&lib, &lane)?);
             lane.advance()?;
             unsafe {
                 lane.begin_prepared()?;
@@ -267,6 +279,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, successor.image_mask()) })?;
                 unsafe { execution.complete_layer(successor.cache()?, &mut lane, completed)?; }
             }
+            reference_encoder.push(encoder_bytes(&lib, &lane)?);
             lane.advance()?;
             unsafe {
                 lane.begin_prepared()?;
@@ -295,5 +308,63 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
 
         eprintln!("PASS cycle={cycle} rows=80 requests=16 actual distributed layer0 -> mapped layer1 engram -> prepared query; incomplete commit revoked request histories; elapsed={:.3}s", start.elapsed().as_secs_f64());
     }
+    assert_eq!(reference_encoder.len(), 2);
+    let mut lane1 = BackboneLane::new(&weights, 80, BackboneLane::workspace_bytes(&lib, 80)?.into_iter().sum())?;
+    let mut index1 = IndexLane::new(&index_weights, 80, IndexLane::workspace_bytes(&lib, 80)?.into_iter().sum())?;
+    let mut execution1 = BackboneExecution::new(&producers, 80, BackboneExecution::workspace_bytes(&lib, 80)?)?;
+    let roce1 = V41Tp4Roce::new(peers, [1, 2, 3, 4], 80, TcpTransportConfig {
+        timeout: Duration::from_secs(120), max_frame_bytes: 2 * 1024 * 1024,
+    })?;
+    let mut transport1 = NativeTp4Wave::new(&lib, roce1, NativeTp4Wave::device_bytes(80)?)?;
+    let leases = (0..16).map(|slot| requests.admit(slot, 3000 + slot as u64)).collect::<Result<Vec<_>>>()?;
+    for &lease in &leases { requests.begin_encoder(lease, 10)?; }
+    let tokens = (0..80u32).map(|i| (i * 7919 + 113 + 17) % 129280).collect::<Vec<_>>();
+    let work = leases.iter().zip(tokens.chunks_exact(5)).map(|(&lease, tokens)| RequestTokens {
+        lease, tokens, image_mask: None, kind: ExpertV2SourceKind::Prefill,
+    }).collect::<Vec<_>>();
+    let mut first = requests.reserve_encoder(&work)?;
+    let mut second = requests.reserve_encoder(&work)?;
+    execution.restart_for(CacheStage::Encoder); execution1.restart_for(CacheStage::Encoder);
+    lane.restart()?; lane1.restart()?; index.restart()?; index1.restart()?;
+    unsafe {
+        requests.begin_text(&first, &mut embedding, &mut lane)?;
+        requests.begin_text(&second, &mut embedding, &mut lane1)?;
+    }
+    for layer in 0..20 {
+        if layer != 0 {
+            for (batch, current_lane) in [(&mut first, &mut lane), (&mut second, &mut lane1)] {
+                current_lane.advance()?;
+                if layer == 1 || layer == 14 {
+                    let current_gate = if layer == 1 { &mut gate } else { &mut gate14 };
+                    let deadline = Instant::now() + Duration::from_secs(120);
+                    while !unsafe { requests.poll_engram(batch, &mut upload, current_gate, current_lane)? } {
+                        ensure!(Instant::now() < deadline, "paired encoder engram timed out");
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
+                }
+                unsafe { current_lane.begin_prepared()?; }
+            }
+        }
+        runtime.block_on(unsafe { requests.execute_encoder_pair_layer(
+            [&mut first, &mut second], [&mut execution, &mut execution1],
+            [&mut lane, &mut lane1], [&mut index, &mut index1], [&mut transport, &mut transport1]) })?;
+    }
+    assert_eq!(encoder_bytes(&lib, &lane)?, reference_encoder[0], "first paired encoder differs from serial");
+    assert_eq!(encoder_bytes(&lib, &lane1)?, reference_encoder[1], "second paired encoder differs from serial");
+    for (batch, current_lane, current_execution) in [(&mut first, &mut lane, &mut execution),
+        (&mut second, &mut lane1, &mut execution1)] {
+        current_lane.advance()?;
+        unsafe {
+            current_lane.begin_prepared()?;
+            requests.publish_encoder_boundary(batch, current_execution, current_lane)?;
+        }
+        requests.commit(batch, current_execution, &[5; 16])?;
+    }
+    for &lease in &leases {
+        assert_eq!(requests.cache().committed_end(lease)?, 10);
+        assert_eq!(requests.begin_decoder_replay(lease)?, 0);
+        requests.release(lease)?;
+    }
+    eprintln!("PASS paired encoder: two independent lanes/QP sets, all 20 layers, 16 requests, both final residual/pre outputs byte-identical to sequential");
     Ok(())
 }
