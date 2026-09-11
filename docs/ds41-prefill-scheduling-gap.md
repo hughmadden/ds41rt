@@ -1,5 +1,9 @@
 # Missing CED prefill and inherited scheduling gaps
 
+Historical audit: the missing CED execution described below was fixed by the
+[bounded CED rollout](ds41-ced-serving.md). Scheduling remains open; see the
+[post-CED dependency audit](ds41-ced-scheduling-audit.md) for current constraints.
+
 The deployed native path does not obtain DeepSeek V4.1's advertised 8B prefill
 compute benefit. It runs all forty backbone layers for every prompt token. This
 is a more important performance gap than the attention fragment prototype tested
