@@ -1,0 +1,333 @@
+{
+  "b12x_revision": "907d5fd556fa729752e6c2c51c4bcf434196bbe0",
+  "native_sha256": "cf202558ee672d1c34a273e9c62d09b1ca8f6bad1367f1cae2c63ceedc5f3560",
+  "daemon_sha256": "3906379bf67cc1e3bc6db4eb6c05284a4ffafca27cdd400968c41c3619236c18",
+  "qualification": {
+    "synthetic_cases": 32,
+    "real_weight_sets": 86,
+    "real_cases": 774,
+    "max_abs": 1.0728836059570312e-06,
+    "invalid_calls": 13,
+    "tolerance": {
+      "rtol": 2e-05,
+      "atol": 2e-06
+    },
+    "query_fixture_cases": 56,
+    "ctests_passed": 2,
+    "previous_aot_objects_byte_identical": 133
+  },
+  "component": [
+    {
+      "rows": 1,
+      "max_abs": {
+        "random": 5.960464477539063e-08,
+        "zero": 0.0,
+        "small": 0.0,
+        "large": 5.960464477539063e-08
+      },
+      "median_us": [
+        16.406399756669998,
+        6.428800150752068
+      ]
+    },
+    {
+      "rows": 2,
+      "max_abs": {
+        "random": 8.940696716308594e-08,
+        "zero": 0.0,
+        "small": 0.0,
+        "large": 5.960464477539063e-08
+      },
+      "median_us": [
+        16.40560030937195,
+        8.217599987983704
+      ]
+    },
+    {
+      "rows": 6,
+      "max_abs": {
+        "random": 1.1920928955078125e-07,
+        "zero": 0.0,
+        "small": 5.960464477539063e-08,
+        "large": 2.384185791015625e-07
+      },
+      "median_us": [
+        16.413599997758865,
+        8.265600353479385
+      ]
+    },
+    {
+      "rows": 16,
+      "max_abs": {
+        "random": 1.1920928955078125e-07,
+        "zero": 0.0,
+        "small": 5.960464477539063e-08,
+        "large": 2.384185791015625e-07
+      },
+      "median_us": [
+        16.702400147914886,
+        12.323200330138206
+      ]
+    },
+    {
+      "rows": 17,
+      "max_abs": {
+        "random": 0.0,
+        "zero": 0.0,
+        "small": 0.0,
+        "large": 0.0
+      },
+      "median_us": [
+        34.8800003528595,
+        34.87199991941452
+      ]
+    },
+    {
+      "rows": 80,
+      "max_abs": {
+        "random": 0.0,
+        "zero": 0.0,
+        "small": 0.0,
+        "large": 0.0
+      },
+      "median_us": [
+        40.78879952430725,
+        40.79599976539612
+      ]
+    },
+    {
+      "rows": 256,
+      "max_abs": {
+        "random": 0.0,
+        "zero": 0.0,
+        "small": 0.0,
+        "large": 0.0
+      },
+      "median_us": [
+        67.99519956111908,
+        67.99840033054352
+      ]
+    },
+    {
+      "rows": 4096,
+      "max_abs": {
+        "random": 0.0,
+        "zero": 0.0,
+        "small": 0.0,
+        "large": 0.0
+      },
+      "median_us": [
+        956.4159870147705,
+        956.7399978637695
+      ]
+    }
+  ],
+  "api": {
+    "target": {
+      "baseline": {
+        "cycle_medians_tps": [
+          32.01360213527358,
+          31.315707422533645
+        ],
+        "samples_tps": [
+          31.82149554268079,
+          32.20690349162041,
+          32.01360213527358,
+          31.208835814504628,
+          31.315707422533645,
+          31.34486016965624
+        ],
+        "pooled_median_tps": 31.583177856168515
+      },
+      "candidate": {
+        "cycle_medians_tps": [
+          32.955763037658194,
+          33.13975450409874
+        ],
+        "samples_tps": [
+          32.889821387376756,
+          32.955763037658194,
+          33.30657312795503,
+          33.05639732283713,
+          33.13975450409874,
+          33.24483020887356
+        ],
+        "pooled_median_tps": 33.09807591346794
+      },
+      "candidate_over_baseline": 1.0479653461155287
+    },
+    "spec": {
+      "baseline": {
+        "cycle_medians_tps": [
+          101.6645289662428,
+          103.68800018283957
+        ],
+        "samples_tps": [
+          105.95273867991455,
+          101.6645289662428,
+          101.3459948516404,
+          102.67176648260472,
+          105.0929115880167,
+          103.68800018283957
+        ],
+        "pooled_median_tps": 103.17988333272214
+      },
+      "candidate": {
+        "cycle_medians_tps": [
+          108.81698616287939,
+          107.12942419703708
+        ],
+        "samples_tps": [
+          103.25214067122471,
+          109.62025340988258,
+          108.81698616287939,
+          103.03169153021831,
+          107.12942419703708,
+          107.20506440081276
+        ],
+        "pooled_median_tps": 107.16724429892491
+      },
+      "candidate_over_baseline": 1.038644751645481
+    }
+  },
+  "quality": [
+    {
+      "case": "arithmetic",
+      "text_equal_between_modes": true,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": "signed_sort",
+      "text_equal_between_modes": true,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": "extraction",
+      "text_equal_between_modes": true,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": "logic",
+      "text_equal_between_modes": true,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        }
+      }
+    },
+    {
+      "case": "unicode",
+      "text_equal_between_modes": false,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": false,
+          "usage_equal_to_baseline": true,
+          "objective_pass": false
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": false
+        }
+      }
+    },
+    {
+      "case": "translation",
+      "text_equal_between_modes": true,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": null
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": "explanation",
+      "text_equal_between_modes": true,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": null
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": null
+        }
+      }
+    },
+    {
+      "case": "long_retrieval",
+      "text_equal_between_modes": true,
+      "usage_equal_between_modes": true,
+      "modes": {
+        "target": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        },
+        "speculative": {
+          "text_equal_to_baseline": true,
+          "usage_equal_to_baseline": true,
+          "objective_pass": true
+        }
+      }
+    }
+  ],
+  "raw_artifacts": "/tmp/ds41-mhc-split",
+  "scope": "Warm component and short counting API measurements; no formal clock admission, representative throughput, broad quality, or release qualification."
+}

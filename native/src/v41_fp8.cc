@@ -24,6 +24,8 @@ struct Variant {
   int device = -1;
 };
 Variant variants[] = {DS41RT_V41_FP8_VARIANTS};
+Module hc_project = DS41RT_V41_HC_PROJECT_MODULE;
+int hc_device = -1;
 std::mutex mutex;
 Variant* capacity(int rows, int k, int n) { for (auto& v : variants) if (int(v.info.capacity_rows) == rows && int(v.info.input_dim) == k && int(v.info.output_dim) == n) return &v; return nullptr; }
 Variant* handle(void* p) { for (auto& v : variants) if (&v == p) return &v; return nullptr; }
@@ -134,4 +136,32 @@ extern "C" int32_t ds41rt_v41_fp8_info(int32_t rows, ds41rt_v41_fp8_info_t* out)
 }
 extern "C" int32_t ds41rt_v41_fp8_initialize(int32_t rows, void** out) {
   return ds41rt_v41_fp8_matrix_initialize(rows, 6144, 25600, out);
+}
+
+
+// Loaded once during mHC planning; no module resolution or allocation on replay.
+extern "C" int32_t ds41rt_v41_hc_project_initialize() {
+  int device, major, minor;
+  auto status=cudaGetDevice(&device); if(status) return status;
+  status=cudaDeviceGetAttribute(&major,cudaDevAttrComputeCapabilityMajor,device); if(status) return status;
+  status=cudaDeviceGetAttribute(&minor,cudaDevAttrComputeCapabilityMinor,device); if(status) return status;
+  if(major!=12 || minor!=0) return cudaErrorInvalidDevice;
+  std::lock_guard<std::mutex> lock(mutex);
+  if(hc_device>=0) return hc_device==device ? 0 : int(cudaErrorInvalidDevice);
+  int result=load(hc_project,device);
+  if(!result) hc_device=device;
+  return result;
+}
+// Internal launch: buffer validation is performed by hc_mixes_workspace.
+extern "C" int32_t ds41rt_v41_hc_project_launch(const uint16_t* residual,
+    const float* weight, float* partials, int32_t rows, void* stream) {
+  int device=-1;
+  int status=cudaGetDevice(&device); if(status) return status;
+  if(hc_device<0 || device!=hc_device) return cudaErrorInvalidDevice;
+  void* r=const_cast<uint16_t*>(residual);
+  void* w=const_cast<float*>(weight);
+  void* p=partials;
+  void* args[]={&r,&w,&p,&rows,&stream,&status};
+  hc_project.launch(args,6);
+  return status;
 }

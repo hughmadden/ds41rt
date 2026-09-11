@@ -23,6 +23,8 @@ def validate_abi(path: Path, label: str, kind: str) -> dict:
         'quant_c_scale_rows_ptr', 'quant_c_scale_mma_ptr', 'alpha_ptr')
     scalars = ('m', 'cos_sin_len', 'grid_x') if kind == 'group_quant' else ('m', 'grid_x') if kind == 'quant' else ('m',)
     stream = 'stream' if kind in ('quant', 'group_quant') else 'current_stream'
+    if kind == 'hc_project':
+        pointers, scalars, stream = ('r', 'w', 'p'), ('m',), 's'
     expected = [f'ds41rt_{label}_Kernel_Module_t *module']
     expected += [f'void *{name}' for name in pointers]
     expected += [f'int32_t {name}' for name in scalars] + [f'cudaStream_t {stream}']
@@ -44,6 +46,11 @@ def dispatch_header(output: Path, manifest: dict) -> None:
     from b12x._lib.quant.mxfp8_rows import mxfp8_rows_quant_aot_grid
     lines = ['#pragma once', '#include <stdint.h>',
              f"#define DS41RT_V41_FP8_SMS {manifest['physical_sms']}"]
+    lines.append('#include "v41_hc_project.h"')
+    prefix = '_mlir_ds41rt_v41_hc_project'
+    lines.append('#define DS41RT_V41_HC_PROJECT_MODULE {' + ','.join((
+        prefix + '_cuda_init', prefix + '_cuda_load_to_device',
+        manifest['hc_project']['abi']['symbol'])) + '}')
     variants = []
     for variant in manifest['variants']:
         label, capacity = variant['label'], variant['capacity']
@@ -143,6 +150,10 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
             if groups > 1:
                 manifest['variants'][-1]['quant_rope_abi'] = validate_abi(output / (label + '_quant_rope.h'), label + '_quant_rope', 'group_quant')
             print(f'exported {label}', flush=True)
+    from b12x.norm.mhc._v41_project import compile_v41_mhc_project_aot
+    compile_v41_mhc_project_aot().export_to_c(str(output), 'v41_hc_project', 'ds41rt_v41_hc_project')
+    manifest['hc_project'] = {'split_k': 8, 'scratch_bytes_per_row': 1536,
+        'abi': validate_abi(output / 'v41_hc_project.h', 'v41_hc_project', 'hc_project')}
     dispatch_header(output, manifest)
     artifacts = {"v41_fp8_variants.h": hashlib.sha256((output / "v41_fp8_variants.h").read_bytes()).hexdigest()}
     for variant in manifest['variants']:
@@ -150,6 +161,9 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
             for suffix in ('.h', '.o'):
                 path = output / (variant['label'] + '_' + kind + suffix)
                 artifacts[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    for suffix in ('.h', '.o'):
+        path = output / ('v41_hc_project' + suffix)
+        artifacts[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     manifest['artifacts'] = artifacts
     (output / 'v41_fp8.json').write_text(json.dumps(manifest, indent=2) + '\n')
 

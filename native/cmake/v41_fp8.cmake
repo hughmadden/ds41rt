@@ -19,6 +19,8 @@ foreach(rows IN ITEMS 1 16 80 256 1024 4096)
   endforeach()
 endforeach()
 endforeach()
+list(APPEND DS41RT_V41_FP8_OBJECTS "${DS41RT_V41_FP8_DIR}/v41_hc_project.o")
+list(APPEND DS41RT_V41_FP8_HEADERS "${DS41RT_V41_FP8_DIR}/v41_hc_project.h")
 add_custom_command(
   OUTPUT "${DS41RT_V41_FP8_DIR}/v41_fp8.json" "${DS41RT_V41_FP8_DIR}/v41_fp8_variants.h"
     ${DS41RT_V41_FP8_OBJECTS} ${DS41RT_V41_FP8_HEADERS}

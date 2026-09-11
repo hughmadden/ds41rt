@@ -162,7 +162,9 @@ impl HcSublayer<'_, '_> {
             "mHC rows exceed capacity"
         );
         unsafe {
-            self.kernel.mixes(
+            // Mixes finish reading partials before pre writes collapsed on this
+            // same stream. Reuse its storage without adding a serving allocation.
+            self.kernel.mixes_workspace(
                 self.residual.buffer,
                 self.weights.get(&self.names[0])?,
                 self.weights.get(&self.names[1])?,
@@ -170,6 +172,7 @@ impl HcSublayer<'_, '_> {
                 self.next_pre.buffer,
                 self.post.buffer,
                 self.comb.buffer,
+                self.collapsed.buffer,
                 rows,
                 stream,
             )?;

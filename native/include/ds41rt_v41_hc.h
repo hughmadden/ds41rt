@@ -16,6 +16,15 @@ int32_t ds41rt_v41_hc_post(const uint16_t* sublayer, const uint16_t* residual,
 int32_t ds41rt_v41_hc_mixes(const uint16_t* residual, const float* fn,
     const float* scale, const float* base, float* pre, float* post, float* comb,
     int32_t rows, void* stream);
+// Call once during planning on the serving device, outside CUDA graph capture.
+int32_t ds41rt_v41_hc_project_initialize();
+// Small rows (1..16) use split-K FP32 projection with changed summation order.
+// Scratch is 16-byte aligned, at least rows*1536 bytes, disjoint from all
+// inputs/outputs, and live until stream completion. Larger rows ignore scratch.
+// Non-AOT builds use the original mixes implementation.
+int32_t ds41rt_v41_hc_mixes_workspace(const uint16_t* residual, const float* fn,
+    const float* scale, const float* base, float* pre, float* post, float* comb,
+    void* scratch, uint64_t scratch_bytes, int32_t rows, void* stream);
 #ifdef __cplusplus
 }
 #endif
