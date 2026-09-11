@@ -224,6 +224,22 @@ fn worker(
         },
     )?;
     let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(capacity)?)?;
+    let mut prefill_pass = TargetPass::new(
+        TargetEmbeddingWave::new(&lib, &table, rows, TargetEmbeddingWave::device_bytes(rows)?)?,
+        BackboneLane::new(&weights, capacity, BackboneLane::workspace_bytes(&lib, capacity)?.into_iter().sum())?,
+        IndexLane::new(&index_weights, capacity, IndexLane::workspace_bytes(&lib, capacity)?.into_iter().sum())?,
+        BackboneExecution::new(&producers, capacity, BackboneExecution::workspace_bytes(&lib, capacity)?)?,
+        EngramDeviceRows::new(&lib, rows, EngramDeviceRows::device_bytes(rows)?)?,
+        [EngramGate::new(&engram_weights[0], rows, 1024 * 1024 * 1024)?,
+         EngramGate::new(&engram_weights[1], rows, 1024 * 1024 * 1024)?],
+        head_weights.wave(&vocabulary, 16, TargetHeadWave::device_bytes(16)?)?,
+        crate::v41_target_pass::TargetTapWave::new(&lib, rows, crate::v41_target_pass::TargetTapWave::device_bytes(rows)?)?,
+        Duration::from_secs(120),
+    )?;
+    let prefill_roce = V41Tp4Roce::new(args.peers.clone().try_into()
+        .map_err(|_| anyhow::anyhow!("four Spark peers required"))?, [1, 2, 3, 4], capacity,
+        TcpTransportConfig { timeout: Duration::from_secs(120), max_frame_bytes: 64 * 1024 * 1024 })?;
+    let mut prefill_transport = NativeTp4Wave::new(&lib, prefill_roce, NativeTp4Wave::device_bytes(capacity)?)?;
     let draft_weights = if args.dspark {
         Some(crate::v41_experts::dspark::DsparkWeights::load(
             &lib,
@@ -256,6 +272,7 @@ fn worker(
         id = id.checked_add(1).context("request ID exhausted")?;
         // Keep healthy QPs across admissions; request/output ownership is fresh.
         transport.begin_request();
+        prefill_transport.begin_request();
         let lease = requests.admit(0, id)?;
         if let Some(draft) = &mut draft {
             draft.admit(id)?;
@@ -267,6 +284,8 @@ fn worker(
             args.prefill_batch_tokens as usize,
             &runtime,
             &mut pass,
+            &mut prefill_pass,
+            &mut prefill_transport,
             &mut requests,
             &mut transport,
             lease,
@@ -285,19 +304,22 @@ fn worker(
             // Also reset failures outside a pending transport borrow (for example
             // client cancellation between completed model steps).
             transport.reset_connections();
+            prefill_transport.reset_connections();
             let _ = job.events.blocking_send(Err(format!("{error:#}")));
         }
         cleanup?;
     }
     Ok(())
 }
-fn generate<'a>(
+fn generate<'w, 'a>(
     lib: &'a NativeLibrary,
     snapshot: &std::path::Path,
     max_context_tokens: usize,
     prefill_batch_tokens: usize,
     runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'_, 'a>,
+    pass: &mut TargetPass<'w, 'a>,
+    prefill_pass: &mut TargetPass<'w, 'a>,
+    prefill_transport: &mut NativeTp4Wave<'a>,
     requests: &mut Requests<'a>,
     transport: &mut NativeTp4Wave<'a>,
     lease: crate::v41_backbone_cache::CacheLease,
@@ -324,7 +346,7 @@ fn generate<'a>(
             prompt_cache_hit_tokens: 0,
         },
     }))?;
-    let mut next = prefill(lib, runtime, pass, requests, transport, lease, &prompt,
+    let mut next = prefill(lib, runtime, pass, prefill_pass, requests, transport, prefill_transport, lease, &prompt,
         prefill_batch_tokens, job, draft.as_deref_mut())?;
     let mut buffered = 0usize;
     let mut pending = std::collections::VecDeque::new();
@@ -393,8 +415,9 @@ fn generate<'a>(
     }))?;
     Ok(())
 }
-fn prefill<'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'_, 'a>, requests: &mut Requests<'a>, transport: &mut NativeTp4Wave<'a>,
+fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    pass: &mut TargetPass<'w, 'a>, other: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
+    transport: &mut NativeTp4Wave<'a>, other_transport: &mut NativeTp4Wave<'a>,
     lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
     job: &NativeRequest, draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<u32> {
     use crate::v41_block::EncoderSuffix;
@@ -402,7 +425,10 @@ fn prefill<'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     let end = tokens.len() as u64;
     let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
     requests.begin_encoder(lease, end)?;
-    for chunk in tokens.chunks(chunk_rows) {
+    let mut chunks = tokens.chunks(chunk_rows);
+    // Process an odd leading chunk before entering reserved pair mode.
+    if chunks.len() % 2 != 0 {
+        let chunk = chunks.next().expect("odd chunk count");
         ensure!(!job.events.is_closed(), "client disconnected");
         let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
@@ -415,6 +441,26 @@ fn prefill<'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         if result.is_err() { pass.discard(&mut batch)?; }
         result?;
         tracing::debug!(target: "ds41rt::timing", rows=chunk.len(), total_us=started.elapsed().as_micros() as u64, "target encoder step");
+    }
+    while let Some(left) = chunks.next() {
+        let right = chunks.next().expect("even remaining chunks");
+        ensure!(!job.events.is_closed(), "client disconnected");
+        let mut first = requests.reserve_encoder(&[RequestTokens { lease, tokens: left,
+            image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+        let mut second = requests.reserve_encoder(&[RequestTokens { lease, tokens: right,
+            image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+        let started = Instant::now();
+        let result = (|| -> Result<()> {
+            runtime.block_on(unsafe { pass.execute_encoder_pair(other, requests, [&mut first, &mut second],
+                [transport, other_transport], &mut suffix) })?;
+            ensure!(!job.events.is_closed(), "client disconnected");
+            pass.commit(requests, &mut first, &[left.len() as u32])?;
+            other.commit(requests, &mut second, &[right.len() as u32])
+        })();
+        if result.is_err() { pass.discard(&mut first)?; other.discard(&mut second)?; }
+        result?;
+        tracing::debug!(target: "ds41rt::timing", rows=left.len()+right.len(),
+            total_us=started.elapsed().as_micros() as u64, "target encoder pair");
     }
     ensure!(!job.events.is_closed(), "client disconnected");
     let start = requests.begin_decoder_replay(lease)?;

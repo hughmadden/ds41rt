@@ -163,6 +163,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Current evidence and integration gaps
 
+- [Paired prefill serving candidate](docs/ds41-paired-serving.md) is implemented and API-tested: warm 16k prefill reaches 3.31–3.32k code / 3.64–3.73k repeated tok/s. Candidate is stopped and not promoted because decode regressed; isolated overlap/acceptance profiling is next. Serial CED remains selected.
+
 Component records establish their stated scopes, not full-model readiness or the performance targets above. Historical records remain under `docs/ds41-*`; use the checklist for current completion status.
 
 | Area | Evidence | Remaining integration or qualification |

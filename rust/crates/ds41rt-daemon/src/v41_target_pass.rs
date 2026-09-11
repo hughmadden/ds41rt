@@ -12,6 +12,7 @@ use crate::v41_target_head::{TargetHeadWave, TargetLogits};
 use anyhow::{ensure, Context, Result};
 use std::time::{Duration, Instant};
 mod taps;
+mod encoder_pair;
 pub(crate) use taps::{TargetTapWave, TargetTaps};
 
 #[derive(Default, Debug, PartialEq, Eq)]
