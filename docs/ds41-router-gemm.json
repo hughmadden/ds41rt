@@ -1,0 +1,320 @@
+{
+  "status": "Component candidate; not wired into native serving",
+  "b12x": {
+    "schema": 1,
+    "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+    "revision": "fbe8d9f71ba86ebd8e23b061df2ffdb5bdc7afe1",
+    "source_tree_sha256": "f9035db00d13769efcea91f34d617f240661db294780b5e10c11aaeaf20a2edd"
+  },
+  "native_running_unchanged": true,
+  "cases": 473,
+  "mutations": 946,
+  "evaluated_rows": 650762,
+  "score_checks_passed": true,
+  "strict_fp32_gate_passed": false,
+  "fp32_expert_set_discrepancy_cases": 2,
+  "ordered_id_discrepancy_cases": 7,
+  "timing_medians_us": [
+    {
+      "experts": 128,
+      "rows": 1,
+      "baseline": 7.8623998910188675,
+      "candidate": 15.054400265216827,
+      "speedup_baseline_over_candidate": 0.522265899172678
+    },
+    {
+      "experts": 128,
+      "rows": 6,
+      "baseline": 9.366400167346,
+      "candidate": 15.26160016655922,
+      "speedup_baseline_over_candidate": 0.6137233360279867
+    },
+    {
+      "experts": 128,
+      "rows": 8,
+      "baseline": 10.094399750232697,
+      "candidate": 15.265600383281708,
+      "speedup_baseline_over_candidate": 0.6612514081848815
+    },
+    {
+      "experts": 128,
+      "rows": 16,
+      "baseline": 14.041600376367569,
+      "candidate": 15.299199521541595,
+      "speedup_baseline_over_candidate": 0.9177996768129404
+    },
+    {
+      "experts": 128,
+      "rows": 26,
+      "baseline": 18.742400407791138,
+      "candidate": 15.355200320482254,
+      "speedup_baseline_over_candidate": 1.2205897687176837
+    },
+    {
+      "experts": 128,
+      "rows": 80,
+      "baseline": 42.185598611831665,
+      "candidate": 15.465600043535233,
+      "speedup_baseline_over_candidate": 2.7277052615534076
+    },
+    {
+      "experts": 128,
+      "rows": 256,
+      "baseline": 116.66719913482666,
+      "candidate": 15.907199680805206,
+      "speedup_baseline_over_candidate": 7.334238676566427
+    },
+    {
+      "experts": 128,
+      "rows": 1024,
+      "baseline": 442.43998527526855,
+      "candidate": 24.795199930667877,
+      "speedup_baseline_over_candidate": 17.843775670791743
+    },
+    {
+      "experts": 128,
+      "rows": 2048,
+      "baseline": 880.9904098510742,
+      "candidate": 51.899200677871704,
+      "speedup_baseline_over_candidate": 16.97502848491273
+    },
+    {
+      "experts": 128,
+      "rows": 4096,
+      "baseline": 1760.201644897461,
+      "candidate": 88.82880210876465,
+      "speedup_baseline_over_candidate": 19.815663423471783
+    },
+    {
+      "experts": 384,
+      "rows": 1,
+      "baseline": 11.208000034093857,
+      "candidate": 20.824800059199333,
+      "speedup_baseline_over_candidate": 0.5382044486493274
+    },
+    {
+      "experts": 384,
+      "rows": 6,
+      "baseline": 17.552800104022026,
+      "candidate": 20.99360004067421,
+      "speedup_baseline_over_candidate": 0.8361024345521597
+    },
+    {
+      "experts": 384,
+      "rows": 8,
+      "baseline": 19.548000395298004,
+      "candidate": 19.845600426197052,
+      "speedup_baseline_over_candidate": 0.9850042314413323
+    },
+    {
+      "experts": 384,
+      "rows": 16,
+      "baseline": 29.868800193071365,
+      "candidate": 18.07439997792244,
+      "speedup_baseline_over_candidate": 1.652547261848558
+    },
+    {
+      "experts": 384,
+      "rows": 26,
+      "baseline": 42.295198887586594,
+      "candidate": 18.119999393820763,
+      "speedup_baseline_over_candidate": 2.334172202125459
+    },
+    {
+      "experts": 384,
+      "rows": 80,
+      "baseline": 109.40880179405212,
+      "candidate": 18.33439990878105,
+      "speedup_baseline_over_candidate": 5.967405660310269
+    },
+    {
+      "experts": 384,
+      "rows": 256,
+      "baseline": 327.3568034172058,
+      "candidate": 21.301599964499474,
+      "speedup_baseline_over_candidate": 15.367709653864855
+    },
+    {
+      "experts": 384,
+      "rows": 1024,
+      "baseline": 1283.2815647125244,
+      "candidate": 62.192799150943756,
+      "speedup_baseline_over_candidate": 20.633925184778423
+    },
+    {
+      "experts": 384,
+      "rows": 2048,
+      "baseline": 2564.8040294647217,
+      "candidate": 112.95680105686188,
+      "speedup_baseline_over_candidate": 22.706061126621428
+    },
+    {
+      "experts": 384,
+      "rows": 4096,
+      "baseline": 5124.349594116211,
+      "candidate": 217.25360751152039,
+      "speedup_baseline_over_candidate": 23.586948234424508
+    }
+  ],
+  "disputed_cases": [
+    {
+      "prefix": "layers.16.ffn.gate",
+      "rows": 4096,
+      "mutation": 0,
+      "score_close": true,
+      "ids_exact_oracle": false,
+      "ids_exact_baseline": false,
+      "expert_set_exact": false,
+      "weights_by_id_close": false,
+      "baseline_ids_exact_oracle": false,
+      "route_close": false,
+      "max_abs_score": 1.5497207641601562e-06,
+      "oracle_id_differences": 2,
+      "baseline_id_differences": 1,
+      "changed_rows": [
+        {
+          "row": 86,
+          "baseline": [
+            110,
+            167,
+            251,
+            316,
+            284,
+            42
+          ],
+          "candidate": [
+            110,
+            167,
+            251,
+            316,
+            284,
+            42
+          ],
+          "fp32_oracle": [
+            110,
+            167,
+            251,
+            316,
+            284,
+            33
+          ],
+          "fp64_oracle": [
+            110,
+            167,
+            251,
+            316,
+            284,
+            42
+          ],
+          "same_expert_set": true,
+          "fp64_selection_margin": 1.1079673356562125e-06,
+          "baseline_fp64_max_abs": 2.5904365186235623e-07,
+          "candidate_fp64_max_abs": 4.1005769468860365e-07
+        },
+        {
+          "row": 2061,
+          "baseline": [
+            3,
+            148,
+            363,
+            313,
+            169,
+            146
+          ],
+          "candidate": [
+            3,
+            148,
+            363,
+            313,
+            169,
+            278
+          ],
+          "fp32_oracle": [
+            3,
+            148,
+            363,
+            313,
+            169,
+            146
+          ],
+          "fp64_oracle": [
+            3,
+            148,
+            363,
+            313,
+            169,
+            278
+          ],
+          "same_expert_set": false,
+          "fp64_selection_margin": 1.7336358411057518e-06,
+          "baseline_fp64_max_abs": 2.816378603665015e-07,
+          "candidate_fp64_max_abs": 4.018000887562323e-07
+        }
+      ]
+    },
+    {
+      "prefix": "layers.29.ffn.gate",
+      "rows": 4096,
+      "mutation": 1,
+      "score_close": true,
+      "ids_exact_oracle": false,
+      "ids_exact_baseline": false,
+      "expert_set_exact": false,
+      "weights_by_id_close": false,
+      "baseline_ids_exact_oracle": true,
+      "route_close": false,
+      "max_abs_score": 5.960464477539062e-07,
+      "oracle_id_differences": 1,
+      "baseline_id_differences": 1,
+      "changed_rows": [
+        {
+          "row": 3902,
+          "baseline": [
+            70,
+            130,
+            261,
+            59,
+            122,
+            173
+          ],
+          "candidate": [
+            70,
+            130,
+            261,
+            59,
+            122,
+            318
+          ],
+          "fp32_oracle": [
+            70,
+            130,
+            261,
+            59,
+            122,
+            173
+          ],
+          "fp64_oracle": [
+            70,
+            130,
+            261,
+            59,
+            122,
+            318
+          ],
+          "same_expert_set": false,
+          "fp64_selection_margin": 1.5070648622383942e-06,
+          "baseline_fp64_max_abs": 1.0830025409802602e-07,
+          "candidate_fp64_max_abs": 1.8231477949548491e-07
+        }
+      ]
+    }
+  ],
+  "raw_artifacts": {
+    "qualification-all.json": "706b2aad32a87dfc882b76278033bc6a34e056b3fd0009eacff6266f6a22fe0e",
+    "qualification-partials.json": "ce7caa2e42d63a4805e5d08238a1efb8f711276248f9a8aea74804770c4e8925",
+    "qualification-diagnostic.json": "d449ce3465e6c4201af2f62f62d31d133c6d95d0cfc155d6c03647e5c0cb8261",
+    "router.so": "fa020cf7af80c7510045f6cb26015876911e2319b128bf86b17f9b3968c8f5a9",
+    "gpu.txt": "dc66d8ea63c1f364ab81087b092cdcc339b3c02c8576a80d516927e838e84551",
+    "v41_router.json": "d14b612dfd2468611de133d9e27bb0b6702c2547fe14b9232828e71c3533f7b0"
+  }
+}

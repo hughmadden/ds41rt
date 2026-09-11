@@ -17,9 +17,17 @@ __global__ void score_kernel(const __nv_bfloat16* hidden,const __nv_bfloat16* we
     scores[row*experts+expert]=sqrtf(logit>20.0f?logit:log1pf(expf(logit)));
   }
 }
-__global__ void select_kernel(const float* scores,const float* bias,const float* bias_vl,
+template<bool TransformLogits = false>
+__global__ void select_kernel(float* scores,const float* bias,const float* bias_vl,
     const uint8_t* image_mask,uint32_t* ids,float* routing,int experts,int topk) {
   const uint64_t row=blockIdx.x;const int tid=threadIdx.x;
+  if constexpr (TransformLogits) {
+    if(tid<experts) {
+      const float logit=scores[row*experts+tid];
+      scores[row*experts+tid]=sqrtf(logit>20.0f?logit:log1pf(expf(logit)));
+    }
+    __syncthreads();
+  }
   const float* correction=image_mask && image_mask[row]?bias_vl:bias;
   float candidate=tid<experts?scores[row*experts+tid]+correction[tid]:-CUDART_INF_F;
   __shared__ float values[512],selected[6];__shared__ uint32_t indices[512];
@@ -64,6 +72,22 @@ extern "C" int32_t ds41rt_v41_router(const uint16_t* hidden,const uint16_t* weig
   score_kernel<<<dim3(experts,rows),256,0,s>>>(reinterpret_cast<const __nv_bfloat16*>(hidden),
       reinterpret_cast<const __nv_bfloat16*>(weight),scores,experts);
   auto status=cudaGetLastError();if(status!=cudaSuccess) return status;
-  select_kernel<<<rows,512,0,s>>>(scores,bias,bias_vl,image_mask,ids,routing,experts,topk);
+  select_kernel<false><<<rows,512,0,s>>>(scores,bias,bias_vl,image_mask,ids,routing,experts,topk);
+  return cudaGetLastError();
+}
+extern "C" int32_t ds41rt_v41_router_select_logits(float* scores,const float* bias,
+    const float* bias_vl,const uint8_t* image_mask,uint32_t* ids,float* routing,
+    int32_t rows,int32_t experts,void* stream) {
+  if(rows<1 || rows>4096 || (experts!=128 && experts!=384)) return cudaErrorInvalidValue;
+  const int topk=experts==128?3:6;
+  const void* p[]={bias,bias_vl,image_mask,scores,ids,routing};
+  const uint64_t n[]={uint64_t(experts)*4,image_mask?uint64_t(experts)*4:0,
+      image_mask?uint64_t(rows):0,uint64_t(rows)*experts*4,
+      uint64_t(rows)*topk*4,uint64_t(rows)*topk*4};
+  for(int i=0;i<6;++i) if(n[i] && !span(p[i],n[i],i==2?1:4)) return cudaErrorInvalidValue;
+  for(int i=3;i<6;++i) for(int j=0;j<i;++j)
+    if(n[j] && !disjoint(p[i],n[i],p[j],n[j])) return cudaErrorInvalidValue;
+  select_kernel<true><<<rows,512,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      scores,bias,bias_vl,image_mask,ids,routing,experts,topk);
   return cudaGetLastError();
 }

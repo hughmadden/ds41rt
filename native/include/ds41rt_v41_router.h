@@ -10,6 +10,11 @@ extern "C" {
 int32_t ds41rt_v41_router(const uint16_t* hidden,const uint16_t* weight,
     const float* bias,const float* bias_vl,const uint8_t* image_mask,float* scores,
     uint32_t* ids,float* routing,int32_t rows,int32_t experts,void* stream);
+// Convert caller-projected FP32 logits in place to sqrtsoftplus scores and
+// select/normalize with the same contract as ds41rt_v41_router.
+int32_t ds41rt_v41_router_select_logits(float* scores,const float* bias,
+    const float* bias_vl,const uint8_t* image_mask,uint32_t* ids,float* routing,
+    int32_t rows,int32_t experts,void* stream);
 #ifdef __cplusplus
 }
 #endif
