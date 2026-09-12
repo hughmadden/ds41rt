@@ -47,6 +47,8 @@ gate below is satisfied merely by an older component test.
   long-context/pool-pressure prefix gate and release performance suite remain open.
 - [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
   Complete native XGrammar enforcement before the compressed-cache migration.
+  [Retained-logit preparation](release-v1-constraints.md) enables first-token
+  reselection under a changed grammar on exact hits; API enforcement remains open.
 - [ ] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
   scales; retain FP8 SWA and the independent FP4 index format. The previous
   FP8-only interpretation was incorrect (user clarification September 12).

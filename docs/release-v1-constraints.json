@@ -1,0 +1,114 @@
+{
+  "scope": "Retained logits prerequisite; native XGrammar enforcement remains pending",
+  "parent_commit": "a20b9e7818ae858ae18b41a843e77ab6879bd0af",
+  "candidate_binary_sha256": "ce589cb4b6f80245a77eb8061cad7d8444c59371827ef762263b20ca16f8a9b6",
+  "native_library_sha256": "9c48be056b262ac519d3e7e6047eee51e6593c1a62b14267bbe21aa7694d9cba",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "d667858bea67024ae089fd6c345c202c5d058758c0a307e4614e54202bf1939c",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/prefix.rs": "e43ec5a97ba05d2de49d2a9f8aa298e0c4ec2e341b5ef80845f7542a2448bc61",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "aaf3da352beafc528814ad71d5713fabf36d208c7527302a392558c8a15feae9",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scores.rs": "cf4c0afa9493c16d5c4dfc25db9119e0060609df152d369b1ef48795472a163d"
+  },
+  "evidence": {
+    "path": "docs/evidence/native-retained-logits.json.gz",
+    "sha256": "a7a58687f81042c50083c190ca6cbdf325a974fcb304258b590860e2b7fb2593"
+  },
+  "hardware": "index, name, driver_version, power.limit [W], clocks.current.memory [MHz]\n0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 405 MHz\n1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 13365 MHz\n",
+  "validation": {
+    "cpu_scores_tests": 2,
+    "cpu_prefix_tests": 4,
+    "retention_cases_per_mode": 75,
+    "unicode_cases_per_mode": 9,
+    "json_sse_equal": true,
+    "retained_prompt_hits_per_mode": 24,
+    "exact_turn_resumes_per_mode": 24
+  },
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 43.24220271031818,
+            "first_content_seconds": 0.001992923440411687,
+            "finish_seconds": 2.199008192459587
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.89611975820749,
+            "first_content_seconds": 0.0021063340245746076,
+            "finish_seconds": 2.2170832459814847
+          }
+        },
+        "candidate_decode_ratio": 0.9919966391529793
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.87117878337112,
+            "first_content_seconds": 0.005594948946963996,
+            "finish_seconds": 2.2215360244154
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.8423493426676,
+            "first_content_seconds": 0.004004434507805854,
+            "finish_seconds": 2.2214384874678217
+          }
+        },
+        "candidate_decode_ratio": 0.9993275332864255
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 143.24481905757966,
+            "first_content_seconds": 0.003818780474830419,
+            "finish_seconds": 0.6671075999620371
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 143.11876488415953,
+            "first_content_seconds": 0.0023607805487699807,
+            "finish_seconds": 0.6660659600165673
+          }
+        },
+        "candidate_decode_ratio": 0.9991200088474442
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 116.91318149844463,
+            "first_content_seconds": 0.0033983244793489575,
+            "finish_seconds": 0.8161472449428402
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 117.05277312141578,
+            "first_content_seconds": 0.003729922464117408,
+            "finish_seconds": 0.8151816655299626
+          }
+        },
+        "candidate_decode_ratio": 1.0011939767713276
+      }
+    ]
+  },
+  "target_counting_long": [
+    {
+      "workload": "counting",
+      "arms": {
+        "reference": {
+          "observed_decode_tokens_per_second": 43.38379246896406,
+          "first_content_seconds": 0.00425661844201386,
+          "finish_seconds": 5.88247383601265
+        },
+        "candidate": {
+          "observed_decode_tokens_per_second": 43.349138935574835,
+          "first_content_seconds": 0.0030697904876433313,
+          "finish_seconds": 5.885546611447353
+        }
+      },
+      "candidate_decode_ratio": 0.9992012331929253
+    }
+  ]
+}

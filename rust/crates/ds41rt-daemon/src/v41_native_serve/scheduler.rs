@@ -1,4 +1,5 @@
 use super::*;
+use super::scores::BatchScores;
 use crate::v41_backbone_cache::CacheLease;
 use crate::v41_requests::RequestBatch;
 use super::prefix::{ImageKeys, PrefixCache, SnapshotKind};
@@ -16,7 +17,7 @@ struct Active {
     cacheable: bool,
     tokens: Vec<u32>,
     image_keys: ImageKeys,
-    next_after_commit: u32,
+    next_after_commit: Option<TokenScores>,
 }
 impl Active {
     fn emit(&mut self, tokens: &[u32]) -> Result<()> {
@@ -79,7 +80,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             if entry.as_ref().is_some_and(|r| r.finished || r.job.events.is_closed()) {
                 let request = entry.take().unwrap();
                 if request.cacheable && requests.cache().request_id(request.lease).is_ok() {
-                    if let Err(error) = prefixes.retain(SnapshotKind::Turn, &request.tokens, &request.image_keys, request.next_after_commit,
+                    if let Err(error) = prefixes.retain(SnapshotKind::Turn, &request.tokens, &request.image_keys, request.next_after_commit.as_ref().context("finished request has no retained logits")?,
                         request.id, request.lease, requests, draft.as_deref_mut()) {
                         tracing::warn!(%error, "completed request prefix was not retained");
                     }
@@ -128,7 +129,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                     requests.attach_images(lease, crate::v41_requests::RequestImages::new(&images)?)?;
                 }
                 let hit = prefixes.restore(&prompt, &image_keys, id, lease, requests, draft.as_deref_mut())?;
-                let cached = hit.map_or(0, |(end, _)| end);
+                let cached = hit.as_ref().map_or(0, |(end, _)| *end);
                 let source_end = requests.cache().committed_end(lease)? as usize;
                 prefixes.make_room(requests, &[(lease, (prompt.len() - source_end) as u32)])?;
                 if !images.is_empty() {
@@ -154,18 +155,19 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                     prompt_usage: PromptUsage { prompt_tokens: prompt.len(), prompt_cache_hit_tokens: cached },
                 }))?;
                 first_transport.begin_request(); second_transport.begin_request();
-                let anchor = if cached == prompt.len() { hit.expect("complete prefix hit").1 }
+                let scores = if cached == prompt.len() { hit.expect("complete prefix hit").1.context("exact prefix has no logits")? }
                 else { prefill(lib, runtime, first, second, requests, first_transport,
                     second_transport, lease, &prompt, args.prefill_batch_tokens as usize, &job,
                     draft.as_deref_mut())? };
                 if cached != prompt.len() {
-                  if let Err(error) = prefixes.retain(SnapshotKind::Prompt, &prompt, &image_keys, anchor, id, lease, requests, draft.as_deref_mut()) {
+                  if let Err(error) = prefixes.retain(SnapshotKind::Prompt, &prompt, &image_keys, &scores, id, lease, requests, draft.as_deref_mut()) {
                     tracing::warn!(%error, "prompt prefix was not retained");
                   }
                 }
                 tracing::debug!(request_id=id, prompt_tokens=prompt.len(), cached_tokens=cached, "native prefix admission");
+                let anchor = scores.select(None)?;
                 Ok(Active { id, lease, job, decoder, anchor, generated: 0, buffered: 0, lane,
-                    finished: false, cacheable: false, tokens: prompt, image_keys, next_after_commit: anchor })
+                    finished: false, cacheable: false, tokens: prompt, image_keys, next_after_commit: Some(scores) })
             })();
             match result {
                 Ok(mut request) => {
@@ -210,21 +212,13 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
 
 async fn execute_logits<'a>(lib: &'a NativeLibrary, pass: &mut TargetPass<'_, 'a>,
     requests: &Requests<'a>, batch: &mut Option<RequestBatch>, transport: &mut NativeTp4Wave<'a>,
-) -> Result<Vec<u32>> {
-    let Some(batch) = batch else { return Ok(Vec::new()); };
+) -> Result<BatchScores> {
+    let Some(batch) = batch else { return BatchScores::new(Vec::new()); };
     let selected: Vec<_> = (0..batch.cache()?.positions().len()).collect();
     let logits = unsafe { pass.execute(requests, batch, transport, 0, &selected).await? };
     let mut bytes = vec![0; logits.logits.bytes];
     lib.copy_d2h(&mut bytes, logits.logits)?;
-    bytes.chunks_exact(129280 * 4).map(|row| {
-        let mut best = (0, f32::NEG_INFINITY);
-        for (i, b) in row.chunks_exact(4).enumerate() {
-            let value = f32::from_ne_bytes(b.try_into().unwrap());
-            ensure!(value.is_finite(), "non-finite target logit");
-            if value > best.1 { best = (i as u32, value); }
-        }
-        Ok(best.0)
-    }).collect()
+    BatchScores::new(bytes)
 }
 
 fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
@@ -284,11 +278,15 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
             for (&slot, input) in members[lane].iter().zip(&inputs[lane]) {
                 let request = active[slot].as_ref().unwrap();
                 let decision = ds41rt_core::verify_dspark_greedy(input,
-                    &next[lane][offset..offset + input.len()], 1, request.job.max_tokens - request.generated)
+                    &next[lane].best[offset..offset + input.len()], 1, request.job.max_tokens - request.generated)
                     .map_err(anyhow::Error::msg)?;
                 accepted_drafts += decision.accepted_inputs - 1;
                 emitted += decision.emitted.len();
-                next_after_commit.push(next[lane][offset + decision.accepted_inputs as usize - 1]);
+                let finishing = decision.emitted.contains(&1)
+                    || request.generated + decision.emitted.len() >= request.job.max_tokens;
+                next_after_commit.push(if finishing {
+                    Some(next[lane].retain(offset + decision.accepted_inputs as usize - 1)?)
+                } else { None });
                 offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
             }
             if let Some(draft) = draft.as_deref_mut() { draft.commit_batch(pass, requests, batch, &accepted)?; }

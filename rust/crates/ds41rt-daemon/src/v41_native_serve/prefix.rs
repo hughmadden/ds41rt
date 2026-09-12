@@ -278,7 +278,7 @@ struct Saved<'a> {
     _images: ImageKeys,
     target: RequestPrefix<'a>,
     draft: Option<DraftPrefix<'a>>,
-    next: u32,
+    next: TokenScores,
 }
 pub(super) struct PrefixCache<'a> {
     retained: Retention<Saved<'a>>,
@@ -299,7 +299,7 @@ impl<'a> PrefixCache<'a> {
         kind: SnapshotKind,
         tokens: &[u32],
         images: &ImageKeys,
-        next: u32,
+        next: &TokenScores,
         id: u64,
         lease: CacheLease,
         requests: &mut Requests<'a>,
@@ -330,7 +330,7 @@ impl<'a> PrefixCache<'a> {
                 _images: images.through(end as usize),
                 target,
                 draft,
-                next,
+                next: next.clone(),
             },
         );
         Ok(())
@@ -343,7 +343,7 @@ impl<'a> PrefixCache<'a> {
         lease: CacheLease,
         requests: &mut Requests<'a>,
         draft: Option<&mut DraftRuntime<'_, 'a>>,
-    ) -> Result<Option<(usize, u32)>> {
+    ) -> Result<Option<(usize, Option<TokenScores>)>> {
         let keys = images.encode(tokens)?;
         let Some((end, frontier, saved)) = self.retained.lookup_reusable(&keys) else {
             return Ok(None);
@@ -357,18 +357,18 @@ impl<'a> PrefixCache<'a> {
                 requests.restore_encoder_prefix(lease, &saved.target, end / 2 * 2, tokens)?;
             // Draft rings stay fresh until decoder replay seeds the final window.
             // The saved next token belongs to a different frontier and is unused.
-            return Ok(Some((start, 0)));
+            return Ok(Some((start, None)));
         }
         if tokens.len() - end >= 128 {
             requests.restore_encoder_continuation(lease, &saved.target, tokens.len() as u64)?;
             // Every final decoder/draft row comes from the new encoder suffix.
-            return Ok(Some((end, 0)));
+            return Ok(Some((end, None)));
         }
         requests.restore_prefix(lease, &saved.target)?;
         if let (Some(draft), Some(saved)) = (draft, saved.draft.as_ref()) {
             draft.restore_prefix(id, end as u64, saved)?;
         }
-        Ok(Some((end, saved.next)))
+        Ok(Some((end, Some(saved.next.clone()))))
     }
     pub fn make_room(&mut self, requests: &Requests<'a>, work: &[(CacheLease, u32)]) -> Result<()> {
         loop {
