@@ -1,3 +1,5 @@
+mod dspark_policy;
+pub use dspark_policy::{select_dspark_prefixes, DsparkPrefixSelection};
 mod dspark_rng;
 pub use dspark_rng::{DsparkRng, DsparkRngReservation};
 mod dspark_verify;

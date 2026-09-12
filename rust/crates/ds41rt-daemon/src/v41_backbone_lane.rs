@@ -128,6 +128,19 @@ impl LaneFfn<'_, '_, '_> {
             let shared_us = timing.elapsed().as_micros() as u64;
             let result = unsafe { pending.finish(&contribution).await }?;
             tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us, dispatch_us=dispatched_us-routed_us, shared_us=shared_us-dispatched_us, collect_us=timing.elapsed().as_micros() as u64-shared_us, "target experts");
+            if tracing::enabled!(target: "ds41rt::route_policy", tracing::Level::DEBUG) {
+                let ffn_us = timing.elapsed().as_micros() as u64;
+                // The dispatch request already owns these CPU-side routes.
+                // No extra device read or worker instrumentation is needed.
+                let route_ids: Vec<_> = request.request().routes.iter().map(|r| r.expert_id).collect();
+                let owners: Vec<_> = rows.iter().map(|r| (r.request_id, r.position)).collect();
+                let unique_experts = route_ids.iter().collect::<std::collections::BTreeSet<_>>().len();
+                tracing::debug!(target: "ds41rt::route_policy", layer=input.layer,
+                    rows=rows.len(), unique_experts, ffn_us, routed_us,
+                    remote_and_shared_us=ffn_us-routed_us,
+                    owners=?owners, route_ids=?route_ids,
+                    "native route policy observation");
+            }
             Ok(result)
         })
         .await
