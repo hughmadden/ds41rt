@@ -105,12 +105,13 @@ gate below is satisfied merely by an older component test.
   [Pool allocation and high-address GPU checks](release-v1-pool.md) pass.
   Configured-pool exhaustion/admission isolation and launcher wiring still
   belong to the remaining API/run-script qualification.
-- [ ] Measure and improve startup reads/transforms/exchange/capture. Aim for
+- [x] Measure and improve startup reads/transforms/exchange/capture. Aim for
   NVMe line rate (coordinator about 14 GB/s, Sparks about 6 GB/s) and roughly
   60–90 seconds load time without sacrificing runtime performance. The
   [clean launcher qualification](release-v1-build-run.md) reaches readiness in
-  55–56 seconds; phase-level Spark I/O, transforms, exchange and capture
-  accounting remains open for the performance report.
+  55–56 seconds. The [cold-cache phase report](release-v1-startup.md) records
+  all 160 Spark layer load/pack intervals, 38–39 second parallel worker readiness,
+  5.44 second coordinator startup, zero startup weight exchange, and lazy graph capture.
 - [x] Qualify normal build/run scripts and optimized backend selection on all
   five hosts from reproducible source and dependency pins.
   Expose concurrency and KV pool parameters through the standard launch script;
@@ -159,7 +160,8 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   into basic, hard and total scores. The user reduced the original five-run
   requirement to three on September 12, 2026. The [final corrected-FP4 campaign](release-v1-tool-eval-final.md)
   records 119/34/153, 123/36/159, and 120/36/156 basic/hard/total points at C16.
-- [ ] Startup time, including phase-level I/O and graph preparation evidence.
+- [x] Startup time, including phase-level I/O and graph preparation evidence.
+  See the [cold-cache startup qualification](release-v1-startup.md).
 - [ ] dsh generates a single-file WebGL Frogger game; retain execution metrics
   and publish a playable link to the actual generated artifact.
 

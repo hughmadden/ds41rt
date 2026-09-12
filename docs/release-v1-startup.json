@@ -1,0 +1,1084 @@
+{
+  "schema": 1,
+  "passed": true,
+  "cache_eviction": {
+    "method": "POSIX_FADV_DONTNEED on every resolved snapshot file after stopping model containers",
+    "files_per_host": 88,
+    "bytes_advised_per_host": 510313353565
+  },
+  "workers": [
+    {
+      "host": "ostrich",
+      "rank": 0,
+      "ready_seconds": 39.072368,
+      "initialization_before_first_layer_ms": 1039.429573059082,
+      "layer_load_pack_sum_ms": 37893,
+      "layer_median_ms": 930.0,
+      "layer_max_ms": 1380,
+      "service_handoff_ms": 108.04915428161621,
+      "resident_bytes": 80216064000,
+      "resident_gb": 80.216064,
+      "resident_output_gb_per_second": 2.1169098250336473,
+      "layers": [
+        {
+          "timestamp": "2026-09-12T18:03:17.526134381Z",
+          "layer": 0,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1146
+        },
+        {
+          "timestamp": "2026-09-12T18:03:18.434962073Z",
+          "layer": 1,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 908
+        },
+        {
+          "timestamp": "2026-09-12T18:03:19.368040001Z",
+          "layer": 2,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 933
+        },
+        {
+          "timestamp": "2026-09-12T18:03:20.268289392Z",
+          "layer": 3,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 900
+        },
+        {
+          "timestamp": "2026-09-12T18:03:21.181986546Z",
+          "layer": 4,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 913
+        },
+        {
+          "timestamp": "2026-09-12T18:03:22.084539325Z",
+          "layer": 5,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 902
+        },
+        {
+          "timestamp": "2026-09-12T18:03:22.988479975Z",
+          "layer": 6,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 903
+        },
+        {
+          "timestamp": "2026-09-12T18:03:23.889691021Z",
+          "layer": 7,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 901
+        },
+        {
+          "timestamp": "2026-09-12T18:03:24.796253330Z",
+          "layer": 8,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 906
+        },
+        {
+          "timestamp": "2026-09-12T18:03:25.701659758Z",
+          "layer": 9,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 905
+        },
+        {
+          "timestamp": "2026-09-12T18:03:26.592985262Z",
+          "layer": 10,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 891
+        },
+        {
+          "timestamp": "2026-09-12T18:03:27.502995327Z",
+          "layer": 11,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 910
+        },
+        {
+          "timestamp": "2026-09-12T18:03:28.428971962Z",
+          "layer": 12,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 925
+        },
+        {
+          "timestamp": "2026-09-12T18:03:29.323971780Z",
+          "layer": 13,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 894
+        },
+        {
+          "timestamp": "2026-09-12T18:03:30.234295675Z",
+          "layer": 14,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 910
+        },
+        {
+          "timestamp": "2026-09-12T18:03:31.134899735Z",
+          "layer": 15,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 900
+        },
+        {
+          "timestamp": "2026-09-12T18:03:32.101894685Z",
+          "layer": 16,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 966
+        },
+        {
+          "timestamp": "2026-09-12T18:03:33.034195102Z",
+          "layer": 17,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 932
+        },
+        {
+          "timestamp": "2026-09-12T18:03:33.953881487Z",
+          "layer": 18,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 919
+        },
+        {
+          "timestamp": "2026-09-12T18:03:34.892518928Z",
+          "layer": 19,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 939
+        },
+        {
+          "timestamp": "2026-09-12T18:03:35.821384598Z",
+          "layer": 20,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 928
+        },
+        {
+          "timestamp": "2026-09-12T18:03:36.757789972Z",
+          "layer": 21,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 936
+        },
+        {
+          "timestamp": "2026-09-12T18:03:37.675999716Z",
+          "layer": 22,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 918
+        },
+        {
+          "timestamp": "2026-09-12T18:03:38.591170033Z",
+          "layer": 23,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 915
+        },
+        {
+          "timestamp": "2026-09-12T18:03:39.544632364Z",
+          "layer": 24,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 953
+        },
+        {
+          "timestamp": "2026-09-12T18:03:40.448936660Z",
+          "layer": 25,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 904
+        },
+        {
+          "timestamp": "2026-09-12T18:03:41.454119216Z",
+          "layer": 26,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1005
+        },
+        {
+          "timestamp": "2026-09-12T18:03:42.389083731Z",
+          "layer": 27,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 934
+        },
+        {
+          "timestamp": "2026-09-12T18:03:43.327794907Z",
+          "layer": 28,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 938
+        },
+        {
+          "timestamp": "2026-09-12T18:03:44.293890695Z",
+          "layer": 29,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 966
+        },
+        {
+          "timestamp": "2026-09-12T18:03:45.249732474Z",
+          "layer": 30,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 955
+        },
+        {
+          "timestamp": "2026-09-12T18:03:46.167656162Z",
+          "layer": 31,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 917
+        },
+        {
+          "timestamp": "2026-09-12T18:03:47.102946896Z",
+          "layer": 32,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 935
+        },
+        {
+          "timestamp": "2026-09-12T18:03:48.050626615Z",
+          "layer": 33,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 947
+        },
+        {
+          "timestamp": "2026-09-12T18:03:49.016506769Z",
+          "layer": 34,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 965
+        },
+        {
+          "timestamp": "2026-09-12T18:03:49.960522553Z",
+          "layer": 35,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 944
+        },
+        {
+          "timestamp": "2026-09-12T18:03:50.955902308Z",
+          "layer": 36,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 995
+        },
+        {
+          "timestamp": "2026-09-12T18:03:51.919377358Z",
+          "layer": 37,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 963
+        },
+        {
+          "timestamp": "2026-09-12T18:03:53.300043202Z",
+          "layer": 38,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1380
+        },
+        {
+          "timestamp": "2026-09-12T18:03:54.292163729Z",
+          "layer": 39,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 992
+        }
+      ]
+    },
+    {
+      "host": "dodo",
+      "rank": 1,
+      "ready_seconds": 38.057061,
+      "initialization_before_first_layer_ms": 1019.978120803833,
+      "layer_load_pack_sum_ms": 36912,
+      "layer_median_ms": 909.5,
+      "layer_max_ms": 1147,
+      "service_handoff_ms": 75.94108581542969,
+      "resident_bytes": 80216064000,
+      "resident_gb": 80.216064,
+      "resident_output_gb_per_second": 2.1731703511053317,
+      "layers": [
+        {
+          "timestamp": "2026-09-12T18:03:17.855100026Z",
+          "layer": 0,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1147
+        },
+        {
+          "timestamp": "2026-09-12T18:03:18.762771529Z",
+          "layer": 1,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 907
+        },
+        {
+          "timestamp": "2026-09-12T18:03:19.670023404Z",
+          "layer": 2,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 907
+        },
+        {
+          "timestamp": "2026-09-12T18:03:20.588039577Z",
+          "layer": 3,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 918
+        },
+        {
+          "timestamp": "2026-09-12T18:03:21.501847277Z",
+          "layer": 4,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 913
+        },
+        {
+          "timestamp": "2026-09-12T18:03:22.401676862Z",
+          "layer": 5,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 899
+        },
+        {
+          "timestamp": "2026-09-12T18:03:23.296382672Z",
+          "layer": 6,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 894
+        },
+        {
+          "timestamp": "2026-09-12T18:03:24.202705617Z",
+          "layer": 7,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 906
+        },
+        {
+          "timestamp": "2026-09-12T18:03:25.101331904Z",
+          "layer": 8,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 898
+        },
+        {
+          "timestamp": "2026-09-12T18:03:26.009172636Z",
+          "layer": 9,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 907
+        },
+        {
+          "timestamp": "2026-09-12T18:03:26.917714723Z",
+          "layer": 10,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 908
+        },
+        {
+          "timestamp": "2026-09-12T18:03:27.819628160Z",
+          "layer": 11,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 901
+        },
+        {
+          "timestamp": "2026-09-12T18:03:28.723314194Z",
+          "layer": 12,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 903
+        },
+        {
+          "timestamp": "2026-09-12T18:03:29.602880646Z",
+          "layer": 13,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 879
+        },
+        {
+          "timestamp": "2026-09-12T18:03:30.525987721Z",
+          "layer": 14,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 923
+        },
+        {
+          "timestamp": "2026-09-12T18:03:31.441302537Z",
+          "layer": 15,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 915
+        },
+        {
+          "timestamp": "2026-09-12T18:03:32.350712691Z",
+          "layer": 16,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 908
+        },
+        {
+          "timestamp": "2026-09-12T18:03:33.277511943Z",
+          "layer": 17,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 927
+        },
+        {
+          "timestamp": "2026-09-12T18:03:34.181604810Z",
+          "layer": 18,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 904
+        },
+        {
+          "timestamp": "2026-09-12T18:03:35.102032221Z",
+          "layer": 19,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 920
+        },
+        {
+          "timestamp": "2026-09-12T18:03:36.161686769Z",
+          "layer": 20,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1059
+        },
+        {
+          "timestamp": "2026-09-12T18:03:37.117299094Z",
+          "layer": 21,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 955
+        },
+        {
+          "timestamp": "2026-09-12T18:03:38.034890952Z",
+          "layer": 22,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 917
+        },
+        {
+          "timestamp": "2026-09-12T18:03:38.939624931Z",
+          "layer": 23,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 904
+        },
+        {
+          "timestamp": "2026-09-12T18:03:39.859407123Z",
+          "layer": 24,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 919
+        },
+        {
+          "timestamp": "2026-09-12T18:03:40.757915438Z",
+          "layer": 25,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 898
+        },
+        {
+          "timestamp": "2026-09-12T18:03:41.667984039Z",
+          "layer": 26,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 910
+        },
+        {
+          "timestamp": "2026-09-12T18:03:42.575783734Z",
+          "layer": 27,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 907
+        },
+        {
+          "timestamp": "2026-09-12T18:03:43.492107419Z",
+          "layer": 28,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 916
+        },
+        {
+          "timestamp": "2026-09-12T18:03:44.396157950Z",
+          "layer": 29,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 904
+        },
+        {
+          "timestamp": "2026-09-12T18:03:45.305831474Z",
+          "layer": 30,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 909
+        },
+        {
+          "timestamp": "2026-09-12T18:03:46.194274306Z",
+          "layer": 31,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 888
+        },
+        {
+          "timestamp": "2026-09-12T18:03:47.136816390Z",
+          "layer": 32,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 942
+        },
+        {
+          "timestamp": "2026-09-12T18:03:48.117496968Z",
+          "layer": 33,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 980
+        },
+        {
+          "timestamp": "2026-09-12T18:03:49.062587596Z",
+          "layer": 34,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 944
+        },
+        {
+          "timestamp": "2026-09-12T18:03:49.992484585Z",
+          "layer": 35,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 929
+        },
+        {
+          "timestamp": "2026-09-12T18:03:50.906368968Z",
+          "layer": 36,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 913
+        },
+        {
+          "timestamp": "2026-09-12T18:03:51.817626443Z",
+          "layer": 37,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 911
+        },
+        {
+          "timestamp": "2026-09-12T18:03:52.732466528Z",
+          "layer": 38,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 914
+        },
+        {
+          "timestamp": "2026-09-12T18:03:53.641948950Z",
+          "layer": 39,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 909
+        }
+      ]
+    },
+    {
+      "host": "emu",
+      "rank": 2,
+      "ready_seconds": 38.739911,
+      "initialization_before_first_layer_ms": 976.5158996582031,
+      "layer_load_pack_sum_ms": 37686,
+      "layer_median_ms": 931.0,
+      "layer_max_ms": 1189,
+      "service_handoff_ms": 50.33612251281738,
+      "resident_bytes": 80216064000,
+      "resident_gb": 80.216064,
+      "resident_output_gb_per_second": 2.1285374940296133,
+      "layers": [
+        {
+          "timestamp": "2026-09-12T18:03:17.848241086Z",
+          "layer": 0,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1189
+        },
+        {
+          "timestamp": "2026-09-12T18:03:18.792029429Z",
+          "layer": 1,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 943
+        },
+        {
+          "timestamp": "2026-09-12T18:03:19.702763385Z",
+          "layer": 2,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 910
+        },
+        {
+          "timestamp": "2026-09-12T18:03:20.632567155Z",
+          "layer": 3,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 929
+        },
+        {
+          "timestamp": "2026-09-12T18:03:21.564730118Z",
+          "layer": 4,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 932
+        },
+        {
+          "timestamp": "2026-09-12T18:03:22.490874381Z",
+          "layer": 5,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 926
+        },
+        {
+          "timestamp": "2026-09-12T18:03:23.420376808Z",
+          "layer": 6,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 929
+        },
+        {
+          "timestamp": "2026-09-12T18:03:24.338953454Z",
+          "layer": 7,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 918
+        },
+        {
+          "timestamp": "2026-09-12T18:03:25.242995100Z",
+          "layer": 8,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 903
+        },
+        {
+          "timestamp": "2026-09-12T18:03:26.168385178Z",
+          "layer": 9,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 925
+        },
+        {
+          "timestamp": "2026-09-12T18:03:27.079295151Z",
+          "layer": 10,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 910
+        },
+        {
+          "timestamp": "2026-09-12T18:03:28.004941781Z",
+          "layer": 11,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 925
+        },
+        {
+          "timestamp": "2026-09-12T18:03:28.939882279Z",
+          "layer": 12,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 934
+        },
+        {
+          "timestamp": "2026-09-12T18:03:29.862543207Z",
+          "layer": 13,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 922
+        },
+        {
+          "timestamp": "2026-09-12T18:03:30.781411132Z",
+          "layer": 14,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 918
+        },
+        {
+          "timestamp": "2026-09-12T18:03:31.715465666Z",
+          "layer": 15,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 934
+        },
+        {
+          "timestamp": "2026-09-12T18:03:32.653091053Z",
+          "layer": 16,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 937
+        },
+        {
+          "timestamp": "2026-09-12T18:03:33.588379528Z",
+          "layer": 17,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 935
+        },
+        {
+          "timestamp": "2026-09-12T18:03:34.514991069Z",
+          "layer": 18,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 926
+        },
+        {
+          "timestamp": "2026-09-12T18:03:35.445050649Z",
+          "layer": 19,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 930
+        },
+        {
+          "timestamp": "2026-09-12T18:03:36.518875813Z",
+          "layer": 20,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1073
+        },
+        {
+          "timestamp": "2026-09-12T18:03:37.491281293Z",
+          "layer": 21,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 972
+        },
+        {
+          "timestamp": "2026-09-12T18:03:38.427772115Z",
+          "layer": 22,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 936
+        },
+        {
+          "timestamp": "2026-09-12T18:03:39.387712669Z",
+          "layer": 23,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 959
+        },
+        {
+          "timestamp": "2026-09-12T18:03:40.320260317Z",
+          "layer": 24,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 932
+        },
+        {
+          "timestamp": "2026-09-12T18:03:41.251329321Z",
+          "layer": 25,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 931
+        },
+        {
+          "timestamp": "2026-09-12T18:03:42.183310901Z",
+          "layer": 26,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 931
+        },
+        {
+          "timestamp": "2026-09-12T18:03:43.126317689Z",
+          "layer": 27,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 942
+        },
+        {
+          "timestamp": "2026-09-12T18:03:44.047968406Z",
+          "layer": 28,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 921
+        },
+        {
+          "timestamp": "2026-09-12T18:03:44.976452733Z",
+          "layer": 29,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 928
+        },
+        {
+          "timestamp": "2026-09-12T18:03:45.907837567Z",
+          "layer": 30,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 931
+        },
+        {
+          "timestamp": "2026-09-12T18:03:46.829720969Z",
+          "layer": 31,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 921
+        },
+        {
+          "timestamp": "2026-09-12T18:03:47.743501797Z",
+          "layer": 32,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 913
+        },
+        {
+          "timestamp": "2026-09-12T18:03:48.709076305Z",
+          "layer": 33,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 965
+        },
+        {
+          "timestamp": "2026-09-12T18:03:49.672266796Z",
+          "layer": 34,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 963
+        },
+        {
+          "timestamp": "2026-09-12T18:03:50.633285782Z",
+          "layer": 35,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 960
+        },
+        {
+          "timestamp": "2026-09-12T18:03:51.551306689Z",
+          "layer": 36,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 917
+        },
+        {
+          "timestamp": "2026-09-12T18:03:52.494190822Z",
+          "layer": 37,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 942
+        },
+        {
+          "timestamp": "2026-09-12T18:03:53.429718458Z",
+          "layer": 38,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 935
+        },
+        {
+          "timestamp": "2026-09-12T18:03:54.369058484Z",
+          "layer": 39,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 939
+        }
+      ]
+    },
+    {
+      "host": "kiwi",
+      "rank": 3,
+      "ready_seconds": 38.556056,
+      "initialization_before_first_layer_ms": 1122.4684410095215,
+      "layer_load_pack_sum_ms": 37336,
+      "layer_median_ms": 924.5,
+      "layer_max_ms": 1257,
+      "service_handoff_ms": 54.180145263671875,
+      "resident_bytes": 80216064000,
+      "resident_gb": 80.216064,
+      "resident_output_gb_per_second": 2.148491107778016,
+      "layers": [
+        {
+          "timestamp": "2026-09-12T18:03:17.987468850Z",
+          "layer": 0,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 1257
+        },
+        {
+          "timestamp": "2026-09-12T18:03:18.920186813Z",
+          "layer": 1,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 932
+        },
+        {
+          "timestamp": "2026-09-12T18:03:19.831912687Z",
+          "layer": 2,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 911
+        },
+        {
+          "timestamp": "2026-09-12T18:03:20.745825577Z",
+          "layer": 3,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 913
+        },
+        {
+          "timestamp": "2026-09-12T18:03:21.652602587Z",
+          "layer": 4,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 906
+        },
+        {
+          "timestamp": "2026-09-12T18:03:22.567610200Z",
+          "layer": 5,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 914
+        },
+        {
+          "timestamp": "2026-09-12T18:03:23.493996188Z",
+          "layer": 6,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 926
+        },
+        {
+          "timestamp": "2026-09-12T18:03:24.409374250Z",
+          "layer": 7,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 915
+        },
+        {
+          "timestamp": "2026-09-12T18:03:25.309980198Z",
+          "layer": 8,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 900
+        },
+        {
+          "timestamp": "2026-09-12T18:03:26.224840658Z",
+          "layer": 9,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 915
+        },
+        {
+          "timestamp": "2026-09-12T18:03:27.134230747Z",
+          "layer": 10,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 909
+        },
+        {
+          "timestamp": "2026-09-12T18:03:28.058889816Z",
+          "layer": 11,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 924
+        },
+        {
+          "timestamp": "2026-09-12T18:03:28.963942034Z",
+          "layer": 12,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 905
+        },
+        {
+          "timestamp": "2026-09-12T18:03:29.873594076Z",
+          "layer": 13,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 909
+        },
+        {
+          "timestamp": "2026-09-12T18:03:30.777722210Z",
+          "layer": 14,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 904
+        },
+        {
+          "timestamp": "2026-09-12T18:03:31.700117287Z",
+          "layer": 15,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 922
+        },
+        {
+          "timestamp": "2026-09-12T18:03:32.614819889Z",
+          "layer": 16,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 914
+        },
+        {
+          "timestamp": "2026-09-12T18:03:33.527421588Z",
+          "layer": 17,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 912
+        },
+        {
+          "timestamp": "2026-09-12T18:03:34.436744299Z",
+          "layer": 18,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 909
+        },
+        {
+          "timestamp": "2026-09-12T18:03:35.368999376Z",
+          "layer": 19,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 932
+        },
+        {
+          "timestamp": "2026-09-12T18:03:36.295427825Z",
+          "layer": 20,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 926
+        },
+        {
+          "timestamp": "2026-09-12T18:03:37.261581849Z",
+          "layer": 21,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 966
+        },
+        {
+          "timestamp": "2026-09-12T18:03:38.213525392Z",
+          "layer": 22,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 951
+        },
+        {
+          "timestamp": "2026-09-12T18:03:39.144988498Z",
+          "layer": 23,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 931
+        },
+        {
+          "timestamp": "2026-09-12T18:03:40.076843508Z",
+          "layer": 24,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 931
+        },
+        {
+          "timestamp": "2026-09-12T18:03:41.001470686Z",
+          "layer": 25,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 924
+        },
+        {
+          "timestamp": "2026-09-12T18:03:41.931343898Z",
+          "layer": 26,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 929
+        },
+        {
+          "timestamp": "2026-09-12T18:03:42.861144469Z",
+          "layer": 27,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 929
+        },
+        {
+          "timestamp": "2026-09-12T18:03:43.764432678Z",
+          "layer": 28,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 903
+        },
+        {
+          "timestamp": "2026-09-12T18:03:44.693984976Z",
+          "layer": 29,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 929
+        },
+        {
+          "timestamp": "2026-09-12T18:03:45.619233804Z",
+          "layer": 30,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 925
+        },
+        {
+          "timestamp": "2026-09-12T18:03:46.543957669Z",
+          "layer": 31,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 924
+        },
+        {
+          "timestamp": "2026-09-12T18:03:47.472704988Z",
+          "layer": 32,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 928
+        },
+        {
+          "timestamp": "2026-09-12T18:03:48.463126179Z",
+          "layer": 33,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 990
+        },
+        {
+          "timestamp": "2026-09-12T18:03:49.419062741Z",
+          "layer": 34,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 955
+        },
+        {
+          "timestamp": "2026-09-12T18:03:50.375090407Z",
+          "layer": 35,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 955
+        },
+        {
+          "timestamp": "2026-09-12T18:03:51.282804438Z",
+          "layer": 36,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 907
+        },
+        {
+          "timestamp": "2026-09-12T18:03:52.208468273Z",
+          "layer": 37,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 925
+        },
+        {
+          "timestamp": "2026-09-12T18:03:53.138452218Z",
+          "layer": 38,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 929
+        },
+        {
+          "timestamp": "2026-09-12T18:03:54.088651224Z",
+          "layer": 39,
+          "resident_bytes": 2005401600,
+          "elapsed_ms": 950
+        }
+      ]
+    }
+  ],
+  "parallel_worker_ready_seconds": 39.081931632,
+  "coordinator": {
+    "ready_seconds": 5.436736,
+    "backbone_index_embedding_load_seconds": 2.712,
+    "remaining_owner_pool_and_connection_seconds": 2.7247359999999996
+  },
+  "core_end_to_end_seconds": 44.653117082,
+  "standard_run_clean_seconds": 56.481127,
+  "standard_run_restored_seconds": 55.152124,
+  "startup_weight_exchange_bytes": 0,
+  "startup_graph_captures": 0,
+  "lazy_graph": {
+    "fresh_c16_shape_increment_mib": 74,
+    "first_c1_graph_warm_first_content_seconds": 0.8856603039894253,
+    "first_c1_graph_warm_finish_seconds": 5.641973902005702
+  },
+  "notes": [
+    "Spark per-layer intervals include checkpoint page access, host staging, H2D transfer and native packing because these operations are pipelined inside one production loader boundary.",
+    "Checkpoint access is mmap/page-fault based, so /proc/1/io read_bytes does not represent physical NVMe traffic; resident output rate is reported rather than claiming a fabricated disk-only bandwidth.",
+    "No weights are exchanged over RDMA during startup; each rank reads its own expert shard. RoCE connection handoff follows loading.",
+    "CUDA graphs are captured lazily on the first live shape, not during readiness."
+  ],
+  "scope": "Cold-cache phase accounting for the exact clean-built release image pair.",
+  "source": {
+    "report_revision": "0922eb1",
+    "engine_revision": "d5fb015d00aa7b302e3ce179b097482da678db76",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+    "sparkinfer_revision": "7299b3b92e70d539b2c0a63aaadce36932ceef4d"
+  },
+  "images": {
+    "coordinator": "sha256:a13258e92dd25ddb889bd31bb77c8813c7881868b103ceec0c140e30e893c213",
+    "spark": "sha256:2f5d328a14f1a52a0d3b2356b041415d744635f3f3557e41403246429984093b"
+  },
+  "hardware": {
+    "rtx_driver": "595.91.07",
+    "rtx_power_limit_watts": 400,
+    "rtx_memory_speed": "standard",
+    "spark_driver": "580.159.03"
+  },
+  "evidence": {
+    "archive": "evidence/native-release-startup.tar.gz",
+    "archive_sha256": "b9f43c04d9b54b2513c9222193d2e38be68283ba27139c75b8c959b0d17b6a64",
+    "archive_bytes": 10113,
+    "raw_sha256": {
+      "startup-record.json": "2e12aa7f9859aa0ba9ea6fb11cfccec614ea940697fb287445201d68f98ecd7e",
+      "ostrich.log": "45e86f247afed5efcb24cf896b78882c1451603e78ad19dbc7e543cdd79a0e78",
+      "dodo.log": "14f2598902acb0c8a116758fd6cf30593b62b82c34142758606bb9c6fd3dec83",
+      "emu.log": "45cd502931d8b49e834f8070899aeeb4f2d238e0a9de2fd304c4bdbc6de5100f",
+      "kiwi.log": "1de4bd1700e64d36577cbbbb63becc69b4ee0ade5e356449e9b4240f4efd3b60",
+      "coordinator.log": "a2bd2a54d719113a5f7bdb19915aa23149d621d56d35dabc269d55af9c313f8f",
+      "run-restored.log": "153ae7357d0c0c4b506cbdf346b21f48f8260044f896581673fc7d9b46ee70e5"
+    }
+  }
+}

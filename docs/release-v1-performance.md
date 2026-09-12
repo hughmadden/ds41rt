@@ -95,6 +95,6 @@ Three C16 tool-eval-bench hard campaigns run with thinking enabled, high effort,
 
 The default C16/24-turn cache reserves 22,471,251,456 bytes: 16.13 GB FP4 values, 2.02 GB E4M3 group-16 scales, 4.03 GB independent FP4 index keys, 0.25 GB index scales, 43.26 MB FP8 SWA, and small ownership metadata. The full warmed coordinator process uses 65,584 MiB. [Memory accounting](release-v1-memory.md) breaks down weights, execution arenas, vision, dSpark, retained tails, graph/runtime growth, and headroom.
 
-A clean five-host build takes 374.44 s. The standard `run.sh` reaches port 8000 in 56.48 s on first launch and 55.15 s after restoration, with target weight loading taking about 1.77 s. See [the build/run report](release-v1-build-run.md). Phase-level startup I/O, transform, exchange, and graph accounting is reported separately.
+A clean five-host build takes 374.44 s. The standard `run.sh` reaches port 8000 in 56.48 s on first launch and 55.15 s after restoration. A separate cold-cache phase run reaches all four Spark workers in 39.08 s and the API in 44.65 s of core startup. It records 160 layer load/pack intervals, zero startup RDMA weight exchange, and lazy graph capture. See the [startup](release-v1-startup.md) and [build/run](release-v1-build-run.md) reports.
 
 Raw outputs, every timed sample, warmups, quality misses, launch logs, and hardware state are preserved in [`evidence/native-release-performance.tar.gz`](evidence/native-release-performance.tar.gz). The complete structured summary is [`release-v1-performance.json`](release-v1-performance.json).

@@ -1089,7 +1089,12 @@
     "default_launch_seconds": 56.481127,
     "restored_launch_seconds": 55.152124,
     "target_weight_load_seconds": 1.768,
-    "phase_level_report": "release-v1-startup.md (pending)"
+    "phase_level_report": "release-v1-startup.md",
+    "cold_cache_core_seconds": 44.653117082,
+    "cold_cache_parallel_worker_seconds": 39.081931632,
+    "cold_cache_coordinator_seconds": 5.436736,
+    "startup_weight_exchange_bytes": 0,
+    "startup_graph_captures": 0
   },
   "quality_note": "All throughput requests completed without serving errors. Strict corpus contracts intentionally preserve format/length misses; target passed 33/40 weighted samples and dSpark 31/40.",
   "reports": {
