@@ -10,6 +10,7 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
     captured: std::collections::BTreeSet<usize>,
+    request_limit: usize,
 }
 struct DraftRequest {
     leases: [WindowLease; 3],
@@ -27,18 +28,28 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         head: &'w VocabularyHead<'a>,
         capacity: u32,
     ) -> Result<Self> {
-        let window = || DsparkWindow::new(lib, 16, capacity, DsparkWindow::device_bytes(16, capacity)?);
+        Self::with_requests(lib, weights, table, head, capacity, 16)
+    }
+    pub fn with_requests(
+        lib: &'a NativeLibrary, weights: &'w DsparkWeights<'a>,
+        table: &'w NativeRtxTensors<'a>, head: &'w VocabularyHead<'a>,
+        capacity: u32, requests: u32,
+    ) -> Result<Self> {
+        ensure!((1..=16).contains(&requests), "invalid draft request limit");
+        let window = || DsparkWindow::new(lib, requests as usize, capacity,
+            DsparkWindow::device_bytes(requests as usize, capacity)?);
         Ok(Self {
             main: weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?,
-            chain: weights.draft(table, head, 16, weights.draft_bytes(16)?)?,
+            chain: weights.draft(table, head, requests, weights.draft_bytes(requests)?)?,
             windows: [window()?, window()?, window()?],
             requests: Default::default(),
             captured: Default::default(),
+            request_limit: requests as usize,
         })
     }
     pub fn admit(&mut self, id: u64) -> Result<()> {
         ensure!(!self.requests.contains_key(&id), "draft request already admitted");
-        let slot = (0..16).find(|slot| self.requests.values().all(|request| request.slot != *slot))
+        let slot = (0..self.request_limit).find(|slot| self.requests.values().all(|request| request.slot != *slot))
             .context("draft request capacity exhausted")?;
         let mut leases = Vec::new();
         for stage in 0..3 {

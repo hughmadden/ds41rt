@@ -1,0 +1,156 @@
+{
+  "scope": "Native pool and concurrency integration; high-address CUDA and short live serving qualification, not final long-context release performance.",
+  "source_parent": "951a064eb01092e83a4b313bef7f93da8a4e874a",
+  "source_note": "Source files include CLI test assertions added after the release binary build; runtime source is unchanged. Final release container provenance remains a separate gate.",
+  "source_sha256": {
+    "native/cuda/kernels/v41_compressor.cu": "afa6664783de27694bb2c93544bc2b1410861cffa7f5d10d8e05fb4a16c84e28",
+    "native/cuda/kernels/v41_index_scores.cu": "2e646fde26797a4e9927f88e283a7258e3ed2a8cb4b97971329dbbd7db2c4df6",
+    "native/cuda/kernels/v41_kv.cu": "1483f8c9561d4c9c97af0c06925eebd67e98ed56f6218264a81104bfdbf0faf6",
+    "native/cuda/kernels/v41_sparse_attention.cu": "c3f1d0261d5263e9629fba3c2470b8b5d53d020f7290d8e9fff9db9720199f49",
+    "native/include/ds41rt_native.h": "a5c6fba18463de91a5d998776437ae59839fdfd904030244b6ad0963df71c749",
+    "native/src/ds41rt_native.cc": "f035c08bf5aa646989f3c572f10d30f5a67b7ca75a0229cf91b50b501bc81164",
+    "rust/crates/ds41rt-daemon/src/cli.rs": "96a6ee0fc2b00c5428e2348f0ef920b6a0e68cb90f25db53ce9107b6c4a47b6a",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache.rs": "a80c13fbff9344ef2bce40c06cf2690ce0f98688d0c77916a02480247465f212",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "92f0131c5b057e04dbe67405e6580130dae01763027002d3a74ad3e7cce46f50",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "f7a133bfe4bcd61ab0469686b860b01b8316a2e71b0868f56d73a0d655c2b6fb",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/speculative.rs": "3078b1f8bba454328f1f200d565c7bf163c2668ba876b7e0816550ba200cb3c3",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "a82a333aedf30f25ac9fe3e0cc0e4965386e41b342221bdc27fac8488835be54",
+    "rust/crates/ds41rt-ffi/src/v41_compressor.rs": "7f45c1cabf9ca4e110c0fce91a80c89f6155ad0a370286997f518aa652aa1459",
+    "rust/crates/ds41rt-ffi/src/v41_index_scores.rs": "25c072fcf1155ecb6988198491f691317c2e21e4df223b141d6d93de9b64e938",
+    "rust/crates/ds41rt-ffi/src/v41_kv.rs": "677fa24b4f28c20c5b76a3960846b94a9a89e66eea6477360cbfdfee1705ee4b",
+    "rust/crates/ds41rt-ffi/src/v41_sparse_attention.rs": "54a12c1ce16cc67745c8ac7591740477bb2ac30ea5cff72d6fec568b5ef25535",
+    "scripts/qualify-ds41-concurrent-api.py": "794e4296651da6a0dc6cf949821e366df1c9eba25d725f520a46bf1f980d41c2",
+    "scripts/qualify-ds41-partial-prefix-api.py": "a8e4f17b06c47e1ed17ecb394a4f5d3f42ce66e96da809bc08f3efd397e786bb",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/memory.rs": "4267501aba032ff514be337a916b388ca5e2114fee61c37b572bc7594ff5c473",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache/high_pages.rs": "ab5d758c2e7f0f141cba1044fa00fcedbeb1355e721fd805c0475c4fcbe11dfd"
+  },
+  "binary_sha256": "35082641bbeeb7629801520977a21a3bb85563ce0255d0f09fa763e2de66f57c",
+  "native_sha256": "6578932177c4871c9b2aef91f09bc36f4ded1213b19e220ca3fc47e543cae157",
+  "default": {
+    "concurrency": 16,
+    "extra_context_equivalents": 8,
+    "max_context_tokens": 1048576,
+    "source_pages": [
+      49184,
+      49184,
+      49184,
+      98368
+    ],
+    "global_bytes": 37521489920,
+    "active_cache_bytes": 37565994496,
+    "runtime_headroom_bytes": 2147483648
+  },
+  "high_address_test": {
+    "highest_physical_row": 67108863,
+    "kv_byte_offset": 34359737856,
+    "passes": true,
+    "compute_sanitizer_errors": 0
+  },
+  "live": {
+    "target_concurrency": [
+      2,
+      6,
+      16
+    ],
+    "spec_concurrency": [
+      2
+    ],
+    "pool_override": "1GiB",
+    "total_device_ceiling": "95%",
+    "cancel_and_replace": true,
+    "full_context_default_boot": [
+      "target",
+      "dspark"
+    ],
+    "total_budget_only_boot": "80GiB"
+  },
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.59296342281658,
+            "first_content_seconds": 0.0014630474615842104,
+            "finish_seconds": 2.2318789109704085
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.69586424512768,
+            "first_content_seconds": 0.0012882904848083854,
+            "finish_seconds": 2.2263534370576963
+          }
+        },
+        "candidate_decode_ratio": 1.0024159113159048
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.2783032999014,
+            "first_content_seconds": 0.00627831049496308,
+            "finish_seconds": 2.2533052195212804
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.50779380074268,
+            "first_content_seconds": 0.0035897574853152037,
+            "finish_seconds": 2.2388933270121925
+          }
+        },
+        "candidate_decode_ratio": 1.005428091548835
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 140.50581151846438,
+            "first_content_seconds": 0.002946425520349294,
+            "finish_seconds": 0.6785521424608305
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 140.6473860689472,
+            "first_content_seconds": 0.003133095509838313,
+            "finish_seconds": 0.6785882715485059
+          }
+        },
+        "candidate_decode_ratio": 1.0010076063683973
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 114.84671067413134,
+            "first_content_seconds": 0.0054647980141453445,
+            "finish_seconds": 0.8313396099256352
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 115.13144943829373,
+            "first_content_seconds": 0.0039566230261698365,
+            "finish_seconds": 0.8293807129957713
+          }
+        },
+        "candidate_decode_ratio": 1.0024792940301992
+      }
+    ]
+  },
+  "hardware": {
+    "driver": "595.91.07",
+    "power_limit_watts": 400,
+    "memory_speed": "standard, no memory overclock (user configuration)",
+    "observed_loaded_memory_mhz": 13365,
+    "reported_max_memory_mhz": 14001
+  },
+  "preserved_failure": "The C2 partial-prefix run initially used the sixteen-entry expectation. The older parent snapshot was evicted; identical output and partial reuse were correct. A separate two-entry follow-up passes. Original trace/assertion retained.",
+  "remaining": [
+    "Default retention must count 24 complete turns, with prompt snapshots handled explicitly",
+    "Configured-pool exhaustion/admission isolation",
+    "Standard run.sh options and native deployment qualification",
+    "Long-context/full-output/vision/API qualification and final release suite"
+  ],
+  "raw_archive": {
+    "path": "docs/evidence/native-release-pool.json.gz",
+    "bytes": 531988,
+    "sha256": "8f8fcbeb6a7605259e26b7c6daf141003d41c87d0d700d11f94d1e8185c37c43"
+  }
+}

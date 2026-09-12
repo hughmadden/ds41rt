@@ -26,6 +26,11 @@ The serving target is 16 concurrent requests with alternating waves.
 See [architecture.md](architecture.md) for ownership and execution contracts and
 [the architecture audit](docs/ds41-architecture-audit.md) for reference details.
 
+Qualification hardware uses a **400 W RTX power limit and standard memory
+speed** (no memory overclock). The current driver is 595.91.07; its reported
+maximum memory clock is 14,001 MHz. Final results will include clocks observed
+under load and the enforced power limit for each campaign.
+
 ## Implementation and qualification
 
 [TO_SHIP_V1.md](TO_SHIP_V1.md) tracks implementation, full-checkpoint bring-up,

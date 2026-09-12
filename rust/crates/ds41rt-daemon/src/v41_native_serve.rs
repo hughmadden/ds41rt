@@ -1,6 +1,7 @@
 pub(crate) mod speculative;
 mod scheduler;
 mod prefix;
+pub(crate) mod memory;
 use crate::v41_backbone_cache::BackboneCache;
 use crate::v41_backbone_execution::BackboneExecution;
 use crate::v41_backbone_execution::CacheProducerWeights;
@@ -32,7 +33,7 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
     ensure!(args.peers.len() == 4, "four Spark peers required");
     let listen = args.listen.clone();
     let limits = ds41rt_api::native_v41::NativeLimits::new(args.max_context_tokens, args.max_output_tokens)?;
-    let (send, receive) = mpsc::channel(16);
+    let (send, receive) = mpsc::channel(args.concurrency as usize);
     let (ready, readiness) = oneshot::channel();
     let worker_thread = std::thread::Builder::new()
         .name("v41-target-cuda".into())
@@ -172,14 +173,6 @@ fn worker(
     let gather_slots = 2 * ds41rt_core::ENGRAM_LAYERS.len();
     let pipeline =
         unsafe { ds41rt_loader::EngramPipeline::new(&catalog, map, rows, gather_slots, rows * 64 * 1024)? };
-    let source_pages = BackboneCache::pages_for_context(16, args.max_context_tokens as usize)?;
-    let mut requests = Requests::new(
-        &lib,
-        pipeline,
-        16,
-        source_pages,
-        BackboneCache::device_bytes(16, source_pages)?,
-    )?;
     let engram_weights = [0, 1]
         .map(|i| EngramLayerWeights::load(&lib, &catalog, i, 256 * 1024 * 1024, 16 * 1024 * 1024))
         .into_iter()
@@ -251,7 +244,7 @@ fn worker(
             &lib,
             &catalog,
             capacity,
-            16,
+            args.concurrency,
             32 * 1024 * 1024 * 1024,
             16 * 1024 * 1024,
         )?)
@@ -260,8 +253,17 @@ fn worker(
     };
     let mut draft = draft_weights
         .as_ref()
-        .map(|weights| DraftRuntime::new(&lib, weights, &table, &vocabulary, capacity))
+        .map(|weights| DraftRuntime::with_requests(&lib, weights, &table, &vocabulary, capacity, args.concurrency))
         .transpose()?;
+    // Size after both lanes, transports and optional draft allocations are live.
+    let (free, total) = lib.cuda_memory_info()?;
+    let pool = memory::PoolPlan::new(args.concurrency as usize, args.max_context_tokens as usize,
+        args.kv_pool_size, args.memory_reservation, free, total)?;
+    tracing::info!(source_pages=?pool.pages, global_bytes=pool.global_bytes,
+        cache_bytes=pool.cache_bytes, device_occupied_bytes=pool.occupied_before,
+        reservation_bytes=pool.reservation_bytes, runtime_headroom_bytes=memory::RUNTIME_HEADROOM,
+        "native KV pool reservation");
+    let mut requests = Requests::new(&lib, pipeline, args.concurrency as usize, pool.pages, pool.cache_bytes)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;

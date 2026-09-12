@@ -11,8 +11,14 @@ gate below is satisfied merely by an older component test.
   the official model's cache semantics; verify cold, partial, exact and divergent
   prefix reuse against uncached execution, including eviction and concurrency.
 - [x] Retain populated last-turn SWAs for fast exact agentic continuation,
-  bounded by concurrent request capacity and invalidated with radix branches.
-- [ ] Measure reuse performance and expose one exact KV pool sizing option.
+  bounded and invalidated with radix branches.
+- [ ] Default to 24 exact retained turns (16 concurrent plus eight spare),
+  with a configurable retention limit (user addition September 12). Audit
+  prompt and completed-turn snapshots so the setting counts retained turns
+  as intended, rather than silently halving capacity by keeping both frontiers.
+- [x] Measure reuse performance and expose one exact KV pool sizing option.
+  [Native pool evidence](release-v1-pool.md) covers focused reuse/performance
+  checks; the full retained-context release matrix remains open.
 - [x] Run an initial tool-eval-bench and basic dsh agentic task after prefix
   correctness, before the full qualification campaign.
 - [x] Repeat tool-eval with thinking enabled at high effort (user correction);
@@ -28,13 +34,19 @@ gate below is satisfied merely by an older component test.
   [Native defaults and output clamping](release-v1-model-limits.md) now have
   focused API/CLI and live target/dSpark verification; full-context qualification
   remains part of the release suite.
-- [ ] Reserve 16 maximum-context requests plus eight additional 1M-context KV
+- [x] Reserve 16 maximum-context requests plus eight additional 1M-context KV
   equivalents; support total memory percentage and MB/GB reservation options.
+  [Pool allocation and high-address GPU checks](release-v1-pool.md) pass.
+  Configured-pool exhaustion/admission isolation and launcher wiring still
+  belong to the remaining API/run-script qualification.
 - [ ] Measure and improve startup reads/transforms/exchange/capture. Aim for
   NVMe line rate (coordinator about 14 GB/s, Sparks about 6 GB/s) and roughly
   60–90 seconds load time without sacrificing runtime performance.
 - [ ] Qualify normal build/run scripts and optimized backend selection on all
   five hosts from reproducible source and dependency pins.
+  Expose concurrency and KV pool parameters through the standard launch script;
+  sixteen active requests and eight retained-context equivalents are defaults,
+  not mandatory settings (user clarification September 12).
   Preserve port 8000 for the standard `run.sh` launch; explicit alternate
   configurations may override `ADDR` (user addition September 12).
 
@@ -42,7 +54,11 @@ gate below is satisfied merely by an older component test.
 
 Every result must identify source and artifact hashes, model revision, hardware,
 launch settings, sampling, input data, cache state, concurrency, warmup, all
-samples and errors. Preserve raw machine-readable output alongside reports.
+samples and errors. State the RTX power limit and standard memory speed up
+front in the README results; capture driver version, enforced power limit and
+loaded memory clocks per campaign. The user reports a September 11 driver update
+reset power caps; do not attribute cross-campaign differences solely to code.
+Preserve raw machine-readable output alongside reports.
 Run the shared four-Spark target/dSpark workloads sequentially to avoid contention.
 
 - [ ] Reuse the located eight content types and Orchid from ../glmrt-release (sources below).
@@ -79,6 +95,9 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   digests and verify the published artifacts match the qualified pair.
 - [ ] After documentation and image gates, advance main to qualified dev and
   create release/vX for the chosen numbered release.
+- [ ] Publish a formal first-release package on GitHub with qualified artifacts
+  and container references. Release notes: a short high-level overview and
+  bulleted key features, linking detailed reports (user addition September 12).
 - [ ] Tell the user to make the images public manually after all other work.
 
 ## Current evidence and next action

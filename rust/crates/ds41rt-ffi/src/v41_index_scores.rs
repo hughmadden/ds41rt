@@ -94,7 +94,7 @@ impl V41IndexScores<'_> {
                 && (1..=16384).contains(&candidates)
                 && (1..=16).contains(&slots)
                 && (1..=4096).contains(&stride)
-                && (1..=16777216).contains(&capacity),
+                && (1..=67108864).contains(&capacity),
             "invalid index scoring shape"
         );
         for (b, n) in [
@@ -171,7 +171,7 @@ impl V41IndexScores<'_> {
                 && (1..=16384).contains(&candidates)
                 && (1..=16).contains(&slots)
                 && (1..=4096).contains(&stride)
-                && (1..=16777216).contains(&capacity)
+                && (1..=67108864).contains(&capacity)
                 && (1..=4096).contains(&proposal_capacity),
             "invalid index scoring shape"
         );

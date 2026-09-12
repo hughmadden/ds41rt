@@ -59,10 +59,10 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
     requests: &mut Requests<'a>, first_transport: &mut NativeTp4Wave<'a>,
     second_transport: &mut NativeTp4Wave<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>,
 ) -> Result<()> {
-    let mut active: Vec<Option<Active>> = (0..16).map(|_| None).collect();
+    let mut active: Vec<Option<Active>> = (0..args.concurrency).map(|_| None).collect();
     let mut id = 0u64;
     let mut closed = false;
-    let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize);
+    let mut prefixes = PrefixCache::new(args.prefix_cache_entries.min(args.concurrency) as usize);
     let limits = ds41rt_api::native_v41::NativeLimits::new(args.max_context_tokens, args.max_output_tokens)?;
     loop {
         // This point is reached only after both complete stacks have drained and

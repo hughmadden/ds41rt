@@ -89,7 +89,7 @@ impl V41Kv<'_> {
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!(
-            (1..=4096).contains(&rows) && (1..=16777216).contains(&capacity),
+            (1..=4096).contains(&rows) && (1..=67108864).contains(&capacity),
             "invalid KV store shape"
         );
         check(&[

@@ -5,6 +5,7 @@ from pathlib import Path
 parser=argparse.ArgumentParser()
 parser.add_argument('--base-url', default='http://127.0.0.1:18042')
 parser.add_argument('--output', type=Path, required=True)
+parser.add_argument('--max-concurrency', type=int, choices=range(1,17), default=16)
 args=parser.parse_args()
 api=runpy.run_path(str(Path(__file__).with_name('qualify-ds41-native-api.py')))
 base=args.base_url
@@ -28,7 +29,7 @@ def same_result(actual, reference):
  assert a.get('prompt_tokens_details',{}).get('cached_tokens',hit)==hit
  return actual['text']==reference['text'] and all(a[k]==e[k] for k in ['prompt_tokens','completion_tokens','total_tokens'])
 for i in range(4):expected[i]=run(i)['result']
-for count in [2,6,16]:
+for count in sorted({c for c in [2,6,args.max_concurrency] if c <= args.max_concurrency}):
  with concurrent.futures.ThreadPoolExecutor(max_workers=count) as pool:
   results=list(pool.map(run,range(count)))
  for r in results:
@@ -37,18 +38,18 @@ for count in [2,6,16]:
  records.append(dict(concurrency=count,results=results))
  args.output.write_text(json.dumps(records,indent=2))
  print('PASS',count,flush=True)
-with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
- pending={pool.submit(run,i,i in [0,3,8]):i for i in range(16)}
- results=[];replacement=16
+with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_concurrency) as pool:
+ pending={pool.submit(run,i,i in [0,3,8]):i for i in range(args.max_concurrency)}
+ results=[];replacement=args.max_concurrency
  while pending:
   done,_=concurrent.futures.wait(pending,return_when=concurrent.futures.FIRST_COMPLETED)
   for f in done:
    pending.pop(f);results.append(f.result())
-   if replacement<20:
+   if replacement<args.max_concurrency+4:
     pending[pool.submit(run,replacement)]=replacement;replacement+=1
 for r in results:
  if not r['cancel']:
   e=expected[r['index']%4];o=r['result'];assert same_result(o,e),('reuse',r['index'])
-records.append(dict(concurrency=16,cancellation_and_replacement=True,results=results))
+records.append(dict(concurrency=args.max_concurrency,cancellation_and_replacement=True,results=results))
 args.output.write_text(json.dumps(records,indent=2))
 print('PASS cancellation and replacement',flush=True)

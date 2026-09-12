@@ -199,7 +199,7 @@ impl V41Compressor<'_> {
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!(
-            (1..=4096).contains(&rows) && (1..=16 * 1048576).contains(&capacity),
+            (1..=4096).contains(&rows) && (1..=64 * 1048576).contains(&capacity),
             "invalid index store shape"
         );
         buffer(packed, rows * 64)?;

@@ -167,7 +167,7 @@ extern "C" int32_t ds41rt_v41_index_pack(const uint16_t* input,uint8_t* packed,
 extern "C" int32_t ds41rt_v41_index_store(const uint8_t* packed,const uint8_t* scales,
     const uint64_t* destinations,uint8_t* cache,uint8_t* cache_scales,
     int32_t rows,uint64_t capacity,void* stream) {
-  if(rows<1 || rows>4096 || capacity<1 || capacity>16*1048576ull)return cudaErrorInvalidValue;
+  if(rows<1 || rows>4096 || capacity<1 || capacity>64*1048576ull)return cudaErrorInvalidValue;
   const void* ptrs[]={packed,scales,destinations,cache,cache_scales};
   const uint64_t bytes[]={uint64_t(rows)*64,uint64_t(rows)*4,uint64_t(rows)*8,capacity*64,capacity*4};
   for(int i=0;i<5;++i) {

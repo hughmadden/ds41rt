@@ -182,7 +182,7 @@ impl V41SparseAttention<'_> {
         };
         if let Some(s) = source {
             ensure!(
-                (1..=16777216).contains(&s.capacity)
+                (1..=67108864).contains(&s.capacity)
                     && (1..=4096).contains(&s.proposal_capacity)
                     && (1..=4096).contains(&s.page_stride),
                 "invalid sparse source shape"

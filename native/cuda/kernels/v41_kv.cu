@@ -53,7 +53,7 @@ extern "C" int32_t ds41rt_v41_kv_pack(const uint16_t* input,const float* frequen
 extern "C" int32_t ds41rt_v41_kv_store(const uint8_t* values,const uint8_t* scales,
     const uint64_t* destinations,uint8_t* cache,uint8_t* cache_scales,
     int32_t rows,uint64_t capacity,void* stream) {
-  if(rows<1 || rows>4096 || capacity<1 || capacity>16777216ull)return cudaErrorInvalidValue;
+  if(rows<1 || rows>4096 || capacity<1 || capacity>67108864ull)return cudaErrorInvalidValue;
   const uint64_t r=rows;const void* p[]={values,scales,destinations,cache,cache_scales};
   const uint64_t n[]={r*512,r*16,r*8,capacity*512,capacity*16};const int align[]={1,1,8,1,1};
   for(int i=0;i<5;++i) {

@@ -305,7 +305,7 @@ static int32_t launch_attention(const uint16_t* query,const float* sink,
   if(!view || rows<1 || rows>4096 || window_width<0 || window_width>128)return cudaErrorInvalidValue;
   const auto v=*view;
   if(v.compressed>1 || v.window_proposal_capacity<1 || v.window_proposal_capacity>4096 ||
-    (v.compressed && (v.source_capacity<1 || v.source_capacity>16777216ull ||
+    (v.compressed && (v.source_capacity<1 || v.source_capacity>67108864ull ||
      v.source_proposal_capacity<1 || v.source_proposal_capacity>4096 ||
      v.page_stride<1 || v.page_stride>4096)))return cudaErrorInvalidValue;
   if(parts<1 || parts>10)return cudaErrorInvalidValue;

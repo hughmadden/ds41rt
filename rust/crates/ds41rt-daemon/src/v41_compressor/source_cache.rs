@@ -55,7 +55,7 @@ pub(crate) struct KvCacheView<'a> {
 impl<'a> SourceCache<'a> {
     pub fn device_bytes(pages: usize, slots: usize) -> Result<usize> {
         ensure!(
-            (1..=65536).contains(&pages),
+            (1..=262144).contains(&pages),
             "invalid index pool page count"
         );
         ensure!((1..=16).contains(&slots), "invalid index slot count");
@@ -360,11 +360,14 @@ fn slice(buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDevic
 }
 
 #[cfg(test)]
+mod high_pages;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::v41_memory::LoadStream;
 
-    fn append(
+    pub(super) fn append(
         cache: &mut SourceCache<'_>,
         slot: usize,
         old: usize,
@@ -414,7 +417,7 @@ mod tests {
         Ok(())
     }
 
-    fn read(cache: &SourceCache<'_>, slot: usize, rows: usize) -> Result<Vec<u8>> {
+    pub(super) fn read(cache: &SourceCache<'_>, slot: usize, rows: usize) -> Result<Vec<u8>> {
         let mut bytes = Vec::new();
         for row in 0..rows {
             let physical =

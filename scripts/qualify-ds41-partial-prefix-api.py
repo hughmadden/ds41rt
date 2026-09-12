@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--base-url', required=True)
     parser.add_argument('--reference-url', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--retained-entries', type=int, choices=[2,16], default=16,
+                        help='Expected cache capacity; two entries evict the older parent tail.')
     args = parser.parse_args()
     tag = uuid.uuid4().hex
     header = f'Session {tag}. The access code is quartz731. The following inventory records do not change the access code.\n'
@@ -30,7 +32,10 @@ def main():
              ('shorter_branch', header + ''.join(records.splitlines(keepends=True)[:120]) + ask, 'quartz731', 'partial'),
              ('parent_still_intact', header + records + '\nReply with only OK.', 'OK', 'full'),
              ('large_uncached_suffix', header + records + tail + ask, 'quartz731', 'partial')]
-    record = dict(scope=__doc__, candidate=args.base_url, reference=args.reference_url, cases=[])
+    if args.retained_entries == 2:
+        cases = [(name,prompt,answer,'partial' if name == 'parent_still_intact' else kind)
+                 for name,prompt,answer,kind in cases]
+    record = dict(scope=__doc__, retained_entries=args.retained_entries, candidate=args.base_url, reference=args.reference_url, cases=[])
     for name, prompt, answer, kind in cases:
         body = API['payload'](prompt, True)
         body['max_tokens'] = 32

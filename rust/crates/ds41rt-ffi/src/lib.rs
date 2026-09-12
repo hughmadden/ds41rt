@@ -3810,6 +3810,16 @@ impl NativeLibrary {
         self.status_to_result("ds41rt_free_host_buffer", status)
     }
 
+    /// Free and total bytes on the current CUDA device, including other processes.
+    pub fn cuda_memory_info(&self) -> Result<(usize, usize)> {
+        let info: Symbol<unsafe extern "C" fn(*mut usize, *mut usize) -> Ds41rtStatus> =
+            unsafe { self.lib.get(b"ds41rt_cuda_memory_info")? };
+        let (mut free, mut total) = (0, 0);
+        self.status_to_result("ds41rt_cuda_memory_info", unsafe { info(&mut free, &mut total) })?;
+        anyhow::ensure!(free <= total && total > 0, "invalid CUDA memory information");
+        Ok((free, total))
+    }
+
     pub fn alloc_device_buffer(&self, bytes: usize) -> Result<Ds41rtDeviceBuffer> {
         let alloc_fn: Symbol<AllocDeviceBufferFn> =
             unsafe { self.lib.get(b"ds41rt_alloc_device_buffer")? };

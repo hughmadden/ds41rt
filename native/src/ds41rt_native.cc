@@ -639,6 +639,23 @@ extern "C" ds41rt_status_t ds41rt_cuda_device_info(int device_id, ds41rt_cuda_de
 #endif
 }
 
+extern "C" ds41rt_status_t ds41rt_cuda_memory_info(size_t* free_bytes, size_t* total_bytes) {
+  if (free_bytes == nullptr || total_bytes == nullptr || free_bytes == total_bytes) {
+    return fail(DS41RT_STATUS_INVALID_ARGUMENT, "memory info requires distinct output pointers");
+  }
+  *free_bytes = 0;
+  *total_bytes = 0;
+#if DS41RT_NATIVE_ENABLE_CUDA
+  const cudaError_t err = cudaMemGetInfo(free_bytes, total_bytes);
+  if (err != cudaSuccess) {
+    return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "cudaMemGetInfo failed", err);
+  }
+  return ok();
+#else
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "memory info requires CUDA");
+#endif
+}
+
 extern "C" ds41rt_status_t ds41rt_alloc_device_buffer(size_t bytes, ds41rt_device_buffer_t* out) {
   if (out == nullptr) {
     return fail(DS41RT_STATUS_INVALID_ARGUMENT, "device buffer output pointer is null");

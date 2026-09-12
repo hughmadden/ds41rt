@@ -386,6 +386,13 @@ mod tests {
         };
         assert_eq!(args.max_context_tokens, 1_048_576);
         assert_eq!(args.max_output_tokens, 393_216);
+        assert_eq!(args.concurrency, 16);
+        for concurrency in ["1", "2", "16"] {
+            assert!(super::Cli::try_parse_from(base.into_iter().chain(["--concurrency", concurrency, "--kv-pool-size", "1.5GiB", "--memory-reservation", "87.5%"])).is_ok());
+        }
+        for concurrency in ["0", "17"] {
+            assert!(super::Cli::try_parse_from(base.into_iter().chain(["--concurrency", concurrency])).is_err());
+        }
         for (context, output, valid) in [("256", "128", true), ("0", "128", false),
             ("1048577", "128", false), ("256", "0", false), ("256", "393217", false)] {
             let command = base.into_iter().chain(["--max-context-tokens", context, "--max-output-tokens", output]);
@@ -456,6 +463,18 @@ pub(crate) struct NativeServeArgs {
     /// Default and maximum generated tokens, further bounded by remaining context.
     #[arg(long, default_value_t = ds41rt_api::native_v41::MAX_OUTPUT_TOKENS, value_parser = clap::value_parser!(u32).range(1..=393216))]
     pub max_output_tokens: u32,
+
+    /// Exact global KV/index byte budget (B/MB/GB/MiB/GiB), rounded down to page groups.
+    #[arg(long)]
+    pub kv_pool_size: Option<crate::v41_native_serve::memory::ByteSize>,
+
+    /// Total device occupancy ceiling (% or B/MB/GB/MiB/GiB); sizes KV after fixed allocations.
+    #[arg(long)]
+    pub memory_reservation: Option<crate::v41_native_serve::memory::Reservation>,
+
+    /// Maximum active requests, shared by both execution lanes.
+    #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(1..=16))]
+    pub concurrency: u32,
 
     /// Maximum retained prompt/turn states; zero disables native prefix reuse.
     #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(0..=16))]

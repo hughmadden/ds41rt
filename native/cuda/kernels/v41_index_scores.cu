@@ -107,7 +107,7 @@ extern "C" int32_t ds41rt_v41_index_scores(const uint8_t* q,const uint8_t* qs,co
     const uint64_t* metadata,const uint64_t* positions,float* output,
     int32_t queries,int32_t candidates,int32_t slots,int32_t stride,uint64_t capacity,void* stream) {
   if(queries<1 || queries>4096 || candidates<1 || candidates>16384 || slots<1 || slots>16 ||
-      stride<1 || stride>4096 || capacity<1 || capacity>16777216ull)return cudaErrorInvalidValue;
+      stride<1 || stride>4096 || capacity<1 || capacity>67108864ull)return cudaErrorInvalidValue;
   const uint64_t rows=queries,count=rows*candidates,out=count*4;
   if(!valid(output,out,4))return cudaErrorInvalidValue;
   const void* ptrs[]={q,qs,weights,keys,ks,pages,lengths,metadata,positions};
@@ -128,7 +128,7 @@ extern "C" int32_t ds41rt_v41_index_scores_overlay(const uint8_t* q,const uint8_
     int32_t queries,int32_t candidates,int32_t slots,int32_t stride,uint64_t capacity,
     uint64_t proposal_capacity,void* stream) {
   if(queries<1 || queries>4096 || candidates<1 || candidates>16384 || slots<1 || slots>16 ||
-      stride<1 || stride>4096 || capacity<1 || capacity>16777216ull ||
+      stride<1 || stride>4096 || capacity<1 || capacity>67108864ull ||
       proposal_capacity<1 || proposal_capacity>4096)return cudaErrorInvalidValue;
   const uint64_t rows=queries,count=rows*candidates,out=count*4;
   if(!valid(output,out,4))return cudaErrorInvalidValue;

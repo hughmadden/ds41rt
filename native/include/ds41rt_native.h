@@ -471,6 +471,8 @@ typedef struct ds41rt_rdma_rc_completion_stats_t {
 
 ds41rt_status_t ds41rt_native_version(char* out, size_t out_len);
 ds41rt_status_t ds41rt_cuda_device_info(int device_id, ds41rt_cuda_device_info_t* out);
+// Current CUDA device's available and total memory, including other processes.
+ds41rt_status_t ds41rt_cuda_memory_info(size_t* free_bytes, size_t* total_bytes);
 ds41rt_status_t ds41rt_alloc_host_buffer(size_t bytes, ds41rt_host_buffer_t* out);
 ds41rt_status_t ds41rt_cuda_host_buffer_device_alias(ds41rt_host_buffer_t host,
                                                     ds41rt_device_buffer_t* out);
