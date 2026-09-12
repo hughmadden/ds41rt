@@ -238,6 +238,15 @@ def export(output_dir: Path, role: str, rows: tuple[int, ...], input_format: str
         export_slices(output_dir, rows, V41DraftSlicePipeline.DEFAULT_WIDTH,
                       role=role, standard_names=True)
         return
+    if role == "spark" and input_format == "fp8_k32":
+        from export_b12x_v41_slices_aot import export as export_slices
+
+        # Match the qualified backbone worker: narrow single-row decode,
+        # wider grouped execution, and direct token output for prefill.
+        widths = {capacity: 64 if capacity == 1 else 192 for capacity in rows}
+        export_slices(output_dir, rows, widths, atomic_min_capacity=256,
+                      role=role, standard_names=True)
+        return
     # Export requires compiler IR, which executable-only cache entries omit.
     os.environ["B12X_COMPILE_DISK_CACHE"] = "0"
     os.environ["B12X_COMPILE_MEMORY_CACHE"] = "0"
