@@ -40,9 +40,24 @@ impl<'a> EngramDeviceRows<'a> {
     ) -> Result<EngramUploadPoll> {
         self.ready = None;
         Ok(match pipeline.poll(wave, histories, layer)? {
-            EngramGatherPoll::Pending => EngramUploadPoll::Pending,
+            EngramGatherPoll::Pending => {
+                tracing::debug!(target: "ds41rt::timing", layer, upload_owner=self as *const Self as usize, "engram IO pending");
+                EngramUploadPoll::Pending
+            }
             EngramGatherPoll::Cancelled => EngramUploadPoll::Cancelled,
-            EngramGatherPoll::Ready(lease) => EngramUploadPoll::Ready(self.upload(&lease.view()?)?),
+            EngramGatherPoll::Ready(lease) => {
+                let gathered = lease.view()?;
+                if let Some(timing) = lease.timing() {
+                    tracing::debug!(target: "ds41rt::timing", layer, rows=gathered.rows,
+                        upload_owner=self as *const Self as usize,
+                        queue_us=timing.queued.as_micros() as u64,
+                        gather_us=timing.gather.as_micros() as u64,
+                        ready_age_us=timing.completed.elapsed().as_micros() as u64,
+                        minor_faults=timing.minor_faults, major_faults=timing.major_faults,
+                        input_blocks=timing.input_blocks, "engram IO delivery");
+                }
+                EngramUploadPoll::Ready(self.upload(&gathered)?)
+            }
         })
     }
     /// Poll on the CUDA-owning thread and recycle ready staging after upload.

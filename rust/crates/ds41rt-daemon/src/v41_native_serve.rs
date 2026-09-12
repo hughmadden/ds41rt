@@ -165,8 +165,11 @@ fn worker(
         BackboneExecution::workspace_bytes(&lib, capacity)?,
     )?;
     let map = ds41rt_loader::EngramTokenMap::from_file(&&args.snapshot.join("tokenizer.json"))?;
+    // Both Engram layers retain their staging leases until consumed. Reserve
+    // both layers for both active lanes so the second lane can gather early.
+    let gather_slots = 2 * ds41rt_core::ENGRAM_LAYERS.len();
     let pipeline =
-        unsafe { ds41rt_loader::EngramPipeline::new(&catalog, map, rows, 2, rows * 64 * 1024)? };
+        unsafe { ds41rt_loader::EngramPipeline::new(&catalog, map, rows, gather_slots, rows * 64 * 1024)? };
     let source_pages = BackboneCache::pages_for_context(16, args.max_context_tokens as usize)?;
     let mut requests = Requests::new(
         &lib,

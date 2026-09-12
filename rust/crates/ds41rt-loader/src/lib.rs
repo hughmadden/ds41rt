@@ -1,7 +1,9 @@
 mod engram_pipeline;
 pub use engram_pipeline::{EngramPipeline, EngramRequestTokens, EngramWave};
 mod engram_gather;
-pub use engram_gather::{EngramGatherer, EngramGatherLease, EngramGatherPoll, EngramGatherTicket};
+pub use engram_gather::{
+    EngramGatherer, EngramGatherLease, EngramGatherPoll, EngramGatherTicket, EngramGatherTiming,
+};
 mod engram_staging;
 pub use engram_staging::{EngramBatchStaging, EngramGatherView};
 mod v41_expert_staging;

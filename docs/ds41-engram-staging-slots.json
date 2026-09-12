@@ -1,0 +1,565 @@
+{
+  "scope": "Four Engram staging leases for two lanes times two Engram layers; mmap/WILLNEED backend unchanged",
+  "candidate_daemon_sha256": "7263fabe67cc09bd0aa21cd3879145a31504e24b6b48c49e30d8df555e235fd1",
+  "baseline": "selected coordinator stream staging, native RMSNorm unchanged",
+  "traces": {
+    "two_slots": {
+      "summary": [
+        {
+          "run": 0,
+          "pending_polls": 200,
+          "deliveries": 400,
+          "per_layer": [
+            {
+              "engram_layer_index": 0,
+              "deliveries": 200,
+              "waited": 100,
+              "queue_us": {
+                "median": 5.0,
+                "max": 65
+              },
+              "gather_us": {
+                "median": 167.0,
+                "max": 706
+              },
+              "ready_age_us": {
+                "median": 6974.0,
+                "max": 446453
+              },
+              "minor_faults": 23820,
+              "major_faults": 0,
+              "input_blocks": 0,
+              "wait_window_median_us": 2241.969108581543,
+              "ready_age_when_waited_median_us": 2218.5
+            },
+            {
+              "engram_layer_index": 1,
+              "deliveries": 200,
+              "waited": 100,
+              "queue_us": {
+                "median": 158.5,
+                "max": 750
+              },
+              "gather_us": {
+                "median": 147.5,
+                "max": 665
+              },
+              "ready_age_us": {
+                "median": 18013.0,
+                "max": 483249
+              },
+              "minor_faults": 23856,
+              "major_faults": 0,
+              "input_blocks": 0,
+              "wait_window_median_us": 2383.589744567871,
+              "ready_age_when_waited_median_us": 2346.5
+            }
+          ]
+        },
+        {
+          "run": 1,
+          "pending_polls": 200,
+          "deliveries": 400,
+          "per_layer": [
+            {
+              "engram_layer_index": 0,
+              "deliveries": 200,
+              "waited": 100,
+              "queue_us": {
+                "median": 18.0,
+                "max": 26
+              },
+              "gather_us": {
+                "median": 38.0,
+                "max": 55
+              },
+              "ready_age_us": {
+                "median": 7322.0,
+                "max": 14785
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0,
+              "wait_window_median_us": 2164.9599075317383,
+              "ready_age_when_waited_median_us": 2127.5
+            },
+            {
+              "engram_layer_index": 1,
+              "deliveries": 200,
+              "waited": 100,
+              "queue_us": {
+                "median": 34.0,
+                "max": 77
+              },
+              "gather_us": {
+                "median": 39.0,
+                "max": 65
+              },
+              "ready_age_us": {
+                "median": 18552.0,
+                "max": 42892
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0,
+              "wait_window_median_us": 2112.0309829711914,
+              "ready_age_when_waited_median_us": 2062.5
+            }
+          ]
+        },
+        {
+          "run": 2,
+          "pending_polls": 200,
+          "deliveries": 400,
+          "per_layer": [
+            {
+              "engram_layer_index": 0,
+              "deliveries": 200,
+              "waited": 100,
+              "queue_us": {
+                "median": 5.0,
+                "max": 21
+              },
+              "gather_us": {
+                "median": 34.5,
+                "max": 57
+              },
+              "ready_age_us": {
+                "median": 7468.5,
+                "max": 12742
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0,
+              "wait_window_median_us": 2194.523811340332,
+              "ready_age_when_waited_median_us": 2173.0
+            },
+            {
+              "engram_layer_index": 1,
+              "deliveries": 200,
+              "waited": 100,
+              "queue_us": {
+                "median": 30.0,
+                "max": 69
+              },
+              "gather_us": {
+                "median": 36.0,
+                "max": 66
+              },
+              "ready_age_us": {
+                "median": 18366.0,
+                "max": 39892
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0,
+              "wait_window_median_us": 2148.0321884155273,
+              "ready_age_when_waited_median_us": 2112.5
+            }
+          ]
+        }
+      ],
+      "process_resources": [
+        [
+          {
+            "minor_faults": 1372048,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17804281002,
+              "wchar": 10807,
+              "syscr": 4377,
+              "syscw": 27,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          },
+          {
+            "minor_faults": 1783752,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665245,
+              "wchar": 14097896,
+              "syscr": 5423,
+              "syscw": 51315,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          }
+        ],
+        [
+          {
+            "minor_faults": 1783752,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665245,
+              "wchar": 14097896,
+              "syscr": 5423,
+              "syscw": 51315,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          },
+          {
+            "minor_faults": 1783781,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665245,
+              "wchar": 28178021,
+              "syscr": 5423,
+              "syscw": 102530,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          }
+        ],
+        [
+          {
+            "minor_faults": 1783781,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665245,
+              "wchar": 28178021,
+              "syscr": 5423,
+              "syscw": 102530,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          },
+          {
+            "minor_faults": 1783786,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665245,
+              "wchar": 42259275,
+              "syscr": 5423,
+              "syscw": 153765,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          }
+        ]
+      ],
+      "log_path": "/tmp/ds41-engram-timing/server.log",
+      "log_sha256": "fec4171c10195925a8134e92977eb5077e3627bdb48342a3e3137fd489d7af6a"
+    },
+    "four_slots": {
+      "summary": [
+        {
+          "run": 0,
+          "pending_polls": 0,
+          "deliveries": 400,
+          "per_layer": [
+            {
+              "engram_layer_index": 0,
+              "deliveries": 200,
+              "waited": 0,
+              "queue_us": {
+                "median": 9.0,
+                "max": 27
+              },
+              "gather_us": {
+                "median": 178.5,
+                "max": 759
+              },
+              "ready_age_us": {
+                "median": 11324.0,
+                "max": 422492
+              },
+              "minor_faults": 23820,
+              "major_faults": 0,
+              "input_blocks": 0
+            },
+            {
+              "engram_layer_index": 1,
+              "deliveries": 200,
+              "waited": 0,
+              "queue_us": {
+                "median": 188.5,
+                "max": 778
+              },
+              "gather_us": {
+                "median": 145.5,
+                "max": 617
+              },
+              "ready_age_us": {
+                "median": 35201.0,
+                "max": 459608
+              },
+              "minor_faults": 23856,
+              "major_faults": 0,
+              "input_blocks": 0
+            }
+          ]
+        },
+        {
+          "run": 1,
+          "pending_polls": 0,
+          "deliveries": 400,
+          "per_layer": [
+            {
+              "engram_layer_index": 0,
+              "deliveries": 200,
+              "waited": 0,
+              "queue_us": {
+                "median": 17.0,
+                "max": 25
+              },
+              "gather_us": {
+                "median": 39.0,
+                "max": 59
+              },
+              "ready_age_us": {
+                "median": 7726.0,
+                "max": 13087
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0
+            },
+            {
+              "engram_layer_index": 1,
+              "deliveries": 200,
+              "waited": 0,
+              "queue_us": {
+                "median": 49.5,
+                "max": 77
+              },
+              "gather_us": {
+                "median": 35.5,
+                "max": 58
+              },
+              "ready_age_us": {
+                "median": 34897.0,
+                "max": 42161
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0
+            }
+          ]
+        },
+        {
+          "run": 2,
+          "pending_polls": 0,
+          "deliveries": 400,
+          "per_layer": [
+            {
+              "engram_layer_index": 0,
+              "deliveries": 200,
+              "waited": 0,
+              "queue_us": {
+                "median": 14.0,
+                "max": 22
+              },
+              "gather_us": {
+                "median": 37.0,
+                "max": 63
+              },
+              "ready_age_us": {
+                "median": 8514.0,
+                "max": 13759
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0
+            },
+            {
+              "engram_layer_index": 1,
+              "deliveries": 200,
+              "waited": 0,
+              "queue_us": {
+                "median": 48.0,
+                "max": 73
+              },
+              "gather_us": {
+                "median": 37.0,
+                "max": 77
+              },
+              "ready_age_us": {
+                "median": 34500.0,
+                "max": 41339
+              },
+              "minor_faults": 0,
+              "major_faults": 0,
+              "input_blocks": 0
+            }
+          ]
+        }
+      ],
+      "process_resources": [
+        [
+          {
+            "minor_faults": 1372039,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17804281001,
+              "wchar": 10807,
+              "syscr": 4377,
+              "syscw": 27,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          },
+          {
+            "minor_faults": 1817876,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665244,
+              "wchar": 14063845,
+              "syscr": 5423,
+              "syscw": 50908,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          }
+        ],
+        [
+          {
+            "minor_faults": 1817876,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665244,
+              "wchar": 14063845,
+              "syscr": 5423,
+              "syscw": 50908,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          },
+          {
+            "minor_faults": 1818157,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665244,
+              "wchar": 28109307,
+              "syscr": 5423,
+              "syscw": 101725,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          }
+        ],
+        [
+          {
+            "minor_faults": 1818157,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665244,
+              "wchar": 28109307,
+              "syscr": 5423,
+              "syscw": 101725,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          },
+          {
+            "minor_faults": 1818406,
+            "major_faults": 0,
+            "io": {
+              "rchar": 17811665244,
+              "wchar": 42155649,
+              "syscr": 5423,
+              "syscw": 152561,
+              "read_bytes": 0,
+              "write_bytes": 0,
+              "cancelled_write_bytes": 0
+            }
+          }
+        ]
+      ],
+      "log_path": "/tmp/ds41-engram-slots/server.log",
+      "log_sha256": "0cdd61a2fb64a0cf2afb0bbbe35e2eebd6e6cf73394cc3990321df6379c5463d"
+    }
+  },
+  "performance": [
+    {
+      "source": "/tmp/ds41-engram-slots/perf-0-candidate.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 304.2446386013995,
+          "per_stream_mean": 51.55223535434219
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 615.3799488149904,
+          "per_stream_mean": 39.939896646904174
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-engram-slots/perf-1-baseline.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 318.8301097474342,
+          "per_stream_mean": 54.03712176835415
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 620.4248565310764,
+          "per_stream_mean": 40.26040608148816
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-engram-slots/perf-2-baseline.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 318.9255478076327,
+          "per_stream_mean": 54.0558148706278
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 620.2742571831593,
+          "per_stream_mean": 40.25700640756676
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-engram-slots/perf-3-candidate.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 323.91115256574227,
+          "per_stream_mean": 54.918750801783546
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 623.8347151561393,
+          "per_stream_mean": 40.48677518676406
+        }
+      ]
+    }
+  ],
+  "qualification": {
+    "full_model_lane_fixture": "pass, 11.19 seconds, four-slot pool",
+    "concurrent_api": "pass C2/C6/C16 cancellation/replacement",
+    "loader_tests": "three Engram-named unit tests pass; these are not gather queue tests",
+    "live_native_api": {
+      "target": {
+        "result": "pass",
+        "artifact": "/tmp/ds41-engram-slots/live-target.json",
+        "sha256": "59c7f93db785277af7d6b9f83819354a838322be7b81f598120ee12c81702ace"
+      },
+      "speculative": {
+        "result": "pass",
+        "artifact": "/tmp/ds41-engram-slots/live-speculative.json",
+        "sha256": "4e30c0a5963124048ca6fbd1c16334e445d003cd8766779be8b2a3e92d00164b"
+      }
+    }
+  },
+  "selected": true
+}

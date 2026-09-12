@@ -50,5 +50,6 @@ the concurrency difference. Neither this result nor the standalone I/O tests
 selects a new serving backend.
 
 [Measurements and artifact identity](ds41-index-graph-retention.json) record the
-frozen daemon and qualifications. The selected live APIs remain coordinator stream
-staging with the previously qualified native RMSNorm library.
+frozen daemon and qualifications. Coordinator stream staging with the qualified
+native RMSNorm library was the selected baseline for these measurements. The later
+[Engram staging correction](ds41-engram-staging-slots.md) was rolled out separately.

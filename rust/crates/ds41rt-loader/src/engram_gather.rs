@@ -7,6 +7,28 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
+
+/// Recorded only when the runtime's timing trace is enabled at submission.
+pub struct EngramGatherTiming {
+    pub queued: Duration,
+    pub gather: Duration,
+    pub completed: Instant,
+    /// Fault/I/O counts are -1 when the OS counter query was unavailable.
+    pub minor_faults: i64,
+    pub major_faults: i64,
+    pub input_blocks: i64,
+}
+
+fn thread_usage() -> Option<libc::rusage> {
+    let mut usage = std::mem::MaybeUninit::<libc::rusage>::uninit();
+    // SAFETY: getrusage initializes the complete output on success.
+    if unsafe { libc::getrusage(libc::RUSAGE_THREAD, usage.as_mut_ptr()) } == 0 {
+        Some(unsafe { usage.assume_init() })
+    } else {
+        None
+    }
+}
 
 /// Holds a staging slot until its synchronous GPU upload has consumed the view.
 /// Dropping a ready result returns the slot to the pool without blocking.
@@ -14,6 +36,7 @@ pub struct EngramGatherLease {
     staging: Option<EngramBatchStaging>,
     recycler: mpsc::SyncSender<EngramBatchStaging>,
     batches: Vec<Arc<EngramBatch>>,
+    timing: Option<EngramGatherTiming>,
 }
 impl EngramGatherLease {
     pub fn view(&self) -> Result<EngramGatherView<'_>> {
@@ -25,6 +48,9 @@ impl EngramGatherLease {
     /// Exact immutable batches represented by the concatenated output rows.
     pub fn batches(&self) -> &[Arc<EngramBatch>] {
         &self.batches
+    }
+    pub fn timing(&self) -> Option<&EngramGatherTiming> {
+        self.timing.as_ref()
     }
 }
 impl Drop for EngramGatherLease {
@@ -89,6 +115,7 @@ impl Drop for EngramGatherTicket {
     }
 }
 struct Job {
+    submitted: Option<Instant>,
     table: Arc<EngramTable>,
     layer: usize,
     lease: EngramGatherLease,
@@ -136,6 +163,8 @@ impl EngramGatherer {
                         continue;
                     }
                     let batches: Vec<_> = job.lease.batches.iter().map(Arc::as_ref).collect();
+                    let before = job.submitted.and_then(|_| thread_usage());
+                    let started = job.submitted.map(|_| Instant::now());
                     let result = job
                         .lease
                         .staging
@@ -143,6 +172,28 @@ impl EngramGatherer {
                         .expect("owned gather slot")
                         .gather(&job.table, &batches, job.layer)
                         .map(|_| ());
+                    if let (Some(submitted), Some(started)) = (job.submitted, started) {
+                        let completed = Instant::now();
+                        let after = thread_usage();
+                        let counts = before
+                            .zip(after)
+                            .map(|(a, b)| {
+                                [
+                                    b.ru_minflt - a.ru_minflt,
+                                    b.ru_majflt - a.ru_majflt,
+                                    b.ru_inblock - a.ru_inblock,
+                                ]
+                            })
+                            .unwrap_or([-1; 3]);
+                        job.lease.timing = Some(EngramGatherTiming {
+                            queued: started.duration_since(submitted),
+                            gather: completed.duration_since(started),
+                            completed,
+                            minor_faults: counts[0],
+                            major_faults: counts[1],
+                            input_blocks: counts[2],
+                        });
+                    }
                     let result = if stopping.load(Ordering::Acquire)
                         || job.cancelled.load(Ordering::Acquire)
                     {
@@ -203,12 +254,15 @@ impl EngramGatherer {
         let cancelled = Arc::new(AtomicBool::new(false));
         let (completion, receive) = mpsc::sync_channel(1);
         let job = Job {
+            submitted: tracing::enabled!(target: "ds41rt::timing", tracing::Level::DEBUG)
+                .then(Instant::now),
             table,
             layer,
             lease: EngramGatherLease {
                 staging: Some(staging),
                 recycler: self.recycler.clone(),
                 batches: batches.to_vec(),
+                timing: None,
             },
             cancelled: Arc::clone(&cancelled),
             completion,

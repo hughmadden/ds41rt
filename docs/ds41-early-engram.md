@@ -32,6 +32,6 @@ a cold-storage benchmark and cannot establish first-use improvement. The change
 moves submission to the earliest available lane-level token boundary and provides
 the basis for measuring actual Engram lead time, queueing and completion delay.
 
-[Measurements](ds41-early-engram.json) identify the frozen candidate. The selected
-live APIs remain on coordinator stream staging while detailed I/O timing is being
-collected; this source change does not yet claim a live rollout or io_uring backend.
+[Measurements](ds41-early-engram.json) identify the frozen candidate. This change
+was subsequently selected together with the [four-slot staging correction](ds41-engram-staging-slots.md)
+after detailed I/O tracing. No io_uring backend has been selected.
