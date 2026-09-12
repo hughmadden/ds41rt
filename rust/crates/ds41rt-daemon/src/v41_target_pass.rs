@@ -121,10 +121,56 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         ensure!(batch.cache()?.stage() == CacheStage::Encoder, "encoder execute phase differs");
         unsafe { self.execute_phase(requests, batch, transport, placement, &[], Some(suffix), None).await }
     }
-    pub async unsafe fn execute_replay(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
-        transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize], encoder: &BlockOutput<'_>) -> Result<TargetLogits<'_>> {
-        ensure!(batch.cache()?.stage() == CacheStage::Replay, "decoder execute phase differs");
-        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, Some(encoder)).await?; }
+    pub async unsafe fn execute_encoder_replay(
+        &mut self,
+        requests: &Requests<'a>,
+        batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>,
+        placement: u64,
+        suffix: &mut EncoderSuffix<'a>,
+    ) -> Result<()> {
+        ensure!(
+            batch.cache()?.stage() == CacheStage::EncoderReplay,
+            "encoder replay phase differs"
+        );
+        unsafe {
+            self.execute_phase(
+                requests,
+                batch,
+                transport,
+                placement,
+                &[],
+                Some(suffix),
+                None,
+            )
+            .await
+        }
+    }
+    pub async unsafe fn execute_replay(
+        &mut self,
+        requests: &Requests<'a>,
+        batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>,
+        placement: u64,
+        selected: &[usize],
+        encoder: &BlockOutput<'_>,
+    ) -> Result<TargetLogits<'_>> {
+        ensure!(
+            batch.cache()?.stage() == CacheStage::Replay,
+            "decoder execute phase differs"
+        );
+        unsafe {
+            self.execute_phase(
+                requests,
+                batch,
+                transport,
+                placement,
+                selected,
+                None,
+                Some(encoder),
+            )
+            .await?;
+        }
         self.head.output()
     }
     async unsafe fn execute_phase(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
@@ -135,7 +181,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         let rows = batch.cache()?.positions().len();
         let stage = batch.cache()?.stage();
         ensure!(
-            (stage == CacheStage::Encoder || !selected.is_empty())
+            (stage.is_encoder() || !selected.is_empty())
                 && selected.len() <= 80
                 && selected.iter().all(|&i| i < rows)
                 && selected
@@ -150,7 +196,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             batch,
             completed: false,
         };
-        if stage != CacheStage::Encoder { self.taps.begin(guard.batch.cache()?)?; }
+        if !stage.is_encoder() {
+            self.taps.begin(guard.batch.cache()?)?;
+        }
         self.execution.restart_for(stage);
         if stage == CacheStage::Replay {
             let encoder = encoder.context("missing retained encoder suffix")?;
@@ -212,12 +260,21 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                     .await?;
             }
         }
-        if stage == CacheStage::Encoder {
-            suffix.as_mut().context("missing encoder retention owner")?.capture(&self.lane.output()?)?;
-            self.lane.advance()?;
-            unsafe {
-                self.lane.begin_prepared()?;
-                self.execution.produce_decoder_source(requests.cache(), guard.batch.cache()?, &self.lane)?;
+        if stage.is_encoder() {
+            suffix
+                .as_mut()
+                .context("missing encoder retention owner")?
+                .capture(&self.lane.output()?)?;
+            if stage == CacheStage::Encoder {
+                self.lane.advance()?;
+                unsafe {
+                    self.lane.begin_prepared()?;
+                    self.execution.produce_decoder_source(
+                        requests.cache(),
+                        guard.batch.cache()?,
+                        &self.lane,
+                    )?;
+                }
             }
             self.state = State::Encoded(id);
         } else {

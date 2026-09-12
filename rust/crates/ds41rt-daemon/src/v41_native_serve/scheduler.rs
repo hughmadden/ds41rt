@@ -112,7 +112,8 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 if let Some(draft) = draft.as_deref_mut() { draft.admit(id)?; }
                 let hit = prefixes.restore(&prompt, id, lease, requests, draft.as_deref_mut())?;
                 let cached = hit.map_or(0, |(end, _)| end);
-                prefixes.make_room(requests, &[(lease, (prompt.len() - cached) as u32)])?;
+                let source_end = requests.cache().committed_end(lease)? as usize;
+                prefixes.make_room(requests, &[(lease, (prompt.len() - source_end) as u32)])?;
                 job.events.blocking_send(Ok(InferenceChunk::Ready {
                     system_fingerprint: Some(if draft.is_some() { "ds41rt-native-fp8-kv-dspark" }
                         else { "ds41rt-native-fp8-kv" }.into()),

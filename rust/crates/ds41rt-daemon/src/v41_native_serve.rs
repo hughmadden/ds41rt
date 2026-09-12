@@ -273,22 +273,70 @@ fn worker(
         &mut requests, &mut transport, &mut prefill_transport, draft.as_mut())
 }
 
-fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'w, 'a>, other: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
-    transport: &mut NativeTp4Wave<'a>, other_transport: &mut NativeTp4Wave<'a>,
-    lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
-    job: &NativeRequest, draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<u32> {
+fn prefill<'w, 'a>(
+    lib: &'a NativeLibrary,
+    runtime: &tokio::runtime::Runtime,
+    pass: &mut TargetPass<'w, 'a>,
+    other: &mut TargetPass<'w, 'a>,
+    requests: &mut Requests<'a>,
+    transport: &mut NativeTp4Wave<'a>,
+    other_transport: &mut NativeTp4Wave<'a>,
+    lease: crate::v41_backbone_cache::CacheLease,
+    tokens: &[u32],
+    chunk_rows: usize,
+    job: &NativeRequest,
+    draft: Option<&mut DraftRuntime<'_, 'a>>,
+) -> Result<u32> {
+    use crate::v41_backbone_cache::{CacheStage, CacheWork};
     use crate::v41_block::EncoderSuffix;
-    use crate::v41_backbone_cache::CacheWork;
     let end = tokens.len() as u64;
     let cached = requests.cache().committed_end(lease)? as usize;
-    if cached > 0 {
-        return prefill_continuation(lib, runtime, pass, requests, transport, lease,
-            &tokens[cached..], chunk_rows, job, draft);
+    let replay = requests.cache().stage(lease)? == CacheStage::EncoderReplay;
+    if cached > 0 && !replay {
+        return prefill_continuation(
+            lib,
+            runtime,
+            pass,
+            requests,
+            transport,
+            lease,
+            &tokens[cached..],
+            chunk_rows,
+            job,
+            draft,
+        );
     }
     let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
-    requests.begin_encoder(lease, end)?;
-    let mut chunks = tokens.chunks(chunk_rows);
+    if replay {
+        let start = requests.cache().history_end(lease)? as usize;
+        ensure!(
+            cached - start <= 128,
+            "encoder prefix replay exceeds one window"
+        );
+        for chunk in tokens[start..cached].chunks(chunk_rows) {
+            ensure!(!job.events.is_closed(), "client disconnected");
+            let mut batch = requests.prepare(&[RequestTokens {
+                lease,
+                tokens: chunk,
+                image_mask: None,
+                kind: ExpertV2SourceKind::Prefill,
+            }])?;
+            let result = (|| -> Result<()> {
+                runtime.block_on(unsafe {
+                    pass.execute_encoder_replay(requests, &mut batch, transport, 0, &mut suffix)
+                })?;
+                ensure!(!job.events.is_closed(), "client disconnected");
+                pass.commit(requests, &mut batch, &[chunk.len() as u32])
+            })();
+            if result.is_err() {
+                pass.discard(&mut batch)?;
+            }
+            result?;
+        }
+    } else {
+        requests.begin_encoder(lease, end)?;
+    }
+    let mut chunks = tokens[cached..].chunks(chunk_rows);
     // Keep the ordinary path for short prompts; pair full chunks first otherwise.
     if chunks.len() == 1 {
         let chunk = chunks.next().expect("one chunk");

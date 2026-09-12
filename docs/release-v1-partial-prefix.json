@@ -1,0 +1,534 @@
+{
+  "scope": "Native compression-boundary admission with bounded encoder SWA replay. Focused qualification, not final release or long-context performance.",
+  "parent_commit": "22b64d551781bf7e7458c262f41b0c40fe3a6053",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache.rs": "256da6f5a85e438440b8ad2ec48a06bc167c063968bb59aff3238d7182c4a2d3",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/ced.rs": "baa4a8a4ba150399425c40aa91e7ec38f6a66cf8dd0d5b35b9d9b582034469c6",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/commit_tests.rs": "e7cab2ee6899c19340603864745ba28394f4612e75f28e1d841f01e3cab175d0",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/prefix.rs": "4b06305d051e63ed5fe1b7e51fa17c7410ea17f7177b77400fc9325b7ed3dd68",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_execution.rs": "4614ddffc38a65dcc04e2c22738334161419364b9fa672a4f88027d92642c044",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "d4c2bc7b723a7c8b64554755ff5d89159e46d2e92f87615051090e34a9ab5ba0",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/prefix.rs": "80696cc8e7bd6fb9df307235708f55fe870657c8cd11f3af6782ab83b4eca5aa",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "0f22271af3b0e42a80afb9fba9ce24f0878bf1837e2e9d2a9ac23484fa8d7bd8",
+    "rust/crates/ds41rt-daemon/src/v41_requests.rs": "f1380a73611bd7081182f026e8465602dbd9d643b2d585165f7e60013af513e0",
+    "rust/crates/ds41rt-daemon/src/v41_target_pass.rs": "5a9d31e9d2b0d91d7b8754279bf1b9eb80a1e2501ec473f0df8af6fdaea7fa96",
+    "rust/crates/ds41rt-daemon/src/v41_window.rs": "ac1f6486ca761c2e087b2be617adca521284f91800a4c84b0e1b89d97d585a71",
+    "scripts/qualify-ds41-partial-prefix-api.py": "7253d7ec36b5f44a1be57d9b8353b4abdcda3bd82f478f5963a191ef9fb440bb",
+    "scripts/qualify-ds41-partial-concurrency.py": "fceb6707ed1ba23eebd5939b327e3f747882902ae00750fc74e3c37bb4fabc5c"
+  },
+  "source_note": "Reviewed source received formatting-only changes after freezing the tested daemon; cargo check passed afterwards. The implementation patch is archived.",
+  "daemon_sha256": "521fe364af6b28d0155e35f28081bd7c8b9c7e2300c82a1b7a63460da7045852",
+  "native_library_sha256": "ccd82d862473f71d01622bcf5decd9d5789444210db1be4cc245dbdcb44b8a07",
+  "reference_provenance": "release-v1-native-admission.json",
+  "launch_commands": {
+    "target": [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-partial-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-native-partial-replay/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-draft-release-default/selected-native:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18043",
+      "--prefill-batch-tokens",
+      "2048"
+    ],
+    "spec": [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-partial-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-native-partial-replay/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-draft-release-default/selected-native:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18044",
+      "--prefill-batch-tokens",
+      "2048"
+    ]
+  },
+  "component_checks": {
+    "real_weight_all_44_owners": "pass; includes sixteen partial restores, 63+65 encoder replay, divergent append, bounded decoder replay and preservation of original initialized bytes",
+    "cuda_memcheck_errors": 0,
+    "radix_tests": 3,
+    "cargo_check": "pass; existing warnings retained in log"
+  },
+  "api": {
+    "target": {
+      "partial_cases": [
+        {
+          "name": "parent",
+          "usage": {
+            "prompt_tokens": 3891,
+            "completion_tokens": 2,
+            "total_tokens": 3893,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 3891
+          },
+          "reference_ttft": 2.2786580739775673,
+          "candidate_ttft": 2.2815116710262373,
+          "answer_equal": true
+        },
+        {
+          "name": "divergent_suffix",
+          "usage": {
+            "prompt_tokens": 3898,
+            "completion_tokens": 4,
+            "total_tokens": 3902,
+            "prompt_tokens_details": {
+              "cached_tokens": 3756
+            },
+            "prompt_cache_hit_tokens": 3756,
+            "prompt_cache_miss_tokens": 142
+          },
+          "reference_ttft": 1.661933049093932,
+          "candidate_ttft": 0.22363491798751056,
+          "answer_equal": true
+        },
+        {
+          "name": "divergent_exact_repeat",
+          "usage": {
+            "prompt_tokens": 3898,
+            "completion_tokens": 4,
+            "total_tokens": 3902,
+            "prompt_tokens_details": {
+              "cached_tokens": 3898
+            },
+            "prompt_cache_hit_tokens": 3898,
+            "prompt_cache_miss_tokens": 0
+          },
+          "reference_ttft": 0.7074878050480038,
+          "candidate_ttft": 0.005265719024464488,
+          "answer_equal": true
+        },
+        {
+          "name": "shorter_branch",
+          "usage": {
+            "prompt_tokens": 1978,
+            "completion_tokens": 4,
+            "total_tokens": 1982,
+            "prompt_tokens_details": {
+              "cached_tokens": 1834
+            },
+            "prompt_cache_hit_tokens": 1834,
+            "prompt_cache_miss_tokens": 144
+          },
+          "reference_ttft": 0.5942973080091178,
+          "candidate_ttft": 0.2626792840892449,
+          "answer_equal": true
+        },
+        {
+          "name": "parent_still_intact",
+          "usage": {
+            "prompt_tokens": 3891,
+            "completion_tokens": 2,
+            "total_tokens": 3893,
+            "prompt_tokens_details": {
+              "cached_tokens": 3891
+            },
+            "prompt_cache_hit_tokens": 3891,
+            "prompt_cache_miss_tokens": 0
+          },
+          "reference_ttft": 0.7225528330309317,
+          "candidate_ttft": 0.004425336956046522,
+          "answer_equal": true
+        },
+        {
+          "name": "large_uncached_suffix",
+          "usage": {
+            "prompt_tokens": 6202,
+            "completion_tokens": 4,
+            "total_tokens": 6206,
+            "prompt_tokens_details": {
+              "cached_tokens": 3754
+            },
+            "prompt_cache_hit_tokens": 3754,
+            "prompt_cache_miss_tokens": 2448
+          },
+          "reference_ttft": 1.9650684490334243,
+          "candidate_ttft": 0.6721615430433303,
+          "answer_equal": true
+        }
+      ],
+      "exact_cases_passed": true,
+      "divergent_c16": "pass",
+      "c2_c6_c16_cancellation_replacement": "pass"
+    },
+    "spec": {
+      "partial_cases": [
+        {
+          "name": "parent",
+          "usage": {
+            "prompt_tokens": 3888,
+            "completion_tokens": 2,
+            "total_tokens": 3890,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 3888
+          },
+          "reference_ttft": 2.4427870229119435,
+          "candidate_ttft": 2.2607636739267036,
+          "answer_equal": true
+        },
+        {
+          "name": "divergent_suffix",
+          "usage": {
+            "prompt_tokens": 3895,
+            "completion_tokens": 4,
+            "total_tokens": 3899,
+            "prompt_tokens_details": {
+              "cached_tokens": 3752
+            },
+            "prompt_cache_hit_tokens": 3752,
+            "prompt_cache_miss_tokens": 143
+          },
+          "reference_ttft": 1.6275551699800417,
+          "candidate_ttft": 0.27303406794089824,
+          "answer_equal": true
+        },
+        {
+          "name": "divergent_exact_repeat",
+          "usage": {
+            "prompt_tokens": 3895,
+            "completion_tokens": 4,
+            "total_tokens": 3899,
+            "prompt_tokens_details": {
+              "cached_tokens": 3895
+            },
+            "prompt_cache_hit_tokens": 3895,
+            "prompt_cache_miss_tokens": 0
+          },
+          "reference_ttft": 0.6391937339212745,
+          "candidate_ttft": 0.004970747046172619,
+          "answer_equal": true
+        },
+        {
+          "name": "shorter_branch",
+          "usage": {
+            "prompt_tokens": 1975,
+            "completion_tokens": 4,
+            "total_tokens": 1979,
+            "prompt_tokens_details": {
+              "cached_tokens": 1832
+            },
+            "prompt_cache_hit_tokens": 1832,
+            "prompt_cache_miss_tokens": 143
+          },
+          "reference_ttft": 0.7340039130067453,
+          "candidate_ttft": 0.21968919201754034,
+          "answer_equal": true
+        },
+        {
+          "name": "parent_still_intact",
+          "usage": {
+            "prompt_tokens": 3888,
+            "completion_tokens": 2,
+            "total_tokens": 3890,
+            "prompt_tokens_details": {
+              "cached_tokens": 3888
+            },
+            "prompt_cache_hit_tokens": 3888,
+            "prompt_cache_miss_tokens": 0
+          },
+          "reference_ttft": 0.6575053490232676,
+          "candidate_ttft": 0.005090977065265179,
+          "answer_equal": true
+        },
+        {
+          "name": "large_uncached_suffix",
+          "usage": {
+            "prompt_tokens": 6199,
+            "completion_tokens": 4,
+            "total_tokens": 6203,
+            "prompt_tokens_details": {
+              "cached_tokens": 3752
+            },
+            "prompt_cache_hit_tokens": 3752,
+            "prompt_cache_miss_tokens": 2447
+          },
+          "reference_ttft": 1.9713092859601602,
+          "candidate_ttft": 0.6767739210044965,
+          "answer_equal": true
+        }
+      ],
+      "exact_cases_passed": true,
+      "divergent_c16": "pass",
+      "c2_c6_c16_cancellation_replacement": "pass"
+    }
+  },
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.49169088170031,
+            "first_content_seconds": 0.08988698845496401,
+            "finish_seconds": 6.092488129506819
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.698352203980406,
+            "first_content_seconds": 0.0012899169814772904,
+            "finish_seconds": 5.973495087528136
+          }
+        },
+        "candidate_decode_ratio": 1.0048635702178916
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 41.98882354458402,
+            "first_content_seconds": 0.12548955553211272,
+            "finish_seconds": 6.201086363987997
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.44597649026713,
+            "first_content_seconds": 0.0012532774708233774,
+            "finish_seconds": 6.0090791115071625
+          }
+        },
+        "candidate_decode_ratio": 1.0108874911724473
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 144.9436319571205,
+            "first_content_seconds": 0.09115897899027914,
+            "finish_seconds": 1.850477450469043
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 144.6015995102628,
+            "first_content_seconds": 0.0013654960202984512,
+            "finish_seconds": 1.764731927018147
+          }
+        },
+        "candidate_decode_ratio": 0.9976402381930177
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 124.83153760633448,
+            "first_content_seconds": 0.12867341749370098,
+            "finish_seconds": 2.171730165486224
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 125.13602571198737,
+            "first_content_seconds": 0.0014687009388580918,
+            "finish_seconds": 2.039318112481851
+          }
+        },
+        "candidate_decode_ratio": 1.0024391921423985
+      }
+    ]
+  },
+  "tool_eval": {
+    "run_id": "2026-09-12T06-44-16.350286Z_7558546e",
+    "concurrency": 16,
+    "scenarios": 88,
+    "basic_points": 125,
+    "basic_max": 138,
+    "hard_points": 32,
+    "hard_max": 38,
+    "total_points": 157,
+    "total_max": 176,
+    "statuses": {
+      "pass": 72,
+      "partial": 13,
+      "fail": 3
+    },
+    "failures": [
+      {
+        "scenario_id": "TC-61",
+        "summary": "Did not attempt to run the analysis script.",
+        "points": 0
+      },
+      {
+        "scenario_id": "TC-74",
+        "summary": "Never created a calendar event.",
+        "points": 0
+      },
+      {
+        "scenario_id": "TC-88",
+        "summary": "Returned extra text or a value that was not exactly 20 digits.",
+        "points": 0
+      }
+    ],
+    "structured_points": 12,
+    "structured_max": 12,
+    "command": [
+      "tool-eval-bench",
+      "--model",
+      "deepseek-ai/DeepSeek-V4.1-Flash",
+      "--backend",
+      "vllm",
+      "--base-url",
+      "http://127.0.0.1:18044",
+      "--api-key",
+      "local",
+      "--format",
+      "openai",
+      "--temperature",
+      "0",
+      "--no-think",
+      "--backend-kwargs",
+      "{\"thinking\":{\"type\":\"disabled\"}}",
+      "--hardmode",
+      "--parallel",
+      "16",
+      "--timeout",
+      "600",
+      "--max-turns",
+      "12",
+      "--reference-date",
+      "2026-09-12",
+      "--no-live",
+      "--no-probe-engine",
+      "--label",
+      "ds41-native-partial-replay-initial",
+      "--json-file",
+      "/tmp/ds41-native-partial-replay/tool-eval.json",
+      "--output-dir",
+      "/tmp/ds41-native-partial-replay/tool-eval"
+    ],
+    "note": "Compatibility adapter label vllm; actual server ds41rt serve-native. This initial rerun does not count toward the final five release runs."
+  },
+  "dsh": {
+    "command": [
+      "dsh",
+      "--profile",
+      "headless",
+      "--patch",
+      "/tmp/ds41-native-partial-replay/dsh.patch.yml",
+      "In this directory, read input.json. Implement summarize.py using only the Python standard library: normalize each name to Unicode NFC, sum integer amounts by normalized name, and write summary.json as UTF-8 JSON with unescaped Unicode names. Include a reusable summarize(rows) function returning the totals. Add test_summary.py using unittest covering the supplied data, empty input, and combining-character normalization. Run the tests and the script, inspect summary.json, then report the actual totals and test result. Work only in this directory; do not delegate or access the network. Complete the task using your tools.\n"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 20.671935783931985,
+    "main_model_steps": 5,
+    "local_tool_calls": 8,
+    "steps": [
+      {
+        "step": 1,
+        "inputTokens": 7251,
+        "outputTokens": 111,
+        "totalTokens": 7362,
+        "cacheReadTokens": 0
+      },
+      {
+        "step": 2,
+        "inputTokens": 239,
+        "outputTokens": 789,
+        "totalTokens": 8390,
+        "cacheReadTokens": 7362
+      },
+      {
+        "step": 3,
+        "inputTokens": 94,
+        "outputTokens": 148,
+        "totalTokens": 8632,
+        "cacheReadTokens": 8390
+      },
+      {
+        "step": 4,
+        "inputTokens": 120,
+        "outputTokens": 223,
+        "totalTokens": 8975,
+        "cacheReadTokens": 8632
+      },
+      {
+        "step": 5,
+        "inputTokens": 313,
+        "outputTokens": 397,
+        "totalTokens": 9685,
+        "cacheReadTokens": 8975
+      }
+    ],
+    "independent_checks": "Three generated tests pass; actual totals, literal UTF-8 and extra NFC/emoji case pass."
+  },
+  "raw_archive": {
+    "path": "docs/evidence/native-partial-prefix.json.gz",
+    "sha256": "d9285e7ec2fdf75fa83b33e932394e42623dba3e30a15b2aaea1518f9e04cee5",
+    "bytes": 853244
+  },
+  "remaining": [
+    "Large exact-resume suffix CED optimization",
+    "Long-context quality and performance matrix",
+    "Final source-pool sizing and reservation options",
+    "Remaining release requirements"
+  ]
+}

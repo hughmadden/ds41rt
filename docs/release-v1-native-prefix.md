@@ -39,7 +39,7 @@ divergent prefix lengths and zero acceptance are covered by device tests.
 
 `--prefix-cache-entries` defaults to 16 and accepts 0 through 16; zero disables
 retention. A compressed-edge token radix stores complete retained frontiers and
-returns the longest matching retained ancestor. Each value owns target state,
+selects an exact ancestor or a compression-aligned partial match. Each value owns target state,
 optional dSpark state and the already-computed next greedy token. Exact prompt
 hits can therefore emit the first token without rerunning a model pass.
 
@@ -57,10 +57,10 @@ upcoming writes, evicting retained entries until the work fits. Active reference
 continue to protect shared pages. Invalidated request leases can be cleaned up
 without stopping the scheduler.
 
-This implementation does **not** reconstruct state at an arbitrary token inside
-a radix edge. That case falls back to a shorter complete retained ancestor or
-cold prefill. Compression-boundary reuse with bounded SWA replay and the final
-release pool sizing policy remain required.
+[Compression-boundary reuse](release-v1-partial-prefix.md) now reconstructs
+encoder state with at most 128 replay tokens when a prompt matches inside a radix
+edge. Exact retained ancestors remain preferable when they skip more computation.
+Final release pool sizing and long-context qualification remain required.
 
 ## Qualification and remaining integration
 
@@ -111,8 +111,8 @@ can be appended without free pages. See the accompanying JSON evidence.
 See [native admission qualification](release-v1-native-admission.md) for live
 complete-prompt and retained-turn parity, concurrency, memory-pressure recovery
 and controlled decode measurements. These focused checks do not replace the
-release's long-context, agentic, vision or full performance gates. Bounded replay
-for other hits and release pool sizing remain open. The original comparison
+release's long-context, agentic, vision or full performance gates. Partial replay
+has separate focused qualification; release pool sizing remains open. The original comparison
 containers have not been replaced by this change.
 
 Reproduce component tests from the repository root:

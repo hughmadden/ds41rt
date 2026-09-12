@@ -123,10 +123,20 @@ impl<'a> WindowState<'a> {
     /// become valid: consumers must enforce the returned view's lower bound.
     /// Existing consumers must be drained; version advancement revokes proposals.
     pub fn begin_replay(&mut self, lease: WindowLease, position: u64) -> Result<()> {
+        ensure!(self.layer >= 20, "invalid decoder replay layer");
+        self.begin_empty_at(lease, position)
+    }
+    pub fn begin_encoder_replay(&mut self, lease: WindowLease, position: u64) -> Result<()> {
+        ensure!(self.layer < 20, "invalid encoder replay layer");
+        self.begin_empty_at(lease, position)
+    }
+    fn begin_empty_at(&mut self, lease: WindowLease, position: u64) -> Result<()> {
         let slot = self.validate(lease)?;
-        ensure!(self.layer >= 20 && position <= 1048576, "invalid decoder replay start");
-        ensure!(self.slots[slot].end == 0 && self.slots[slot].version == 0,
-            "decoder replay requires a fresh window lease");
+        ensure!(position <= 1048576, "invalid window replay start");
+        ensure!(
+            self.slots[slot].end == 0 && self.slots[slot].version == 0,
+            "decoder replay requires a fresh window lease"
+        );
         if let Err(error) = self.ends.library.copy_h2d(
             slice(self.ends.buffer, slot * 8, 8), &position.to_ne_bytes()) {
             self.slots[slot].request = None;

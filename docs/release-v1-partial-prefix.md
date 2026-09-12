@@ -1,7 +1,8 @@
 # Compression-boundary prefix reuse
 
-Status: component prerequisites qualified; partial reuse is not yet enabled in
-native admission. Exact retained-frontier reuse remains the qualified live path.
+Status: compression-boundary reuse is enabled in native admission and has passed
+focused GPU, API and C16 qualification. Long-context release qualification and
+the final pool sizing policy remain open.
 
 ## Reference contract
 
@@ -34,25 +35,72 @@ normalizes that bounded suffix through the official token map.
 [Component evidence](release-v1-partial-prefix-components.json) records exact
 hash agreement with sequential Engram histories, identity isolation, device
 source truncation after release, divergent writes across all four stored planes,
-compression alignment and CUDA memcheck with zero errors. These helpers are not
-yet called by partial-hit admission, so the live serving artifacts are unchanged.
+compression alignment and CUDA memcheck with zero errors. Native admission now
+uses these helpers for partial matches.
 
-## Remaining integration
+## Native admission and replay
 
-The radix must choose a retained descendant when a prompt matches only part of
-an edge. Admission will truncate global sources at the aligned match, reconstruct
-encoder windows over at most 128 cached tokens with global writes disabled, then
-continue encoder prefill through the uncached suffix. The retained encoder-output
-suffix must span that transition so the existing final-window decoder path can
-seed decoder and dSpark state. Engram history advances through the replay segment;
-global source ownership remains fixed until new tokens begin.
+The radix can choose a retained descendant when a prompt matches only part of
+an edge. It compares the computation saved by that partial match with an exact
+retained ancestor, accounting for the replay window. Only the selected value's
+LRU clock advances. Admission truncates global sources at the aligned match and
+reconstructs encoder windows over at most 128 cached tokens with global writes
+disabled. New suffix tokens then advance the encoder and compressed sources.
+The encoder-output suffix spans that transition, allowing the final-window
+decoder path to seed decoder and dSpark state. Engram history advances through
+replay while the committed global frontier stays fixed.
+
+API cache-hit accounting excludes the replayed tokens: a match at token 3,884
+with 128 replay tokens reports 3,756 reused tokens. Source-capacity preflight
+reserves only new global rows, since replay consumes existing source pages.
+The original longer snapshot stays valid after shorter or divergent requests.
+
+The real-weight cache test restores sixteen requests from a longer snapshot,
+replays 63 then 65 encoder tokens, appends a divergent suffix and completes the
+128-token decoder window. It checks all twenty encoder attention bindings,
+causal bounds, zero acceptance, ownership isolation and preservation of every
+initialized byte in the original snapshot. CUDA memcheck reports zero errors.
+
+Live target-only and dSpark checks cover a divergent question, an exact repeat,
+a shorter branch, the original parent and a suffix spanning multiple prefill
+chunks. Objective answers match the uncached reference in every case. Sixteen
+simultaneous divergent branches pass in both modes, as do the existing C2/C6/C16
+and cancellation/replacement checks.
+
+Four warm AB/BA pairs per workload compare ordinary 256-token decode with the
+original uncached APIs. Target-only counting/code medians change by +0.49%/+1.09%;
+dSpark changes by -0.24%/+0.24%. Paired output text and token counts agree. This
+small spread provides no clear regression signal in these short-context checks;
+it does not replace retained-context or release throughput measurements.
+
+The [admission manifest](release-v1-partial-prefix.json) records binary/source
+identities and links the raw requests, SSE events, test output and measurements.
+
+## Agentic rerun
+
+With partial replay enabled, the same initial C16 tool-eval-bench configuration
+completes all 88 scenarios: **125/138 basic + 32/38 hard = 157/176 points**,
+with 72 passes, 13 partials and three failures. All six structured-output cases
+pass again (12/12). Zero-score cases are TC-61 (analysis script not attempted),
+TC-74 (calendar event not created) and TC-88 (answer-only number formatting).
+The earlier retained-frontier run remains 155/176; this single rerun is not a
+controlled attribution of score changes or one of the five final release runs.
+
+A fresh isolated dsh coding task completes in 20.67 seconds with five main model
+steps and eight actual local tool calls. Its three generated tests pass
+independently. Actual Unicode totals, literal UTF-8 output and an additional
+NFC/emoji case also pass. Continuation cache counts are 7,362, 8,390, 8,632 and
+8,975 tokens, each exactly the preceding prompt plus committed output. The task,
+configuration, generated files and complete session are archived. This check
+preserves full-turn reuse while the new partial path is enabled; it is separate
+from the final Frogger task and comprehensive Unicode qualification.
+
+## Remaining release work
 
 Keep exact retained-turn restoration as the short-continuation fast path. Large
 uncached suffixes should use encoder continuation plus bounded decoder prefill
 instead of unnecessarily executing all forty layers over every new token.
 
-Before enabling this path, qualify causal source bounds, replay truncation,
-failure invalidation, odd/even boundaries, zero/partial acceptance, divergent
-branches, eviction, C16 isolation and long-context quality. Measure replay cost
-and retained-context prefill against the existing path. Final pool sizing and
-memory reservation options remain separate open release gates.
+Qualify long-context quality and measure replay cost and retained-context
+prefill across the full release matrix. Final pool sizing and memory reservation
+options remain separate open release gates.

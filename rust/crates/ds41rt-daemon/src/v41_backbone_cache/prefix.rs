@@ -26,6 +26,63 @@ fn slice(mut buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtD
     buffer
 }
 impl<'a> BackboneCache<'a> {
+    /// Attach a complete-group global prefix and initialize empty encoder
+    /// windows at the bounded replay start. Decoder windows remain fresh.
+    /// Subsequent replay reads the shared source pages without producing them.
+    pub fn restore_encoder_prefix(
+        &mut self,
+        lease: CacheLease,
+        prefix: &BackbonePrefix<'a>,
+        end: u64,
+        prompt_end: u64,
+    ) -> Result<u64> {
+        let request = self.request(lease)?;
+        ensure!(
+            prefix.owner == self.owner
+                && end > 0
+                && end % 2 == 0
+                && end <= prefix.end
+                && end <= prompt_end
+                && prompt_end <= 1048576
+                && request.end == 0
+                && request.version == 0
+                && request.phase == CachePhase::Full
+                && request.publication.is_empty(),
+            "invalid encoder prefix restore frontier or owner"
+        );
+        let start = end.saturating_sub(128);
+        let windows = request.windows;
+        let sources = request.sources;
+        let result = (|| -> Result<()> {
+            for layer in 0..20 {
+                self.windows[layer].begin_encoder_replay(windows[layer], start)?;
+            }
+            for ((state, lease), saved) in self.sources.iter_mut().zip(sources).zip(&prefix.sources)
+            {
+                state.restore_compressed_prefix(lease, saved, end)?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            if let Err(cleanup) = self.release(&[lease]) {
+                tracing::error!(%cleanup, "releasing failed encoder prefix restore");
+            }
+            return Err(error);
+        }
+        let request = self.requests[lease.slot]
+            .as_mut()
+            .expect("validated fresh admission");
+        request.end = end;
+        request.phase = CachePhase::EncoderReplay {
+            prefix: end,
+            target: prompt_end,
+            end: start,
+        };
+        request.version = 1;
+        self.committed_end(lease)?;
+        Ok(start)
+    }
+
     /// Snapshot only a fully committed request, after all producer/consumer
     /// streams have drained. Global KV/index pages remain shared; only bounded
     /// SWA and pending compressor state is copied into the retained GPU arena.

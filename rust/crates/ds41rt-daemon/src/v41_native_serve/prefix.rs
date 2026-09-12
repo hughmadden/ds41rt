@@ -9,6 +9,21 @@ struct Node<T> {
     value: Option<(u64, T)>,
     children: BTreeMap<u32, Node<T>>,
 }
+#[derive(Clone, Copy)]
+struct Reusable {
+    common: usize,
+    frontier: usize,
+    clock: u64,
+}
+impl Reusable {
+    fn skipped(self) -> usize {
+        if self.common == self.frontier {
+            self.common
+        } else {
+            (self.common / 2 * 2).saturating_sub(128)
+        }
+    }
+}
 impl<T> Node<T> {
     fn empty(edge: Vec<u32>) -> Self {
         Self {
@@ -66,6 +81,68 @@ impl<T> Node<T> {
             .into_iter()
             .chain(self.children.values().filter_map(Self::oldest))
             .min()
+    }
+    fn any_frontier(&self, position: usize) -> Option<Reusable> {
+        self.value
+            .as_ref()
+            .map(|&(clock, _)| Reusable {
+                common: position,
+                frontier: position,
+                clock,
+            })
+            .or_else(|| {
+                self.children
+                    .values()
+                    .find_map(|child| child.any_frontier(position + child.edge.len()))
+            })
+    }
+    fn find_reusable(&self, tokens: &[u32], position: usize) -> Option<Reusable> {
+        let mut best = self.value.as_ref().map(|&(clock, _)| Reusable {
+            common: position,
+            frontier: position,
+            clock,
+        });
+        if let Some(child) = tokens.first().and_then(|first| self.children.get(first)) {
+            let common = child
+                .edge
+                .iter()
+                .zip(tokens)
+                .take_while(|(a, b)| a == b)
+                .count();
+            let candidate = if common == child.edge.len() {
+                child.find_reusable(&tokens[common..], position + common)
+            } else {
+                child
+                    .any_frontier(position + child.edge.len())
+                    .map(|found| Reusable {
+                        common: position + common,
+                        ..found
+                    })
+            };
+            if let Some(candidate) = candidate {
+                if best.is_none_or(|old| candidate.skipped() > old.skipped()) {
+                    best = Some(candidate);
+                }
+            }
+        }
+        if best.is_none() && position > 0 {
+            best = self.any_frontier(position).map(|found| Reusable {
+                common: position,
+                ..found
+            });
+        }
+        best.filter(|found| found.skipped() > 0)
+    }
+    fn refresh(&mut self, old: u64, new: u64) -> Option<&T> {
+        if let Some((clock, value)) = self.value.as_mut() {
+            if *clock == old {
+                *clock = new;
+                return Some(value);
+            }
+        }
+        self.children
+            .values_mut()
+            .find_map(|child| child.refresh(old, new))
     }
     fn exact_clock(&self, tokens: &[u32]) -> Option<u64> {
         if tokens.is_empty() {
@@ -129,6 +206,20 @@ impl<T> Radix<T> {
             .checked_add(1)
             .expect("prefix access clock exhausted");
         self.root.lookup(tokens, 0, self.clock)
+    }
+    /// Prefer the most computation saved: a populated exact ancestor can beat
+    /// a slightly longer partial match which needs a complete replay window.
+    pub fn lookup_reusable(&mut self, tokens: &[u32]) -> Option<(usize, usize, &T)> {
+        let found = self.root.find_reusable(tokens, 0)?;
+        self.clock = self
+            .clock
+            .checked_add(1)
+            .expect("prefix access clock exhausted");
+        let value = self
+            .root
+            .refresh(found.clock, self.clock)
+            .expect("selected retained frontier");
+        Some((found.common, found.frontier, value))
     }
     pub fn evict_one(&mut self) -> bool {
         let Some(oldest) = self.root.oldest() else {
@@ -205,13 +296,20 @@ impl<'a> PrefixCache<'a> {
         requests: &mut Requests<'a>,
         draft: Option<&mut DraftRuntime<'_, 'a>>,
     ) -> Result<Option<(usize, u32)>> {
-        let Some((end, saved)) = self.radix.lookup(tokens) else {
+        let Some((end, frontier, saved)) = self.radix.lookup_reusable(tokens) else {
             return Ok(None);
         };
         ensure!(
-            saved.target.end() == end as u64 && saved.draft.is_some() == draft.is_some(),
+            saved.target.end() == frontier as u64 && saved.draft.is_some() == draft.is_some(),
             "retained execution mode or token frontier differs"
         );
+        if end != frontier {
+            let start =
+                requests.restore_encoder_prefix(lease, &saved.target, end / 2 * 2, tokens)?;
+            // Draft rings stay fresh until decoder replay seeds the final window.
+            // The saved next token belongs to a different frontier and is unused.
+            return Ok(Some((start, 0)));
+        }
         requests.restore_prefix(lease, &saved.target)?;
         if let (Some(draft), Some(saved)) = (draft, saved.draft.as_ref()) {
             draft.restore_prefix(id, end as u64, saved)?;
@@ -236,6 +334,36 @@ impl<'a> PrefixCache<'a> {
 mod tests {
     use super::*;
     use std::{cell::Cell, rc::Rc};
+    #[test]
+    fn partial_radix_match_accounts_for_alignment_replay_and_exact_ancestors() {
+        let tokens: Vec<u32> = (1..=512).collect();
+        let mut radix = Radix::new(16);
+        radix.insert(&tokens, 512);
+        let mut partial = tokens[..451].to_vec();
+        partial.push(9999);
+        assert_eq!(radix.lookup_reusable(&partial), Some((451, 512, &512)));
+        radix.insert(&tokens[..384], 384);
+        // Replaying at 450 only skips 322 tokens; the populated 384-token
+        // ancestor skips more work and preserves its complete window state.
+        assert_eq!(radix.lookup_reusable(&partial), Some((384, 384, &384)));
+        assert_eq!(radix.lookup_reusable(&tokens), Some((512, 512, &512)));
+        assert!(radix.lookup_reusable(&tokens[..128]).is_none());
+        assert!(radix.lookup_reusable(&[9999]).is_none());
+        assert_eq!(
+            radix.lookup_reusable(&tokens[..258]),
+            Some((258, 384, &384))
+        );
+        assert!(radix.evict_one());
+        assert_eq!(radix.entries, 1);
+        assert_eq!(
+            radix.lookup_reusable(&tokens[..258]),
+            Some((258, 384, &384))
+        );
+        assert!(radix.evict_one());
+        assert_eq!(radix.entries, 0);
+        assert!(radix.root.children.is_empty());
+    }
+
     #[test]
     fn token_radix_splits_edges_and_returns_longest_retained_frontier() {
         let mut radix = Radix::new(16);

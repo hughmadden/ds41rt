@@ -72,6 +72,105 @@ fn produce(
     }
     Ok(())
 }
+fn qualify_encoder_prefix_replay(
+    lib: &NativeLibrary,
+    bank: &mut BackboneCache<'_>,
+    windows: &mut [WindowWave<'_, '_>],
+    sources: &mut [CompressorWave<'_, '_>],
+) -> Result<()> {
+    let original = bank.begin_request(0, 9100)?;
+    let batch = bank.plan(&[CacheWork {
+        lease: original,
+        tokens: 385,
+        kind: ExpertV2SourceKind::Prefill,
+    }])?;
+    produce(lib, bank, &batch, windows, sources, 81)?;
+    bank.commit(&batch, windows, sources, &[385])?;
+    let expected = committed_bytes(lib, bank, original)?;
+    let saved = bank.retain_prefix(original, BackbonePrefix::device_bytes())?;
+    bank.release(&[original])?;
+    let resumed = (0..16)
+        .map(|slot| bank.begin_request(slot, 9200 + slot as u64))
+        .collect::<Result<Vec<_>>>()?;
+    for &lease in &resumed {
+        assert!(bank
+            .restore_encoder_prefix(lease, &saved, 259, 300)
+            .is_err());
+        assert!(bank
+            .restore_encoder_prefix(lease, &saved, 386, 400)
+            .is_err());
+        assert_eq!(bank.restore_encoder_prefix(lease, &saved, 258, 300)?, 130);
+        assert_eq!(bank.committed_end(lease)?, 258);
+        assert_eq!(bank.history_end(lease)?, 130);
+        assert!(bank.begin_decoder_replay(lease).is_err());
+    }
+    let work = |tokens| {
+        resumed
+            .iter()
+            .map(|&lease| CacheWork {
+                lease,
+                tokens,
+                kind: ExpertV2SourceKind::Prefill,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert!(bank.plan(&work(129)).is_err());
+    let zero = bank.plan(&work(1))?;
+    produce(lib, bank, &zero, windows, sources, 82)?;
+    bank.commit(&zero, windows, sources, &[0; 16])?;
+    assert!(bank.validate_batch(&zero).is_err());
+    for rows in [63, 65] {
+        let batch = bank.plan(&work(rows))?;
+        assert_eq!(batch.stage(), CacheStage::EncoderReplay);
+        assert!(batch.source_chunks(2).is_err());
+        produce(lib, bank, &batch, windows, sources, 83)?;
+        for layer in 0..20 {
+            // Includes window-only layers 0/1 and all three encoder sources.
+            bank.attention(&batch, layer, &windows[layer], None)?;
+        }
+        bank.commit(&batch, windows, sources, &[rows; 16])?;
+        for &lease in &resumed {
+            assert_eq!(bank.committed_end(lease)?, 258);
+        }
+    }
+    for &lease in &resumed {
+        assert_eq!(bank.history_end(lease)?, 258);
+        assert_eq!(bank.stage(lease)?, CacheStage::Encoder);
+        let request = bank.request(lease)?;
+        for layer in 0..20 {
+            let view = bank.windows[layer].view(request.windows[layer])?;
+            assert_eq!((view.begin, view.end), (130, 258));
+        }
+        for layer in 20..40 {
+            assert_eq!(bank.windows[layer].end(request.windows[layer])?, 0);
+        }
+    }
+    assert!(bank.plan(&work(43)).is_err());
+    let suffix = bank.plan(&work(42))?;
+    produce(lib, bank, &suffix, windows, sources, 84)?;
+    bank.commit(&suffix, windows, sources, &[42; 16])?;
+    for &lease in &resumed {
+        assert_eq!(bank.begin_decoder_replay(lease)?, 172);
+    }
+    let decoder = bank.plan_replay(&work(128))?;
+    produce(lib, bank, &decoder, windows, sources, 85)?;
+    bank.commit(&decoder, windows, sources, &[128; 16])?;
+    for &lease in &resumed {
+        assert_eq!(bank.committed_end(lease)?, 300);
+        assert_eq!(bank.stage(lease)?, CacheStage::Full);
+    }
+    bank.release(&resumed)?;
+    let original = bank.begin_request(0, 9300)?;
+    bank.restore_prefix(original, &saved)?;
+    assert_eq!(
+        committed_bytes(lib, bank, original)?,
+        expected,
+        "encoder replay or divergent suffix changed retained future rows"
+    );
+    bank.release(&[original])?;
+    eprintln!("PASS C16 partial encoder replay: shared complete-group sources, 128 bounded rows, zero acceptance, suffix append, decoder replay, immutable retained future");
+    Ok(())
+}
 #[test]
 fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Result<()> {
     let Some(path) = std::env::var_os("DS41RT_CACHE_COMMIT_LIBRARY") else {
@@ -279,6 +378,7 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
     bank.release(&[restored])?;
     drop(saved);
     eprintln!("PASS retained full backbone prefix: all 44 owners, odd carry, slot reuse, exact next commit");
+    qualify_encoder_prefix_replay(&lib, &mut bank, &mut windows, &mut sources)?;
     // CED publishes all global sources during encoder work, then only decoder
     // windows during replay. Reuse the same real-weight producers and bank.
     let ced = (0..16).map(|slot| bank.begin_request(slot, 1000 + slot as u64))

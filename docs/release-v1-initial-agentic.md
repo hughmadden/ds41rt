@@ -77,7 +77,7 @@ benchmark results and traces, the dsh session, exact task and overlay, generated
 files, independent test output and setup failures. The dsh session includes stream
 timing, but this task is not a controlled performance comparison.
 
-Next cache work is compression-boundary reuse inside radix edges with bounded
-SWA reconstruction, followed by final pool sizing. Full vision, comprehensive
+[Partial-prefix integration and its agentic rerun](release-v1-partial-prefix.md)
+now have focused qualification. Large-suffix prefill and final pool sizing remain. Full vision, comprehensive
 Unicode/API qualification and the complete release performance campaign remain
 open. The final Frogger task is separate from this small coding check.

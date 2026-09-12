@@ -345,7 +345,11 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         unsafe {
             bank.bank().produce_window(batch, &query, &mut self.windows[layer])?;
         }
-        if let Some(i) = SOURCES.iter().position(|&l| l == layer).filter(|_| batch.stage() != CacheStage::Replay) {
+        if let Some(i) = SOURCES
+            .iter()
+            .position(|&l| l == layer)
+            .filter(|_| !batch.stage().reuses_sources())
+        {
             unsafe {
                 bank.bank().produce_source(batch, &query, &mut self.sources[i])?;
             }
@@ -357,7 +361,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         let source = SOURCES
             .iter()
             .rposition(|&l| l <= layer)
-            .filter(|_| batch.stage() != CacheStage::Replay && !publishing)
+            .filter(|_| !batch.stage().reuses_sources() && !publishing)
             .map(|i| &self.sources[i]);
         let cache = bank.bank().attention(batch, layer, &self.windows[layer], source)?;
         if INDEX.contains(&layer) {

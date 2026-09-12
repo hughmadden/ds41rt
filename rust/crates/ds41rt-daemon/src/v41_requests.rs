@@ -138,12 +138,47 @@ impl<'a> Requests<'a> {
             .expect("validated restored request").history = history;
         Ok(())
     }
+    pub fn restore_encoder_prefix(
+        &mut self,
+        lease: CacheLease,
+        prefix: &RequestPrefix<'a>,
+        end: usize,
+        prompt: &[u32],
+    ) -> Result<usize> {
+        let request = self.request(lease)?;
+        ensure!(
+            request.history.position() == 0 && request.prefill.is_none() && end <= prompt.len(),
+            "invalid encoder history restore"
+        );
+        let start = end.saturating_sub(128);
+        let history = self.pipeline.history_at(
+            start as u64,
+            &prompt[start.saturating_sub(3)..start],
+            None,
+        )?;
+        if let Err(error) =
+            self.cache
+                .restore_encoder_prefix(lease, &prefix.cache, end as u64, prompt.len() as u64)
+        {
+            if let Err(cleanup) = self.release_if_present(lease) {
+                tracing::error!(%cleanup, "releasing failed encoder history restore");
+            }
+            return Err(error);
+        }
+        self.slots
+            .iter_mut()
+            .flatten()
+            .find(|r| r.lease == lease)
+            .expect("validated restored request")
+            .history = history;
+        Ok(start)
+    }
     pub fn validate(&self, batch: &RequestBatch) -> Result<()> {
         ensure!(!batch.finished, "request batch finished");
         self.cache.validate_batch(&batch.cache)?;
         for &lease in &batch.leases {
             ensure!(
-                self.request(lease)?.history.position() == self.cache.committed_end(lease)?,
+                self.request(lease)?.history.position() == self.cache.history_end(lease)?,
                 "engram and backbone history differ"
             );
         }
@@ -190,7 +225,7 @@ impl<'a> Requests<'a> {
             ensure!(request.prefill.is_none(), "reserved encoder requires reservation preparation");
             let history = &request.history;
             ensure!(
-                history.position() == self.cache.committed_end(r.lease)?,
+                history.position() == self.cache.history_end(r.lease)?,
                 "request histories differ"
             );
             ensure!(

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
 <title id="title">DS41RT native execution across one coordinator and four expert workers</title>
-<desc id="desc">The RTX coordinator owns admission, prefix state, attention, Engram projections, shared experts, dSpark and greedy verification. Four DGX Spark workers provide intermediate-dimension tensor-parallel routed experts. Two execution lanes serve up to sixteen requests. Vision and arbitrary partial-prefix replay remain release integration gates.</desc>
+<desc id="desc">The RTX coordinator owns admission, prefix state, attention, Engram projections, shared experts, dSpark and greedy verification. Four DGX Spark workers provide intermediate-dimension tensor-parallel routed experts. Two execution lanes serve up to sixteen requests. Partial matches replay at most 128 encoder tokens. Vision and final pool sizing remain release integration gates.</desc>
 <defs>
 <linearGradient id="panel" x2="1" y2="1"><stop stop-color="#10243a"/><stop offset="1" stop-color="#0d1b2d"/></linearGradient>
 <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 Z" fill="#46d7e8"/></marker>
@@ -37,7 +37,7 @@ text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#b9cde0}
 <rect x="350" y="294" width="794" height="112" rx="12" fill="#10243a" stroke="#46d7e8" stroke-width="1.3"/>
 <rect x="350" y="304" width="4" height="92" rx="2" fill="#46d7e8"/>
 <text x="368" y="322" class="label" text-anchor="start">1 · Admission and prefix lookup</text>
-<text x="368" y="348" class="body" text-anchor="start">Token radix → restore a retained frontier → prefill the uncached suffix</text>
+<text x="368" y="348" class="body" text-anchor="start">Token radix → exact restoration or bounded partial replay → new suffix</text>
 <text x="368" y="370" class="body" text-anchor="start">Exact prompt hit reuses the saved next token; each request gets a fresh lease</text>
 <path d="M747 406 V436" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)"/>
 <rect x="350" y="436" width="794" height="98" rx="12" fill="#10243a" stroke="#56d69c" stroke-width="1.3"/>
@@ -128,5 +128,5 @@ text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#b9cde0}
 <text x="66" y="1056" class="label" text-anchor="start">TWO LANES · UP TO EIGHT REQUESTS PER LANE</text>
 <text x="66" y="1082" class="body" text-anchor="start">Independent target stacks overlap around remote expert work. Admission, migration and retirement occur after both stacks drain.</text>
 <text x="66" y="1107" class="body" text-anchor="start">Speculative proposals stay private until verification commits the same accepted prefix to target, draft and Engram state.</text>
-<text x="44" y="1178" class="small" text-anchor="start">Native serving design · arbitrary partial-prefix replay and vision remain release gates · schematic, not a measured timeline</text>
+<text x="44" y="1178" class="small" text-anchor="start">Native serving design · vision and final pool sizing remain release gates · schematic, not a measured timeline</text>
 </svg>

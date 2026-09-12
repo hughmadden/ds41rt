@@ -93,8 +93,9 @@ through the actual serve-native dispatch and APIs.
 KV/index page retention and copy-on-write. Native radix admission and completed
 state scheduling are now wired into serve-native. [Admission qualification](release-v1-native-admission.md)
 covers complete hits, retained turns, C16 cancellation/replacement, small-pool
-pressure and controlled short-context decode. Bounded replay for arbitrary
-partial hits, final pool sizing and the full release qualification remain open.
+pressure and controlled short-context decode. [Partial-prefix replay](release-v1-partial-prefix.md)
+now passes focused GPU, API and C16 checks. Large exact-resume suffix optimization,
+final pool sizing and the full release qualification remain open.
 [Retained-state component evidence](release-v1-retained-state.json) remains
 separate from these API results.
 

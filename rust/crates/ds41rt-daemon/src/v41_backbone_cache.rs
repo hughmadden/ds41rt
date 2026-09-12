@@ -322,6 +322,18 @@ impl<'a> BackboneCache<'a> {
     pub fn plan(&self, work: &[CacheWork]) -> Result<CacheBatch> {
         self.plan_stage(work, false, false)
     }
+    pub fn stage(&self, lease: CacheLease) -> Result<CacheStage> {
+        Ok(self.request(lease)?.phase.stage())
+    }
+    /// Engram advances through encoder replay, while global source ownership
+    /// remains at the cached prefix end. Decoder replay has no Engram work.
+    pub fn history_end(&self, lease: CacheLease) -> Result<u64> {
+        let end = self.committed_end(lease)?;
+        Ok(match self.request(lease)?.phase {
+            CachePhase::EncoderReplay { end, .. } => end,
+            _ => end,
+        })
+    }
     pub fn check_append_capacity(&self, work: &[(CacheLease, u32)]) -> Result<()> {
         for (i, source) in self.sources.iter().enumerate() {
             let appends = work.iter().map(|&(lease, tokens)|
@@ -391,7 +403,11 @@ impl<'a> BackboneCache<'a> {
         Ok(CacheBatch {
             reserved: reserve,
             stage: stage.context("empty cache batch")?,
-            replay_snapshot: if replay || stage == Some(CacheStage::Encoder) { Some(crate::v41_compressor::reserve_source_snapshot()?) } else { None },
+            replay_snapshot: if stage != Some(CacheStage::Full) {
+                Some(crate::v41_compressor::reserve_source_snapshot()?)
+            } else {
+                None
+            },
             identity,
             owner: self.owner,
             requests,
@@ -477,8 +493,8 @@ impl<'a> BackboneCache<'a> {
         let source_layer = SOURCES.iter().copied().rev().find(|&n| n <= layer);
         let source_index = source_layer.and_then(|l| SOURCES.iter().position(|&s| s == l));
         let published_sources = self.publication_masks(batch)?.1;
-        let committed_source = batch.stage == CacheStage::Replay
-            || source_index.is_some_and(|i| published_sources & (1 << i) != 0);
+        let committed_source = source_index
+            .is_some_and(|i| batch.stage.reuses_sources() || published_sources & (1 << i) != 0);
         ensure!(
             source.is_some() == (source_layer.is_some() && !committed_source),
             "attention batch source presence differs"

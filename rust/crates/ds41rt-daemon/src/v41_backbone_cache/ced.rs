@@ -5,28 +5,36 @@ pub(crate) enum CacheStage {
     #[default]
     Full,
     Encoder,
+    EncoderReplay,
     Replay,
 }
 impl CacheStage {
     pub(crate) fn windows(self) -> std::ops::Range<usize> {
         match self {
             Self::Full => 0..40,
-            Self::Encoder => 0..20,
+            Self::Encoder | Self::EncoderReplay => 0..20,
             Self::Replay => 20..40,
         }
     }
     pub(super) fn source_count(self) -> usize {
-        if self == Self::Replay {
+        if self.reuses_sources() {
             0
         } else {
             4
         }
+    }
+    pub(crate) fn reuses_sources(self) -> bool {
+        matches!(self, Self::Replay | Self::EncoderReplay)
+    }
+    pub(crate) fn is_encoder(self) -> bool {
+        matches!(self, Self::Encoder | Self::EncoderReplay)
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum CachePhase {
     Full,
     Encoder { target: u64 },
+    EncoderReplay { prefix: u64, target: u64, end: u64 },
     Replay { target: u64, end: u64 },
 }
 impl CachePhase {
@@ -34,16 +42,20 @@ impl CachePhase {
         match self {
             Self::Full => CacheStage::Full,
             Self::Encoder { .. } => CacheStage::Encoder,
+            Self::EncoderReplay { .. } => CacheStage::EncoderReplay,
             Self::Replay { .. } => CacheStage::Replay,
         }
     }
     pub(super) fn position(self, end: u64) -> u64 {
         match self {
-            Self::Replay { end, .. } => end,
+            Self::Replay { end, .. } | Self::EncoderReplay { end, .. } => end,
             _ => end,
         }
     }
     pub(super) fn window_end(self, layer: usize, end: u64) -> u64 {
+        if let Self::EncoderReplay { end, .. } = self {
+            return if layer < 20 { end } else { 0 };
+        }
         if layer < 20 {
             return end;
         }
@@ -51,12 +63,14 @@ impl CachePhase {
             Self::Full => end,
             Self::Encoder { .. } => 0,
             Self::Replay { end, .. } => end,
+            Self::EncoderReplay { .. } => unreachable!("handled above"),
         }
     }
     pub(super) fn validate_tokens(self, position: u64, tokens: u32) -> Result<()> {
         let target = match self {
             Self::Full => 1048576,
             Self::Encoder { target } | Self::Replay { target, .. } => target,
+            Self::EncoderReplay { prefix, .. } => prefix,
         };
         ensure!(
             position
@@ -68,6 +82,16 @@ impl CachePhase {
     }
     pub(super) fn advance(&mut self, published: &mut u64, next: u64) {
         match *self {
+            Self::EncoderReplay { prefix, target, .. } if next == prefix => {
+                *self = Self::Encoder { target }
+            }
+            Self::EncoderReplay { prefix, target, .. } => {
+                *self = Self::EncoderReplay {
+                    prefix,
+                    target,
+                    end: next,
+                }
+            }
             Self::Replay { target, .. } if next == target => *self = Self::Full,
             Self::Replay { target, .. } => *self = Self::Replay { target, end: next },
             _ => *published = next,
@@ -128,6 +152,32 @@ impl BackboneCache<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn encoder_replay_advances_windows_without_advancing_global_sources() -> Result<()> {
+        let mut phase = CachePhase::EncoderReplay {
+            prefix: 258,
+            target: 300,
+            end: 130,
+        };
+        let mut global = 258;
+        assert_eq!(phase.stage().windows(), 0..20);
+        assert_eq!(phase.stage().source_count(), 0);
+        assert!(phase.validate_tokens(130, 129).is_err());
+        phase.advance(&mut global, 193);
+        assert_eq!(global, 258);
+        assert_eq!(phase.position(global), 193);
+        assert_eq!(phase.window_end(0, global), 193);
+        assert_eq!(phase.window_end(19, global), 193);
+        assert_eq!(phase.window_end(20, global), 0);
+        phase.advance(&mut global, 258);
+        assert_eq!(phase, CachePhase::Encoder { target: 300 });
+        assert_eq!(global, 258);
+        phase.validate_tokens(258, 42)?;
+        phase.advance(&mut global, 300);
+        assert_eq!(global, 300);
+        Ok(())
+    }
+
     #[test]
     fn ced_progress_preserves_global_history_until_replay_finishes() -> Result<()> {
         for target in [1, 127, 128, 129, 2048, 16410, 1048576] {
