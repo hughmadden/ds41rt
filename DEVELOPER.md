@@ -86,6 +86,11 @@ request execution.
 
 ## Integration and release
 
+Develop on `dev`; promote `main` and create `release/vX` only after the final
+container pair is qualified and published and documentation is complete.
+See the [operation manual](docs/OPERATIONS.md) for branch procedures and the
+[first-release checklist](docs/release-v1-checklist.md) for the current scope.
+
 Full integration must cover 40-layer CED execution, engram prefetch, vision,
 request-safe cache transactions, target sampling, dSpark verification and
 rollback, concurrency 16, API behavior and restart readiness.
