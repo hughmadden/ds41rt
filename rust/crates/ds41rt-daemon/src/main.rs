@@ -7,6 +7,7 @@ mod cli;
 mod commands;
 mod python_graph_capture;
 mod v41_compressor;
+mod v41_vision;
 mod v41_index_query;
 mod v41_index_lane;
 mod v41_index_selection;

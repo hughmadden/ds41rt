@@ -204,6 +204,7 @@ if(DS41RT_ENABLE_CUDA)
     cuda/kernels/v41_dspark_cache.cu
     cuda/kernels/v41_dspark_attention.cu
     cuda/kernels/v41_compressor.cu
+    cuda/kernels/v41_vision.cu
     cuda/kernels/v41_kv.cu
     cuda/kernels/v41_sparse_attention.cu
     cuda/kernels/v41_index_scores.cu

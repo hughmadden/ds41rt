@@ -9,6 +9,8 @@ pub use v41_sparse_attention::{V41SparseAttention, V41SparseSource, V41SparseWin
 pub use v41_index_scores::V41IndexScores;
 pub use v41_kv::V41Kv;
 mod v41_compressor;
+mod v41_vision;
+pub use v41_vision::V41VisionOps;
 pub use v41_compressor::V41Compressor;
 mod v41_dspark_attention;
 pub use v41_dspark_attention::{V41DsparkAttention,V41AttentionWindow};

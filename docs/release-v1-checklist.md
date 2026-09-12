@@ -31,8 +31,9 @@ gate below is satisfied merely by an older component test.
   multi-image correctness and resource qualification.
   [Native preprocessing](release-v1-vision-preprocess.md) matches reference grids
   and complete patches across 21 format cases and handles sixteen expanded image
-  spans. Encoder/aligner execution, image-aware caching/routing and API serving
-  remain the next implementation work.
+  spans. The [native encoder/aligner component](release-v1-vision-encoder.md)
+  now has GPU operation, full-vector and precision-control evidence. Image-aware
+  caching/routing, API serving and image-answer qualification remain open.
 - [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
 - [x] Verify official maximum context/output limits. Default to those limits;
   clamp each output allowance to remaining context and the model output cap.

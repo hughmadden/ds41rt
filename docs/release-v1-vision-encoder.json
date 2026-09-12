@@ -1,0 +1,113 @@
+{
+  "scope": "Native encoder/aligner component; vision serving and release qualification remain open",
+  "source_parent": "6f03356f3d6e71718a175a396eb3defb26a9b4e4",
+  "branch": "dev",
+  "date": "2026-09-12",
+  "reference": {
+    "model_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+    "files": {
+      "DeepSeek_V41_Tech_Report.pdf": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
+      "README.md": "347c9db4e5506acb531cbc3b724407ab88e9af8781679152f0823d7bac16d251",
+      "config.json": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
+      "inference/README.md": "2834402823199ee24e9a42bdf36a0fc6daf94448f444cb062c042a057a798f1c",
+      "inference/config.json": "2e84f45cf1dac8c7fcbb200e96667d4b913275690668ed496f24c7747207a809",
+      "inference/convert.py": "035028340479145594a81d6084a8424e57363adf83c0d5983914783d95614d76",
+      "inference/engram.py": "11f35ecbead8150c35aa002b3d180ef290b05a25afe883a11884f94d476d3897",
+      "inference/generate.py": "8668d67f7d108e32b90d50cb0d8606889ceb2219bfe95741d84e22f70768e9f0",
+      "inference/image_processor.py": "482759e3bcc4e9bb5ee582b244cc563f5d0e163d8b48dda91ebb7106e62f9272",
+      "inference/kernel.py": "1236c3507019ed176f5dba5e04bcea58867cf654818c6cf138ed4845398c2455",
+      "inference/model.py": "4e9ae23620edc8028ccc5d5fef552ab7fdc7dcd6f79608754fe9f67644056f65",
+      "inference/vision.py": "5d49edc196a4ef22384abe76d35a40098cbe1e74b586c8f66a2edff4f076b26c",
+      "model.safetensors.index.json": "74b0686a3d2891980d5e303251b075a3bccae2c2ff650747db2620a649b98fa8",
+      "tokenizer.json": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+      "encoding/encoding.py": "b4bd8a06f94a06a61564156c7a543d649ed86ecdd72a4dfb94b064e16d9c572f"
+    }
+  },
+  "source_sha256": {
+    "native/CMakeLists.txt": "09fc590b76c752fe4131641c879ca1145d88ae75330f77a2067ce24ceb26d413",
+    "native/include/ds41rt_v41_vision.h": "785288028e3f3f04648bdd42fac80a814267319e5d96c777ee282a775f732f71",
+    "native/cuda/kernels/v41_vision.cu": "6f5c1532ecfafad84521fe50bb3de15d95acf3dccd1676bda191b33301401cad",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "e7954fe480cab4e652b54d2b28f9f6940d09ffd6f29e363cfb87a1c803913910",
+    "rust/crates/ds41rt-ffi/src/v41_vision.rs": "88d5b2ae76fbe3169fa1321b1405518185ca716ec014a53e4d18449bf5405e85",
+    "rust/crates/ds41rt-daemon/src/main.rs": "c9f813ad2d7bd1e0b992f9725d873316af407b2e4f1d0bf5d5619a3e8b1a938c",
+    "rust/crates/ds41rt-daemon/src/v41_vision.rs": "616d87f1e4af3e619db389686480e9faf16fd0b309a013a5f1c188d50b80e0c1",
+    "rust/crates/ds41rt-daemon/src/v41_vision/tests.rs": "9e6719ec0d4e4f7e676d472735f3bb13a680ca52a11db0863a48026f59040dc6",
+    "scripts/qualify-ds41-vision-ops.py": "31b34f0bdc0a08547e35833cd3323cdb29b1ab18fe532b536cf7fe3390682c89",
+    "scripts/qualify-ds41-vision-encoder.py": "c3a8f6ac875a89de6bafc1f73dbaece7fa75c11307a9de9aef9785f15dfa065f"
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/ds41-native-vision/cmake/libds41rt_native.so",
+      "bytes": 9050720,
+      "sha256": "28ba926432334b17d2f97602ed1ab2d0e17fe44b0d6726b3b6a61c6790cb9239"
+    },
+    {
+      "path": "/home/tj/Developer/ds41rt/rust/target/debug/deps/ds41rt-13312f7b1c44a5b6",
+      "bytes": 410973032,
+      "sha256": "af102054c25977f5a1f20e4703c1a6305800069b740cad5fba0efde4b50ff42b"
+    },
+    {
+      "path": "/tmp/ds41-native-vision/libds41rt_native-unpadded.so",
+      "bytes": 9050720,
+      "sha256": "8b1b1bc15072edc059d0b2f88fc75202de19c175793eb5f67135b1bb0bd0cfa4"
+    }
+  ],
+  "hardware": "index, name, driver_version, power.limit [W], enforced.power.limit [W], clocks.current.memory [MHz], clocks.max.memory [MHz], memory.total [MiB], memory.free [MiB]\n0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 13365 MHz, 14001 MHz, 97887 MiB, 26498 MiB\n1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 405 MHz, 14001 MHz, 97887 MiB, 11348 MiB\n",
+  "native_cuda_libraries": [
+    "/usr/local/cuda-13.3/targets/x86_64-linux/lib/libcublas.so.13.6.0.2",
+    "/usr/local/cuda-13.3/targets/x86_64-linux/lib/libcublasLt.so.13.6.0.2",
+    "/usr/local/cuda-13.3/targets/x86_64-linux/lib/libcudart.so.13.3.29"
+  ],
+  "reference_cuda_libraries": [
+    "/home/tj/Developer/ds41rt/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libcublas.so.13",
+    "/home/tj/Developer/ds41rt/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libcublasLt.so.13",
+    "/home/tj/Developer/ds41rt/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libcudart.so.13"
+  ],
+  "native_build": {
+    "cuda": "13.3",
+    "arch": "120",
+    "build_type": "Release",
+    "expert_aot": false,
+    "fp8_aot": false,
+    "xgrammar": false
+  },
+  "rust_build": "test profile, unoptimized + debuginfo; GPU kernels compiled Release",
+  "component_default": "BF16 attention probabilities and PV operands, FP32 accumulation/softmax",
+  "validation": {
+    "operation_cases": 64,
+    "rejection_checks": 12,
+    "operation_checks_passed": true,
+    "operation_memcheck_errors": 0,
+    "full_encoder_memcheck_errors": 0,
+    "full_encoder_memcheck_cases": 4,
+    "full_encoder_repeat_cases_per_precision": 13,
+    "final_artifact_vectors_match": true,
+    "all_patch_projections_and_delimiters_exact": true,
+    "uniform_numerical_diagnostic_bounds_passed": false,
+    "image_answer_quality_qualified": false,
+    "vision_serving_enabled": false
+  },
+  "numerical_notes": [
+    "Exploratory 3% relative-L2 and 0.9995 cosine bounds are retained, including failures at intermediate stages and two final BF16 spans.",
+    "FP32 and reference fused-attention controls also accumulate rounding differences; no bit-exact dtype requirement is imposed on release image-answer qualification.",
+    "bf16-1-reference.json used FP32 metric reductions; later reports use FP64 because large-vector cosine reductions were inaccurate. The earlier report is superseded.",
+    "A padded-scratch experiment produced identical spans but no consistent speed gain and was removed; its reports are retained.",
+    "Operation checks cover both PyTorch-bundled BLAS and native CUDA 13.3 BLAS. The full Rust encoder memcheck uses the native libraries.",
+    "Reference timings and per-image native timings are component observations, not final API or text-serving regression measurements."
+  ],
+  "evidence": {
+    "path": "docs/evidence/native-vision-encoder.json.gz",
+    "sha256": "f4f7178d8041d7c79d8bb060a891fe6fa96c03adbf586cb90d6a91c1a5a6ab64",
+    "bytes": 280366
+  },
+  "remaining": [
+    "image embeddings in target/dSpark prefill and replay",
+    "image-aware prefix identity and ownership",
+    "vision routing and Engram masks",
+    "API admission through 16 images",
+    "image-answer quality",
+    "mixed-request cancellation/recovery",
+    "complete serving memory accounting and text-performance regression qualification"
+  ]
+}
