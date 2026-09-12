@@ -8,29 +8,72 @@ All reported RTX measurements use an enforced **400 W power limit** and **standa
 
 ## Performance
 
-The release candidate uses corrected architectural FP4 compressed KV and the standard C16 launch. Target-only and dSpark workloads ran sequentially across the shared workers.
+The release candidate uses architectural FP4 compressed KV and the standard C16 launch. Local target-only and dSpark workloads ran sequentially. Throughput tests use temperature zero and thinking disabled; tool evaluation uses high thinking.
+
+**Performance qualification is reopened:** development-to-release prefill regression remains unresolved. These candidate measurements do not establish parity with the earlier ~7K prefill and ~145 counting decode results.
+
+**Headline results.** Median throughput, cache size, memory use, and startup time for the measured release candidate.
 
 | Measurement | Result |
 |---|---:|
-| Best median prefill, 0 base + 32K new | **2,668 prompt tok/s** |
-| Low-entropy dSpark decode, counting 1–200 | **127.70 tok/s** |
-| Weighted eight-type target decode | 37.89 tok/s |
-| Weighted eight-type dSpark decode | **60.68 tok/s** |
-| dSpark gain on the weighted mix | 60.16% |
-| C16 aggregate warm decode | **683.70 tok/s** |
+| Best median prefill, 0 base + 32K new | 2,667.95 tok/s |
+| Best observed prefill sample | 2,738.47 tok/s |
+| Low-entropy dSpark decode, counting 1–200 warm median | 127.70 tok/s |
+| Weighted eight-type target-only median | 37.89 tok/s |
+| Weighted eight-type dSpark median | 60.68 tok/s |
+| dSpark gain on weighted mix | 60.16% |
+| C16 aggregate warm decode median | 683.70 tok/s |
 | Default architectural cache | 20.93 GiB |
-| Warmed coordinator process | 64.05 GiB |
+| Warmed C16 coordinator process | 64.05 GiB |
 | Clean standard-launch readiness | 55–56 s |
 
-The [performance report](docs/release-v1-performance.md) contains every sample, the 30-cell prefill matrix, retained-context decode through 256K, concurrency scaling, memory, startup, 1.04M-token needle retrieval, and three high-thinking tool-eval runs. The [machine-readable results](docs/release-v1-performance.json) and [raw evidence](docs/evidence/native-release-performance.tar.gz) preserve inputs, outputs, cache counters, hardware state, and errors.
+**Eight content types and counting.** Local eight-case results use five samples per mode; official Flash uses one request per case. Quality columns count passed checks. Official JSON Schema returned HTTP 400, so no full official weighted score is available.
 
-The [eight-case comparison table](docs/release-v1-performance.md#eight-content-types-and-low-entropy-decode)
-also includes one official `deepseek-flash` API reference run. Seven cases
-completed; JSON Schema returned HTTP 400.
+| Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target quality | dSpark quality | Official quality |
+|---|---:|---:|---:|---:|---:|---:|
+| Code | 38.35 | 99.57 | 345.90 | 5/5 | 5/5 | 1/1 |
+| Math | 37.79 | 96.52 | 285.33 | 5/5 | 5/5 | 1/1 |
+| Fable | 37.89 | 38.32 | 123.63 | 1/5 | 0/5 | 0/1 |
+| Hello | 37.64 | 50.00 | 141.10 | 5/5 | 5/5 | 1/1 |
+| Topic | 37.66 | 56.82 | 169.24 | 2/5 | 1/5 | 0/1 |
+| Natural JSON | 38.05 | 81.74 | 175.33 | 5/5 | 5/5 | 1/1 |
+| Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | N/A |
+| Multilingual | 37.58 | 57.20 | 183.61 | 5/5 | 5/5 | 1/1 |
+| Counting 1–200 | Not measured | **127.70** | **427.29** | N/A | 3/3 warm | 1/1 |
 
-**Performance qualification is reopened:** development-to-release prefill
-regression remains unresolved. The published candidate figures above do not
-establish parity with the earlier ~7K prefill and ~145 counting decode results.
+Counting is outside the weighted score: local dSpark uses three warm samples; official Flash uses one fresh request. Both pass the 1–200 sequence check. Official timings include network streaming on unknown provider hardware and use provider-reported token counts.
+
+**Prefill.** Median new prompt tokens/s above each retained base, target-only; two timed samples per cell after one warmup.
+
+| Retained base | +1K | +2K | +4K | +8K | +16K | +32K |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 1,472 | 1,815 | 2,490 | 2,233 | 2,573 | **2,668** |
+| 32K | 1,384 | 1,719 | 2,440 | 2,595 | 2,545 | 2,654 |
+| 64K | 1,308 | 1,649 | 2,388 | 2,568 | 2,539 | 2,647 |
+| 128K | 1,209 | 1,535 | 2,256 | 2,507 | 2,594 | 2,598 |
+| 256K | 989 | 1,346 | 2,001 | 1,902 | 2,326 | 2,264 |
+
+**Decode over retained context.** Weighted dSpark tokens/s across eight content types, with two samples per type and verified prefix reuse at each base.
+
+| Retained base | Weighted dSpark tok/s | Quality passes |
+|---:|---:|---:|
+| 0 | 59.59 | 13/16 |
+| 32K | 53.75 | 15/16 |
+| 64K | 55.06 | 15/16 |
+| 128K | 54.04 | 12/16 |
+| 256K | 51.87 | 13/16 |
+
+**Concurrency scaling.** Three samples per concurrency with a fully cached prompt and exact 599-token counting output. Aggregate timing includes scheduler admission gaps.
+
+| Concurrency | Median aggregate tok/s | Range | Scale vs C1 |
+|---:|---:|---:|---:|
+| 1 | 124.81 | 123.20–124.98 | 1.00× |
+| 2 | 176.58 | 174.10–176.86 | 1.41× |
+| 4 | 288.89 | 288.72–289.02 | 2.31× |
+| 8 | 416.34 | 411.79–416.79 | 3.34× |
+| 16 | **683.70** | 683.64–689.58 | **5.48×** |
+
+The [performance report](docs/release-v1-performance.md) provides methodology, artifact identities, quality misses, and the memory, startup, needle-retrieval, and agentic results. [Machine-readable results](docs/release-v1-performance.json) and [raw evidence](docs/evidence/native-release-performance.tar.gz) preserve samples, inputs, outputs, cache counters, hardware state, and errors.
 
 ## Getting started
 
