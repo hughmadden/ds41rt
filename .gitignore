@@ -43,3 +43,4 @@ reports/phase0_artifacts/smoke/
 reports/quantization/router-replay-inputs/*.bf16
 reports/quantization/router-replay-inputs/*.bin
 .ds41rt-wip/
+run-agent.sh
