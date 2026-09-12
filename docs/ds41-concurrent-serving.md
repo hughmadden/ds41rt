@@ -73,7 +73,7 @@ long-context concurrent quality and sustained serving remain unqualified. This
 implementation establishes concurrent API execution, not the complete release
 or the 90/270 TPS performance targets.
 
-Temporary qualification APIs were stopped afterward. Normal ports 18041/18042
-still use the preceding frozen runtime; this change has not been selected for
-production deployment. The final error-path cleanup explicitly retains uncommitted
+Temporary qualification APIs were stopped afterward. The subsequent
+[16k regression and rollout](ds41-scheduler-rollout.md) selects this scheduler on
+normal ports 18041/18042. The final error-path cleanup explicitly retains uncommitted
 batches for lane reset even when execution has already invalidated their metadata.

@@ -63,8 +63,9 @@ quality records are in the same directory; the temporary API was stopped afterwa
 
 This fixture covers target execution, batched proposals and target/draft cache
 ownership across retirement and migration. It does not qualify HTTP admission, mixed prefill scheduling,
-concurrent cancellation or production C16 throughput. Production APIs remain on
-their previously selected frozen binaries and still serialize whole requests.
+concurrent cancellation or production C16 throughput. Those have separate API
+checks in the subsequent [scheduler rollout](ds41-scheduler-rollout.md), which
+selects concurrent serving on the normal ports.
 
 ## Cooperative transport progress
 

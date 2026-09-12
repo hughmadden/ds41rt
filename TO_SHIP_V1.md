@@ -192,6 +192,13 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Current evidence and integration gaps
 
+- The [concurrent scheduler rollout](docs/ds41-scheduler-rollout.md) is selected
+  on 18041/18042 after paired 16k prefill/long-decode regressions and lifecycle
+  checks. Outputs and usage match; warm prefill remains about 7k code/8k repeated,
+  with about 39 target /118 dSpark long-context decode TPS. Short-prompt counting
+  reaches 606 aggregate TPS at C16. Mixed prefill scheduling, independent lane
+  progress, slow-client isolation and C1 performance targets remain open.
+
 - [Decode lane qualification](docs/ds41-decode-lanes.md) checks real full-stack
   C2/C6/C16 batches, retirement and lane migration against byte-exact serial logits.
   Rebalance only between committed token steps or complete dSpark verification

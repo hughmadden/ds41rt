@@ -123,7 +123,7 @@
   "target_c2_c6_c16_retirement_cancellation_replacement_pass": true,
   "quality_text_and_usage_pairs_equal": 8,
   "inherited_quality_failure": "Unicode answer format in both baseline and candidate",
-  "selected_production_apis_changed": false,
+  "selected_production_apis_changed": true,
   "raw_artifacts": "/tmp/ds41-scheduler",
   "target_distinct_sequences_pass": true,
   "speculative_distinct_sequences_pass": true,
@@ -198,5 +198,6 @@
       "lane1": 8,
       "rounds": 11
     }
-  ]
+  ],
+  "selection_evidence": "docs/ds41-scheduler-rollout.json"
 }

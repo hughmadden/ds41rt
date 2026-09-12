@@ -1,0 +1,210 @@
+{
+  "source_commit": "ef37942",
+  "daemon_sha256": "016f6073a19af3ccec3fe39085a80b9977ba502e5d0cc2faa51889e30461778c",
+  "scope": "Paired C1 baseline/candidate at 16k code/repeated context. Prefill means use last two of three samples; long decode means use two 599-token runs. Both sides use the same mode in each comparison.",
+  "measurements": [
+    {
+      "mode": "target",
+      "workload": "prefill",
+      "kind": "code",
+      "baseline": {
+        "effective_prompt_tokens_per_second": 6835.14662853364,
+        "observed_decode_tokens_per_second": 38.265080479281124
+      },
+      "candidate": {
+        "effective_prompt_tokens_per_second": 7010.133395416482,
+        "observed_decode_tokens_per_second": 38.623064191623165
+      },
+      "all_text_and_usage_equal": true
+    },
+    {
+      "mode": "target",
+      "workload": "prefill",
+      "kind": "repeated",
+      "baseline": {
+        "effective_prompt_tokens_per_second": 8043.070158527282,
+        "observed_decode_tokens_per_second": 38.34335070143298
+      },
+      "candidate": {
+        "effective_prompt_tokens_per_second": 8009.360983755609,
+        "observed_decode_tokens_per_second": 38.59780287344526
+      },
+      "all_text_and_usage_equal": true
+    },
+    {
+      "mode": "target",
+      "workload": "long",
+      "kind": "code",
+      "baseline": {
+        "effective_prompt_tokens_per_second": 6810.284371613368,
+        "observed_decode_tokens_per_second": 38.71652459894429
+      },
+      "candidate": {
+        "effective_prompt_tokens_per_second": 6937.6676480117385,
+        "observed_decode_tokens_per_second": 38.92177624943932
+      },
+      "all_text_and_usage_equal": true
+    },
+    {
+      "mode": "speculative",
+      "workload": "prefill",
+      "kind": "code",
+      "baseline": {
+        "effective_prompt_tokens_per_second": 7012.941324734706,
+        "observed_decode_tokens_per_second": 110.22258502837829
+      },
+      "candidate": {
+        "effective_prompt_tokens_per_second": 6986.715901479555,
+        "observed_decode_tokens_per_second": 112.25538339974625
+      },
+      "all_text_and_usage_equal": true
+    },
+    {
+      "mode": "speculative",
+      "workload": "prefill",
+      "kind": "repeated",
+      "baseline": {
+        "effective_prompt_tokens_per_second": 7776.733522944389,
+        "observed_decode_tokens_per_second": 115.30103084091911
+      },
+      "candidate": {
+        "effective_prompt_tokens_per_second": 8112.065252419547,
+        "observed_decode_tokens_per_second": 113.30856552667429
+      },
+      "all_text_and_usage_equal": true
+    },
+    {
+      "mode": "speculative",
+      "workload": "long",
+      "kind": "code",
+      "baseline": {
+        "effective_prompt_tokens_per_second": 7020.449930573526,
+        "observed_decode_tokens_per_second": 119.92039941814029
+      },
+      "candidate": {
+        "effective_prompt_tokens_per_second": 7086.085494297211,
+        "observed_decode_tokens_per_second": 117.77352657879891
+      },
+      "all_text_and_usage_equal": true
+    }
+  ],
+  "selected_ports": {
+    "target": 18041,
+    "speculative": 18042
+  },
+  "live_lifecycle_checks_pass": true,
+  "expert_profile": {
+    "ostrich": {
+      "target": {
+        "samples": 23897,
+        "means": {
+          "active_experts": 6.0,
+          "unique_expert_weight_bytes": 31334400.0,
+          "upload_us": 15.102648868058752,
+          "kernel_us": 157.01549578588987,
+          "compact_us": 4.1095088203167744,
+          "execution_host_us": 165.97957902665607,
+          "total_us": 181.11185504456625,
+          "unique_weight_GB_per_s": 199.56246893445694
+        }
+      },
+      "speculative": {
+        "samples": 3992,
+        "means": {
+          "active_experts": 22.354709418837675,
+          "unique_expert_weight_bytes": 116745234.46893787,
+          "upload_us": 17.603206412825653,
+          "kernel_us": 500.3856268368647,
+          "compact_us": 6.37277760391006,
+          "execution_host_us": 511.6174849699399,
+          "total_us": 529.2505010020041,
+          "unique_weight_GB_per_s": 233.3105273365477
+        }
+      }
+    },
+    "dodo": {
+      "target": {
+        "samples": 23876,
+        "means": {
+          "active_experts": 6.0,
+          "unique_expert_weight_bytes": 31334400.0,
+          "upload_us": 15.05687719886078,
+          "kernel_us": 156.57059780216073,
+          "compact_us": 4.103466759686255,
+          "execution_host_us": 165.42180432233204,
+          "total_us": 180.50644999162338,
+          "unique_weight_GB_per_s": 200.12952904218633
+        }
+      },
+      "speculative": {
+        "samples": 3982,
+        "means": {
+          "active_experts": 22.36765444500251,
+          "unique_expert_weight_bytes": 116812838.57358111,
+          "upload_us": 18.528879959819186,
+          "kernel_us": 509.45657053573353,
+          "compact_us": 6.421303915893654,
+          "execution_host_us": 520.7900552486187,
+          "total_us": 539.3510798593671,
+          "unique_weight_GB_per_s": 229.28910005173404
+        }
+      }
+    },
+    "emu": {
+      "target": {
+        "samples": 23914,
+        "means": {
+          "active_experts": 6.0,
+          "unique_expert_weight_bytes": 31334400.0,
+          "upload_us": 15.104541272894538,
+          "kernel_us": 157.32807116481766,
+          "compact_us": 4.108274809680297,
+          "execution_host_us": 166.25085723843773,
+          "total_us": 181.3908589110981,
+          "unique_weight_GB_per_s": 199.16598333665408
+        }
+      },
+      "speculative": {
+        "samples": 3998,
+        "means": {
+          "active_experts": 22.345922961480742,
+          "unique_expert_weight_bytes": 116699348.07403702,
+          "upload_us": 17.223861930965484,
+          "kernel_us": 500.12994487050656,
+          "compact_us": 6.24267339026588,
+          "execution_host_us": 511.15082541270635,
+          "total_us": 528.4082041020511,
+          "unique_weight_GB_per_s": 233.33805398165623
+        }
+      }
+    },
+    "kiwi": {
+      "target": {
+        "samples": 23914,
+        "means": {
+          "active_experts": 6.0,
+          "unique_expert_weight_bytes": 31334400.0,
+          "upload_us": 15.10529397005938,
+          "kernel_us": 157.6386092051102,
+          "compact_us": 4.114123791378956,
+          "execution_host_us": 166.48201890106213,
+          "total_us": 181.61411725349168,
+          "unique_weight_GB_per_s": 198.7736390088896
+        }
+      },
+      "speculative": {
+        "samples": 4000,
+        "means": {
+          "active_experts": 22.34925,
+          "unique_expert_weight_bytes": 116716723.2,
+          "upload_us": 17.197,
+          "kernel_us": 502.3883921051025,
+          "compact_us": 6.279480062007904,
+          "execution_host_us": 513.329,
+          "total_us": 530.55325,
+          "unique_weight_GB_per_s": 232.32368628370338
+        }
+      }
+    }
+  }
+}
