@@ -192,8 +192,9 @@ Completion means a working, qualified release with measured performance, not com
   C2/C6/C16 batches, retirement and lane migration against byte-exact serial logits.
   Rebalance only between committed token steps or complete dSpark verification
   rounds, principally after retirement; admit new requests to the lighter lane.
-  This is execution qualification, not concurrent API serving. The serving loop,
-  per-request draft ownership and batched verification still require integration.
+  Request-owned draft caches and batched commits also pass this fixture and C1
+  API regression checks. This is execution qualification, not concurrent API
+  serving. The serving loop and batched draft proposals still require integration.
 
 - [KV sharing across attention heads](docs/ds41-attention-head-reuse.md) is selected with 2048-token chunks. Isolated warm 16k prefill reaches 5.32/5.28k code and 6.56/6.46k repeated tok/s, about 27–28% and 45–46% above the preceding library. The 599-token decode comparison preserves text and usage at 38.02 target / 117.97 dSpark tok/s versus 37.87 / 118.78. All 34 reference cases, 220 byte-exact kernel comparisons, two shared-memory racecheck fixtures and both API lifecycle checks pass; inherited quality failures remain. A 4096-token chunk retest still loses and is not selected. Live ports are 18041/18042. Reprofile prefill before choosing expert grouping/ordering or remaining scheduling/transfer work; adjacent-query reuse and wider concurrency remain open.
 

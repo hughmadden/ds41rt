@@ -167,8 +167,12 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             })?, NativeTp4Wave::device_bytes(80)?)?;
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
         if std::env::var_os("DS41RT_TARGET_PASS_DECODE_LANES").is_some() {
+            let draft_weights = crate::v41_experts::dspark::DsparkWeights::load(
+                &lib, &catalog, 80, 1, 32 * 1024 * 1024 * 1024, 16 * 1024 * 1024)?;
+            let mut draft = crate::v41_native_serve::speculative::DraftRuntime::new(
+                &lib, &draft_weights, &table, &vocabulary, 80)?;
             return decode_lanes::qualify(&lib, &runtime, &mut requests,
-                &mut pass, &mut other, &mut transport, &mut second_transport);
+                &mut pass, &mut other, &mut transport, &mut second_transport, &mut draft);
         }
         // Drop after the first cooperative suspension, with dispatched work and
         // potentially a follower waiting for KV. Both admissions must be revoked

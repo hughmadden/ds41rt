@@ -3,14 +3,18 @@ use crate::v41_dspark_cache::{DsparkWindow, WindowLease};
 use crate::v41_experts::dspark::{DsparkChain, DsparkMainContext, DsparkWeights};
 use crate::v41_requests::RequestBatch;
 
-/// Serial serving owner; immutable weights are shared with the target pass.
-pub(super) struct DraftRuntime<'w, 'a> {
+/// Execution workspaces share a request-indexed bank of persistent draft state.
+pub(crate) struct DraftRuntime<'w, 'a> {
     main: DsparkMainContext<'w, 'a>,
     chain: DsparkChain<'w, 'a>,
     windows: [DsparkWindow<'a>; 3],
-    leases: Option<[WindowLease; 3]>,
-    rng: ds41rt_core::DsparkRng,
+    requests: std::collections::BTreeMap<u64, DraftRequest>,
     captured: bool,
+}
+struct DraftRequest {
+    leases: [WindowLease; 3],
+    rng: ds41rt_core::DsparkRng,
+    slot: usize,
 }
 impl<'w, 'a> DraftRuntime<'w, 'a> {
     pub fn new(
@@ -25,16 +29,17 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             main: weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?,
             chain: weights.draft(table, head, 1, weights.draft_bytes(1)?)?,
             windows: [window()?, window()?, window()?],
-            leases: None,
-            rng: ds41rt_core::DsparkRng::new(0),
+            requests: Default::default(),
             captured: false,
         })
     }
     pub fn admit(&mut self, id: u64) -> Result<()> {
-        ensure!(self.leases.is_none(), "draft request already admitted");
+        ensure!(!self.requests.contains_key(&id), "draft request already admitted");
+        let slot = (0..16).find(|slot| self.requests.values().all(|request| request.slot != *slot))
+            .context("draft request capacity exhausted")?;
         let mut leases = Vec::new();
         for stage in 0..3 {
-            match self.windows[stage].begin_request(0, id) {
+            match self.windows[stage].begin_request(slot, id) {
                 Ok(lease) => leases.push(lease),
                 Err(error) => {
                     for (stage, lease) in leases.into_iter().enumerate() {
@@ -44,19 +49,17 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
                 }
             }
         }
-        self.leases = Some(
-            leases
-                .try_into()
-                .ok()
-                .context("draft admission incomplete")?,
-        );
-        self.rng = ds41rt_core::DsparkRng::new(id);
+        self.requests.insert(id, DraftRequest {
+            leases: leases.try_into().ok().context("draft admission incomplete")?,
+            rng: ds41rt_core::DsparkRng::new(id),
+            slot,
+        });
         Ok(())
     }
-    pub fn release(&mut self) -> Result<()> {
+    pub fn release(&mut self, id: u64) -> Result<()> {
         let mut failure = None;
-        if let Some(leases) = self.leases.take() {
-            for (window, lease) in self.windows.iter_mut().zip(leases) {
+        if let Some(request) = self.requests.remove(&id) {
+            for (window, lease) in self.windows.iter_mut().zip(request.leases) {
                 if window.request_id(lease).is_ok() {
                     if let Err(error) = window.release(lease) {
                         failure = Some(error);
@@ -66,6 +69,15 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         }
         failure.map_or(Ok(()), Err)
     }
+    #[cfg(test)]
+    pub(crate) fn validate_position(&self, id: u64, end: u64) -> Result<()> {
+        let request = self.requests.get(&id).context("draft request not admitted")?;
+        for (window, lease) in self.windows.iter().zip(request.leases) {
+            ensure!(window.request_id(lease)? == id, "draft request identity differs");
+            ensure!(window.committed_end(lease)? == Some(end), "draft position differs");
+        }
+        Ok(())
+    }
     pub fn commit(
         &mut self,
         pass: &mut TargetPass<'_, 'a>,
@@ -73,7 +85,22 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         batch: &mut RequestBatch,
         accepted: u32,
     ) -> Result<()> {
-        let leases = self.leases.context("draft request not admitted")?;
+        self.commit_batch(pass, requests, batch, &[accepted])
+    }
+    pub fn commit_batch(
+        &mut self,
+        pass: &mut TargetPass<'_, 'a>,
+        requests: &mut Requests<'a>,
+        batch: &mut RequestBatch,
+        accepted: &[u32],
+    ) -> Result<()> {
+        let ids = batch.cache()?.request_ids();
+        ensure!(ids.len() == accepted.len(), "draft acceptance count differs");
+        let leases = ids.iter().map(|id| self.requests.get(id)
+            .map(|request| request.leases).context("draft request not admitted"))
+            .collect::<Result<Vec<_>>>()?;
+        let stage_leases: [Vec<WindowLease>; 3] = std::array::from_fn(|stage|
+            leases.iter().map(|request| request[stage]).collect());
         let taps = pass.taps(batch)?;
         let mut proposal = unsafe {
             self.main
@@ -86,8 +113,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
                 batch,
                 &mut proposal,
                 &mut [a, b, c],
-                [&[leases[0]], &[leases[1]], &[leases[2]]],
-                &[accepted],
+                [&stage_leases[0], &stage_leases[1], &stage_leases[2]],
+                accepted,
             )
         }
     }
@@ -106,11 +133,13 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         ensure!(!job.events.is_closed(), "client disconnected");
         let start = Instant::now();
         let end = requests.cache().committed_end(lease)?;
-        let leases = self.leases.context("draft request not admitted")?;
+        let id = requests.cache().request_id(lease)?;
+        let request = self.requests.get_mut(&id).context("draft request not admitted")?;
+        let leases = request.leases;
         let mut inputs = vec![anchor];
         if end >= 2 && remaining > 1 {
             self.chain.set_tokens(&[anchor as i32])?;
-            self.chain.prepare_sampling(&mut [&mut self.rng], &[0.0])?;
+            self.chain.prepare_sampling(&mut [&mut request.rng], &[0.0])?;
             let windows = [&self.windows[0], &self.windows[1], &self.windows[2]];
             let bindings = [
                 &[(leases[0], end)][..],

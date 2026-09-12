@@ -9,6 +9,7 @@ pub(super) fn qualify<'w, 'a>(
     second: &mut TargetPass<'w, 'a>,
     first_transport: &mut NativeTp4Wave<'a>,
     second_transport: &mut NativeTp4Wave<'a>,
+    draft: &mut crate::v41_native_serve::speculative::DraftRuntime<'_, 'a>,
 ) -> Result<()> {
     for per_lane in [1usize, 3, 8] {
         let mut expected = Vec::new();
@@ -16,6 +17,9 @@ pub(super) fn qualify<'w, 'a>(
             let leases = (0..2 * per_lane)
                 .map(|slot| requests.admit(slot, 9000 + slot as u64))
                 .collect::<Result<Vec<_>>>()?;
+            for slot in 0..2 * per_lane { draft.admit(9000 + slot as u64)?; }
+            assert!(draft.admit(9000).is_err(), "duplicate draft identity accepted");
+            if per_lane == 8 { assert!(draft.admit(9999).is_err(), "draft capacity exceeded"); }
             let mut members = [
                 (0..per_lane).collect::<Vec<_>>(),
                 (per_lane..2 * per_lane).collect::<Vec<_>>(),
@@ -31,6 +35,7 @@ pub(super) fn qualify<'w, 'a>(
                     for _ in 0..2 {
                         let slot = members[0].pop().unwrap();
                         requests.release(leases[slot])?;
+                        draft.release(9000 + slot as u64)?;
                         retired.push(slot);
                     }
                     let moved = members[1].pop().unwrap();
@@ -73,8 +78,8 @@ pub(super) fn qualify<'w, 'a>(
                 if overlap {
                     assert_eq!(outputs, expected[step], "overlap differs: per_lane={per_lane}, step={step}");
                 } else { expected.push(outputs.clone()); }
-                first.commit(requests, &mut a, &vec![width as u32; members[0].len()])?;
-                second.commit(requests, &mut b, &vec![width as u32; members[1].len()])?;
+                draft.commit_batch(first, requests, &mut a, &vec![width as u32; members[0].len()])?;
+                draft.commit_batch(second, requests, &mut b, &vec![width as u32; members[1].len()])?;
                 for (slots, bytes) in members.iter().zip(&outputs) {
                     for (&slot, row) in slots.iter().zip(bytes.chunks_exact(129280 * 4)) {
                         let next = row.chunks_exact(4).enumerate().map(|(i, b)|
@@ -82,13 +87,14 @@ pub(super) fn qualify<'w, 'a>(
                             .max_by(|a, b| a.1.total_cmp(&b.1)).unwrap().0;
                         tokens[slot] = vec![next];
                         assert_eq!(requests.cache().committed_end(leases[slot])?, 8 + step as u64);
+                        draft.validate_position(9000 + slot as u64, 8 + step as u64)?;
                     }
                 }
                 eprintln!("decode lanes per_lane={per_lane} overlap={overlap} step={step} members={:?} execute_us={}",
                     members.each_ref().map(|m| m.len()), elapsed.as_micros());
             }
             for (slot, lease) in leases.into_iter().enumerate() {
-                if !retired.contains(&slot) { requests.release(lease)?; }
+                if !retired.contains(&slot) { requests.release(lease)?; draft.release(9000 + slot as u64)?; }
             }
         }
     }

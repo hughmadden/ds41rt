@@ -23,8 +23,29 @@ Every selected FP32 logit is byte-identical to the serial execution, and each
 surviving request's committed position is checked after every step. All cases
 passed both before and after the polling change below.
 
-This fixture covers target execution, cache ownership, retirement and migration.
-It does not qualify dSpark migration, HTTP admission, mixed prefill scheduling,
+The fixture now also loads the serving dSpark runtime, admits the same request
+identities, and commits each target batch into its three draft caches. It checks
+all three draft-cache identities and committed positions after every step,
+including after retirement and migration. Duplicate admission and capacity
+overflow are rejected. Repeating the serial and overlapping runs reuses released
+slots. This extended fixture passes in 10.91 seconds.
+
+The serving draft runtime now maps request IDs to independent cache leases and
+RNG state. Its batched commit resolves leases in target-batch order, independently
+of execution-lane assignment. The single-request serving path uses this same
+commit implementation. Shared execution workspaces and captured proposal graphs
+remain separate from persistent request state.
+
+A temporary release API using the request-indexed runtime passed the native API
+lifecycle check, including cancellation recovery. All eight comparison prompts
+preserved text and token usage against the selected speculative API. The strict
+quality checker still exits 1 because both versions fail the inherited Unicode
+format check; this is not full quality qualification. Artifacts are in
+`/tmp/ds41-draft-requests/{component.log,api.json,quality.json}`. The temporary API
+was stopped after validation; the normal selected APIs were left unchanged.
+
+This fixture covers target execution and target/draft cache ownership across
+retirement and migration. It does not qualify batched draft proposals, HTTP admission, mixed prefill scheduling,
 concurrent cancellation or production C16 throughput. Production APIs remain on
 their previously selected frozen binaries and still serialize whole requests.
 
@@ -63,7 +84,7 @@ indiscriminately. The counting fixture already has almost maximal acceptance;
 reducing round latency is the immediate opportunity for that workload.
 
 Outstanding serving work: replace whole-request serialization with per-request
-generation state, batch dSpark proposals and commits, size head workspaces for
+generation state, batch dSpark proposals, size head workspaces for
 verification batches, overlap the two lanes and rebalance at committed boundaries.
 Admission, retirement, cancellation and lane reuse then need API-level C1–C16
 qualification and simultaneous aggregate/per-stream measurements.

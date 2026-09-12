@@ -64,6 +64,9 @@ impl CacheBatch {
     pub fn identity(&self) -> u64 {
         self.identity
     }
+    pub fn request_ids(&self) -> Vec<u64> {
+        self.requests.iter().map(|request| request.id).collect()
+    }
     pub fn positions(&self) -> Vec<u64> {
         self.requests
             .iter()

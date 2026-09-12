@@ -1,4 +1,4 @@
-mod speculative;
+pub(crate) mod speculative;
 use crate::v41_backbone_cache::BackboneCache;
 use crate::v41_backbone_execution::BackboneExecution;
 use crate::v41_backbone_execution::CacheProducerWeights;
@@ -298,7 +298,7 @@ fn worker(
             Ok(())
         };
         if let Some(draft) = &mut draft {
-            draft.release()?;
+            draft.release(id)?;
         }
         if let Err(error) = result {
             // Also reset failures outside a pending transport borrow (for example
