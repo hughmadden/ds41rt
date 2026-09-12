@@ -166,6 +166,7 @@ def main() -> None:
     parser.add_argument("--base", type=int, action="append")
     parser.add_argument("--suffix", type=int, action="append")
     parser.add_argument("--repeats", type=int, default=2)
+    parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--timeout", type=float, default=1800)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -173,7 +174,7 @@ def main() -> None:
         parser.error("output already exists")
     bases = args.base or list(DEFAULT_BASES)
     suffixes = args.suffix or list(DEFAULT_SUFFIXES)
-    if args.repeats < 1 or any(value < 0 for value in bases) or any(
+    if args.repeats < 1 or args.warmups < 0 or any(value < 0 for value in bases) or any(
         value <= 0 for value in suffixes
     ):
         parser.error("invalid matrix dimensions")
@@ -185,7 +186,10 @@ def main() -> None:
         parser.error("context source is empty")
     needed = max(bases) + max(suffixes) + 2048
     source_ids *= math.ceil(needed / len(source_ids))
-    unique = iter(markers(tokenizer, len(bases) * (2 + len(suffixes) * args.repeats * 4)))
+    unique = iter(markers(
+        tokenizer,
+        len(bases) * (2 + len(suffixes) * (args.warmups + args.repeats) * 4),
+    ))
     report = {
         "schema": 1,
         "scope": __doc__,
@@ -194,6 +198,7 @@ def main() -> None:
         "bases": bases,
         "suffixes": suffixes,
         "repeats": args.repeats,
+        "warmups_per_cell": args.warmups,
         "controls": {"temperature": 0, "thinking": "disabled", "max_tokens": 1},
         "tokenizer_sha256": sha256(args.tokenizer.read_bytes()),
         "context_sha256": sha256(source.encode()),
@@ -248,13 +253,16 @@ def main() -> None:
             )
 
         for suffix in suffixes:
-            for repeat in range(1, args.repeats + 1):
+            for sequence in range(args.warmups + args.repeats):
+                timed = sequence >= args.warmups
+                repeat = sequence - args.warmups + 1 if timed else sequence + 1
                 target_total = expected_parent_hit + suffix if base else suffix
                 attempts = []
                 sample = {
                     "base_context_tokens": base,
                     "suffix_tokens": suffix,
                     "repeat": repeat,
+                    "timed": timed,
                     "attempts": attempts,
                 }
                 report["samples"].append(sample)
@@ -321,7 +329,8 @@ def main() -> None:
                         )
                         save()
                         print(
-                            f"measure base={base} suffix={suffix} repeat={repeat} "
+                            f"{'measure' if timed else 'warmup'} base={base} "
+                            f"suffix={suffix} repeat={repeat} "
                             f"cached={sample['cached_tokens']} "
                             f"seconds={sample['first_content_seconds']:.6f} "
                             f"tps={sample['effective_prefill_tokens_per_second']:.2f}",
@@ -342,6 +351,7 @@ def main() -> None:
                 for row in report["samples"]
                 if row["base_context_tokens"] == base
                 and row["suffix_tokens"] == suffix
+                and row["timed"]
             ]
             values = [row["effective_prefill_tokens_per_second"] for row in rows]
             report["cells"].append(
