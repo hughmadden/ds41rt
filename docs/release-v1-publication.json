@@ -1,61 +1,56 @@
 {
-  "schema": 1,
-  "release": "v3",
-  "release_commit": "681256121deebbd16f5946facd09964278b6b339",
-  "branches_at_publication": {
-    "dev": "681256121deebbd16f5946facd09964278b6b339",
-    "main": "681256121deebbd16f5946facd09964278b6b339",
-    "release/v3": "681256121deebbd16f5946facd09964278b6b339"
+  "schema": 2,
+  "release": "v1",
+  "name": "DS41RT v1",
+  "first_ds41rt_release": true,
+  "numbering_correction": {
+    "replaced": "v3",
+    "reason": "The old number continued two local DS4RT tags.",
+    "legacy_tags": [
+      "ds4rt-v1",
+      "ds4rt-v2"
+    ],
+    "obsolete_ds41rt_refs_absent": [
+      "v3",
+      "release/v3"
+    ]
   },
-  "tag": {
-    "name": "v3",
-    "annotated_object": "2ade3b93dff30aa72813c251d3d3577748f7d032",
-    "target_commit": "681256121deebbd16f5946facd09964278b6b339"
+  "refs": {
+    "branches": [
+      "dev",
+      "main",
+      "release/v1"
+    ],
+    "tag": "v1",
+    "relationship": "advanced together to the commit containing this publication record"
   },
   "github_release": {
     "id": 387678878,
-    "url": "https://github.com/tpurtell/ds41rt/releases/tag/v3",
-    "published_at": "2026-09-12T19:22:30Z",
+    "url": "https://github.com/tpurtell/ds41rt/releases/tag/v1",
     "draft": false,
     "prerelease": false,
-    "evidence_asset": {
-      "url": "https://github.com/tpurtell/ds41rt/releases/download/v3/native-release-v3-build-run.tar.gz",
-      "bytes": 209334,
-      "sha256": "43192d5c9d47e7fb23e35ccc9c1c80009aa8a6d2fb7e6db6fc1e45c800859701"
+    "published_at": "2026-09-12T19:22:30Z",
+    "asset": {
+      "id": 560045671,
+      "name": "native-release-v1-build-run.tar.gz",
+      "url": "https://github.com/tpurtell/ds41rt/releases/download/v1/native-release-v1-build-run.tar.gz",
+      "bytes": 196134,
+      "sha256": "fb36216bb997906f273a08332fc3578cabebb668c274b75065255252f5e9f52e"
     }
-  },
-  "pages": {
-    "source_branch": "main",
-    "source_path": "/docs",
-    "build_id": 1211219703,
-    "build_commit": "681256121deebbd16f5946facd09964278b6b339",
-    "status": "built",
-    "frogger_url": "https://tpurtell.github.io/ds41rt/frogger.html",
-    "frogger_http_status": 200,
-    "frogger_bytes": 15763,
-    "frogger_sha256": "187d2e5a22e7477d59752b1e3982b98e6fa0a5df760f4b03cc2acceb8db6c185",
-    "matches_repository_artifact": true
   },
   "containers": {
     "coordinator": {
-      "package_url": "https://github.com/users/tpurtell/packages/container/package/ds41rt-coordinator",
-      "digest": "sha256:0d8a29160924dc62694d65f46e5101bf39071fb28e7611344489dde416bfe950",
-      "visibility": "private"
+      "tag": "ghcr.io/tpurtell/ds41rt-coordinator:v1",
+      "digest": "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9"
     },
-    "spark_expert": {
-      "package_url": "https://github.com/users/tpurtell/packages/container/package/ds41rt-spark-expert",
-      "digest": "sha256:672f82a1a99872cdc8014811b99c0967e0955c8c3e1e29b91bd48e7b06d3566d",
-      "visibility": "private"
-    }
+    "spark": {
+      "tag": "ghcr.io/tpurtell/ds41rt-spark-expert:v1",
+      "digest": "sha256:1f1bff295a1d112c8a2fb80918b5abcafcf10eec4936717e234d3d727635a0be"
+    },
+    "latest_identical": true,
+    "visibility": "private"
   },
-  "service_after_publication": {
-    "healthy": true,
-    "port": 8000,
-    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
-    "max_context_tokens": 1048576,
-    "max_output_tokens": 393216,
-    "coordinator_containers": 1,
-    "spark_expert_containers": 4
-  },
-  "remaining_owner_action": "Make both GHCR packages public manually."
+  "measured_image_revision": "9ea5c96468da690fe7dd01471d4fa2fb8555a606",
+  "performance_regression": "resolved",
+  "full_qualification_rerun": false
 }

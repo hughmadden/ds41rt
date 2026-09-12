@@ -1,24 +1,18 @@
-# DS41RT v3 publication record
+# DS41RT v1 publication record
 
-DS41RT v3 was published from qualified release commit `681256121deebbd16f5946facd09964278b6b339`. The `v3` annotated tag resolves to that commit. At publication, `dev`, `main`, and `release/v3` also resolved to the same source and documentation tree.
+The first DS41RT release is published as [DS41RT v1](https://github.com/tpurtell/ds41rt/releases/tag/v1). The earlier `v3` identity came from continuing two local DS4RT tag numbers and was replaced in place. Legacy history is now explicitly named `ds4rt-v1` and `ds4rt-v2`; there is no DS41RT `v2` or `v3` release.
 
-The [GitHub release](https://github.com/tpurtell/ds41rt/releases/tag/v3) is public, final rather than draft or prerelease, and includes the high-level release notes, qualified container references, source archives, and the sanitized qualification evidence asset. GitHub reports release ID `387678878` and publication time `2026-09-12T19:22:30Z`.
+The release remains final rather than draft or prerelease. It retains GitHub release ID `387678878` and its original publication time, `2026-09-12T19:22:30Z`. Its notes identify the project as the first DS41RT release, summarize the high-level features, link the detailed reports, and cite the exact corrected container digests.
 
-| Published artifact | Identity |
-|---|---|
-| annotated tag object | `2ade3b93dff30aa72813c251d3d3577748f7d032` |
-| tag target / release source | `681256121deebbd16f5946facd09964278b6b339` |
-| qualification evidence asset | `sha256:43192d5c9d47e7fb23e35ccc9c1c80009aa8a6d2fb7e6db6fc1e45c800859701` |
-| coordinator OCI index | `sha256:0d8a29160924dc62694d65f46e5101bf39071fb28e7611344489dde416bfe950` |
-| Spark expert manifest | `sha256:672f82a1a99872cdc8014811b99c0967e0955c8c3e1e29b91bd48e7b06d3566d` |
+The attached `native-release-v1-build-run.tar.gz` asset is 196,134 bytes with SHA-256 `fb36216bb997906f273a08332fc3578cabebb668c274b75065255252f5e9f52e`. GitHub asset ID `560045671` reports the same digest. The obsolete v3-named asset was removed.
 
-GitHub Pages now serves `main:/docs`. Build `1211219703` completed for release commit `681256121deebbd16f5946facd09964278b6b339` with no error. The [playable Frogger artifact](https://tpurtell.github.io/ds41rt/frogger.html) returns HTTP 200 and exactly matches [`frogger.html`](frogger.html): 15,763 bytes and SHA-256 `187d2e5a22e7477d59752b1e3982b98e6fa0a5df760f4b03cc2acceb8db6c185`.
+Published containers:
 
-The standard five-host v3 service remained healthy after publication. `/v1/models` reports only `deepseek-ai/DeepSeek-V4.1-Flash` with the official 1,048,576-token context and 393,216-token output limits. The coordinator and four rank-specific expert containers continue to run from the v3 images.
+- `ghcr.io/tpurtell/ds41rt-coordinator:v1` and `latest`: `sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9`
+- `ghcr.io/tpurtell/ds41rt-spark-expert:v1` and `latest`: `sha256:1f1bff295a1d112c8a2fb80918b5abcafcf10eec4936717e234d3d727635a0be`
 
-Both GHCR packages are intentionally still private. The repository owner will perform the requested final manual visibility change:
+Raw-manifest comparison confirms `v1` and `latest` are identical for each role. Both images report version `v1` and measured source revision `9ea5c96468da690fe7dd01471d4fa2fb8555a606`. The source tag includes later performance and publication documentation; no inference source changed after the measured image.
 
-- [ds41rt-coordinator package settings](https://github.com/users/tpurtell/packages/container/package/ds41rt-coordinator/settings)
-- [ds41rt-spark-expert package settings](https://github.com/users/tpurtell/packages/container/package/ds41rt-spark-expert/settings)
+The corrected standard build restores 7,743.47 prompt tok/s at the headline prefill cell, 150.51 tok/s warm dSpark counting, and 742.91 aggregate tok/s at C16. The complete three-sample rerun is in the [performance report](release-v1-performance.md). The full qualification suite was not repeated.
 
-[Machine-readable publication record](release-v1-publication.json) preserves the release, tag, branch, Pages, container, evidence, and remaining-owner-action state.
+`dev`, `main`, `release/v1`, and annotated tag `v1` are advanced to the publication record. The obsolete `release/v3` branch and `v3` tag are absent. The README-backed Pages deployment remains public. Both GHCR packages remain private for the repository owner's requested manual visibility change.
