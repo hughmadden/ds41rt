@@ -85,9 +85,20 @@ pub(super) fn run(config: NativeExpertServiceConfig, listen: &str) -> Result<()>
         let mut index = 0;
         while index < connections.len() {
             let mut execution_failed = false;
-            let result = connections[index].poll(|view, _mapped, emit| {
+            let result = connections[index].poll(|view, mapped, emit| {
                 let request = V41BackboneRequest::parse(view.frame_bytes(), config.capacity)?;
                 execution.bind_layer(&weights[request.layer() as usize])?;
+                if let Some(slot) = mapped.response_slot {
+                    let response = unsafe { execution.execute_mapped_request(&request,
+                        config.rank as u64 + 1, &mut exchange, slot) };
+                    let response = match response {
+                        Ok(response) => response,
+                        Err(error) => { execution_failed = true; return Err(error); }
+                    };
+                    if let Some(response) = response {
+                        return emit(ProtocolV2ExecutorResponseRef::Device(response));
+                    }
+                }
                 let mut emit_failed = false;
                 let result = execution.execute_host_chunks(
                     &request,

@@ -142,6 +142,35 @@ impl<'a> V41BackboneRequest<'a> {
         }
         Ok(())
     }
+    fn response_header(&self, executor_id: u64) -> Result<ExpertProtocolV2ResponseHeader> {
+        ensure!(executor_id != 0, "native response needs an executor identity");
+        let header = &self.view.header;
+        Ok(ExpertProtocolV2ResponseHeader {
+                request_id: header.request_id,
+                placement_version: header.placement_version,
+                layer_id: header.layer_id,
+                row_count: self.rows(),
+                output_dim: V41_HIDDEN,
+                output_dtype: ExpertV2Dtype::Bf16,
+                output_row_stride_bytes: V41_PARTIAL_ROW_BYTES,
+                output_payload_bytes: self.plane_bytes()? as u64,
+                status: ExpertProtocolV2Status::Ok,
+                flags: header.flags,
+                executor_id,
+            })
+    }
+    pub fn response_device(&self, executor_id: u64, output: ds41rt_ffi::Ds41rtDeviceBuffer)
+        -> Result<crate::ExpertProtocolV2DeviceResponseRef<'static>> {
+        let response = crate::ExpertProtocolV2DeviceResponseRef {
+            header: self.response_header(executor_id)?, row_indices: None,
+            partial_output_payload: output,
+        };
+        response.validate()?;
+        Ok(response)
+    }
+    pub fn permits_device_response(&self) -> bool {
+        self.view.header.flags & EXPERT_PROTOCOL_V2_FLAG_DEBUG_CHECKSUM == 0
+    }
     pub fn response<'p>(
         &self,
         executor_id: u64,
@@ -155,21 +184,8 @@ impl<'a> V41BackboneRequest<'a> {
             partials.len() == self.plane_bytes()?,
             "native route plane extent mismatch"
         );
-        let header = &self.view.header;
         let response = ExpertProtocolV2ResponseRef {
-            header: ExpertProtocolV2ResponseHeader {
-                request_id: header.request_id,
-                placement_version: header.placement_version,
-                layer_id: header.layer_id,
-                row_count: self.rows(),
-                output_dim: V41_HIDDEN,
-                output_dtype: ExpertV2Dtype::Bf16,
-                output_row_stride_bytes: V41_PARTIAL_ROW_BYTES,
-                output_payload_bytes: partials.len() as u64,
-                status: ExpertProtocolV2Status::Ok,
-                flags: header.flags,
-                executor_id,
-            },
+            header: self.response_header(executor_id)?,
             row_indices: None,
             partial_output_payload: partials,
         };

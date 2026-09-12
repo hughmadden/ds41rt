@@ -576,6 +576,27 @@ impl ExpertExecution<'_, '_> {
         Ok(())
     }
 
+    /// Write the complete rank plane into the transport's registered send slot.
+    /// Return None before execution when bounded frames or checksums need fallback.
+    /// # Safety
+    /// The slot is GPU-accessible on this device and exclusively owned until the
+    /// caller emits the returned response; the transport retains it through send completion.
+    pub unsafe fn execute_mapped_request(&mut self,
+        request: &ds41rt_transport::v41_expert::V41BackboneRequest<'_>, executor_id: u64,
+        exchange: &mut HostExpertExchange, slot: Ds41rtDeviceBuffer,
+    ) -> Result<Option<ds41rt_transport::ExpertProtocolV2DeviceResponseRef<'static>>> {
+        let prefix = ds41rt_transport::EXPERT_PROTOCOL_V2_RESPONSE_HEADER_LEN;
+        let bytes = request.plane_bytes()?;
+        if !request.permits_device_response() || slot.bytes < prefix + bytes { return Ok(None); }
+        let output = Ds41rtDeviceBuffer {
+            ptr: unsafe { slot.ptr.cast::<u8>().add(prefix).cast() }, bytes, ..slot
+        };
+        // Validate the destination descriptor before launching any GPU work.
+        let response = request.response_device(executor_id, output)?;
+        self.execute_request_output(request, executor_id, exchange, Some(output))?;
+        Ok(Some(response))
+    }
+
     /// Host fallback from a validated wire request to a compact BF16 rank response.
     /// The borrowed response prevents reuse of exchange storage until encoding/send ends.
     pub fn execute_host_request<'a>(
@@ -584,6 +605,14 @@ impl ExpertExecution<'_, '_> {
         executor_id: u64,
         exchange: &'a mut HostExpertExchange,
     ) -> Result<ds41rt_transport::ExpertProtocolV2ResponseRef<'a>> {
+        self.execute_request_output(request, executor_id, exchange, None)?;
+        request.response(executor_id, &exchange.partials[..request.plane_bytes()?])
+    }
+
+    fn execute_request_output(&mut self,
+        request: &ds41rt_transport::v41_expert::V41BackboneRequest<'_>, executor_id: u64,
+        exchange: &mut HostExpertExchange, destination: Option<Ds41rtDeviceBuffer>,
+    ) -> Result<()> {
         let super::ExpertLayer::Backbone { layer, .. } = self._weights.layer else {
             anyhow::bail!("backbone requests cannot execute on RTX dSpark weights");
         };
@@ -637,11 +666,11 @@ impl ExpertExecution<'_, '_> {
                 timing.record(1, self.stream.raw)?;
             }
         }
-        let output = self
+        let output = destination.unwrap_or(self
             .compact_output
             .as_ref()
             .context("missing compact output")?
-            .buffer;
+            .buffer);
         unsafe {
             let reducer = self.compact_reducer.as_ref().context("missing compact reducer")?;
             let (kernel, slots, _) = self.execution_state(request.rows());
@@ -659,10 +688,9 @@ impl ExpertExecution<'_, '_> {
         }
         self.synchronize()?;
         let executed_us = started.map(|t| t.elapsed().as_micros() as u64);
-        self.library.copy_d2h(
-            &mut exchange.partials[..bytes],
-            Ds41rtDeviceBuffer { bytes, ..output },
-        )?;
+        if destination.is_none() {
+            self.library.copy_d2h(&mut exchange.partials[..bytes], Ds41rtDeviceBuffer { bytes, ..output })?;
+        }
         if let (Some(timing), Some(started)) = (&self.timing, started) {
             let total_us = started.elapsed().as_micros() as u64;
             let (kernel_us, compact_us) = unsafe { timing.elapsed_us()? };
@@ -686,7 +714,7 @@ impl ExpertExecution<'_, '_> {
             let unique_expert_weight_bytes =
                 self._weights.budget().resident_bytes / 384 * active_experts;
             tracing::debug!(target: "ds41rt::expert_timing",
-                layer, executor_id, rows=request.rows(), active_experts,
+                layer, executor_id, rows=request.rows(), active_experts, direct_registered_output=destination.is_some(),
                 kernel_capacity=self.execution_state(request.rows()).0.info().capacity_rows,
                 max_expert_rows=histogram.iter().copied().max().unwrap_or(0),
                 ?expert_rows_histogram, expert_rows_tail_routes,
@@ -696,6 +724,9 @@ impl ExpertExecution<'_, '_> {
                 download_us=total_us-executed_us.unwrap(), total_us,
                 "native expert execution");
         }
-        request.response(executor_id, &exchange.partials[..bytes])
+        Ok(())
     }
 }
+
+#[cfg(test)]
+mod mapped_tests;
