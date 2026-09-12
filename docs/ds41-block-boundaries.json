@@ -1,0 +1,65 @@
+{
+  "source_parent": "822e610",
+  "daemon_sha256": "42e91194af2610140ec7fd4f7a42d021683cf36095a50a3c0cf7592d91e54dc8",
+  "scope": "Sequential paired baseline/candidate on the same RTX device for each mode; three 599-token runs after 16k code context. Warm means use last two samples; all-sample means retained.",
+  "results": {
+    "target": {
+      "gpu": 0,
+      "baseline": {
+        "decode_tps": [
+          38.035992830559024,
+          38.94149545881698,
+          38.92422042553513
+        ],
+        "all_mean_decode_tps": 38.63390290497038,
+        "warm_mean_decode_tps": 38.93285794217606,
+        "warm_mean_prefill_tps": 6835.863725143765
+      },
+      "candidate": {
+        "decode_tps": [
+          39.05616776676503,
+          39.35108558223669,
+          39.67838327843501
+        ],
+        "all_mean_decode_tps": 39.361878875812245,
+        "warm_mean_decode_tps": 39.51473443033585,
+        "warm_mean_prefill_tps": 6999.610720514753
+      },
+      "all_outputs_and_usage_equal": true
+    },
+    "speculative": {
+      "gpu": 1,
+      "baseline": {
+        "decode_tps": [
+          120.46226314660024,
+          118.27670835932558,
+          119.2643996613895
+        ],
+        "all_mean_decode_tps": 119.33445705577178,
+        "warm_mean_decode_tps": 118.77055401035754,
+        "warm_mean_prefill_tps": 6938.075634416162
+      },
+      "candidate": {
+        "decode_tps": [
+          117.61228182280158,
+          120.35648426507039,
+          120.51897069829053
+        ],
+        "all_mean_decode_tps": 119.49591226205416,
+        "warm_mean_decode_tps": 120.43772748168047,
+        "warm_mean_prefill_tps": 6841.608689677487
+      },
+      "all_outputs_and_usage_equal": true
+    }
+  },
+  "component_pass": true,
+  "api_lifecycle_pass": true,
+  "concurrent_distinct_c2_c6_c16_cancellation_replacement_pass": true,
+  "quality_text_and_usage_pairs_equal": 8,
+  "inherited_quality_failure": "Unicode format in both versions",
+  "selected_ports": [
+    18041,
+    18042
+  ],
+  "selected_api_lifecycle_pass": true
+}

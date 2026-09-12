@@ -77,9 +77,17 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
                 && binding.layer() == self.layer && self.tokens.len() == rows,
                 "block advance layer or identity differs");
             let [attention, ffn] = next.prepare_bindings(&self.attention, &self.ffn)?;
-            for (source, destination) in self.ffn.output()?.into_iter().zip(self.inputs()) {
-                self.library.copy_d2d(destination, source, source.bytes)?;
-            }
+            let stream = self.ffn.stream_raw();
+            let copied = (|| -> Result<()> {
+                for (source, destination) in self.ffn.output()?.into_iter().zip(self.inputs()) {
+                    unsafe { self.library.copy_d2d_async(destination, source, source.bytes, stream)?; }
+                }
+                Ok(())
+            })();
+            // Both destinations must be ready for taps/Engram or the next query.
+            // Drain even if only the first copy was successfully submitted.
+            let drained = unsafe { self.library.cuda_stream_synchronize(stream) };
+            copied.and(drained)?;
             // Backbone mHC executes on its own drained streams; it has no
             // external captured mHC graphs to invalidate during this rebind.
             unsafe {
@@ -380,14 +388,17 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
                 anyhow::bail!("block FFN is not pending");
             };
             ensure!(
-                binding == expected && result.device_id == self.inputs()[0].device_id,
+                binding == expected && result.device_id == self.inputs()[0].device_id
+                    && result.bytes >= rows * 10240 && !result.ptr.is_null(),
                 "block FFN result binding differs"
             );
-            self.library
-                .copy_d2d(self.ffn.sublayer_result(), result, rows * 10240)?;
-            unsafe {
-                self.ffn.finish()?;
-            }
+            // Reduction has already completed. Post-mixing can consume its
+            // buffer directly instead of copying through the mHC scratch input.
+            let stream = self.ffn.stream_raw();
+            let enqueued = unsafe { self.ffn.enqueue_finish(Some(result), stream) };
+            let drained = unsafe { self.library.cuda_stream_synchronize(stream) };
+            enqueued.and(drained)?;
+            unsafe { self.ffn.complete()?; }
             self.phase = Phase::Ready(binding, rows);
             Ok(())
         })();

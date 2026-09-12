@@ -192,6 +192,14 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Current evidence and integration gaps
 
+- [Block-boundary copy reduction](docs/ds41-block-boundaries.md) is selected on
+  18041/18042. It removes 118 blocking copies and 79 explicit waits per full
+  target stack while preserving arithmetic. Same-GPU warm comparisons are
+  38.93→39.51 target TPS and 118.77→120.44 dSpark TPS; the all-sample dSpark mean
+  is essentially unchanged. Long outputs, eight quality pairs, C2/C6/C16 and
+  cancellation/replacement checks pass their regression comparisons, with the
+  inherited Unicode-format failure unchanged.
+
 - The [concurrent scheduler rollout](docs/ds41-scheduler-rollout.md) is selected
   on 18041/18042 after paired 16k prefill/long-decode regressions and lifecycle
   checks. Outputs and usage match; warm prefill remains about 7k code/8k repeated,

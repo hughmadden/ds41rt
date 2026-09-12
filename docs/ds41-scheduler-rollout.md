@@ -1,6 +1,7 @@
 # Concurrent scheduler selected on the normal APIs
 
-Source `ef37942` is selected on ports 18041 (target-only) and 18042 (dSpark).
+Source `ef37942` was selected on ports 18041 (target-only) and 18042 (dSpark),
+and was subsequently superseded by the [block-boundary copy reduction](ds41-block-boundaries.md).
 The frozen daemon is `/tmp/ds41-scheduler-rollout/daemon`, SHA-256
 `016f6073a19af3ccec3fe39085a80b9977ba502e5d0cc2faa51889e30461778c`.
 Native kernels and the four registered-output Spark workers are unchanged.
