@@ -48,7 +48,7 @@ release_trim() {
 
 release_known_key() {
   case "$1" in
-    MODEL_ID|MODEL_VARIANT|MODEL_REVISION|EXPERT_FORMAT|DSPARK|DSPARK_DRAFT_POLICY|COORDINATOR_GPU|COORDINATOR_GPU_UUID|COORDINATOR_GPU_PCI_BUS_ID|COORDINATOR_GPU_HEADROOM_GIB|KV_POOL_TOKENS|MAX_CONTEXT_TOKENS|MAX_OUTPUT_TOKENS|CONCURRENCY|SPARK_REDUCTION_MIN_ROWS|SPARKINFER_EXL3|ADDR|EXPERT_PORT|SPARK_[0-3]_HOST|SPARK_[0-3]_LANE_A|SPARK_[0-3]_LANE_B|COORDINATOR_DOCKER_DEV|COORDINATOR_DOCKER_INFERENCE|SPARK_EXPERT_DOCKER_DEV|SPARK_EXPERT_DOCKER_INFERENCE)
+    MODEL_ID|MODEL_VARIANT|MODEL_REVISION|EXPERT_FORMAT|DSPARK|DSPARK_DRAFT_POLICY|COORDINATOR_GPU|COORDINATOR_GPU_UUID|COORDINATOR_GPU_PCI_BUS_ID|COORDINATOR_GPU_HEADROOM_GIB|KV_POOL_TOKENS|KV_POOL_SIZE|MEMORY_RESERVATION|MAX_CONTEXT_TOKENS|MAX_OUTPUT_TOKENS|CONCURRENCY|PREFIX_CACHE_ENTRIES|PREFILL_BATCH_TOKENS|SPARK_DEVICE_BUDGET_BYTES|SPARK_REDUCTION_MIN_ROWS|SPARKINFER_EXL3|ADDR|EXPERT_PORT|SPARK_[0-3]_HOST|SPARK_[0-3]_LANE_A|SPARK_[0-3]_LANE_B|COORDINATOR_DOCKER_DEV|COORDINATOR_DOCKER_INFERENCE|SPARK_EXPERT_DOCKER_DEV|SPARK_EXPERT_DOCKER_INFERENCE)
       return 0
       ;;
     *)
@@ -61,11 +61,11 @@ release_load_config() {
   local config="$1"
   [[ -f "$config" ]] || release_die "configuration file not found: $config"
 
-  local default_model_id=wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1
+  local default_model_id=deepseek-ai/DeepSeek-V4.1-Flash
   MODEL_ID="$default_model_id"
-  MODEL_VARIANT=pro
-  MODEL_REVISION=7a63f24905223aff19212d65226be708950823ac
-  EXPERT_FORMAT=exl3
+  MODEL_VARIANT=flash
+  MODEL_REVISION=dba1be0a40aa45a94ad051997016db3960a90277
+  EXPERT_FORMAT=native
   DSPARK=on
   DSPARK_DRAFT_POLICY=adaptive
   COORDINATOR_GPU=0
@@ -73,13 +73,18 @@ release_load_config() {
   COORDINATOR_GPU_PCI_BUS_ID=
   COORDINATOR_GPU_HEADROOM_GIB=8
   KV_POOL_TOKENS=
-  MAX_CONTEXT_TOKENS=
-  MAX_OUTPUT_TOKENS=
-  CONCURRENCY=4
+  KV_POOL_SIZE=
+  MEMORY_RESERVATION=
+  MAX_CONTEXT_TOKENS=1048576
+  MAX_OUTPUT_TOKENS=393216
+  CONCURRENCY=16
+  PREFIX_CACHE_ENTRIES=24
+  PREFILL_BATCH_TOKENS=2048
+  SPARK_DEVICE_BUDGET_BYTES=107374182400
   SPARK_REDUCTION_MIN_ROWS=16
-  SPARKINFER_EXL3=force
+  SPARKINFER_EXL3=disable
   ADDR=0.0.0.0:8000
-  EXPERT_PORT=9100
+  EXPERT_PORT=19441
   COORDINATOR_DOCKER_DEV=ds41rt-coordinator-dev
   COORDINATOR_DOCKER_INFERENCE=ds41rt-coordinator
   SPARK_EXPERT_DOCKER_DEV=ds41rt-spark-expert-dev
@@ -142,7 +147,14 @@ release_load_config() {
   [[ -z "$COORDINATOR_GPU_UUID" && -z "$COORDINATOR_GPU_PCI_BUS_ID" ]] ||
     [[ -n "$COORDINATOR_GPU_UUID" && -n "$COORDINATOR_GPU_PCI_BUS_ID" ]] ||
     release_die "COORDINATOR_GPU_UUID and COORDINATOR_GPU_PCI_BUS_ID must be set together"
-  [[ "$CONCURRENCY" =~ ^[1-4]$ ]] || release_die "CONCURRENCY must be in 1..4"
+  [[ "$CONCURRENCY" =~ ^([1-9]|1[0-6])$ ]] || release_die "CONCURRENCY must be in 1..16"
+  [[ "$PREFIX_CACHE_ENTRIES" =~ ^([0-9]|[1-9][0-9]|1[01][0-9]|12[0-8])$ ]] ||
+    release_die "PREFIX_CACHE_ENTRIES must be in 0..128"
+  [[ "$PREFILL_BATCH_TOKENS" =~ ^[0-9]+$ ]] &&
+    ((PREFILL_BATCH_TOKENS >= 80 && PREFILL_BATCH_TOKENS <= 4096)) ||
+    release_die "PREFILL_BATCH_TOKENS must be in 80..4096"
+  [[ "$SPARK_DEVICE_BUDGET_BYTES" =~ ^[1-9][0-9]*$ ]] ||
+    release_die "SPARK_DEVICE_BUDGET_BYTES must be a positive integer"
   [[ "$SPARK_REDUCTION_MIN_ROWS" =~ ^[1-9][0-9]*$ ]] ||
     release_die "SPARK_REDUCTION_MIN_ROWS must be a positive integer"
   [[ "$EXPERT_PORT" =~ ^[0-9]+$ ]] && ((EXPERT_PORT >= 1 && EXPERT_PORT <= 65535)) || release_die "EXPERT_PORT must be in 1..65535"
@@ -151,9 +163,17 @@ release_load_config() {
     value="${!release_integer_name}"
     [[ -z "$value" || "$value" =~ ^[1-9][0-9]*$ ]] || release_die "$release_integer_name must be a positive integer"
   done
+  [[ -z "$MAX_CONTEXT_TOKENS" ]] || ((MAX_CONTEXT_TOKENS <= 1048576)) ||
+    release_die "MAX_CONTEXT_TOKENS must be in 1..1048576"
+  [[ -z "$MAX_OUTPUT_TOKENS" ]] || ((MAX_OUTPUT_TOKENS <= 393216)) ||
+    release_die "MAX_OUTPUT_TOKENS must be in 1..393216"
   if [[ -n "$KV_POOL_TOKENS" ]]; then
     ((KV_POOL_TOKENS % 64 == 0)) || release_die "KV_POOL_TOKENS must be a multiple of 64"
   fi
+  [[ -z "$KV_POOL_SIZE" || "$KV_POOL_SIZE" =~ ^[0-9]+([.][0-9]{1,6})?(B|MB|GB|MiB|GiB)?$ ]] ||
+    release_die "KV_POOL_SIZE must use B, MB, GB, MiB or GiB"
+  [[ -z "$MEMORY_RESERVATION" || "$MEMORY_RESERVATION" =~ ^[0-9]+([.][0-9]{1,6})?((B|MB|GB|MiB|GiB)|%)$ ]] ||
+    release_die "MEMORY_RESERVATION must be a byte size or percentage"
   [[ "$ADDR" == *:* ]] || release_die "ADDR must be HOST:PORT"
   [[ -n "$MODEL_ID" && "$MODEL_ID" == */* && "$MODEL_ID" != *[[:space:]]* ]] ||
     release_die "MODEL_ID must be a Hugging Face repository ID"
