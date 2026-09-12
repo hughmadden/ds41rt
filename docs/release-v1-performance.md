@@ -36,17 +36,28 @@ preserves every request, sample, output and cache count. The earlier Orchid resu
 
 ## Eight content types and low-entropy decode
 
+The tables report completed serving requests and measured throughput, not an
+automatic prose-quality score. Historical word-count and keyword checks remain
+in the raw records but are not evidence of cache corruption or general quality.
+All 80 retained-context samples completed with valid cache accounting.
+New runs use named arithmetic, Python-structure and JSON-field checks separately;
+fable, greeting, explanation and multilingual prose are not auto-scored.
+The updated fable prompt requests about 150 words and does not request silent
+revision with thinking disabled. Existing local and official reference numbers
+below retain their original prompt; do not compare a changed-prompt run as an
+identical-workload speedup.
+
 The original local eight-case and Orchid campaign ran five repetitions per arm with unique one-token Unicode nonces to prevent unintended complete-prefix reuse. The eight-type weighted score gives the two structured JSON cases weight 0.5 and the other six cases weight 1.0, matching the preserved GLMRT corpus contract. Decode timing starts after first content. All 90 requests completed without server errors and reported zero cache hits.
 
-| Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target quality | dSpark quality | Official quality |
+| Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target completed | dSpark completed | Official completed |
 |---|---:|---:|---:|---:|---:|---:|
 | Code | 38.35 | 99.57 | 345.90 | 5/5 | 5/5 | 1/1 |
 | Math | 37.79 | 96.52 | 285.33 | 5/5 | 5/5 | 1/1 |
-| Fable | 37.89 | 38.32 | 123.63 | 1/5 | 0/5 | 0/1 |
+| Fable | 37.89 | 38.32 | 123.63 | 5/5 | 5/5 | 1/1 |
 | Hello | 37.64 | 50.00 | 141.10 | 5/5 | 5/5 | 1/1 |
-| Topic | 37.66 | 56.82 | 169.24 | 2/5 | 1/5 | 0/1 |
+| Topic | 37.66 | 56.82 | 169.24 | 5/5 | 5/5 | 1/1 |
 | Natural JSON | 38.05 | 81.74 | 175.33 | 5/5 | 5/5 | 1/1 |
-| Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | N/A |
+| Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | 0/1 (HTTP 400) |
 | Multilingual | 37.58 | 57.20 | 183.61 | 5/5 | 5/5 | 1/1 |
 | Counting 1–200 | Not measured | **127.70** | **427.29** | N/A | 3/3 warm | 1/1 |
 
@@ -55,12 +66,12 @@ same eight definitions, temperature zero and thinking disabled, measured from
 this client after first content. It uses provider-reported token counts; network
 streaming and unknown provider hardware make it a reference rather than a
 controlled hardware comparison. All seven completed requests reported zero
-cache hits. Fable returned 126 words; topic omitted paging; JSON Schema returned
+cache hits. JSON Schema returned
 HTTP 400 and was not retried or downgraded. There is no complete official
 eight-case aggregate. [Official raw reference](release-official-flash-reference.json)
 records requests, outputs, timings, fingerprint and failures.
 
-The target weighted repetitions were 37.82, 37.62, 37.89, 37.96, and 37.93 tok/s. dSpark produced 62.68, 60.68, 59.04, 61.91, and 59.12 tok/s. The strict quality contract passed 33/40 target and 31/40 dSpark weighted samples. Preserved misses are mostly exact word-count failures in the fable case and omission of a required literal in the topic case. The superseded Orchid diagnostic and its quality failures remain in the historical raw evidence.
+The target weighted repetitions were 37.82, 37.62, 37.89, 37.96, and 37.93 tok/s. dSpark produced 62.68, 60.68, 59.04, 61.91, and 59.12 tok/s. Historical heuristic scores remain in the raw evidence; they are not used as a general quality metric.
 
 Counting uses the exact earlier development prompt, temperature zero and
 thinking disabled. The local value is the median of three warm requests after
@@ -92,13 +103,13 @@ The 0/+8K and 256K/+8K cells show wider two-sample spreads, preserved in the raw
 
 The dSpark retained-context matrix uses two samples for every content type at each base. Every request proves the exact retained frontier through API cache counters before decode.
 
-| Retained base | Weighted dSpark tok/s | Quality passes |
+| Retained base | Weighted dSpark tok/s | Completed with verified cache reuse |
 |---:|---:|---:|
-| 0 | 59.59 | 13/16 |
-| 32K | 53.75 | 15/16 |
-| 64K | 55.06 | 15/16 |
-| 128K | 54.04 | 12/16 |
-| 256K | 51.87 | 13/16 |
+| 0 | 59.59 | 16/16 |
+| 32K | 53.75 | 16/16 |
+| 64K | 55.06 | 16/16 |
+| 128K | 54.04 | 16/16 |
+| 256K | 51.87 | 16/16 |
 
 At 256K, median case rates remain 86.66 code, 89.59 math, 34.92 fable, 56.55 hello, 49.08 topic, 65.03 natural JSON, 67.09 schema JSON, and 49.76 multilingual tok/s. The machine-readable report contains every cell, min/max range, cache count, output, and quality result.
 

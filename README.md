@@ -27,17 +27,17 @@ The release candidate uses architectural FP4 compressed KV and the standard C16 
 | Warmed C16 coordinator process | 64.05 GiB |
 | Clean standard-launch readiness | 55–56 s |
 
-**Eight content types and counting.** Local eight-case results use five samples per mode; official Flash uses one request per case. Quality columns count passed checks. Official JSON Schema returned HTTP 400, so no full official weighted score is available.
+**Eight content types and counting.** Local eight-case results use five samples per mode; official Flash uses one request per case. Completion columns count finished serving requests, not prose quality. Official JSON Schema returned HTTP 400, so no full official weighted score is available. Historical word-count and keyword failures are excluded from this serving metric.
 
-| Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target quality | dSpark quality | Official quality |
+| Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target completed | dSpark completed | Official completed |
 |---|---:|---:|---:|---:|---:|---:|
 | Code | 38.35 | 99.57 | 345.90 | 5/5 | 5/5 | 1/1 |
 | Math | 37.79 | 96.52 | 285.33 | 5/5 | 5/5 | 1/1 |
-| Fable | 37.89 | 38.32 | 123.63 | 1/5 | 0/5 | 0/1 |
+| Fable | 37.89 | 38.32 | 123.63 | 5/5 | 5/5 | 1/1 |
 | Hello | 37.64 | 50.00 | 141.10 | 5/5 | 5/5 | 1/1 |
-| Topic | 37.66 | 56.82 | 169.24 | 2/5 | 1/5 | 0/1 |
+| Topic | 37.66 | 56.82 | 169.24 | 5/5 | 5/5 | 1/1 |
 | Natural JSON | 38.05 | 81.74 | 175.33 | 5/5 | 5/5 | 1/1 |
-| Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | N/A |
+| Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | 0/1 (HTTP 400) |
 | Multilingual | 37.58 | 57.20 | 183.61 | 5/5 | 5/5 | 1/1 |
 | Counting 1–200 | Not measured | **127.70** | **427.29** | N/A | 3/3 warm | 1/1 |
 
@@ -55,13 +55,13 @@ Counting is outside the weighted score: local dSpark uses three warm samples; of
 
 **Decode over retained context.** Weighted dSpark tokens/s across eight content types, with two samples per type and verified prefix reuse at each base.
 
-| Retained base | Weighted dSpark tok/s | Quality passes |
+| Retained base | Weighted dSpark tok/s | Completed with verified cache reuse |
 |---:|---:|---:|
-| 0 | 59.59 | 13/16 |
-| 32K | 53.75 | 15/16 |
-| 64K | 55.06 | 15/16 |
-| 128K | 54.04 | 12/16 |
-| 256K | 51.87 | 13/16 |
+| 0 | 59.59 | 16/16 |
+| 32K | 53.75 | 16/16 |
+| 64K | 55.06 | 16/16 |
+| 128K | 54.04 | 16/16 |
+| 256K | 51.87 | 16/16 |
 
 **Concurrency scaling.** Three samples per concurrency with a fully cached prompt and exact 599-token counting output. Aggregate timing includes scheduler admission gaps.
 

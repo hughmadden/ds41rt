@@ -1,11 +1,19 @@
 # Release semantic workload contract
 
 The [self-contained corpus](../scripts/fixtures/release-semantic-corpus.json)
-preserves the requested GLMRT prompts, output budgets, category weights and
+preserves the GLMRT output budgets, category weights and
 structured-edit schema. Its metadata records the sibling repository revision
 and SHA-256 hashes of both source scripts. The
 [quality validator](../scripts/release_semantic_quality.py) preserves all three
-original validation functions with identical Python ASTs.
+original validation functions with identical Python ASTs for historical evidence.
+Current throughput runs use [named objective checks](../scripts/release_throughput_checks.py)
+for arithmetic, Python structure and JSON fields. Open-ended prose is not
+auto-scored. Serving completion and cache correctness are reported separately.
+
+The fable prompt now requests about 150 words without silent revision. Its
+original prompt remains in the corpus metadata. Existing local and official
+reference measurements retain that original prompt and are not rescored as
+new-prompt measurements.
 
 The weighted cases are code, math, fable, hello, topic, natural JSON,
 schema-constrained JSON and multilingual output. Each JSON case has weight 0.5;

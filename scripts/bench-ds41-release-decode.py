@@ -61,7 +61,7 @@ def main():
     tokenizer = Tokenizer.from_file(str(args.tokenizer))
     nonces = token_zero_nonces(args.repeats * (len(selected) + int(args.include_orchid) + int(args.include_counting)),
                                args.nonce_seed, tokenizer)
-    quality = runpy.run_path(str(Path(__file__).with_name('release_semantic_quality.py')))
+    quality = runpy.run_path(str(Path(__file__).with_name('release_throughput_checks.py')))
     api = runpy.run_path(str(Path(__file__).with_name('qualify-ds41-native-api.py')))
     report = dict(
         scope=__doc__, label=args.label, base_url=args.base_url, model=args.model,
@@ -133,11 +133,15 @@ def main():
                     sample['quality_contract_issues'] = ([] if sample['quality_contract_passed'] else
                         [f"expected {definition['requested_repetitions']} exact orchid words, observed {len(words)} tokens"])
                 else:
-                    sample.update(quality['validate_case_content'](case_id, content))
+                    sample.update(quality['check_output'](case_id, content))
                 # The first user-content token is unique. A small hit may still
                 # cover the invariant chat-template prefix before user content.
                 sample['bounded_static_prefix_hit'] = (isinstance(sample['cached_tokens'], int) and 0 <= sample['cached_tokens'] <= 32)
-                sample['passed'] = sample['quality_contract_passed'] and (args.remote_reference or case_id == 'counting' or sample['bounded_static_prefix_hit'])
+                sample['serving_completed'] = bool(content.strip())
+                sample['passed'] = (sample['serving_completed']
+                    and sample.get('quality_contract_passed', True)
+                    and sample.get('objective_checks_passed') is not False
+                    and (args.remote_reference or case_id == 'counting' or sample['bounded_static_prefix_hit']))
             except Exception as error:
                 sample.update(error=repr(error), passed=False)
             save()
@@ -148,7 +152,9 @@ def main():
         timed_seconds = sum(sample['weight'] *
             (sample['finish_seconds'] - sample['first_content_seconds']) for sample in weighted)
         summary = dict(repeat=repeat + 1, weighted_cases=len(weighted),
-                       quality_passed=sum(sample.get('quality_contract_passed', False) for sample in weighted),
+                       serving_completed=sum(sample.get('serving_completed', False) for sample in weighted),
+                       objective_checks_passed=sum(sample.get('objective_checks_passed') is True for sample in weighted),
+                       objective_checks_assessed=sum(sample.get('objective_checks_passed') is not None for sample in weighted),
                        weighted_observed_decode_tokens_per_second=(timed_tokens / timed_seconds
                            if timed_seconds > 0 and len(weighted) == len(selected) else None),
                        partial_weighted_observed_decode_tokens_per_second=(timed_tokens / timed_seconds

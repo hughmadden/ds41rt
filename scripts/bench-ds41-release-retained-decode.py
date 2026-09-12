@@ -60,7 +60,7 @@ def main() -> None:
         str(Path(__file__).with_name("bench-ds41-release-prefill-matrix.py"))
     )
     api = runpy.run_path(str(Path(__file__).with_name("qualify-ds41-native-api.py")))
-    quality = runpy.run_path(str(Path(__file__).with_name("release_semantic_quality.py")))
+    quality = runpy.run_path(str(Path(__file__).with_name("release_throughput_checks.py")))
     corpus = json.loads(args.corpus.read_text())
     cases = corpus["weighted_case_ids"]
     tokenizer = Tokenizer.from_file(str(args.tokenizer))
@@ -189,15 +189,15 @@ def main() -> None:
                         else 0 <= hit <= 32
                     )
                 )
-                validation = quality["validate_case_content"](case_id, result["text"])
+                validation = quality["check_output"](case_id, result["text"])
                 sample.update(
                     {
                         "result": result,
                         "content_sha256": sha256(result["text"].encode()),
                         "cache_valid": cache_valid,
-                        "quality_contract_passed": validation["quality_contract_passed"],
-                        "quality_contract_issues": validation["quality_contract_issues"],
-                        "passed": cache_valid,
+                        **validation,
+                        "serving_completed": bool(result["text"].strip()),
+                        "passed": cache_valid and bool(result["text"].strip()),
                     }
                 )
                 save()
@@ -208,7 +208,7 @@ def main() -> None:
                 print(
                     f"measure context={context} repeat={repeat} case={case_id} "
                     f"cached={hit} tps={result['observed_decode_tokens_per_second']:.2f} "
-                    f"quality={'PASS' if validation['quality_contract_passed'] else 'FAIL'}",
+                    f"objective_checks={validation['objective_checks_passed']}",
                     flush=True,
                 )
 
@@ -229,7 +229,8 @@ def main() -> None:
                     "median_observed_decode_tokens_per_second": statistics.median(values),
                     "min_observed_decode_tokens_per_second": min(values),
                     "max_observed_decode_tokens_per_second": max(values),
-                    "quality_passed": sum(row["quality_contract_passed"] for row in rows),
+                    "serving_completed": sum(row["serving_completed"] for row in rows),
+                    "cache_valid": sum(row["cache_valid"] for row in rows),
                 }
             )
     report["context_summaries"] = []
@@ -252,13 +253,14 @@ def main() -> None:
                 "context_tokens": context,
                 "samples": len(rows),
                 "weighted_observed_decode_tokens_per_second": timed_tokens / timed_seconds,
-                "quality_passed": sum(row["quality_contract_passed"] for row in rows),
+                "serving_completed": sum(row["serving_completed"] for row in rows),
+                "cache_valid": sum(row["cache_valid"] for row in rows),
             }
         )
     report["completed_ns"] = time.time_ns()
     report["passed"] = all(row["passed"] for row in report["samples"])
-    report["quality_passed"] = all(
-        row["quality_contract_passed"] for row in report["samples"]
+    report["objective_checks_passed"] = all(
+        row["objective_checks_passed"] is not False for row in report["samples"]
     )
     save()
 

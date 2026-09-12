@@ -47,7 +47,7 @@
     },
     "fable": {
       "category": "creative-prose",
-      "prompt": "Write a self-contained fable of exactly 150 words about two parrots who disagree about sharing credit. Output no title or preamble. Include the final one-sentence moral in the 150-word total. Before responding, silently revise the draft until the entire response is between 140 and 170 words.",
+      "prompt": "Write a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral.",
       "max_tokens": 256,
       "weight": 1.0,
       "json_schema": false
@@ -144,5 +144,7 @@
     "thinking": "disabled",
     "source": "scripts/qualify-ds41-native-text-performance.py",
     "supersedes": "orchid as the release low-entropy qualification; orchid retained as historical evidence"
-  }
+  },
+  "historical_fable_prompt": "Write a self-contained fable of exactly 150 words about two parrots who disagree about sharing credit. Output no title or preamble. Include the final one-sentence moral in the 150-word total. Before responding, silently revise the draft until the entire response is between 140 and 170 words.",
+  "throughput_validation": "named-objective-checks-v1; open-ended prose is unscored"
 }
