@@ -58,7 +58,7 @@ ENV DS41RT_RELEASE_VERSION=${DS41RT_RELEASE_VERSION}
 
 LABEL org.opencontainers.image.title="DS41RT inference"
 LABEL org.opencontainers.image.source="https://github.com/tpurtell/ds41rt"
-LABEL org.opencontainers.image.description="DeepSeek V4 Pro inference for one RTX PRO 6000 and four DGX Spark expert workers"
+LABEL org.opencontainers.image.description="DeepSeek V4.1 Flash inference for one RTX PRO 6000 and four DGX Spark expert workers"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.revision=${DS41RT_ENGINE_COMMIT}
 LABEL org.opencontainers.image.version=${DS41RT_RELEASE_VERSION}
