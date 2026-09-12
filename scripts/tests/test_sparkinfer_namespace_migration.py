@@ -220,16 +220,19 @@ def test_metadata_free_release_copies_filter_and_reject_python_caches() -> None:
         )
 
 
-def test_slotted_builds_link_the_native_deepseek_aot_module() -> None:
-    for relative in (
-        "scripts/build-release-artifacts.sh",
-        "scripts/build-wip-artifacts.sh",
-    ):
-        text = (ROOT / relative).read_text(encoding="utf-8")
-        assert "-DDS41RT_ENABLE_DS4_FLASH_AOT=ON" in text, (
-            f"{relative} must link the native Flash/Pro expert and shared-expert "
-            "AOT module into slotted artifacts"
-        )
+def test_release_excludes_legacy_ds4_aot_and_wip_retains_it() -> None:
+    release = (ROOT / "scripts/build-release-artifacts.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "-DDS41RT_ENABLE_DS4_FLASH_AOT=OFF" in release, (
+        "native V4.1 release artifacts must exclude the legacy DS4 Flash/Pro "
+        "AOT bridge"
+    )
+
+    wip = (ROOT / "scripts/build-wip-artifacts.sh").read_text(encoding="utf-8")
+    assert "-DDS41RT_ENABLE_DS4_FLASH_AOT=ON" in wip, (
+        "development artifacts must retain the legacy DS4 Flash/Pro AOT bridge"
+    )
 
 
 def test_remote_dev_staging_reconciles_the_pinned_fork() -> None:
@@ -387,8 +390,10 @@ def test_launchers_use_only_the_packed_spark_moe_layout() -> None:
     assert "DS41RT_SPARKINFER_SOURCE_W4A16" not in phase0
     assert "DS41RT_SPARKINFER_HYBRID_W4A4_W4A16" not in phase0
     assert "SPARK_MOE_MODE" not in release
-    assert "export DS41RT_SPARK_PREBUILT=1" in release
-    assert "export DS41RT_SPARK_SKIP_STAGE=1" in release
+    assert "DS41RT_SPARK_PREBUILT" not in release
+    assert "DS41RT_SPARK_SKIP_STAGE" not in release
+    assert "expertd-native" in release
+    assert "serve-native" in release
 
     env = os.environ.copy()
     env["DS41RT_SPARK_PREBUILT"] = "1"
@@ -479,22 +484,16 @@ def test_release_preflight_requires_matching_engine_revisions() -> None:
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
 
     assert (
-        """coordinator_engine_commit="$(
-  docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}'"""
+        """engine_commit="$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}'"""
         in release
     )
-    assert '""|"<no value>"|unknown|unknown-*)' in release
-    assert (
-        """remote_engine_commit="$(
-    ssh -o BatchMode=yes "$host" \\
-      "docker image inspect -f '{{index .Config.Labels \\"org.opencontainers.image.revision\\"}}'"""
-        in release
-    )
-    assert '[[ "$remote_engine_commit" == "$coordinator_engine_commit" ]]' in release
-    fingerprint = release.split('deployment_fingerprint="$(', maxsplit=1)[1].split(
-        "check_model_cache_local()", maxsplit=1
+    assert "coordinator image has no engine revision" in release
+    assert 'test "$(docker image inspect -f' in release
+    assert '"$image")" = "$engine"' in release
+    fingerprint = release.split('fingerprint="$(', maxsplit=1)[1].split(
+        'coordinator="$RELEASE_COORDINATOR_CONTAINER_NAME"', maxsplit=1
     )[0]
-    assert '"$coordinator_engine_commit"' in fingerprint
+    assert '"$engine_commit"' in fingerprint
 
 
 def test_release_build_overrides_the_base_image_version_label() -> None:

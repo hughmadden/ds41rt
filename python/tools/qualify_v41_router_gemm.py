@@ -10,6 +10,7 @@ import torch
 import cutlass
 import cutlass.cute as cute
 from safetensors import safe_open
+import _pinned_sparkinfer  # noqa: F401  # verifies and prepends the pinned fork
 from b12x._lib.utils import make_ptr, current_cuda_stream
 from b12x._lib.runtime_control import freeze_kernel_resolution
 from b12x.moe._shared.v41_router import compile_v41_router_scores_aot

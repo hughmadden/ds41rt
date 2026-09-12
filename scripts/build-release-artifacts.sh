@@ -98,6 +98,9 @@ cargo build \
   -p ds41rt-daemon \
   --release
 
+# Release images serve the native V4.1 path. The DS4 Flash/Pro AOT bridge is
+# retained for development commands, but must not add legacy generated kernels
+# or ABI coupling to the release artifact.
 cmake \
   -S "$build_root/source/native" \
   -B "$build_root/native" \
@@ -109,7 +112,7 @@ cmake \
   -DDS41RT_ENABLE_RDMA=ON \
   -DDS41RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
   -DDS41RT_ENABLE_SPARKINFER_COORDINATOR_AOT="$coordinator_aot" \
-  -DDS41RT_ENABLE_DS4_FLASH_AOT=ON \
+  -DDS41RT_ENABLE_DS4_FLASH_AOT=OFF \
   -DDS41RT_ENABLE_W8A16_AOT="$w8a16_aot" \
   -DDS41RT_SPARKINFER_SOURCE_DIR="$build_root/source/third_party/sparkinfer" \
   -DDS41RT_SPARKINFER_LOCK_FILE="$build_root/source/third_party/sparkinfer.lock.json" \
