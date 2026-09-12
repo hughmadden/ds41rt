@@ -8,6 +8,8 @@ repository.workspace = true
 [dependencies]
 anyhow.workspace = true
 libc.workspace = true
+image.workspace = true
+turbojpeg.workspace = true
 ds41rt-core = { path = "../ds41rt-core" }
 serde.workspace = true
 serde_json.workspace = true

@@ -12,7 +12,7 @@ ENV PATH=/opt/cargo/bin:${PATH}
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       bash ca-certificates curl git git-lfs jq ripgrep pkg-config \
-      build-essential clang cmake ninja-build python3-venv \
+      build-essential clang cmake ninja-build nasm python3-venv \
       rdma-core ibverbs-providers libibverbs-dev perftest \
       openssh-client netcat-openbsd iproute2 pciutils && \
     rm -rf /var/lib/apt/lists/*

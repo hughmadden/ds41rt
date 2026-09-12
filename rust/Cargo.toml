@@ -23,6 +23,8 @@ bytes = "1"
 clap = { version = "4", features = ["derive", "env"] }
 futures = "0.3"
 io-uring = "0.7"
+image = { version = "0.25.10", default-features = false, features = ["png", "webp", "gif"] }
+turbojpeg = { version = "1.5.1", default-features = false, features = ["cmake", "require-simd"] }
 libc = "0.2"
 libloading = "0.8"
 pyo3 = { version = "0.22", features = ["auto-initialize"] }

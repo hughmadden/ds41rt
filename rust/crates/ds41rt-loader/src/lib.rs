@@ -14,6 +14,9 @@ pub use v41_catalog::{
     V41CoordinatorTensorReader,
 };
 mod v41_config;
+mod v41_image;
+pub use v41_image::{V41Image, V41ImageGrid, V41ImageSpan, V41VisionPrompt, V41ImageTokenType,
+    V41_IMAGE_TOKEN_ID, V41_MAX_IMAGES};
 pub use v41_config::{
     read_official_v41_config, OfficialV41Config, V41QuantizationConfig, V41RopeScaling,
     V41TextConfig, V41VisionConfig, OFFICIAL_V41_MODEL_ID, OFFICIAL_V41_REVISION,

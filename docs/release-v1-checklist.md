@@ -29,6 +29,10 @@ gate below is satisfied merely by an older component test.
   prompt rendering and model instruction-following failures.
 - [ ] Native vision accepts up to 16 images per prompt, with API validation,
   multi-image correctness and resource qualification.
+  [Native preprocessing](release-v1-vision-preprocess.md) matches reference grids
+  and complete patches across 21 format cases and handles sixteen expanded image
+  spans. Encoder/aligner execution, image-aware caching/routing and API serving
+  remain the next implementation work.
 - [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
 - [x] Verify official maximum context/output limits. Default to those limits;
   clamp each output allowance to remaining context and the model output cap.
