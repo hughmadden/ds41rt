@@ -134,7 +134,10 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   are preserved; final serving measurements remain open.
 - [ ] Headline maximum prefill, low-entropy decode and weighted eight-type
   decode throughput; KV size and total GPU RAM requirement.
-- [ ] Memory accounting by arena, tensor, KV cache, graphs and other allocations.
+- [x] Memory accounting by arena, tensor, KV cache, graphs and other allocations.
+  [Exact planner and live residency evidence](release-v1-memory.md) reconciles the
+  default C16 allocation to 63.97 GiB at readiness and measures a 74 MiB lazy
+  graph/runtime increase after a maximum-concurrency speculative batch.
 - [ ] Eight content types plus low-entropy decode, target-only and dSpark.
 - [ ] Prefill matrix: base contexts 0, 32K, 64K, 128K, 256K crossed with
   added 1K, 2K, 4K, 8K, 16K, 32K tokens.

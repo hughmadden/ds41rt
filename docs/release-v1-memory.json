@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "passed": true,
+  "scope": "Exact default C16 memory plan plus live readiness and maximum-concurrency lazy graph/runtime residency for the clean-built corrected-FP4 release candidate.",
+  "source": {
+    "report_revision": "b8f2478581f9c7e102bc784de7334810c27f7652",
+    "engine_revision": "d5fb015d00aa7b302e3ce179b097482da678db76",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+    "sparkinfer_revision": "7299b3b92e70d539b2c0a63aaadce36932ceef4d",
+    "xgrammar_revision": "557becfb64c503ae9c04344b0047661f43f44320"
+  },
+  "images": {
+    "coordinator": "sha256:a13258e92dd25ddb889bd31bb77c8813c7881868b103ceec0c140e30e893c213",
+    "spark": "sha256:2f5d328a14f1a52a0d3b2356b041415d744635f3f3557e41403246429984093b"
+  },
+  "artifact_sha256": {
+    "coordinator_executable": "8bf754f1f11f2026f395e46f9e04b26be4f0b9fd9b667687224046416b7dc344",
+    "coordinator_native_library": "bfed8269593ed3ffffb13e0cec4841ff312cf672a9642b9bfa4ab421afdb08b2"
+  },
+  "launch": {
+    "port": 8000,
+    "concurrency": 16,
+    "retained_turns": 24,
+    "prompt_snapshots": 24,
+    "max_context_tokens": 1048576,
+    "max_output_tokens": 393216,
+    "prefill_batch_tokens": 2048,
+    "dspark": true,
+    "fingerprint": "ds41rt-native-fp4-kv-dspark"
+  },
+  "hardware": {
+    "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "driver": "595.91.07",
+    "power_limit_watts": 400,
+    "memory_speed": "standard, no memory overclock",
+    "loaded_memory_clock_mhz": 13365,
+    "max_memory_clock_mhz": 14001,
+    "nvidia_smi_total_mib": 97887,
+    "cuda_allocatable_total_bytes": 101973491712
+  },
+  "startup_plan": {
+    "occupied_before_cache_bytes": 46216249344,
+    "occupied_before_cache_gib": 43.042236328125,
+    "eager_cache_bytes": 22471251456,
+    "eager_cache_gib": 20.92798376083374,
+    "planned_at_readiness_bytes": 68687500800,
+    "planned_at_readiness_gib": 63.97022008895874,
+    "runtime_headroom_bytes": 2147483648,
+    "reservation_ceiling_bytes": 101973491712
+  },
+  "live": {
+    "fresh_process_mib": 65510,
+    "fresh_device_used_mib": 65520,
+    "after_c16_process_mib": 65584,
+    "after_c16_device_used_mib": 65596,
+    "lazy_c16_increment_mib": 74,
+    "remaining_device_free_mib": 31655,
+    "c16_graph_warm_aggregate_tps": 657.64
+  },
+  "planner": {
+    "schema": 1,
+    "capacity": 4096,
+    "weights": {
+      "backbone_lane": 6896423360,
+      "cache_producers": 145517568,
+      "index_lane": 45916160,
+      "embedding": 1323827200,
+      "engram": 324874240,
+      "vocabulary": 1323827200,
+      "target_norm": 10240,
+      "vision_weights": 970536960,
+      "dspark_resident": 7950520200
+    },
+    "arenas": {
+      "vision_buffers": 613244992,
+      "vision_workspace": 4194304,
+      "target_embedding_two_lanes": 419627008,
+      "target_backbone_two_lanes": 5970526232,
+      "target_index_two_lanes": 7025424392,
+      "target_cache_producer_two_lanes": 6666551616,
+      "engram_upload_two_lanes": 152576000,
+      "engram_gates_four": 2492092432,
+      "target_head_two_lanes": 63931904,
+      "target_taps_two_lanes": 251658240,
+      "transport_two_lanes": 503316480,
+      "dspark_main_context_4096": 498974736,
+      "dspark_three_windows_4096": 15828096
+    },
+    "dspark_plan_80": {
+      "expert_resident_bytes": 7219445760,
+      "auxiliary_resident_bytes": 713428872,
+      "shared_packed_scale_bytes": 3317760,
+      "projection_packed_scale_bytes": 11182080,
+      "grouped_output_resident_bytes": 3145728,
+      "projection_bytes_per_wave": 40319028,
+      "main_context_additional_bytes_per_wave": 5515916,
+      "draft_token_bytes_per_wave": 64,
+      "attention_output_additional_bytes_per_wave": 31570956,
+      "attention_wave_additional_bytes_per_wave": 15976704,
+      "shared_execution_bytes_per_wave": 5827596,
+      "load_staging_bytes": 18800640,
+      "window_cache_bytes": 15828096,
+      "execution_bytes_per_wave": 200775408,
+      "hc_bytes_per_wave": 54120960,
+      "router_bytes_per_wave": 122880,
+      "confidence_bytes_per_wave": 860480,
+      "markov_bytes_per_wave": 12476480,
+      "terminal_additional_bytes_per_wave": 91031488,
+      "peak_device_bytes_one_wave": 8424946256
+    },
+    "cache": {
+      "source_pages": [
+        49216,
+        49216,
+        49216,
+        98432
+      ],
+      "source_rows": 62996480,
+      "fp4_values": 16127098880,
+      "fp4_e4m3_scales": 2015887360,
+      "fp4_index_keys": 4031774720,
+      "fp4_index_scales": 251985920,
+      "source_global_total": 22426746880,
+      "page_tables": 1048576,
+      "lengths": 512,
+      "compressor_pending": 196608,
+      "fp8_swa_windows": 43258880,
+      "eager_cache_total": 22471251456
+    },
+    "retained_tail_upper_bound": {
+      "backbone_per_snapshot": 2720064,
+      "dspark_per_snapshot": 202752,
+      "complete_tail_per_snapshot": 2922816,
+      "completed_turn_bank_24": 70147584,
+      "prompt_snapshot_bank_24": 70147584,
+      "both_banks_24_each": 140295168
+    }
+  },
+  "reconciliation": {
+    "deterministic_explicit_pre_cache_bytes": 43659399560,
+    "pre_cache_residual_bytes": 2556849784,
+    "pre_cache_residual_includes": [
+      "dSpark draft execution owners not exposed as an independent startup counter",
+      "CUDA context, cuBLAS/library state, graph bookkeeping and allocator overhead"
+    ],
+    "fresh_live_minus_planned_bytes": 4712960,
+    "c16_live_minus_planned_bytes": 82305024
+  },
+  "method": {
+    "planner": "A temporary test-only probe called the production device_bytes/plan functions against the qualified native library and official model catalog; the probe was removed without changing the worktree.",
+    "live": "The same qualified coordinator image was restarted with RUST_LOG=info solely to expose the existing startup plan, then exercised with one warmup and one C16 aggregate decode run. The service was restored through standard run.sh afterward.",
+    "graph_limit": "The 74 MiB delta is the observed maximum-concurrency shape used by the C16 workload, not a promise that every possible future shape has already been captured."
+  },
+  "source_sha256": {
+    "v41_native_serve.rs": "4bd865b16f910e6280f9b97b62a2f32f66c4ad4d3a2c62e9db53b029d5a68476",
+    "memory.rs": "90801b6ea9f862089f7270f167229f98096bb0ef6f020c1dce55f60f32f88a0f",
+    "v41_backbone_cache.rs": "256da6f5a85e438440b8ad2ec48a06bc167c063968bb59aff3238d7182c4a2d3",
+    "v41_window.rs": "ac1f6486ca761c2e087b2be617adca521284f91800a4c84b0e1b89d97d585a71",
+    "source_cache.rs": "d4f9db70ef337d760a117602c64f664e1bb2a7ca94f3014c441fb05077832cd2",
+    "dspark.rs": "67a78b276d86daa3a24381f5e1daf6441ba80ad855aebfe2268cadf6bc9a83a4",
+    "v41_vision.rs": "616d87f1e4af3e619db389686480e9faf16fd0b309a013a5f1c188d50b80e0c1"
+  },
+  "evidence": {
+    "archive": "evidence/native-release-memory.tar.gz",
+    "archive_sha256": "88cb30dd8909a83299d633ae791473a717779f3d141d7f345b6f512719729fdc",
+    "archive_bytes": 8875,
+    "raw_sha256": {
+      "planner.json": "c396b6deed961c28dd3a81513de9303b7cb5e5fd7983a04c87e0e6c095519507",
+      "startup.log": "7369b4eba5804e0675f75f790f815355d82af2d86bd75ee7f6ce7ed510ff972e",
+      "c16-graph-warm-v2.json": "b1621437763094a9906da00f3a9ee6b71127fb4c73018a9b97d64e75ded54afc",
+      "nvidia-before.csv": "e1d0c5df7ee7af7d310ccde6657a816c340313bdc45f0267ccb10103146e9c92",
+      "nvidia-after.csv": "e2de36c624935c980ccfca2314e2a5ea72298ec6f69e780cba6b12b23aeeef3",
+      "process-after.csv": "c7b0f8794fd7d98aacc90fc6cdce11bf5c319b183a705ef897d4441fcc928c66",
+      "coordinator-inspect.json": "d4c41a3b7cbd240aa771fc7511b39f0a2afda05d2edf49b3ff18170900fe3310",
+      "run-restored.log": "9a1dcf9af84644e9be9d15e52ef8179762a6942f5b6a867e0aeea6c3e925a62c"
+    }
+  },
+  "standard_service_restored": true
+}
