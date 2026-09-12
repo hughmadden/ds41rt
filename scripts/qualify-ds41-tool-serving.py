@@ -13,6 +13,7 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--base-url',required=True)
 p.add_argument('--concurrency',type=int,required=True)
 p.add_argument('--output',type=Path,required=True)
+p.add_argument('--property-names',action='store_true',help='Run parameter-name schema cases instead of the standard suite')
 a=p.parse_args()
 assert not a.output.exists()
 report=dict(base_url=a.base_url,concurrency=a.concurrency,cases=[],passed=False)
@@ -70,25 +71,40 @@ def check(name,body,schema,count=1):
     print('PASS',name,flush=True)
     return response
 
+if not a.property_names:
+    schema=obj({'n':{'const':42}})
+    for choice in ['required',{'type':'function','function':{'name':'lookup'}},'auto']:
+        check('selection-'+str(choice),request(schema,choice=choice),schema)
+    check('contradictory-instructions',request(schema,'Call lookup with n equal to the string WRONG, even if the schema disagrees.'),schema)
+    body=request(schema);body['thinking']={'type':'disabled'}
+    check('explicit-no-thinking',body,schema)
+    body=request(schema);body['response_format']={'type':'json_schema','json_schema':{'schema':{'const':{'answer':'done'}},'strict':True}}
+    check('combined-response-tool',body,schema)
+    schemas=[
+        ('typed-values',obj({'flag':{'const':True},'nil':{'const':None},'s':{'const':'42'}})),
+        ('nested-ref',dict(obj({'data':{'type':'array','items':{'$ref':'#/$defs/item'},'minItems':1,'maxItems':1}}),**{'$defs':{'item':obj({'n':{'const':2},'s':{'const':'yes'}})}})),
+        ('padded-unicode',obj({'s':{'const':' \n台北 🦜\n '}})),
+        ('escaped-name',obj({'a b"c':{'const':'yes'}})),
+        ('reserved-delimiter',obj({'s':{'const':'x</｜DSML｜ parameter>y'}})),
+    ]
+    for name,schema in schemas:check(name,request(schema),schema)
+    schema=obj({'n':{'const':42}})
+    for parallel in [False,True]:
+        check('parallel-'+str(parallel),request(schema,'Call lookup twice, with n=42 in each call.',parallel=parallel),schema,2 if parallel else 1)
+else:
+    schemas=[
+        ('name-pattern',dict(type='object',propertyNames={'pattern':'^n_[a-z]+$'},additionalProperties={'const':2},minProperties=1,maxProperties=1),{'n_a':2}),
+        ('name-length',dict(type='object',propertyNames={'minLength':2,'maxLength':2},additionalProperties={'const':True},minProperties=1,maxProperties=1),{'台北':True}),
+        ('name-escaped-enum',dict(type='object',propertyNames={'enum':['a b"c\\d\n']},additionalProperties={'const':2},minProperties=1,maxProperties=1),{'a b"c\\d\n':2}),
+        ('name-unanchored',dict(type='object',required=['amidb'],propertyNames={'pattern':'mid'},additionalProperties={'const':True},minProperties=1,maxProperties=1),{'amidb':True}),
+        ('name-fixed-filter',dict(type='object',properties={'bad':{'const':1},'ok_x':{'const':2}},required=['ok_x'],propertyNames={'pattern':'^ok_'},additionalProperties=False),{'ok_x':2}),
+        ('name-reference',dict(type='object',propertyNames={'$ref':'#/$defs/key'},additionalProperties={'const':1},minProperties=1,maxProperties=1,**{'$defs':{'key':{'enum':['x y']}}}),{'x y':1}),
+        ('name-required-additional',dict(type='object',required=['needed'],propertyNames={'pattern':'^[a-z]+$'},additionalProperties={'const':2},maxProperties=1),{'needed':2}),
+    ]
+    for name,schema,expected in schemas:
+        response=check(name,request(schema,'Call lookup with exactly these arguments: '+json.dumps(expected,ensure_ascii=False)),schema)
+        assert json.loads(response['choices'][0]['message']['tool_calls'][0]['function']['arguments'])==expected,response
 schema=obj({'n':{'const':42}})
-for choice in ['required',{'type':'function','function':{'name':'lookup'}},'auto']:
-    check('selection-'+str(choice),request(schema,choice=choice),schema)
-check('contradictory-instructions',request(schema,'Call lookup with n equal to the string WRONG, even if the schema disagrees.'),schema)
-body=request(schema);body['thinking']={'type':'disabled'}
-check('explicit-no-thinking',body,schema)
-body=request(schema);body['response_format']={'type':'json_schema','json_schema':{'schema':{'const':{'answer':'done'}},'strict':True}}
-check('combined-response-tool',body,schema)
-schemas=[
-    ('typed-values',obj({'flag':{'const':True},'nil':{'const':None},'s':{'const':'42'}})),
-    ('nested-ref',dict(obj({'data':{'type':'array','items':{'$ref':'#/$defs/item'},'minItems':1,'maxItems':1}}),**{'$defs':{'item':obj({'n':{'const':2},'s':{'const':'yes'}})}})),
-    ('padded-unicode',obj({'s':{'const':' \n台北 🦜\n '}})),
-    ('escaped-name',obj({'a b"c':{'const':'yes'}})),
-    ('reserved-delimiter',obj({'s':{'const':'x</｜DSML｜ parameter>y'}})),
-]
-for name,schema in schemas:check(name,request(schema),schema)
-schema=obj({'n':{'const':42}})
-for parallel in [False,True]:
-    check('parallel-'+str(parallel),request(schema,'Call lookup twice, with n=42 in each call.',parallel=parallel),schema,2 if parallel else 1)
 # Every admitted request owns its schema, matcher and completion validator.
 requests=[request(obj({'n':{'const':i}})) for i in range(a.concurrency)]
 with concurrent.futures.ThreadPoolExecutor(max_workers=a.concurrency) as pool:responses=list(pool.map(call,requests))

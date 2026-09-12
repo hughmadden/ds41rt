@@ -107,6 +107,19 @@ if(DS41RT_ENABLE_XGRAMMAR)
     DS41RT_SCHEMA_SOURCE "${DS41RT_SCHEMA_SOURCE}")
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_schema.cc" "${DS41RT_SCHEMA_SOURCE}")
   list(FILTER DS41RT_XGRAMMAR_SOURCES EXCLUDE REGEX "/cpp/json_schema_converter\\.cc$")
+  # Correct UTF-8 range tails and Unicode negation in a generated copy. Source
+  # provenance is checked above; the patcher additionally verifies its anchors.
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/xgrammar_unicode_fsm.inc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/prepare-xgrammar-unicode.py")
+  execute_process(COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/prepare-xgrammar-unicode.py"
+    --source "${DS41RT_XGRAMMAR_SOURCE_DIR}/cpp/grammar_functor.cc"
+    --replacement "${CMAKE_CURRENT_SOURCE_DIR}/src/xgrammar_unicode_fsm.inc"
+    --output "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_unicode.cc"
+    COMMAND_ERROR_IS_FATAL ANY)
+  list(FILTER DS41RT_XGRAMMAR_SOURCES EXCLUDE REGEX "/cpp/grammar_functor\\.cc$")
+  list(APPEND DS41RT_XGRAMMAR_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_unicode.cc")
   list(APPEND DS41RT_XGRAMMAR_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_schema.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/xgrammar_v41_tools.cc")
   add_library(ds41rt_xgrammar STATIC ${DS41RT_XGRAMMAR_SOURCES})

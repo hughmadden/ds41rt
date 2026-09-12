@@ -18,6 +18,8 @@ The implementation reuses the pinned XGrammar schema parser and intermediate
 representation. CMake generates a copy of its converter translation unit with
 an explicit project factory extension; the vendored source and provenance lock
 remain unchanged. Existing response-schema conversion keeps its original path.
+The [parameter-name extension](release-v1-tool-names.md) also corrects Unicode
+range compilation in a generated copy of the pinned FSM implementation.
 
 The [component evidence](evidence/native-tool-grammar.json.gz) records 17 groups
 using the official 129,280-token vocabulary. Positive and negative checks cover
@@ -31,8 +33,9 @@ inference, tool-eval or performance qualification.
 
 ## Remaining work
 
-- Implement root `patternProperties` and `propertyNames`; the component currently
-  rejects them explicitly.
+- Implement root `patternProperties`, which is still explicitly rejected.
+  [Root `propertyNames`](release-v1-tool-names.md) now has generation support;
+  combined constraints and complex regex cases remain open.
 - Enforce named-property exclusions for additional arguments in the grammar,
   including alternate escaped spellings. Completed-argument validation now
   rejects duplicate keys recursively.

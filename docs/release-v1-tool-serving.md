@@ -75,8 +75,9 @@ establish the full release performance matrix or constrained-tool throughput.
 ## Remaining release work
 
 This serving integration does not close the complete tools release gate.
-Root `patternProperties` and `propertyNames` are still explicitly unsupported
-by the parameter converter. Grammar-level additional-key exclusions, broader
+Root `patternProperties` is still explicitly unsupported by the parameter
+converter; [root `propertyNames`](release-v1-tool-names.md) is implemented in the
+subsequent name-constraint qualification. Grammar-level additional-key exclusions, broader
 reserved-delimiter/string combinations and schema intersections still need
 work; independent validation prevents a successful nonconforming completion
 but does not replace generation support. Complete those cases and broader

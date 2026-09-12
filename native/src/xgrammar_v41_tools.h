@@ -29,10 +29,13 @@ class V41ToolCallingConverter : public JSONSchemaConverter {
   std::optional<std::string> GetCache(const std::string&) const override;
  private:
   int level_ = 0;
+  bool key_context_ = false;
   RefResolver resolver_;
   std::unordered_map<std::string, std::string> cache_, refs_;
   std::string ContextKey(const std::string&) const;
   std::string Flag(const std::string&, bool string = false) const;
+  std::string EncodedString(const StringSpec&);
+  std::string GenerateNamedObject(const ObjectSpec&, const std::string&);
 };
 std::string V41ToolSchemaToEBNF(const picojson::value& schema, bool strict);
 }  // namespace xgrammar

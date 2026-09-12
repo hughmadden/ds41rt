@@ -87,8 +87,38 @@ case('recursive-arguments',schema,
     [arguments({'node':{'next':None,'value':'1'}})])
 case('root-reference',{'$ref':'#/$defs/args','$defs':{'args':object_schema({'x':{'const':2}})}},
     [arguments({'x':2})],[arguments({'x':'2'}),''])
+case('property-name-pattern',dict(type='object',propertyNames={'pattern':'^n_[a-z]+$'},additionalProperties={'type':'integer'},minProperties=1,maxProperties=2),
+    [arguments({'n_a':2}),arguments({'n_a':2,'n_b':3})],
+    ['',arguments({'x':2}),arguments({'n_a':'2'}),arguments({'n_a':1,'n_b':2,'n_c':3})])
+case('property-name-length',dict(type='object',propertyNames={'minLength':2,'maxLength':2},additionalProperties={'const':True},minProperties=1,maxProperties=1),
+    [arguments({'台北':True}),arguments({'a ':True}),arguments({'"\\':True}),arguments({'\n\t':True})],
+    [arguments({'x':True}),arguments({'abc':True}),arguments({'台北':False})])
+case('property-name-enum',dict(type='object',propertyNames={'enum':['a b"c\\d\n','台北']},additionalProperties={'const':2}),
+    [arguments({'a b"c\\d\n':2}),arguments({'台北':2}),''],[arguments({'other':2})])
+case('property-name-fixed-filter',dict(type='object',properties={'bad':{'const':1},'ok_x':{'const':2}},required=['ok_x'],propertyNames={'pattern':'^ok_'},additionalProperties=False),
+    [arguments({'ok_x':2})],[arguments({'bad':1,'ok_x':2}),arguments({'ok_x':2,'ok_y':3})])
+case('property-name-unanchored',dict(type='object',propertyNames={'pattern':'mid'},additionalProperties={'const':True}),
+    [arguments({'amidb':True}),arguments({'mid':True})],[arguments({'other':True})])
+case('property-name-reference',dict(type='object',propertyNames={'$ref':'#/$defs/key'},additionalProperties={'const':1},**{'$defs':{'key':{'enum':['x y','台北']}}}),
+    [arguments({'x y':1}),arguments({'台北':1})],[arguments({'x':1})])
+case('property-name-required-additional',dict(type='object',required=['needed'],propertyNames={'pattern':'^[a-z]+$'},additionalProperties={'type':'integer'}),
+    [arguments({'needed':2}),arguments({'needed':2,'other':3})],['',arguments({'other':2}),arguments({'needed':'2'})])
+case('property-name-unicode-class',dict(type='object',propertyNames={'pattern':'^[台北]{2}$'},additionalProperties={'const':True}),
+    [arguments({'台北':True}),arguments({'北台':True})],[arguments({'台x':True})])
+case('property-name-negative-class',dict(type='object',propertyNames={'pattern':'^[^台]{2}$'},additionalProperties={'const':True}),
+    [arguments({'北京':True}),arguments({'a ':True})],[arguments({'台北':True})])
+case('property-name-repeated-group',dict(type='object',propertyNames={'pattern':'^(ab){2}$'},additionalProperties={'const':True}),
+    [arguments({'abab':True})],[arguments({'ab':True}),arguments({'ababab':True})])
 
 api_specs={}
+for name,pattern,good,bad in [
+    ('json-unicode-range',r'^[\u005d-\u53ef]{2}$',['北京','a北'],['台北']),
+    ('json-negative-unicode',r'^[^台]{2}$',['北京','ab'],['台北','北台']),
+    ('json-negative-emoji',r'^[^🦜]+$',['台北','😀','abc'],['🦜','a🦜','🦜a']),
+    ('json-unicode-range-tail',r'^[\u0800-\u53ef]+$',['北京','北','\u0800','可'],['台','a']),
+]:
+    api_specs[name]=dict(type='structural_tag',format=dict(type='ds41_json_schema',strict=False,json_schema=dict(type='string',pattern=pattern)))
+    case(name,None,[json.dumps(v,ensure_ascii=False) for v in good],[json.dumps(v,ensure_ascii=False) for v in bad])
 if a.api_cases:
     for path in sorted(a.api_cases.glob('*.json')):
         entry=json.loads(path.read_text())
@@ -127,5 +157,21 @@ try:
                     finally:invoke('matcher_destroy',matcher,error=False)
         finally:invoke('grammar_destroy',grammar,error=False)
         print('PASS',name,flush=True)
+    report['compile_errors']=[]
+    for schema in [
+        dict(type='object',properties={'bad':{'const':1}},required=['bad'],propertyNames={'pattern':'^ok_'},additionalProperties=False),
+        dict(type='object',properties={'bad':{'const':1}},minProperties=1,propertyNames={'pattern':'^ok_'},additionalProperties=False),
+        dict(type='object',required=['missing'],propertyNames={'pattern':'^[a-z]+$'},additionalProperties=False),
+    ]:
+        grammar=P();error=c.create_string_buffer(8192)
+        spec=dict(type='structural_tag',format=dict(type='ds41_tool_schema',json_schema=schema,strict=True))
+        status=lib.ds41rt_xgrammar_compile(compiler,3,json.dumps(spec).encode(),1,c.byref(grammar),error,len(error))
+        report['compile_errors'].append(dict(schema=schema,status=status,error=error.value.decode()));save()
+        assert status!=0 and not grammar.value,report['compile_errors'][-1]
+    # The same compiler remains usable after unsatisfiable-name failures.
+    grammar=P()
+    spec=dict(type='structural_tag',format=dict(type='ds41_tool_schema',json_schema=object_schema({'x':{'const':2}}),strict=True))
+    invoke('compile',compiler,3,json.dumps(spec).encode(),1,c.byref(grammar))
+    invoke('grammar_destroy',grammar,error=False)
     report['passed']=True;save()
 finally:invoke('compiler_destroy',compiler,error=False)
