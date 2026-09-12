@@ -68,6 +68,14 @@ gate below is satisfied merely by an older component test.
   divergent prefix and target/dSpark correctness. Final release measurements
   must use the corrected cache. [Packing primitive evidence](release-v1-compressed-kv.md)
   is preparation only; serving integration and these gates remain open.
+  Track this work in order:
+
+  1. Integrate architectural FP4 throughout compressed-cache serving and retention.
+  2. Optimize and qualify prefill, decode and dSpark against the matched FP8
+     baseline; reduced cache bytes alone do not satisfy the performance gate.
+  3. Once performance matches or improves, qualify needle retrieval and
+     high-thinking tool calls, including agentic cache reuse, before release.
+
 - [x] Verify official maximum context/output limits. Default to those limits;
   clamp each output allowance to remaining context and the model output cap.
   Keep configurable smaller development storage reservations for side-by-side APIs.
