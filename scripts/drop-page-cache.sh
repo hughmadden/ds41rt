@@ -57,8 +57,16 @@ if [[ ${1:-} == --install-helper ]]; then
     # Install a new inode, then rename: never alter an executing setuid binary.
     pending=$(mktemp /usr/local/libexec/ds41rt-bench/.drop-page-cache.XXXXXXXX)
     trap 'rm -f -- "$pending"' EXIT
-    /usr/bin/install -o root -g "$3" -m 4750 -- "$2" "$pending"
-    mv -fT -- "$pending" "$helper"
+    /usr/bin/install -o root -g "$3" -m 0750 -- "$2" "$pending"
+    # Set privilege only after copying and ownership changes, which can clear it.
+    /usr/bin/chmod 4750 -- "$pending"
+    [[ $(stat -c '%u:%g:%a' -- "$pending") == "0:$3:4750" ]] || {
+        echo 'Staged helper failed ownership/mode checks.' >&2; exit 1;
+    }
+    /usr/bin/mv -fT -- "$pending" "$helper"
+    check_helper && [[ $(stat -c '%g' -- "$helper") == "$3" ]] || {
+        echo 'Installed helper failed ownership/access checks.' >&2; exit 1;
+    }
     echo "Installed $helper (root, group $3, mode 4750)."
     exit 0
 fi
