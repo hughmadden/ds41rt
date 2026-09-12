@@ -1,7 +1,7 @@
 use super::*;
 use crate::v41_backbone_cache::CacheLease;
 use crate::v41_requests::RequestBatch;
-use super::prefix::{PrefixCache, SnapshotKind};
+use super::prefix::{ImageKeys, PrefixCache, SnapshotKind};
 
 struct Active {
     id: u64,
@@ -15,6 +15,7 @@ struct Active {
     finished: bool,
     cacheable: bool,
     tokens: Vec<u32>,
+    image_keys: ImageKeys,
     next_after_commit: u32,
 }
 impl Active {
@@ -71,7 +72,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             if entry.as_ref().is_some_and(|r| r.finished || r.job.events.is_closed()) {
                 let request = entry.take().unwrap();
                 if request.cacheable && requests.cache().request_id(request.lease).is_ok() {
-                    if let Err(error) = prefixes.retain(SnapshotKind::Turn, &request.tokens, request.next_after_commit,
+                    if let Err(error) = prefixes.retain(SnapshotKind::Turn, &request.tokens, &request.image_keys, request.next_after_commit,
                         request.id, request.lease, requests, draft.as_deref_mut()) {
                         tracing::warn!(%error, "completed request prefix was not retained");
                     }
@@ -110,7 +111,8 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 job.max_tokens = limits.output_for_prompt(prompt.len(), job.max_tokens)?;
                 let decoder = ds41rt_loader::streaming_token_decoder(&args.snapshot, false)?;
                 if let Some(draft) = draft.as_deref_mut() { draft.admit(id)?; }
-                let hit = prefixes.restore(&prompt, id, lease, requests, draft.as_deref_mut())?;
+                let image_keys = prefixes.prepare_key(&prompt, &[])?;
+                let hit = prefixes.restore(&prompt, &image_keys, id, lease, requests, draft.as_deref_mut())?;
                 let cached = hit.map_or(0, |(end, _)| end);
                 let source_end = requests.cache().committed_end(lease)? as usize;
                 prefixes.make_room(requests, &[(lease, (prompt.len() - source_end) as u32)])?;
@@ -125,13 +127,13 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                     second_transport, lease, &prompt, args.prefill_batch_tokens as usize, &job,
                     draft.as_deref_mut())? };
                 if cached != prompt.len() {
-                  if let Err(error) = prefixes.retain(SnapshotKind::Prompt, &prompt, anchor, id, lease, requests, draft.as_deref_mut()) {
+                  if let Err(error) = prefixes.retain(SnapshotKind::Prompt, &prompt, &image_keys, anchor, id, lease, requests, draft.as_deref_mut()) {
                     tracing::warn!(%error, "prompt prefix was not retained");
                   }
                 }
                 tracing::debug!(request_id=id, prompt_tokens=prompt.len(), cached_tokens=cached, "native prefix admission");
                 Ok(Active { id, lease, job, decoder, anchor, generated: 0, buffered: 0, lane,
-                    finished: false, cacheable: false, tokens: prompt, next_after_commit: anchor })
+                    finished: false, cacheable: false, tokens: prompt, image_keys, next_after_commit: anchor })
             })();
             match result {
                 Ok(mut request) => {

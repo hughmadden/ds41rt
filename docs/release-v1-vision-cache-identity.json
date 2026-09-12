@@ -1,0 +1,49 @@
+{
+  "scope": "Image-content keys and lifetime ownership in the native prefix radix; live vision serving remains disabled",
+  "source_parent": "971188c835ca2493a5f0107937eeea753776855d",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/prefix.rs": "eb9b7c42ce242fb301f144fdd01a6f5098e44e4a7db82420ec1c2b69bfdc1783",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/prefix/images.rs": "62ce140f156f148351d651aee537bc54d5c62dd754b8dacc731c5d2ab2543665",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "fd82e7e262580e37637a4c16be42fe2a1c69f7928da82e331033d8af7d6243a8"
+  },
+  "test_binary": {
+    "path": "/home/tj/Developer/ds41rt/rust/target/debug/deps/ds41rt-13312f7b1c44a5b6",
+    "sha256": "be8feea10f09f2f17c56567ed1fcaa0a23a9bd0606d99119e05dd83a64cf13c9"
+  },
+  "command": "cargo test --manifest-path rust/Cargo.toml -p ds41rt-daemon --bin ds41rt v41_native_serve::prefix",
+  "build": {
+    "profile": "test, unoptimized + debuginfo",
+    "result": "pass",
+    "existing_warnings": true
+  },
+  "validation": {
+    "passed": 10,
+    "failed": 0,
+    "image_identity_tests": 6,
+    "existing_radix_tests": 4,
+    "actual_loader_spans": true,
+    "partial_image_matches": true,
+    "all_hash_bytes": true,
+    "retention_and_active_lifetimes": true,
+    "recycled_shared_edge_isolation": true,
+    "sixteen_image_bounds": true,
+    "expired_admission_cycles": 1000,
+    "million_token_text_buffer_borrowed": true,
+    "live_vision_cache_qualified": false,
+    "performance_campaign_run": false
+  },
+  "evidence": {
+    "path": "docs/evidence/native-vision-cache-identity.json.gz",
+    "sha256": "032b60900530079cae3373474a340a2c852d18455ffa3b3fe2faf85a0c3d94ff",
+    "bytes": 60313
+  },
+  "remaining": [
+    "image-feature replacement",
+    "routing and replay image masks",
+    "image-aware Engram restore",
+    "16-image API admission",
+    "live cached/uncached image parity",
+    "image-answer quality",
+    "text-performance regression checks"
+  ]
+}

@@ -3,6 +3,9 @@ use crate::v41_backbone_cache::{BackbonePrefix, CacheLease};
 use crate::v41_requests::RequestPrefix;
 use speculative::DraftPrefix;
 use std::collections::BTreeMap;
+mod images;
+pub(super) use images::ImageKeys;
+use images::ImageKeySpace;
 
 struct Node<T> {
     edge: Vec<u32>,
@@ -272,23 +275,30 @@ impl<T> Retention<T> {
     }
 }
 struct Saved<'a> {
+    _images: ImageKeys,
     target: RequestPrefix<'a>,
     draft: Option<DraftPrefix<'a>>,
     next: u32,
 }
 pub(super) struct PrefixCache<'a> {
     retained: Retention<Saved<'a>>,
+    images: ImageKeySpace,
 }
 impl<'a> PrefixCache<'a> {
     pub fn new(limit: usize) -> Self {
         Self {
             retained: Retention::new(limit),
+            images: ImageKeySpace::default(),
         }
+    }
+    pub fn prepare_key(&mut self, tokens: &[u32], images: &[ds41rt_loader::V41ImageSpan]) -> Result<ImageKeys> {
+        self.images.prepare(tokens, images)
     }
     pub fn retain(
         &mut self,
         kind: SnapshotKind,
         tokens: &[u32],
+        images: &ImageKeys,
         next: u32,
         id: u64,
         lease: CacheLease,
@@ -304,9 +314,10 @@ impl<'a> PrefixCache<'a> {
             end > 0 && end as usize <= tokens.len(),
             "retained token frontier differs"
         );
+        let keys = images.encode(&tokens[..end as usize])?;
         // Evict before allocating another tail, keeping peak retained residency
         // within the configured number of completed states.
-        if !bank.remove_exact(&tokens[..end as usize])
+        if !bank.remove_exact(&keys)
             && bank.entries >= bank.limit
         {
             bank.evict_one();
@@ -314,8 +325,9 @@ impl<'a> PrefixCache<'a> {
         let target = requests.retain_prefix(lease, BackbonePrefix::device_bytes())?;
         let draft = draft.map(|d| d.retain_prefix(id, end)).transpose()?;
         bank.insert(
-            &tokens[..end as usize],
+            &keys,
             Saved {
+                _images: images.through(end as usize),
                 target,
                 draft,
                 next,
@@ -326,12 +338,14 @@ impl<'a> PrefixCache<'a> {
     pub fn restore(
         &mut self,
         tokens: &[u32],
+        images: &ImageKeys,
         id: u64,
         lease: CacheLease,
         requests: &mut Requests<'a>,
         draft: Option<&mut DraftRuntime<'_, 'a>>,
     ) -> Result<Option<(usize, u32)>> {
-        let Some((end, frontier, saved)) = self.retained.lookup_reusable(tokens) else {
+        let keys = images.encode(tokens)?;
+        let Some((end, frontier, saved)) = self.retained.lookup_reusable(&keys) else {
             return Ok(None);
         };
         ensure!(
