@@ -64,7 +64,7 @@ gate below is satisfied merely by an older component test.
   124/138 basic and 35/38 hard. The [three final corrected-FP4 runs](release-v1-tool-eval-final.md)
   score 119–123/138 basic and 34–36/38 hard with no serving failures, completing
   this gate at the quality level accepted by the user.
-- [ ] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
+- [x] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
   scales; retain FP8 SWA and the independent FP4 index format. The previous
   FP8-only interpretation was incorrect (user clarification September 12).
   Optimize compressed packing, paged attention reads/dequantization and their
@@ -78,7 +78,9 @@ gate below is satisfied merely by an older component test.
   must use the corrected cache. [Packing primitive evidence](release-v1-compressed-kv.md)
   covers the original standalone packer. [Serving integration evidence](release-v1-compressed-serving.md)
   now covers mixed attention, storage, retention and initial paired decode; the
-  broader performance and subsequent quality gates remain open.
+  [Final performance](release-v1-performance.md) and
+  [prefix qualification](release-v1-prefix-final.md) complete the broader
+  runtime, retained-context, concurrency and reuse gates on the clean image.
   [Long-context retrieval](release-v1-needle.md) now passes fresh and exact-reuse
   checks through 1.04M source tokens in both target and dSpark modes.
   [Final tool evaluation](release-v1-tool-eval-final.md) completes three C16
@@ -131,25 +133,27 @@ reset power caps; do not attribute cross-campaign differences solely to code.
 Preserve raw machine-readable output alongside reports.
 Run the shared four-Spark target/dSpark workloads sequentially to avoid contention.
 
-- [ ] Reuse the located eight content types and Orchid from ../glmrt-release (sources below).
+- [x] Reuse the located eight content types and Orchid from ../glmrt-release (sources below).
   The [self-contained corpus and original quality checks](release-v1-corpus.md)
-  are preserved; final serving measurements remain open.
-- [ ] Headline maximum prefill, low-entropy decode and weighted eight-type
-  decode throughput; KV size and total GPU RAM requirement.
+  are preserved; [final serving measurements](release-v1-performance.md) retain
+  every strict quality miss and raw response.
+- [x] Headline maximum prefill, low-entropy decode and weighted eight-type
+  decode throughput; KV size and total GPU RAM requirement. See the
+  [performance](release-v1-performance.md) and [memory](release-v1-memory.md) reports.
 - [x] Memory accounting by arena, tensor, KV cache, graphs and other allocations.
   [Exact planner and live residency evidence](release-v1-memory.md) reconciles the
   default C16 allocation to 63.97 GiB at readiness and measures a 74 MiB lazy
   graph/runtime increase after a maximum-concurrency speculative batch.
-- [ ] Eight content types plus low-entropy decode, target-only and dSpark.
-- [ ] Prefill matrix: base contexts 0, 32K, 64K, 128K, 256K crossed with
+- [x] Eight content types plus low-entropy decode, target-only and dSpark.
+- [x] Prefill matrix: base contexts 0, 32K, 64K, 128K, 256K crossed with
   added 1K, 2K, 4K, 8K, 16K, 32K tokens.
-- [ ] dSpark decode on retained prefixes for all eight types at base contexts
+- [x] dSpark decode on retained prefixes for all eight types at base contexts
   0, 32K, 64K, 128K, 256K; prove cache reuse in measurement evidence.
 - [x] Needle retrieval through 1M tokens. The corrected FP4 candidate retrieves
   every deterministic needle from fresh 32K, 128K, 512K, and 1.04M source
   contexts and repeats each with a full prompt-cache hit in target and dSpark
   modes; see the [preserved evidence](release-v1-needle.md).
-- [ ] Concurrency scaling through C16, reporting aggregate tokens per second.
+- [x] Concurrency scaling through C16, reporting aggregate tokens per second.
 - [x] Three tool-eval-bench hard-mode runs at the measured best concurrency,
   with thinking enabled at high effort and sufficient timeout; points split
   into basic, hard and total scores. The user reduced the original five-run
