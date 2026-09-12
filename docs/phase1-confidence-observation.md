@@ -104,3 +104,19 @@ observations. Local raw files are `/tmp/ds41-phase1-logits-{1,5}.json` and
 more input than it emits: reconstruct output from emitted tokens (or stop at
 EOS), never blindly interpret accepted-input count as emitted-token count.
 The standard coordinator was restored after the probe.
+
+## Layer-boundary activation tracing
+
+For a disposable coordinator, enable `ds41rt::activation_trace=debug` with
+`DS41RT_ACTIVATION_TRACE_POSITION` set to the first query position to inspect
+and `DS41RT_ACTIVATION_TRACE_DIR` set to a writable diagnostic directory.
+Matching passes write per-layer completed residual/pre buffers and token-position
+metadata into batch/stage/row-count subdirectories. Existing buffer files are
+never overwritten. This adds synchronous downloads and file writes; do not use
+its timings as production throughput. Normal serving performs neither operation.
+
+`scripts/compare-ds41-layer-residuals.py LEFT RIGHT --common-rows 2 --output JSON`
+checks matching positions, BF16 geometry, finite values and layer coverage before
+reporting per-row exact differences, RMS differences and maximum errors. Matching
+positions alone do not prove matching token history; pair identical requests and
+use the verification log to establish the shared prefix.

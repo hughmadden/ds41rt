@@ -180,6 +180,16 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         let id = batch.cache()?.identity();
         let rows = batch.cache()?.positions().len();
         let stage = batch.cache()?.stage();
+        let activation_trace = if tracing::enabled!(target: "ds41rt::activation_trace", tracing::Level::DEBUG) {
+            let position: u64 = std::env::var("DS41RT_ACTIVATION_TRACE_POSITION")?.parse()?;
+            if batch.cache()?.positions().first() == Some(&position) {
+                let directory = std::path::PathBuf::from(std::env::var("DS41RT_ACTIVATION_TRACE_DIR")?)
+                    .join(format!("batch{id}-{stage:?}-{rows}rows"));
+                std::fs::create_dir_all(&directory)?;
+                std::fs::write(directory.join("positions.json"), serde_json::to_vec(&batch.cache()?.positions())?)?;
+                Some(directory)
+            } else { None }
+        } else { None };
         ensure!(
             (stage.is_encoder() || !selected.is_empty())
                 && selected.len() <= 80
@@ -258,6 +268,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                         guard.batch.image_mask(),
                     )
                     .await?;
+            }
+            if let Some(directory) = &activation_trace {
+                self.lane.trace_output(directory)?;
             }
         }
         if stage.is_encoder() {

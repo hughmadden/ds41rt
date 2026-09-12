@@ -1,0 +1,484 @@
+{
+  "scope": "Short-context sparse tile-boundary correctness investigation. Disposable native overlay against published v1 dependencies; not final integrated-build or serving throughput qualification.",
+  "layer_comparisons": {
+    "activation": {
+      "first_differing_layer": 2,
+      "compared_layers": 40,
+      "common_rows": 2,
+      "positions": [
+        [
+          49,
+          50
+        ],
+        [
+          49,
+          50,
+          51,
+          52,
+          53,
+          54
+        ]
+      ],
+      "report_sha256": "7678a387ce95b4719329b9e608a5ca9f1ccdfddf4564f496dd2209434b4a9695",
+      "selected_layer_errors": [
+        {
+          "layer": 0,
+          "sha256": [
+            "c3dd3d8c8d04b05026d72e2bdb76b9e9a4ef03673f0c6206b2465116b3e4bed7",
+            "ebe46224ad2ad7cecde07b6911f7c5337a94698ff2287c796b3592c463ed461c"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.06371313008604304,
+            0.03325435222645625
+          ]
+        },
+        {
+          "layer": 1,
+          "sha256": [
+            "e43a1f6a4c98180bb1f3dd804be83a483e8a65407a2ad267845814d56926e396",
+            "f12f59f05b346fadcea6e61676423e4e2d0f048a3f3482c3e2f8dba1e9e8f8d2"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.08162609485745827,
+            0.04077638493768173
+          ]
+        },
+        {
+          "layer": 2,
+          "sha256": [
+            "5fc1a2c0ae8a715d66f1d80bdaaac243ff94143658904a9d863180333335d6a6",
+            "4b3c77bfeeba838e532e085bcc84709e403fba4280766dde5e1c5de6b431049e"
+          ],
+          "changed_elements": [
+            9425,
+            11616
+          ],
+          "max_abs": [
+            0.0068359375,
+            0.00341796875
+          ],
+          "rms": [
+            0.0010603524824855486,
+            0.000492066644950489
+          ],
+          "reference_rms": [
+            0.0864607519572297,
+            0.047884346978215676
+          ]
+        },
+        {
+          "layer": 39,
+          "sha256": [
+            "a6e45bfbd5bfca5ac592c6e2e674afba4e81cc894ebb23841e1f693e306b6962",
+            "45984d34419d0c2545fcfadb581e73ffc016d826f4381f271d57b7ffc4cc90b0"
+          ],
+          "changed_elements": [
+            20266,
+            20199
+          ],
+          "max_abs": [
+            2.2265625,
+            1.96875
+          ],
+          "rms": [
+            0.5216338166269797,
+            0.4011953582037683
+          ],
+          "reference_rms": [
+            3.2382633362313045,
+            3.100016008460114
+          ]
+        }
+      ]
+    },
+    "fixed-window": {
+      "first_differing_layer": null,
+      "compared_layers": 40,
+      "common_rows": 2,
+      "positions": [
+        [
+          49,
+          50
+        ],
+        [
+          49,
+          50,
+          51,
+          52,
+          53,
+          54
+        ]
+      ],
+      "report_sha256": "aef9ba277cf1b4b76d0afc15e0a46b8b3d3f6ac3adb4e1b63b5514852382af6e",
+      "selected_layer_errors": [
+        {
+          "layer": 0,
+          "sha256": [
+            "2748281fef7d44492b70477a1f9160e50db60a62477df611b71e1d5fd7553f03",
+            "02d0a4720887a30ee8ca47927ffcdd22f3d890b03847b657738179057703f64e"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.09347537618925607,
+            0.07195754206189138
+          ]
+        },
+        {
+          "layer": 1,
+          "sha256": [
+            "7fdc40b093586d89b9099a72ec419a19f749d7ba2c7790a8ec07cb4e41e83dbb",
+            "c81ad56aa4bb08b47a66efc3ae0ae7f2e4b49828040766e4e3ab290017e607d6"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.11718874683269691,
+            0.0937306903784034
+          ]
+        },
+        {
+          "layer": 2,
+          "sha256": [
+            "150c04d3c88d6b90ded31d2a0f54e62b61ad54dc942855952f1c9120ceb34d0c",
+            "4ea52425118a060ae5bda9e9923a745da3e05228052b19813b5e74aebacef7f8"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.1171481690080848,
+            0.09047945250045088
+          ]
+        },
+        {
+          "layer": 39,
+          "sha256": [
+            "52c29ea7aaf0a2f29f0fb26a9dc5894efd9445a42bb70c94165562178e3a748a",
+            "99cc0437ab6781ca35dea393ce61901b516e1123d612b282f1dda159de524a98"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            3.7936354436093245,
+            3.881778544484536
+          ]
+        }
+      ]
+    },
+    "row-window": {
+      "first_differing_layer": null,
+      "compared_layers": 40,
+      "common_rows": 2,
+      "positions": [
+        [
+          49,
+          50
+        ],
+        [
+          49,
+          50,
+          51,
+          52,
+          53,
+          54
+        ]
+      ],
+      "report_sha256": "ca05131d9338793e955607142dc89995b7a77c86a5e53aed9d83d503ca9fcafe",
+      "selected_layer_errors": [
+        {
+          "layer": 0,
+          "sha256": [
+            "c3dd3d8c8d04b05026d72e2bdb76b9e9a4ef03673f0c6206b2465116b3e4bed7",
+            "ebe46224ad2ad7cecde07b6911f7c5337a94698ff2287c796b3592c463ed461c"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.06371313008604304,
+            0.03325435222645625
+          ]
+        },
+        {
+          "layer": 1,
+          "sha256": [
+            "e43a1f6a4c98180bb1f3dd804be83a483e8a65407a2ad267845814d56926e396",
+            "f12f59f05b346fadcea6e61676423e4e2d0f048a3f3482c3e2f8dba1e9e8f8d2"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.08162609485745827,
+            0.04077638493768173
+          ]
+        },
+        {
+          "layer": 2,
+          "sha256": [
+            "a6568a2e5b5254db79384c339e9fe8e886080da1cf2d38dceefd09feeedda399",
+            "27d99a3db43c4aa264346b85d0cda833a81a5bdb4f21a22204d67adc25f44b10"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            0.08647093331657296,
+            0.047884346978215676
+          ]
+        },
+        {
+          "layer": 39,
+          "sha256": [
+            "aace7c72cda1a4e1662dfe64f4e816689a6d97e2442e16aa640ab72a06949024",
+            "a8daa0c2d8621e3f4fafee1d5584aa5b6bd680cc9f9fe6c46b5e5da34faa09f5"
+          ],
+          "changed_elements": [
+            0,
+            0
+          ],
+          "max_abs": [
+            0.0,
+            0.0
+          ],
+          "rms": [
+            0.0,
+            0.0
+          ],
+          "reference_rms": [
+            3.2426092182549264,
+            3.130005415956259
+          ]
+        }
+      ]
+    }
+  },
+  "paired_outputs": [
+    {
+      "arm": "activation",
+      "case": "code",
+      "same_request": true,
+      "exact_output_match": false,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "activation",
+      "case": "fable",
+      "same_request": true,
+      "exact_output_match": false,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "activation",
+      "case": "topic",
+      "same_request": true,
+      "exact_output_match": false,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "fixed-window",
+      "case": "code",
+      "same_request": true,
+      "exact_output_match": true,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "fixed-window",
+      "case": "fable",
+      "same_request": true,
+      "exact_output_match": true,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "fixed-window",
+      "case": "topic",
+      "same_request": true,
+      "exact_output_match": true,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "row-window",
+      "case": "code",
+      "same_request": true,
+      "exact_output_match": true,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "row-window",
+      "case": "fable",
+      "same_request": true,
+      "exact_output_match": true,
+      "objective_passed": [
+        true,
+        true
+      ]
+    },
+    {
+      "arm": "row-window",
+      "case": "topic",
+      "same_request": true,
+      "exact_output_match": true,
+      "objective_passed": [
+        true,
+        true
+      ]
+    }
+  ],
+  "artifacts_sha256": {
+    "ds41rt": "25252977b8d94f2339490d79b3ed446e6aa3e1917c4a0e3fd02825f0f20b8be1",
+    "libds41rt_phase1.so": "d1eb16d2057fbc1314deab5fa08a3ceb7ab066ce9119cd679d58a21aa214f591",
+    "libds41rt_native.so": "ea9a845f2518b279d6f4ecf2a7d38b01acafecc3613ff44712591623d6894503"
+  },
+  "focused_cases_passed": 63,
+  "negative_control": "Published v1 fails compressed FP8 at position 49 with six rows; maximum absolute difference 0.00048828125 versus explicit single-query widths.",
+  "standard_service_restored": true,
+  "long_context_regression": {
+    "bit_exact_cases": 60,
+    "total_cases": 60,
+    "scope": "Existing graph microbenchmark, ten routing/masking patterns per row count at position 2048. Medians across patterns are diagnostics, not serving TPS.",
+    "medians": [
+      {
+        "rows": 1,
+        "baseline_us": 47.307999432086945,
+        "candidate_us": 47.18240052461624
+      },
+      {
+        "rows": 2,
+        "baseline_us": 47.36320078372955,
+        "candidate_us": 47.19119966030121
+      },
+      {
+        "rows": 6,
+        "baseline_us": 47.3688006401062,
+        "candidate_us": 47.19199985265732
+      },
+      {
+        "rows": 16,
+        "baseline_us": 47.36400097608566,
+        "candidate_us": 47.19119966030121
+      },
+      {
+        "rows": 80,
+        "baseline_us": 92.35759973526001,
+        "candidate_us": 92.21519827842712
+      },
+      {
+        "rows": 256,
+        "baseline_us": 109.83279943466187,
+        "candidate_us": 107.03519582748413
+      }
+    ]
+  }
+}

@@ -4,7 +4,10 @@ Scope: one RTX PRO 6000 Blackwell coordinator and four DGX Spark workers,
 using the official V4.1 Flash weights. Target 90 tok/s target-only and
 270 tok/s C1 dSpark code generation, preserve prefill, and avoid substantial
 high-concurrency throughput regressions. Commit and push incremental work on
-dev. Phase 2 dual-RTX execution is forward-looking context, not this goal.
+dev. Milestone commit messages should include approximate before → after values
+for the metrics already measured, labeling instrumented probes and allowing a
+summary across several commits. Do not run extra tests solely for commit-message
+numbers. Diagnostic-only work should not imply a measured speedup. Phase 2 dual-RTX execution is forward-looking context, not this goal.
 
 ## Required adaptive verification (A4)
 

@@ -87,11 +87,12 @@ __global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* quer
     const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,
     int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v,float* partial,
     const uint64_t* window_begins) {
-  // Zero width requests the exact former host maximum for this contiguous,
-  // ascending request. Reading metadata keeps decode graph arguments stable.
+  // Keep each query's softmax tile boundaries independent of other proposal
+  // rows. A batch-wide maximum moves compressed keys between BF16 probability
+  // tiles when draft length changes, perturbing already-causal output rows.
   if(width==0) {
-    const uint64_t last=metadata[(uint64_t(gridDim.x)-1)*10+3];
-    width=last<127?int(last+1):128;
+    const uint64_t position=metadata[uint64_t(blockIdx.x)*10+3];
+    width=position<127?int(position+1):128;
   }
   static_assert(Groups==1 || Groups==2 || Groups==4);
   static_assert(!Split || Groups==1);

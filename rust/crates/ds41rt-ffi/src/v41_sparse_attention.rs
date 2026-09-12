@@ -109,8 +109,8 @@ impl V41SparseAttention<'_> {
     /// live window/source leases and proposal snapshots; causal source lengths
     /// and unique IDs are correct. Inputs remain immutable on the initialized
     /// stream device through completion/replay, with disjoint BF16 output.
-    /// Width zero derives the causal maximum from the last metadata row; this
-    /// mode requires ascending query positions within the request. Optional
+    /// Width zero derives each query's own causal window length, keeping its
+    /// softmax tiles independent of other rows in the launch. Optional
     /// split scratch is disjoint from all inputs/output and remains live through
     /// replay; partitions alter softmax rounding and require separate qualification.
     pub unsafe fn launch(

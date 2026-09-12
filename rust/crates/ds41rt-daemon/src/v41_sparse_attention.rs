@@ -279,8 +279,8 @@ impl<'a> SparseAttentionWave<'a> {
                 r.source.is_some() == (layer >= 2),
                 "attention source presence differs"
             );
-            // Positions are checked ascending above; the kernel derives the
-            // same maximum width from the last live metadata row on replay.
+            // Device metadata supplies each query's causal width on replay,
+            // independent of the selected draft suffix and its row count.
             let width = 0;
             for &position in r.positions {
                 let wm = w.metadata(position)?;
