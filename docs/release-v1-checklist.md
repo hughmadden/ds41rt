@@ -103,14 +103,20 @@ gate below is satisfied merely by an older component test.
   belong to the remaining API/run-script qualification.
 - [ ] Measure and improve startup reads/transforms/exchange/capture. Aim for
   NVMe line rate (coordinator about 14 GB/s, Sparks about 6 GB/s) and roughly
-  60–90 seconds load time without sacrificing runtime performance.
-- [ ] Qualify normal build/run scripts and optimized backend selection on all
+  60–90 seconds load time without sacrificing runtime performance. The
+  [clean launcher qualification](release-v1-build-run.md) reaches readiness in
+  55–56 seconds; phase-level Spark I/O, transforms, exchange and capture
+  accounting remains open for the performance report.
+- [x] Qualify normal build/run scripts and optimized backend selection on all
   five hosts from reproducible source and dependency pins.
   Expose concurrency and KV pool parameters through the standard launch script;
   sixteen active requests and eight retained-context equivalents are defaults,
   not mandatory settings (user clarification September 12).
   Preserve port 8000 for the standard `run.sh` launch; explicit alternate
-  configurations may override `ADDR` (user addition September 12).
+  configurations may override `ADDR` (user addition September 12). A
+  [five-host clean build/run campaign](release-v1-build-run.md) covers an empty
+  image state, pinned source build, dry runs, default launch, real overrides,
+  option restoration, image identity and native backend fingerprints.
 
 ## Release performance suite
 
@@ -172,13 +178,12 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 ## Current evidence and next action
 
-The user set the next work order on September 12: finish and push the 24-turn
-retention qualification, then native vision through sixteen images together
-with Unicode and tool/schema correctness. Standard `run.sh` and deployment
-qualification follow those correctness gates, before the final performance
-suite, reports, containers and GitHub release. The latest user ordering puts
-the optimized architectural FP4 compressed-cache migration immediately after
-XGrammar/tool-schema correctness and before launcher/final release qualification.
+The 24-turn retention, native vision through sixteen images, Unicode,
+tool/schema correctness, architectural FP4 migration, long-context needle,
+three-run tool evaluation and clean standard launcher gates are complete at the
+current candidate revision. Next, close the corrected-FP4 prefix matrix and run
+the final performance suite on the exact clean-built image pair, followed by
+the README/reports, registry publication, branch/tag work and GitHub release.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running

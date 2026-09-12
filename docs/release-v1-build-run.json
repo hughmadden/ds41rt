@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "passed": true,
+  "source": {
+    "engine_revision": "d5fb015d00aa7b302e3ce179b097482da678db76",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+    "sparkinfer_revision": "7299b3b92e70d539b2c0a63aaadce36932ceef4d",
+    "sparkinfer_tree_sha256": "2678ac188756a16a3645256cf3ac40dc07648d8608eef25cf038a5f3c96d3af1",
+    "xgrammar_revision": "557becfb64c503ae9c04344b0047661f43f44320"
+  },
+  "clean_start": {
+    "hosts": 5,
+    "containers": 0,
+    "images": 0,
+    "port_8000_free": true,
+    "gpu_workloads_idle": true
+  },
+  "initial_failure": {
+    "duration_seconds": 182.778411,
+    "reason": "legacy DS4 AOT wrapper was incompatible with the pinned SparkInfer ABI",
+    "fixed": true
+  },
+  "focused_tests": {
+    "environment": "qualified coordinator image",
+    "passed": 29,
+    "failed": 0
+  },
+  "build": {
+    "command": "./build.sh",
+    "duration_seconds": 374.438841,
+    "coordinator_image_id": "sha256:a13258e92dd25ddb889bd31bb77c8813c7881868b103ceec0c140e30e893c213",
+    "spark_image_id": "sha256:2f5d328a14f1a52a0d3b2356b041415d744635f3f3557e41403246429984093b",
+    "spark_image_identical_on_all_workers": true,
+    "spark_distribution_bytes": 24729185792,
+    "spark_distribution_gigabits_per_second": [9.34, 9.23, 8.95],
+    "artifact_checksums_passed": true,
+    "provenance_checks_passed": true
+  },
+  "artifact_sha256": {
+    "coordinator_executable": "8bf754f1f11f2026f395e46f9e04b26be4f0b9fd9b667687224046416b7dc344",
+    "coordinator_native_library": "bfed8269593ed3ffffb13e0cec4841ff312cf672a9642b9bfa4ab421afdb08b2",
+    "spark_executable": "0865699b9e355b5eb456398e13c79b14c70886ee863e9175f8c9dc899e9b050f",
+    "spark_native_library": "903a4a4a9e92033f4489280677b33541a22333ee3520bf6a65514c651e96332b"
+  },
+  "launches": {
+    "default": {
+      "duration_seconds": 56.481127,
+      "port": 8000,
+      "concurrency": 16,
+      "prefix_cache_entries": 24,
+      "max_context_tokens": 1048576,
+      "max_output_tokens": 393216,
+      "prefill_batch_tokens": 2048,
+      "dspark": true,
+      "fingerprint": "ds41rt-native-fp4-kv-dspark",
+      "reasoning_defaulted_on": true,
+      "coordinator_gpu_memory_mib": 65548
+    },
+    "override": {
+      "duration_seconds": 53.628121,
+      "concurrency": 2,
+      "kv_pool_size": "2GiB",
+      "prefix_cache_entries": 3,
+      "max_context_tokens": 65536,
+      "max_output_tokens": 8192,
+      "prefill_batch_tokens": 1024,
+      "dspark": false,
+      "fingerprint": "ds41rt-native-fp4-kv",
+      "coordinator_gpu_memory_mib": 20786
+    },
+    "restored_default": {
+      "duration_seconds": 55.152124,
+      "running_after_qualification": true,
+      "fingerprint": "ds41rt-native-fp4-kv-dspark",
+      "reasoning_defaulted_on": true
+    }
+  },
+  "hardware": {
+    "rtx_model": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "rtx_driver": "595.91.07",
+    "rtx_power_limit_watts": 400,
+    "rtx_standard_max_memory_clock_mhz": 14001,
+    "spark_model": "NVIDIA GB10",
+    "spark_driver": "580.159.03",
+    "spark_count": 4
+  },
+  "evidence": {
+    "archive": "evidence/native-clean-build-run.tar.gz",
+    "archive_sha256": "c5faa2c617a9ab914a6336133ffbc266fa8be11be5c955c1d96e6fca44edaf77",
+    "archive_bytes": 128345,
+    "raw_sha256": {
+      "build.log": "c1966055d89798d361b1fa16fee9cebd65f08f677219091d9432badae8b63302",
+      "build-v2.log": "060ff628f8cd8e0184956c816887bfaeed9028d44e8fa4379f87b64107641f89",
+      "run.log": "f469b571fb88c27a221c7d42d54f5936aa31ce9372af28522a8e1e3a99f9b84c",
+      "run-override.log": "8d1e77f349077d61f2cdd9e36985d6a25c4af2ab568f49c2f01e3bb3d095baef",
+      "run-restored.log": "eed01e1999e5dbb4d1e28caac52d6122f39e77943bf58893ce8546bbb1b1cc40"
+    }
+  },
+  "open": [
+    "phase-level Spark storage, transform, exchange, and graph-capture accounting",
+    "registry digest qualification after publication",
+    "final performance suite"
+  ]
+}
