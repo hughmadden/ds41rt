@@ -1,0 +1,59 @@
+{
+  "scope": "Earlier first-lane Engram preparation only; original index graph lifecycle retained",
+  "daemon_sha256": "75a464591a36f6e010ab196b2a8a7484d31b5eeb71c27d0f9b1dc1eafa63ca18",
+  "concurrent_api": "C2/C6/C16, cancellation and replacement pass",
+  "performance": [
+    {
+      "source": "/tmp/ds41-early-engram/perf-0-candidate.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 300.5454901381976
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 605.4510392941556
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-early-engram/perf-1-baseline.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 317.50839659946024
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 618.6407573211166
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-early-engram/perf-2-baseline.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 318.4447373719017
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 618.2293177449324
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-early-engram/perf-3-candidate.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 318.15609101030907
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 614.8901691412913
+        }
+      ]
+    }
+  ]
+}

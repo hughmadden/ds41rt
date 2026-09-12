@@ -171,28 +171,35 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     let started = Instant::now();
     let speculative = draft.is_some();
     let mut inputs = [Vec::new(), Vec::new()];
+    let mut batches = [None, None];
+    let mut draft_us = 0u64;
+    let mut prepare_us = 0u64;
     for lane in 0..2 {
         ensure!(members[lane].len() <= 8, "decode lane exceeds eight requests");
         let seeds = members[lane].iter().map(|&slot| {
             let r = active[slot].as_ref().unwrap();
             Ok((r.id, r.anchor, requests.cache().committed_end(r.lease)?, r.job.max_tokens - r.generated))
         }).collect::<Result<Vec<_>>>()?;
+        let draft_start = Instant::now();
         inputs[lane] = if seeds.is_empty() { Vec::new() }
             else if let Some(draft) = draft.as_deref_mut() { draft.propose(lib, &seeds)? }
             else { seeds.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect() };
-    }
-    let draft_us = started.elapsed().as_micros() as u64;
-    let proposed: usize = inputs.iter().flatten().map(|tokens| tokens.len() - 1).sum();
-    let mut batches = [None, None];
-    for lane in 0..2 {
+        draft_us += draft_start.elapsed().as_micros() as u64;
         if !members[lane].is_empty() {
+            // Token IDs are now known: start this lane's mapped Engram reads
+            // while the other lane generates its draft proposals. RequestBatch
+            // cancels its I/O on drop if subsequent preparation fails.
+            let prepare_start = Instant::now();
             let work: Vec<_> = members[lane].iter().zip(&inputs[lane]).map(|(&slot, tokens)| RequestTokens {
                 lease: active[slot].as_ref().unwrap().lease, tokens, image_mask: None,
                 kind: if draft.is_some() { ExpertV2SourceKind::MtpVerify } else { ExpertV2SourceKind::Decode },
             }).collect();
             batches[lane] = Some(requests.prepare(&work)?);
+            prepare_us += prepare_start.elapsed().as_micros() as u64;
         }
     }
+    let prepared_us = started.elapsed().as_micros() as u64;
+    let proposed: usize = inputs.iter().flatten().map(|tokens| tokens.len() - 1).sum();
     let [a, b] = &mut batches;
     // Drain both futures even if one fails, before discarding private device state.
     let results = runtime.block_on(async { tokio::join!(
@@ -231,8 +238,8 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         }
         tracing::debug!(target: "ds41rt::timing", speculative,
             requests=members[0].len()+members[1].len(), lane0=members[0].len(), lane1=members[1].len(),
-            proposed, accepted=accepted_drafts, emitted, draft_us,
-            verify_us=executed_us-draft_us, total_us=started.elapsed().as_micros() as u64,
+            proposed, accepted=accepted_drafts, emitted, draft_us, prepare_us,
+            verify_us=executed_us-prepared_us, total_us=started.elapsed().as_micros() as u64,
             "native scheduler round");
         Ok(())
     })();

@@ -1,0 +1,140 @@
+{
+  "selected": false,
+  "scope": "Combined per-layer index graph retention and earlier first-lane Engram preparation; baseline is coordinator stream staging, native RMSNorm unchanged",
+  "daemon_sha256": "adcb72a11d51e906ffda3c47bbf01a287ac646190496bcb780d6db7e32d7c7b5",
+  "candidate_patch": "/tmp/ds41-index-graphs/candidate.patch",
+  "long_counting": {
+    "matched-spec": [
+      {
+        "side": "target",
+        "decode_tps": 125.07349260152647,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "speculative",
+        "decode_tps": 124.83368179384186,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "target",
+        "decode_tps": 124.39460179118853,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "speculative",
+        "decode_tps": 124.92823481550606,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "target",
+        "decode_tps": 123.73035789767627,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "speculative",
+        "decode_tps": 124.9307360126034,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      }
+    ],
+    "target-long": [
+      {
+        "side": "target",
+        "decode_tps": 41.68401899316834,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "speculative",
+        "decode_tps": 41.83234674531008,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "target",
+        "decode_tps": 41.837094162352116,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      },
+      {
+        "side": "speculative",
+        "decode_tps": 41.87702116459111,
+        "prompt_tokens": 16410,
+        "completion_tokens": 599
+      }
+    ]
+  },
+  "concurrency_performance": [
+    {
+      "source": "/tmp/ds41-index-graphs/concurrent-perf-0-baseline.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 319.5489922151042,
+          "per_stream_mean": 54.167507309736386
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 620.4934340213866,
+          "per_stream_mean": 40.24892665937546
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-index-graphs/concurrent-perf-1-candidate.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 305.803968970805,
+          "per_stream_mean": 51.826024823831105
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 618.5028957941822,
+          "per_stream_mean": 40.12827038312654
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-index-graphs/concurrent-perf-2-candidate.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 311.84592538809414,
+          "per_stream_mean": 52.84036141585378
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 611.0616329378217,
+          "per_stream_mean": 39.64770401733368
+        }
+      ]
+    },
+    {
+      "source": "/tmp/ds41-index-graphs/concurrent-perf-3-baseline.json",
+      "results": [
+        {
+          "concurrency": 6,
+          "aggregate_tps": 317.9386537787771,
+          "per_stream_mean": 53.916700727092426
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 619.43838635795,
+          "per_stream_mean": 40.186143791104826
+        }
+      ]
+    }
+  ],
+  "qualification": {
+    "full_model_lane_fixture": "pass, 11.29 seconds",
+    "native_api": "pass",
+    "concurrent_api": "pass, C2/C6/C16, cancellation and replacement",
+    "target_paired_quality": "8/8 identical text and usage; inherited Unicode objective failure"
+  }
+}
