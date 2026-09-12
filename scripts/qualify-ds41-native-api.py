@@ -33,6 +33,8 @@ def stream_case(base, body, cancel=False):
                 break
             event = json.loads(data)
             events.append(dict(seconds=elapsed, event=event))
+            if event.get('error'):
+                raise RuntimeError(f"SSE inference error: {event['error']}")
             if event.get('usage'):
                 usage = event['usage']
             for choice in event.get('choices', []):

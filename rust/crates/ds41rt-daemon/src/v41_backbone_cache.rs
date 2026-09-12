@@ -322,6 +322,14 @@ impl<'a> BackboneCache<'a> {
     pub fn plan(&self, work: &[CacheWork]) -> Result<CacheBatch> {
         self.plan_stage(work, false, false)
     }
+    pub fn check_append_capacity(&self, work: &[(CacheLease, u32)]) -> Result<()> {
+        for (i, source) in self.sources.iter().enumerate() {
+            let appends = work.iter().map(|&(lease, tokens)|
+                Ok((self.request(lease)?.sources[i], tokens))).collect::<Result<Vec<_>>>()?;
+            source.check_append_capacity(&appends)?;
+        }
+        Ok(())
+    }
     pub fn plan_replay(&self, work: &[CacheWork]) -> Result<CacheBatch> {
         self.plan_stage(work, true, false)
     }

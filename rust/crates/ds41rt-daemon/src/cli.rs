@@ -437,6 +437,10 @@ pub(crate) struct NativeServeArgs {
     #[arg(long, default_value_t = 32768, value_parser = clap::value_parser!(u32).range(1..=1048576))]
     pub max_context_tokens: u32,
 
+    /// Maximum retained prompt/turn states; zero disables native prefix reuse.
+    #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(0..=16))]
+    pub prefix_cache_entries: u32,
+
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
 

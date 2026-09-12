@@ -151,6 +151,15 @@ impl<'a> CompressorState<'a> {
     pub fn committed_end(&self, lease: CompressorLease) -> Result<u64> {
         Ok(self.slots[self.validate(lease)?].end)
     }
+    pub fn check_append_capacity(&self, work: &[(CompressorLease, u32)]) -> Result<()> {
+        let ratio = ratio(self.layer)?;
+        let appends = work.iter().map(|&(lease, tokens)| {
+            let slot = self.validate(lease)?;
+            let old = self.slots[slot].end as usize;
+            Ok((slot, old / ratio, (old + tokens as usize) / ratio))
+        }).collect::<Result<Vec<_>>>()?;
+        self.index.reserve(&appends).map(|_| ())
+    }
     pub fn index_cache(&self, lease: CompressorLease) -> Result<IndexCacheView<'_>> {
         let slot = self.validate(lease)?;
         Ok(self

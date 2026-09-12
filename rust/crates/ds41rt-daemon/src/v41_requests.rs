@@ -111,6 +111,10 @@ impl<'a> Requests<'a> {
         }
         Ok(())
     }
+    pub fn release_if_present(&mut self, lease: CacheLease) -> Result<()> {
+        if self.slots.iter().flatten().any(|r| r.lease == lease) { self.release(lease)?; }
+        Ok(())
+    }
     pub fn retain_prefix(&mut self, lease: CacheLease, budget: usize) -> Result<RequestPrefix<'a>> {
         let request = self.request(lease)?;
         ensure!(request.prefill.is_none() && request.history.position() == self.cache.committed_end(lease)?,

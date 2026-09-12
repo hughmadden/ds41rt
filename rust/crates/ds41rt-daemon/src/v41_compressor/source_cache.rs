@@ -260,18 +260,38 @@ impl<'a> SourceCache<'a> {
                     && self.pages[slot].len() == old.div_ceil(PAGE_ROWS),
                 "index history binding differs"
             );
+        }
+        for (position, &(slot, old, new)) in appends.iter().enumerate() {
             plan.lengths.push((slot, new as u64));
             if new > old && old % PAGE_ROWS != 0 {
                 let logical = old / PAGE_ROWS;
                 let source = self.pages[slot][logical];
                 if pool.shared(source) {
-                    ensure!(
-                        plan.used < pool.free.len(),
-                        "index cache copy-on-write pool exhausted"
-                    );
-                    let destination = pool.free[pool.free.len() - plan.used - 1];
-                    plan.used += 1;
-                    plan.replacements.push((slot, logical, source, destination));
+                    // If every owner appends in this transaction, one can keep
+                    // the original. All tail copies precede every accepted write,
+                    // including writes by that owner. A snapshot or non-appending
+                    // owner prevents this optimization. Exclusive appends avoid
+                    // this bounded (at most sixteen owners) scan entirely.
+                    let mut writers = 0;
+                    let mut last = position;
+                    for (i, &(other, begin, end)) in appends.iter().enumerate() {
+                        if end > begin
+                            && begin % PAGE_ROWS != 0
+                            && self.pages[other][begin / PAGE_ROWS] == source
+                        {
+                            writers += 1;
+                            last = i;
+                        }
+                    }
+                    if writers != pool.references(source) || position != last {
+                        ensure!(
+                            plan.used < pool.free.len(),
+                            "index cache copy-on-write pool exhausted"
+                        );
+                        let destination = pool.free[pool.free.len() - plan.used - 1];
+                        plan.used += 1;
+                        plan.replacements.push((slot, logical, source, destination));
+                    }
                 }
             }
             let extra = new.div_ceil(PAGE_ROWS) - self.pages[slot].len();
@@ -352,24 +372,38 @@ mod tests {
         value: u8,
         stream: *mut c_void,
     ) -> Result<()> {
-        let plan = cache.reserve(&[(slot, old, new)])?;
+        append_many(cache, &[(slot, old, new, value)], stream)
+    }
+
+    fn append_many(
+        cache: &mut SourceCache<'_>,
+        work: &[(usize, usize, usize, u8)],
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let appends: Vec<_> = work
+            .iter()
+            .map(|&(slot, old, new, _)| (slot, old, new))
+            .collect();
+        let plan = cache.reserve(&appends)?;
         let library = cache.lengths.library;
         unsafe {
             cache.copy_shared_tails(&plan, stream)?;
             library.cuda_stream_synchronize(stream)?;
         }
-        for row in old..new {
-            let destination = cache.destination(&plan, slot, row)? as usize;
-            for (buffer, width) in [
-                (cache.packed.buffer, 64),
-                (cache.scales.buffer, 4),
-                (cache.kv_values.buffer, 512),
-                (cache.kv_scales.buffer, 16),
-            ] {
-                library.copy_h2d(
-                    slice(buffer, destination * width, width),
-                    &vec![value; width],
-                )?;
+        for &(slot, old, new, value) in work {
+            for row in old..new {
+                let destination = cache.destination(&plan, slot, row)? as usize;
+                for (buffer, width) in [
+                    (cache.packed.buffer, 64),
+                    (cache.scales.buffer, 4),
+                    (cache.kv_values.buffer, 512),
+                    (cache.kv_scales.buffer, 16),
+                ] {
+                    library.copy_h2d(
+                        slice(buffer, destination * width, width),
+                        &vec![value; width],
+                    )?;
+                }
             }
         }
         unsafe {
@@ -400,6 +434,52 @@ mod tests {
             }
         }
         Ok(bytes)
+    }
+
+    #[test]
+    #[ignore = "requires a CUDA native library in DS41RT_NATIVE_LIB"]
+    fn native_source_shared_writers_fit_exact_pool_and_preserve_nonwriters() -> Result<()> {
+        let library = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let stream = LoadStream {
+            library: &library,
+            raw: library.cuda_stream_create()?,
+        };
+        for nonwriter in [false, true] {
+            let mut cache = SourceCache::new(&library, 3, 3)?;
+            append(&mut cache, 0, 0, 6, 0x11, stream.raw)?;
+            let short = cache.retain_prefix(0, 3)?;
+            cache.restore_prefix(1, &short)?;
+            cache.restore_prefix(2, &short)?;
+            let original = cache.pages[0][0];
+            // The retained snapshot needs the original page, so three writers
+            // cannot fit in two spare pages. Planning must leave owners intact.
+            assert!(cache.reserve(&[(0, 6, 7), (1, 3, 4), (2, 3, 4)]).is_err());
+            assert_eq!(cache.pool.borrow().free.len(), 2);
+            drop(short);
+            assert!(cache.reserve(&[(0, 6, 7), (0, 6, 7)]).is_err());
+            assert!(cache.reserve(&[(16, 6, 7)]).is_err());
+            let end = if nonwriter { 3 } else { 4 };
+            append_many(
+                &mut cache,
+                &[(0, 6, 7, 0x22), (1, 3, 4, 0x33), (2, 3, end, 0x44)],
+                stream.raw,
+            )?;
+            assert_eq!(cache.pool.borrow().free.len(), 0);
+            assert_eq!(cache.pages[2][0], original);
+            assert_ne!(cache.pages[0][0], original);
+            assert_ne!(cache.pages[1][0], original);
+            assert_ne!(cache.pages[0][0], cache.pages[1][0]);
+            // Slot two may overwrite rows that belonged to slot zero's longer
+            // prefix; its copy must have completed before any branch wrote.
+            for (slot, old, new, value) in [(0, 6, 7, 0x22), (1, 3, 4, 0x33), (2, 3, end, 0x44)] {
+                let bytes = read(&cache, slot, new)?;
+                assert!(bytes[..old * 596].iter().all(|&v| v == 0x11));
+                assert!(bytes[old * 596..].iter().all(|&v| v == value));
+                cache.release(slot)?;
+            }
+            assert_eq!(cache.pool.borrow().free.len(), 3);
+        }
+        Ok(())
     }
 
     #[test]

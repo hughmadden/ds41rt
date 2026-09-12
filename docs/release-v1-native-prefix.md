@@ -2,8 +2,10 @@
 
 The release API uses `serve-native`, entering `v41_native_serve.rs` and its
 `scheduler.rs`. The older `commands/real_full` radix/cache is not on that path.
-The current native scheduler always admits a fresh cache lease, reports zero
-cache-hit tokens and releases its request on completion.
+The native scheduler now restores retained request state through a token radix
+and reports the reused token count through the API. The original development
+APIs remain available for uncached comparisons; separately launched candidates
+exercise this integration.
 
 ## Compressed source ownership
 
@@ -26,6 +28,39 @@ uploads the page table and initialized row count. A shared partial tail copies
 256 × (64 + 4 + 512 + 16) = 152,576 bytes, independent of total prefix length.
 Host reference accounting occurs at page allocation/publication/release; this
 is not an end-to-end performance result.
+
+When every owner of a shared partial page appends in the same transaction, one
+owner keeps the original page. All other copies finish before any accepted rows
+are written. A retained snapshot or non-appending owner prevents reuse by a
+writer. This avoids reserving an unnecessary extra page at full concurrency;
+divergent prefix lengths and zero acceptance are covered by device tests.
+
+## Admission and eviction
+
+`--prefix-cache-entries` defaults to 16 and accepts 0 through 16; zero disables
+retention. A compressed-edge token radix stores complete retained frontiers and
+returns the longest matching retained ancestor. Each value owns target state,
+optional dSpark state and the already-computed next greedy token. Exact prompt
+hits can therefore emit the first token without rerunning a model pass.
+
+The scheduler captures successful prompt prefill and normal completion at drained
+transaction boundaries. It excludes failed and cancelled completions, and stores
+only the token frontier actually committed by greedy verification. Resuming a
+turn restores the forty target rings, compressor carry, Engram history, shared
+source pages and three draft rings. A longer prompt executes its uncached suffix.
+
+Least-recently-used eviction drops a radix value and its state together. Duplicate
+frontiers are removed before recapture; full-cache eviction precedes allocating
+another tail, so retained tail residency stays within the configured limit.
+Before admission and each decode round, source capacity is checked for the
+upcoming writes, evicting retained entries until the work fits. Active references
+continue to protect shared pages. Invalidated request leases can be cleaned up
+without stopping the scheduler.
+
+This implementation does **not** reconstruct state at an arbitrary token inside
+a radix edge. That case falls back to a shorter complete retained ancestor or
+cold prefill. Compression-boundary reuse with bounded SWA replay and the final
+release pool sizing policy remain required.
 
 ## Qualification and remaining integration
 
@@ -73,12 +108,12 @@ copy-on-write isolation, completed page sharing, restoration after original
 request release, eviction, pool exhaustion and recovery when an exclusive tail
 can be appended without free pages. See the accompanying JSON evidence.
 
-These are native ownership prerequisites, not enabled API prefix reuse. Still
-required: native token radix publication and lookup; scheduler admission and
-completion integration for retained state; bounded replay for other hits;
-eviction coupling and pool sizing; API numerical/agentic/concurrency
-qualification; controlled ordinary decode and prefix-resume performance checks.
-The existing development containers have not been replaced by this change.
+See [native admission qualification](release-v1-native-admission.md) for live
+complete-prompt and retained-turn parity, concurrency, memory-pressure recovery
+and controlled decode measurements. These focused checks do not replace the
+release's long-context, agentic, vision or full performance gates. Bounded replay
+for other hits and release pool sizing remain open. The original comparison
+containers have not been replaced by this change.
 
 Reproduce component tests from the repository root:
 

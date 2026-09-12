@@ -14,7 +14,10 @@ impl PagePool {
         }
     }
     pub fn shared(&self, page: u32) -> bool {
-        self.references[page as usize] > 1
+        self.references(page) > 1
+    }
+    pub fn references(&self, page: u32) -> usize {
+        self.references[page as usize]
     }
     pub fn retain(&mut self, pages: &[u32]) {
         for &page in pages {

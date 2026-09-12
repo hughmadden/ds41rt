@@ -1,6 +1,7 @@
 use super::*;
 use crate::v41_backbone_cache::CacheLease;
 use crate::v41_requests::RequestBatch;
+use super::prefix::PrefixCache;
 
 struct Active {
     id: u64,
@@ -12,12 +13,16 @@ struct Active {
     buffered: usize,
     lane: usize,
     finished: bool,
+    cacheable: bool,
+    tokens: Vec<u32>,
+    next_after_commit: u32,
 }
 impl Active {
     fn emit(&mut self, tokens: &[u32]) -> Result<()> {
         for &token in tokens {
             ensure!(!self.job.events.is_closed(), "client disconnected");
             self.anchor = token;
+            self.tokens.push(token);
             self.generated += 1;
             self.buffered += 1;
             if token != 1 {
@@ -40,6 +45,7 @@ impl Active {
                         else { InferenceFinishReason::Length },
                 }))?;
                 self.finished = true;
+                self.cacheable = true;
                 break;
             }
         }
@@ -56,13 +62,20 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
     let mut active: Vec<Option<Active>> = (0..16).map(|_| None).collect();
     let mut id = 0u64;
     let mut closed = false;
+    let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize);
     loop {
         // This point is reached only after both complete stacks have drained and
         // committed. No cache owner is migrated or retired inside a layer stack.
         for entry in &mut active {
             if entry.as_ref().is_some_and(|r| r.finished || r.job.events.is_closed()) {
                 let request = entry.take().unwrap();
-                if requests.cache().request_id(request.lease).is_ok() { requests.release(request.lease)?; }
+                if request.cacheable && requests.cache().request_id(request.lease).is_ok() {
+                    if let Err(error) = prefixes.retain(&request.tokens, request.next_after_commit,
+                        request.id, request.lease, requests, draft.as_deref_mut()) {
+                        tracing::warn!(%error, "completed request prefix was not retained");
+                    }
+                }
+                requests.release_if_present(request.lease)?;
                 if let Some(draft) = draft.as_deref_mut() { draft.release(request.id)?; }
             }
         }
@@ -97,16 +110,27 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                     .is_some_and(|n| n <= args.max_context_tokens as usize), "native text request exceeds context limit");
                 let decoder = ds41rt_loader::streaming_token_decoder(&args.snapshot, false)?;
                 if let Some(draft) = draft.as_deref_mut() { draft.admit(id)?; }
+                let hit = prefixes.restore(&prompt, id, lease, requests, draft.as_deref_mut())?;
+                let cached = hit.map_or(0, |(end, _)| end);
+                prefixes.make_room(requests, &[(lease, (prompt.len() - cached) as u32)])?;
                 job.events.blocking_send(Ok(InferenceChunk::Ready {
                     system_fingerprint: Some(if draft.is_some() { "ds41rt-native-fp8-kv-dspark" }
                         else { "ds41rt-native-fp8-kv" }.into()),
-                    prompt_usage: PromptUsage { prompt_tokens: prompt.len(), prompt_cache_hit_tokens: 0 },
+                    prompt_usage: PromptUsage { prompt_tokens: prompt.len(), prompt_cache_hit_tokens: cached },
                 }))?;
                 first_transport.begin_request(); second_transport.begin_request();
-                let anchor = prefill(lib, runtime, first, second, requests, first_transport,
+                let anchor = if cached == prompt.len() { hit.expect("complete prefix hit").1 }
+                else { prefill(lib, runtime, first, second, requests, first_transport,
                     second_transport, lease, &prompt, args.prefill_batch_tokens as usize, &job,
-                    draft.as_deref_mut())?;
-                Ok(Active { id, lease, job, decoder, anchor, generated: 0, buffered: 0, lane, finished: false })
+                    draft.as_deref_mut())? };
+                if cached != prompt.len() {
+                  if let Err(error) = prefixes.retain(&prompt, anchor, id, lease, requests, draft.as_deref_mut()) {
+                    tracing::warn!(%error, "prompt prefix was not retained");
+                  }
+                }
+                tracing::debug!(prompt_tokens=prompt.len(), cached_tokens=cached, "native prefix admission");
+                Ok(Active { id, lease, job, decoder, anchor, generated: 0, buffered: 0, lane,
+                    finished: false, cacheable: false, tokens: prompt, next_after_commit: anchor })
             })();
             match result {
                 Ok(mut request) => {
@@ -120,7 +144,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                     // Other completed requests retain their caches.
                     let _ = events.blocking_send(Err(format!("{error:#}")));
                     tracing::warn!(%error, "native request admission failed");
-                    if requests.cache().request_id(lease).is_ok() { requests.release(lease)?; }
+                    requests.release_if_present(lease)?;
                     if let Some(draft) = draft.as_deref_mut() { draft.release(id)?; }
                     first_transport.reset_connections(); second_transport.reset_connections();
                 }
@@ -131,13 +155,18 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             .filter_map(|(slot, request)| request.as_ref().filter(|r| r.lane == lane && !r.finished
                 && !r.job.events.is_closed()).map(|_| slot)).collect());
         if members.iter().all(Vec::is_empty) { continue; }
-        let result = round(lib, runtime, first, second, requests, first_transport,
-            second_transport, &mut active, &members, draft.as_deref_mut());
+        let capacity: Vec<_> = members.iter().flatten().map(|&slot| {
+            let r = active[slot].as_ref().unwrap();
+            (r.lease, if draft.is_some() { (r.job.max_tokens - r.generated).min(6) as u32 } else { 1 })
+        }).collect();
+        let result = prefixes.make_room(requests, &capacity).and_then(|_| round(lib, runtime,
+            first, second, requests, first_transport, second_transport, &mut active, &members, draft.as_deref_mut()));
         if let Err(error) = result {
             first_transport.reset_connections(); second_transport.reset_connections();
             for request in active.iter_mut().flatten() {
                 let _ = request.job.events.blocking_send(Err(format!("{error:#}")));
                 request.finished = true;
+                request.cacheable = false;
             }
         }
     }
@@ -216,6 +245,7 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
             let mut offset = 0;
             let mut accepted = Vec::new();
             let mut emissions = Vec::new();
+            let mut next_after_commit = Vec::new();
             for (&slot, input) in members[lane].iter().zip(&inputs[lane]) {
                 let request = active[slot].as_ref().unwrap();
                 let decision = ds41rt_core::verify_dspark_greedy(input,
@@ -223,13 +253,15 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
                     .map_err(anyhow::Error::msg)?;
                 accepted_drafts += decision.accepted_inputs - 1;
                 emitted += decision.emitted.len();
+                next_after_commit.push(next[lane][offset + decision.accepted_inputs as usize - 1]);
                 offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
             }
             if let Some(draft) = draft.as_deref_mut() { draft.commit_batch(pass, requests, batch, &accepted)?; }
             else { pass.commit(requests, batch, &accepted)?; }
             batches[lane] = None; // Only successful commits relinquish cleanup ownership.
-            for (&slot, tokens) in members[lane].iter().zip(emissions) {
+            for ((&slot, tokens), next_token) in members[lane].iter().zip(emissions).zip(next_after_commit) {
                 let request = active[slot].as_mut().unwrap();
+                request.next_after_commit = next_token;
                 if let Err(error) = request.emit(&tokens) {
                     let _ = request.job.events.blocking_send(Err(format!("{error:#}")));
                     request.finished = true;

@@ -1,0 +1,133 @@
+{
+  "date_utc": "2026-09-12T06:00:12.589351+00:00",
+  "scope": "Focused native exact-frontier integration. Not arbitrary partial-prefix replay, full agentic qualification or release performance.",
+  "base_commit": "0fd1c1bdef38eca82f4755bdb0681dc09cf53788",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/cli.rs": "0e8741230e20bf1f4ded1f47c5d42254d64ef55bd2ef8f24edb0b31ab8c04f79",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache.rs": "4a4d95338ffba1b50844c52533f78778a0cfc41f585c74b52c167adaf3327ee8",
+    "rust/crates/ds41rt-daemon/src/v41_compressor.rs": "d852a7880afff172ef6bb71dd9cb547db9eaf70c4763c373a7d94da2fde5afe9",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache.rs": "b2d268a78b0d2322385bf820fba4bb4e5ad9f05cb96c55818ef414bbd47137c4",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache/ownership.rs": "9d438181b1b57a55d2134be2a5b457cd1b8c180b92a3a2d529df35ce7a1f185d",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "53390202d9dda8d016ff741fd7ef2a179e25c4b3bcfcda24f0b7ed673597d384",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/prefix.rs": "7115761ca71594345f6fc44e6786c1ad072e1181344439d018b1574d37729acd",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "d51b01c943d8db14b791852acfa6701c3fc3c737dda89a30b650732bd14fbae4",
+    "rust/crates/ds41rt-daemon/src/v41_requests.rs": "807b35546dd5a8bc940f583d131da5366e56dc3730db3a383b2562f403e93ce1",
+    "scripts/qualify-ds41-concurrent-api.py": "0af6a3ca822dd8cc0780880475f40dafbd06bf6c1a8f7bcbba2b0f21f3b84b17",
+    "scripts/qualify-ds41-native-api.py": "f69f0d6b726751ca98c06aa9a45d915088e362b168900cc3ca37cad3fc8e8e55",
+    "scripts/qualify-ds41-prefix-api.py": "68570595d1b88cc15b5e74af1b9663745da2e8b35fab05c2f27ca3001fe765bd",
+    "scripts/qualify-ds41-prefix-performance.py": "8e8fd88036b8810c8028bcf9ba2c7a4e6a73921f4337d76d39644cc29e725481"
+  },
+  "binary_sha256": {
+    "initial": "fc7796a306faf21d9ed86e8337572b21198012d231ccab73d6a7bfcf25d97094",
+    "fixed": "7d9015187012ba6c486e652d594aeadb66768f43d798ffd5d40336edaa51607b",
+    "baseline": "cde19ddc4619000b66d8184bd45392b3a83adc914c5a6364dd5fae7a67464756"
+  },
+  "native_library_sha256": "ccd82d862473f71d01622bcf5decd9d5789444210db1be4cc245dbdcb44b8a07",
+  "coordinator_image": "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+  "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 43.194590229121225,
+            "first_content_seconds": 0.0885363175184466,
+            "finish_seconds": 5.993440622463822
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 43.45040095009078,
+            "first_content_seconds": 0.0014328374527394772,
+            "finish_seconds": 5.870163365500048
+          }
+        },
+        "candidate_decode_ratio": 1.0059222860921386
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 43.0427629645702,
+            "first_content_seconds": 0.12723522051237524,
+            "finish_seconds": 6.049151409009937
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 43.3285394748142,
+            "first_content_seconds": 0.0013515845057554543,
+            "finish_seconds": 5.886928167426959
+          }
+        },
+        "candidate_decode_ratio": 1.0066393625910872
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 147.0790574837713,
+            "first_content_seconds": 0.09188884845934808,
+            "finish_seconds": 1.824587355426047
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 146.90482844683459,
+            "first_content_seconds": 0.0013123065000399947,
+            "finish_seconds": 1.7370953364879824
+          }
+        },
+        "candidate_decode_ratio": 0.9988154055382362
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 126.04233929290004,
+            "first_content_seconds": 0.1287666165153496,
+            "finish_seconds": 2.152079787978437
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 125.39484282792503,
+            "first_content_seconds": 0.001599257462657988,
+            "finish_seconds": 2.0352211374556646
+          }
+        },
+        "candidate_decode_ratio": 0.9948628653783524
+      }
+    ]
+  },
+  "dspark_code_followup": [
+    {
+      "workload": "code",
+      "arms": {
+        "reference": {
+          "observed_decode_tokens_per_second": 126.53288561763907,
+          "first_content_seconds": 0.12672614096663892,
+          "finish_seconds": 2.1406434399541467
+        },
+        "candidate": {
+          "observed_decode_tokens_per_second": 126.88211218602294,
+          "first_content_seconds": 0.0014041290269233286,
+          "finish_seconds": 2.0112384145031683
+        }
+      },
+      "candidate_decode_ratio": 1.0027599668392861
+    }
+  ],
+  "raw_archive": {
+    "path": "docs/evidence/native-prefix-admission.json.gz",
+    "sha256": "10ec15d1772782b5b6a1d535c7b4a867a69173cdcdc4218f77b25eaf5ef9f1e6"
+  },
+  "pressure": {
+    "max_context_tokens": 512,
+    "initial": "C2/C6 pass; C16 incomplete SSE, reproduced twice",
+    "fixed": "C2/C6/C16 and cancellation/replacement pass",
+    "component": "4 pass, CUDA memcheck 0 errors"
+  },
+  "qualification": {
+    "radix_tests": 2,
+    "complete_and_turn_resume_both_modes": true,
+    "final_dspark_concurrency": true,
+    "original_baselines_replaced": false
+  },
+  "setup_failure": "Starting three target coordinators on GPU0 exhausted memory. Stopped the temporary pressure coordinator and restarted the fixed candidate. Failed setup and successful retry records are both retained."
+}

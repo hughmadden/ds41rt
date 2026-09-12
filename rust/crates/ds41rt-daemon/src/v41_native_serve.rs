@@ -1,5 +1,6 @@
 pub(crate) mod speculative;
 mod scheduler;
+mod prefix;
 use crate::v41_backbone_cache::BackboneCache;
 use crate::v41_backbone_execution::BackboneExecution;
 use crate::v41_backbone_execution::CacheProducerWeights;
@@ -280,6 +281,11 @@ fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     use crate::v41_block::EncoderSuffix;
     use crate::v41_backbone_cache::CacheWork;
     let end = tokens.len() as u64;
+    let cached = requests.cache().committed_end(lease)? as usize;
+    if cached > 0 {
+        return prefill_continuation(lib, runtime, pass, requests, transport, lease,
+            &tokens[cached..], chunk_rows, job, draft);
+    }
     let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
     requests.begin_encoder(lease, end)?;
     let mut chunks = tokens.chunks(chunk_rows);
@@ -331,4 +337,36 @@ fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     if result.is_err() { pass.discard(&mut batch)?; }
     tracing::debug!(target: "ds41rt::timing", rows, total_us=started.elapsed().as_micros() as u64, "target decoder replay");
     result
+}
+
+fn prefill_continuation<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>, transport: &mut NativeTp4Wave<'a>,
+    lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
+    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<u32> {
+    ensure!(!tokens.is_empty(), "prefix continuation has no uncached rows");
+    let mut anchor = 0;
+    for chunk in tokens.chunks(chunk_rows) {
+        ensure!(!job.events.is_closed(), "client disconnected");
+        let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
+            image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+        let result = (|| -> Result<u32> {
+            let logits = runtime.block_on(unsafe { pass.execute(requests, &mut batch, transport,
+                0, &[chunk.len() - 1]) })?;
+            let mut bytes = vec![0; logits.logits.bytes];
+            lib.copy_d2h(&mut bytes, logits.logits)?;
+            let mut best = (0u32, f32::NEG_INFINITY);
+            for (i, b) in bytes.chunks_exact(4).enumerate() {
+                let value = f32::from_ne_bytes(b.try_into().unwrap());
+                ensure!(value.is_finite(), "non-finite continuation logit");
+                if value > best.1 { best = (i as u32, value); }
+            }
+            ensure!(!job.events.is_closed(), "client disconnected");
+            if let Some(draft) = draft.as_deref_mut() { draft.commit(pass, requests, &mut batch, chunk.len() as u32)?; }
+            else { pass.commit(requests, &mut batch, &[chunk.len() as u32])?; }
+            Ok(best.0)
+        })();
+        if result.is_err() { pass.discard(&mut batch)?; }
+        anchor = result?;
+    }
+    Ok(anchor)
 }

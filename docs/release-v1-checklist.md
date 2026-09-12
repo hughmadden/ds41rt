@@ -38,7 +38,7 @@ launch settings, sampling, input data, cache state, concurrency, warmup, all
 samples and errors. Preserve raw machine-readable output alongside reports.
 Run the shared four-Spark target/dSpark workloads sequentially to avoid contention.
 
-- [ ] Locate and reuse the eight content types and Orchid from ../glmrt-release.
+- [ ] Reuse the located eight content types and Orchid from ../glmrt-release (sources below).
 - [ ] Headline maximum prefill, low-entropy decode and weighted eight-type
   decode throughput; KV size and total GPU RAM requirement.
 - [ ] Memory accounting by arena, tensor, KV cache, graphs and other allocations.
@@ -59,6 +59,9 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 - [ ] README: headline numbers, short intro, Docker and source getting started,
   host configuration, options, performance report, engineering report, thanks.
+- [ ] Place an execution-path SVG immediately below the README short intro,
+  using `../glmrt-release/docs/balanced-path-execution.svg` as the visual reference
+  and showing the final qualified native serving design (user addition September 12).
 - [ ] Concise engineering report covering the final design: kernels, scheduling,
   memory/storage, transport, optimizations, prefix caching, vision and API.
 - [ ] Complete performance report covering every suite item above.
@@ -74,10 +77,10 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
 on September 12. Docker inspection confirms both run `serve-native`, which enters
-v41_native_serve.rs and its scheduler.rs. The native scheduler currently reports
-zero cache-hit tokens and releases all request state on completion. It has four
+v41_native_serve.rs and its scheduler.rs. Those original artifacts report
+zero cache-hit tokens and release all request state on completion. The path has four
 source pools (ratio-two layers 2/8/14 and ratio-one layer 20), forty SWA rings,
-and CED decoder replay bounded to 128 tokens. It needs a native prefix index,
+and CED decoder replay bounded to 128 tokens. The candidate now adds a native prefix index,
 shared source pages, retained SWA/compressor/history state and admission wiring.
 
 Correction to the initial source audit: the token radix and dSpark tail cache
@@ -87,11 +90,13 @@ inactive path were discarded. Native release implementation must be verified
 through the actual serve-native dispatch and APIs.
 
 [Native source prefix ownership](release-v1-native-prefix.md) implements shared
-KV/index page retention and copy-on-write. Native radix admission, full retained
-state scheduling and end-to-end performance qualification remain open. The
-native owners now support GPU retention of SWA/compressor/dSpark state and
-independent Engram history restoration; [component evidence](release-v1-retained-state.json)
-does not yet establish API prefix reuse.
+KV/index page retention and copy-on-write. Native radix admission and completed
+state scheduling are now wired into serve-native. [Admission qualification](release-v1-native-admission.md)
+covers complete hits, retained turns, C16 cancellation/replacement, small-pool
+pressure and controlled short-context decode. Bounded replay for arbitrary
+partial hits, final pool sizing and the full release qualification remain open.
+[Retained-state component evidence](release-v1-retained-state.json) remains
+separate from these API results.
 
 [Initial paired quality evidence](release-v1-initial-quality.json) records eight
 cases per mode against the existing development artifacts. Both modes pass five
@@ -101,3 +106,12 @@ Traditional Chinese translation renders correctly in both arms. This evidence
 does not establish an encoding bug or comprehensive Unicode correctness.
 The open-ended English explanations differ across modes. The script exits 1
 because its strict combined gate is not satisfied; do not count this as a pass.
+
+The located release corpus is `../glmrt-release/python/tools/bench_real_full_mtp_acceptance.py`:
+`WEIGHTED_CASE_IDS` selects code, math, fable, hello, topic, structured-json,
+structured-json-schema and multilingual. The two JSON cases each have weight
+0.5; all six other cases have weight 1.0. Preserve its actual prompts, token
+budgets and schema. Counting/repetition and syntax diagnostics are excluded from
+the weighted score. `../glmrt-release/python/tools/bench_real_full_repeat_decode.py`
+provides Orchid. Port the corpus and measurement contract, not the other engine's
+numbers or model-specific launch assumptions.
