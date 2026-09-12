@@ -231,6 +231,13 @@ def export_input_quantizer(output_dir: Path, manifest: dict) -> None:
 def export(output_dir: Path, role: str, rows: tuple[int, ...], input_format: str = "bf16") -> None:
     if input_format not in ("bf16", "fp8_k32") or (role != "spark" and input_format != "bf16"):
         raise ValueError("FP8 K32 input is supported only for Spark backbone experts")
+    if role == "coordinator":
+        from b12x.moe._shared.kernels.v41_slice_pipeline import V41DraftSlicePipeline
+        from export_b12x_v41_slices_aot import export as export_slices
+
+        export_slices(output_dir, rows, V41DraftSlicePipeline.DEFAULT_WIDTH,
+                      role=role, standard_names=True)
+        return
     # Export requires compiler IR, which executable-only cache entries omit.
     os.environ["B12X_COMPILE_DISK_CACHE"] = "0"
     os.environ["B12X_COMPILE_MEMORY_CACHE"] = "0"

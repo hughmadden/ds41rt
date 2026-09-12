@@ -161,6 +161,25 @@ impl<'library> DsparkWeights<'library> {
             terminal_additional_bytes_per_wave: DsparkTerminal::additional_bytes(16)?,
         })
     }
+    /// Serving retains a large target-context projection buffer, but expert
+    /// execution only needs the bounded speculative request batch. Reserve the
+    /// full context owner in addition to the conservative draft-wave plan before
+    /// loading weights; never size expert scratch from prefill capacity.
+    pub fn load_serving(
+        library: &'library NativeLibrary,
+        catalog: &OfficialV41Catalog,
+        context_capacity: u32,
+        requests: u32,
+        device_budget: usize,
+        pinned_staging_bytes: usize,
+    ) -> Result<Self> {
+        let draft_capacity = DsparkAttentionWave::projection_capacity(requests)?;
+        let context_bytes = DsparkMainContext::device_bytes(library, context_capacity)?;
+        let draft_budget = device_budget.checked_sub(context_bytes)
+            .context("dSpark main context exceeds device budget")?;
+        Self::load(library, catalog, draft_capacity, 1, draft_budget, pinned_staging_bytes)
+    }
+
     /// Admit all three stages and the requested expert wave workspaces before
     /// reading payloads; this does not allocate the wave workspaces themselves.
     pub fn load(

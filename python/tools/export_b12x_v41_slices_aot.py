@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Export the experimental Spark slice pipeline through the existing expert ABI.
+"""Export native V4.1 slice pipelines through the existing expert ABI.
 
-Explicit width only: serving policy selection awaits native qualification.
-The ordinary expert exporter and production defaults are unchanged.
+Explicit widths support comparisons; the ordinary coordinator exporter selects
+the qualified b12x draft recipe and uses standard coordinator artifact names.
 """
 
 import argparse
@@ -17,7 +17,7 @@ os.environ["B12X_COMPILE_MEMORY_CACHE"] = "0"
 import _pinned_sparkinfer
 
 
-def export(output, capacities, width, atomic_min_capacity=None, role="spark"):
+def export(output, capacities, width, atomic_min_capacity=None, role="spark", *, standard_names=False):
     import torch
     import cutlass
     import cutlass.cute as cute
@@ -31,13 +31,15 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark"):
     if (props.major, props.minor) not in ((12, 0), (12, 1)):
         raise ValueError("native Blackwell device required")
     coordinator = role == "coordinator"
+    if standard_names and not coordinator:
+        raise ValueError("standard draft names require coordinator role")
     if coordinator and ((props.major, props.minor) != (12, 0) or atomic_min_capacity is not None):
         raise ValueError("coordinator slices require SM120 and ordered route output")
     experts, intermediate, kernel_intermediate, topk = ((128, 2304, 2304, 3) if coordinator else (384, 576, 640, 6))
     output.mkdir(parents=True, exist_ok=True)
     manifest = dict(
         schema=1,
-        experimental=True,
+        experimental=not standard_names,
         role=role,
         input_format="bf16" if coordinator else "fp8_k32",
         sparkinfer_revision=_pinned_sparkinfer.REVISION,
@@ -77,7 +79,8 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark"):
             make_fake_tensor(dtype, shape, stride, assumed_align=16)
             for dtype, shape, stride in specs
         ]
-        label = f"v41_slices_m{capacity}_w{selected_width}"
+        label = (f"v41_coordinator_m{capacity}" if standard_names
+                 else f"v41_slices_m{capacity}_w{selected_width}")
         pipeline = (V41DraftSlicePipeline(capacity, selected_width, props.multi_processor_count)
                     if coordinator else V41SlicePipeline(capacity, selected_width, atomic_tokens=atomic))
         if coordinator:

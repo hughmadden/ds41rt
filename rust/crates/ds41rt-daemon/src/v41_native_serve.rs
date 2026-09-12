@@ -245,11 +245,11 @@ fn worker(
         TcpTransportConfig { timeout: Duration::from_secs(120), max_frame_bytes: 64 * 1024 * 1024 })?;
     let mut prefill_transport = NativeTp4Wave::new(&lib, prefill_roce, NativeTp4Wave::device_bytes(capacity)?)?;
     let draft_weights = if args.dspark {
-        Some(crate::v41_experts::dspark::DsparkWeights::load(
+        Some(crate::v41_experts::dspark::DsparkWeights::load_serving(
             &lib,
             &catalog,
             capacity,
-            1,
+            16,
             32 * 1024 * 1024 * 1024,
             16 * 1024 * 1024,
         )?)

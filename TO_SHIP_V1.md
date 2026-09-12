@@ -4,11 +4,14 @@ This is the single implementation, full-checkpoint bring-up and release plan; it
 The official checkpoint is available on the coordinator and all four Sparks, so component fixtures and checkpoint-backed work can proceed in whichever order removes dependencies fastest.
 Completion means a working, qualified release with measured performance, not component-only qualification.
 
+The user closed this session goal after the draft expert integration. The broader release checklist below remains unfinished; see [the next-session handoff](docs/HANDOFF_NEXT_SESSION.md).
+
 ## Required release contract
+
+- [x] Compare N64/N192 on live counting and wire the [qualified draft recipe into normal coordinator builds](docs/ds41-draft-release-recipe.md). The widths are effectively tied; retain N192. Correct dSpark admission to use 80 expert rows while reserving the full prefill-context owner. Default-native numerical, API, concurrency and paired-output checks pass.
 
 - [x] Export and deploy [native RTX dSpark expert slices](docs/ds41-draft-native-slices.md). Official native/replay checks, memcheck, full-model lanes, concurrent recovery and eight paired prompts pass; the inherited Unicode failure remains. Warm counting improves 133.8→146.2 C1 TPS, 329.7→370.6 C6 aggregate and 634.2→691.2 C16 aggregate. N192 is selected in development; live-routing tiling comparison and release-default policy wiring remain open.
 
-- [ ] Select final RTX draft tiling from live routing and wire the measured backend into release planner/defaults. [Native N192](docs/ds41-draft-native-slices.md) is selected in development; N64 remains promising for shared small-row routing.
 
 - [x] Parallelize [dSpark vocabulary adjustment and sampling](docs/ds41-draft-sampling.md) without extra allocation or ABI changes. Two hundred exact cases, graph reuse, racecheck, memcheck, full-model lanes and concurrent API recovery pass. Warm counting improves 131.2→133.9 C1 TPS, 323.3→326.8 C6 aggregate and 629.1→632.6 C16 aggregate. Both live API modes pass rollout checks. The [dSpark graph profile](docs/ds41-dspark-node-profile.md) identifies local routed experts as the largest remaining draft-side kernel cost.
 
