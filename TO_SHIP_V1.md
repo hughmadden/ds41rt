@@ -192,6 +192,12 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Current evidence and integration gaps
 
+- [Register-cached RMSNorm](docs/ds41-rmsnorm.md) is selected on 18041/18042.
+  Its 5120-wide kernel is about 44% faster at small row counts with 116 bit-exact
+  comparisons and clean racecheck. End-to-end target-only is essentially flat;
+  warm dSpark improves about 1.1% in the paired sample. C2/C6/C16, lifecycle and
+  output regressions pass, with the inherited Unicode-format failure unchanged.
+
 - [Block-boundary copy reduction](docs/ds41-block-boundaries.md) is selected on
   18041/18042. It removes 118 blocking copies and 79 explicit waits per full
   target stack while preserving arithmetic. Same-GPU warm comparisons are

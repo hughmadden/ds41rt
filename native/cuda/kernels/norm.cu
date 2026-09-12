@@ -57,6 +57,36 @@ __device__ uint16_t f32_to_bf16_rne(float value) {
   return static_cast<uint16_t>((bits + rounding_bias) >> 16);
 }
 
+__device__ __forceinline__ float fixed_tree_sum(float sum, float* scratch) {
+  const int tid = threadIdx.x;
+  scratch[tid] = sum;
+  __syncthreads();
+  // Preserve the existing descending-stride FP32 addition tree. Warp zero
+  // gathers each lane's partials across warps, reduces those in the same order,
+  // then finishes the last five levels with shuffles. Other warps only need
+  // the initial partial-publication barrier and final scalar-publication barrier.
+  static_assert(kBlock >= 32 && (kBlock & (kBlock - 1)) == 0);
+  if (tid < 32) {
+    float partial[kBlock / 32];
+#pragma unroll
+    for (int i = 0; i < kBlock / 32; ++i) partial[i] = scratch[tid + i * 32];
+#pragma unroll
+    for (int stride = kBlock / 64; stride > 0; stride >>= 1) {
+#pragma unroll
+      for (int i = 0; i < stride; ++i) partial[i] += partial[i + stride];
+    }
+    float reduced = partial[0];
+#pragma unroll
+    for (int stride = 16; stride > 0; stride >>= 1) {
+      const float other = __shfl_down_sync(0xffffffffu, reduced, stride);
+      if (tid < stride) reduced += other;
+    }
+    if (tid == 0) scratch[0] = reduced;
+  }
+  __syncthreads();
+  return scratch[0];
+}
+
 __global__ void ds4_flash_rmsnorm_bf16_kernel(const uint16_t* x,
                                                const uint16_t* weight,
                                                uint16_t* out, int rows,
@@ -69,19 +99,36 @@ __global__ void ds4_flash_rmsnorm_bf16_kernel(const uint16_t* x,
     const float value = bf16_to_f32(x[row * hidden + col]);
     sum += value * value;
   }
-  scratch[tid] = sum;
-  __syncthreads();
-  for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-    if (tid < stride) {
-      scratch[tid] += scratch[tid + stride];
-    }
-    __syncthreads();
-  }
-  const float inv = rsqrtf(scratch[0] / static_cast<float>(hidden) + eps);
+  const float inv = rsqrtf(fixed_tree_sum(sum, scratch) / static_cast<float>(hidden) + eps);
   for (int col = tid; col < hidden; col += blockDim.x) {
     const float value = bf16_to_f32(x[row * hidden + col]);
     out[row * hidden + col] =
         f32_to_bf16_rne(value * inv * bf16_to_f32(weight[col]));
+  }
+}
+
+// C1 and dSpark verification use the official 5120-wide backbone norm.
+// Keep each thread's input stripe live across the reduction, preserving its
+// accumulation order while avoiding the second device read and loop branches.
+template <int Hidden>
+__global__ void ds41_rmsnorm_cached_bf16_kernel(const uint16_t* x,
+    const uint16_t* weight, uint16_t* out, int rows, float eps) {
+  static_assert(Hidden % kBlock == 0);
+  __shared__ float scratch[kBlock];
+  const int row = blockIdx.x;
+  const int tid = threadIdx.x;
+  float values[Hidden / kBlock];
+  float sum = 0.0f;
+#pragma unroll
+  for (int i = 0; i < Hidden / kBlock; ++i) {
+    values[i] = bf16_to_f32(x[row * Hidden + tid + i * kBlock]);
+    sum += values[i] * values[i];
+  }
+  const float inv = rsqrtf(fixed_tree_sum(sum, scratch) / static_cast<float>(Hidden) + eps);
+#pragma unroll
+  for (int i = 0; i < Hidden / kBlock; ++i) {
+    const int col = tid + i * kBlock;
+    out[row * Hidden + col] = f32_to_bf16_rne(values[i] * inv * bf16_to_f32(weight[col]));
   }
 }
 
@@ -365,8 +412,13 @@ extern "C" ds41rt_status_t ds41rt_cuda_ds4_rmsnorm_bf16_rne_async(
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
   (void)cudaGetLastError();
-  ds4_flash_rmsnorm_bf16_kernel<<<rows, kBlock, 0, stream>>>(
-      x, weight, out, rows, hidden, eps);
+  if (hidden == 5120) {
+    ds41_rmsnorm_cached_bf16_kernel<5120><<<rows, kBlock, 0, stream>>>(
+        x, weight, out, rows, eps);
+  } else {
+    ds4_flash_rmsnorm_bf16_kernel<<<rows, kBlock, 0, stream>>>(
+        x, weight, out, rows, hidden, eps);
+  }
   return status_from_cuda(cudaGetLastError());
 }
 

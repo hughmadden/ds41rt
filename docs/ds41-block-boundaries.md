@@ -47,4 +47,6 @@ the inherited Unicode-format failure. The frozen daemon
 Its SHA-256 is `42e91194af2610140ec7fd4f7a42d021683cf36095a50a3c0cf7592d91e54dc8`.
 Both selected APIs pass the lifecycle qualifier. The preceding scheduler
 containers remain stopped for rollback; creation commands and live qualification
-records are in `/tmp/ds41-boundary`.
+records are in `/tmp/ds41-boundary`. The subsequent
+[RMSNorm rollout](ds41-rmsnorm.md) retains this daemon and selects a newer native
+library on the normal APIs.
