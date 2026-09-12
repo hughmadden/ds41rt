@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "passed": true,
+  "scope": "Final corrected-FP4 native prefix qualification: cold, compression-boundary partial, exact, divergent, multi-chunk, C16, cancellation, replacement, 24-turn retention and LRU eviction.",
+  "source": {
+    "report_revision": "7bb5da78953cf5c4ff0748d96e708ef32b4e8236",
+    "engine_revision": "d5fb015d00aa7b302e3ce179b097482da678db76",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277"
+  },
+  "images": {
+    "coordinator": "sha256:a13258e92dd25ddb889bd31bb77c8813c7881868b103ceec0c140e30e893c213",
+    "spark": "sha256:2f5d328a14f1a52a0d3b2356b041415d744635f3f3557e41403246429984093b"
+  },
+  "candidate": {
+    "url": "http://127.0.0.1:8000",
+    "mode": "dSpark",
+    "concurrency": 16,
+    "retained_turns": 24,
+    "fingerprint": "ds41rt-native-fp4-kv-dspark"
+  },
+  "reference": {
+    "url": "http://127.0.0.1:18041",
+    "mode": "target-only",
+    "retention": 0,
+    "kv_pool_size": "2GiB",
+    "gpu": "second identical RTX PRO 6000"
+  },
+  "partial_cases": [
+    {
+      "name": "parent",
+      "expected_reuse": "cold",
+      "expected_answer": "OK",
+      "prompt_tokens": 3887,
+      "hit_tokens": 0,
+      "miss_tokens": 3887,
+      "candidate_ttft_seconds": 3.1565226999809965,
+      "reference_ttft_seconds": 3.335491662961431
+    },
+    {
+      "name": "divergent_suffix",
+      "expected_reuse": "partial",
+      "expected_answer": "quartz731",
+      "prompt_tokens": 3894,
+      "hit_tokens": 3752,
+      "miss_tokens": 142,
+      "candidate_ttft_seconds": 0.3495298750931397,
+      "reference_ttft_seconds": 3.747929922072217
+    },
+    {
+      "name": "divergent_exact_repeat",
+      "expected_reuse": "full",
+      "expected_answer": "quartz731",
+      "prompt_tokens": 3894,
+      "hit_tokens": 3894,
+      "miss_tokens": 0,
+      "candidate_ttft_seconds": 0.005151547957211733,
+      "reference_ttft_seconds": 1.5214923140592873
+    },
+    {
+      "name": "shorter_branch",
+      "expected_reuse": "partial",
+      "expected_answer": "quartz731",
+      "prompt_tokens": 1974,
+      "hit_tokens": 1830,
+      "miss_tokens": 144,
+      "candidate_ttft_seconds": 0.3338530050823465,
+      "reference_ttft_seconds": 1.134923919918947
+    },
+    {
+      "name": "parent_still_intact",
+      "expected_reuse": "full",
+      "expected_answer": "OK",
+      "prompt_tokens": 3887,
+      "hit_tokens": 3887,
+      "miss_tokens": 0,
+      "candidate_ttft_seconds": 0.0049006210174411535,
+      "reference_ttft_seconds": 1.5189526400063187
+    },
+    {
+      "name": "large_uncached_suffix",
+      "expected_reuse": "partial",
+      "expected_answer": "quartz731",
+      "prompt_tokens": 6198,
+      "hit_tokens": 3750,
+      "miss_tokens": 2448,
+      "candidate_ttft_seconds": 1.3041690150275826,
+      "reference_ttft_seconds": 3.332910757046193
+    }
+  ],
+  "concurrency": [
+    {
+      "concurrency": 2,
+      "cancellation_and_replacement": false,
+      "requests": 2,
+      "cancelled": 0
+    },
+    {
+      "concurrency": 6,
+      "cancellation_and_replacement": false,
+      "requests": 6,
+      "cancelled": 0
+    },
+    {
+      "concurrency": 16,
+      "cancellation_and_replacement": false,
+      "requests": 16,
+      "cancelled": 0
+    },
+    {
+      "concurrency": 16,
+      "cancellation_and_replacement": true,
+      "requests": 20,
+      "cancelled": 3
+    }
+  ],
+  "retention": {
+    "turn_limit": 24,
+    "cases": 75,
+    "complete_prompt_hits": 24,
+    "exact_completed_turn_resumes": 24,
+    "oldest_evicted_cached_tokens": 0,
+    "next_retained_cached_tokens": 34
+  },
+  "cache_contract": {
+    "compressed_source": "FP4 E2M1 with group-16 E4M3 scales",
+    "swa": "FP8 E4M3 with E8M0 scales",
+    "index": "independent FP4",
+    "compression_boundary_tokens": 2,
+    "bounded_swa_replay_tokens": 128,
+    "radix": "token compressed-edge tree",
+    "ownership": "shared physical pages with copy-on-write partial tails"
+  },
+  "hardware": {
+    "driver": "595.91.07",
+    "power_limit_watts": 400,
+    "memory_speed": "standard, no memory overclock",
+    "max_memory_clock_mhz": 14001
+  },
+  "source_sha256": {
+    "prefix.rs": "89cdc9c7c281c1a146249e02453e9792d5586a691f9730329e95e4de1e3fc566",
+    "scheduler.rs": "f3ae1a1621863d2d9b6bc253cce404cc0423b76ffde2bd62e6b5bd18bc88df7c",
+    "partial_script": "a8e4f17b06c47e1ed17ecb394a4f5d3f42ce66e96da809bc08f3efd397e786bb",
+    "concurrency_script": "794e4296651da6a0dc6cf949821e366df1c9eba25d725f520a46bf1f980d41c2",
+    "retention_script": "b325d5077bc98abb2d8c3789d9d0739d82572e3120676ee501f031b873d74cff"
+  },
+  "evidence": {
+    "archive": "evidence/native-release-prefix-final.tar.gz",
+    "archive_sha256": "5ac940134c631d09a0e9aabd00c2a8d64cccc3a0b6f558407a1035e8a205e96d",
+    "archive_bytes": 117481
+  },
+  "standard_service_restored": true
+}

@@ -7,9 +7,11 @@ gate below is satisfied merely by an older component test.
 
 ## Implementation and correctness gates
 
-- [ ] Token radix, compression block ownership and bounded SWA replay follow
+- [x] Token radix, compression block ownership and bounded SWA replay follow
   the official model's cache semantics; verify cold, partial, exact and divergent
   prefix reuse against uncached execution, including eviction and concurrency.
+  The [final corrected-FP4 campaign](release-v1-prefix-final.md) passes all six
+  reuse/branch cases, C2/C6/C16, cancellation/replacement, and 24-turn LRU eviction.
 - [x] Retain populated last-turn SWAs for fast exact agentic continuation,
   bounded and invalidated with radix branches.
 - [x] Default to 24 exact retained turns (16 concurrent plus eight spare),

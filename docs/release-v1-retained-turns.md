@@ -22,12 +22,15 @@ state and optional dSpark windows as well as its page references.
 The global-pool default remains `(concurrency + 8)` configured-context
 equivalents, plus `concurrency + 2 × retention` spare page groups for active
 copy-on-write and retained partial tails. With concurrency 16 and retention 24,
-this adds 64 spare groups. One group occupies 762,880 bytes.
+this adds 64 spare groups. In the final compressed-cache format, one group
+occupies 455,680 bytes.
 
 At the default 1,048,576-token context, the source page counts become
-49,216 / 49,216 / 49,216 / 98,432, totaling 37,545,902,080 global index/KV bytes.
-This is 24,412,160 bytes more than the preceding pool qualification's 32-spare
-policy. Historical measurements in that report retain their original sizes.
+49,216 / 49,216 / 49,216 / 98,432, totaling 22,426,746,880 global index/KV bytes.
+Together with FP8 SWA, page tables and compressor tails, the eager cache is
+22,471,251,456 bytes. Historical FP8 measurements in the original JSON retain
+their original sizes; the [final memory report](release-v1-memory.md) supersedes
+them for release sizing.
 
 Each target snapshot also allocates 2,720,064 bytes for forty SWA windows and
 four compressor tails. The two full 24-entry banks use 130,563,072 target-tail
