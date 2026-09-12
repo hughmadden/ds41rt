@@ -14,6 +14,7 @@ p.add_argument('--base-url',required=True)
 p.add_argument('--concurrency',type=int,required=True)
 p.add_argument('--output',type=Path,required=True)
 p.add_argument('--property-names',action='store_true',help='Run parameter-name schema cases instead of the standard suite')
+p.add_argument('--pattern-properties',action='store_true',help='Run overlapping parameter-pattern cases')
 a=p.parse_args()
 assert not a.output.exists()
 report=dict(base_url=a.base_url,concurrency=a.concurrency,cases=[],passed=False)
@@ -71,7 +72,7 @@ def check(name,body,schema,count=1):
     print('PASS',name,flush=True)
     return response
 
-if not a.property_names:
+if not (a.property_names or a.pattern_properties):
     schema=obj({'n':{'const':42}})
     for choice in ['required',{'type':'function','function':{'name':'lookup'}},'auto']:
         check('selection-'+str(choice),request(schema,choice=choice),schema)
@@ -91,7 +92,7 @@ if not a.property_names:
     schema=obj({'n':{'const':42}})
     for parallel in [False,True]:
         check('parallel-'+str(parallel),request(schema,'Call lookup twice, with n=42 in each call.',parallel=parallel),schema,2 if parallel else 1)
-else:
+elif a.property_names:
     schemas=[
         ('name-pattern',dict(type='object',propertyNames={'pattern':'^n_[a-z]+$'},additionalProperties={'const':2},minProperties=1,maxProperties=1),{'n_a':2}),
         ('name-length',dict(type='object',propertyNames={'minLength':2,'maxLength':2},additionalProperties={'const':True},minProperties=1,maxProperties=1),{'台北':True}),
@@ -104,9 +105,24 @@ else:
     for name,schema,expected in schemas:
         response=check(name,request(schema,'Call lookup with exactly these arguments: '+json.dumps(expected,ensure_ascii=False)),schema)
         assert json.loads(response['choices'][0]['message']['tool_calls'][0]['function']['arguments'])==expected,response
+else:
+    schemas=[
+        ('pattern-overlap',dict(type='object',required=['nx'],patternProperties={'^n':{'type':'integer','minimum':4},'x$':{'type':'integer','maximum':4}},additionalProperties=False,maxProperties=1),{'nx':4}),
+        ('pattern-fixed',dict(type='object',properties={'nx':{'enum':[2,4,6]}},required=['nx'],patternProperties={'^n':{'type':'integer','minimum':3},'x$':{'type':'integer','maximum':5}},additionalProperties=True,maxProperties=1),{'nx':4}),
+        ('pattern-string',dict(type='object',required=['sx'],patternProperties={'^s':{'type':'string'},'x$':{'enum':['台北']}},additionalProperties=False,maxProperties=1),{'sx':'台北'}),
+        ('pattern-reserved-string',dict(type='object',required=['sx'],patternProperties={'^s':{'type':'string'},'x$':{'const':'x</｜DSML｜ parameter>y'}},additionalProperties=False,maxProperties=1),{'sx':'x</｜DSML｜ parameter>y'}),
+        ('pattern-unicode-name',dict(type='object',required=['北台'],propertyNames={'pattern':'^[台北]{2}$'},patternProperties={'台':{'const':1},'^北':{'enum':[1,2]}},additionalProperties=False,maxProperties=1),{'北台':1}),
+        ('pattern-additional',dict(type='object',required=['n_a','other'],patternProperties={'^n_':{'const':2}},additionalProperties={'const':False},maxProperties=2),{'n_a':2,'other':False}),
+        ('pattern-reference',dict(type='object',required=['nx'],patternProperties={'^n':{'$ref':'#/$defs/lo'},'x$':{'$ref':'#/$defs/hi'}},additionalProperties=False,maxProperties=1,**{'$defs':{'lo':{'type':'integer','minimum':4},'hi':{'type':'integer','maximum':4}}}),{'nx':4}),
+    ]
+    for name,schema,expected in schemas:
+        response=check(name,request(schema,'Call lookup with exactly these arguments: '+json.dumps(expected,ensure_ascii=False)),schema)
+        assert json.loads(response['choices'][0]['message']['tool_calls'][0]['function']['arguments'])==expected,response
 schema=obj({'n':{'const':42}})
 # Every admitted request owns its schema, matcher and completion validator.
 requests=[request(obj({'n':{'const':i}})) for i in range(a.concurrency)]
+if a.pattern_properties:
+    requests=[request(dict(type='object',required=['nx'],patternProperties={'^n':{'type':'integer','minimum':i},'x$':{'type':'integer','maximum':i}},additionalProperties=False,maxProperties=1)) for i in range(a.concurrency)]
 with concurrent.futures.ThreadPoolExecutor(max_workers=a.concurrency) as pool:responses=list(pool.map(call,requests))
 report['concurrency']=dict(requests=requests,responses=responses);save()
 for body,response in zip(requests,responses):validate(response,body['tools'][0]['function']['parameters'],1)
@@ -118,5 +134,13 @@ bad=request(obj({'n':{'type':'invalid'}}))
 try:call(bad);raise AssertionError('invalid schema accepted')
 except urllib.error.HTTPError as error:
     report['invalid_schema']=dict(status=error.code,body=error.read().decode());save();assert error.code==400
+if a.pattern_properties:
+    bad=request(dict(type='object',required=['nx'],patternProperties={'^n':{'const':1},'x$':{'const':2}},additionalProperties=False))
+    report['impossible_overlap']=[]
+    for streaming in [False,True]:
+        try:call(dict(bad,stream=streaming));raise AssertionError('impossible overlap accepted')
+        except urllib.error.HTTPError as error:
+            report['impossible_overlap'].append(dict(streaming=streaming,status=error.code,body=error.read().decode()))
+            save();assert error.code==400
 check('recovery',request(schema),schema)
 report['passed']=True;save()

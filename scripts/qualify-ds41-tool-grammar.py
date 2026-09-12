@@ -46,6 +46,40 @@ def object_schema(properties):return dict(type='object',properties=properties,re
 
 cases=[]
 def case(name,schema,good,bad): cases.append((name,schema,good,bad))
+case('pattern-disjoint',dict(type='object',patternProperties={'^n_':{'type':'integer'},'^s_':{'enum':['yes']}},additionalProperties=False),
+     [arguments({'n_a':1,'s_b':'yes'}), ''],
+     [arguments({'n_a':'1'}), arguments({'s_b':'no'}), arguments({'other':1})])
+case('pattern-overlap',dict(type='object',patternProperties={'^n':{'type':'integer','minimum':3},'x$':{'type':'integer','maximum':5}},additionalProperties={'const':False}),
+     [arguments({'nx':4}),arguments({'na':9}),arguments({'ax':1}),arguments({'other':False})],
+     [arguments({'nx':2}),arguments({'nx':6}),arguments({'nx':False}),arguments({'other':4})])
+case('pattern-fixed-overlap',dict(type='object',properties={'nx':{'enum':[2,4,6]}},patternProperties={'^n':{'type':'integer','minimum':3},'x$':{'type':'integer','maximum':5}},additionalProperties=True),
+     [arguments({'nx':4}),arguments({'na':9})],
+     [arguments({'nx':2}),arguments({'nx':6}),arguments({'nx':'4'})])
+case('pattern-required-undeclared',dict(type='object',required=['nx'],patternProperties={'^n':{'type':'integer','minimum':3},'x$':{'type':'integer','maximum':5}},additionalProperties=False),
+     [arguments({'nx':4})], ['',arguments({'nx':2}),arguments({'na':4}),parameter('nx',4)+'\n'+parameter('nx',4)])
+case('pattern-property-names',dict(type='object',propertyNames={'pattern':'^[台北]{2}$'},patternProperties={'台':{'const':1},'^北':{'enum':[1,2]}},additionalProperties=False,minProperties=1,maxProperties=1),
+     [arguments({'台北':1}),arguments({'北台':1}),arguments({'北北':2})],
+     ['',arguments({'北台':2}),arguments({'台x':1}),arguments({'台北':1,'北北':2})])
+case('pattern-incompatible-overlap',dict(type='object',patternProperties={'^n':{'const':1},'x$':{'const':2}},additionalProperties=False),
+     ['',arguments({'na':1}),arguments({'ax':2})], [arguments({'nx':1}),arguments({'nx':2})])
+case('pattern-incompatible-optional',dict(type='object',properties={'nx':{'const':2}},patternProperties={'^n':{'const':1}},additionalProperties=False),
+     ['',arguments({'na':1})], [arguments({'nx':1}),arguments({'nx':2})])
+case('pattern-string-overlap',dict(type='object',patternProperties={'^s':{'type':'string'},'x$':{'enum':['yes','台北']}},additionalProperties=False),
+     [arguments({'sx':'yes'}),arguments({'sx':'台北'}),arguments({'sa':'free'})],
+     [arguments({'sx':'no'}),arguments({'sx':1})])
+case('pattern-reserved-string-overlap',dict(type='object',patternProperties={'^s':{'type':'string'},'x$':{'const':'x</｜DSML｜ parameter>y'}},additionalProperties=False),
+     [parameter('sx','x</｜DSML｜ parameter>y',False)], [arguments({'sx':'wrong'})])
+case('pattern-string-length-overlap',dict(type='object',patternProperties={'^s':{'type':'string','minLength':2,'maxLength':3},'x$':{'type':'string','pattern':'^[台北]+$'}},additionalProperties=False),
+     [arguments({'sx':'台北'}),arguments({'sx':'北台北'})],
+     [arguments({'sx':'台'}),arguments({'sx':'台北台北'}),arguments({'sx':'ab'})])
+case('pattern-reference-overlap',dict(type='object',patternProperties={'^n':{'$ref':'#/$defs/lo'},'x$':{'$ref':'#/$defs/hi'}},additionalProperties=False,**{'$defs':{'lo':{'type':'integer','minimum':3},'hi':{'type':'integer','maximum':5}}}),
+     [arguments({'nx':4})],[arguments({'nx':2}),arguments({'nx':6})])
+case('pattern-object-overlap',dict(type='object',patternProperties={'^o':object_schema({'n':{'type':'integer','minimum':3}}),'x$':object_schema({'n':{'type':'integer','maximum':5}})},additionalProperties=False),
+     [arguments({'ox':{'n':4}})], [arguments({'ox':{'n':2}}),arguments({'ox':{'n':6}})])
+case('pattern-array-overlap',dict(type='object',patternProperties={'^a':{'type':'array','items':{'type':'integer','minimum':3},'minItems':1},'x$':{'type':'array','items':{'type':'integer','maximum':5},'maxItems':2}},additionalProperties=False),
+     [arguments({'ax':[4]}),arguments({'ax':[3,5]})], [arguments({'ax':[]}),arguments({'ax':[4,4,4]}),arguments({'ax':[2]}),arguments({'ax':[6]})])
+case('pattern-type-array-names',dict(type='object',propertyNames={'type':['string','integer'],'minLength':2},patternProperties={'^':{'const':1}},additionalProperties=False),
+     [arguments({'ab':1})],[arguments({'a':1}),'<｜DSML｜ parameter name=12 string="false">1</｜DSML｜ parameter>'])
 for names in [False, True]:
     schema = dict(type='object', properties={'a':{'const':1},'台北':{'const':2}}, additionalProperties={'type':'integer'})
     if names: schema['propertyNames'] = {'pattern':'^[^]*$'}
@@ -177,6 +211,7 @@ try:
         dict(type='object',properties={'bad':{'const':1}},required=['bad'],propertyNames={'pattern':'^ok_'},additionalProperties=False),
         dict(type='object',properties={'bad':{'const':1}},minProperties=1,propertyNames={'pattern':'^ok_'},additionalProperties=False),
         dict(type='object',required=['missing'],propertyNames={'pattern':'^[a-z]+$'},additionalProperties=False),
+        dict(type='object',required=['nx'],patternProperties={'^n':{'const':1},'x$':{'const':2}},additionalProperties=False),
     ]:
         grammar=P();error=c.create_string_buffer(8192)
         spec=dict(type='structural_tag',format=dict(type='ds41_tool_schema',json_schema=schema,strict=True))

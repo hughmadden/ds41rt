@@ -30,12 +30,29 @@ mod images;
 #[cfg(test)]
 mod unicode_tests;
 pub use limits::{NativeLimits, MAX_CONTEXT_TOKENS, MAX_OUTPUT_TOKENS};
+#[derive(Debug, Clone)]
+pub enum NativeFailure {
+    BadRequest(String),
+    Worker(String),
+}
+impl std::fmt::Display for NativeFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self { Self::BadRequest(message) | Self::Worker(message) => f.write_str(message) }
+    }
+}
+impl std::error::Error for NativeFailure {}
+impl From<String> for NativeFailure {
+    fn from(message: String) -> Self { Self::Worker(message) }
+}
+impl From<&str> for NativeFailure {
+    fn from(message: &str) -> Self { Self::Worker(message.into()) }
+}
 pub struct NativeRequest {
     pub prompt: String,
     pub constraint: Option<NativeConstraint>,
     pub images: Vec<ds41rt_loader::V41Image>,
     pub max_tokens: usize,
-    pub events: mpsc::Sender<Result<InferenceChunk, String>>,
+    pub events: mpsc::Sender<Result<InferenceChunk, NativeFailure>>,
 }
 #[derive(Clone)]
 struct NativeState {
@@ -179,19 +196,29 @@ async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> 
     else if let Err(e) = state.queue.try_send(job) {
         return error(StatusCode::SERVICE_UNAVAILABLE, e);
     }
+    // Admission errors must retain their cause and HTTP status, including for
+    // SSE, before a protocol processor can turn early EOF into a finish chunk.
+    let first = match receive.recv().await {
+        Some(Ok(chunk)) => chunk,
+        Some(Err(NativeFailure::BadRequest(message))) => return error(StatusCode::BAD_REQUEST, message),
+        Some(Err(message)) => return error(StatusCode::INTERNAL_SERVER_ERROR, message),
+        None => return error(StatusCode::INTERNAL_SERVER_ERROR, "native worker ended without completion"),
+    };
     // Never let a failed/disconnected backend be converted to a successful EOF.
     let failure = Arc::new(Mutex::new(None::<String>));
     let input_failure = failure.clone();
     let input = async_stream::stream! {
-        let mut finished = false;
-        while let Some(event) = receive.recv().await {
+        let mut finished = matches!(first, InferenceChunk::Finish { .. });
+        yield first;
+        while !finished {
+            let Some(event) = receive.recv().await else { break; };
             match event {
                 Ok(chunk) => {
                     finished = matches!(chunk,InferenceChunk::Finish { .. });
                     yield chunk;
                     if finished { break; }
                 }
-                Err(message) => { *input_failure.lock().unwrap() = Some(message); break; }
+                Err(message) => { *input_failure.lock().unwrap() = Some(message.to_string()); break; }
             }
         }
         if !finished {
@@ -253,7 +280,10 @@ async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> 
     while let Some(chunk) = chunks.next().await {
         match chunk {
             Ok(chunk) => response.append(chunk),
-            Err(e) => return error(StatusCode::INTERNAL_SERVER_ERROR, e),
+            Err(e) => {
+                let message = failure.lock().unwrap().clone().unwrap_or_else(|| e.to_string());
+                return error(StatusCode::INTERNAL_SERVER_ERROR, message);
+            }
         }
     }
     if let Some(message) = failure.lock().unwrap().clone() {
@@ -399,6 +429,60 @@ mod tests {
                 assert_eq!(value["usage"]["prompt_tokens"], 18);
             }
             worker.await.unwrap();
+        }
+    }
+    #[tokio::test]
+    async fn admission_errors_preserve_status_and_cause_before_json_or_sse() {
+        for streaming in [false, true] {
+            for bad_request in [false, true] {
+                let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+                let worker = tokio::spawn(async move {
+                    let job = rx.recv().await.unwrap();
+                    let message = "required parameter has incompatible value constraints: nx".to_string();
+                    job.events.send(Err(if bad_request { NativeFailure::BadRequest(message) }
+                        else { NativeFailure::Worker(message) })).await.unwrap();
+                });
+                let body = json!({"model":MODEL,"messages":[{"role":"user","content":"Call lookup."}],
+                    "tools":[{"type":"function","function":{"name":"lookup","strict":true,
+                        "parameters":{"type":"object","properties":{"nx":{"const":1}},"required":["nx"]}}}],
+                    "tool_choice":"required","stream":streaming});
+                let request = axum::http::Request::post("/v1/chat/completions")
+                    .header("content-type", "application/json").body(Body::from(body.to_string())).unwrap();
+                let response = router(tx).oneshot(request).await.unwrap();
+                assert_eq!(response.status(), if bad_request { StatusCode::BAD_REQUEST }
+                    else { StatusCode::INTERNAL_SERVER_ERROR });
+                let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+                let value: Value = serde_json::from_slice(&bytes).unwrap();
+                assert_eq!(value["error"]["message"], "required parameter has incompatible value constraints: nx");
+                worker.await.unwrap();
+            }
+        }
+    }
+    #[tokio::test]
+    async fn late_worker_failure_is_not_replaced_by_required_tool_validation() {
+        for streaming in [false, true] {
+            let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+            tokio::spawn(async move {
+                let job = rx.recv().await.unwrap();
+                job.events.send(Ok(InferenceChunk::Ready { system_fingerprint: None,
+                    prompt_usage: PromptUsage { prompt_tokens: 1, prompt_cache_hit_tokens: 0 } })).await.unwrap();
+                job.events.send(Err(NativeFailure::Worker("late execution failure".into()))).await.unwrap();
+            });
+            let body = json!({"model":MODEL,"messages":[{"role":"user","content":"Call lookup."}],
+                "tools":[{"type":"function","function":{"name":"lookup","strict":true,
+                    "parameters":{"type":"object","properties":{"n":{"const":1}},"required":["n"]}}}],
+                "tool_choice":"required","stream":streaming});
+            let request = axum::http::Request::post("/v1/chat/completions")
+                .header("content-type", "application/json").body(Body::from(body.to_string())).unwrap();
+            let response = router(tx).oneshot(request).await.unwrap();
+            if streaming {
+                assert!(axum::body::to_bytes(response.into_body(), 1024 * 1024).await.is_err());
+            } else {
+                assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+                let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+                let value: Value = serde_json::from_slice(&bytes).unwrap();
+                assert_eq!(value["error"]["message"], "late execution failure");
+            }
         }
     }
     #[tokio::test]

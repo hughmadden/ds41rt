@@ -7,6 +7,10 @@
 
 namespace xgrammar {
 namespace {
+class EmptyIntersection : public std::invalid_argument {
+ public:
+  EmptyIntersection() : std::invalid_argument("schema intersection has no valid value") {}
+};
 const std::string kEnd = "</｜DSML｜ parameter>";
 const std::string kEndPrefix = "</｜DSML｜";
 const std::string kRaw = "v41_raw_string";
@@ -139,8 +143,15 @@ void V41ToolCallingConverter::AddBasicRules() {
   JSONSchemaConverter::AddBasicRules();
   level_ = previous_level;
   key_context_ = previous_key_context;
-  ebnf_script_creator_.AddRule(kRaw,
-      "TagDispatch(loop_after_dispatch=false,excludes=(" + Literal(kEndPrefix) + "))");
+  if (regular_context_) {
+    auto raw = V41RegularFSM(Grammar::FromRegex("[^]*"));
+    auto forbidden = V41RegularFSM(Grammar::FromRegex("[^]*" + kEndPrefix + "[^]*"));
+    auto body = V41EmitFSM(V41Subtract(raw, forbidden), ebnf_script_creator_);
+    ebnf_script_creator_.AddRule(kRaw, body);
+  } else {
+    ebnf_script_creator_.AddRule(kRaw,
+        "TagDispatch(loop_after_dispatch=false,excludes=(" + Literal(kEndPrefix) + "))");
+  }
   // JSON-quoted attribute names, without raw spaces or control characters.
   ebnf_script_creator_.AddRule(kKey, R"ebnf("\"" ([^\x00-\x20"\\] | "\\" basic_escape)* "\"")ebnf");
 }
@@ -152,6 +163,7 @@ std::string V41ToolCallingConverter::Flag(const std::string& value, bool string)
 }
 #define V41_SCALAR(Name, Spec) \
 std::string V41ToolCallingConverter::Generate##Name(const Spec& spec, const std::string& name) { \
+  if (key_context_) return "[^\\x00-\\U0010ffff]"; \
   return Flag(JSONSchemaConverter::Generate##Name(spec, name)); \
 }
 V41_SCALAR(Integer, IntegerSpec)
@@ -171,6 +183,8 @@ std::string V41ToolCallingConverter::GenerateString(const StringSpec& spec, cons
     body = "[^]{" + std::to_string(spec.min_length) + "," +
         (spec.max_length == -1 ? "" : std::to_string(spec.max_length)) + "}";
   }
+  if (regular_context_)
+    return Flag(body, true) + " | " + Flag(EncodedString(spec));
   return Flag(body, true);
 }
 std::string V41ToolCallingConverter::EncodedString(const StringSpec& spec) {
@@ -197,15 +211,17 @@ std::string V41ToolCallingConverter::EncodedString(const StringSpec& spec) {
   return Literal("\"") + " " + rule + " " + Literal("\"");
 }
 std::string V41ToolCallingConverter::GenerateArray(const ArraySpec& spec, const std::string& name) {
+  if (key_context_) return "[^\\x00-\\U0010ffff]";
   ++level_;
   auto value = JSONSchemaConverter::GenerateArray(spec, name);
   --level_;
   return Flag(value);
 }
 std::string V41ToolCallingConverter::GenerateObject(const ObjectSpec& spec, const std::string& name, bool) {
+  if (key_context_) return "[^\\x00-\\U0010ffff]";
   const bool root = level_ == 0;
   if (root && !spec.pattern_properties.empty()) {
-    throw std::invalid_argument("V4.1 root patternProperties conversion is not implemented");
+    return GeneratePatternObject(spec, name);
   }
   if (root && spec.property_names) {
     return GenerateNamedObject(spec, name);
@@ -324,6 +340,161 @@ std::string V41ToolCallingConverter::GenerateEnum(const EnumSpec& spec, const st
   std::vector<std::string> alternatives;
   for (const auto& value : spec.json_values) alternatives.push_back(GenerateConst({value}, name));
   return EBNFScriptCreator::Or(alternatives);
+}
+std::string V41ToolCallingConverter::GenerateAllOf(const AllOfSpec& spec, const std::string& name) {
+  std::vector<SchemaSpecPtr> schemas;
+  for (const auto& schema : spec.schemas) {
+    if (std::holds_alternative<AnySpec>(schema->spec)) continue;
+    if (std::none_of(schemas.begin(), schemas.end(), [&](const auto& previous) {
+          return previous == schema || (!previous->cache_key.empty() && previous->cache_key == schema->cache_key);
+        })) schemas.push_back(schema);
+  }
+  if (schemas.empty()) return GenerateAny(AnySpec{}, name);
+  if (schemas.size() == 1) return GenerateFromSpec(schemas.front(), name);
+  std::optional<FSMWithStartEnd> intersection;
+  for (const auto& schema : schemas) {
+    V41ToolCallingConverter child(resolver_);
+    child.level_ = level_;
+    child.key_context_ = key_context_;
+    child.regular_context_ = true;
+    auto fsm = V41RegularFSM(Grammar::FromEBNF(child.Convert(schema)));
+    intersection = intersection ? V41Intersect(*intersection, fsm) : std::move(fsm);
+  }
+  if (V41Empty(*intersection)) throw EmptyIntersection();
+  return V41EmitFSM(*intersection, ebnf_script_creator_);
+}
+std::string V41ToolCallingConverter::GeneratePatternObject(const ObjectSpec& spec,
+    const std::string& name) {
+  auto name_spec = spec.property_names ? spec.property_names : SchemaSpec::Make(StringSpec{});
+  auto key_fsm = [&](const SchemaSpecPtr& schema) {
+    V41ToolCallingConverter child(resolver_);
+    child.level_ = 1;
+    child.key_context_ = true;
+    return V41RegularFSM(Grammar::FromEBNF(child.Convert(schema)));
+  };
+  GrammarCompiler compiler(TokenizerInfo(std::vector<std::string>{}), 1, false);
+  auto compile = [&](const FSMWithStartEnd& fsm) {
+    EBNFScriptCreator script;
+    auto root = script.AllocateRuleName("root");
+    auto body = V41EmitFSM(fsm, script);
+    script.AddRuleWithAllocatedName(root, body);
+    return compiler.CompileGrammar(script.GetScript());
+  };
+  auto matches = [](const CompiledGrammar& grammar, const std::string& key) {
+    GrammarMatcher matcher(grammar);
+    return matcher.AcceptString(key) && matcher.IsCompleted();
+  };
+  auto allowed = key_fsm(name_spec);
+  auto allowed_matcher = compile(allowed);
+  std::vector<FSMWithStartEnd> patterns;
+  std::vector<CompiledGrammar> pattern_matchers;
+  for (const auto& property : spec.pattern_properties) {
+    StringSpec pattern; pattern.pattern = property.pattern;
+    patterns.push_back(key_fsm(SchemaSpec::Make(pattern)));
+    pattern_matchers.push_back(compile(patterns.back()));
+  }
+  SchemaSpecPtr additional;
+  if (spec.allow_additional_properties) additional = spec.additional_properties_schema;
+  else if (spec.allow_unevaluated_properties) additional = spec.unevaluated_properties_schema;
+  if (!additional && (spec.allow_additional_properties || spec.allow_unevaluated_properties))
+    additional = SchemaSpec::Make(AnySpec{});
+
+  auto fixed = spec.properties;
+  std::vector<std::string> missing;
+  for (const auto& required : spec.required)
+    if (std::none_of(fixed.begin(), fixed.end(), [&](const auto& p) { return p.name == required; }))
+      missing.push_back(required);
+  std::sort(missing.begin(), missing.end());
+  for (const auto& required : missing) fixed.push_back({required, nullptr});
+  std::vector<ObjectSpec::Property> properties;
+  for (const auto& property : fixed) {
+    auto key = Replace(SafeJSON(picojson::value(property.name)), " ", "\\u0020");
+    if (!matches(allowed_matcher, key)) {
+      if (spec.required.count(property.name))
+        throw std::invalid_argument("required parameter violates propertyNames: " + property.name);
+      continue;
+    }
+    AllOfSpec value;
+    if (property.schema) value.schemas.push_back(property.schema);
+    for (size_t i = 0; i < patterns.size(); ++i)
+      if (matches(pattern_matchers[i], key)) value.schemas.push_back(spec.pattern_properties[i].schema);
+    if (value.schemas.empty()) {
+      if (!additional) throw std::invalid_argument("required parameter matches no allowed property: " + property.name);
+      value.schemas.push_back(additional);
+    }
+    properties.push_back({property.name, SchemaSpec::Make(value)});
+  }
+  // Required names materialized above are fixed too, so a dynamic branch must
+  // never supply another occurrence with weaker constraints.
+  if (!fixed.empty()) {
+    EnumSpec excluded;
+    for (const auto& property : fixed)
+      excluded.json_values.push_back(picojson::value(property.name).serialize(false));
+    allowed = V41Subtract(allowed, key_fsm(SchemaSpec::Make(excluded)));
+  }
+  struct Region { FSMWithStartEnd keys; AllOfSpec value; };
+  std::vector<Region> regions;
+  if (!V41Empty(allowed)) regions.push_back({std::move(allowed), {}});
+  for (size_t i = 0; i < patterns.size(); ++i) {
+    std::vector<Region> next;
+    for (const auto& region : regions) {
+      auto yes = V41Intersect(region.keys, patterns[i]);
+      auto no = V41Subtract(region.keys, patterns[i]);
+      if (!V41Empty(yes)) {
+        auto value = region.value;
+        value.schemas.push_back(spec.pattern_properties[i].schema);
+        next.push_back({std::move(yes), std::move(value)});
+      }
+      if (!V41Empty(no)) next.push_back({std::move(no), region.value});
+      if (next.size() > 256)
+        throw std::invalid_argument("patternProperties exceeds the disjoint-region budget");
+    }
+    regions = std::move(next);
+  }
+  ++level_;
+  indent_manager_.StartIndent();
+  for (auto it = properties.begin(); it != properties.end();) {
+    it->schema->cache_key = ebnf_script_creator_.AllocateRuleName("v41_pattern_cache");
+    try {
+      auto rule = CreateRule(it->schema, name + "_fixed_pattern_value");
+      AddCache(it->schema->cache_key, rule);
+      ++it;
+    } catch (const EmptyIntersection&) {
+      if (spec.required.count(it->name))
+        throw std::invalid_argument("required parameter has incompatible value constraints: " + it->name);
+      it = properties.erase(it);
+    }
+  }
+  std::vector<std::string> dynamic;
+  for (auto& region : regions) {
+    if (region.value.schemas.empty()) {
+      if (!additional) continue;
+      region.value.schemas.push_back(additional);
+    }
+    std::string value;
+    try {
+      value = CreateRule(SchemaSpec::Make(region.value), name + "_pattern_value");
+    } catch (const EmptyIntersection&) { continue; }
+    auto key = V41EmitFSM(region.keys, ebnf_script_creator_);
+    dynamic.push_back(FormatOtherProperty(key, value, name, "pattern"));
+  }
+  auto other = dynamic.empty() ? std::string{} : EBNFScriptCreator::Or(dynamic);
+  auto dynamic_schema = dynamic.empty() ? nullptr : SchemaSpec::Make(AnySpec{});
+  std::string result;
+  if (!dynamic_schema && spec.min_properties > static_cast<int>(properties.size()))
+    throw std::invalid_argument("patternProperties leaves too few allowed parameters");
+  if (!properties.empty()) {
+    result = GetPartialRuleForProperties(properties, spec.required, dynamic_schema, name,
+        "pattern", spec.min_properties, spec.max_properties, other);
+    if (spec.required.empty() && spec.min_properties == 0)
+      result = "(" + result + ") | " + GetWhitespacePattern();
+  } else if (dynamic_schema && spec.max_properties != 0) {
+    result = GetWhitespacePattern() + " " + EBNFScriptCreator::Repeat(
+        "(" + other + " " + GetWhitespacePattern() + ")", spec.min_properties, spec.max_properties);
+  } else result = GetWhitespacePattern();
+  indent_manager_.EndIndent();
+  --level_;
+  return result;
 }
 std::string V41ToolCallingConverter::GenerateRef(const RefSpec& spec, const std::string&) {
   auto key = ContextKey(spec.uri);

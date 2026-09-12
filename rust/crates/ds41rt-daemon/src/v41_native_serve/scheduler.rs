@@ -178,14 +178,16 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             match result {
                 Ok(mut request) => {
                     if let Err(error) = request.emit(&[request.anchor]) {
-                        let _ = request.job.events.blocking_send(Err(format!("{error:#}")));
+                        let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
                         request.finished = true;
                     }
                     active[slot] = Some(request); loads[lane] += 1;
                 }
                 Err(error) => {
                     // Other completed requests retain their caches.
-                    let _ = events.blocking_send(Err(format!("{error:#}")));
+                    let failure = error.downcast_ref::<ds41rt_api::native_v41::NativeFailure>()
+                        .cloned().unwrap_or_else(|| format!("{error:#}").into());
+                    let _ = events.blocking_send(Err(failure));
                     tracing::warn!(%error, "native request admission failed");
                     requests.release_if_present(lease)?;
                     if let Some(draft) = draft.as_deref_mut() { draft.release(id)?; }
@@ -207,7 +209,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
         if let Err(error) = result {
             first_transport.reset_connections(); second_transport.reset_connections();
             for request in active.iter_mut().flatten() {
-                let _ = request.job.events.blocking_send(Err(format!("{error:#}")));
+                let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
                 request.finished = true;
                 request.cacheable = false;
             }
@@ -310,7 +312,7 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
                 let request = active[slot].as_mut().unwrap();
                 request.next_after_commit = next_token;
                 if let Err(error) = request.emit(&tokens) {
-                    let _ = request.job.events.blocking_send(Err(format!("{error:#}")));
+                    let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
                     request.finished = true;
                 }
             }

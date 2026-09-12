@@ -19,6 +19,7 @@ class V41ToolCallingConverter : public JSONSchemaConverter {
   std::string GenerateConst(const ConstSpec&, const std::string&) override;
   std::string GenerateEnum(const EnumSpec&, const std::string&) override;
   std::string GenerateRef(const RefSpec&, const std::string&) override;
+  std::string GenerateAllOf(const AllOfSpec&, const std::string&) override;
   std::string FormatProperty(const std::string&, const std::string&, const std::string&, int64_t) override;
   std::string FormatOtherProperty(const std::string&, const std::string&, const std::string&, const std::string&) override;
   std::string GetKeyPattern() const override;
@@ -30,12 +31,14 @@ class V41ToolCallingConverter : public JSONSchemaConverter {
  private:
   int level_ = 0;
   bool key_context_ = false;
+  bool regular_context_ = false;
   RefResolver resolver_;
   std::unordered_map<std::string, std::string> cache_, refs_;
   std::string ContextKey(const std::string&) const;
   std::string Flag(const std::string&, bool string = false) const;
   std::string EncodedString(const StringSpec&);
   std::string GenerateNamedObject(const ObjectSpec&, const std::string&);
+  std::string GeneratePatternObject(const ObjectSpec&, const std::string&);
   std::string NamePatternExcluding(const SchemaSpecPtr&,
       const std::vector<ObjectSpec::Property>&);
 };

@@ -1,6 +1,6 @@
 use super::scores::{BatchScores, VOCAB};
 use anyhow::{ensure, Result};
-use ds41rt_api::native_v41::NativeConstraint;
+use ds41rt_api::native_v41::{NativeConstraint, NativeFailure};
 use ds41rt_ffi::{NativeLibrary, Ds41rtXGrammarCompiler, Ds41rtXGrammarGrammar,
     Ds41rtXGrammarMatcher, DS41RT_XGRAMMAR_STRUCTURAL_TAG};
 use std::{collections::{HashMap, VecDeque}, path::PathBuf, sync::Arc};
@@ -22,7 +22,8 @@ impl<'a> Compiler<'a> {
         }
         let grammar = if let Some(grammar) = self.grammars.get(spec) { grammar.clone() } else {
             let grammar = Arc::new(self.compiler.as_ref().unwrap().compile(
-                DS41RT_XGRAMMAR_STRUCTURAL_TAG, Some(&spec.0), true)?);
+                DS41RT_XGRAMMAR_STRUCTURAL_TAG, Some(&spec.0), true)
+                .map_err(|error| NativeFailure::BadRequest(format!("{error:#}")))?);
             if self.grammars.len() == 64 {
                 if let Some(old) = self.order.pop_front() { self.grammars.remove(&old); }
             }
