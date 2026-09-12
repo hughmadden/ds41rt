@@ -1,4 +1,4 @@
-"""ctypes bindings for official TP4 expert component qualification."""
+"""ctypes bindings for official TP4 and local dSpark expert qualification."""
 
 import ctypes as C
 import torch
@@ -83,11 +83,13 @@ def check(code):
 
 
 class Native:
-    def __init__(self, lib, capacity, weights, wire, ids, routing):
+    def __init__(self, lib, capacity, weights, wire, ids, routing, *, coordinator=False):
         self.lib = lib
         self.info = info = Info()
         self.handle = P()
         check(lib.ds41rt_v41_expert_info(capacity, C.byref(info)))
+        expected = ((0, 128, 5120, 2304, 2304, 3, capacity, 1)
+                    if coordinator else (1, 384, 5120, 576, 640, 6, capacity, 7))
         assert (
             info.abi_version,
             info.role,
@@ -98,7 +100,7 @@ class Native:
             info.topk,
             info.capacity_rows,
             info.input_dtype,
-        ) == (info.abi_version, 1, 384, 5120, 576, 640, 6, capacity, 7)
+        ) == (info.abi_version, *expected)
         assert info.abi_version in (2, 3)
         self.token_accumulation = info.abi_version == 3
         if self.token_accumulation:
@@ -155,7 +157,7 @@ class Native:
         ]:
             setattr(self.args, name, getattr(info, name))
         offset = slots[41] - self.storage.data_ptr()
-        output_rows = capacity if self.token_accumulation else capacity * 6
+        output_rows = capacity if self.token_accumulation else capacity * info.topk
         self.output = (
             self.storage[offset : offset + output_rows * 5120 * 4]
             .view(torch.float32)
@@ -164,6 +166,6 @@ class Native:
 
     def run(self, rows):
         self.args.num_tokens = rows
-        self.args.scatter_rows = rows * 6
+        self.args.scatter_rows = rows * self.info.topk
         self.args.stream = torch.cuda.current_stream().cuda_stream
         check(self.lib.ds41rt_v41_expert_launch(self.handle, C.byref(self.args)))

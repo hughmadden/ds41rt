@@ -1,0 +1,2183 @@
+{
+  "scope": "Official weights, synthetic BF16 input and routing; composed CUDA-graph component path, not deployed",
+  "runs": [
+    {
+      "stage": 0,
+      "raw_path": "/tmp/ds41-draft-expert-slices/official-final-stage0.json",
+      "raw_sha256": "f35a41651e9af0baceffa6c3906c346f3539ca600a72a3cb19a9de4d8f059db3",
+      "source": {
+        "kind": "source",
+        "b12x": "3b19ffc1886ef0545b0e41fd4c079c5963208b6e",
+        "stage": 0,
+        "native_sha256": "0c4d4dadd683194d4da7f6728f1be1b86e72d5296c1035d9a2b26d23d4a0034f",
+        "script_sha256": "27396d0ff0fa18da898c95ab14ba5389831dc5285809c3c76c9e1a6bd8624b5c",
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "scope": "Official dSpark weights: native persistent vs full grouped slice path.\n\nSynthetic BF16 inputs and controlled shared/dispersed routing; this is a\ncomponent comparison, not live model activation or API qualification.\n"
+      },
+      "checks": [
+        {
+          "kind": "check",
+          "route_rel_l2": 3.706678342041414e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 3.883541666027668e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.003604571143569e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2925091158754185e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 3.525880174493068e-06,
+          "cosine": 1.0,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 3.4123967651567e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 3.55018663356077e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.7757436410192895e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.1839344555019125e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 1.9886413156200433e-06,
+          "cosine": 1.0000001192092896,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 3.3011552602602023e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 3.4772597246046644e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 3.6668664051831e-06,
+          "cosine": 0.9999999403953552,
+          "mismatches": 2
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.9951469809598166e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3158385431543138e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 1.169019583358022e-06,
+          "cosine": 1.0,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2743238403677424e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.505380258810419e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.885240585863812e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 2.0701196312700176e-10,
+          "cosine": 1.0,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2275260747051107e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 3.391684003872797e-06,
+          "cosine": 1.0,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.028650314400693e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3315930519629546e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.9972610232343868e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 1.1959262746774613e-10,
+          "cosine": 1.0,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2419506251480925e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 1.5797231753822416e-05,
+          "cosine": 1.0,
+          "mismatches": 2
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.391960407521765e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.6582444689893237e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.0497688879572706e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 6.943830926919858e-11,
+          "cosine": 1.0,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3166103702010332e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 9.172246791422367e-06,
+          "cosine": 1.0,
+          "mismatches": 2
+        }
+      ],
+      "timings": [
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 5,
+          "samples_us": {
+            "native": [
+              1291.9456481933594,
+              1293.721644083659,
+              1298.7743377685547,
+              1282.0480346679688,
+              1292.2196706136067,
+              1296.1109161376953
+            ],
+            "64": [
+              57.34293460845947,
+              57.34399954477946,
+              57.34399954477946,
+              57.34399954477946,
+              57.34399954477946,
+              57.34399954477946
+            ],
+            "128": [
+              73.72693220774333,
+              73.7610658009847,
+              73.72907002766927,
+              73.72693220774333,
+              73.69386355082194,
+              73.72799714406331
+            ],
+            "192": [
+              89.94133472442627,
+              89.83786900838216,
+              90.00960191090901,
+              89.90720113118489,
+              90.00960191090901,
+              90.07786909739177
+            ]
+          },
+          "medians_us": {
+            "native": 1292.9706573486328,
+            "64": 57.34399954477946,
+            "128": 73.72746467590332,
+            "192": 89.97546831766763
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 15,
+          "samples_us": {
+            "native": [
+              2093.8069661458335,
+              2101.6234079996743,
+              2105.8228810628257,
+              2099.404780069987,
+              2109.4399770100913,
+              2093.8410441080728
+            ],
+            "64": [
+              69.68639691670735,
+              69.59679921468098,
+              69.63199774424235,
+              69.66719627380371,
+              69.63093280792236,
+              69.66613133748372
+            ],
+            "128": [
+              84.71893469492595,
+              84.82133547465007,
+              84.4106674194336,
+              84.95786984761556,
+              84.58240032196045,
+              84.54826672871907
+            ],
+            "192": [
+              96.97279930114746,
+              96.93866570790608,
+              97.0410664876302,
+              97.10933367411296,
+              97.21173445383708,
+              97.07520008087158
+            ]
+          },
+          "medians_us": {
+            "native": 2100.5140940348306,
+            "64": 69.64906454086304,
+            "128": 84.6506675084432,
+            "192": 97.05813328425089
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 40,
+          "samples_us": {
+            "native": [
+              2131.3536326090493,
+              2146.099090576172,
+              2129.8528035481772,
+              2132.650629679362,
+              2140.160115559896,
+              2136.883290608724
+            ],
+            "64": [
+              118.85333061218262,
+              118.54506333669026,
+              118.64746411641438,
+              119.0229336420695,
+              118.71573130289714,
+              119.05706723531087
+            ],
+            "128": [
+              92.19413598378499,
+              92.16000239054362,
+              92.12586879730225,
+              92.12586879730225,
+              92.12586879730225,
+              92.12586879730225
+            ],
+            "192": [
+              106.46186669667561,
+              106.49600028991699,
+              106.46186669667561,
+              106.42773310343425,
+              106.39359951019287,
+              106.36053085327148
+            ]
+          },
+          "medians_us": {
+            "native": 2134.766960144043,
+            "64": 118.78453095753989,
+            "128": 92.12586879730225,
+            "192": 106.44479990005493
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 5,
+          "samples_us": {
+            "native": [
+              1162.9567464192708,
+              1167.8731282552083,
+              1166.370137532552,
+              1167.7354176839192,
+              1164.9365743001301,
+              1166.916275024414
+            ],
+            "64": [
+              194.32106018066406,
+              194.11627451578775,
+              194.5258617401123,
+              194.2527929941813,
+              194.45759455362955,
+              194.01386578877768
+            ],
+            "128": [
+              197.39306767781576,
+              197.52960205078125,
+              197.32586542765299,
+              197.25546836853027,
+              197.597869237264,
+              197.18826611836752
+            ],
+            "192": [
+              193.29706827799478,
+              193.2981332143148,
+              193.69386037190756,
+              193.22880109151205,
+              193.0239995320638,
+              192.92160669962564
+            ]
+          },
+          "medians_us": {
+            "native": 1166.643206278483,
+            "64": 194.28692658742267,
+            "128": 197.35946655273438,
+            "192": 193.26293468475342
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 15,
+          "samples_us": {
+            "native": [
+              1201.425043741862,
+              1204.2922973632812,
+              1205.179723103841,
+              1204.2911529541016,
+              1203.6778767903645,
+              1204.0874481201172
+            ],
+            "64": [
+              610.0650787353516,
+              609.9967956542969,
+              608.5631688435873,
+              610.3381474812826,
+              610.4735692342123,
+              610.3381474812826
+            ],
+            "128": [
+              564.5653406778971,
+              564.9749120076498,
+              564.2922719319662,
+              564.2922719319662,
+              564.8384094238281,
+              564.6336237589518
+            ],
+            "192": [
+              557.8751881917318,
+              558.2848230997721,
+              557.3290506998698,
+              557.3290506998698,
+              558.079973856608,
+              557.6021194458008
+            ]
+          },
+          "medians_us": {
+            "native": 1204.1893005371094,
+            "64": 610.2016131083171,
+            "128": 564.5994822184244,
+            "192": 557.7386538187664
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 40,
+          "samples_us": {
+            "native": [
+              1663.1807963053386,
+              1660.1098378499348,
+              1662.5663757324219,
+              1664.8192087809246,
+              1662.3616536458333,
+              1666.049067179362
+            ],
+            "64": [
+              1509.0347290039062,
+              1509.1028849283855,
+              1508.2154591878254,
+              1508.5567474365234,
+              1508.9664459228516,
+              1508.3520253499348
+            ],
+            "128": [
+              1446.1962381998699,
+              1446.468226114909,
+              1446.5365091959636,
+              1446.2635040283203,
+              1446.331787109375,
+              1446.3999430338542
+            ],
+            "192": [
+              1430.731709798177,
+              1430.733871459961,
+              1430.3243001302083,
+              1430.5962880452473,
+              1431.0741424560547,
+              1430.8704376220703
+            ]
+          },
+          "medians_us": {
+            "native": 1662.8735860188804,
+            "64": 1508.7615966796875,
+            "128": 1446.3658650716147,
+            "192": 1430.7327906290689
+          }
+        }
+      ],
+      "gpu_states": [
+        {
+          "kind": "gpu_start",
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P8, 180 MHz, 405 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 5,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2820 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 15,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2820 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 40,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2820 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 5,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2812 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 15,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2805 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 40,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2797 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        }
+      ]
+    },
+    {
+      "stage": 1,
+      "raw_path": "/tmp/ds41-draft-expert-slices/official-final-stage1.json",
+      "raw_sha256": "63e21b19a92126de33808f23d68d948b89726acbc47f68a4611bc0c9aa8f84d4",
+      "source": {
+        "kind": "source",
+        "b12x": "3b19ffc1886ef0545b0e41fd4c079c5963208b6e",
+        "stage": 1,
+        "native_sha256": "0c4d4dadd683194d4da7f6728f1be1b86e72d5296c1035d9a2b26d23d4a0034f",
+        "script_sha256": "27396d0ff0fa18da898c95ab14ba5389831dc5285809c3c76c9e1a6bd8624b5c",
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "scope": "Official dSpark weights: native persistent vs full grouped slice path.\n\nSynthetic BF16 inputs and controlled shared/dispersed routing; this is a\ncomponent comparison, not live model activation or API qualification.\n"
+      },
+      "checks": [
+        {
+          "kind": "check",
+          "route_rel_l2": 2.0642932696546268e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.6956707088743315e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.8907963195147204e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3513480940096088e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.756256473584017e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2438541691371938e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.8769618748137873e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3361844014857525e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.8630286646725835e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2689926382213343e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.948938077589446e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.364823892264667e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 7.927788828965276e-06,
+          "cosine": 0.9999999403953552,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.65688405218134e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.000000238418579,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.000000238418579,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.973640095798146e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.000000238418579,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.7570782989982945e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 0.9999998807907104,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999998807907104,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.6606375769233637e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 0.9999998807907104,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3208801991358996e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.4778247009749066e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.9489864772358487e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.9259377143375787e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.223695005909576e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.4191693981379103e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.5682709292595973e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.7498016308413753e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        }
+      ],
+      "timings": [
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 5,
+          "samples_us": {
+            "native": [
+              1291.604232788086,
+              1284.5738728841145,
+              1289.2842610677083,
+              1289.0122731526692,
+              1295.4964955647786,
+              1286.6901397705078
+            ],
+            "64": [
+              57.34399954477946,
+              57.34293460845947,
+              57.34399954477946,
+              57.34506845474243,
+              57.34506845474243,
+              57.34399954477946
+            ],
+            "128": [
+              73.69386355082194,
+              73.72799714406331,
+              73.72799714406331,
+              73.76213073730469,
+              73.69386355082194,
+              73.69386355082194
+            ],
+            "192": [
+              89.94133472442627,
+              89.94133472442627,
+              90.11306762695312,
+              90.00960191090901,
+              89.94133472442627,
+              89.94133472442627
+            ]
+          },
+          "medians_us": {
+            "native": 1289.1482671101887,
+            "64": 57.34399954477946,
+            "128": 73.71093034744263,
+            "192": 89.94133472442627
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 15,
+          "samples_us": {
+            "native": [
+              2107.7332814534507,
+              2111.4879608154297,
+              2094.3541208902993,
+              2100.156784057617,
+              2117.9733276367188,
+              2097.868855794271
+            ],
+            "64": [
+              69.63199774424235,
+              69.66613133748372,
+              69.7002649307251,
+              69.63199774424235,
+              69.63199774424235,
+              69.59786415100098
+            ],
+            "128": [
+              84.71893469492595,
+              84.95786984761556,
+              84.44586594899495,
+              84.88960266113281,
+              84.75306828816731,
+              84.41173235575359
+            ],
+            "192": [
+              97.21173445383708,
+              97.0410664876302,
+              97.07520008087158,
+              97.31520016988118,
+              97.07520008087158,
+              96.97173436482747
+            ]
+          },
+          "medians_us": {
+            "native": 2103.945032755534,
+            "64": 69.63199774424235,
+            "128": 84.73600149154663,
+            "192": 97.07520008087158
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 40,
+          "samples_us": {
+            "native": [
+              2142.139689127604,
+              2140.4319763183594,
+              2132.855478922526,
+              2143.0964152018228,
+              2132.4459075927734,
+              2144.1195170084634
+            ],
+            "64": [
+              118.78399848937988,
+              118.92053286234538,
+              118.85226567586263,
+              119.29492950439453,
+              119.05706723531087,
+              118.92053286234538
+            ],
+            "128": [
+              92.16000239054362,
+              92.12586879730225,
+              92.19413598378499,
+              92.16000239054362,
+              92.12586879730225,
+              92.12586879730225
+            ],
+            "192": [
+              106.46186669667561,
+              106.42773310343425,
+              106.46080176035564,
+              106.42773310343425,
+              106.46186669667561,
+              106.39359951019287
+            ]
+          },
+          "medians_us": {
+            "native": 2141.2858327229815,
+            "64": 118.92053286234538,
+            "128": 92.14293559392294,
+            "192": 106.44426743189494
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 5,
+          "samples_us": {
+            "native": [
+              1165.073013305664,
+              1170.0565338134766,
+              1169.4421132405598,
+              1169.1691080729167,
+              1169.0335591634114,
+              1170.6036885579426
+            ],
+            "64": [
+              194.5258617401123,
+              194.2527929941813,
+              194.45865948994955,
+              194.2527929941813,
+              194.73066329956055,
+              194.32106018066406
+            ],
+            "128": [
+              197.4623998006185,
+              197.73546854654947,
+              197.11999893188477,
+              197.596804300944,
+              197.596804300944,
+              197.18826611836752
+            ],
+            "192": [
+              193.57120196024576,
+              193.22880109151205,
+              193.29706827799478,
+              193.0239995320638,
+              193.09226671854654,
+              193.22880109151205
+            ]
+          },
+          "medians_us": {
+            "native": 1169.3056106567383,
+            "64": 194.38985983530682,
+            "128": 197.52960205078125,
+            "192": 193.22880109151205
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 15,
+          "samples_us": {
+            "native": [
+              1204.4288635253906,
+              1205.5892944335938,
+              1205.9307098388672,
+              1204.2922973632812,
+              1204.360580444336,
+              1203.9508819580078
+            ],
+            "64": [
+              610.1333618164062,
+              610.2687835693359,
+              610.2015813191732,
+              609.5882415771484,
+              609.6565246582031,
+              609.5872243245443
+            ],
+            "128": [
+              564.2922719319662,
+              564.6325429280599,
+              564.4981384277344,
+              565.3162638346354,
+              564.4970575968424,
+              564.8384094238281
+            ],
+            "192": [
+              557.7386856079102,
+              557.5338363647461,
+              557.8751881917318,
+              556.9877624511719,
+              558.4213256835938,
+              557.9423904418945
+            ]
+          },
+          "medians_us": {
+            "native": 1204.3947219848633,
+            "64": 609.8949432373047,
+            "128": 564.5653406778972,
+            "192": 557.806936899821
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 40,
+          "samples_us": {
+            "native": [
+              1663.6586507161458,
+              1664.1365051269531,
+              1660.586675008138,
+              1663.7952168782551,
+              1665.1957194010417,
+              1667.208480834961
+            ],
+            "64": [
+              1509.1711680094402,
+              1509.1028849283855,
+              1508.7626139322917,
+              1508.8981628417969,
+              1508.6250305175781,
+              1508.7605794270833
+            ],
+            "128": [
+              1446.3999430338542,
+              1446.331787109375,
+              1446.2635040283203,
+              1446.5354919433594,
+              1446.5376536051433,
+              1446.0586547851562
+            ],
+            "192": [
+              1430.1184336344402,
+              1430.2548726399739,
+              1430.7328542073567,
+              1430.3914388020833,
+              1430.7328542073567,
+              1430.664571126302
+            ]
+          },
+          "medians_us": {
+            "native": 1663.965861002604,
+            "64": 1508.8303883870444,
+            "128": 1446.3658650716147,
+            "192": 1430.5280049641926
+          }
+        }
+      ],
+      "gpu_states": [
+        {
+          "kind": "gpu_start",
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P8, 180 MHz, 405 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 5,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2767 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 15,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2820 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 40,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2812 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 5,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2812 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 15,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2805 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 40,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2797 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        }
+      ]
+    },
+    {
+      "stage": 2,
+      "raw_path": "/tmp/ds41-draft-expert-slices/official-final-stage2.json",
+      "raw_sha256": "aa7b3ce3cce6731243d9f3af910270b56bdf0b744a38e2c32f534b3d396b7c15",
+      "source": {
+        "kind": "source",
+        "b12x": "3b19ffc1886ef0545b0e41fd4c079c5963208b6e",
+        "stage": 2,
+        "native_sha256": "0c4d4dadd683194d4da7f6728f1be1b86e72d5296c1035d9a2b26d23d4a0034f",
+        "script_sha256": "27396d0ff0fa18da898c95ab14ba5389831dc5285809c3c76c9e1a6bd8624b5c",
+        "device": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        "scope": "Official dSpark weights: native persistent vs full grouped slice path.\n\nSynthetic BF16 inputs and controlled shared/dispersed routing; this is a\ncomponent comparison, not live model activation or API qualification.\n"
+      },
+      "checks": [
+        {
+          "kind": "check",
+          "route_rel_l2": 1.662271564839557e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.7733617241333377e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.9990363142596834e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3939586313304062e-08,
+          "case": "shared",
+          "rows": 5,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 1.876936472910984e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.3143133631720048e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.1930038229811544e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.4870963954981562e-08,
+          "case": "shared",
+          "rows": 15,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.1068318645234285e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.463680637276866e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2183840542311373e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.4841600776426276e-08,
+          "case": "shared",
+          "rows": 40,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.1884412504391548e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.1657424298382466e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.0515383170049972e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 6.142260190244997e-06,
+          "cosine": 0.9999999403953552,
+          "mismatches": 1
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.9042258375966412e-08,
+          "case": "dispersed",
+          "rows": 5,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2609754068980692e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.295401557717014e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 0.0,
+          "cosine": 1.0000001192092896,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.1823504781082192e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 4.528954832494492e-06,
+          "cosine": 1.0,
+          "mismatches": 3
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.6760451632412696e-08,
+          "case": "dispersed",
+          "rows": 15,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 2.0379904981382424e-06,
+          "cosine": 1.0,
+          "mismatches": 2
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2456175585716665e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 64,
+          "rel_l2": 1.0693984222598374e-05,
+          "cosine": 0.9999999403953552,
+          "mismatches": 4
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 0.9999999403953552,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.42342945711016e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 42,
+          "width": 192,
+          "rel_l2": 1.0593890692689456e-05,
+          "cosine": 0.9999999403953552,
+          "mismatches": 3
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.2078154415794415e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 64,
+          "rel_l2": 4.665061169362161e-06,
+          "cosine": 1.0,
+          "mismatches": 6
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 0.0,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 128,
+          "rel_l2": 0.0,
+          "cosine": 1.0,
+          "mismatches": 0
+        },
+        {
+          "kind": "check",
+          "route_rel_l2": 2.4877889970298384e-08,
+          "case": "dispersed",
+          "rows": 40,
+          "seed": 77,
+          "width": 192,
+          "rel_l2": 1.4409404229809297e-06,
+          "cosine": 1.0,
+          "mismatches": 3
+        }
+      ],
+      "timings": [
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 5,
+          "samples_us": {
+            "native": [
+              1293.3119455973308,
+              1292.9023742675781,
+              1292.356236775716,
+              1304.849116007487,
+              1300.003178914388,
+              1296.384048461914
+            ],
+            "64": [
+              57.34399954477946,
+              57.34399954477946,
+              57.34399954477946,
+              57.34399954477946,
+              57.34399954477946,
+              57.34399954477946
+            ],
+            "128": [
+              73.72693220774333,
+              73.69386355082194,
+              73.72799714406331,
+              73.69279861450195,
+              73.72799714406331,
+              73.76213073730469
+            ],
+            "192": [
+              89.80480035146077,
+              89.80586528778076,
+              89.87306753794353,
+              90.04373550415039,
+              90.11200269063313,
+              90.07786909739177
+            ]
+          },
+          "medians_us": {
+            "native": 1294.8479970296225,
+            "64": 57.34399954477946,
+            "128": 73.72746467590332,
+            "192": 89.95840152104697
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 15,
+          "samples_us": {
+            "native": [
+              2112.0000203450522,
+              2095.8197275797525,
+              2095.2415466308594,
+              2107.0164998372397,
+              2105.0367991129556,
+              2104.728571573893
+            ],
+            "64": [
+              69.62026755015056,
+              69.66613133748372,
+              69.63307062784831,
+              69.66613133748372,
+              69.73333358764648,
+              69.63199774424235
+            ],
+            "128": [
+              84.61653391520183,
+              84.58240032196045,
+              84.41173235575359,
+              84.78720188140869,
+              85.50399939219157,
+              85.29919783274333
+            ],
+            "192": [
+              96.59732977549235,
+              97.07520008087158,
+              97.07520008087158,
+              96.90453211466472,
+              98.13333352406819,
+              98.06506633758545
+            ]
+          },
+          "medians_us": {
+            "native": 2104.8826853434243,
+            "64": 69.64960098266602,
+            "128": 84.70186789830527,
+            "192": 97.07520008087158
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "shared",
+          "rows": 40,
+          "samples_us": {
+            "native": [
+              2130.876795450846,
+              2137.7034505208335,
+              2146.7124938964844,
+              2150.3316243489585,
+              2142.344411214193,
+              2138.2484436035156
+            ],
+            "64": [
+              118.6463991800944,
+              119.02186870574951,
+              118.98880004882812,
+              118.91946792602539,
+              119.33013598124187,
+              119.0229336420695
+            ],
+            "128": [
+              92.12586879730225,
+              92.12586879730225,
+              92.16000239054362,
+              92.09067026774089,
+              92.12586879730225,
+              92.12586879730225
+            ],
+            "192": [
+              106.49600028991699,
+              106.52906894683838,
+              106.53013388315837,
+              106.49600028991699,
+              106.53013388315837,
+              106.49600028991699
+            ]
+          },
+          "medians_us": {
+            "native": 2140.2964274088545,
+            "64": 119.00533437728882,
+            "128": 92.12586879730225,
+            "192": 106.51253461837769
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 5,
+          "samples_us": {
+            "native": [
+              1170.8075205485027,
+              1168.0768330891926,
+              1170.739237467448,
+              1167.7354176839192,
+              1167.3258463541667,
+              1168.7594095865886
+            ],
+            "64": [
+              194.38932736714682,
+              194.11627451578775,
+              194.0821329752604,
+              194.04800732930502,
+              194.11627451578775,
+              194.18452580769858
+            ],
+            "128": [
+              197.324800491333,
+              197.42719332377115,
+              197.324800491333,
+              197.4613348642985,
+              197.66613642374674,
+              197.56479263305664
+            ],
+            "192": [
+              193.29706827799478,
+              193.36533546447754,
+              192.9898738861084,
+              193.26292673746744,
+              193.22880109151205,
+              193.12639236450195
+            ]
+          },
+          "medians_us": {
+            "native": 1168.4181213378906,
+            "64": 194.11627451578775,
+            "128": 197.44426409403482,
+            "192": 193.24586391448975
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 15,
+          "samples_us": {
+            "native": [
+              1206.2037150065105,
+              1202.7904510498047,
+              1204.1557312011719,
+              1205.0431569417317,
+              1203.268305460612,
+              1203.6778767903645
+            ],
+            "64": [
+              610.5429331461588,
+              609.6554438273112,
+              608.6997350056967,
+              609.3823750813802,
+              610.0650787353516,
+              610.6805165608724
+            ],
+            "128": [
+              564.8384094238281,
+              564.4287745157877,
+              564.4970575968424,
+              564.4298553466797,
+              564.634641011556,
+              564.6325429280599
+            ],
+            "192": [
+              557.6704025268555,
+              557.8069051106771,
+              557.5338363647461,
+              557.3973337809244,
+              558.0117543538412,
+              557.6021194458008
+            ]
+          },
+          "medians_us": {
+            "native": 1203.916803995768,
+            "64": 609.8602612813313,
+            "128": 564.5648002624512,
+            "192": 557.6362609863281
+          }
+        },
+        {
+          "kind": "timing",
+          "case": "dispersed",
+          "rows": 40,
+          "samples_us": {
+            "native": [
+              1662.771224975586,
+              1663.1807963053386,
+              1658.6069742838542,
+              1667.1403249104817,
+              1664.955774943034,
+              1668.0277506510417
+            ],
+            "64": [
+              1509.1018676757812,
+              1508.6261749267578,
+              1508.6250305175781,
+              1509.0347290039062,
+              1508.8981628417969,
+              1508.8981628417969
+            ],
+            "128": [
+              1446.6720581054688,
+              1446.673075358073,
+              1446.5365091959636,
+              1446.8096415201824,
+              1446.5365091959636,
+              1446.5365091959636
+            ],
+            "192": [
+              1430.801010131836,
+              1430.4607391357422,
+              1430.5962880452473,
+              1430.664571126302,
+              1430.664571126302,
+              1430.4607391357422
+            ]
+          },
+          "medians_us": {
+            "native": 1664.0682856241863,
+            "64": 1508.8981628417969,
+            "128": 1446.6042836507163,
+            "192": 1430.6304295857747
+          }
+        }
+      ],
+      "gpu_states": [
+        {
+          "kind": "gpu_start",
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 592 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 5,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2820 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 15,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2820 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "shared",
+          "rows": 40,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2812 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 5,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2805 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 15,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2805 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        },
+        {
+          "kind": "gpu_after_timing",
+          "case": "dispersed",
+          "rows": 40,
+          "state": "index, uuid, pstate, clocks.current.sm [MHz], clocks.current.memory [MHz], clocks_event_reasons.active\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 2797 MHz, 13365 MHz, 0x0000000000000000\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, P8, 180 MHz, 405 MHz, 0x0000000000000000"
+        }
+      ]
+    }
+  ]
+}
