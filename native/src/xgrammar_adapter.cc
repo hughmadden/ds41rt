@@ -1,4 +1,5 @@
 #include "ds41rt_native.h"
+#include "xgrammar_v41_tools.h"
 
 #include <dlpack/dlpack.h>
 #include <picojson.h>
@@ -66,16 +67,20 @@ void ExpandResponseSchemas(picojson::value& node) {
   auto& object = node.get<picojson::object>();
   auto type = object.find("type");
   if (type != object.end() && type->second.is<std::string>() &&
-      type->second.get<std::string>() == "ds41_json_schema") {
+      (type->second.get<std::string>() == "ds41_json_schema" ||
+       type->second.get<std::string>() == "ds41_tool_schema")) {
     auto schema = object.find("json_schema");
     auto strict = object.find("strict");
     if (schema == object.end() || strict == object.end() || !strict->second.is<bool>())
-      throw std::invalid_argument("ds41_json_schema requires json_schema and boolean strict");
-    auto grammar = xgrammar::Grammar::FromJSONSchema(schema->second.serialize(false),
-        true, std::nullopt, std::nullopt, strict->second.get<bool>(), kJsonMaxWhitespaceCount);
+      throw std::invalid_argument(type->second.get<std::string>() +
+          " requires json_schema and boolean strict");
+    auto grammar = type->second.get<std::string>() == "ds41_tool_schema"
+        ? xgrammar::V41ToolSchemaToEBNF(schema->second, strict->second.get<bool>())
+        : xgrammar::Grammar::FromJSONSchema(schema->second.serialize(false),
+            true, std::nullopt, std::nullopt, strict->second.get<bool>(), kJsonMaxWhitespaceCount).ToString();
     picojson::object replacement;
     replacement["type"] = picojson::value(std::string("grammar"));
-    replacement["grammar"] = picojson::value(grammar.ToString());
+    replacement["grammar"] = picojson::value(grammar);
     node = picojson::value(std::move(replacement));
     return;
   }

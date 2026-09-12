@@ -91,7 +91,27 @@ if(DS41RT_ENABLE_XGRAMMAR)
     "${DS41RT_XGRAMMAR_SOURCE_DIR}/cpp/*.cc"
   )
   list(FILTER DS41RT_XGRAMMAR_SOURCES EXCLUDE REGEX "/cpp/tvm_ffi/.*\\.cc$")
+  # Extend the pinned schema factory in a generated translation unit. The
+  # anonymous upstream parser is reused without changing the vendored tree.
+  file(READ "${DS41RT_XGRAMMAR_SOURCE_DIR}/cpp/json_schema_converter.cc" DS41RT_SCHEMA_SOURCE)
+  set(DS41RT_SCHEMA_FACTORY "switch (json_format) {\n    case JSONFormat::kJSON:")
+  string(FIND "${DS41RT_SCHEMA_SOURCE}" "${DS41RT_SCHEMA_FACTORY}" DS41RT_SCHEMA_FACTORY_AT)
+  if(DS41RT_SCHEMA_FACTORY_AT EQUAL -1)
+    message(FATAL_ERROR "Pinned XGrammar schema factory no longer matches the V4.1 extension")
+  endif()
+  string(REPLACE "#include \"json_schema_converter.h\""
+    "#include \"json_schema_converter.h\"\n#include \"xgrammar_v41_tools.h\""
+    DS41RT_SCHEMA_SOURCE "${DS41RT_SCHEMA_SOURCE}")
+  string(REPLACE "${DS41RT_SCHEMA_FACTORY}"
+    "switch (json_format) {\n    case static_cast<JSONFormat>(5): {\n      V41ToolCallingConverter converter(ref_resolver);\n      return converter.Convert(spec);\n    }\n    case JSONFormat::kJSON:"
+    DS41RT_SCHEMA_SOURCE "${DS41RT_SCHEMA_SOURCE}")
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_schema.cc" "${DS41RT_SCHEMA_SOURCE}")
+  list(FILTER DS41RT_XGRAMMAR_SOURCES EXCLUDE REGEX "/cpp/json_schema_converter\\.cc$")
+  list(APPEND DS41RT_XGRAMMAR_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_schema.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/xgrammar_v41_tools.cc")
   add_library(ds41rt_xgrammar STATIC ${DS41RT_XGRAMMAR_SOURCES})
+  target_include_directories(ds41rt_xgrammar PRIVATE
+    "${DS41RT_XGRAMMAR_SOURCE_DIR}/cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_include_directories(ds41rt_xgrammar
     PUBLIC "${DS41RT_XGRAMMAR_SOURCE_DIR}/include"
   )
@@ -762,6 +782,7 @@ target_include_directories(ds41rt_native PUBLIC
 )
 if(DS41RT_ENABLE_XGRAMMAR)
   target_link_libraries(ds41rt_native PRIVATE ds41rt_xgrammar)
+  target_include_directories(ds41rt_native PRIVATE "${DS41RT_XGRAMMAR_SOURCE_DIR}/cpp")
   target_compile_definitions(ds41rt_native PRIVATE DS41RT_NATIVE_ENABLE_XGRAMMAR=1)
 else()
   target_compile_definitions(ds41rt_native PRIVATE DS41RT_NATIVE_ENABLE_XGRAMMAR=0)

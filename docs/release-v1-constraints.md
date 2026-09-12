@@ -60,3 +60,7 @@ requests currently preserve a permissive tool-block alternative: the response
 schema applies to the final answer, and this is not strict argument enforcement.
 Finish and qualify those tool policies before the architectural FP4 compressed
 cache migration and its separate performance/needle/tool-eval gates.
+
+The [typed DSML grammar component](release-v1-tool-grammar.md) now has 17
+official-tokenizer test groups. API integration and the documented remaining
+schema cases are still open; this component does not establish strict serving.
