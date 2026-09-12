@@ -42,6 +42,23 @@ impl BatchScores {
             Some(mask) => argmax(&self.bytes[row * ROW_BYTES..(row + 1) * ROW_BYTES], Some(mask)),
         }
     }
+    // Diagnostic only: scores are already on the host. Callers gate the scan
+    // behind the logit trace target so normal serving incurs no extra work.
+    pub fn top_two(&self, row: usize) -> Result<[(u32, f32); 2]> {
+        ensure!(row < self.best.len(), "diagnostic logit row is outside batch");
+        let mut top = [(0, f32::NEG_INFINITY); 2];
+        for (token, bytes) in self.bytes[row * ROW_BYTES..(row + 1) * ROW_BYTES]
+            .chunks_exact(4).enumerate() {
+            let value = f32::from_ne_bytes(bytes.try_into().unwrap());
+            if value > top[0].1 {
+                top[1] = top[0];
+                top[0] = (token as u32, value);
+            } else if value > top[1].1 {
+                top[1] = (token as u32, value);
+            }
+        }
+        Ok(top)
+    }
     // Copy only a finishing request's committed frontier, never every decode row.
     pub fn retain(&self, row: usize) -> Result<TokenScores> {
         ensure!(row < self.best.len(), "retained logit row is outside batch");
@@ -104,5 +121,15 @@ mod tests {
         let mut invalid = row(91);
         invalid[..4].copy_from_slice(&f32::NAN.to_ne_bytes());
         assert!(TokenScores::new(invalid).is_err());
+    }
+    #[test]
+    fn diagnostic_top_two_preserves_greedy_ties_and_negative_scores() {
+        let mut values = vec![-10.0f32; VOCAB];
+        values[17] = -2.;
+        values[91] = -2.;
+        let batch = BatchScores::new(values.into_iter().flat_map(f32::to_ne_bytes).collect()).unwrap();
+        assert_eq!(batch.best, [17]);
+        assert_eq!(batch.top_two(0).unwrap(), [(17, -2.), (91, -2.)]);
+        assert!(batch.top_two(1).is_err());
     }
 }

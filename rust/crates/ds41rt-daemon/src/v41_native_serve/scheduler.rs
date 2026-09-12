@@ -310,6 +310,18 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
                 let decision = ds41rt_core::verify_dspark_greedy(input,
                     selected, 1, request.job.max_tokens - request.generated)
                     .map_err(anyhow::Error::msg)?;
+                if tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG) {
+                    let top_two = (offset..offset + input.len())
+                        .map(|row| next[lane].top_two(row)).collect::<Result<Vec<_>>>()?;
+                    tracing::debug!(target: "ds41rt::logit_trace",
+                        request_id=request.id, lane, generated=request.generated,
+                        context_tokens=requests.cache().committed_end(request.lease)?,
+                        input=?input, selected=?selected, top_two=?top_two,
+                        accepted_inputs=decision.accepted_inputs,
+                        emitted=?decision.emitted,
+                        constrained=request.constraint.is_some(),
+                        "native verification logits");
+                }
                 if let Some(confidence) = draft.as_deref()
                     .and_then(|draft| draft.confidence_trace(request.id)) {
                     // Agreement after the first mismatch is conditional on a

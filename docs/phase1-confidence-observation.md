@@ -64,3 +64,43 @@ confidence bins with conditional acceptance. It excludes constrained and termina
 observations from calibration and never labels unverified suffix positions.
 The timings include instrumentation and first-use effects. They do not constitute
 a counterfactual shorter-policy trajectory or a held-out throughput prediction.
+
+## Greedy divergence diagnostics
+
+Add `ds41rt::logit_trace=debug` to record each verifier input, selected token,
+and the two highest unconstrained target logits per row. Records include the
+request identity, generated-token offset, committed context, and accepted input
+count. Only rows through the accepted frontier describe the emitted trajectory;
+rows after rejection use a different history. Constrained selections may differ
+from the unconstrained top two.
+
+The scan uses scores already downloaded for normal target selection and adds no
+device transfers. It runs only when this separate trace target is enabled. It is
+intended to compare the first divergence at identical token histories, not to
+justify treating arbitrary output differences as harmless numerical drift.
+
+Fresh-start repeats of the first code, fable, and topic requests reproduce each
+fixed-length arm's earlier output exactly (six of six). The trace reconstructs
+the streamed content, and paired requests are identical. The first divergence
+has the same top-two candidates in both arms:
+
+| Case | Output token offset (zero-based) | Limit 1 winner / margin | Limit 5 winner / margin |
+|---|---:|---|---|
+| Code | 35 | ` them` / 0.00754 | ` sorted` / 0.06940 |
+| Fable | 2 | ` mango` / 0.58017 | ` lush` / 2.31431 |
+| Topic | 1 | ` are` / 0.28997 | `'s` / 0.08312 |
+
+Code is a close decision, but the fable difference cannot be characterized as a
+tiny tie. Fable and topic diverge in the first verification pass, before any
+length-dependent target commit or rollback. This narrows their investigation to
+the proposed batch execution and its inputs; it does not establish the source
+of the numerical difference or rule out a cache-read/masking defect. Next,
+compare intermediate activations at the same first-pass rows across shapes.
+Adaptive selection remains disabled pending this investigation.
+
+[Paired scores and trace hashes](phase1-logit-comparison.json) preserve the
+observations. Local raw files are `/tmp/ds41-phase1-logits-{1,5}.json` and
+`/tmp/ds41-phase1-logits-{1,5}-trace.log`. Terminal matched EOS can commit one
+more input than it emits: reconstruct output from emitted tokens (or stop at
+EOS), never blindly interpret accepted-input count as emitted-token count.
+The standard coordinator was restored after the probe.

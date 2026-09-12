@@ -1,0 +1,147 @@
+{
+  "scope": "Paired fresh-start C1 greedy divergence diagnostics; scores at identical emitted histories. No equivalence conclusion for other positions or shapes.",
+  "trace_sha256": {
+    "1": "85e456e4bd85473b3cf84f85fa361d41b299652cf43449f9bfcc2aada846a27d",
+    "5": "30b4e48128c0a2149db70221e74ea67793047d18e79b5cc4f5b08367c0c05189"
+  },
+  "samples": [
+    {
+      "case": "code",
+      "first_divergent_token": 35,
+      "same_request": true,
+      "trace_reconstructs_content": true,
+      "limit_1_repeats_previous_output": true,
+      "limit_1": {
+        "token": 1066,
+        "top_two": [
+          [
+            1066,
+            35.097927
+          ],
+          [
+            24216,
+            35.09039
+          ]
+        ],
+        "margin": 0.007536999999999239,
+        "round_generated": 35,
+        "row": 0,
+        "verifier_rows": 2,
+        "context_tokens": 88,
+        "token_text": " them"
+      },
+      "limit_5_repeats_previous_output": true,
+      "limit_5": {
+        "token": 24216,
+        "top_two": [
+          [
+            24216,
+            35.058323
+          ],
+          [
+            1066,
+            34.98892
+          ]
+        ],
+        "margin": 0.06940300000000121,
+        "round_generated": 32,
+        "row": 3,
+        "verifier_rows": 6,
+        "context_tokens": 85,
+        "token_text": " sorted"
+      }
+    },
+    {
+      "case": "fable",
+      "first_divergent_token": 2,
+      "same_request": true,
+      "trace_reconstructs_content": true,
+      "limit_1_repeats_previous_output": true,
+      "limit_1": {
+        "token": 80051,
+        "top_two": [
+          [
+            80051,
+            27.608906
+          ],
+          [
+            58780,
+            27.028738
+          ]
+        ],
+        "margin": 0.5801680000000005,
+        "round_generated": 1,
+        "row": 1,
+        "verifier_rows": 2,
+        "context_tokens": 49,
+        "token_text": " mango"
+      },
+      "limit_5_repeats_previous_output": true,
+      "limit_5": {
+        "token": 58780,
+        "top_two": [
+          [
+            58780,
+            28.653412
+          ],
+          [
+            80051,
+            26.339102
+          ]
+        ],
+        "margin": 2.314309999999999,
+        "round_generated": 1,
+        "row": 1,
+        "verifier_rows": 6,
+        "context_tokens": 49,
+        "token_text": " lush"
+      }
+    },
+    {
+      "case": "topic",
+      "first_divergent_token": 1,
+      "same_request": true,
+      "trace_reconstructs_content": true,
+      "limit_1_repeats_previous_output": true,
+      "limit_1": {
+        "token": 477,
+        "top_two": [
+          [
+            477,
+            31.258453
+          ],
+          [
+            734,
+            30.968481
+          ]
+        ],
+        "margin": 0.2899719999999988,
+        "round_generated": 1,
+        "row": 0,
+        "verifier_rows": 2,
+        "context_tokens": 42,
+        "token_text": " are"
+      },
+      "limit_5_repeats_previous_output": true,
+      "limit_5": {
+        "token": 734,
+        "top_two": [
+          [
+            734,
+            31.026966
+          ],
+          [
+            477,
+            30.94385
+          ]
+        ],
+        "margin": 0.08311600000000041,
+        "round_generated": 1,
+        "row": 0,
+        "verifier_rows": 6,
+        "context_tokens": 42,
+        "token_text": "'s"
+      }
+    }
+  ]
+}
