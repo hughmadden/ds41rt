@@ -4,7 +4,8 @@ use crate::v41_backbone_cache::CacheLease;
 use crate::v41_requests::RequestBatch;
 use super::prefix::{ImageKeys, PrefixCache, SnapshotKind};
 
-struct Active {
+struct Active<'a> {
+    constraint: Option<super::constraints::State<'a>>,
     id: u64,
     lease: CacheLease,
     job: NativeRequest,
@@ -19,10 +20,11 @@ struct Active {
     image_keys: ImageKeys,
     next_after_commit: Option<TokenScores>,
 }
-impl Active {
+impl Active<'_> {
     fn emit(&mut self, tokens: &[u32]) -> Result<()> {
         for &token in tokens {
             ensure!(!self.job.events.is_closed(), "client disconnected");
+            if let Some(constraint) = &mut self.constraint { constraint.accept(token)?; }
             self.anchor = token;
             self.tokens.push(token);
             self.generated += 1;
@@ -68,7 +70,8 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
     second_transport: &mut NativeTp4Wave<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>,
     vision: &mut crate::v41_vision::VisionRuntime<'a>,
 ) -> Result<()> {
-    let mut active: Vec<Option<Active>> = (0..args.concurrency).map(|_| None).collect();
+    let mut active: Vec<Option<Active<'a>>> = (0..args.concurrency).map(|_| None).collect();
+    let mut compiler = super::constraints::Compiler::new(lib, args.snapshot.join("tokenizer.json"));
     let mut id = 0u64;
     let mut closed = false;
     let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize);
@@ -114,7 +117,9 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             let lease = requests.admit(slot, id)?;
             let lane = usize::from(loads[1] < loads[0]);
             let events = job.events.clone();
-            let result = (|| -> Result<Active> {
+            let result = (|| -> Result<Active<'a>> {
+                let mut constraint = job.constraint.as_ref().map(|spec| compiler.matcher(spec)).transpose()?;
+                ensure!(!job.events.is_closed(), "client disconnected");
                 let prompt = ds41rt_loader::encode_tokenizer_text(&args.snapshot, &job.prompt, false)?.token_ids;
                 let (prompt, images) = if job.images.is_empty() { (prompt, Vec::new()) } else {
                     let expanded = ds41rt_loader::V41VisionPrompt::expand(&prompt,
@@ -165,8 +170,9 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                   }
                 }
                 tracing::debug!(request_id=id, prompt_tokens=prompt.len(), cached_tokens=cached, "native prefix admission");
-                let anchor = scores.select(None)?;
-                Ok(Active { id, lease, job, decoder, anchor, generated: 0, buffered: 0, lane,
+                let mask = constraint.as_mut().map(|state| state.mask()).transpose()?.flatten();
+                let anchor = scores.select(mask)?;
+                Ok(Active { constraint, id, lease, job, decoder, anchor, generated: 0, buffered: 0, lane,
                     finished: false, cacheable: false, tokens: prompt, image_keys, next_after_commit: Some(scores) })
             })();
             match result {
@@ -224,7 +230,7 @@ async fn execute_logits<'a>(lib: &'a NativeLibrary, pass: &mut TargetPass<'_, 'a
 fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     first: &mut TargetPass<'w, 'a>, second: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
     first_transport: &mut NativeTp4Wave<'a>, second_transport: &mut NativeTp4Wave<'a>,
-    active: &mut [Option<Active>], members: &[Vec<usize>; 2], mut draft: Option<&mut DraftRuntime<'_, 'a>>,
+    active: &mut [Option<Active<'a>>], members: &[Vec<usize>; 2], mut draft: Option<&mut DraftRuntime<'_, 'a>>,
 ) -> Result<()> {
     let started = Instant::now();
     let speculative = draft.is_some();
@@ -242,6 +248,11 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         inputs[lane] = if seeds.is_empty() { Vec::new() }
             else if let Some(draft) = draft.as_deref_mut() { draft.propose(lib, &seeds)? }
             else { seeds.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect() };
+        for (&slot, input) in members[lane].iter().zip(&mut inputs[lane]) {
+            if let Some(constraint) = &active[slot].as_ref().unwrap().constraint {
+                constraint.truncate_proposal(input)?;
+            }
+        }
         draft_us += draft_start.elapsed().as_micros() as u64;
         if !members[lane].is_empty() {
             // Token IDs are now known: start this lane's mapped Engram reads
@@ -277,8 +288,11 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
             let mut next_after_commit = Vec::new();
             for (&slot, input) in members[lane].iter().zip(&inputs[lane]) {
                 let request = active[slot].as_ref().unwrap();
+                let constrained = request.constraint.as_ref().map(|state|
+                    state.select_verification(&next[lane], offset, input)).transpose()?;
+                let selected = constrained.as_deref().unwrap_or(&next[lane].best[offset..offset + input.len()]);
                 let decision = ds41rt_core::verify_dspark_greedy(input,
-                    &next[lane].best[offset..offset + input.len()], 1, request.job.max_tokens - request.generated)
+                    selected, 1, request.job.max_tokens - request.generated)
                     .map_err(anyhow::Error::msg)?;
                 accepted_drafts += decision.accepted_inputs - 1;
                 emitted += decision.emitted.len();

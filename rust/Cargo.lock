@@ -666,6 +666,7 @@ dependencies = [
  "ds41rt-loader",
  "ds41rt-transport",
  "futures",
+ "jsonschema",
  "percent-encoding",
  "serde",
  "serde_json",

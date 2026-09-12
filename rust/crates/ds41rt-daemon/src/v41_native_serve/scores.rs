@@ -35,6 +35,13 @@ impl BatchScores {
         let best = bytes.chunks_exact(ROW_BYTES).map(|row| argmax(row, None)).collect::<Result<_>>()?;
         Ok(Self { bytes, best })
     }
+    pub fn select(&self, row: usize, mask: Option<&[u32]>) -> Result<u32> {
+        ensure!(row < self.best.len(), "selected logit row is outside batch");
+        match mask {
+            None => Ok(self.best[row]),
+            Some(mask) => argmax(&self.bytes[row * ROW_BYTES..(row + 1) * ROW_BYTES], Some(mask)),
+        }
+    }
     // Copy only a finishing request's committed frontier, never every decode row.
     pub fn retain(&self, row: usize) -> Result<TokenScores> {
         ensure!(row < self.best.len(), "retained logit row is outside batch");

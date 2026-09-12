@@ -13,6 +13,7 @@ base64 = "=0.22.1"
 percent-encoding = "=2.3.2"
 ureq = "=2.12.1"
 url = "=2.5.8"
+jsonschema = { version = "=0.18.3", default-features = false, features = ["draft201909", "draft202012"] }
 anyhow.workspace = true
 async-stream.workspace = true
 axum.workspace = true

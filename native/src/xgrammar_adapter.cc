@@ -55,6 +55,34 @@ picojson::value ParseJSON(const std::string& text, const char* label) {
   return value;
 }
 
+// Project-owned structural node: preserve strictness and bounded whitespace
+// when composing a response schema with reasoning or tool alternatives.
+void ExpandResponseSchemas(picojson::value& node) {
+  if (node.is<picojson::array>()) {
+    for (auto& child : node.get<picojson::array>()) ExpandResponseSchemas(child);
+    return;
+  }
+  if (!node.is<picojson::object>()) return;
+  auto& object = node.get<picojson::object>();
+  auto type = object.find("type");
+  if (type != object.end() && type->second.is<std::string>() &&
+      type->second.get<std::string>() == "ds41_json_schema") {
+    auto schema = object.find("json_schema");
+    auto strict = object.find("strict");
+    if (schema == object.end() || strict == object.end() || !strict->second.is<bool>())
+      throw std::invalid_argument("ds41_json_schema requires json_schema and boolean strict");
+    auto grammar = xgrammar::Grammar::FromJSONSchema(schema->second.serialize(false),
+        true, std::nullopt, std::nullopt, strict->second.get<bool>(), kJsonMaxWhitespaceCount);
+    picojson::object replacement;
+    replacement["type"] = picojson::value(std::string("grammar"));
+    replacement["grammar"] = picojson::value(grammar.ToString());
+    node = picojson::value(std::move(replacement));
+    return;
+  }
+  // Schemas are user data, never structural formats to recursively rewrite.
+  for (auto& entry : object) if (entry.first != "json_schema") ExpandResponseSchemas(entry.second);
+}
+
 const picojson::object& RequireObject(const picojson::value& value, const char* label) {
   if (!value.is<picojson::object>()) {
     throw std::invalid_argument(std::string(label) + " must be an object");
@@ -248,7 +276,11 @@ extern "C" ds41rt_status_t ds41rt_xgrammar_compile(
           if (grammar_json == nullptr) {
             throw std::invalid_argument("structural-tag JSON text is null");
           }
-          return handle->compiler.CompileStructuralTag(grammar_json);
+          {
+            auto structural = ParseJSON(grammar_json, "structural tag");
+            ExpandResponseSchemas(structural);
+            return handle->compiler.CompileStructuralTag(structural.serialize(false));
+          }
       }
       throw std::invalid_argument("unknown XGrammar grammar kind");
     }();

@@ -1,11 +1,11 @@
 # Native constrained decoding
 
-Native XGrammar enforcement remains an open release gate. The initial API audit
-confirmed that a strict JSON schema requesting an object with `value: "allowed"`
-can return the plain text `DISALLOWED` with HTTP 200. The pinned protocol converter
-accepts `json_schema` while discarding its nested fields. Native generation also
-currently selects unconstrained greedy tokens. This must be fixed before release;
-existing tool-eval scores do not establish schema enforcement.
+Native response schemas are now enforced through XGrammar; see the
+[response qualification](release-v1-response-constraints.md). Strict tool-argument,
+selection and parallel-call enforcement remain open release work. The initial
+API audit found that a strict schema requesting `value: "allowed"` returned
+`DISALLOWED` with HTTP 200. Preserving the schema across protocol conversion and
+masking generation now fixes that reproducer, including exact cached prompts.
 
 ## Retained logits prerequisite
 
@@ -45,18 +45,18 @@ checks show no material decode regression; they do not establish release-wide
 performance. RTX power limits are 400W, memory uses standard speed (observed
 loaded clock 13,365 MHz), and the driver is recorded in the evidence.
 
-## Remaining enforcement
+## Shared enforcement and remaining tools
 
-Preserve response schemas before protocol conversion; compile bounded cached
-grammars against the pinned V4.1 tokenizer. Apply masks at first-token selection
-and every target verification row. Validate speculative proposals on forked
-matcher state and commit only emitted tokens to the request matcher. Support the
-V4.1 spaced DSML tags and required/named/parallel tool policies, preserving JSON
-parameter types and strict schema constraints. Thinking precedes constrained
-answer/tool output; default high effort remains enabled.
+Response grammars are compiled against the pinned V4.1 tokenizer in a bounded
+64-entry LRU. Request-local matchers mask first-token selection and each target
+verification row; forked matchers truncate illegal dSpark proposals. Only emitted
+tokens advance authoritative matcher state. Thinking precedes the constrained
+answer and defaults to high effort. Completed JSON answers receive independent
+schema validation before a successful completion is emitted.
 
-Qualify actual API responses, both JSON and SSE, with strict schema and tool
-cases, exact-prefix hits under changed constraints, partial/divergent reuse,
-concurrency, cancellation and recovery in target-only and dSpark modes. Then
-proceed to the architectural FP4 compressed-cache migration and its separate
-performance/needle/tool-eval gates.
+Strict tool arguments, required/named selection, parallel-call limits and their
+streaming behavior still need the V4.1 DSML grammar. Combined response/tool
+requests currently preserve a permissive tool-block alternative: the response
+schema applies to the final answer, and this is not strict argument enforcement.
+Finish and qualify those tool policies before the architectural FP4 compressed
+cache migration and its separate performance/needle/tool-eval gates.

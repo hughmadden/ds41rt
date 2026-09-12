@@ -1,0 +1,223 @@
+{
+  "scope": "Native response constraints; strict tool argument and selection grammar remains open",
+  "baseline_commit": "8a7944b13ecbda34852e553c16fec4822077c00e",
+  "source_sha256": {
+    "native/src/xgrammar_adapter.cc": "1a20fbec0d94648d8d47c75dbff678acd82cd2b2d7686be7f26e2945222b4108",
+    "rust/Cargo.lock": "3b3def223ca43171fe18cf4566d7db8109391222f7b68c13a800e0bb0f151d22",
+    "rust/crates/ds41rt-api/Cargo.toml": "5dbe8c91322318ed11ed56a4d8e83a962c5e35962e0f773ff82ab88a83c09066",
+    "rust/crates/ds41rt-api/src/native_v41.rs": "39f07552dc029bda66a354cccbe17c44ac9eaeaf875aca7ad30aee78daca8617",
+    "rust/crates/ds41rt-api/src/native_v41/constraints.rs": "fa61c64756dc3ded479f51786a66457f47630dfee41f38fd801a2d7041b4a837",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "4bd865b16f910e6280f9b97b62a2f32f66c4ad4d3a2c62e9db53b029d5a68476",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "ecbf2259860b9d870f1a8384c7a494c0824428fcffa9d2bfa489528169e61d13",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scores.rs": "09d1478b4bfca0e2d75af073b5b2d070388469900f1c6099a3e34f8bb60810e3",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/constraints.rs": "ed28eeb11ff9e95a32b577087846396edd179a4ff17f3f9cd33abe23b6094c32",
+    "scripts/qualify-ds41-response-constraints.py": "9575f2164c6b5fc55771969d5c3b9d2e5663c922a42d09687aff3e0fea48e98f"
+  },
+  "candidate_binary_sha256": "b1fe10bdb177217449a2d3a39bad877f26c7e8f03788335eb443d7460bba6649",
+  "native_library_sha256": "99301054e00ec1ce8816b779e63b88f4fdb4351d7be00325b38e3e3d13c27d98",
+  "xgrammar_lock": {
+    "schema": 1,
+    "repository": "https://github.com/mlc-ai/xgrammar.git",
+    "revision": "557becfb64c503ae9c04344b0047661f43f44320",
+    "dlpack_revision": "bbd2f4d32427e548797929af08cfe2a9cbb3cf12",
+    "source_tree_sha256": "7fa7462fa24c26e6f51ea20ae4faf4c1a416448d2795f7f588ddd8a39c4185b8"
+  },
+  "hardware": "index, name, driver_version, power.limit [W], clocks.current.memory [MHz]\n0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 810 MHz\n1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 13365 MHz\n",
+  "launch": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-response-dialect-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1",
+      "--entrypoint",
+      "/daemon",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "-v",
+      "/tmp/ds41-native-response/daemon-dialect:/daemon:ro",
+      "-v",
+      "/tmp/ds41-native-response/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18065",
+      "--prefill-batch-tokens",
+      "2048",
+      "--concurrency",
+      "16",
+      "--max-context-tokens",
+      "32768"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-response-dialect-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1",
+      "--entrypoint",
+      "/daemon",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "-v",
+      "/tmp/ds41-native-response/daemon-dialect:/daemon:ro",
+      "-v",
+      "/tmp/ds41-native-response/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18066",
+      "--prefill-batch-tokens",
+      "2048",
+      "--concurrency",
+      "2",
+      "--max-context-tokens",
+      "32768"
+    ]
+  ],
+  "evidence": {
+    "path": "docs/evidence/native-response-constraints.json.gz",
+    "sha256": "1c922554526e1c6f99a4f1c72f270c497d76fb8c3e25e2eb888e11ea65a9a2ae"
+  },
+  "checks": {
+    "api_tests": 13,
+    "native_xgrammar_selftest": true,
+    "native_build": true,
+    "release_build": true
+  },
+  "live": {
+    "target": {
+      "paired_json_sse_cases": 16,
+      "concurrent_requests": 16,
+      "combined_tool_dispatch_cases": 3,
+      "invalid_schema_status": 400,
+      "passed": true
+    },
+    "spec": {
+      "paired_json_sse_cases": 16,
+      "concurrent_requests": 2,
+      "combined_tool_dispatch_cases": 3,
+      "invalid_schema_status": 400,
+      "passed": true
+    }
+  },
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 43.102043974292265,
+            "first_content_seconds": 0.0036579339648596942,
+            "finish_seconds": 5.921654812002089
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 43.0963450233471,
+            "first_content_seconds": 0.0030411325278691947,
+            "finish_seconds": 5.920771800505463
+          }
+        },
+        "candidate_decode_ratio": 0.9998677800303725
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.933225087328836,
+            "first_content_seconds": 0.006001579982694238,
+            "finish_seconds": 5.945511094527319
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 43.019768719573065,
+            "first_content_seconds": 0.003089910955168307,
+            "finish_seconds": 5.930600327963475
+          }
+        },
+        "candidate_decode_ratio": 1.0020157729140589
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 145.3982667313732,
+            "first_content_seconds": 0.004819558991584927,
+            "finish_seconds": 1.7586244859849103
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 145.487943258019,
+            "first_content_seconds": 0.003916573012247682,
+            "finish_seconds": 1.7566660505253822
+          }
+        },
+        "candidate_decode_ratio": 1.0006167647569792
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 126.09869461596199,
+            "first_content_seconds": 0.005269174464046955,
+            "finish_seconds": 2.02626028546365
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 126.56467315270427,
+            "first_content_seconds": 0.0034048944944515824,
+            "finish_seconds": 2.020559403055813
+          }
+        },
+        "candidate_decode_ratio": 1.0036953478238726
+      }
+    ]
+  }
+}

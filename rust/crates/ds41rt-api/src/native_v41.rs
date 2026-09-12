@@ -23,12 +23,15 @@ use tokio::sync::mpsc;
 
 pub const MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
 mod limits;
+mod constraints;
+pub use constraints::NativeConstraint;
 mod images;
 #[cfg(test)]
 mod unicode_tests;
 pub use limits::{NativeLimits, MAX_CONTEXT_TOKENS, MAX_OUTPUT_TOKENS};
 pub struct NativeRequest {
     pub prompt: String,
+    pub constraint: Option<NativeConstraint>,
     pub images: Vec<ds41rt_loader::V41Image>,
     pub max_tokens: usize,
     pub events: mpsc::Sender<Result<InferenceChunk, String>>,
@@ -69,7 +72,13 @@ fn error(status: StatusCode, message: impl ToString) -> Response {
     )
         .into_response()
 }
-async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Response {
+async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> Response {
+    let response_format = body.get("response_format").cloned().filter(|v| !v.is_null());
+    // The recipe rejects its regex variant, while native XGrammar supports it.
+    // Keep the original format for enforcement and render it as ordinary text.
+    if response_format.as_ref().and_then(|v| v.get("type")).and_then(Value::as_str) == Some("regex") {
+        body["response_format"] = json!({"type":"text"});
+    }
     let parsed: ChatCompletionRequest = match serde_json::from_value(body) {
         Ok(r) => r,
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
@@ -92,6 +101,17 @@ async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Resp
     }
     let max_tokens = match state.limits.requested_output(converted.inference_options.max_tokens) {
         Ok(limit) => limit,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e),
+    };
+    let response_validator = match constraints::response_validator(response_format.as_ref()) {
+        Ok(validator) => validator,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e),
+    };
+    let required_tools = if converted.conversation.tools.is_empty()
+        || matches!(converted.conversation.tool_choice, deepseek_recipe_core::tools::ToolChoice::None) { None }
+        else { Some(matches!(converted.conversation.tool_choice, deepseek_recipe_core::tools::ToolChoice::Required)) };
+    let constraint = match constraints::response_constraint(response_format, converted.conversation.thinking_mode, required_tools) {
+        Ok(constraint) => constraint,
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
     let rendered = DeepseekV41Encoding::new().render_conversation(&converted.conversation);
@@ -135,6 +155,7 @@ async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Resp
         else { rendered.prompt.replace("<｜image｜>", "<｜deepseek_image｜>") };
     let job = NativeRequest {
         prompt,
+        constraint,
         images: prepared,
         max_tokens,
         events,
@@ -166,13 +187,29 @@ async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Resp
     if streaming {
         let stream = async_stream::stream! {
             futures::pin_mut!(chunks);
+            let mut content = String::new();
             while let Some(chunk) = chunks.next().await {
                 let failed = failure.lock().unwrap().clone();
                 if let Some(message) = failed {
                     yield Err::<String,std::io::Error>(std::io::Error::other(message)); return;
                 }
                 match chunk {
-                    Ok(chunk) => yield Ok(format!("data: {}\n\n",serde_json::to_string(&chunk).unwrap())),
+                    Ok(chunk) => {
+                        if let Some(validator) = &response_validator {
+                            let value = serde_json::to_value(&chunk).unwrap();
+                            if let Some(choices) = value["choices"].as_array() {
+                                for choice in choices {
+                                    if let Some(text) = choice["delta"]["content"].as_str() { content.push_str(text); }
+                                    if choice["finish_reason"].as_str() == Some("stop") {
+                                        if let Err(error) = constraints::validate_complete(validator, &content) {
+                                            yield Err(std::io::Error::other(error.to_string())); return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        yield Ok(format!("data: {}\n\n",serde_json::to_string(&chunk).unwrap()));
+                    },
                     Err(e) => { yield Err(std::io::Error::other(e.to_string())); return; }
                 }
             }
@@ -204,6 +241,19 @@ async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Resp
     }
     if let Some(message) = failure.lock().unwrap().clone() {
         return error(StatusCode::INTERNAL_SERVER_ERROR, message);
+    }
+    if let Some(validator) = response_validator {
+        let value = serde_json::to_value(response).unwrap();
+        if let Some(choices) = value["choices"].as_array() {
+            for choice in choices {
+                if choice["finish_reason"].as_str() == Some("stop") {
+                    if let Err(e) = constraints::validate_complete(&validator, choice["message"]["content"].as_str().unwrap_or("")) {
+                        return error(StatusCode::INTERNAL_SERVER_ERROR, e);
+                    }
+                }
+            }
+        }
+        return Json(value).into_response();
     }
     Json(response).into_response()
 }

@@ -1,6 +1,7 @@
 pub(crate) mod speculative;
 mod scheduler;
 mod scores;
+mod constraints;
 use scores::TokenScores;
 mod prefix;
 pub(crate) mod memory;
