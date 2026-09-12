@@ -81,6 +81,27 @@ def model_list_matches(payload: dict, model_id: str) -> subprocess.CompletedProc
     )
 
 
+def native_model_list_matches(
+    payload: dict, model_id: str
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; release_native_model_list_matches "$2"',
+            "bash",
+            str(RELEASE_COMMON),
+            model_id,
+        ],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        input=json.dumps(payload),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
 def resolve_gpu_identity(
     tmp_path: Path,
     nvidia_smi_row: str,
@@ -348,6 +369,12 @@ def test_release_readiness_requires_exact_configured_api_identity() -> None:
     }
     assert model_list_matches(duplicate, model_id).returncode != 0
 
+    native = {"object": "list", "data": [{"id": model_id}]}
+    assert native_model_list_matches(native, model_id).returncode == 0
+    assert native_model_list_matches(native, f"{model_id}-other").returncode != 0
+    duplicate_native = {"object": "list", "data": [{"id": model_id}] * 2}
+    assert native_model_list_matches(duplicate_native, model_id).returncode != 0
+
 
 def test_release_config_rejects_native_pro_and_gpu1(tmp_path: Path) -> None:
     native_pro = load_config(tmp_path, "MODEL_VARIANT=pro\n")
@@ -448,7 +475,7 @@ def test_release_config_rejects_exl3_kernel_mode_format_mismatches(
 
 def test_launchers_fingerprint_and_export_model_controls() -> None:
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
-    assert "release_api_advertises_model" in release
+    assert "release_api_advertises_native_model" in release
     assert "release_resolve_coordinator_gpu_identity" in release
     assert '"$RELEASE_COORDINATOR_GPU_UUID"' in release
     assert '"$RELEASE_MODEL_ID"' in release

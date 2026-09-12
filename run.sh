@@ -62,7 +62,7 @@ case "$DSPARK" in on|off) ;; *) release_die "DSPARK must be on or off" ;; esac
 [[ -z "$MEMORY_RESERVATION" || "$MEMORY_RESERVATION" =~ ^[0-9]+([.][0-9]{1,6})?((B|MB|GB|MiB|GiB)|%)$ ]] || release_die "MEMORY_RESERVATION has an invalid unit"
 ((restart == 0 || dry_run == 0)) || release_die "--restart and --dry-run are mutually exclusive"
 
-for tool in docker ssh curl ss nvidia-smi sha256sum python3; do release_need "$tool"; done
+for tool in docker ssh curl jq ss nvidia-smi sha256sum python3; do release_need "$tool"; done
 docker info >/dev/null 2>&1 || release_die "local Docker daemon is unavailable"
 docker image inspect "$COORDINATOR_DOCKER_INFERENCE" >/dev/null 2>&1 || release_die "coordinator image is missing: $COORDINATOR_DOCKER_INFERENCE (run ./build.sh)"
 hf_home="${HF_HOME:-$HOME/.cache/huggingface}"
@@ -157,7 +157,7 @@ args=(serve-native --snapshot "/root/.cache/huggingface/$snapshot_rel" --native-
 docker run -d --name "$coordinator" --restart no --gpus device="$RELEASE_COORDINATOR_GPU_UUID" --network host --ipc host --ulimit memlock=-1:-1 --device=/dev/infiniband -e "DS41RT_RELEASE_CONFIG_SHA256=$fingerprint" -v "$hf_home:/root/.cache/huggingface:ro" "$COORDINATOR_DOCKER_INFERENCE" ds41rt "${args[@]}" >/dev/null
 api_url="http://127.0.0.1:${ADDR##*:}"
 until curl -fsS "$api_url/health" >/dev/null 2>&1 &&
-  release_api_advertises_model "$api_url" "$RELEASE_MODEL_ID"; do
+  release_api_advertises_native_model "$api_url" "$RELEASE_MODEL_ID"; do
   [[ "$(docker inspect -f '{{.State.Status}}' "$coordinator" 2>/dev/null)" == running ]] || { docker logs --tail 200 "$coordinator" >&2 || true; release_die "native coordinator exited during startup"; }
   ((SECONDS < deadline)) || { docker logs --tail 200 "$coordinator" >&2 || true; release_die "native API did not become ready"; }
   sleep 1

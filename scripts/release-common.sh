@@ -32,6 +32,23 @@ release_api_advertises_model() {
     release_model_list_matches "$model_id"
 }
 
+release_native_model_list_matches() {
+  local model_id="$1"
+  jq -e \
+    --arg model_id "$model_id" \
+    '.object == "list"
+      and (.data | type == "array")
+      and ([.data[]? | select(.id == $model_id)] | length == 1)' \
+    >/dev/null 2>&1
+}
+
+release_api_advertises_native_model() {
+  local url="$1"
+  local model_id="$2"
+  curl -fsS "$url/v1/models" 2>/dev/null |
+    release_native_model_list_matches "$model_id"
+}
+
 release_validate_model_list_file() {
   local path="$1"
   local model_id="$2"
