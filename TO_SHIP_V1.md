@@ -6,6 +6,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
+- [x] Compare [Engram row I/O and prefetch overlap](docs/ds41-engram-io-comparison.md) across mmap, buffered reads, Linux/POSIX AIO and io_uring on both official tables. Warm mmap remains cheapest; completed background gather hides first-mapping work that advisory cache warming leaves at consumption. io_uring helps evicted rows at adequate queue depth, but runtime integration and actual queue/lead-time measurement remain open. A narrowly extended container seccomp profile passes ring, read and registered-buffer checks.
+
 - [x] Queue [coordinator input and metadata staging](docs/ds41-stream-staging.md) on consumer streams. Full-model ownership/replay, 56 query comparisons and concurrent API recovery pass. Warm target C1 measures 39.86→41.80 TPS and dSpark 120.89→123.49; C16 stays about 611 aggregate TPS. A [kernel-node trace](docs/ds41-coordinator-node-profile.md) confirms 280 fewer blocking copies and about 160 fewer synchronization calls per target step. Cold/first-use C6 variability and release-performance targets remain open.
 
 - [x] Evaluate [combined attention-input mHC/query capture](docs/ds41-prepared-query.md). Real-weight and concurrent API correctness pass, but small/inconclusive C1 gains and variable C6 results do not justify the standalone change. Candidate is not selected; running RMSNorm artifacts remain unchanged. Larger coordinator graph capture remains open.
