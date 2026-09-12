@@ -2,11 +2,11 @@
 
 These runs explicitly disabled thinking and remain cache/correctness diagnostics.
 The user's subsequent qualification requirement is thinking enabled at high
-effort; the five final release runs must use that setting.
+effort; the three final release runs must use that setting.
 
 The first tool-eval-bench run and a real dsh coding task completed on the native
 dSpark candidate with retained-frontier reuse enabled. This is an initial
-correctness check, not one of the five final release benchmark runs. Source and
+correctness check, not one of the three final release benchmark runs. Source and
 binary identities are in the [admission manifest](release-v1-native-admission.json).
 
 ## Tool-eval-bench

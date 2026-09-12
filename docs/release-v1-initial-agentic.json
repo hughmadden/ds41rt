@@ -1,5 +1,5 @@
 {
-  "scope": "Initial agentic correctness check, before remaining cache/vision/limits integration. Does not count toward five final release runs.",
+  "scope": "Initial agentic correctness check, before remaining cache/vision/limits integration. Does not count toward three final release runs.",
   "source_commit": "0d5ae55",
   "documentation_commit": "fa6bebf",
   "artifact_provenance": "release-v1-native-admission.json",

@@ -48,20 +48,26 @@ These remain explicit tool/schema qualification issues. The previous
 thinking-disabled results are separate diagnostics, not substitutes for this run.
 
 This initial rerun uses an explicit 4,096-token development output cap and does
-not count toward the five final release runs. The final campaign follows the
+not count toward the three final release runs. The final campaign follows the
 qualified output policy after the remaining API and memory work.
 [Result metadata](release-v1-thinking-agentic.json) and
 [compressed raw evidence](evidence/native-thinking-high-agentic.json.gz) preserve
 the exact command, all scenarios, complete tool traces and the benchmark report.
 
+The user reduced the final campaign to three runs on September 12, 2026.
+They also reported official-API hard scores of 32 without thinking and 34 with
+thinking, and a basic score of approximately 117. These are user-reported
+comparison context, not independently verified measurements; schema support
+and other run settings may differ.
+
 The reproducible runner defaults to thinking enabled at high effort. For the
-final qualified endpoint, use five sequential runs with its measured best
+final qualified endpoint, use three sequential runs with its measured best
 concurrency and omit a development output override:
 
 ```bash
 python3 scripts/qualify-ds41-tool-eval.py \
   --base-url http://127.0.0.1:8000 --output-dir /tmp/ds41-release-tool-eval \
-  --reference-date 2026-09-12 --parallel 16 --runs 5
+  --reference-date 2026-09-12 --parallel 16 --runs 3
 ```
 
 Each run gets a new directory, and the runner exports basic/hard/total points and

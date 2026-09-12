@@ -3,7 +3,7 @@
 
 Runs are sequential; the benchmark uses the requested concurrency internally.
 The vllm label selects its OpenAI-compatible adapter, not the serving engine.
-Use --runs 5 only for the final qualified release artifact. Preserve the whole
+Use --runs 3 only for the final qualified release artifact. Preserve the whole
 output directory, including failed cases, commands, logs and raw tool traces.
 """
 import argparse

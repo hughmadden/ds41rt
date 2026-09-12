@@ -466,7 +466,7 @@
       "--output-dir",
       "/tmp/ds41-native-partial-replay/tool-eval"
     ],
-    "note": "Compatibility adapter label vllm; actual server ds41rt serve-native. This initial rerun does not count toward the final five release runs."
+    "note": "Compatibility adapter label vllm; actual server ds41rt serve-native. This initial rerun does not count toward the final three release runs."
   },
   "dsh": {
     "command": [

@@ -84,7 +84,7 @@ with 72 passes, 13 partials and three failures. All six structured-output cases
 pass again (12/12). Zero-score cases are TC-61 (analysis script not attempted),
 TC-74 (calendar event not created) and TC-88 (answer-only number formatting).
 The earlier retained-frontier run remains 155/176; this single rerun is not a
-controlled attribution of score changes or one of the five final release runs.
+controlled attribution of score changes or one of the three final release runs.
 
 A fresh isolated dsh coding task completes in 20.67 seconds with five main model
 steps and eight actual local tool calls. Its three generated tests pass

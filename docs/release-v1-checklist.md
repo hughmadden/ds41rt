@@ -32,6 +32,8 @@ gate below is satisfied merely by an older component test.
   60–90 seconds load time without sacrificing runtime performance.
 - [ ] Qualify normal build/run scripts and optimized backend selection on all
   five hosts from reproducible source and dependency pins.
+  Preserve port 8000 for the standard `run.sh` launch; explicit alternate
+  configurations may override `ADDR` (user addition September 12).
 
 ## Release performance suite
 
@@ -51,9 +53,10 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   0, 32K, 64K, 128K, 256K; prove cache reuse in measurement evidence.
 - [ ] Needle retrieval through 1M tokens.
 - [ ] Concurrency scaling through C16, reporting aggregate tokens per second.
-- [ ] Five tool-eval-bench hard-mode runs at the measured best concurrency,
+- [ ] Three tool-eval-bench hard-mode runs at the measured best concurrency,
   with thinking enabled at high effort and sufficient timeout; points split
-  into basic, hard and total scores.
+  into basic, hard and total scores. The user reduced the original five-run
+  requirement to three on September 12, 2026.
 - [ ] Startup time, including phase-level I/O and graph preparation evidence.
 - [ ] dsh generates a single-file WebGL Frogger game; retain execution metrics
   and publish a playable link to the actual generated artifact.
@@ -107,11 +110,11 @@ separate from these API results.
 basic and 32/38 hard points (155/176 total) from one C16 tool-eval-bench run.
 A real dsh coding task passed independent file/test checks and reused complete
 committed turns across five tool continuations. This satisfies the initial
-agentic check, not the five final release runs or arbitrary partial-prefix reuse.
+agentic check, not the three final release runs or arbitrary partial-prefix reuse.
 
 The [thinking-enabled high-effort rerun](release-v1-thinking.md) records 120/138
 basic and 35/38 hard points (155/176 total). It preserves the forced-tool API
-rejection and other failures. Final five-run reporting uses thinking enabled at
+rejection and other failures. Final three-run reporting uses thinking enabled at
 high effort; the earlier disabled-thinking scores remain cache diagnostics.
 
 [Initial paired quality evidence](release-v1-initial-quality.json) records eight
