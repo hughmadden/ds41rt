@@ -45,6 +45,7 @@ pub(crate) struct SparseAttentionWave<'a> {
     replay_begins: DeviceAllocation<'a>,
     metadata: DeviceAllocation<'a>,
     staging: HostAllocation<'a>,
+    replay_staging: HostAllocation<'a>,
     capacity: usize,
     // Keep one live-shape graph per backbone layer; fingerprints still bind
     // every external pointer and launch geometry before replay.
@@ -90,6 +91,7 @@ impl<'a> SparseAttentionWave<'a> {
             replay_begins: DeviceAllocation::new(library, capacity * 8)?,
             metadata: DeviceAllocation::new(library, capacity * 80)?,
             staging: HostAllocation::new(library, capacity * 80)?,
+            replay_staging: HostAllocation::new(library, capacity * 8)?,
             capacity,
             graphs: std::array::from_fn(|_| None),
         })
@@ -182,9 +184,15 @@ impl<'a> SparseAttentionWave<'a> {
         if let Some(s) = selection {
             s.validate_query(binding)?;
         }
-        self.stream
-            .library
-            .copy_d2d(self.query.buffer, query.rotated, query.rotated.bytes)?;
+        let copied = unsafe {
+            self.stream.library.copy_d2d_async(
+                self.query.buffer, query.rotated, query.rotated.bytes, self.stream.raw,
+            )
+        };
+        if let Err(error) = copied {
+            self.synchronize()?;
+            return Err(error);
+        }
         let mut out = unsafe { self.execute(query.layer, sink, requests, selection)? };
         out.query = Some(binding);
         out.tokens = Some(tokens);
@@ -197,6 +205,24 @@ impl<'a> SparseAttentionWave<'a> {
     /// inputs or cache owners. Output retains proposal/selection borrows until
     /// its consumers finish, preventing accepted commits or producer reuse.
     pub unsafe fn execute<'s>(
+        &'s mut self,
+        layer: usize,
+        sink: Ds41rtDeviceBuffer,
+        requests: &'s [AttentionRequest<'s>],
+        selection: Option<&'s IndexSelectionOutput<'s>>,
+    ) -> Result<SparseAttentionOutput<'s>> {
+        let library = self.stream.library;
+        let stream = self.stream.raw;
+        match unsafe { self.execute_staged(layer, sink, requests, selection) } {
+            Ok(output) => Ok(output),
+            Err(error) => {
+                // Includes partial input/metadata staging and graph errors.
+                unsafe { library.cuda_stream_synchronize(stream)?; }
+                Err(error)
+            }
+        }
+    }
+    unsafe fn execute_staged<'s>(
         &'s mut self,
         layer: usize,
         sink: Ds41rtDeviceBuffer,
@@ -348,20 +374,25 @@ impl<'a> SparseAttentionWave<'a> {
         for (i, m) in metadata.into_iter().enumerate() {
             self.staging.bytes_mut()[i * 8..i * 8 + 8].copy_from_slice(&m.to_ne_bytes());
         }
-        self.stream
-            .library
-            .copy_h2d(self.metadata.buffer, &self.staging.bytes_mut()[..rows * 80])?;
+        unsafe {
+            self.stream.library.copy_host_buffer_h2d_async(
+                self.metadata.buffer, self.staging.buffer, rows * 80, self.stream.raw,
+            )?;
+        }
         if requests.iter().any(|r| r.window.cache.begin != 0) {
             let mut row = 0;
             for request in requests {
                 for _ in request.positions {
-                    self.staging.bytes_mut()[row * 8..row * 8 + 8]
+                    self.replay_staging.bytes_mut()[row * 8..row * 8 + 8]
                         .copy_from_slice(&request.window.cache.begin.to_ne_bytes());
                     row += 1;
                 }
             }
-            self.stream.library.copy_h2d(self.replay_begins.buffer,
-                &self.staging.bytes_mut()[..rows * 8])?;
+            unsafe {
+                self.stream.library.copy_host_buffer_h2d_async(
+                    self.replay_begins.buffer, self.replay_staging.buffer, rows * 8, self.stream.raw,
+                )?;
+            }
         }
         if self.graphs[layer]
             .as_ref()

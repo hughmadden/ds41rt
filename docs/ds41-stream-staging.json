@@ -1,0 +1,339 @@
+{
+  "source_parent": "22ceb55",
+  "daemon_sha256": "e897c49122e8e64850ceb5283b53fe2ede574b7f496a10b4d958d11f39cd5bb2",
+  "native_sha256": "d56c464ce91bf68ca349838fb7854ce273512c4ba80f6ecd139f9a4994446f4b",
+  "scope": "Sequential same-GPU baseline/candidate counting after 16k code context, 599 output tokens. Baseline APIs were already running; candidate APIs freshly launched. Cold results retained but not an isolated startup comparison.",
+  "results": {
+    "target": {
+      "gpu": 0,
+      "all_text_and_usage_equal": true,
+      "baseline": {
+        "decode_tps": [
+          40.47877595474605,
+          39.86469857559994
+        ],
+        "prefill_tps": [
+          6639.355403546257,
+          6863.438332064333
+        ]
+      },
+      "candidate": {
+        "decode_tps": [
+          41.2682122918371,
+          41.79565175514308
+        ],
+        "prefill_tps": [
+          3590.5999535180254,
+          6748.373494604675
+        ]
+      }
+    },
+    "speculative": {
+      "gpu": 1,
+      "all_text_and_usage_equal": true,
+      "baseline": {
+        "decode_tps": [
+          121.42837403129396,
+          121.27335143504969,
+          120.49795803877393
+        ],
+        "prefill_tps": [
+          5567.095646547391,
+          7048.614603610326,
+          7193.8741036761085
+        ]
+      },
+      "candidate": {
+        "decode_tps": [
+          120.10073076312295,
+          123.24267514759694,
+          123.73818347171664
+        ],
+        "prefill_tps": [
+          3759.7705275924363,
+          6747.660833834323,
+          7188.415350528298
+        ]
+      }
+    }
+  },
+  "qualification": {
+    "full_model_lanes": true,
+    "query_bit_exact_cases": 56,
+    "speculative_lifecycle": true,
+    "speculative_distinct_c2_c6_c16_cancel_replace": true,
+    "target_quality_text_and_usage_pairs_equal": 8,
+    "inherited_unicode_format_failure": true,
+    "selected_target_lifecycle": true,
+    "selected_speculative_lifecycle": true
+  },
+  "selected": true,
+  "raw_artifacts": "/tmp/ds41-staged",
+  "concurrent_scope": "Short counting prompt, 599 tokens. Initial baseline C1/C6/C16 followed by candidate; aggregate includes admission gaps. Not the same workload as 16k C1.",
+  "concurrent": {
+    "baseline": [
+      {
+        "concurrency": 1,
+        "aggregate_tps": 128.18109089775294,
+        "per_stream_mean": 128.18109089775294
+      },
+      {
+        "concurrency": 6,
+        "aggregate_tps": 314.19334684359893,
+        "per_stream_mean": 53.24965819919167
+      },
+      {
+        "concurrency": 16,
+        "aggregate_tps": 609.6831462337906,
+        "per_stream_mean": 39.53945067016562
+      }
+    ],
+    "candidate": [
+      {
+        "concurrency": 1,
+        "aggregate_tps": 130.27384423097408,
+        "per_stream_mean": 130.27384423097408
+      },
+      {
+        "concurrency": 6,
+        "aggregate_tps": 305.4343994393788,
+        "per_stream_mean": 51.72773557078946
+      },
+      {
+        "concurrency": 16,
+        "aggregate_tps": 611.491808823025,
+        "per_stream_mean": 39.65736554080775
+      }
+    ],
+    "candidate-repeat0": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 298.5903805512324,
+        "per_stream_mean": 50.57209973593724
+      }
+    ],
+    "baseline-repeat0": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 312.55375548206234,
+        "per_stream_mean": 52.98298380697237
+      }
+    ],
+    "baseline-repeat1": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 312.37979396398055,
+        "per_stream_mean": 52.962447306322
+      }
+    ],
+    "candidate-repeat1": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 319.0086790414369,
+        "per_stream_mean": 54.07355074943278
+      }
+    ]
+  },
+  "concurrent_repeat_order": [
+    "candidate-repeat0",
+    "baseline-repeat0",
+    "baseline-repeat1",
+    "candidate-repeat1"
+  ],
+  "concurrent_repeat_note": "Candidate restarted before repeat0, then remained running. Initial candidate C6 slowdowns recover on the last warm repeat. Cause not isolated; first-use scheduling remains open.",
+  "candidate_profile": {
+    "interval_ns": [
+      5000000000,
+      19000000000
+    ],
+    "logit_downloads": 544,
+    "cuda_api": [
+      {
+        "name": "cudaStreamSynchronize_v3020",
+        "calls": 464292,
+        "calls_per_step": 853.4779411764706,
+        "total_ms": 7217.336051
+      },
+      {
+        "name": "cudaMemcpyAsync_v3020",
+        "calls": 421632,
+        "calls_per_step": 775.0588235294117,
+        "total_ms": 988.404942
+      },
+      {
+        "name": "cuKernelGetName",
+        "calls": 285432,
+        "calls_per_step": 524.6911764705883,
+        "total_ms": 25.422241
+      },
+      {
+        "name": "cudaLaunchKernel_v7000",
+        "calls": 237591,
+        "calls_per_step": 436.74816176470586,
+        "total_ms": 527.658101
+      },
+      {
+        "name": "cudaGraphLaunch_v10000",
+        "calls": 143523,
+        "calls_per_step": 263.8290441176471,
+        "total_ms": 693.935661
+      },
+      {
+        "name": "cudaMemcpy_v3020",
+        "calls": 55997,
+        "calls_per_step": 102.93566176470588,
+        "total_ms": 231.814873
+      },
+      {
+        "name": "cudaLaunchKernelExC_v11060",
+        "calls": 47841,
+        "calls_per_step": 87.94301470588235,
+        "total_ms": 108.191431
+      },
+      {
+        "name": "cudaGraphNodeGetType_v10000",
+        "calls": 19032,
+        "calls_per_step": 34.98529411764706,
+        "total_ms": 3.440771
+      },
+      {
+        "name": "cudaGraphGetNodes_v10000",
+        "calls": 8700,
+        "calls_per_step": 15.992647058823529,
+        "total_ms": 1.779434
+      },
+      {
+        "name": "cudaGraphExecDestroy_v10000",
+        "calls": 4350,
+        "calls_per_step": 7.9963235294117645,
+        "total_ms": 18.014488
+      },
+      {
+        "name": "cudaGraphDestroy_v10000",
+        "calls": 4350,
+        "calls_per_step": 7.9963235294117645,
+        "total_ms": 3.312621
+      },
+      {
+        "name": "cudaGraphInstantiate_v12000",
+        "calls": 4350,
+        "calls_per_step": 7.9963235294117645,
+        "total_ms": 131.077902
+      },
+      {
+        "name": "cudaStreamEndCapture_v10000",
+        "calls": 4350,
+        "calls_per_step": 7.9963235294117645,
+        "total_ms": 1.69407
+      },
+      {
+        "name": "cudaStreamBeginCapture_v10000",
+        "calls": 4350,
+        "calls_per_step": 7.9963235294117645,
+        "total_ms": 2.468111
+      }
+    ],
+    "raw_artifacts": "/tmp/ds41-staged-profile"
+  },
+  "selected_ports": [
+    18041,
+    18042
+  ],
+  "selected_containers": [
+    "ds41-staged-live-target-api-dev",
+    "ds41-staged-live-spec-api-dev"
+  ],
+  "live_create_commands": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-staged-live-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-staged/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-rmsnorm/selected-native:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18041",
+      "--prefill-batch-tokens",
+      "2048"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-staged-live-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-staged/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-rmsnorm/selected-native:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "ds41rt-coordinator-dev:latest",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18042",
+      "--prefill-batch-tokens",
+      "2048"
+    ]
+  ]
+}

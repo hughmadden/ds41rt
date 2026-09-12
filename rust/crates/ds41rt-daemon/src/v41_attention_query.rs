@@ -1,7 +1,7 @@
 //! Real backbone low-rank query projection, normalization and rotary graphs.
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_layer_graphs::LayerGraphs;
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps, V41Fp8Plan};
@@ -109,6 +109,7 @@ impl<'a> AttentionQueryWeights<'a> {
                 .map(|n| DeviceAllocation::new(self.library, n * capacity as usize))
                 .collect::<Result<Vec<_>>>()?,
             norm: self.library.v41_attention_ops()?,
+            position_staging: HostAllocation::new(self.library, capacity as usize * 8)?,
             weights: self,
             capacity,
             graphs: LayerGraphs::new(self.library),
@@ -162,6 +163,7 @@ pub(crate) struct AttentionQueryWave<'w, 'a> {
     scratch: Vec<DeviceAllocation<'a>>,
     alpha: DeviceAllocation<'a>,
     buffers: Vec<DeviceAllocation<'a>>,
+    position_staging: HostAllocation<'a>,
     norm: V41AttentionOps<'a>,
     weights: &'w AttentionQueryWeights<'a>,
     capacity: u32,
@@ -372,14 +374,15 @@ impl AttentionQueryWave<'_, '_> {
             "invalid query tokens"
         );
         let binding = QueryBinding::new(self.weights.layer)?;
-        self.stream.library.copy_h2d(
-            self.positions(),
-            &tokens
-                .iter()
-                .flat_map(|p| p.to_ne_bytes())
-                .collect::<Vec<_>>(),
-        )?;
+        for (dst, token) in self.position_staging.bytes_mut().chunks_exact_mut(8).zip(tokens) {
+            dst.copy_from_slice(&token.to_ne_bytes());
+        }
         let prepared_and_executed = (|| -> Result<()> {
+            unsafe {
+                self.stream.library.copy_host_buffer_h2d_async(
+                    self.positions(), self.position_staging.buffer, tokens.len() * 8, self.stream.raw,
+                )?;
+            }
             prepare(self.stream.raw, self.input())?;
             let rows = tokens.len() as u32;
             if self

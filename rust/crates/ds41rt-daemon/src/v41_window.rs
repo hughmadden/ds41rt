@@ -428,10 +428,11 @@ impl WindowWave<'_, '_> {
                 bytes[row * 8..row * 8 + 8].copy_from_slice(&(c.position + j as u64).to_ne_bytes());
             }
         }
-        self.stream.library.copy_h2d(
-            self.positions.buffer,
-            &self.staging.bytes_mut()[..p.rows * 8],
-        )
+        unsafe {
+            self.stream.library.copy_host_buffer_h2d_async(
+                self.positions.buffer, self.staging.buffer, p.rows * 8, self.stream.raw,
+            )
+        }
     }
     unsafe fn enqueue(&self, rows: usize) -> Result<()> {
         unsafe {
@@ -492,13 +493,25 @@ impl WindowWave<'_, '_> {
             && query.tokens()?.iter().copied().eq(chunks.iter().flat_map(|c|
                 c.position..c.position + u64::from(c.tokens))),
             "window query layer, rows or positions differ");
-        self.synchronize()?;
-        self.stream.library.copy_d2d(self.input.buffer, query.hidden, query.hidden.bytes)?;
-        if self.graph.is_none_or(|(_, rows, owner)| rows != prepared.rows || owner != state.owner) {
-            self.clear_graph()?;
-            unsafe { self.capture(state, chunks)?; }
+        let executed = (|| -> Result<()> {
+            unsafe {
+                self.stream.library.copy_d2d_async(
+                    self.input.buffer, query.hidden, query.hidden.bytes, self.stream.raw,
+                )?;
+            }
+            if self.graph.is_none_or(|(_, rows, owner)| rows != prepared.rows || owner != state.owner) {
+                self.clear_graph()?;
+                unsafe { self.capture(state, chunks)?; }
+            }
+            unsafe { self.replay(state, chunks)?; }
+            Ok(())
+        })();
+        if let Err(error) = executed {
+            self.synchronize()?;
+            self.ready = None;
+            return Err(error);
         }
-        unsafe { self.replay(state, chunks) }
+        self.output(state)
     }
     /// # Safety
     /// Finite attention-input hidden rows follow chunk order on this device,
@@ -509,8 +522,7 @@ impl WindowWave<'_, '_> {
         chunks: &[WindowChunk],
     ) -> Result<WindowOutput<'s>> {
         let p = self.prepare(state, chunks)?;
-        self.upload(&p)?;
-        let launched = unsafe { self.enqueue(p.rows) };
+        let launched = self.upload(&p).and_then(|()| unsafe { self.enqueue(p.rows) });
         launched.and(self.synchronize())?;
         self.ready = Some(p);
         self.output(state)
@@ -560,8 +572,9 @@ impl WindowWave<'_, '_> {
             rows == p.rows && owner == state.owner,
             "window capture binding differs"
         );
-        self.upload(&p)?;
-        let launched = unsafe { self.stream.library.cuda_graph_launch(g, self.stream.raw) };
+        let launched = self.upload(&p).and_then(|()| unsafe {
+            self.stream.library.cuda_graph_launch(g, self.stream.raw)
+        });
         launched.and(self.synchronize())?;
         self.ready = Some(p);
         self.output(state)

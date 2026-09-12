@@ -1,7 +1,7 @@
 //! Backbone inverse rotary, grouped FP8 wo_a and native FP8 wo_b.
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_layer_graphs::LayerGraphs;
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_sparse_attention::SparseAttentionOutput;
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{ensure, Context, Result};
@@ -103,6 +103,7 @@ impl<'a> AttentionOutputWeights<'a> {
                 .into_iter()
                 .map(|n| DeviceAllocation::new(self.library, n * capacity as usize))
                 .collect::<Result<Vec<_>>>()?,
+            position_staging: HostAllocation::new(self.library, capacity as usize * 8)?,
             weights: self,
             capacity,
             graphs: LayerGraphs::new(self.library),
@@ -157,6 +158,7 @@ pub(crate) struct AttentionOutputWave<'w, 'a> {
     alpha: DeviceAllocation<'a>,
     norm: V41AttentionOps<'a>,
     buffers: Vec<DeviceAllocation<'a>>,
+    position_staging: HostAllocation<'a>,
     weights: &'w AttentionOutputWeights<'a>,
     capacity: u32,
     graphs: LayerGraphs<'w, 'a, AttentionOutputWeights<'a>>,
@@ -330,29 +332,32 @@ impl AttentionOutputWave<'_, '_> {
                 && attention.values.device_id == self.b(0).device_id,
             "attention output origin differs"
         );
-        self.stream
-            .library
-            .copy_d2d(self.b(0), attention.values, attention.values.bytes)?;
-        self.stream.library.copy_h2d(
-            self.positions(),
-            &tokens
-                .iter()
-                .flat_map(|p| p.to_ne_bytes())
-                .collect::<Vec<_>>(),
-        )?;
-        let rows = attention.rows as u32;
-        if self
-            .graphs
-            .get(self.weights.layer, self.weights)
-            .is_none_or(|(_, n)| n != rows)
-        {
-            self.clear_graph()?;
-            unsafe {
-                self.capture(rows)?;
-            }
+        for (dst, token) in self.position_staging.bytes_mut().chunks_exact_mut(8).zip(tokens) {
+            dst.copy_from_slice(&token.to_ne_bytes());
         }
-        unsafe {
-            self.replay(rows)?;
+        let executed = (|| -> Result<()> {
+            unsafe {
+                self.stream.library.copy_d2d_async(
+                    self.b(0), attention.values, attention.values.bytes, self.stream.raw,
+                )?;
+                self.stream.library.copy_host_buffer_h2d_async(
+                    self.positions(), self.position_staging.buffer, tokens.len() * 8, self.stream.raw,
+                )?;
+            }
+            let rows = attention.rows as u32;
+            if self.graphs.get(self.weights.layer, self.weights).is_none_or(|(_, n)| n != rows) {
+                self.clear_graph()?;
+                unsafe { self.capture(rows)?; }
+            }
+            unsafe { self.replay(rows)?; }
+            Ok(())
+        })();
+        if let Err(error) = executed {
+            // Drain staged copies even if graph preparation/replay rejects them.
+            self.synchronize()?;
+            self.ready = None;
+            self.origin = None;
+            return Err(error);
         }
         self.origin = Some(attention.binding()?);
         self.output()

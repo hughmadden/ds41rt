@@ -1,0 +1,117 @@
+{
+  "scope": "Selected target-only runtime, short counting prompt, node-level Nsight tracing from process launch. Analysis 5\u201319 seconds removes loading and early warmup. Instrumented timings; not an unprofiled throughput benchmark. RTX only; gaps also include remote Spark execution.",
+  "interval_ns": [
+    5000000000,
+    19000000000
+  ],
+  "logit_downloads": 518,
+  "kernel_events": 963793,
+  "graph_kernel_events": 710024,
+  "kernel_union_ms": 5938.616111,
+  "kernel_copy_union_ms": 6261.714825,
+  "source_parent": "22ceb55",
+  "selected_daemon_sha256": "42e91194af2610140ec7fd4f7a42d021683cf36095a50a3c0cf7592d91e54dc8",
+  "native_sha256": "d56c464ce91bf68ca349838fb7854ce273512c4ba80f6ecd139f9a4994446f4b",
+  "categories_ms_per_step": {
+    "dense_fp8": 5.485048540540541,
+    "sparse_attend_merge": 1.456406864864865,
+    "mhc": 0.8822672490347491,
+    "rmsnorm": 0.6522705772200772,
+    "generic_including_lm_head": 0.8894778687258686,
+    "quantization": 0.54202472007722
+  },
+  "cuda_api": [
+    {
+      "name": "cudaStreamSynchronize_v3020",
+      "calls": 525145,
+      "total_ms": 7127.739652,
+      "us_per_call": 13.572898250959259
+    },
+    {
+      "name": "cudaMemcpy_v3020",
+      "calls": 198352,
+      "total_ms": 822.917169,
+      "us_per_call": 4.148771724005808
+    },
+    {
+      "name": "cudaGraphLaunch_v10000",
+      "calls": 136722,
+      "total_ms": 681.797858,
+      "us_per_call": 4.986745790728632
+    },
+    {
+      "name": "cudaMemcpyAsync_v3020",
+      "calls": 256626,
+      "total_ms": 629.200261,
+      "us_per_call": 2.451818058185842
+    },
+    {
+      "name": "cudaLaunchKernel_v7000",
+      "calls": 226321,
+      "total_ms": 520.842668,
+      "us_per_call": 2.301344850897619
+    },
+    {
+      "name": "cudaGraphInstantiate_v12000",
+      "calls": 4143,
+      "total_ms": 127.714807,
+      "us_per_call": 30.8266490465846
+    },
+    {
+      "name": "cudaLaunchKernelExC_v11060",
+      "calls": 45574,
+      "total_ms": 108.829437,
+      "us_per_call": 2.3879720235221837
+    },
+    {
+      "name": "cuKernelGetName",
+      "calls": 271895,
+      "total_ms": 25.445911,
+      "us_per_call": 0.0935872708214568
+    },
+    {
+      "name": "cudaGraphExecDestroy_v10000",
+      "calls": 4143,
+      "total_ms": 18.414024,
+      "us_per_call": 4.444611151339609
+    },
+    {
+      "name": "cudaGraphNodeGetType_v10000",
+      "calls": 18126,
+      "total_ms": 3.419329,
+      "us_per_call": 0.1886422266357718
+    },
+    {
+      "name": "cudaGraphDestroy_v10000",
+      "calls": 4143,
+      "total_ms": 3.295825,
+      "us_per_call": 0.7955165339126237
+    },
+    {
+      "name": "cudaStreamBeginCapture_v10000",
+      "calls": 4143,
+      "total_ms": 2.362505,
+      "us_per_call": 0.5702401641322713
+    },
+    {
+      "name": "cudaGraphGetNodes_v10000",
+      "calls": 8286,
+      "total_ms": 1.802024,
+      "us_per_call": 0.21747815592565775
+    },
+    {
+      "name": "cudaStreamEndCapture_v10000",
+      "calls": 4143,
+      "total_ms": 1.699803,
+      "us_per_call": 0.4102831281679942
+    }
+  ],
+  "raw_artifacts": "/tmp/ds41-node-profile-full",
+  "limitations": [
+    "Instrumented kernel durations are not unprofiled latencies.",
+    "RTX gaps include remote expert execution; not all are host overhead.",
+    "API wait durations overlap GPU work and cannot be added to kernel totals.",
+    "The profiling duration cut the SSE request short; this was not a quality qualification run.",
+    "Delayed node-level capture exported successfully but had no CUDA events; only launch-time tracing is used."
+  ]
+}
