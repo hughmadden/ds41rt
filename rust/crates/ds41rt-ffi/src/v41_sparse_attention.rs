@@ -1,5 +1,5 @@
-//! Direct FP8 window/paged-source sparse attention with private proposal overlays.
-use crate::{Ds41rtDeviceBuffer, NativeLibrary};
+//! Mixed FP8 window / FP4 paged-source attention with private proposal overlays.
+use crate::{Ds41rtDeviceBuffer, NativeLibrary, V41Kv};
 use anyhow::{ensure, Context, Result};
 use std::ffi::c_void;
 #[repr(C)]
@@ -17,6 +17,7 @@ struct RawView {
 }
 const _: [(); 120] = [(); std::mem::size_of::<RawView>()];
 pub struct V41SparseSource {
+    // Architectural compressed E2M1 values and E4M3 group-16 scales.
     pub values: Ds41rtDeviceBuffer,
     pub scales: Ds41rtDeviceBuffer,
     pub proposals: Ds41rtDeviceBuffer,
@@ -104,7 +105,7 @@ impl V41SparseAttention<'_> {
     /// # Safety
     /// Rotated BF16 queries [rows,64,512], finite FP32 sinks [64], U64 metadata
     /// [rows,10] and optional I32 source IDs [rows,512] follow the native header.
-    /// FP8 KV dequantizes to finite BF16. Caller binds every row to one request's
+    /// FP8 window and FP4 source KV dequantize to finite BF16. Caller binds every row to one request's
     /// live window/source leases and proposal snapshots; causal source lengths
     /// and unique IDs are correct. Inputs remain immutable on the initialized
     /// stream device through completion/replay, with disjoint BF16 output.
@@ -188,10 +189,10 @@ impl V41SparseAttention<'_> {
                 "invalid sparse source shape"
             );
             for (b, n) in [
-                (s.values, s.capacity * 512),
-                (s.scales, s.capacity * 16),
-                (s.proposals, s.proposal_capacity * 512),
-                (s.proposal_scales, s.proposal_capacity * 16),
+                (s.values, s.capacity * V41Kv::COMPRESSED_VALUE_BYTES),
+                (s.scales, s.capacity * V41Kv::COMPRESSED_SCALE_BYTES),
+                (s.proposals, s.proposal_capacity * V41Kv::COMPRESSED_VALUE_BYTES),
+                (s.proposal_scales, s.proposal_capacity * V41Kv::COMPRESSED_SCALE_BYTES),
                 (s.pages, s.page_stride * 4),
                 (s.end, 8),
                 (
@@ -210,7 +211,7 @@ impl V41SparseAttention<'_> {
             view.source_capacity = s.capacity as u64;
             view.source_proposal_capacity = s.proposal_capacity as u64;
             view.page_stride = s.page_stride as u32;
-            view.compressed = 1;
+            view.compressed = 2;
         }
         let status = if let Some(bounds) = window.replay_begins {
             check(bounds, rows * 8)?;

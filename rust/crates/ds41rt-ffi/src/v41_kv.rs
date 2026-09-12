@@ -51,6 +51,9 @@ impl NativeLibrary {
     }
 }
 impl V41Kv<'_> {
+    pub const COMPRESSED_VALUE_BYTES: usize = 256;
+    pub const COMPRESSED_SCALE_BYTES: usize = 32;
+    pub const COMPRESSED_ROW_BYTES: usize = Self::COMPRESSED_VALUE_BYTES + Self::COMPRESSED_SCALE_BYTES;
     /// # Safety
     /// Finite BF16 input [rows,512] and optional FP32 complex frequencies
     /// [rows,32,2] are live on the stream device. Rotated values remain finite.

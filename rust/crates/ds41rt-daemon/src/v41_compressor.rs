@@ -278,7 +278,7 @@ impl<'a> CompressorWeights<'a> {
                 raw: self.library.cuda_stream_create()?,
             },
             kernel,
-            kv: self.library.v41_kv()?,
+            kv: self.library.v41_compressed_kv()?,
             _workspace: workspace,
             norm: self.library.v41_attention_ops()?,
             weights: self,
@@ -307,8 +307,8 @@ impl<'a> CompressorWeights<'a> {
             index_key: DeviceAllocation::new(self.library, rows * 256)?,
             index_packed: DeviceAllocation::new(self.library, rows * 64)?,
             index_scales: DeviceAllocation::new(self.library, rows * 4)?,
-            kv_values: DeviceAllocation::new(self.library, rows * 512)?,
-            kv_scales: DeviceAllocation::new(self.library, rows * 16)?,
+            kv_values: DeviceAllocation::new(self.library, rows * V41Kv::COMPRESSED_VALUE_BYTES)?,
+            kv_scales: DeviceAllocation::new(self.library, rows * V41Kv::COMPRESSED_SCALE_BYTES)?,
             cache_destinations: DeviceAllocation::new(self.library, rows * 8)?,
             output: DeviceAllocation::new(self.library, rows * 1024)?,
             capacity: rows,
@@ -436,9 +436,9 @@ impl CompressorWave<'_, '_> {
         Ok(V41Compressor::WORKSPACE_BYTES
             + rows
                 * if ratio(layer)? == 2 {
-                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68 + 8 + 528
+                    10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68 + 8 + V41Kv::COMPRESSED_ROW_BYTES
                 } else {
-                    10240 + 1024 + 1024 + 264 + 512 + 68 + 8 + 528
+                    10240 + 1024 + 1024 + 264 + 512 + 68 + 8 + V41Kv::COMPRESSED_ROW_BYTES
                 })
     }
     /// Packed BF16 [sum(chunk.tokens),5120], in chunk order. Finish all producer
@@ -782,9 +782,9 @@ impl CompressorWave<'_, '_> {
         let mut index_scales = self.index_scales.buffer;
         index_scales.bytes = prepared.rows * 4;
         let mut kv_values = self.kv_values.buffer;
-        kv_values.bytes = prepared.rows * 512;
+        kv_values.bytes = prepared.rows * V41Kv::COMPRESSED_VALUE_BYTES;
         let mut kv_scales = self.kv_scales.buffer;
-        kv_scales.bytes = prepared.rows * 16;
+        kv_scales.bytes = prepared.rows * V41Kv::COMPRESSED_SCALE_BYTES;
         Ok(CompressorOutput {
             kv_values,
             kv_scales,

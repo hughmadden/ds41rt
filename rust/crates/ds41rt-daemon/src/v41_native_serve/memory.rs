@@ -6,7 +6,7 @@ use std::{fmt, str::FromStr};
 const RETAINED_CONTEXTS: usize = 8;
 // Extra pages cover retained partial tails and active copy-on-write frontiers.
 const MAX_GROUPS: usize = 131_072;
-const GROUP_BYTES: usize = 5 * 256 * 596;
+const GROUP_BYTES: usize = 5 * 256 * (68 + ds41rt_ffi::V41Kv::COMPRESSED_ROW_BYTES);
 // Future retained windows, request scratch and graph/runtime allocations.
 // Kept outside the eagerly allocated cache; this is not a CUDA process quota.
 pub(super) const RUNTIME_HEADROOM: usize = 2 * 1024 * 1024 * 1024;
@@ -230,11 +230,12 @@ mod tests {
     fn default_pool_covers_twenty_four_contexts_and_private_tails() {
         let p = PoolPlan::new(16, 1_048_576, 24, None, None, 96 << 30, 96 << 30).unwrap();
         assert_eq!(p.pages, [49_216, 49_216, 49_216, 98_432]);
-        assert_eq!(p.global_bytes, 37_497_077_760 + 64 * GROUP_BYTES);
+        assert_eq!(p.global_bytes, 22_426_746_880);
         assert!(p.cache_bytes > p.global_bytes);
         let small = PoolPlan::new(16, 32768, 24, None, None, 8 << 30, 96 << 30).unwrap();
         assert_eq!(small.pages, [1600, 1600, 1600, 3200]);
-        assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 32 << 30, 96 << 30).is_err());
+        assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 32 << 30, 96 << 30).is_ok());
+        assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 22 << 30, 96 << 30).is_err());
     }
     #[test]
     fn exact_and_total_budgets_round_down_without_undercutting_admission() {

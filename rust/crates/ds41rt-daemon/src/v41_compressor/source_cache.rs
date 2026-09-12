@@ -1,7 +1,7 @@
-//! Paired index/FP8 KV pages owned by compressor request leases.
+//! Paired index/FP4 KV pages owned by compressor request leases.
 use crate::v41_memory::{DeviceAllocation, HostAllocation};
 use anyhow::{ensure, Result};
-use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
+use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Kv};
 use std::ffi::c_void;
 use std::{cell::RefCell, rc::Rc};
 mod ownership;
@@ -9,6 +9,9 @@ use ownership::PagePool;
 pub(crate) use ownership::SourcePrefix;
 
 pub(super) const PAGE_ROWS: usize = 256;
+const KV_VALUES: usize = V41Kv::COMPRESSED_VALUE_BYTES;
+const KV_SCALES: usize = V41Kv::COMPRESSED_SCALE_BYTES;
+const SOURCE_ROW_BYTES: usize = 68 + V41Kv::COMPRESSED_ROW_BYTES;
 pub(super) struct SourceCache<'a> {
     pub packed: DeviceAllocation<'a>,
     pub scales: DeviceAllocation<'a>,
@@ -43,7 +46,7 @@ pub(crate) struct IndexCacheView<'a> {
     /// U64 committed row count, published after accepted value/scale writes.
     pub device_rows: Ds41rtDeviceBuffer,
 }
-/// FP8 K32 serving KV shares physical pages and publication with index keys.
+/// FP4 K16 serving KV shares physical pages and publication with index keys.
 pub(crate) struct KvCacheView<'a> {
     pub values: Ds41rtDeviceBuffer,
     pub scales: Ds41rtDeviceBuffer,
@@ -59,7 +62,7 @@ impl<'a> SourceCache<'a> {
             "invalid index pool page count"
         );
         ensure!((1..=16).contains(&slots), "invalid index slot count");
-        Ok(pages * PAGE_ROWS * (68 + 528) + slots * (pages.min(4096) * 4 + 8))
+        Ok(pages * PAGE_ROWS * SOURCE_ROW_BYTES + slots * (pages.min(4096) * 4 + 8))
     }
     pub fn new(library: &'a NativeLibrary, pages: usize, slots: usize) -> Result<Self> {
         Self::device_bytes(pages, slots)?;
@@ -72,8 +75,8 @@ impl<'a> SourceCache<'a> {
             stride: pages.min(4096),
             packed: DeviceAllocation::new(library, pages * PAGE_ROWS * 64)?,
             scales: DeviceAllocation::new(library, pages * PAGE_ROWS * 4)?,
-            kv_values: DeviceAllocation::new(library, pages * PAGE_ROWS * 512)?,
-            kv_scales: DeviceAllocation::new(library, pages * PAGE_ROWS * 16)?,
+            kv_values: DeviceAllocation::new(library, pages * PAGE_ROWS * KV_VALUES)?,
+            kv_scales: DeviceAllocation::new(library, pages * PAGE_ROWS * KV_SCALES)?,
             capacity: pages * PAGE_ROWS,
             pages: std::array::from_fn(|_| vec![]),
             rows: [0; 16],
@@ -169,8 +172,8 @@ impl<'a> SourceCache<'a> {
             for (buffer, row_bytes) in [
                 (self.packed.buffer, 64),
                 (self.scales.buffer, 4),
-                (self.kv_values.buffer, 512),
-                (self.kv_scales.buffer, 16),
+                (self.kv_values.buffer, KV_VALUES),
+                (self.kv_scales.buffer, KV_SCALES),
             ] {
                 let bytes = PAGE_ROWS * row_bytes;
                 unsafe {
@@ -399,8 +402,8 @@ mod tests {
                 for (buffer, width) in [
                     (cache.packed.buffer, 64),
                     (cache.scales.buffer, 4),
-                    (cache.kv_values.buffer, 512),
-                    (cache.kv_scales.buffer, 16),
+                    (cache.kv_values.buffer, KV_VALUES),
+                    (cache.kv_scales.buffer, KV_SCALES),
                 ] {
                     library.copy_h2d(
                         slice(buffer, destination * width, width),
@@ -425,8 +428,8 @@ mod tests {
             for (buffer, width) in [
                 (cache.packed.buffer, 64),
                 (cache.scales.buffer, 4),
-                (cache.kv_values.buffer, 512),
-                (cache.kv_scales.buffer, 16),
+                (cache.kv_values.buffer, KV_VALUES),
+                (cache.kv_scales.buffer, KV_SCALES),
             ] {
                 let start = bytes.len();
                 bytes.resize(start + width, 0);
@@ -462,8 +465,8 @@ mod tests {
         cache.restore_prefix(0, &saved)?;
         assert!(read(&cache, 0, 300)?.iter().all(|&v| v == 0x11));
         let branch = read(&cache, 1, 130)?;
-        assert!(branch[..100 * 596].iter().all(|&v| v == 0x11));
-        assert!(branch[100 * 596..].iter().all(|&v| v == 0x22));
+        assert!(branch[..100 * SOURCE_ROW_BYTES].iter().all(|&v| v == 0x11));
+        assert!(branch[100 * SOURCE_ROW_BYTES..].iter().all(|&v| v == 0x22));
         drop(short);
         drop(saved);
         drop(empty);
@@ -510,8 +513,8 @@ mod tests {
             // prefix; its copy must have completed before any branch wrote.
             for (slot, old, new, value) in [(0, 6, 7, 0x22), (1, 3, 4, 0x33), (2, 3, end, 0x44)] {
                 let bytes = read(&cache, slot, new)?;
-                assert!(bytes[..old * 596].iter().all(|&v| v == 0x11));
-                assert!(bytes[old * 596..].iter().all(|&v| v == value));
+                assert!(bytes[..old * SOURCE_ROW_BYTES].iter().all(|&v| v == 0x11));
+                assert!(bytes[old * SOURCE_ROW_BYTES..].iter().all(|&v| v == value));
                 cache.release(slot)?;
             }
             assert_eq!(cache.pool.borrow().free.len(), 3);
@@ -551,8 +554,8 @@ mod tests {
         append(&mut cache, 1, 259, 280, 0x53, stream.raw)?;
         assert_eq!(read(&cache, 0, 270)?, original);
         let branch = read(&cache, 1, 280)?;
-        assert!(branch[..259 * 596].iter().all(|&v| v == 0x31));
-        assert!(branch[259 * 596..].iter().all(|&v| v == 0x53));
+        assert!(branch[..259 * SOURCE_ROW_BYTES].iter().all(|&v| v == 0x31));
+        assert!(branch[259 * SOURCE_ROW_BYTES..].iter().all(|&v| v == 0x53));
         cache.release(0)?;
         cache.release(1)?;
         assert_eq!(cache.pool.borrow().free.len(), 3);

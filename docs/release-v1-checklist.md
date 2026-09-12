@@ -73,7 +73,9 @@ gate below is satisfied merely by an older component test.
   and thinking-enabled high-effort tool-call evaluation, plus cold/partial/exact/
   divergent prefix and target/dSpark correctness. Final release measurements
   must use the corrected cache. [Packing primitive evidence](release-v1-compressed-kv.md)
-  is preparation only; serving integration and these gates remain open.
+  covers the original standalone packer. [Serving integration evidence](release-v1-compressed-serving.md)
+  now covers mixed attention, storage, retention and initial paired decode; the
+  broader performance and subsequent quality gates remain open.
   Track this work in order:
 
   1. Integrate architectural FP4 throughout compressed-cache serving and retention.

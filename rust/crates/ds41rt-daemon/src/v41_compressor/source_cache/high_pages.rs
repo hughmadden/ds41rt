@@ -13,11 +13,11 @@ fn u64s(values: &[u64]) -> Vec<u8> {
 }
 
 #[test]
-#[ignore = "requires CUDA and 40 GiB free device memory"]
+#[ignore = "requires CUDA and 24 GiB free device memory"]
 fn highest_physical_page_scatter_score_attention_and_fork() -> Result<()> {
     let library = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
     let (free, total) = library.cuda_memory_info()?;
-    ensure!(free > 40usize << 30, "high-page test requires 40 GiB free");
+    ensure!(free > 24usize << 30, "high-page test requires 24 GiB free");
     eprintln!("high-page memory: free={free} total={total}");
     let stream = LoadStream {
         library: &library,
@@ -36,11 +36,11 @@ fn highest_physical_page_scatter_score_attention_and_fork() -> Result<()> {
     let destination = filled(&library, &u64s(&destinations))?;
     let packed = filled(&library, &vec![0x22; 256 * 64])?; // E2M1 ones
     let scales = filled(&library, &vec![127; 256 * 4])?;
-    let kv = filled(&library, &vec![0x38; 256 * 512])?; // E4M3 ones
-    let kv_scales = filled(&library, &vec![127; 256 * 16])?;
+    let kv = filled(&library, &vec![0x22; 256 * KV_VALUES])?; // E2M1 ones
+    let kv_scales = filled(&library, &vec![0x38; 256 * KV_SCALES])?;
     let workspace = DeviceAllocation::new(&library, V41Compressor::WORKSPACE_BYTES)?;
     let compressor = unsafe { library.v41_compressor(workspace.buffer)? };
-    let encoding = library.v41_kv()?;
+    let encoding = library.v41_compressed_kv()?;
     unsafe {
         compressor.index_store(
             packed.buffer,
@@ -71,8 +71,8 @@ fn highest_physical_page_scatter_score_attention_and_fork() -> Result<()> {
     for (allocation, width, expected) in [
         (&cache.packed, 64, 0x22),
         (&cache.scales, 4, 127),
-        (&cache.kv_values, 512, 0x38),
-        (&cache.kv_scales, 16, 127),
+        (&cache.kv_values, KV_VALUES, 0x22),
+        (&cache.kv_scales, KV_SCALES, 0x38),
     ] {
         let mut actual = vec![0; width];
         library.copy_d2h(
@@ -209,12 +209,12 @@ fn highest_physical_page_scatter_score_attention_and_fork() -> Result<()> {
     assert_ne!(cache.pages[0][0], cache.pages[1][0]);
     assert_eq!(super::tests::read(&cache, 0, 256)?, original);
     let branch = super::tests::read(&cache, 1, 256)?;
-    assert_eq!(&branch[..255 * 596], &original[..255 * 596]);
-    assert!(branch[255 * 596..].iter().all(|&v| v == 0x11));
+    assert_eq!(&branch[..255 * SOURCE_ROW_BYTES], &original[..255 * SOURCE_ROW_BYTES]);
+    assert!(branch[255 * SOURCE_ROW_BYTES..].iter().all(|&v| v == 0x11));
     cache.release(0)?;
     cache.release(1)?;
     drop(prefix);
     assert_eq!(cache.pool.borrow().free.len(), 262144);
-    eprintln!("PASS highest row=67108863, KV byte offset=34359737856; scatter, both index scorers, attention, four-plane COW");
+    eprintln!("PASS highest row=67108863, KV byte offset=17179868928; scatter, both index scorers, attention, four-plane COW");
     Ok(())
 }

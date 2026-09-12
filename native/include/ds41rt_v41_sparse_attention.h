@@ -16,6 +16,8 @@ typedef struct ds41rt_v41_sparse_kv {
   uint64_t source_capacity;
   uint64_t source_proposal_capacity;
   uint32_t page_stride;
+  // 0: no source; 1: legacy FP8/E8M0 K32 source; 2: FP4/E4M3 K16 source.
+  // Window slots 0/1 always use FP8/E8M0 K32. Captured descriptors retain format.
   uint32_t compressed;
 } ds41rt_v41_sparse_kv_t;
 int32_t ds41rt_v41_sparse_attention_initialize(void);
@@ -28,7 +30,9 @@ int32_t ds41rt_v41_sparse_attention_initialize(void);
 // pointers/metadata/IDs. Width must cover every query's causal window (max128).
 // Width 0 derives that maximum from the last metadata row; the caller must
 // provide ascending request positions. Positive widths retain explicit control.
-// Values E4M3 and scales E8M0/K32 must dequantize to finite BF16; queries/sinks
+// Window values E4M3 and scales E8M0/K32; source layout follows compressed.
+// FP4 source rows contain 256 E2M1 bytes and 32 E4M3 scale bytes. All values
+// must dequantize to finite BF16; queries/sinks
 // finite. Same stream device, live immutable inputs, disjoint output through
 // completion/replay. Caller guarantees lease/snapshot/request correspondence,
 // selected-ID uniqueness and causal source counts. No allocation/synchronization.

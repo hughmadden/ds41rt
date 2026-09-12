@@ -1,0 +1,68 @@
+{
+  "scope": "Initial compressed FP4 serving integration; broader performance and subsequent quality gates remain open.",
+  "source_base": "4bc0e9a",
+  "artifacts": {
+    "candidate_daemon": {
+      "path": "/tmp/ds41-native-fp4-serving/daemon-fp4",
+      "sha256": "791d08ce9c1d224559151d8b177d24c1a00d51390c101eac83ce7fb542869863"
+    },
+    "candidate_native": {
+      "path": "/tmp/ds41-native-fp4-serving/serving-cmake/libds41rt_native.so",
+      "sha256": "7b470c25ec2310e82cdb8f4c5d0f683b5d024322a08b69a25d0069542c2aa3fd"
+    },
+    "reference_daemon": {
+      "path": "/tmp/ds41-native-tool-pattern-properties/daemon-qualified",
+      "sha256": "e0dc33780c8200fbb4b929bf698672f199c3de7f3a8f66ac7da34df0d24510e9"
+    },
+    "reference_native": {
+      "path": "/tmp/ds41-native-tool-pattern-properties/qualified-cmake/libds41rt_native.so",
+      "sha256": "a5f2da4f43b14abc4b789c74bdb613217f8417510d706b0bee99213927b8c604"
+    }
+  },
+  "archive": {
+    "path": "docs/evidence/native-compressed-serving.json.gz",
+    "sha256": "baeb2592960d68ac5880fafadf17b45f147961f1034e7a16ad2c59a5fef604bb"
+  },
+  "attention_checks": 1470,
+  "native_closed_form_checks": 96,
+  "python_sanitizer_checks": 40,
+  "sanitizer_errors": 0,
+  "source_cache_tests_per_gpu": 5,
+  "pool_tests": 3,
+  "global_source_pool_bytes": {
+    "fp8": 37545902080,
+    "fp4": 22426746880
+  },
+  "initial_serving": {
+    "target": [
+      {
+        "name": "counting",
+        "median_decode_change_percent": -0.3237990606468788,
+        "reference_tps": 43.150417541362806,
+        "candidate_tps": 43.02597249908908
+      },
+      {
+        "name": "code",
+        "median_decode_change_percent": -0.36114184642909164,
+        "reference_tps": 42.949877298998814,
+        "candidate_tps": 42.789238346344334
+      }
+    ],
+    "spec": [
+      {
+        "name": "counting",
+        "median_decode_change_percent": -0.09670666437363584,
+        "reference_tps": 145.73058593032175,
+        "candidate_tps": 145.58939846427774
+      },
+      {
+        "name": "code",
+        "median_decode_change_percent": 1.947912730703738,
+        "reference_tps": 126.48948287605813,
+        "candidate_tps": 128.90302095594427
+      }
+    ]
+  },
+  "performance_gate_complete": false,
+  "needle_and_tool_quality_gate_complete": false
+}

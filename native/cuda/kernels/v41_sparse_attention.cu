@@ -16,6 +16,33 @@ __device__ __forceinline__ uint32_t packed_fp8_pair(uint16_t input,uint32_t fact
 }
 
 #endif
+__device__ __forceinline__ uint16_t fp4_bf16_bits(unsigned value) {
+  const unsigned magnitude=value&7;
+  return uint16_t(((value&8)<<12) | (magnitude<2?(magnitude?0x3f00:0):0x3f00+magnitude*64));
+}
+__device__ __forceinline__ uint64_t packed_fp4_quad(uint16_t input,uint8_t scale) {
+  const uint32_t low=uint32_t(fp4_bf16_bits(input&15))|
+      (uint32_t(fp4_bf16_bits((input>>4)&15))<<16);
+  const uint32_t high=uint32_t(fp4_bf16_bits((input>>8)&15))|
+      (uint32_t(fp4_bf16_bits(input>>12))<<16);
+#if defined(__CUDA_ARCH_SPECIFIC__) && __CUDA_ARCH_SPECIFIC__ == 1200
+  uint32_t factors,a,b;
+  const uint16_t scales=uint16_t(scale)|(uint16_t(scale)<<8);
+  asm("cvt.rn.bf16x2.e4m3x2 %0, %1;" : "=r"(factors) : "h"(scales));
+  asm("mul.bf16x2 %0, %1, %2;" : "=r"(a) : "r"(low), "r"(factors));
+  asm("mul.bf16x2 %0, %1, %2;" : "=r"(b) : "r"(high), "r"(factors));
+  return uint64_t(a)|(uint64_t(b)<<32);
+#else
+  __nv_fp8_e4m3 f;f.__x=scale;
+  uint64_t result=0;
+#pragma unroll
+  for(int j=0;j<4;++j) {
+    const float value=__bfloat162float(__ushort_as_bfloat16(fp4_bf16_bits((input>>(j*4))&15)));
+    result|=uint64_t(__bfloat16_as_ushort(__float2bfloat16_rn(__fmul_rn(value,float(f)))))<<(j*16);
+  }
+  return result;
+#endif
+}
 // Pad shared rows to distribute WMMA traffic across memory banks.
 constexpr int kKvStride=520, kOutputStride=516, kProbabilityStride=80;
 constexpr int kKvBytes=64*kKvStride*2, kOutputBytes=16*kOutputStride*4;
@@ -55,7 +82,7 @@ __device__ __forceinline__ uint64_t locate(const ds41rt_v41_sparse_kv_t& v,const
   return physical<v.source_capacity?((2ull<<62)|physical):UINT64_MAX;
 }
 // Grid-constant descriptor avoids a per-thread copy for dynamic source indexing.
-template<bool Split,int Groups=1>
+template<bool Split,int Groups=1,bool SourceFP4=false>
 __global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,
     int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v,float* partial,
@@ -126,6 +153,12 @@ __global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* quer
         uint64_t packed=0;
         if(ref!=UINT64_MAX) {
           const int tag=ref>>62;const uint64_t physical=ref&((1ull<<62)-1);
+          if(SourceFP4 && tag>=2) {
+            const uint8_t* source=v.values[tag]+physical*256+col/2;
+            const uint16_t bytes=(reinterpret_cast<uintptr_t>(source)&1)?
+                uint16_t(source[0])|(uint16_t(source[1])<<8):*reinterpret_cast<const uint16_t*>(source);
+            packed=packed_fp4_quad(bytes,v.scales[tag][physical*32+col/16]);
+          } else {
           const uint8_t* source=v.values[tag]+physical*512+col;
           uint32_t bytes;
           if((reinterpret_cast<uintptr_t>(source)&3)==0)
@@ -148,6 +181,7 @@ __global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* quer
             packed|=uint64_t(__bfloat16_as_ushort(value))<<(j*16);
           }
 #endif
+          }
         }
         *reinterpret_cast<uint64_t*>(kv+key*kKvStride+col)=packed;
       }
@@ -290,21 +324,52 @@ bool disjoint(const void* a,uint64_t n,const void* b,uint64_t m) {
   const auto x=reinterpret_cast<uintptr_t>(a),y=reinterpret_cast<uintptr_t>(b);return x+n<=y||y+m<=x;
 }
 }
-extern "C" int32_t ds41rt_v41_sparse_attention_initialize(void) {
-  const auto status=cudaFuncSetAttribute(attend<false>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
+template<bool FP4> static int32_t initialize_format() {
+  const auto status=cudaFuncSetAttribute(attend<false,1,FP4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
   if(status!=cudaSuccess)return status;
-  const auto split=cudaFuncSetAttribute(attend<true>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
+  const auto split=cudaFuncSetAttribute(attend<true,1,FP4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
   if(split!=cudaSuccess)return split;
-  const auto pair=cudaFuncSetAttribute(attend<false,2>,cudaFuncAttributeMaxDynamicSharedMemorySize,kGroupedSharedBytes);
+  const auto pair=cudaFuncSetAttribute(attend<false,2,FP4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kGroupedSharedBytes);
   if(pair!=cudaSuccess)return pair;
-  return cudaFuncSetAttribute(attend<false,4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kFourSharedBytes);
+  return cudaFuncSetAttribute(attend<false,4,FP4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kFourSharedBytes);
+}
+extern "C" int32_t ds41rt_v41_sparse_attention_initialize(void) {
+  const auto status=initialize_format<false>();
+  return status==cudaSuccess?initialize_format<true>():status;
+}
+template<bool FP4> static int32_t dispatch_attention(const uint16_t* query,const float* sink,
+    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
+    int32_t window_width,const ds41rt_v41_sparse_kv_t& v,void* stream,float* partial,
+    int parts,const uint64_t* window_begins) {
+  if(partial) {
+    attend<true,1,FP4><<<dim3(rows,4,parts),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,partial,window_begins);
+    const auto status=cudaGetLastError();
+    if(status!=cudaSuccess)return status;
+    merge<<<dim3(rows,64),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      partial,sink,reinterpret_cast<__nv_bfloat16*>(output),parts);
+  } else if(rows>=256) {
+    attend<false,4,FP4><<<dim3(rows,1),512,kFourSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
+  } else if(rows>=128) {
+    attend<false,2,FP4><<<dim3(rows,2),256,kGroupedSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
+  } else {
+    attend<false,1,FP4><<<dim3(rows,4),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
+      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
+  }
+  return cudaGetLastError();
 }
 static int32_t launch_attention(const uint16_t* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
     int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,float* partial,uint64_t scratch_bytes,int parts,const uint64_t* window_begins=nullptr) {
   if(!view || rows<1 || rows>4096 || window_width<0 || window_width>128)return cudaErrorInvalidValue;
   const auto v=*view;
-  if(v.compressed>1 || v.window_proposal_capacity<1 || v.window_proposal_capacity>4096 ||
+  if(v.compressed>2 || v.window_proposal_capacity<1 || v.window_proposal_capacity>4096 ||
     (v.compressed && (v.source_capacity<1 || v.source_capacity>67108864ull ||
      v.source_proposal_capacity<1 || v.source_proposal_capacity>4096 ||
      v.page_stride<1 || v.page_stride>4096)))return cudaErrorInvalidValue;
@@ -325,34 +390,18 @@ static int32_t launch_attention(const uint16_t* query,const float* sink,
       (partial && !disjoint(inputs[i],sizes[i],partial,required)))return cudaErrorInvalidValue;
   const uint64_t capacity[]={128,v.window_proposal_capacity,v.source_capacity,v.source_proposal_capacity};
   for(int i=0;i<(v.compressed?4:2);++i) {
-    if(!span(v.values[i],capacity[i]*512,1) || !span(v.scales[i],capacity[i]*16,1) ||
-      !disjoint(v.values[i],capacity[i]*512,output,q) || !disjoint(v.scales[i],capacity[i]*16,output,q) ||
-      (partial && (!disjoint(v.values[i],capacity[i]*512,partial,required) ||
-                   !disjoint(v.scales[i],capacity[i]*16,partial,required))))return cudaErrorInvalidValue;
+    const uint64_t values=capacity[i]*((v.compressed==2 && i>=2)?256:512);
+    const uint64_t scales=capacity[i]*((v.compressed==2 && i>=2)?32:16);
+    if(!span(v.values[i],values,1) || !span(v.scales[i],scales,1) ||
+      !disjoint(v.values[i],values,output,q) || !disjoint(v.scales[i],scales,output,q) ||
+      (partial && (!disjoint(v.values[i],values,partial,required) ||
+                   !disjoint(v.scales[i],scales,partial,required))))return cudaErrorInvalidValue;
   }
-  if(partial) {
-    attend<true><<<dim3(rows,4,parts),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
-      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
-      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,partial,window_begins);
-    const auto status=cudaGetLastError();
-    if(status!=cudaSuccess)return status;
-    merge<<<dim3(rows,64),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
-      partial,sink,reinterpret_cast<__nv_bfloat16*>(output),parts);
-  } else if(rows>=256) {
-    attend<false,4><<<dim3(rows,1),512,kFourSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
-      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
-      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
-  } else if(rows>=128) {
-    attend<false,2><<<dim3(rows,2),256,kGroupedSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
-      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
-      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
-  } else {
-    attend<false><<<dim3(rows,4),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
-      reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
-      reinterpret_cast<__nv_bfloat16*>(output),window_width,v,nullptr,window_begins);
-  }
-  return cudaGetLastError();
+  return v.compressed==2?
+      dispatch_attention<true>(query,sink,metadata,selected,output,rows,window_width,v,stream,partial,parts,window_begins):
+      dispatch_attention<false>(query,sink,metadata,selected,output,rows,window_width,v,stream,partial,parts,window_begins);
 }
+
 extern "C" int32_t ds41rt_v41_sparse_attention(const uint16_t* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
     int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream) {

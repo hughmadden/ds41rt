@@ -1,15 +1,17 @@
 # Architectural compressed KV restoration
 
 The release plan places this migration **after native XGrammar enforcement**.
-Serving currently still uses FP8 compressed KV. The former interpretation of
+The serving candidate now uses architectural FP4 compressed KV; its full
+performance and quality gates remain open. See the [integration qualification](release-v1-compressed-serving.md).
+The former interpretation of
 “FP8 KV” as requiring replacement of DeepSeek's architectural compressed FP4
 was incorrect. The intended layout is FP4 compressed KV, FP8 sliding-window KV,
 and the separate existing FP4 index keys/queries.
 
-The new standalone CUDA packing/scatter primitives and Rust FFI constructor are
-preparation for that migration. They are not selected by the serving compressor.
+The initial standalone CUDA packing/scatter qualification below preceded
+serving integration. The serving compressor now selects that FP4 constructor.
 A 512-coordinate compressed row occupies 256 E2M1 value bytes and 32 E4M3 scale
-bytes (groups of 16), versus the current 512 + 16 bytes. Optional RoPE rotates
+bytes (groups of 16), versus the previous 512 + 16 bytes. Optional RoPE rotates
 the final 64 coordinates and rounds to BF16 before quantization. Scales use
 `E4M3(max(amax, 6 * 2^-9) / 6)`, with round-to-nearest E2M1 values. Inputs and
 rotated coordinates must remain within the finite scale range (magnitude <=2688).
@@ -52,9 +54,9 @@ nvcc -std=c++17 -O3 -arch=sm_120 -shared -Xcompiler -fPIC \
 
 ## Remaining migration and release gates
 
-After XGrammar, wire compressed proposals and persistent pages to this format;
-update mixed FP4/FP8 attention reads, cache copies/retention, buffer validation,
-cache identity, and pool sizing together. Optimize unpacking and attention for
+The candidate wires compressed proposals, persistent pages, mixed attention
+reads, cache copies/retention, buffer validation, format identity and pool sizing
+together. Continue optimizing unpacking and attention for
 prefill, decode and dSpark, measuring against the existing FP8 baseline with
 matched hardware settings. Smaller traffic is not proof of higher throughput.
 Performance must match or improve before the requested needle and high-thinking
@@ -86,5 +88,5 @@ changes. Keep the qualified FP8 serving artifacts for matched comparisons.
   at 528 bytes per row. Their similarly named constants describe architectural
   FP8 SWA, not compressed source storage.
 
-This is an implementation map, not evidence that migration or performance
-qualification has completed.
+This map records the audited integration boundaries. The linked integration
+report records completed checks; full performance and release qualification remain open.
