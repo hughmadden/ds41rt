@@ -291,8 +291,9 @@ fn prefill<'w, 'a>(
     use crate::v41_block::EncoderSuffix;
     let end = tokens.len() as u64;
     let cached = requests.cache().committed_end(lease)? as usize;
-    let replay = requests.cache().stage(lease)? == CacheStage::EncoderReplay;
-    if cached > 0 && !replay {
+    let stage = requests.cache().stage(lease)?;
+    let replay = stage == CacheStage::EncoderReplay;
+    if cached > 0 && stage == CacheStage::Full {
         return prefill_continuation(
             lib,
             runtime,
@@ -333,7 +334,7 @@ fn prefill<'w, 'a>(
             }
             result?;
         }
-    } else {
+    } else if stage == CacheStage::Full {
         requests.begin_encoder(lease, end)?;
     }
     let mut chunks = tokens[cached..].chunks(chunk_rows);

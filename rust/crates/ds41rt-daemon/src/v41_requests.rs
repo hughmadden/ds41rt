@@ -124,11 +124,23 @@ impl<'a> Requests<'a> {
         Ok(RequestPrefix { cache, history })
     }
     pub fn restore_prefix(&mut self, lease: CacheLease, prefix: &RequestPrefix<'a>) -> Result<()> {
+        self.restore_retained(lease, prefix, None)
+    }
+    pub fn restore_encoder_continuation(&mut self, lease: CacheLease,
+        prefix: &RequestPrefix<'a>, prompt_end: u64) -> Result<()> {
+        self.restore_retained(lease, prefix, Some(prompt_end))
+    }
+    fn restore_retained(&mut self, lease: CacheLease, prefix: &RequestPrefix<'a>,
+        prompt_end: Option<u64>) -> Result<()> {
         let request = self.request(lease)?;
         ensure!(request.history.position() == 0 && request.prefill.is_none()
             && prefix.history.position() == prefix.cache.end(), "invalid request prefix restore");
         let history = prefix.history.fork()?;
-        if let Err(error) = self.cache.restore_prefix(lease, &prefix.cache) {
+        let restored = match prompt_end {
+            Some(end) => self.cache.restore_encoder_continuation(lease, &prefix.cache, end),
+            None => self.cache.restore_prefix(lease, &prefix.cache),
+        };
+        if let Err(error) = restored {
             if let Err(cleanup) = self.release(lease) {
                 tracing::error!(%cleanup, "releasing failed request prefix restore");
             }

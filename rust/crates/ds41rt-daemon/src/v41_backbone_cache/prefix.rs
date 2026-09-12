@@ -158,6 +158,21 @@ impl<'a> BackboneCache<'a> {
     /// Restore into a fresh admission. Any partially applied failure revokes
     /// the whole request after draining; no mixed-layer frontier is observable.
     pub fn restore_prefix(&mut self, lease: CacheLease, prefix: &BackbonePrefix<'a>) -> Result<()> {
+        self.restore_retained_phase(lease, prefix, CachePhase::Full)
+    }
+
+    /// A new suffix covering the whole decoder window needs only the saved
+    /// encoder rings and global sources. Preserve odd compressor carry while
+    /// leaving decoder rings fresh for the final-window replay.
+    pub fn restore_encoder_continuation(&mut self, lease: CacheLease,
+        prefix: &BackbonePrefix<'a>, prompt_end: u64) -> Result<()> {
+        ensure!(prompt_end <= 1048576 && prompt_end.saturating_sub(prefix.end) >= 128,
+            "encoder continuation must cover the final decoder window");
+        self.restore_retained_phase(lease, prefix, CachePhase::Encoder { target: prompt_end })
+    }
+
+    fn restore_retained_phase(&mut self, lease: CacheLease, prefix: &BackbonePrefix<'a>,
+        phase: CachePhase) -> Result<()> {
         let request = self.request(lease)?;
         ensure!(
             prefix.owner == self.owner
@@ -175,6 +190,7 @@ impl<'a> BackboneCache<'a> {
                 .iter_mut()
                 .zip(windows)
                 .zip(&prefix.windows)
+                .take(phase.stage().windows().end)
                 .enumerate()
             {
                 unsafe {
@@ -227,6 +243,7 @@ impl<'a> BackboneCache<'a> {
             .as_mut()
             .expect("validated prefix admission");
         request.end = prefix.end;
+        request.phase = phase;
         request.version = 1;
         self.committed_end(lease)?;
         Ok(())

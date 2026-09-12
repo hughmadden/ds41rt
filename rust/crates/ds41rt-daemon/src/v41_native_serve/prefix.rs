@@ -310,6 +310,11 @@ impl<'a> PrefixCache<'a> {
             // The saved next token belongs to a different frontier and is unused.
             return Ok(Some((start, 0)));
         }
+        if tokens.len() - end >= 128 {
+            requests.restore_encoder_continuation(lease, &saved.target, tokens.len() as u64)?;
+            // Every final decoder/draft row comes from the new encoder suffix.
+            return Ok(Some((end, 0)));
+        }
         requests.restore_prefix(lease, &saved.target)?;
         if let (Some(draft), Some(saved)) = (draft, saved.draft.as_ref()) {
             draft.restore_prefix(id, end as u64, saved)?;

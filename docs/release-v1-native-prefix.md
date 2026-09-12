@@ -47,7 +47,9 @@ The scheduler captures successful prompt prefill and normal completion at draine
 transaction boundaries. It excludes failed and cancelled completions, and stores
 only the token frontier actually committed by greedy verification. Resuming a
 turn restores the forty target rings, compressor carry, Engram history, shared
-source pages and three draft rings. A longer prompt executes its uncached suffix.
+source pages and three draft rings for short continuations. With at least 128
+new prompt tokens, [encoder continuation](release-v1-exact-suffix.md) restores
+only encoder rings and sources, then rebuilds the final decoder/draft window.
 
 Least-recently-used eviction drops a radix value and its state together. Duplicate
 frontiers are removed before recapture; full-cache eviction precedes allocating

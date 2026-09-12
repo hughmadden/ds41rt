@@ -97,9 +97,9 @@ from the final Frogger task and comprehensive Unicode qualification.
 
 ## Remaining release work
 
-Keep exact retained-turn restoration as the short-continuation fast path. Large
-uncached suffixes should use encoder continuation plus bounded decoder prefill
-instead of unnecessarily executing all forty layers over every new token.
+[Large exact-resume suffixes](release-v1-exact-suffix.md) now restore encoder
+state and use bounded decoder prefill. Short continuations keep the complete
+retained-turn fast path.
 
 Qualify long-context quality and measure replay cost and retained-context
 prefill across the full release matrix. Final pool sizing and memory reservation

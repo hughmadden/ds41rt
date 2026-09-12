@@ -169,6 +169,48 @@ fn qualify_encoder_prefix_replay(
     );
     bank.release(&[original])?;
     eprintln!("PASS C16 partial encoder replay: shared complete-group sources, 128 bounded rows, zero acceptance, suffix append, decoder replay, immutable retained future");
+
+    // Exact continuation preserves encoder rings and the odd compressor carry,
+    // while avoiding all decoder writes until the final bounded replay.
+    let full = bank.begin_request(0, 9400)?;
+    let encoder = bank.begin_request(1, 9401)?;
+    bank.restore_prefix(full, &saved)?;
+    assert!(bank.restore_encoder_continuation(encoder, &saved, 512).is_err());
+    assert!(bank.restore_encoder_continuation(encoder, &saved, 1048577).is_err());
+    bank.restore_encoder_continuation(encoder, &saved, 514)?;
+    assert_eq!(bank.history_end(encoder)?, 385);
+    for layer in 20..40 {
+        assert_eq!(bank.windows[layer].end(bank.request(encoder)?.windows[layer])?, 0);
+    }
+    let encoder_bytes = |bank: &BackboneCache<'_>, lease, full: bool| -> Result<Vec<u8>> {
+        let mut bytes = committed_bytes(lib, bank, lease)?;
+        if full { bytes.drain(20 * 128 * 528..40 * 128 * 528); }
+        Ok(bytes)
+    };
+    assert_eq!(encoder_bytes(bank, encoder, false)?, encoder_bytes(bank, full, true)?);
+    for rows in [128, 1] {
+        for lease in [full, encoder] {
+            let batch = bank.plan(&[CacheWork { lease, tokens: rows,
+                kind: ExpertV2SourceKind::Prefill }])?;
+            produce(lib, bank, &batch, windows, sources, 86 + rows as usize)?;
+            bank.commit(&batch, windows, sources, &[rows])?;
+        }
+        assert_eq!(encoder_bytes(bank, encoder, false)?, encoder_bytes(bank, full, true)?,
+            "encoder continuation differs from full continuation, including odd carry");
+    }
+    assert_eq!(bank.begin_decoder_replay(encoder)?, 386);
+    let decoder = bank.plan_replay(&[CacheWork { lease: encoder, tokens: 128,
+        kind: ExpertV2SourceKind::Prefill }])?;
+    produce(lib, bank, &decoder, windows, sources, 90)?;
+    bank.commit(&decoder, windows, sources, &[128])?;
+    assert_eq!(bank.stage(encoder)?, CacheStage::Full);
+    assert_eq!(bank.committed_end(encoder)?, 514);
+    bank.release(&[full, encoder])?;
+    let original = bank.begin_request(0, 9500)?;
+    bank.restore_prefix(original, &saved)?;
+    assert_eq!(committed_bytes(lib, bank, original)?, expected);
+    bank.release(&[original])?;
+    eprintln!("PASS exact encoder continuation: populated rings and odd carry match full continuation; decoder stays fresh until final 128 rows");
     Ok(())
 }
 #[test]

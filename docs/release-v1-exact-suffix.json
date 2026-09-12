@@ -1,0 +1,672 @@
+{
+  "scope": "Exact retained-turn encoder continuation for suffixes of at least 128 tokens; focused qualification, not the full release matrix.",
+  "parent_commit": "6cd6fb62a285cc0654bd914e938903811e54655d",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/commit_tests.rs": "1b40457221732c8c19b35ed77adce83ea64fe42dddc1c1e50dc8e82ca67f70cf",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/prefix.rs": "929900bf07788d32c260c5c96e9c4970f8d499bb3cd8e3ab997d133a79c729a0",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "5aeccd15ae27dd4ff83a775a77b78ec1f754ff5ff6c8f0404489b56bbc4d0ede",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/prefix.rs": "f9a4c5c4fd489206493c69d7558b8596aab253af8f74c90e68fe9107dde3a259",
+    "rust/crates/ds41rt-daemon/src/v41_requests.rs": "8428884f12fce6e16afd65e623c99e262a625635f8911803116a2fef3ec10e4d",
+    "scripts/qualify-ds41-exact-suffix.py": "ddb1ee72c9cc146f1326516d6ef71f8641de25ba5de9bf27db2f63b83267d36c"
+  },
+  "daemon_sha256": "b37beaea9f031ec8c58d19824513f6877a6451187a51fb0e98b7f13abc1f2659",
+  "native_library_sha256": "ccd82d862473f71d01622bcf5decd9d5789444210db1be4cc245dbdcb44b8a07",
+  "reference_provenance": "release-v1-partial-prefix.json",
+  "launch_commands": {
+    "target": [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-exact-encoder-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-native-exact-encoder/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-draft-release-default/selected-native:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18045",
+      "--prefill-batch-tokens",
+      "2048"
+    ],
+    "spec": [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-exact-encoder-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "-v",
+      "/tmp/ds41-native-exact-encoder/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-draft-release-default/selected-native:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1:-1",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "--entrypoint",
+      "/daemon",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18046",
+      "--prefill-batch-tokens",
+      "2048"
+    ]
+  },
+  "component_checks": {
+    "real_weight_all_44_owners": "pass; includes odd-carry exact encoder continuation, final decoder replay, original preservation, C16 partial replay and failure recovery",
+    "cuda_memcheck_errors": 0
+  },
+  "api_checks": {
+    "target": {
+      "exact": true,
+      "partial": "pass",
+      "c2_c6_c16_cancellation_replacement": "pass",
+      "suffix": true,
+      "warm_suffix": true
+    },
+    "spec": {
+      "exact": true,
+      "partial": "pass",
+      "c2_c6_c16_cancellation_replacement": "pass",
+      "suffix": true,
+      "warm_suffix": true
+    }
+  },
+  "initial_suffix_measurements": {
+    "target": [
+      {
+        "suffix_rows": 16,
+        "ttft_seconds": {
+          "reference": 0.20150642096996307,
+          "candidate": 0.18694574502296746
+        },
+        "speedup": 1.0778871749405516,
+        "prompt_tokens": [
+          2119,
+          2119
+        ],
+        "new_tokens": [
+          160,
+          160
+        ]
+      },
+      {
+        "suffix_rows": 96,
+        "ttft_seconds": {
+          "reference": 0.4901684019714594,
+          "candidate": 0.33073520759353414
+        },
+        "speedup": 1.482056916582842,
+        "prompt_tokens": [
+          2837,
+          2839
+        ],
+        "new_tokens": [
+          880,
+          880
+        ]
+      },
+      {
+        "suffix_rows": 192,
+        "ttft_seconds": {
+          "reference": 0.8666241044993512,
+          "candidate": 0.5182455400354229
+        },
+        "speedup": 1.672226845290586,
+        "prompt_tokens": [
+          3703,
+          3701
+        ],
+        "new_tokens": [
+          1744,
+          1744
+        ]
+      },
+      {
+        "suffix_rows": 384,
+        "ttft_seconds": {
+          "reference": 1.7264840475399978,
+          "candidate": 1.3312946074875072
+        },
+        "speedup": 1.2968459707038955,
+        "prompt_tokens": [
+          5429,
+          5429
+        ],
+        "new_tokens": [
+          3472,
+          3472
+        ]
+      },
+      {
+        "suffix_rows": 768,
+        "ttft_seconds": {
+          "reference": 3.085515967977699,
+          "candidate": 1.5710947220213711
+        },
+        "speedup": 1.963927397074998,
+        "prompt_tokens": [
+          8888,
+          8886
+        ],
+        "new_tokens": [
+          6928,
+          6928
+        ]
+      },
+      {
+        "suffix_rows": 1536,
+        "ttft_seconds": {
+          "reference": 6.098485517955851,
+          "candidate": 2.0085102319717407
+        },
+        "speedup": 3.036322853067574,
+        "prompt_tokens": [
+          16334,
+          16330
+        ],
+        "new_tokens": [
+          14376,
+          14376
+        ]
+      }
+    ],
+    "spec": [
+      {
+        "suffix_rows": 16,
+        "ttft_seconds": {
+          "reference": 0.19659819855587557,
+          "candidate": 0.18705635599326342
+        },
+        "speedup": 1.0510105230690787,
+        "prompt_tokens": [
+          2115,
+          2118
+        ],
+        "new_tokens": [
+          159,
+          159
+        ]
+      },
+      {
+        "suffix_rows": 96,
+        "ttft_seconds": {
+          "reference": 0.48606538446620107,
+          "candidate": 0.3309676260105334
+        },
+        "speedup": 1.4686191224356533,
+        "prompt_tokens": [
+          2840,
+          2840
+        ],
+        "new_tokens": [
+          879,
+          879
+        ]
+      },
+      {
+        "suffix_rows": 192,
+        "ttft_seconds": {
+          "reference": 0.8638276385026984,
+          "candidate": 0.5175231950706802
+        },
+        "speedup": 1.6691573377396582,
+        "prompt_tokens": [
+          3702,
+          3700
+        ],
+        "new_tokens": [
+          1743,
+          1743
+        ]
+      },
+      {
+        "suffix_rows": 384,
+        "ttft_seconds": {
+          "reference": 1.7137200660072267,
+          "candidate": 1.3440532474778593
+        },
+        "speedup": 1.2750388194984492,
+        "prompt_tokens": [
+          5432,
+          5431
+        ],
+        "new_tokens": [
+          3471,
+          3471
+        ]
+      },
+      {
+        "suffix_rows": 768,
+        "ttft_seconds": {
+          "reference": 3.068458761961665,
+          "candidate": 1.6943045379011892
+        },
+        "speedup": 1.8110432294318837,
+        "prompt_tokens": [
+          8886,
+          8888
+        ],
+        "new_tokens": [
+          6927,
+          6927
+        ]
+      },
+      {
+        "suffix_rows": 1536,
+        "ttft_seconds": {
+          "reference": 6.049416530528106,
+          "candidate": 2.0068174944608472
+        },
+        "speedup": 3.0144328257180883,
+        "prompt_tokens": [
+          16334,
+          16336
+        ],
+        "new_tokens": [
+          14375,
+          14375
+        ]
+      }
+    ]
+  },
+  "warm_suffix_measurements": {
+    "target": [
+      {
+        "suffix_rows": 16,
+        "ttft_seconds": {
+          "reference": 0.20209476450691,
+          "candidate": 0.18867453699931502
+        },
+        "speedup": 1.071128980735984,
+        "prompt_tokens": [
+          2117,
+          2116
+        ],
+        "new_tokens": [
+          160,
+          160
+        ]
+      },
+      {
+        "suffix_rows": 96,
+        "ttft_seconds": {
+          "reference": 0.4945592670701444,
+          "candidate": 0.3336199004552327
+        },
+        "speedup": 1.4824033770027085,
+        "prompt_tokens": [
+          2837,
+          2837
+        ],
+        "new_tokens": [
+          880,
+          880
+        ]
+      },
+      {
+        "suffix_rows": 192,
+        "ttft_seconds": {
+          "reference": 0.8726305715390481,
+          "candidate": 0.5298593650222756
+        },
+        "speedup": 1.6469097823766166,
+        "prompt_tokens": [
+          3700,
+          3701
+        ],
+        "new_tokens": [
+          1744,
+          1744
+        ]
+      },
+      {
+        "suffix_rows": 384,
+        "ttft_seconds": {
+          "reference": 1.711587392957881,
+          "candidate": 0.6011048129294068
+        },
+        "speedup": 2.8474025762939426,
+        "prompt_tokens": [
+          5427,
+          5432
+        ],
+        "new_tokens": [
+          3472,
+          3472
+        ]
+      },
+      {
+        "suffix_rows": 768,
+        "ttft_seconds": {
+          "reference": 3.060566172003746,
+          "candidate": 1.145596862072125
+        },
+        "speedup": 2.67159091765307,
+        "prompt_tokens": [
+          8886,
+          8884
+        ],
+        "new_tokens": [
+          6928,
+          6928
+        ]
+      },
+      {
+        "suffix_rows": 1536,
+        "ttft_seconds": {
+          "reference": 6.088817336538341,
+          "candidate": 2.0724701930303127
+        },
+        "speedup": 2.93795170469276,
+        "prompt_tokens": [
+          16333,
+          16336
+        ],
+        "new_tokens": [
+          14376,
+          14376
+        ]
+      }
+    ],
+    "spec": [
+      {
+        "suffix_rows": 16,
+        "ttft_seconds": {
+          "reference": 0.19849131151568145,
+          "candidate": 0.18626054550986737
+        },
+        "speedup": 1.0656648243584477,
+        "prompt_tokens": [
+          2117,
+          2118
+        ],
+        "new_tokens": [
+          159,
+          159
+        ]
+      },
+      {
+        "suffix_rows": 96,
+        "ttft_seconds": {
+          "reference": 0.4901849825400859,
+          "candidate": 0.3332681424799375
+        },
+        "speedup": 1.4708426040739693,
+        "prompt_tokens": [
+          2838,
+          2838
+        ],
+        "new_tokens": [
+          879,
+          879
+        ]
+      },
+      {
+        "suffix_rows": 192,
+        "ttft_seconds": {
+          "reference": 0.8663716400042176,
+          "candidate": 0.5196824535378255
+        },
+        "speedup": 1.6671173600460192,
+        "prompt_tokens": [
+          3702,
+          3700
+        ],
+        "new_tokens": [
+          1743,
+          1743
+        ]
+      },
+      {
+        "suffix_rows": 384,
+        "ttft_seconds": {
+          "reference": 1.7065481385798194,
+          "candidate": 0.594097752997186
+        },
+        "speedup": 2.8725039439560085,
+        "prompt_tokens": [
+          5428,
+          5434
+        ],
+        "new_tokens": [
+          3471,
+          3471
+        ]
+      },
+      {
+        "suffix_rows": 768,
+        "ttft_seconds": {
+          "reference": 3.039090654987376,
+          "candidate": 1.101721004000865
+        },
+        "speedup": 2.7584938872464213,
+        "prompt_tokens": [
+          8886,
+          8887
+        ],
+        "new_tokens": [
+          6927,
+          6927
+        ]
+      },
+      {
+        "suffix_rows": 1536,
+        "ttft_seconds": {
+          "reference": 6.110398382006679,
+          "candidate": 1.9655170749756508
+        },
+        "speedup": 3.1087994400060737,
+        "prompt_tokens": [
+          16336,
+          16336
+        ],
+        "new_tokens": [
+          14375,
+          14375
+        ]
+      }
+    ]
+  },
+  "ordinary_decode": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.7663987588203,
+            "first_content_seconds": 0.002825999981723726,
+            "finish_seconds": 5.9650899085681885
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.962397783896414,
+            "first_content_seconds": 0.002355804026592523,
+            "finish_seconds": 5.9377789460122585
+          }
+        },
+        "candidate_decode_ratio": 1.0045830144871781
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.90283920724071,
+            "first_content_seconds": 0.005226575012784451,
+            "finish_seconds": 5.947615540993866
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.81300714984867,
+            "first_content_seconds": 0.0022926940000616014,
+            "finish_seconds": 5.957839317037724
+          }
+        },
+        "candidate_decode_ratio": 0.9979061512232767
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 143.25937514693118,
+            "first_content_seconds": 0.006535120483022183,
+            "finish_seconds": 1.7866165040177293
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 142.98778448693355,
+            "first_content_seconds": 0.0029759500175714493,
+            "finish_seconds": 1.7863533140043728
+          }
+        },
+        "candidate_decode_ratio": 0.9981042032347337
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 123.93797018680245,
+            "first_content_seconds": 0.006042946479283273,
+            "finish_seconds": 2.0635240804986097
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 124.16701959294204,
+            "first_content_seconds": 0.0040300830150954425,
+            "finish_seconds": 2.057813001971226
+          }
+        },
+        "candidate_decode_ratio": 1.0018480971230557
+      }
+    ]
+  },
+  "timing_limits": "All initial samples, including first-use outliers, are retained. Warm followup primes every suffix shape before AB/BA measurements. Approximately 1,960-token parents; no long-context or aggregate release headline claim.",
+  "dsh": {
+    "command": [
+      "dsh",
+      "--profile",
+      "headless",
+      "--patch",
+      "/tmp/ds41-native-exact-encoder/dsh.patch.yml",
+      "In this directory, read input.json. Implement summarize.py using only the Python standard library: normalize each name to Unicode NFC, sum integer amounts by normalized name, and write summary.json as UTF-8 JSON with unescaped Unicode names. Include a reusable summarize(rows) function returning the totals. Add test_summary.py using unittest covering the supplied data, empty input, and combining-character normalization. Run the tests and the script, inspect summary.json, then report the actual totals and test result. Work only in this directory; do not delegate or access the network. Complete the task using your tools.\n"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 26.072173895081505,
+    "main_model_steps": 7,
+    "local_tool_calls": 8,
+    "steps": [
+      {
+        "step": 1,
+        "inputTokens": 7251,
+        "outputTokens": 111,
+        "totalTokens": 7362,
+        "cacheReadTokens": 0
+      },
+      {
+        "step": 2,
+        "inputTokens": 239,
+        "outputTokens": 127,
+        "totalTokens": 7728,
+        "cacheReadTokens": 7362
+      },
+      {
+        "step": 3,
+        "inputTokens": 117,
+        "outputTokens": 1293,
+        "totalTokens": 9138,
+        "cacheReadTokens": 7728
+      },
+      {
+        "step": 4,
+        "inputTokens": 94,
+        "outputTokens": 80,
+        "totalTokens": 9312,
+        "cacheReadTokens": 9138
+      },
+      {
+        "step": 5,
+        "inputTokens": 226,
+        "outputTokens": 113,
+        "totalTokens": 9651,
+        "cacheReadTokens": 9312
+      },
+      {
+        "step": 6,
+        "inputTokens": 156,
+        "outputTokens": 156,
+        "totalTokens": 9963,
+        "cacheReadTokens": 9651
+      },
+      {
+        "step": 7,
+        "inputTokens": 246,
+        "outputTokens": 435,
+        "totalTokens": 10644,
+        "cacheReadTokens": 9963
+      }
+    ],
+    "independent_checks": "test_combining_character_normalization (test_summary.SummarizeTests.test_combining_character_normalization)\nCanonically equivalent spellings must merge into one NFC key. ... ok\ntest_empty_input (test_summary.SummarizeTests.test_empty_input) ... ok\ntest_negative_and_zero_amounts (test_summary.SummarizeTests.test_negative_and_zero_amounts) ... ok\ntest_output_file_is_utf8_with_unescaped_unicode (test_summary.SummarizeTests.test_output_file_is_utf8_with_unescaped_unicode)\nmain() writes UTF-8 JSON whose names are literal, not \\uXXXX. ... ok\ntest_supplied_data (test_summary.SummarizeTests.test_supplied_data)\nThe exact rows from input.json collapse to two normalized names. ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 0.000s\n\nOK\ncafé: 11\n台北: 2\nPASS independent totals, literal UTF-8, NFC and combining-character/emoji case\n"
+  },
+  "raw_archive": {
+    "path": "docs/evidence/native-exact-suffix.json.gz",
+    "bytes": 790038,
+    "sha256": "a52c8c2ecdbbd3d48d87fbc821dedafb178912bbd285ff3ff3d1d760d0c4a4f2"
+  },
+  "remaining": [
+    "Final source-pool sizing and memory reservation options",
+    "Official context/output defaults and clamping",
+    "Long-context release qualification",
+    "Remaining vision, correctness, build, image, documentation and benchmark requirements"
+  ]
+}
