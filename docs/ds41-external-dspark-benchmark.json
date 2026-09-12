@@ -1,0 +1,221 @@
+{
+  "provenance": "User-supplied four-Spark-only dSpark comparison, received 2026-09-12. Not independently verified. The original labels ours/published belong to the supplied comparison, not DS41RT measurements.",
+  "units": "tokens/s",
+  "columns": [
+    "C1 per-stream: supplied ours / published",
+    "C1 aggregate: supplied ours / published",
+    "C6 aggregate: supplied ours / published",
+    "Peak aggregate: supplied ours / their peak"
+  ],
+  "rows": [
+    {
+      "category": "code",
+      "values": [
+        [
+          89.6,
+          73.8
+        ],
+        [
+          84.0,
+          66.5
+        ],
+        [
+          321.2,
+          225.5
+        ],
+        [
+          321.2,
+          225.5
+        ]
+      ]
+    },
+    {
+      "category": "math",
+      "values": [
+        [
+          86.9,
+          50.9
+        ],
+        [
+          78.0,
+          45.6
+        ],
+        [
+          277.5,
+          182.7
+        ],
+        [
+          277.5,
+          182.7
+        ]
+      ]
+    },
+    {
+      "category": "tables (format)",
+      "values": [
+        [
+          89.0,
+          55.4
+        ],
+        [
+          74.0,
+          44.0
+        ],
+        [
+          246.9,
+          182.1
+        ],
+        [
+          246.9,
+          215.1
+        ]
+      ]
+    },
+    {
+      "category": "JSON",
+      "values": [
+        [
+          91.1,
+          52.1
+        ],
+        [
+          77.4,
+          43.7
+        ],
+        [
+          189.7,
+          130.4
+        ],
+        [
+          198.2,
+          130.4
+        ]
+      ]
+    },
+    {
+      "category": "reasoning",
+      "values": [
+        [
+          71.7,
+          37.8
+        ],
+        [
+          66.6,
+          35.0
+        ],
+        [
+          220.0,
+          133.6
+        ],
+        [
+          220.0,
+          133.6
+        ]
+      ]
+    },
+    {
+      "category": "summary",
+      "values": [
+        [
+          40.8,
+          25.7
+        ],
+        [
+          34.7,
+          21.9
+        ],
+        [
+          89.6,
+          73.5
+        ],
+        [
+          96.4,
+          73.5
+        ]
+      ]
+    },
+    {
+      "category": "prose",
+      "values": [
+        [
+          36.8,
+          24.4
+        ],
+        [
+          35.1,
+          22.9
+        ],
+        [
+          112.0,
+          74.8
+        ],
+        [
+          112.0,
+          74.8
+        ]
+      ]
+    },
+    {
+      "category": "narrative",
+      "values": [
+        [
+          37.7,
+          24.9
+        ],
+        [
+          36.2,
+          23.8
+        ],
+        [
+          92.2,
+          52.4
+        ],
+        [
+          92.2,
+          53.4
+        ]
+      ]
+    },
+    {
+      "category": "counting ceiling",
+      "values": [
+        [
+          102.4,
+          62.2
+        ],
+        [
+          95.8,
+          57.3
+        ],
+        [
+          393.9,
+          184.9
+        ],
+        [
+          393.9,
+          259.9
+        ]
+      ]
+    },
+    {
+      "category": "Mean of 8 categories",
+      "values": [
+        [
+          68.0,
+          43.1
+        ],
+        [
+          60.8,
+          38.0
+        ],
+        [
+          193.6,
+          131.9
+        ],
+        null
+      ]
+    }
+  ],
+  "counting_note": "Published C1 per-stream also lists 92.2 back-to-back.",
+  "follow_up": "After planned prefill work, compare matching prompt categories, context/output lengths, thinking settings and concurrency; report acceptance, target verification time, draft time, per-stream decode and wall-clock aggregate separately. Current DS41RT counting results are not a comparable category suite."
+}

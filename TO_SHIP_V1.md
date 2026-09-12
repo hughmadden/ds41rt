@@ -6,6 +6,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
+- [x] Pair full encoder chunks first and execute a reserved short tail afterward. [Tail scheduling](docs/ds41-prefill-tail.md) reaches 6.4–6.5k code / 7.4–7.8k repeated-text warm 16k prefill tok/s, preserves real-model encoder bytes and eight API quality-case outputs per mode, and retains about 38 target / 118 dSpark counting TPS. Remaining pair-boundary/response overlap, expert reuse and attention investigations precede broad decode tuning. The user-supplied [four-Spark category benchmark](docs/ds41-external-dspark-benchmark.json) is retained for that later comparison; its “ours” label does not refer to this runtime.
+
 - [x] Deploy [bounded CED prefill](docs/ds41-ced-serving.md): full-prompt encoder plus final-128 decoder replay and dSpark seeding. Warm 16k prefill reaches 3.03–3.06k code / 3.49–3.51k repeated tok/s. Trace confirms 330,760 rather than 656,400 token-layer executions for 16,410 tokens. Broader approximation quality and C16 scheduling remain open. Earlier throughput entries below are historical checkpoints.
 
 - [x] Deploy [packed FP8 KV conversion](docs/ds41-attention-packed.md) with exhaustive bit-exact conversion and native attention qualification. Warm 16k prefill reaches 1.58–1.60k code / 1.83–1.84k repeated tok/s. Retain 2048-token chunks after a same-artifact 4096 trial regresses repeated-text prefill; adjacent-query KV sharing remains an unproven candidate.

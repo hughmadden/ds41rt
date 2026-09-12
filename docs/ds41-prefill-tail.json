@@ -1,0 +1,859 @@
+{
+  "baseline_commit": "d9f1c36",
+  "native_library": "/tmp/ds41-head-reuse/cmake/libds41rt_native.so",
+  "daemon": "/tmp/ds41-tail/daemon",
+  "native_sha256": "fa8220816df160d9dc5ed912ee291a8c13345df9c1f4b2fb232a6e06bb46c15d",
+  "daemon_sha256": "ef2fc941d5447c0c2be393a1e173c786f633af64469d78dc443756887d68d22f",
+  "prefill_baseline": [
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 5.0027137419674546,
+      "finish_seconds": 6.542091634008102,
+      "observed_decode_tokens_per_second": 37.67755812259547,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "target",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 3280.2196660459563
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 4.765777595923282,
+      "finish_seconds": 5.300101237022318,
+      "observed_decode_tokens_per_second": 108.54844431120694,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "speculative",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 3443.2995811716773
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 3.0842463289154693,
+      "finish_seconds": 4.639251593966037,
+      "observed_decode_tokens_per_second": 37.29890907997272,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "target",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 5320.5867009235735
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 3.110091481008567,
+      "finish_seconds": 3.6290306230075657,
+      "observed_decode_tokens_per_second": 111.76647761928102,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "speculative",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 5276.372126095283
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.5604931859998032,
+      "finish_seconds": 4.1279251569649205,
+      "observed_decode_tokens_per_second": 37.003200824267715,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "target",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 6409.312116014067
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.6351640269858763,
+      "finish_seconds": 3.1498382630525157,
+      "observed_decode_tokens_per_second": 112.69264310422997,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "speculative",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 6227.69582156563
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.500233803060837,
+      "finish_seconds": 4.052958752028644,
+      "observed_decode_tokens_per_second": 37.353685878852026,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "target",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 6563.78614668329
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.5405720740091056,
+      "finish_seconds": 3.060739340959117,
+      "observed_decode_tokens_per_second": 111.50259480970739,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "speculative",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 6459.568759292432
+    }
+  ],
+  "prefill_candidate": [
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 4.6925289139617234,
+      "finish_seconds": 6.230782332015224,
+      "observed_decode_tokens_per_second": 37.7051006806102,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "target",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 3497.0482443219857
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 4.490275563090108,
+      "finish_seconds": 5.064696390996687,
+      "observed_decode_tokens_per_second": 100.97126911531986,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "speculative",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 3654.5641285113024
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.5208758119260892,
+      "finish_seconds": 4.066546891001053,
+      "observed_decode_tokens_per_second": 37.52415425584025,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "target",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 6509.64237205396
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.566854059929028,
+      "finish_seconds": 3.0875410399166867,
+      "observed_decode_tokens_per_second": 111.39130077993256,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 59,
+        "total_tokens": 16469,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "speculative",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+      "effective_prompt_tokens_per_second": 6393.039735361396
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.1529731419868767,
+      "finish_seconds": 3.7040288608986884,
+      "observed_decode_tokens_per_second": 37.39388552765312,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "target",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 7622.4824545907095
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.12037575407885,
+      "finish_seconds": 2.6332217960152775,
+      "observed_decode_tokens_per_second": 113.09436996140396,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "speculative",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 7739.665938186221
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.2156040949048474,
+      "finish_seconds": 3.790109178982675,
+      "observed_decode_tokens_per_second": 36.83697219305585,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "target",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 7407.009238581858
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+      "first_content_seconds": 2.0978202619589865,
+      "finish_seconds": 2.609928815974854,
+      "observed_decode_tokens_per_second": 113.25723725013759,
+      "usage": {
+        "prompt_tokens": 16411,
+        "completion_tokens": 59,
+        "total_tokens": 16470,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16411
+      },
+      "mode": "speculative",
+      "kind": "repeated",
+      "filler_tokens": 16384,
+      "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+      "effective_prompt_tokens_per_second": 7822.881825288064
+    }
+  ],
+  "long_decode_baseline": [
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200",
+      "first_content_seconds": 5.440165346022695,
+      "finish_seconds": 21.299547091010027,
+      "observed_decode_tokens_per_second": 37.70638790437147,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 599,
+        "total_tokens": 17009,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "target",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "ebc0e8f387e6bde18c02b7478c89a9daf13d56e681cc8051ca34bcbd140cb172",
+      "effective_prompt_tokens_per_second": 3016.452434115325
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200",
+      "first_content_seconds": 5.005046835984103,
+      "finish_seconds": 9.990338744944893,
+      "observed_decode_tokens_per_second": 119.95285550383272,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 599,
+        "total_tokens": 17009,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "speculative",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "ebc0e8f387e6bde18c02b7478c89a9daf13d56e681cc8051ca34bcbd140cb172",
+      "effective_prompt_tokens_per_second": 3278.6905972625987
+    }
+  ],
+  "long_decode_candidate": [
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200",
+      "first_content_seconds": 4.8146240239730105,
+      "finish_seconds": 20.551891912007704,
+      "observed_decode_tokens_per_second": 37.99897188346583,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 599,
+        "total_tokens": 17009,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "target",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "ebc0e8f387e6bde18c02b7478c89a9daf13d56e681cc8051ca34bcbd140cb172",
+      "effective_prompt_tokens_per_second": 3408.3658284200824
+    },
+    {
+      "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200",
+      "first_content_seconds": 4.540840319939889,
+      "finish_seconds": 9.590798360994086,
+      "observed_decode_tokens_per_second": 118.41682547428957,
+      "usage": {
+        "prompt_tokens": 16410,
+        "completion_tokens": 599,
+        "total_tokens": 17009,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16410
+      },
+      "mode": "speculative",
+      "kind": "code",
+      "filler_tokens": 16384,
+      "prompt_sha256": "ebc0e8f387e6bde18c02b7478c89a9daf13d56e681cc8051ca34bcbd140cb172",
+      "effective_prompt_tokens_per_second": 3613.868544978308
+    }
+  ],
+  "quality_case_outputs_and_usage_preserved": 8,
+  "benchmark_outputs_and_usage_preserved": 8,
+  "component_log": "\nrunning 1 test\nlayer fixture official coordinator weights loaded in 1.769s\nPASS cancelled independent encoder: both batches revoked before owner reuse\nPASS independent encoder chunks 65+65+0: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready\nPASS independent encoder chunks 79+1+0: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready\nPASS independent encoder chunks 65+65+1: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready\nPASS independent encoder chunks 64+64+27: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready\ntest v41_target_pass::distributed_tests::real_target_prefill_commit_and_decode ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 767 filtered out; finished in 7.26s\n\n",
+  "profile": {
+    "scope": "C1 speculative 16k prefill; host wall-time traces, not additive GPU kernel costs. First code request includes cold initialization. Same native library and daemon; only chunk size changes.",
+    "source_commit": "d9f1c36",
+    "runs": {
+      "2048": [
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 5.022463127039373,
+            "finish_seconds": 5.611691830097698,
+            "observed_decode_tokens_per_second": 98.4337655293396,
+            "usage": {
+              "prompt_tokens": 16410,
+              "completion_tokens": 59,
+              "total_tokens": 16469,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16410
+            },
+            "mode": "speculative",
+            "kind": "code",
+            "filler_tokens": 16384,
+            "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+            "effective_prompt_tokens_per_second": 3267.3211499858876
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 2048,
+              "us": 1443598
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 1423211
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 730593
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 690621
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 2074,
+              "us": 497402
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 123705
+            }
+          ]
+        },
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 3.00009131396655,
+            "finish_seconds": 3.518652940983884,
+            "observed_decode_tokens_per_second": 111.84784407131077,
+            "usage": {
+              "prompt_tokens": 16410,
+              "completion_tokens": 59,
+              "total_tokens": 16469,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16410
+            },
+            "mode": "speculative",
+            "kind": "code",
+            "filler_tokens": 16384,
+            "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+            "effective_prompt_tokens_per_second": 5469.833509268634
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 2048,
+              "us": 547176
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 689459
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 563917
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 567462
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 2074,
+              "us": 495694
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 119558
+            }
+          ]
+        },
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 2.5429660349618644,
+            "finish_seconds": 3.05425835296046,
+            "observed_decode_tokens_per_second": 113.43804308861006,
+            "usage": {
+              "prompt_tokens": 16411,
+              "completion_tokens": 59,
+              "total_tokens": 16470,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16411
+            },
+            "mode": "speculative",
+            "kind": "repeated",
+            "filler_tokens": 16384,
+            "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+            "effective_prompt_tokens_per_second": 6453.487688932545
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 2048,
+              "us": 469420
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 617579
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 473780
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 476091
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 2075,
+              "us": 409415
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 82402
+            }
+          ]
+        },
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 2.465640918002464,
+            "finish_seconds": 2.9802277350099757,
+            "observed_decode_tokens_per_second": 112.71178756053,
+            "usage": {
+              "prompt_tokens": 16411,
+              "completion_tokens": 59,
+              "total_tokens": 16470,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16411
+            },
+            "mode": "speculative",
+            "kind": "repeated",
+            "filler_tokens": 16384,
+            "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+            "effective_prompt_tokens_per_second": 6655.875914525037
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 2048,
+              "us": 464172
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 568484
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 468231
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4096,
+              "us": 457440
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 2075,
+              "us": 410235
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 83071
+            }
+          ]
+        }
+      ],
+      "4096": [
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 6.74807679397054,
+            "finish_seconds": 7.278318085940555,
+            "observed_decode_tokens_per_second": 109.3841631693971,
+            "usage": {
+              "prompt_tokens": 16410,
+              "completion_tokens": 59,
+              "total_tokens": 16469,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16410
+            },
+            "mode": "speculative",
+            "kind": "code",
+            "filler_tokens": 16384,
+            "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+            "effective_prompt_tokens_per_second": 2431.8039792704294
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 4096,
+              "us": 2692254
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 8192,
+              "us": 2819813
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4122,
+              "us": 995438
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 124905
+            }
+          ]
+        },
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 3.4317845789482817,
+            "finish_seconds": 3.9516898340079933,
+            "observed_decode_tokens_per_second": 111.55878775131565,
+            "usage": {
+              "prompt_tokens": 16410,
+              "completion_tokens": 59,
+              "total_tokens": 16469,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16410
+            },
+            "mode": "speculative",
+            "kind": "code",
+            "filler_tokens": 16384,
+            "prompt_sha256": "3807f2145e9e568298c2cc7b947b952d6a60eba932a4e77f5fec1a1e2b29af2e",
+            "effective_prompt_tokens_per_second": 4781.768675302187
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 4096,
+              "us": 1152609
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 8192,
+              "us": 1227269
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4122,
+              "us": 917993
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 119350
+            }
+          ]
+        },
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 3.005154018988833,
+            "finish_seconds": 3.5165171429980546,
+            "observed_decode_tokens_per_second": 113.42233586431634,
+            "usage": {
+              "prompt_tokens": 16411,
+              "completion_tokens": 59,
+              "total_tokens": 16470,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16411
+            },
+            "mode": "speculative",
+            "kind": "repeated",
+            "filler_tokens": 16384,
+            "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+            "effective_prompt_tokens_per_second": 5460.951384289427
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 4096,
+              "us": 930654
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 8192,
+              "us": 1174941
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4123,
+              "us": 803747
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 82184
+            }
+          ]
+        },
+        {
+          "api": {
+            "text": "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20",
+            "first_content_seconds": 3.0015449470374733,
+            "finish_seconds": 3.5110557680018246,
+            "observed_decode_tokens_per_second": 113.83467752504919,
+            "usage": {
+              "prompt_tokens": 16411,
+              "completion_tokens": 59,
+              "total_tokens": 16470,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 16411
+            },
+            "mode": "speculative",
+            "kind": "repeated",
+            "filler_tokens": 16384,
+            "prompt_sha256": "c790295aa3d1cacf1a573a583097ba99759dabe418ab6dcf169c427012284347",
+            "effective_prompt_tokens_per_second": 5467.517658263844
+          },
+          "stages": [
+            {
+              "stage": "encoder step",
+              "rows": 4096,
+              "us": 947537
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 8192,
+              "us": 1129746
+            },
+            {
+              "stage": "encoder pair",
+              "rows": 4123,
+              "us": 828029
+            },
+            {
+              "stage": "decoder replay",
+              "rows": 128,
+              "us": 82888
+            }
+          ]
+        }
+      ]
+    },
+    "artifacts": {
+      "/tmp/ds41-head-reuse/profile/2048/server.log": "190081394cc907e6b81cbc999b354e953d3411c26516622436f8e1a4994edafa",
+      "/tmp/ds41-head-reuse/profile/2048/api.json": "b1df0e18133812f857e84eb83ac05e87ed7d43d34a69c77062113caa18a0456b",
+      "/tmp/ds41-head-reuse/profile/2048/api.log": "075fe6c684b24ec413d96e14ca1069cff4a166ee224a3e9e74e44b509552c566",
+      "/tmp/ds41-head-reuse/profile/2048/create-command.json": "0db8176d6d6da6b519295b807d6a6dd4d23c0045969a9f926a613200e968396e",
+      "/tmp/ds41-head-reuse/profile/4096/server.log": "987afe50df012bd5c6d1ef7e09f7493bf2cd71058dcfdc45e5afb611d689c547",
+      "/tmp/ds41-head-reuse/profile/4096/api.json": "16b796450b05f28aaf26cc75822229f0a569f7a071481ef254371562ee041669",
+      "/tmp/ds41-head-reuse/profile/4096/api.log": "efcfdaed6b27a92ff5ad7e3e9bc9989901be1a6e3cde3e0080fea32c90bb36b6",
+      "/tmp/ds41-head-reuse/profile/4096/create-command.json": "0923463b09977041053606af2e444ebb8ce6755a3616a95dbd2b6827ce663fbd"
+    }
+  },
+  "scope": "C1 counting after 16k code/repeated context. Existing quality failures persist; no broad decode or C16 claim."
+}

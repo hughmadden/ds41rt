@@ -426,9 +426,9 @@ fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
     requests.begin_encoder(lease, end)?;
     let mut chunks = tokens.chunks(chunk_rows);
-    // Process an odd leading chunk before entering reserved pair mode.
-    if chunks.len() % 2 != 0 {
-        let chunk = chunks.next().expect("odd chunk count");
+    // Keep the ordinary path for short prompts; pair full chunks first otherwise.
+    if chunks.len() == 1 {
+        let chunk = chunks.next().expect("one chunk");
         ensure!(!job.events.is_closed(), "client disconnected");
         let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
@@ -442,8 +442,9 @@ fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         result?;
         tracing::debug!(target: "ds41rt::timing", rows=chunk.len(), total_us=started.elapsed().as_micros() as u64, "target encoder step");
     }
-    while let Some(left) = chunks.next() {
-        let right = chunks.next().expect("even remaining chunks");
+    while chunks.len() >= 2 {
+        let left = chunks.next().expect("first paired chunk");
+        let right = chunks.next().expect("second paired chunk");
         ensure!(!job.events.is_closed(), "client disconnected");
         let mut first = requests.reserve_encoder(&[RequestTokens { lease, tokens: left,
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
@@ -461,6 +462,22 @@ fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         result?;
         tracing::debug!(target: "ds41rt::timing", rows=left.len()+right.len(),
             total_us=started.elapsed().as_micros() as u64, "target encoder pair");
+    }
+    if let Some(chunk) = chunks.next() {
+        ensure!(!job.events.is_closed(), "client disconnected");
+        let mut batch = requests.reserve_encoder(&[RequestTokens { lease, tokens: chunk,
+            image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+        let started = Instant::now();
+        let result = (|| -> Result<()> {
+            runtime.block_on(unsafe { pass.execute_reserved_encoder(requests, &mut batch,
+                transport, &mut suffix) })?;
+            ensure!(!job.events.is_closed(), "client disconnected");
+            pass.commit(requests, &mut batch, &[chunk.len() as u32])
+        })();
+        if result.is_err() { pass.discard(&mut batch)?; }
+        result?;
+        tracing::debug!(target: "ds41rt::timing", rows=chunk.len(),
+            total_us=started.elapsed().as_micros() as u64, "target encoder tail");
     }
     ensure!(!job.events.is_closed(), "client disconnected");
     let start = requests.begin_decoder_replay(lease)?;

@@ -192,8 +192,8 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             transport.reset_connections(); second_transport.reset_connections();
             eprintln!("PASS cancelled independent encoder: both batches revoked before owner reuse");
         }
-        for (left, right) in [(65usize, 65usize), (79, 1)] {
-            let tokens: Vec<u32> = (0..left + right).map(|i| ((i * 7919 + 17) % 129280) as u32).collect();
+        for (left, right, tail) in [(65usize, 65usize, 0usize), (79, 1, 0), (65, 65, 1), (64, 64, 27)] {
+            let tokens: Vec<u32> = (0..left + right + tail).map(|i| ((i * 7919 + 17) % 129280) as u32).collect();
             let mut expected = None;
             for paired in [false, true] {
                 let lease = requests.admit(0, 7000 + paired as u64)?;
@@ -204,13 +204,21 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                     let mut first = requests.reserve_encoder(&[RequestTokens { lease,
                         tokens: &tokens[..left], image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
                     let mut second = requests.reserve_encoder(&[RequestTokens { lease,
-                        tokens: &tokens[left..], image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+                        tokens: &tokens[left..left + right], image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
                     runtime.block_on(unsafe { pass.execute_encoder_pair(&mut other, &mut requests,
                         [&mut first, &mut second], [&mut transport, &mut second_transport], &mut suffix) })?;
                     pass.commit(&mut requests, &mut first, &[left as u32])?;
                     other.commit(&mut requests, &mut second, &[right as u32])?;
+                    if tail != 0 {
+                        let mut batch = requests.reserve_encoder(&[RequestTokens { lease,
+                            tokens: &tokens[left + right..], image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+                        runtime.block_on(unsafe { pass.execute_reserved_encoder(&mut requests,
+                            &mut batch, &mut transport, &mut suffix) })?;
+                        pass.commit(&mut requests, &mut batch, &[tail as u32])?;
+                    }
                 } else {
-                    for chunk in [&tokens[..left], &tokens[left..]] {
+                    for chunk in [&tokens[..left], &tokens[left..left + right], &tokens[left + right..]] {
+                        if chunk.is_empty() { continue; }
                         let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
                             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
                         runtime.block_on(unsafe { pass.execute_encoder(&requests, &mut batch,
@@ -224,13 +232,13 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                     let mut value = vec![0; buffer.bytes]; lib.copy_d2h(&mut value, buffer)?;
                     bytes.extend_from_slice(&value);
                 }
-                if let Some(expected) = &expected { assert!(&bytes == expected, "encoder pair differs at {left}+{right}"); }
+                if let Some(expected) = &expected { assert!(&bytes == expected, "encoder pair differs at {left}+{right}+{tail}"); }
                 else { expected = Some(bytes); }
                 assert_eq!(requests.cache().committed_end(lease)?, end);
                 assert_eq!(requests.begin_decoder_replay(lease)?, end.saturating_sub(128));
                 requests.release(lease)?;
             }
-            eprintln!("PASS independent encoder chunks {left}+{right}: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready");
+            eprintln!("PASS independent encoder chunks {left}+{right}+{tail}: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready");
         }
         return Ok(());
     }
