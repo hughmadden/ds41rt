@@ -1,0 +1,109 @@
+{
+  "scope": "DeepSeek Harness single-file WebGL Frogger agentic qualification",
+  "date": "2026-09-13",
+  "artifact": {
+    "path": "docs/frogger.html",
+    "bytes": 15763,
+    "sha256": "187d2e5a22e7477d59752b1e3982b98e6fa0a5df760f4b03cc2acceb8db6c185",
+    "play_url": "https://tpurtell.github.io/ds41rt/frogger.html"
+  },
+  "serving": {
+    "base_url": "http://127.0.0.1:8000/v1",
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+    "engine_revision": "d5fb015d00aa7b302e3ce179b097482da678db76",
+    "coordinator_image_id": "sha256:a13258e92dd25ddb889bd31bb77c8813c7881868b103ceec0c140e30e893c213",
+    "spark_image_id": "sha256:2f5d328a14f1a52a0d3b2356b041415d744635f3f3557e41403246429984093b",
+    "cache_format": "FP4 E2M1 values with group-16 E4M3 scales; FP8 SWA; independent FP4 index",
+    "dspark": true
+  },
+  "harness": {
+    "version": "0.1.5-rc.1",
+    "profile": "headless",
+    "filesystem": "workspace-write",
+    "approval": "never",
+    "thinking": "enabled",
+    "reasoning_effort": "high",
+    "context_window": 65536,
+    "successful_max_tokens": 32768
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "result": "failed",
+      "wall_seconds": 252.829825,
+      "max_tokens": 16384,
+      "model_steps": 2,
+      "tool_calls": {
+        "total": 1,
+        "bash": 1
+      },
+      "usage_sum": {
+        "input_tokens": 7465,
+        "output_tokens": 16517,
+        "cache_read_tokens": 7516,
+        "total_tokens": 31498
+      },
+      "turn_end_reason": "max-tokens",
+      "workspace_files": 0,
+      "note": "The model inspected the empty directory, then exhausted the response while designing the artifact before its first write."
+    },
+    {
+      "attempt": 2,
+      "result": "passed",
+      "wall_seconds": 433.1681251525879,
+      "max_tokens": 32768,
+      "model_steps": 15,
+      "tool_calls": {
+        "total": 16,
+        "write": 1,
+        "bash": 11,
+        "edit": 4
+      },
+      "seconds_to_first_write_from_session": 222.712,
+      "usage_sum": {
+        "input_tokens": 9072,
+        "output_tokens": 33469,
+        "cache_read_tokens": 486939,
+        "total_tokens": 529480
+      },
+      "final_step_usage": {
+        "input_tokens": 205,
+        "output_tokens": 320,
+        "cache_read_tokens": 42822,
+        "total_tokens": 43347
+      },
+      "turn_end_reason": "completed",
+      "workspace_files": 1,
+      "agent_logic_checks": {
+        "passed": 20,
+        "total": 20
+      }
+    }
+  ],
+  "independent_validation": {
+    "static_checks": {
+      "passed": 20,
+      "total": 20,
+      "record": "independent-static.json"
+    },
+    "javascript_parse": {
+      "tool": "Node.js --check",
+      "passed": true
+    },
+    "browser": {
+      "tool": "Google Chrome headless",
+      "viewport": "1280x900",
+      "webgl": "SwiftShader",
+      "exit_code": 0,
+      "stderr": "",
+      "screenshot_sha256": "94a7abd3927d55be6164ef9ec3ab9e32abb313b672c8fb7f54b977e3bd4ffa9c"
+    }
+  },
+  "first_attempt_is_retained": true,
+  "notes": [
+    "All aggregate usage fields are sums reported by the harness across model steps; cached context is therefore counted once per step in cache_read_tokens.",
+    "The successful run fixed swept platform overlap/carry and teleport wrap handling before its final checks.",
+    "The browser screenshot visibly contains the WebGL game board; a shader or program initialization exception would have prevented those draw calls."
+  ]
+}

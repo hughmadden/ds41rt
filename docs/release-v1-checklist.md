@@ -84,8 +84,7 @@ gate below is satisfied merely by an older component test.
   [Long-context retrieval](release-v1-needle.md) now passes fresh and exact-reuse
   checks through 1.04M source tokens in both target and dSpark modes.
   [Final tool evaluation](release-v1-tool-eval-final.md) completes three C16
-  hard-mode runs with thinking enabled at high effort. Broader prefix and final
-  performance qualification remain open.
+  hard-mode runs with thinking enabled at high effort.
   Track this work in order:
 
   1. Integrate architectural FP4 throughout compressed-cache serving and retention.
@@ -162,8 +161,11 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   records 119/34/153, 123/36/159, and 120/36/156 basic/hard/total points at C16.
 - [x] Startup time, including phase-level I/O and graph preparation evidence.
   See the [cold-cache startup qualification](release-v1-startup.md).
-- [ ] dsh generates a single-file WebGL Frogger game; retain execution metrics
-  and publish a playable link to the actual generated artifact.
+- [x] dsh generates a single-file WebGL Frogger game; retain execution metrics
+  and publish a playable link to the actual generated artifact. The
+  [agentic artifact report](release-v1-frogger.md) records one max-token failure,
+  the successful 15-step repair run, 20/20 agent and independent checks, and the
+  [playable generated game](https://tpurtell.github.io/ds41rt/frogger.html).
 
 ## Documentation and publication
 
@@ -189,12 +191,11 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 ## Current evidence and next action
 
-The 24-turn retention, native vision through sixteen images, Unicode,
-tool/schema correctness, architectural FP4 migration, long-context needle,
-three-run tool evaluation and clean standard launcher gates are complete at the
-current candidate revision. Next, close the corrected-FP4 prefix matrix and run
-the final performance suite on the exact clean-built image pair, followed by
-the README/reports, registry publication, branch/tag work and GitHub release.
+The implementation, corrected-FP4 prefix/performance suite, memory/startup,
+three-run tool evaluation, dsh artifact and clean standard launcher gates are
+complete on the exact clean-built candidate. Remaining work is the README and
+engineering report, registry publication and digest verification, then the
+release branch, main, tag and GitHub release.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running

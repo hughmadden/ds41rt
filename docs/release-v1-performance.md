@@ -91,6 +91,21 @@ Needle retrieval passes fresh and exact-reuse prompts at 32K, 128K, 512K, and 1.
 
 Three C16 tool-eval-bench hard campaigns run with thinking enabled, high effort, temperature 0, and eight extra turns. Scores are 119/34/153, 123/36/159, and 120/36/156 for basic/hard/total points. All 264 scenarios finish without serving failures. See [the tool-eval report](release-v1-tool-eval-final.md).
 
+## Agentic artifact generation
+
+DeepSeek Harness 0.1.5-rc.1 used this release service with thinking enabled at
+high effort to create a self-contained WebGL Frogger game. The passing run took
+433.17 seconds, 15 model steps and 16 tool calls; the first file write occurred
+at 222.7 seconds. The agent wrote one 15,763-byte HTML file, found and repaired
+two moving-platform defects, and passed its 20/20 logic simulation. Independent
+checks passed 20/20 plus JavaScript parsing, and Chrome rendered the exact file
+through WebGL without errors. **[Play Frogger](https://tpurtell.github.io/ds41rt/frogger.html)**
+or see the [complete execution report](release-v1-frogger.md).
+
+The initial 16,384-token attempt is retained as a failed qualification: it ended
+at the output limit after 252.83 seconds without writing a file. The passing
+retry used a 32,768-token allowance while retaining high-effort thinking.
+
 ## Memory and startup
 
 The default C16/24-turn cache reserves 22,471,251,456 bytes: 16.13 GB FP4 values, 2.02 GB E4M3 group-16 scales, 4.03 GB independent FP4 index keys, 0.25 GB index scales, 43.26 MB FP8 SWA, and small ownership metadata. The full warmed coordinator process uses 65,584 MiB. [Memory accounting](release-v1-memory.md) breaks down weights, execution arenas, vision, dSpark, retained tails, graph/runtime growth, and headroom.
