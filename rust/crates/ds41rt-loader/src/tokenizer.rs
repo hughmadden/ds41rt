@@ -56,6 +56,22 @@ impl StreamingTokenDecoder {
         )
         .map_err(|err| anyhow::anyhow!("stream-decoding tokenizer token {token_id}: {err}"))
     }
+
+    /// Flush the terminal suffix using the tokenizer's ordinary decode policy.
+    /// DecodeStream waits whenever the current text ends in U+FFFD: it may be
+    /// an incomplete UTF-8 scalar, or a literal replacement character. At EOS
+    /// or a token limit no later bytes can resolve that ambiguity.
+    pub fn finish(&mut self) -> Result<Option<String>> {
+        let decoded = self.tokenizer.tokenizer.decode(&self.ids, self.skip_special_tokens)
+            .map_err(|err| anyhow::anyhow!("finishing tokenizer stream: {err}"))?;
+        let remaining = decoded.strip_prefix(&self.prefix)
+            .ok_or_else(|| anyhow::anyhow!("terminal tokenizer stream prefix differs"))?;
+        let result = (!remaining.is_empty()).then(|| remaining.to_owned());
+        self.ids.clear();
+        self.prefix.clear();
+        self.prefix_index = 0;
+        Ok(result)
+    }
 }
 
 impl LoadedTokenizer {
@@ -163,3 +179,6 @@ pub fn streaming_token_decoder(
         prefix_index: 0,
     })
 }
+
+#[cfg(test)]
+mod tests;

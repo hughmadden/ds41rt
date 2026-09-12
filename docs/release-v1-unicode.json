@@ -1,0 +1,198 @@
+{
+  "scope": "Native terminal Unicode flushing, pinned-tokenizer cutoffs, API JSON/SSE and separate model instruction-following evidence",
+  "source_parent": "903fd360e259cfca3bc440a82f236e195f67c311",
+  "source_sha256": {
+    "rust/crates/ds41rt-loader/src/tokenizer.rs": "7115738a1e73806e11818d687916c138cd54c7431713484e6c5ab99d24b16b65",
+    "rust/crates/ds41rt-loader/src/tokenizer/tests.rs": "e6a4c09155cb07c6bb5c1596d6f54162d2e63f00066242cc71a46d6df11add29",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "ed225399ef881d5bb8c638be9d3cb67b1f69e9be580b2aef3af8fcc7866859fa",
+    "rust/crates/ds41rt-api/src/native_v41.rs": "35416e0f5510907748ee9e77c9b78ab5b0e34f662d1d10e019131e03fdf95d28",
+    "rust/crates/ds41rt-api/src/native_v41/unicode_tests.rs": "7db13cca2195e7d764ef9a07a057b54cdb009abc4a87a3a6965498d1c7759186",
+    "scripts/qualify-ds41-unicode.py": "aafe06cd60797c67b89b2ec12dda85babc750a4ba39f5c3a07e371f02e1b04a5"
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/ds41-native-unicode/daemon",
+      "sha256": "432e4a7fc78f771e1b1c1a8478a1faaa9b7034df9fb500bd82a673a8a83a8326",
+      "bytes": 30976184
+    },
+    {
+      "path": "/tmp/ds41-native-vision-serving/daemon",
+      "sha256": "fbc53433f79995f097d2ceaf7224b926e83b3c7bf986224422abcc09c8348521",
+      "bytes": 30979720
+    },
+    {
+      "path": "/tmp/ds41-native-vision-serving/cmake/libds41rt_native.so",
+      "sha256": "9c48be056b262ac519d3e7e6047eee51e6593c1a62b14267bbe21aa7694d9cba",
+      "bytes": 16774912
+    }
+  ],
+  "archive": {
+    "path": "docs/evidence/native-unicode.json.gz",
+    "sha256": "6a6f7ec7910c22110b2b05e8fae9d40201a46fd298eb7f4f87dcb8fd9d4a9e59",
+    "bytes": 82197,
+    "format": "gzip JSON mapping artifact filenames to complete text"
+  },
+  "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "spark_revision": "e53fd5a1f4a8380377fef91a5b3e69414f192223",
+  "hardware": "index, name, driver_version, power.limit [W], enforced.power.limit [W], clocks.current.memory [MHz], clocks.max.memory [MHz], memory.total [MiB], memory.used [MiB]\n0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 405 MHz, 14001 MHz, 97887 MiB, 73565 MiB\n1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 405 MHz, 14001 MHz, 97887 MiB, 88761 MiB\n",
+  "memory_speed": "standard settings, no overclock",
+  "launch_commands": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-unicode-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1",
+      "--entrypoint",
+      "/daemon",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "-v",
+      "/tmp/ds41-native-unicode/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-native-vision-serving/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18057",
+      "--prefill-batch-tokens",
+      "2048",
+      "--concurrency",
+      "16",
+      "--max-context-tokens",
+      "32768"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-unicode-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1",
+      "--entrypoint",
+      "/daemon",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "-v",
+      "/tmp/ds41-native-unicode/daemon:/daemon:ro",
+      "-v",
+      "/tmp/ds41-native-vision-serving/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18058",
+      "--prefill-batch-tokens",
+      "2048",
+      "--concurrency",
+      "2",
+      "--max-context-tokens",
+      "32768"
+    ]
+  ],
+  "validation": {
+    "official_roundtrip_strings": 157,
+    "official_token_cutoffs": 1045,
+    "native_api_tests": 10,
+    "live_cases_per_mode": 9,
+    "response_forms": [
+      "JSON",
+      "SSE"
+    ],
+    "complete_echoes_exact": true,
+    "replacement_character_preserved": true,
+    "truncated_emoji_uses_whole_decode_replacement": true,
+    "arithmetic_disabled_thinking_strict_answer": false,
+    "arithmetic_default_high_thinking_strict_answer": true,
+    "initial_fixture_failures_preserved": [
+      "stream_options with stream=false",
+      "newline adjoining </think> belongs to delimiter"
+    ]
+  },
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.438102816744504,
+            "first_content_seconds": 0.0016827929648570716,
+            "finish_seconds": 2.2402373674558476
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.29380792184268,
+            "first_content_seconds": 0.0014753510477021337,
+            "finish_seconds": 2.2477855545002967
+          }
+        },
+        "candidate_decode_ratio": 0.996599874044207
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 141.06481183858702,
+            "first_content_seconds": 0.0017157875117845833,
+            "finish_seconds": 0.674865510489326
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 141.692347978589,
+            "first_content_seconds": 0.0034169675782322884,
+            "finish_seconds": 0.673765589017421
+          }
+        },
+        "candidate_decode_ratio": 1.0044485661010913
+      }
+    ]
+  },
+  "remaining": "Native tool/schema constraints and API audit; long-context/pool-pressure cache qualification; native launch scripts; full release suite, reports and publication."
+}

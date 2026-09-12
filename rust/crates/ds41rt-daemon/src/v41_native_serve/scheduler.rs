@@ -35,6 +35,12 @@ impl Active {
                 }
             }
             if token == 1 || self.generated == self.job.max_tokens {
+                if let Some(content) = self.decoder.finish()? {
+                    self.job.events.blocking_send(Ok(InferenceChunk::Text {
+                        content, content_tokens: self.buffered,
+                    }))?;
+                    self.buffered = 0;
+                }
                 if self.buffered > 0 {
                     self.job.events.blocking_send(Ok(InferenceChunk::Text {
                         content: String::new(), content_tokens: self.buffered,

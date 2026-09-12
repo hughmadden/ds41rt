@@ -24,6 +24,8 @@ use tokio::sync::mpsc;
 pub const MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
 mod limits;
 mod images;
+#[cfg(test)]
+mod unicode_tests;
 pub use limits::{NativeLimits, MAX_CONTEXT_TOKENS, MAX_OUTPUT_TOKENS};
 pub struct NativeRequest {
     pub prompt: String,

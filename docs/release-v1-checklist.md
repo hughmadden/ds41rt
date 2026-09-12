@@ -25,8 +25,12 @@ gate below is satisfied merely by an older component test.
   correctness, before the full qualification campaign.
 - [x] Repeat tool-eval with thinking enabled at high effort (user correction);
   retain earlier thinking-disabled runs as cache diagnostics.
-- [ ] Resolve Unicode correctness, distinguishing tokenization, UTF-8 streaming,
+- [x] Resolve Unicode correctness, distinguishing tokenization, UTF-8 streaming,
   prompt rendering and model instruction-following failures.
+  [Unicode completion qualification](release-v1-unicode.md) fixes dropped terminal
+  U+FFFD/incomplete UTF-8, verifies 157 official-tokenizer strings and 1,045 token
+  cuts, and checks JSON/SSE in both modes. The historical arithmetic formatting
+  failure remains labeled model behavior; default high thinking returns `36`.
 - [x] Native vision accepts up to 16 images per prompt, with API validation,
   multi-image correctness and resource qualification.
   [Native preprocessing](release-v1-vision-preprocess.md) matches reference grids
