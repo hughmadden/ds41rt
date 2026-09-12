@@ -310,6 +310,22 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
                 let decision = ds41rt_core::verify_dspark_greedy(input,
                     selected, 1, request.job.max_tokens - request.generated)
                     .map_err(anyhow::Error::msg)?;
+                if let Some(confidence) = draft.as_deref()
+                    .and_then(|draft| draft.confidence_trace(request.id)) {
+                    // Agreement after the first mismatch is conditional on a
+                    // rejected history and must not be treated as acceptance.
+                    let matched = input.iter().skip(1).zip(selected.iter())
+                        .take_while(|(proposal, target)| proposal == target).count();
+                    tracing::debug!(target: "ds41rt::draft_policy",
+                        request_id=request.id, lane, generated=request.generated,
+                        context_tokens=requests.cache().committed_end(request.lease)?,
+                        verifier_rows=input.len(), lane_rows=inputs[lane].iter().map(Vec::len).sum::<usize>(),
+                        constrained=request.constraint.is_some(), raw_confidence=?confidence,
+                        matched_prefix=matched, accepted_inputs=decision.accepted_inputs,
+                        eos=decision.eos, length_limit=decision.length_limit,
+                        verify_us=executed_us-prepared_us,
+                        "native draft policy observation");
+                }
                 accepted_drafts += decision.accepted_inputs - 1;
                 emitted += decision.emitted.len();
                 let finishing = decision.emitted.contains(&1)

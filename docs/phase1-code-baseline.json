@@ -1,0 +1,33 @@
+{
+  "scope": "Initial uninstrumented C1 code baseline, standard published v1 service; three distinct nonce requests, not a complete Phase 1 baseline campaign.",
+  "image_revision": "9ea5c96468da690fe7dd01471d4fa2fb8555a606",
+  "controls": {
+    "temperature": 0,
+    "thinking": "disabled"
+  },
+  "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+  "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+  "raw_sha256": "b2aea390b595d43f55f8000d5af446ef8b6330f4cd9f9c73a65474cf14839c31",
+  "raw_file": "/tmp/ds41-phase1-code-baseline.json",
+  "samples": [
+    {
+      "tps": 115.62420621754241,
+      "cached_tokens": 0,
+      "completion_tokens": 214,
+      "passed": true
+    },
+    {
+      "tps": 123.50656227030075,
+      "cached_tokens": 0,
+      "completion_tokens": 214,
+      "passed": true
+    },
+    {
+      "tps": 120.75967339196976,
+      "cached_tokens": 0,
+      "completion_tokens": 214,
+      "passed": true
+    }
+  ],
+  "median_tps": 120.75967339196976
+}

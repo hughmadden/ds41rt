@@ -11,6 +11,8 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     requests: std::collections::BTreeMap<u64, DraftRequest>,
     captured: std::collections::BTreeSet<usize>,
     request_limit: usize,
+    // Diagnostic-only downloads; production proposal generation adds no copies.
+    confidence_trace: std::collections::BTreeMap<u64, Vec<f32>>,
 }
 struct DraftRequest {
     leases: [WindowLease; 3],
@@ -45,6 +47,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             requests: Default::default(),
             captured: Default::default(),
             request_limit: requests as usize,
+            confidence_trace: Default::default(),
         })
     }
     pub fn admit(&mut self, id: u64) -> Result<()> {
@@ -71,6 +74,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         Ok(())
     }
     pub fn release(&mut self, id: u64) -> Result<()> {
+        self.confidence_trace.remove(&id);
         let mut failure = None;
         if let Some(request) = self.requests.remove(&id) {
             for (window, lease) in self.windows.iter_mut().zip(request.leases) {
@@ -167,6 +171,9 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             ensure!(seen.insert(id) && self.requests.contains_key(&id), "invalid draft request identity");
             ensure!(anchor < 129280 && remaining > 0, "invalid draft request input");
         }
+        for &(id, _, _, _) in inputs {
+            self.confidence_trace.remove(&id);
+        }
         let active: Vec<_> = inputs.iter().enumerate()
             .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
         let mut outputs: Vec<_> = inputs.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect();
@@ -195,11 +202,27 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
         let packed: Vec<_> = bytes.chunks_exact(4)
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
+        if tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
+            let confidence = self.chain.draft_output()?[2];
+            ensure!(confidence.bytes == 5 * count * 4, "draft confidence extent differs");
+            let mut bytes = vec![0; confidence.bytes];
+            lib.copy_d2h(&mut bytes, confidence)?;
+            let values: Vec<_> = bytes.chunks_exact(4)
+                .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
+            for (row, &(_, &(id, _, _, _))) in active.iter().enumerate() {
+                self.confidence_trace.insert(id,
+                    (0..5).map(|step| values[step * count + row]).collect());
+            }
+        }
         for (row, &(output, &(_, anchor, _, remaining))) in active.iter().enumerate() {
             let tokens: Vec<_> = (0..6).map(|step| packed[step * count + row]).collect();
             ensure!(tokens[0] == anchor && tokens.iter().all(|&token| token < 129280), "invalid draft tokens");
             outputs[output] = tokens[..remaining.min(6)].to_vec();
         }
         Ok(outputs)
+    }
+
+    pub fn confidence_trace(&self, id: u64) -> Option<&[f32]> {
+        self.confidence_trace.get(&id).map(Vec::as_slice)
     }
 }
