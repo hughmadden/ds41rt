@@ -376,6 +376,22 @@ pub(crate) struct SchedulerRowAuditArgs {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn native_limits_default_to_model_maximum_and_allow_smaller_launches() {
+        use clap::Parser;
+        let base = ["ds41rt", "serve-native", "--snapshot", "/model", "--native-lib", "/native.so",
+            "--peers", "127.0.0.1:19441"];
+        let super::Commands::ServeNative(args) = super::Cli::try_parse_from(base).unwrap().command else {
+            panic!("expected native serving");
+        };
+        assert_eq!(args.max_context_tokens, 1_048_576);
+        assert_eq!(args.max_output_tokens, 393_216);
+        for (context, output, valid) in [("256", "128", true), ("0", "128", false),
+            ("1048577", "128", false), ("256", "0", false), ("256", "393217", false)] {
+            let command = base.into_iter().chain(["--max-context-tokens", context, "--max-output-tokens", output]);
+            assert_eq!(super::Cli::try_parse_from(command).is_ok(), valid);
+        }
+    }
     use super::*;
 
     #[test]
@@ -434,8 +450,12 @@ pub(crate) struct NativeServeArgs {
     pub prefill_batch_tokens: u32,
 
     /// Total prompt plus generated tokens; compressed cache is reserved at startup.
-    #[arg(long, default_value_t = 32768, value_parser = clap::value_parser!(u32).range(1..=1048576))]
+    #[arg(long, default_value_t = ds41rt_api::native_v41::MAX_CONTEXT_TOKENS, value_parser = clap::value_parser!(u32).range(1..=1048576))]
     pub max_context_tokens: u32,
+
+    /// Default and maximum generated tokens, further bounded by remaining context.
+    #[arg(long, default_value_t = ds41rt_api::native_v41::MAX_OUTPUT_TOKENS, value_parser = clap::value_parser!(u32).range(1..=393216))]
+    pub max_output_tokens: u32,
 
     /// Maximum retained prompt/turn states; zero disables native prefix reuse.
     #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(0..=16))]

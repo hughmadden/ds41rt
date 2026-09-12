@@ -22,9 +22,12 @@ gate below is satisfied merely by an older component test.
 - [ ] Native vision accepts up to 16 images per prompt, with API validation,
   multi-image correctness and resource qualification.
 - [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
-- [ ] Verify official maximum context/output limits. Default to those limits;
+- [x] Verify official maximum context/output limits. Default to those limits;
   clamp each output allowance to remaining context and the model output cap.
   Keep configurable smaller development storage reservations for side-by-side APIs.
+  [Native defaults and output clamping](release-v1-model-limits.md) now have
+  focused API/CLI and live target/dSpark verification; full-context qualification
+  remains part of the release suite.
 - [ ] Reserve 16 maximum-context requests plus eight additional 1M-context KV
   equivalents; support total memory percentage and MB/GB reservation options.
 - [ ] Measure and improve startup reads/transforms/exchange/capture. Aim for

@@ -71,6 +71,11 @@ Native requests default to thinking enabled at **high** effort. Set
 to disable reasoning explicitly. The pinned V4.1 encoder maps high to 75/100.
 See [reasoning controls and qualification](docs/release-v1-thinking.md).
 
+`serve-native` defaults to a 1,048,576-token context and a 393,216-token output
+maximum. Omitted output limits use the maximum; each request clamps to its
+remaining context. Use `--max-context-tokens` and `--max-output-tokens` for smaller
+development launches. See [limit behavior and verification](docs/release-v1-model-limits.md).
+
 The migration retains the OpenAI-compatible API, streaming, reasoning controls,
 tool calls, JSON/JSON Schema constraints, admission, continuous batching,
 prefix reuse, cancellation, metrics, health/readiness, and restart tooling.

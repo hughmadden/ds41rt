@@ -44,7 +44,10 @@ TC-43 calls search with an empty required query. TC-45 receives the adapter's
 HTTP 400 for forced tool choice with thinking enabled; the benchmark describes
 this as no tool calls, but the raw trace identifies an API rejection. TC-68 makes
 an unnecessary file-search call and adds prose around the requested JSON.
-These remain explicit tool/schema qualification issues. The previous
+The [official API reference](https://api-docs.deepseek.com/api/create-chat-completion/)
+confirms that forced tool choice returns HTTP 400 in thinking mode. TC-45
+therefore records an official compatibility restriction; TC-43 and TC-68 remain
+tool/schema qualification issues. The previous
 thinking-disabled results are separate diagnostics, not substitutes for this run.
 
 This initial rerun uses an explicit 4,096-token development output cap and does

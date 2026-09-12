@@ -22,6 +22,8 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
 pub const MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
+mod limits;
+pub use limits::{NativeLimits, MAX_CONTEXT_TOKENS, MAX_OUTPUT_TOKENS};
 pub struct NativeRequest {
     pub prompt: String,
     pub max_tokens: usize,
@@ -30,13 +32,21 @@ pub struct NativeRequest {
 #[derive(Clone)]
 struct NativeState {
     queue: mpsc::Sender<NativeRequest>,
+    limits: NativeLimits,
 }
 pub fn router(queue: mpsc::Sender<NativeRequest>) -> Router {
+    router_with_limits(queue, NativeLimits::default())
+}
+pub fn router_with_limits(queue: mpsc::Sender<NativeRequest>, limits: NativeLimits) -> Router {
     Router::new()
         .route("/health", get(health))
-        .route("/v1/models", get(|| async { Json(json!({"object":"list","data":[{"id":MODEL,"object":"model","owned_by":"deepseek-ai"}]})) }))
+        .route("/v1/models", get(models))
         .route("/v1/chat/completions", post(chat))
-        .with_state(NativeState { queue })
+        .with_state(NativeState { queue, limits })
+}
+async fn models(State(state): State<NativeState>) -> Json<Value> {
+    Json(json!({"object":"list","data":[{"id":MODEL,"object":"model","owned_by":"deepseek-ai",
+        "max_context_tokens":state.limits.context(),"max_output_tokens":state.limits.output()}]}))
 }
 async fn health(State(state): State<NativeState>) -> StatusCode {
     if state.queue.is_closed() {
@@ -73,10 +83,10 @@ async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Resp
             "native target sampling currently requires temperature=0",
         );
     }
-    let max_tokens = converted.inference_options.max_tokens.unwrap_or(128) as usize;
-    if !(1..=4096).contains(&max_tokens) {
-        return error(StatusCode::BAD_REQUEST, "max_tokens must be 1..4096");
-    }
+    let max_tokens = match state.limits.requested_output(converted.inference_options.max_tokens) {
+        Ok(limit) => limit,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e),
+    };
     let rendered = DeepseekV41Encoding::new().render_conversation(&converted.conversation);
     if !rendered.image_sources.is_empty() {
         return error(
@@ -168,6 +178,47 @@ mod tests {
     use tower::ServiceExt;
     fn request(stream: bool) -> axum::http::Request<Body> {
         axum::http::Request::post("/v1/chat/completions").header("content-type","application/json").body(Body::from(json!({"model":MODEL,"messages":[{"role":"user","content":"What is 2 + 2? Answer with just the number."}],"thinking":{"type":"disabled"},"temperature":0,"max_tokens":16,"stream":stream}).to_string())).unwrap()
+    }
+    #[tokio::test]
+    async fn output_limits_reach_worker_and_model_metadata() {
+        for (limits, requested, expected) in [
+            (NativeLimits::default(), None, 393_216),
+            (NativeLimits::default(), Some(8192), 8192),
+            (NativeLimits::default(), Some(u32::MAX), 393_216),
+            (NativeLimits::new(256, 128).unwrap(), None, 128),
+            (NativeLimits::new(256, 128).unwrap(), Some(8192), 128),
+            (NativeLimits::new(256, 128).unwrap(), Some(8), 8),
+        ] {
+            let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+            let app = router_with_limits(tx, limits);
+            let response = app.clone().oneshot(axum::http::Request::get("/v1/models")
+                .body(Body::empty()).unwrap()).await.unwrap();
+            let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+            let value: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(value["data"][0]["max_context_tokens"], limits.context());
+            assert_eq!(value["data"][0]["max_output_tokens"], limits.output());
+            let worker = tokio::spawn(async move {
+                let job = rx.recv().await.unwrap();
+                assert_eq!(job.max_tokens, expected);
+                job.events.send(Ok(InferenceChunk::Ready { system_fingerprint: None,
+                    prompt_usage: PromptUsage { prompt_tokens: 1, prompt_cache_hit_tokens: 0 } })).await.unwrap();
+                job.events.send(Ok(InferenceChunk::Finish {
+                    finish_reason: InferenceFinishReason::Length,
+                })).await.unwrap();
+            });
+            let body = json!({"model":MODEL,"messages":[{"role":"user","content":"Count."}],
+                "max_tokens":requested});
+            let response = app.oneshot(axum::http::Request::post("/v1/chat/completions")
+                .header("content-type", "application/json").body(Body::from(body.to_string())).unwrap()).await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            worker.await.unwrap();
+        }
+        let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+        let body = json!({"model":MODEL,"messages":[{"role":"user","content":"Count."}],"max_tokens":0});
+        let response = router(tx).oneshot(axum::http::Request::post("/v1/chat/completions")
+            .header("content-type", "application/json").body(Body::from(body.to_string())).unwrap()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert!(rx.try_recv().is_err());
     }
     #[tokio::test]
     async fn thinking_defaults_high_and_honors_explicit_overrides() {

@@ -31,6 +31,7 @@ use tokio::sync::{mpsc, oneshot};
 pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
     ensure!(args.peers.len() == 4, "four Spark peers required");
     let listen = args.listen.clone();
+    let limits = ds41rt_api::native_v41::NativeLimits::new(args.max_context_tokens, args.max_output_tokens)?;
     let (send, receive) = mpsc::channel(16);
     let (ready, readiness) = oneshot::channel();
     let worker_thread = std::thread::Builder::new()
@@ -55,7 +56,7 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
         .map_err(anyhow::Error::msg)?;
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     tracing::info!(%listen,"native V4.1 target API ready");
-    axum::serve(listener, ds41rt_api::native_v41::router(send))
+    axum::serve(listener, ds41rt_api::native_v41::router_with_limits(send, limits))
         .with_graceful_shutdown(async {
             let mut term =
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())

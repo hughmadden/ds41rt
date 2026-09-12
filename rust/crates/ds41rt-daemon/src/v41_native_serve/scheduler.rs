@@ -63,6 +63,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
     let mut id = 0u64;
     let mut closed = false;
     let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize);
+    let limits = ds41rt_api::native_v41::NativeLimits::new(args.max_context_tokens, args.max_output_tokens)?;
     loop {
         // This point is reached only after both complete stacks have drained and
         // committed. No cache owner is migrated or retired inside a layer stack.
@@ -90,7 +91,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
         // Admit available work at a completed boundary. Prefill currently owns
         // both lanes; mixed prefill/decode interleaving is a subsequent policy.
         while let Some(slot) = active.iter().position(Option::is_none) {
-            let job = if active.iter().all(Option::is_none) && !closed {
+            let mut job = if active.iter().all(Option::is_none) && !closed {
                 match receive.blocking_recv() { Some(job) => job, None => { closed = true; break; } }
             } else {
                 match receive.try_recv() {
@@ -106,8 +107,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             let events = job.events.clone();
             let result = (|| -> Result<Active> {
                 let prompt = ds41rt_loader::encode_tokenizer_text(&args.snapshot, &job.prompt, false)?.token_ids;
-                ensure!(!prompt.is_empty() && prompt.len().checked_add(job.max_tokens)
-                    .is_some_and(|n| n <= args.max_context_tokens as usize), "native text request exceeds context limit");
+                job.max_tokens = limits.output_for_prompt(prompt.len(), job.max_tokens)?;
                 let decoder = ds41rt_loader::streaming_token_decoder(&args.snapshot, false)?;
                 if let Some(draft) = draft.as_deref_mut() { draft.admit(id)?; }
                 let hit = prefixes.restore(&prompt, id, lease, requests, draft.as_deref_mut())?;
