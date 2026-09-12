@@ -65,8 +65,9 @@ matrix or measure pattern-schema compilation throughput. Both RTX GPUs use
 
 ## Remaining release work
 
-Broader high-thinking tool-eval qualification remains required before compressed
-FP4 migration. Complex regex anchors, some schema combinations and arbitrary
+The [broader high-thinking run](release-v1-tools-agentic-high.md) now completes
+with 159/176 points. Compressed FP4 integration is next. Complex regex anchors,
+some schema combinations and arbitrary
 dynamic-name duplicate prevention remain outside this grammar qualification;
 independent completed-argument validation remains enabled. The full release
 performance suite and its three final tool-eval runs still follow FP4 migration.

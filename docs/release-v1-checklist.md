@@ -57,8 +57,10 @@ gate below is satisfied merely by an older component test.
   this gate open. [Additional-name exclusions](release-v1-tool-exclusions.md)
   prevent additional arguments from bypassing declared value constraints.
   [Pattern intersections](release-v1-tool-patterns.md) apply all matching regular
-  value constraints and preserve native admission errors. Broader high-thinking
-  tool evaluation and remaining unsupported schema combinations keep this gate open.
+  value constraints and preserve native admission errors. The broader
+  [high-thinking agentic run](release-v1-tools-agentic-high.md) now scores
+  124/138 basic and 35/38 hard. Remaining schema limitations and final
+  qualification on the corrected FP4 serving build keep the release gate open.
 - [ ] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
   scales; retain FP8 SWA and the independent FP4 index format. The previous
   FP8-only interpretation was incorrect (user clarification September 12).
