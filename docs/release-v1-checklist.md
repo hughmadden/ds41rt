@@ -76,6 +76,8 @@ gate below is satisfied merely by an older component test.
   covers the original standalone packer. [Serving integration evidence](release-v1-compressed-serving.md)
   now covers mixed attention, storage, retention and initial paired decode; the
   broader performance and subsequent quality gates remain open.
+  [Long-context retrieval](release-v1-needle.md) now passes fresh and exact-reuse
+  checks through 1.04M source tokens in both target and dSpark modes.
   Track this work in order:
 
   1. Integrate architectural FP4 throughout compressed-cache serving and retention.
@@ -128,7 +130,10 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   added 1K, 2K, 4K, 8K, 16K, 32K tokens.
 - [ ] dSpark decode on retained prefixes for all eight types at base contexts
   0, 32K, 64K, 128K, 256K; prove cache reuse in measurement evidence.
-- [ ] Needle retrieval through 1M tokens.
+- [x] Needle retrieval through 1M tokens. The corrected FP4 candidate retrieves
+  every deterministic needle from fresh 32K, 128K, 512K, and 1.04M source
+  contexts and repeats each with a full prompt-cache hit in target and dSpark
+  modes; see the [preserved evidence](release-v1-needle.md).
 - [ ] Concurrency scaling through C16, reporting aggregate tokens per second.
 - [ ] Three tool-eval-bench hard-mode runs at the measured best concurrency,
   with thinking enabled at high effort and sufficient timeout; points split

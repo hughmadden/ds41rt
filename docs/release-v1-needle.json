@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "candidate": "corrected FP4 compressed source cache",
+  "thinking": true,
+  "reasoning_effort": "high",
+  "temperature": 0,
+  "cases": [
+    {"source_tokens": 32768, "needle_position": 0.1, "prompt_tokens": 32878, "target_cold_seconds": 6.057, "target_exact_seconds": 1.592, "dspark_cold_seconds": 7.145, "dspark_exact_seconds": 1.005},
+    {"source_tokens": 131072, "needle_position": 0.5, "prompt_tokens": 131181, "target_cold_seconds": 20.859, "target_exact_seconds": 2.070, "dspark_cold_seconds": 19.518, "dspark_exact_seconds": 1.047},
+    {"source_tokens": 524288, "needle_position": 0.9, "prompt_tokens": 524396, "target_cold_seconds": 111.558, "target_exact_seconds": 3.280, "dspark_cold_seconds": 112.464, "dspark_exact_seconds": 1.712},
+    {"source_tokens": 1040000, "needle_position": 0.5, "prompt_tokens": 1040110, "target_cold_seconds": 322.567, "target_exact_seconds": 5.190, "dspark_cold_seconds": 323.552, "dspark_exact_seconds": 3.201}
+  ],
+  "assertions": {
+    "exact_retrievals": 16,
+    "cold_cached_tokens": 0,
+    "exact_cached_tokens_equal_prompt_tokens": true,
+    "target_fingerprint": "ds41rt-native-fp4-kv",
+    "dspark_fingerprint": "ds41rt-native-fp4-kv-dspark"
+  },
+  "raw_sha256": {
+    "failed-prefix-collision.json": "c5ce99e1cdf15aa7207eb548b5c5344cb2d342a3ca96373919dbd71003bfb565",
+    "smoke.json": "9bae5edfecb9ec2fab44f08dc1e5eaa05d419c9f010c224954551b20adb1a1c6",
+    "completed.json": "0a2580e1d053d2017569c59807f3309b38f99d5fed8abfbf062e205894328e2e"
+  },
+  "evidence_archive_sha256": "442888c23a134ac4987fb1dc3799ec5d30e31122b807f82fe8ddee5ab3643f2e",
+  "artifact_sha256": {
+    "daemon": "1da2bfd1f6913ce13fc21e23fb46b58e2603f9f9d31eca4b1ee615f4166dece3",
+    "native_library": "289139172e7e1d6643dae673e0f3ecdbbc60db6be8c64373e6bf4ba2d228f51d"
+  },
+  "passed": true
+}
