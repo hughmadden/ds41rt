@@ -6,7 +6,9 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
-- [ ] Qualify and compare [RTX dSpark fused expert slices](docs/ds41-draft-expert-slice-geometry.md) against the current persistent kernel on official weights. The geometry extension passes 26 component cases and grouped memcheck. [Official-weight comparison](docs/ds41-draft-expert-slice-comparison.md) passes 108 checks across all three stages; five dispersed rows improve about 1.17 ms to 0.19 ms per expert stage in the composed graph. Native export, live routing and serving selection remain open.
+- [x] Export and deploy [native RTX dSpark expert slices](docs/ds41-draft-native-slices.md). Official native/replay checks, memcheck, full-model lanes, concurrent recovery and eight paired prompts pass; the inherited Unicode failure remains. Warm counting improves 133.8→146.2 C1 TPS, 329.7→370.6 C6 aggregate and 634.2→691.2 C16 aggregate. N192 is selected in development; live-routing tiling comparison and release-default policy wiring remain open.
+
+- [ ] Select final RTX draft tiling from live routing and wire the measured backend into release planner/defaults. [Native N192](docs/ds41-draft-native-slices.md) is selected in development; N64 remains promising for shared small-row routing.
 
 - [x] Parallelize [dSpark vocabulary adjustment and sampling](docs/ds41-draft-sampling.md) without extra allocation or ABI changes. Two hundred exact cases, graph reuse, racecheck, memcheck, full-model lanes and concurrent API recovery pass. Warm counting improves 131.2→133.9 C1 TPS, 323.3→326.8 C6 aggregate and 629.1→632.6 C16 aggregate. Both live API modes pass rollout checks. The [dSpark graph profile](docs/ds41-dspark-node-profile.md) identifies local routed experts as the largest remaining draft-side kernel cost.
 

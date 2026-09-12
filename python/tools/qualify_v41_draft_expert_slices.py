@@ -28,10 +28,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--snapshot', type=Path, required=True)
     ap.add_argument('--native-lib', type=Path, required=True)
+    ap.add_argument('--candidate-lib', type=Path, help='Also check and time the exported native slice pipeline')
+    ap.add_argument('--candidate-width', type=int, choices=[64, 128, 192], default=192)
+    ap.add_argument('--rows', type=int, nargs='+', default=[5, 15, 40])
     ap.add_argument('--stage', type=int, choices=range(3), default=0)
     ap.add_argument('--output', type=Path, required=True)
     ap.add_argument('--no-timing', action='store_true')
     opt = ap.parse_args()
+    if any(row < 1 or row > 80 for row in opt.rows):
+        ap.error("rows must be between 1 and 80")
     torch.manual_seed(410123)
     capacity, experts, topk, h, n = 80, 128, 3, 5120, 2304
     records = []
@@ -83,6 +88,10 @@ def main():
     ids = torch.empty(capacity, topk, dtype=torch.int32, device='cuda')
     routing = torch.empty(capacity, topk, device='cuda')
     native = Native(lib, capacity, weights, x, ids, routing, coordinator=True)
+    candidate = None
+    if opt.candidate_lib:
+        candidate = Native(library(str(opt.candidate_lib)), capacity, weights, x, ids, routing, coordinator=True)
+        emit('candidate_source', width=opt.candidate_width, native_sha256=hashlib.sha256(opt.candidate_lib.read_bytes()).hexdigest())
     routes = capacity * topk
     meta = torch.empty(routes, 19, dtype=torch.int32, device='cuda')
     live = torch.empty(1, dtype=torch.int32, device='cuda')
@@ -109,11 +118,13 @@ def main():
         variants[width] = (partial, out, args, fn, ra, reducer)
     shared = torch.zeros(capacity, h, device='cuda', dtype=torch.bfloat16)
     outputs = {arm: torch.empty_like(shared) for arm in ('native', 64, 128, 192)}
+    if candidate is not None:
+        outputs['candidate'] = torch.empty_like(shared)
     def finish(route_output, out, rows):
         check(lib.ds41rt_v41_reduce_routes_async((P*4)(route_output.data_ptr(), None, None, None),
               shared.data_ptr(), out.data_ptr(), rows, 1, topk, torch.cuda.current_stream().cuda_stream))
     for case in ('shared', 'dispersed'):
-        for rows in (5, 15, 40):
+        for rows in opt.rows:
             live.fill_(rows)
             def populate(seed):
                 torch.manual_seed(seed)
@@ -130,6 +141,8 @@ def main():
                 def run():
                     if arm == 'native':
                         native.run(rows); result = native.output
+                    elif arm == 'candidate':
+                        candidate.run(rows); result = candidate.output
                     else:
                         partial, result, args, fn, ra, reducer = variants[arm]
                         check(lib.ds41rt_v41_expert_input_quantize_async(quant, x.data_ptr(), wire.data_ptr(), rows,
@@ -152,14 +165,18 @@ def main():
                 torch.cuda.synchronize()
                 ref = outputs['native'][:rows].float()
                 assert torch.isfinite(ref).all() and ref.norm() > 0
-                for arm in variants:
+                for arm in outputs:
+                    if arm == 'native':
+                        continue
                     actual = outputs[arm][:rows].float()
                     rel = ((actual-ref).norm()/ref.norm()).item()
                     cosine = torch.nn.functional.cosine_similarity(actual.flatten(), ref.flatten(), dim=0).item()
                     native_routes = native.output[:rows*topk]
-                    candidate_routes = variants[arm][1][:rows*topk]
+                    candidate_routes = (candidate.output if arm == 'candidate' else variants[arm][1])[:rows*topk]
                     route_rel = ((candidate_routes-native_routes).norm()/native_routes.norm()).item()
                     assert torch.isfinite(candidate_routes).all() and route_rel < 1e-5
+                    if arm == 'candidate':
+                        assert torch.equal(candidate_routes, variants[opt.candidate_width][1][:rows*topk]), 'native/composed route mismatch'
                     assert bool((outputs[arm][rows:] == 12345).all())
                     emit('check', route_rel_l2=route_rel, case=case, rows=rows, seed=seed, width=arm,
                          rel_l2=rel, cosine=cosine, mismatches=int((actual != ref).sum()))
