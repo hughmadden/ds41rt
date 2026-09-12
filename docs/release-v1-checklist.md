@@ -10,10 +10,10 @@ gate below is satisfied merely by an older component test.
 - [ ] Token radix, compression block ownership and bounded SWA replay follow
   the official model's cache semantics; verify cold, partial, exact and divergent
   prefix reuse against uncached execution, including eviction and concurrency.
-- [ ] Retain populated last-turn SWAs for fast exact agentic continuation,
+- [x] Retain populated last-turn SWAs for fast exact agentic continuation,
   bounded by concurrent request capacity and invalidated with radix branches.
 - [ ] Measure reuse performance and expose one exact KV pool sizing option.
-- [ ] Run an initial tool-eval-bench and basic dsh agentic task after prefix
+- [x] Run an initial tool-eval-bench and basic dsh agentic task after prefix
   correctness, before the full qualification campaign.
 - [ ] Resolve Unicode correctness, distinguishing tokenization, UTF-8 streaming,
   prompt rendering and model instruction-following failures.
@@ -97,6 +97,12 @@ pressure and controlled short-context decode. Bounded replay for arbitrary
 partial hits, final pool sizing and the full release qualification remain open.
 [Retained-state component evidence](release-v1-retained-state.json) remains
 separate from these API results.
+
+[Initial agentic qualification](release-v1-initial-agentic.md) records 123/138
+basic and 32/38 hard points (155/176 total) from one C16 tool-eval-bench run.
+A real dsh coding task passed independent file/test checks and reused complete
+committed turns across five tool continuations. This satisfies the initial
+agentic check, not the five final release runs or arbitrary partial-prefix reuse.
 
 [Initial paired quality evidence](release-v1-initial-quality.json) records eight
 cases per mode against the existing development artifacts. Both modes pass five

@@ -1,0 +1,141 @@
+{
+  "scope": "Initial agentic correctness check, before remaining cache/vision/limits integration. Does not count toward five final release runs.",
+  "source_commit": "0d5ae55",
+  "documentation_commit": "fa6bebf",
+  "artifact_provenance": "release-v1-native-admission.json",
+  "endpoint": "http://127.0.0.1:18044",
+  "mode": "dSpark greedy, retained frontiers enabled",
+  "tool_eval": {
+    "version": "2.6.1.dev45+gcf54b4bfe",
+    "run_id": "2026-09-12T06-01-06.640869Z_3c3e44fa",
+    "scenarios": 88,
+    "concurrency": 16,
+    "timeout_seconds": 600,
+    "max_turns": 12,
+    "thinking": false,
+    "basic_points": 123,
+    "basic_max": 138,
+    "hard_points": 32,
+    "hard_max": 38,
+    "total_points": 155,
+    "total_max": 176,
+    "statuses": {
+      "pass": 70,
+      "partial": 15,
+      "fail": 3
+    },
+    "structured_output_points": 12,
+    "structured_output_max": 12,
+    "backend_label_note": "vllm is the benchmark compatibility label; both tested servers are ds41rt serve-native. The tool rejects an arbitrary ds41rt label."
+  },
+  "failure_comparison": {
+    "concurrency": 3,
+    "results": {
+      "uncached-failures": [
+        {
+          "scenario_id": "TC-61",
+          "status": "fail",
+          "points": 0,
+          "summary": "Did not attempt to run the analysis script."
+        },
+        {
+          "scenario_id": "TC-71",
+          "status": "pass",
+          "points": 2,
+          "summary": "Looked up contacts, found 3 Jordans, and asked for clarification."
+        },
+        {
+          "scenario_id": "TC-88",
+          "status": "fail",
+          "points": 0,
+          "summary": "Returned extra text or a value that was not exactly 20 digits."
+        }
+      ],
+      "candidate-failures-repeat": [
+        {
+          "scenario_id": "TC-61",
+          "status": "fail",
+          "points": 0,
+          "summary": "Did not attempt to run the analysis script."
+        },
+        {
+          "scenario_id": "TC-71",
+          "status": "pass",
+          "points": 2,
+          "summary": "Looked up contacts, found 3 Jordans, and asked for clarification."
+        },
+        {
+          "scenario_id": "TC-88",
+          "status": "fail",
+          "points": 0,
+          "summary": "Returned extra text or a value that was not exactly 20 digits."
+        }
+      ]
+    },
+    "interpretation": "The same three-case verdicts in uncached and candidate C3 checks: TC-61/88 fail, TC-71 pass. This does not replace the original C16 score or establish exact numerical parity."
+  },
+  "dsh": {
+    "version": "0.1.5-rc.1",
+    "exit_code": 0,
+    "wall_seconds": 20.84249672095757,
+    "main_model_steps": 6,
+    "local_tool_calls": 8,
+    "scope": "One isolated coding task; six main model steps, eight real local tool calls. Includes harness overhead and a separate title request. Not release performance or comprehensive Unicode qualification.",
+    "steps": [
+      {
+        "step": 1,
+        "uncached_input_tokens": 7249,
+        "cached_tokens": 0,
+        "output_tokens": 123,
+        "step_to_first_stream_event_ms": 1686,
+        "step_wall_ms": 2711
+      },
+      {
+        "step": 2,
+        "uncached_input_tokens": 238,
+        "cached_tokens": 7372,
+        "output_tokens": 869,
+        "step_to_first_stream_event_ms": 291,
+        "step_wall_ms": 7976
+      },
+      {
+        "step": 3,
+        "uncached_input_tokens": 92,
+        "cached_tokens": 8479,
+        "output_tokens": 104,
+        "step_to_first_stream_event_ms": 184,
+        "step_wall_ms": 1075
+      },
+      {
+        "step": 4,
+        "uncached_input_tokens": 131,
+        "cached_tokens": 8675,
+        "output_tokens": 89,
+        "step_to_first_stream_event_ms": 322,
+        "step_wall_ms": 905
+      },
+      {
+        "step": 5,
+        "uncached_input_tokens": 169,
+        "cached_tokens": 8894,
+        "output_tokens": 219,
+        "step_to_first_stream_event_ms": 335,
+        "step_wall_ms": 2146
+      },
+      {
+        "step": 6,
+        "uncached_input_tokens": 183,
+        "cached_tokens": 9282,
+        "output_tokens": 435,
+        "step_to_first_stream_event_ms": 249,
+        "step_wall_ms": 5089
+      }
+    ],
+    "full_turn_frontier_reuse": true,
+    "independent_validation": "Generated tests pass; JSON totals and UTF-8 bytes checked independently; additional NFC/emoji case passes."
+  },
+  "raw_archive": {
+    "path": "docs/evidence/native-initial-agentic.json.gz",
+    "sha256": "7b29c620cfab3726be24e29dc391b0d42af4458ae2cd8423cd4c79dfa5b067a3"
+  }
+}
