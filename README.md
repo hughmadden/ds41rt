@@ -100,9 +100,9 @@ Edit [`ds41rt.config`](ds41rt.config) for the deployment. At minimum, verify the
 To use the published images, pull the coordinator image locally and the Spark image on each worker:
 
 ```bash
-docker pull ghcr.io/tpurtell/ds41rt-coordinator:v3
+docker pull ghcr.io/tpurtell/ds41rt-coordinator:v1
 for host in ostrich dodo emu kiwi; do
-  ssh "$host" docker pull ghcr.io/tpurtell/ds41rt-spark-expert:v3
+  ssh "$host" docker pull ghcr.io/tpurtell/ds41rt-spark-expert:v1
 done
 ./run.sh --dry-run
 ./run.sh
