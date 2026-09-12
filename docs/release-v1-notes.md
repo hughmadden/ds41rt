@@ -15,7 +15,7 @@ DS41RT v3 is the first public release of the DeepSeek V4.1 runtime. It serves th
 
 The release candidate reaches 2,668 prompt tok/s at its best median prefill cell and 683.70 aggregate decode tok/s at C16. Measurements use a 400 W RTX power limit and standard memory speed with no memory overclock.
 
-Read the [README](https://github.com/tpurtell/ds41rt/blob/v3/README.md), [engineering report](https://github.com/tpurtell/ds41rt/blob/v3/docs/ENGINEERING.md), [performance report](https://github.com/tpurtell/ds41rt/blob/v3/docs/release-v1-performance.md), and [release checklist](https://github.com/tpurtell/ds41rt/blob/v3/docs/release-v1-checklist.md). The agentic qualification also produced a [playable single-file WebGL Frogger](https://tpurtell.github.io/ds41rt/frogger.html).
+Read the [README](https://github.com/tpurtell/ds41rt/blob/v3/README.md), [engineering report](https://github.com/tpurtell/ds41rt/blob/v3/docs/ENGINEERING.md), [performance report](https://github.com/tpurtell/ds41rt/blob/v3/docs/release-v1-performance.md), and [completed release checklist](https://github.com/tpurtell/ds41rt/blob/main/docs/release-v1-checklist.md). The agentic qualification also produced a [playable single-file WebGL Frogger](https://tpurtell.github.io/ds41rt/frogger.html).
 
 Container images:
 

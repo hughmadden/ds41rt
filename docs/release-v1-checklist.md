@@ -184,14 +184,14 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   The [v3 build and registry report](release-v1-build-run.md) records clean-tag
   rebuilding, standard launch, a matched no-regression canary, v3/`latest`
   identity, registry manifests and native-host pull-by-digest verification.
-- [ ] After documentation and image gates, advance main to qualified dev and
-  create release/vX for the chosen numbered release.
-- [ ] Publish a formal first-release package on GitHub with qualified artifacts
+- [x] After documentation and image gates, advance main to qualified dev and
+  create `release/v3` for the chosen numbered release.
+- [x] Publish a formal first-release package on GitHub with qualified artifacts
   and container references. Release notes: a short high-level overview and
   bulleted key features, linking detailed reports (user addition September 12).
-  [Draft feature notes](release-v1-notes.md) are prepared; final artifact/report
-  references and actual GitHub publication remain pending.
-- [ ] Tell the user to make the images public manually after all other work.
+  The [v3 release](https://github.com/tpurtell/ds41rt/releases/tag/v3) and
+  [publication record](release-v1-publication.md) preserve the final state.
+- [ ] Repository owner action after handoff: make both GHCR packages public.
 
 ## Evidence and audit trail
 
@@ -201,8 +201,9 @@ report and clean standard launcher gates are complete. The release is numbered
 v3 because local repository history already contains the DS4RT v1 and v2 tags.
 The final v3 images have also passed clean-tag rebuild, standard launch,
 performance equivalence, registry publication and pull-by-digest verification.
-Remaining work is advancing main and `release/v3`, creating the v3 tag and
-formal GitHub release, then recording those publication results.
+The qualified source is now on `main`, `release/v3` and tag `v3`; the formal
+GitHub release and main-backed Pages deployment are public. The sole remaining
+owner action is changing both GHCR packages from private to public.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
