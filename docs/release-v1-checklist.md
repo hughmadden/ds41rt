@@ -15,6 +15,8 @@ gate below is satisfied merely by an older component test.
 - [ ] Measure reuse performance and expose one exact KV pool sizing option.
 - [x] Run an initial tool-eval-bench and basic dsh agentic task after prefix
   correctness, before the full qualification campaign.
+- [ ] Repeat tool-eval with thinking enabled at high effort (user correction);
+  retain earlier thinking-disabled runs as cache diagnostics.
 - [ ] Resolve Unicode correctness, distinguishing tokenization, UTF-8 streaming,
   prompt rendering and model instruction-following failures.
 - [ ] Native vision accepts up to 16 images per prompt, with API validation,
@@ -50,7 +52,8 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 - [ ] Needle retrieval through 1M tokens.
 - [ ] Concurrency scaling through C16, reporting aggregate tokens per second.
 - [ ] Five tool-eval-bench hard-mode runs at the measured best concurrency,
-  with sufficient timeout; points split into basic, hard and total scores.
+  with thinking enabled at high effort and sufficient timeout; points split
+  into basic, hard and total scores.
 - [ ] Startup time, including phase-level I/O and graph preparation evidence.
 - [ ] dsh generates a single-file WebGL Frogger game; retain execution metrics
   and publish a playable link to the actual generated artifact.

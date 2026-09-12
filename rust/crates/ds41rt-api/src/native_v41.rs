@@ -58,7 +58,9 @@ async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Resp
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
     let include_usage = parsed.include_usage();
-    let converted = match parsed.convert(ConversionOptions::default()) {
+    // Native serving defaults to thinking at the adapter's high effort. Explicit
+    // thinking/effort settings retain the official conversion precedence.
+    let converted = match parsed.convert(ConversionOptions::default().with_default_thinking_mode(true)) {
         Ok(r) => r,
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
@@ -166,6 +168,53 @@ mod tests {
     use tower::ServiceExt;
     fn request(stream: bool) -> axum::http::Request<Body> {
         axum::http::Request::post("/v1/chat/completions").header("content-type","application/json").body(Body::from(json!({"model":MODEL,"messages":[{"role":"user","content":"What is 2 + 2? Answer with just the number."}],"thinking":{"type":"disabled"},"temperature":0,"max_tokens":16,"stream":stream}).to_string())).unwrap()
+    }
+    #[tokio::test]
+    async fn thinking_defaults_high_and_honors_explicit_overrides() {
+        for (options, score) in [
+            (json!({}), Some(75)),
+            (json!({"thinking":{"type":"enabled"}}), Some(75)),
+            (json!({"reasoning_effort":"low"}), Some(50)),
+            (json!({"reasoning_effort":"high"}), Some(75)),
+            (json!({"reasoning_effort":"max"}), Some(100)),
+            (json!({"reasoning_effort":"none"}), None),
+            (json!({"thinking":{"type":"disabled"},"reasoning_effort":"max"}), None),
+        ] {
+            let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+            let worker = tokio::spawn(async move {
+                let job = rx.recv().await.unwrap();
+                if let Some(score) = score {
+                    assert!(job.prompt.contains(&format!("Reasoning Effort: {score} (range 1-100")));
+                    assert!(job.prompt.ends_with("<think>"));
+                } else {
+                    assert!(!job.prompt.contains("Reasoning Effort:"));
+                    assert!(job.prompt.ends_with("</think>"));
+                }
+                job.events.send(Ok(InferenceChunk::Ready { system_fingerprint: None,
+                    prompt_usage: PromptUsage { prompt_tokens: 1, prompt_cache_hit_tokens: 0 } })).await.unwrap();
+                job.events.send(Ok(InferenceChunk::Text {
+                    content: if score.is_some() { "Compute. </think>4" } else { "4" }.into(),
+                    content_tokens: 1,
+                })).await.unwrap();
+                job.events.send(Ok(InferenceChunk::Finish {
+                    finish_reason: InferenceFinishReason::Stop,
+                })).await.unwrap();
+            });
+            let mut body = json!({"model":MODEL,"messages":[{"role":"user","content":"2+2?"}],
+                "max_tokens":16,"stream":false});
+            body.as_object_mut().unwrap().extend(options.as_object().unwrap().clone());
+            let request = axum::http::Request::post("/v1/chat/completions")
+                .header("content-type", "application/json").body(Body::from(body.to_string())).unwrap();
+            let response = router(tx).oneshot(request).await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+            let value: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(value["choices"][0]["message"]["content"], "4");
+            if score.is_some() {
+                assert_eq!(value["choices"][0]["message"]["reasoning_content"], "Compute. ");
+            }
+            worker.await.unwrap();
+        }
     }
     #[tokio::test]
     async fn official_prompt_and_both_response_modes() {

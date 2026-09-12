@@ -1,0 +1,143 @@
+{
+  "scope": "Native high-effort default and overrides; tool-eval results recorded separately after completion.",
+  "live_artifact_provenance": "release-v1-exact-suffix.json",
+  "api_source_sha256": "cc0e70799bb38af489b4e13266113ed7b9a712694526df777a8316cfede37040",
+  "tests": "   Compiling ds41rt-transport v0.1.0 (/home/tj/Developer/ds41rt/rust/crates/ds41rt-transport)\n   Compiling ds41rt-loader v0.1.0 (/home/tj/Developer/ds41rt/rust/crates/ds41rt-loader)\n   Compiling ds41rt-api v0.1.0 (/home/tj/Developer/ds41rt/rust/crates/ds41rt-api)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.10s\n     Running unittests src/lib.rs (rust/target/debug/deps/ds41rt_api-5933d8ca0b95daed)\n\nrunning 3 tests\ntest native_v41::tests::worker_error_and_missing_finish_are_not_success ... ok\ntest native_v41::tests::official_prompt_and_both_response_modes ... ok\ntest native_v41::tests::thinking_defaults_high_and_honors_explicit_overrides ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 106 filtered out; finished in 0.00s\n\n",
+  "live_cases": [
+    {
+      "case": "default",
+      "request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is 2 + 2? Answer with just the number."
+          }
+        ],
+        "temperature": 0,
+        "max_tokens": 512,
+        "stream": false
+      },
+      "response": {
+        "id": "chatcmpl-9d8359ba-5136-41f8-8569-b8ba347eafde",
+        "object": "chat.completion",
+        "created": 1789196606,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4",
+              "reasoning_content": "We need answer just number. 2+2=4. Must comply."
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 44,
+          "completion_tokens": 19,
+          "total_tokens": 63,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 44
+        }
+      }
+    },
+    {
+      "case": "explicit_high",
+      "request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is 2 + 2? Answer with just the number."
+          }
+        ],
+        "temperature": 0,
+        "max_tokens": 512,
+        "stream": false,
+        "reasoning_effort": "high"
+      },
+      "response": {
+        "id": "chatcmpl-da70a7c0-782e-4b61-bff3-804c188ccf6f",
+        "object": "chat.completion",
+        "created": 1789196607,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4",
+              "reasoning_content": "We need answer just number. 2+2=4. Must comply."
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 44,
+          "completion_tokens": 19,
+          "total_tokens": 63,
+          "prompt_tokens_details": {
+            "cached_tokens": 44
+          },
+          "prompt_cache_hit_tokens": 44,
+          "prompt_cache_miss_tokens": 0
+        }
+      }
+    },
+    {
+      "case": "disabled",
+      "request": {
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is 2 + 2? Answer with just the number."
+          }
+        ],
+        "temperature": 0,
+        "max_tokens": 512,
+        "stream": false,
+        "thinking": {
+          "type": "disabled"
+        }
+      },
+      "response": {
+        "id": "chatcmpl-c214abab-61d5-402a-9367-5479075d26ed",
+        "object": "chat.completion",
+        "created": 1789196607,
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "system_fingerprint": "ds41rt-native-fp8-kv-dspark",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "4"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 18,
+          "completion_tokens": 2,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 18
+        }
+      }
+    }
+  ]
+}

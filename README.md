@@ -66,6 +66,11 @@ No weights are bundled with the repository or containers.
 
 ## Serving scope
 
+Native requests default to thinking enabled at **high** effort. Set
+`reasoning_effort` to override the effort, or use `"thinking":{"type":"disabled"}`
+to disable reasoning explicitly. The pinned V4.1 encoder maps high to 75/100.
+See [reasoning controls and qualification](docs/release-v1-thinking.md).
+
 The migration retains the OpenAI-compatible API, streaming, reasoning controls,
 tool calls, JSON/JSON Schema constraints, admission, continuous batching,
 prefix reuse, cancellation, metrics, health/readiness, and restart tooling.
