@@ -1,5 +1,10 @@
 # Native pool sizing and concurrency
 
+This report records the pool qualification before the separate 24-turn cache
+change. [Completed-turn retention](release-v1-retained-turns.md) updates the
+current default to 64 spare groups and records the corresponding allocation;
+the measurements below preserve the preceding artifact's 32-spare policy.
+
 `serve-native` defaults to sixteen active requests and compressed-source space
 for another eight configured-context equivalents. At the default 1,048,576-token
 context, the four pools reserve 24 full contexts plus 32 spare page groups for
@@ -57,10 +62,9 @@ serve-native ... --concurrency 2 --max-context-tokens 32768 \
   --kv-pool-size 1GiB --memory-reservation 95%
 ```
 
-Standard `run.sh` parameter wiring remains a release gate. The existing retained
-snapshot accounting also needs the user's new 24-turn default: prompt and
-completed-turn frontiers must not silently count as two separate turns. The
-current C2 qualification below uses the preceding two-snapshot retention policy.
+Standard `run.sh` parameter wiring remains a release gate. The subsequent
+[24-turn change](release-v1-retained-turns.md) separates prompt and completed-turn
+banks. The C2 qualification below uses the preceding two-snapshot retention policy.
 
 ## Verification
 

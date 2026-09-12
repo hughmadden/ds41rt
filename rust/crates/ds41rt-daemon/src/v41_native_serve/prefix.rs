@@ -238,22 +238,56 @@ impl<T> Radix<T> {
         true
     }
 }
+/// Prompt repeats and completed agentic turns have separate bounded banks.
+/// A turn slot cannot be consumed by its own prompt snapshot.
+#[derive(Clone, Copy)]
+pub(super) enum SnapshotKind { Prompt, Turn }
+struct Retention<T> {
+    prompts: Radix<T>,
+    turns: Radix<T>,
+}
+impl<T> Retention<T> {
+    fn new(limit: usize) -> Self {
+        Self { prompts: Radix::new(limit), turns: Radix::new(limit) }
+    }
+    fn bank_mut(&mut self, kind: SnapshotKind) -> &mut Radix<T> {
+        match kind { SnapshotKind::Prompt => &mut self.prompts, SnapshotKind::Turn => &mut self.turns }
+    }
+    fn lookup_reusable(&mut self, tokens: &[u32]) -> Option<(usize, usize, &T)> {
+        let prompt = self.prompts.root.find_reusable(tokens, 0);
+        let turn = self.turns.root.find_reusable(tokens, 0);
+        // Prefer completed turns on a tie. Refresh only the chosen bank's LRU.
+        let kind = match (prompt, turn) {
+            (Some(p), Some(t)) if p.skipped() > t.skipped() => SnapshotKind::Prompt,
+            (_, Some(_)) => SnapshotKind::Turn,
+            (Some(_), None) => SnapshotKind::Prompt,
+            (None, None) => return None,
+        };
+        self.bank_mut(kind).lookup_reusable(tokens)
+    }
+    fn evict_one(&mut self) -> bool {
+        // Under global-page pressure, reclaim prompt snapshots before completed
+        // turns; their pages may remain shared until the turn also expires.
+        self.prompts.evict_one() || self.turns.evict_one()
+    }
+}
 struct Saved<'a> {
     target: RequestPrefix<'a>,
     draft: Option<DraftPrefix<'a>>,
     next: u32,
 }
 pub(super) struct PrefixCache<'a> {
-    radix: Radix<Saved<'a>>,
+    retained: Retention<Saved<'a>>,
 }
 impl<'a> PrefixCache<'a> {
     pub fn new(limit: usize) -> Self {
         Self {
-            radix: Radix::new(limit),
+            retained: Retention::new(limit),
         }
     }
     pub fn retain(
         &mut self,
+        kind: SnapshotKind,
         tokens: &[u32],
         next: u32,
         id: u64,
@@ -261,7 +295,8 @@ impl<'a> PrefixCache<'a> {
         requests: &mut Requests<'a>,
         draft: Option<&mut DraftRuntime<'_, 'a>>,
     ) -> Result<()> {
-        if self.radix.limit == 0 {
+        let bank = self.retained.bank_mut(kind);
+        if bank.limit == 0 {
             return Ok(());
         }
         let end = requests.cache().committed_end(lease)?;
@@ -271,14 +306,14 @@ impl<'a> PrefixCache<'a> {
         );
         // Evict before allocating another tail, keeping peak retained residency
         // within the configured number of completed states.
-        if !self.radix.remove_exact(&tokens[..end as usize])
-            && self.radix.entries >= self.radix.limit
+        if !bank.remove_exact(&tokens[..end as usize])
+            && bank.entries >= bank.limit
         {
-            self.radix.evict_one();
+            bank.evict_one();
         }
         let target = requests.retain_prefix(lease, BackbonePrefix::device_bytes())?;
         let draft = draft.map(|d| d.retain_prefix(id, end)).transpose()?;
-        self.radix.insert(
+        bank.insert(
             &tokens[..end as usize],
             Saved {
                 target,
@@ -296,7 +331,7 @@ impl<'a> PrefixCache<'a> {
         requests: &mut Requests<'a>,
         draft: Option<&mut DraftRuntime<'_, 'a>>,
     ) -> Result<Option<(usize, u32)>> {
-        let Some((end, frontier, saved)) = self.radix.lookup_reusable(tokens) else {
+        let Some((end, frontier, saved)) = self.retained.lookup_reusable(tokens) else {
             return Ok(None);
         };
         ensure!(
@@ -326,7 +361,7 @@ impl<'a> PrefixCache<'a> {
             match requests.cache().check_append_capacity(work) {
                 Ok(()) => return Ok(()),
                 Err(error) => {
-                    if !self.radix.evict_one() {
+                    if !self.retained.evict_one() {
                         return Err(error);
                     }
                 }
@@ -339,6 +374,36 @@ impl<'a> PrefixCache<'a> {
 mod tests {
     use super::*;
     use std::{cell::Cell, rc::Rc};
+    #[test]
+    fn twenty_four_completed_turns_do_not_compete_with_prompt_snapshots() {
+        let mut retained = Retention::new(24);
+        for i in 100..124 {
+            retained.bank_mut(SnapshotKind::Prompt).insert(&[i, 1], (false, i));
+            retained.bank_mut(SnapshotKind::Turn).insert(&[i, 1, 2], (true, i));
+        }
+        assert_eq!((retained.prompts.entries, retained.turns.entries), (24, 24));
+        for i in 100..124 {
+            assert_eq!(retained.lookup_reusable(&[i, 1]), Some((2, 2, &(false, i))));
+            assert_eq!(retained.lookup_reusable(&[i, 1, 2, 3]), Some((3, 3, &(true, i))));
+        }
+        for i in 200..224 {
+            retained.bank_mut(SnapshotKind::Prompt).insert(&[i, 1], (false, i));
+        }
+        for i in 100..124 {
+            assert_eq!(retained.lookup_reusable(&[i, 1, 2, 3]), Some((3, 3, &(true, i))));
+        }
+        retained.bank_mut(SnapshotKind::Turn).insert(&[999, 1, 2], (true, 999));
+        assert!(retained.lookup_reusable(&[100, 1, 2, 3]).is_none());
+        assert_eq!(retained.turns.entries, 24);
+        for _ in 0..24 { assert!(retained.evict_one()); }
+        assert_eq!((retained.prompts.entries, retained.turns.entries), (0, 24));
+        for _ in 0..24 { assert!(retained.evict_one()); }
+        assert!(!retained.evict_one());
+        let mut disabled = Retention::new(0);
+        disabled.bank_mut(SnapshotKind::Turn).insert(&[1], (true, 1));
+        assert!(disabled.lookup_reusable(&[1]).is_none());
+    }
+
     #[test]
     fn partial_radix_match_accounts_for_alignment_replay_and_exact_ancestors() {
         let tokens: Vec<u32> = (1..=512).collect();

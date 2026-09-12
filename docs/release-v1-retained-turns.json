@@ -1,0 +1,175 @@
+{
+  "scope": "Separate completed-turn/prompt retention banks; focused short-context reuse, eviction, correctness and performance plus full-default pool allocation. Not final release qualification.",
+  "source_parent": "8a9974dddb608d55ac0b430a882e882ade7f726b",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/cli.rs": "c9bd1fee96614965e2afc3c635c606714f726717b0018158da027dda49f0ea46",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "0fd14475e3838b178494f26f5f942998cfb4d80bb99e04fb3fc8fe28732db822",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/memory.rs": "98212172d8dd5c4de23c96ac256a43893093ca21c8a01c91a0b726e3b063caca",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/prefix.rs": "c31b90bdfff165d4d04722d55307f4186787eb6c20453a43059259cd53c4909c",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "07b7b2d28b59178d05f727799d7e477c8e4625c69032e25a65d6d816067eeef2",
+    "scripts/qualify-ds41-retained-turns.py": "d9e19ca604261a4d5732da6369317c22597d17017e06d54f42d61b1226352507"
+  },
+  "binary_sha256": "de59a55f10af297d012c8aa31ba7369232df97821af29a04eab1bfa2b8915b09",
+  "native_sha256": "6578932177c4871c9b2aef91f09bc36f4ded1213b19e220ca3fc47e543cae157",
+  "spark_aot_commit": "e53fd5a1f4a8380377fef91a5b3e69414f192223",
+  "defaults": {
+    "concurrency": 16,
+    "completed_turns": 24,
+    "prompt_snapshots": 24,
+    "extra_context_equivalents": 8,
+    "max_context_tokens": 1048576,
+    "source_pages": [
+      49216,
+      49216,
+      49216,
+      98432
+    ],
+    "global_bytes": 37545902080,
+    "active_cache_bytes": 37590406656,
+    "runtime_headroom_bytes": 2147483648
+  },
+  "retention_limit_range": [
+    0,
+    128
+  ],
+  "tests": {
+    "memory_prefix_prefill": 8,
+    "cli": 1,
+    "live_retention": {
+      "target": {
+        "concurrency": 16,
+        "turns": 24,
+        "cases": 75
+      },
+      "dspark": {
+        "concurrency": 2,
+        "turns": 24,
+        "cases": 75
+      },
+      "override": {
+        "concurrency": 2,
+        "turns": 2,
+        "cases": 9
+      }
+    },
+    "prefix_and_partial_modes": [
+      "target",
+      "dspark"
+    ],
+    "concurrency": {
+      "target": [
+        2,
+        6,
+        16
+      ],
+      "dspark": [
+        2
+      ]
+    },
+    "cancel_and_replace": true,
+    "full_default_boot": [
+      "target",
+      "dspark"
+    ]
+  },
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.54404018883385,
+            "first_content_seconds": 0.0015263674431480467,
+            "finish_seconds": 2.234229777008295
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.71495793003803,
+            "first_content_seconds": 0.0013058215263299644,
+            "finish_seconds": 2.2261306164436974
+          }
+        },
+        "candidate_decode_ratio": 1.0040174308891576
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.21189159435157,
+            "first_content_seconds": 0.004338816448580474,
+            "finish_seconds": 2.255253955954686
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.508041202609625,
+            "first_content_seconds": 0.002352438517846167,
+            "finish_seconds": 2.2377469899947755
+          }
+        },
+        "candidate_decode_ratio": 1.0070157862410904
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 141.78372292710105,
+            "first_content_seconds": 0.006420094054192305,
+            "finish_seconds": 0.6764608215307817
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 141.27820980723908,
+            "first_content_seconds": 0.001753368997015059,
+            "finish_seconds": 0.6761296984623186
+          }
+        },
+        "candidate_decode_ratio": 0.9964346180970161
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 115.0821959606852,
+            "first_content_seconds": 0.006630965508520603,
+            "finish_seconds": 0.8321717205108143
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 114.9184354892134,
+            "first_content_seconds": 0.00393908197293058,
+            "finish_seconds": 0.8310505459667183
+          }
+        },
+        "candidate_decode_ratio": 0.9985770129766403
+      }
+    ]
+  },
+  "performance_contract": {
+    "runs_per_workload": 4,
+    "completion_tokens": 96,
+    "order": "alternating AB/BA after both arms primed; inference serial across four shared workers",
+    "candidate_pool": "context-scaled default",
+    "reference_pool": "1GiB explicit",
+    "output_and_token_parity": true
+  },
+  "hardware": {
+    "driver": "595.91.07",
+    "power_limit_watts": 400,
+    "memory_speed": "standard, no memory overclock (user configuration)",
+    "observed_loaded_memory_mhz": 13365,
+    "reported_max_memory_mhz": 14001
+  },
+  "preserved_failures": [
+    "Original admission-log parser expected fields before message; original completed live requests and parser KeyError preserved.",
+    "Corrected parser exposed target-only EOS frontier assumption in dSpark collector. verify_dspark_greedy commits matched draft EOS; corrected collector validates same preserved requests and exact frontier survival."
+  ],
+  "remaining": [
+    "Native vision up to sixteen images and comprehensive Unicode/tools/schema correctness (next priority)",
+    "Constrained-pool admission isolation",
+    "Standard run.sh/native deployment qualification after correctness",
+    "Final long-context/performance/eval suite, reports, containers and GitHub release"
+  ],
+  "raw_archive": {
+    "path": "docs/evidence/native-retained-turns.json.gz",
+    "bytes": 344420,
+    "sha256": "d2aec8d4b10aaee5b06f5706a74f14920736eb86093a7770894c7950b4575fb8"
+  }
+}

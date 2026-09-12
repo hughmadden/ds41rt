@@ -258,8 +258,8 @@ fn worker(
     // Size after both lanes, transports and optional draft allocations are live.
     let (free, total) = lib.cuda_memory_info()?;
     let pool = memory::PoolPlan::new(args.concurrency as usize, args.max_context_tokens as usize,
-        args.kv_pool_size, args.memory_reservation, free, total)?;
-    tracing::info!(source_pages=?pool.pages, global_bytes=pool.global_bytes,
+        args.prefix_cache_entries as usize, args.kv_pool_size, args.memory_reservation, free, total)?;
+    tracing::info!(retained_turn_limit=args.prefix_cache_entries, prompt_snapshot_limit=args.prefix_cache_entries, source_pages=?pool.pages, global_bytes=pool.global_bytes,
         cache_bytes=pool.cache_bytes, device_occupied_bytes=pool.occupied_before,
         reservation_bytes=pool.reservation_bytes, runtime_headroom_bytes=memory::RUNTIME_HEADROOM,
         "native KV pool reservation");

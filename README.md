@@ -81,6 +81,14 @@ maximum. Omitted output limits use the maximum; each request clamps to its
 remaining context. Use `--max-context-tokens` and `--max-output-tokens` for smaller
 development launches. See [limit behavior and verification](docs/release-v1-model-limits.md).
 
+Native serving defaults to 16 concurrent requests, global KV capacity for 24
+configured-context equivalents, and 24 retained completed turns. A separate
+24-entry prompt cache preserves fast repeats. `--concurrency`,
+`--prefix-cache-entries`, `--kv-pool-size` and `--memory-reservation` override these
+settings. See [pool controls](docs/release-v1-pool.md) and
+[completed-turn retention](docs/release-v1-retained-turns.md). Standard `run.sh`
+wiring remains under qualification.
+
 The migration retains the OpenAI-compatible API, streaming, reasoning controls,
 tool calls, JSON/JSON Schema constraints, admission, continuous batching,
 prefix reuse, cancellation, metrics, health/readiness, and restart tooling.

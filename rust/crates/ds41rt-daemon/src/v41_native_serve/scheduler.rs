@@ -1,7 +1,7 @@
 use super::*;
 use crate::v41_backbone_cache::CacheLease;
 use crate::v41_requests::RequestBatch;
-use super::prefix::PrefixCache;
+use super::prefix::{PrefixCache, SnapshotKind};
 
 struct Active {
     id: u64,
@@ -62,7 +62,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
     let mut active: Vec<Option<Active>> = (0..args.concurrency).map(|_| None).collect();
     let mut id = 0u64;
     let mut closed = false;
-    let mut prefixes = PrefixCache::new(args.prefix_cache_entries.min(args.concurrency) as usize);
+    let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize);
     let limits = ds41rt_api::native_v41::NativeLimits::new(args.max_context_tokens, args.max_output_tokens)?;
     loop {
         // This point is reached only after both complete stacks have drained and
@@ -71,7 +71,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             if entry.as_ref().is_some_and(|r| r.finished || r.job.events.is_closed()) {
                 let request = entry.take().unwrap();
                 if request.cacheable && requests.cache().request_id(request.lease).is_ok() {
-                    if let Err(error) = prefixes.retain(&request.tokens, request.next_after_commit,
+                    if let Err(error) = prefixes.retain(SnapshotKind::Turn, &request.tokens, request.next_after_commit,
                         request.id, request.lease, requests, draft.as_deref_mut()) {
                         tracing::warn!(%error, "completed request prefix was not retained");
                     }
@@ -125,11 +125,11 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                     second_transport, lease, &prompt, args.prefill_batch_tokens as usize, &job,
                     draft.as_deref_mut())? };
                 if cached != prompt.len() {
-                  if let Err(error) = prefixes.retain(&prompt, anchor, id, lease, requests, draft.as_deref_mut()) {
+                  if let Err(error) = prefixes.retain(SnapshotKind::Prompt, &prompt, anchor, id, lease, requests, draft.as_deref_mut()) {
                     tracing::warn!(%error, "prompt prefix was not retained");
                   }
                 }
-                tracing::debug!(prompt_tokens=prompt.len(), cached_tokens=cached, "native prefix admission");
+                tracing::debug!(request_id=id, prompt_tokens=prompt.len(), cached_tokens=cached, "native prefix admission");
                 Ok(Active { id, lease, job, decoder, anchor, generated: 0, buffered: 0, lane,
                     finished: false, cacheable: false, tokens: prompt, next_after_commit: anchor })
             })();

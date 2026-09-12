@@ -12,10 +12,12 @@ gate below is satisfied merely by an older component test.
   prefix reuse against uncached execution, including eviction and concurrency.
 - [x] Retain populated last-turn SWAs for fast exact agentic continuation,
   bounded and invalidated with radix branches.
-- [ ] Default to 24 exact retained turns (16 concurrent plus eight spare),
+- [x] Default to 24 exact retained turns (16 concurrent plus eight spare),
   with a configurable retention limit (user addition September 12). Audit
   prompt and completed-turn snapshots so the setting counts retained turns
   as intended, rather than silently halving capacity by keeping both frontiers.
+  [Independent prompt/turn banks](release-v1-retained-turns.md) pass live 24-turn
+  reuse, eviction and focused parity/concurrency/performance checks in both modes.
 - [x] Measure reuse performance and expose one exact KV pool sizing option.
   [Native pool evidence](release-v1-pool.md) covers focused reuse/performance
   checks; the full retained-context release matrix remains open.
@@ -102,6 +104,12 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 ## Current evidence and next action
 
+The user set the next work order on September 12: finish and push the 24-turn
+retention qualification, then native vision through sixteen images together
+with Unicode and tool/schema correctness. Standard `run.sh` and deployment
+qualification follow those correctness gates, before the final performance
+suite, reports, containers and GitHub release.
+
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
 on September 12. Docker inspection confirms both run `serve-native`, which enters
@@ -123,8 +131,10 @@ state scheduling are now wired into serve-native. [Admission qualification](rele
 covers complete hits, retained turns, C16 cancellation/replacement, small-pool
 pressure and controlled short-context decode. [Partial-prefix replay](release-v1-partial-prefix.md)
 now passes focused GPU, API and C16 checks. [Large exact-resume suffixes](release-v1-exact-suffix.md)
-use encoder continuation and bounded decoder prefill. Final pool sizing and the
-full release qualification remain open.
+use encoder continuation and bounded decoder prefill. [Pool sizing](release-v1-pool.md)
+and [24 completed-turn retention](release-v1-retained-turns.md) now have focused
+qualification. Constrained-pool admission isolation and the full release suite
+remain open.
 [Retained-state component evidence](release-v1-retained-state.json) remains
 separate from these API results.
 

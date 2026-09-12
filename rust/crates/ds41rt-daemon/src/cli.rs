@@ -387,6 +387,11 @@ mod tests {
         assert_eq!(args.max_context_tokens, 1_048_576);
         assert_eq!(args.max_output_tokens, 393_216);
         assert_eq!(args.concurrency, 16);
+        assert_eq!(args.prefix_cache_entries, 24);
+        for entries in ["0", "2", "24", "128"] {
+            assert!(super::Cli::try_parse_from(base.into_iter().chain(["--prefix-cache-entries", entries])).is_ok());
+        }
+        assert!(super::Cli::try_parse_from(base.into_iter().chain(["--prefix-cache-entries", "129"])).is_err());
         for concurrency in ["1", "2", "16"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--concurrency", concurrency, "--kv-pool-size", "1.5GiB", "--memory-reservation", "87.5%"])).is_ok());
         }
@@ -476,8 +481,8 @@ pub(crate) struct NativeServeArgs {
     #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(1..=16))]
     pub concurrency: u32,
 
-    /// Maximum retained prompt/turn states; zero disables native prefix reuse.
-    #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(0..=16))]
+    /// Retained completed turns, plus a separate prompt-repeat bank of this size; zero disables reuse.
+    #[arg(long, default_value_t = 24, value_parser = clap::value_parser!(u32).range(0..=128))]
     pub prefix_cache_entries: u32,
 
     /// Enable greedy RTX dSpark proposal generation and target verification.
