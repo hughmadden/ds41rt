@@ -1125,6 +1125,8 @@
     "official_full_eight_case_weighted_tps": null,
     "low_entropy_requirement": "counting 1 through 200 replaces historical Orchid",
     "counting_reference": "release-counting-reference.json",
-    "counting_warm_median_tps": 127.70215665499619
+    "counting_warm_median_tps": 127.70215665499619,
+    "official_counting_reference": "release-official-counting-reference.json",
+    "official_counting_tps": 427.28830449168225
   }
 }

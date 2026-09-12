@@ -17,8 +17,7 @@ The low-entropy release requirement now uses counting 1–200, replacing Orchid.
 The current release image passes the sequence check and reaches **127.70 tok/s**
 median over three warm samples after one initial request. This remains below
 the earlier ~145 counting measurement. [Counting evidence](release-counting-reference.json)
-preserves every request, sample, output and cache count. The older Orchid
-figures below are historical measurements.
+preserves every request, sample, output and cache count. The earlier Orchid results remain in the historical raw evidence.
 
 ## Headline results
 
@@ -27,7 +26,6 @@ figures below are historical measurements.
 | Best median prefill, 0 base + 32K new | 2,667.95 tok/s |
 | Best observed prefill sample | 2,738.47 tok/s |
 | Low-entropy dSpark decode, counting 1–200 warm median | 127.70 tok/s |
-| Historical Orchid median | 128.03 tok/s |
 | Weighted eight-type target-only median | 37.89 tok/s |
 | Weighted eight-type dSpark median | 60.68 tok/s |
 | dSpark gain on weighted mix | 60.16% |
@@ -38,7 +36,7 @@ figures below are historical measurements.
 
 ## Eight content types and low-entropy decode
 
-Each local arm ran five repetitions with unique one-token Unicode nonces to prevent unintended complete-prefix reuse. The eight-type weighted score gives the two structured JSON cases weight 0.5 and the other six cases weight 1.0, matching the preserved GLMRT corpus contract. Decode timing starts after first content. All 90 requests completed without server errors and reported zero cache hits.
+The original local eight-case and Orchid campaign ran five repetitions per arm with unique one-token Unicode nonces to prevent unintended complete-prefix reuse. The eight-type weighted score gives the two structured JSON cases weight 0.5 and the other six cases weight 1.0, matching the preserved GLMRT corpus contract. Decode timing starts after first content. All 90 requests completed without server errors and reported zero cache hits.
 
 | Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target quality | dSpark quality | Official quality |
 |---|---:|---:|---:|---:|---:|---:|
@@ -50,7 +48,7 @@ Each local arm ran five repetitions with unique one-token Unicode nonces to prev
 | Natural JSON | 38.05 | 81.74 | 175.33 | 5/5 | 5/5 | 1/1 |
 | Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | N/A |
 | Multilingual | 37.58 | 57.20 | 183.61 | 5/5 | 5/5 | 1/1 |
-| Orchid, historical | 38.53 | **128.03** | Not run | 0/5 | 0/5 | N/A |
+| Counting 1–200 | Not measured | **127.70** | **427.29** | N/A | 3/3 warm | 1/1 |
 
 The official `deepseek-flash` column is a single sequential API run of the
 same eight definitions, temperature zero and thinking disabled, measured from
@@ -62,7 +60,17 @@ HTTP 400 and was not retried or downgraded. There is no complete official
 eight-case aggregate. [Official raw reference](release-official-flash-reference.json)
 records requests, outputs, timings, fingerprint and failures.
 
-The target weighted repetitions were 37.82, 37.62, 37.89, 37.96, and 37.93 tok/s. dSpark produced 62.68, 60.68, 59.04, 61.91, and 59.12 tok/s. The strict quality contract passed 33/40 target and 31/40 dSpark weighted samples. Preserved misses are mostly exact word-count failures in the fable case and omission of a required literal in the topic case. Orchid is a throughput diagnostic and generated 99 words instead of the contract length, so its 0/5 quality result is retained rather than hidden.
+The target weighted repetitions were 37.82, 37.62, 37.89, 37.96, and 37.93 tok/s. dSpark produced 62.68, 60.68, 59.04, 61.91, and 59.12 tok/s. The strict quality contract passed 33/40 target and 31/40 dSpark weighted samples. Preserved misses are mostly exact word-count failures in the fable case and omission of a required literal in the topic case. The superseded Orchid diagnostic and its quality failures remain in the historical raw evidence.
+
+Counting uses the exact earlier development prompt, temperature zero and
+thinking disabled. The local value is the median of three warm requests after
+one initial request; all three reuse 21 prompt tokens and produce 599 completion
+tokens. The official value is one fresh request with zero cache hits and 598
+provider-reported completion tokens. Both pass the ordered 1–200 sequence check.
+The target-only counting cell has not been measured in this campaign. Counting
+is outside the eight-case weighted score. [Official counting evidence](release-official-counting-reference.json)
+and [local counting evidence](release-counting-reference.json) retain the exact
+requests, outputs, token counts and client-observed timings.
 
 ## Prefill matrix
 
