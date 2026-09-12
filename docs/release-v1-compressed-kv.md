@@ -61,3 +61,30 @@ Performance must match or improve before the requested needle and high-thinking
 tool-call qualification. Validate cold, partial, exact and divergent cache reuse,
 concurrency, eviction and cancellation as well. The final release suite, memory
 report and three tool-eval runs must describe the corrected serving build.
+
+### Serving integration map
+
+The source audit after the pattern-schema qualification identifies these coupled
+changes. Keep the qualified FP8 serving artifacts for matched comparisons.
+
+- `rust/crates/ds41rt-daemon/src/v41_compressor.rs`: select the existing
+  compressed pack/scatter primitive, change proposal allocations from 512/16 to
+  256/32 value/scale bytes, and update wave memory accounting together.
+- `v41_compressor/source_cache.rs` in the same crate: update persistent page
+  allocations, copy-on-write row strides, pool byte estimates and their tests.
+  Preserve page ownership and logical row indices. Each compressed row saves
+  240 bytes; the separate 68-byte index row remains unchanged.
+- `rust/crates/ds41rt-ffi/src/v41_sparse_attention.rs` and
+  `native/cuda/kernels/v41_sparse_attention.cu`: validate the two source-buffer
+  layouts separately and decode source tags 2/3 as FP4 with E4M3 scales.
+  Window tags 0/1 remain FP8 with E8M0 scales. Cover ordinary, grouped, split
+  and bounded-replay attention paths with the same format contract.
+- Retained source-page references and cache identity must agree with the new
+  layout. Update high-page-address qualification, publication/copy tests and
+  memory reports before measuring the full-context defaults.
+- Keep `v41_window`, its 128-row prefix snapshots and the dSpark window cache
+  at 528 bytes per row. Their similarly named constants describe architectural
+  FP8 SWA, not compressed source storage.
+
+This is an implementation map, not evidence that migration or performance
+qualification has completed.
