@@ -27,7 +27,7 @@ gate below is satisfied merely by an older component test.
   retain earlier thinking-disabled runs as cache diagnostics.
 - [ ] Resolve Unicode correctness, distinguishing tokenization, UTF-8 streaming,
   prompt rendering and model instruction-following failures.
-- [ ] Native vision accepts up to 16 images per prompt, with API validation,
+- [x] Native vision accepts up to 16 images per prompt, with API validation,
   multi-image correctness and resource qualification.
   [Native preprocessing](release-v1-vision-preprocess.md) matches reference grids
   and complete patches across 21 format cases and handles sixteen expanded image
@@ -35,8 +35,12 @@ gate below is satisfied merely by an older component test.
   now has GPU operation, full-vector and precision-control evidence.
   [Image cache identity and ownership](release-v1-vision-cache-identity.md) have
   focused radix tests. [Feature replacement and request masks](release-v1-vision-features.md)
-  pass CUDA and request-plumbing checks. API preparation, live image-cache/replay
-  parity and image-answer qualification remain open.
+  pass CUDA and request-plumbing checks. [Native serving qualification](release-v1-vision-serving.md)
+  covers image answers, changed/reordered images, partial replay, exact hits,
+  maximum spans, cancellation/recovery, C16 target and C2 dSpark admission, and
+  focused text regression checks. Longer target/dSpark descriptions are
+  semantically consistent, not necessarily token-identical. The broader
+  long-context/pool-pressure prefix gate and release performance suite remain open.
 - [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
 - [x] Verify official maximum context/output limits. Default to those limits;
   clamp each output allowance to remaining context and the model output cap.

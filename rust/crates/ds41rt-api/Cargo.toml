@@ -8,6 +8,11 @@ repository.workspace = true
 [dependencies]
 deepseek-recipe = "=0.1.0"
 deepseek-recipe-encoding = "=0.1.0"
+deepseek-recipe-core = "=0.1.0"
+base64 = "=0.22.1"
+percent-encoding = "=2.3.2"
+ureq = "=2.12.1"
+url = "=2.5.8"
 anyhow.workspace = true
 async-stream.workspace = true
 axum.workspace = true

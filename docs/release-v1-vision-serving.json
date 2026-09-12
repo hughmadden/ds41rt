@@ -1,0 +1,283 @@
+{
+  "scope": "Native API vision through sixteen images, bounded preparation, selective encoder/cache replay, live semantics and focused text regression",
+  "source_parent": "86baab7b98e73ca1c809b24193a9e57d28cb7142",
+  "source_sha256": {
+    "rust/Cargo.lock": "f96253c6e6d65c651efd4eae7e59bfad1347d6614358033fc15449b9f3011f1b",
+    "rust/crates/ds41rt-api/Cargo.toml": "32a89770c5cf29b4fa00ee6d46aecc90916f3a13fdf9237648d3feb010ed1ade",
+    "rust/crates/ds41rt-api/src/native_v41.rs": "a750b5edb63430e334ffa5ea752695068dbe5085c70c76c6f12b22f76ba6983e",
+    "rust/crates/ds41rt-api/src/native_v41/images.rs": "19d0d068f00f2ed32d2164287e524ee242c6e596fe1170d4c8ead53cfee79e98",
+    "rust/crates/ds41rt-api/src/native_v41/fixtures/black.png": "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "65d38564681dbc2d024f52fbe10de4556e24bed07b573815559ba3eb67a685d8",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs": "03f5708fe5c06e4ff4e1455c0dbe5a48465d47aec37c25e68ea20850709a5b2f",
+    "rust/crates/ds41rt-daemon/src/v41_vision.rs": "616d87f1e4af3e619db389686480e9faf16fd0b309a013a5f1c188d50b80e0c1",
+    "native/cuda/kernels/v41_vision.cu": "4c365516032bdf51c0e59b438ac84c743a48c3247790d24c0f21bdeb699b66cf",
+    "scripts/qualify-ds41-native-vision.py": "3194b80d4097bd6fe56a60fa5d98612a28d68b3ca54441f88453c13d9004657c"
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/ds41-native-vision-serving/daemon",
+      "sha256": "fbc53433f79995f097d2ceaf7224b926e83b3c7bf986224422abcc09c8348521",
+      "bytes": 30979720
+    },
+    {
+      "path": "/tmp/ds41-native-vision-serving/daemon-first-canary",
+      "sha256": "368a664ef0c0643939ebf8b991c00524ff9ca882bf598c1fa7d7a812d7047e2a",
+      "bytes": 30978072
+    },
+    {
+      "path": "/tmp/ds41-native-vision-serving/cmake/libds41rt_native.so",
+      "sha256": "9c48be056b262ac519d3e7e6047eee51e6593c1a62b14267bbe21aa7694d9cba",
+      "bytes": 16774912
+    },
+    {
+      "path": "/tmp/ds41-native-retained24/daemon",
+      "sha256": "de59a55f10af297d012c8aa31ba7369232df97821af29a04eab1bfa2b8915b09",
+      "bytes": 27259392
+    },
+    {
+      "path": "/tmp/ds41-native-release-pool/cmake/libds41rt_native.so",
+      "sha256": "6578932177c4871c9b2aef91f09bc36f4ded1213b19e220ca3fc47e543cae157",
+      "bytes": 14046432
+    }
+  ],
+  "archive": {
+    "path": "docs/evidence/native-vision-serving.json.gz",
+    "sha256": "0a73d0ab097de375e6c602c6c49e15b85769d5f8c78b3867e0c2fe0296cfde46",
+    "bytes": 227121,
+    "format": "gzip JSON mapping artifact filenames to complete text"
+  },
+  "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+  "spark_revision": "e53fd5a1f4a8380377fef91a5b3e69414f192223",
+  "launch": [
+    {
+      "name": "ds41-vision-target-api-dev",
+      "id": "8b1dd9dbb727c77e7e3acc5d3102042d3fd1e63420a12476067f706652c1937c",
+      "image": "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "command": [
+        "serve-native",
+        "--native-lib",
+        "/audit/cmake/libds41rt_native.so",
+        "--snapshot",
+        "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "127.0.0.1:18055",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--max-context-tokens",
+        "32768"
+      ],
+      "mounts": [
+        "/home/tj/.cache/huggingface:/hf:ro",
+        "/tmp/ds41-native-vision-serving/daemon:/daemon:ro",
+        "/tmp/ds41-native-vision-serving/cmake:/audit/cmake:ro"
+      ],
+      "environment": [
+        "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+        "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+        "CUDA_VISIBLE_DEVICES=0",
+        "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+        "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223"
+      ]
+    },
+    {
+      "name": "ds41-vision-spec-api-dev",
+      "id": "76be73e0f97ac5277305268fc050c74c1b1be3867ba54c28234bdd966fcbe134",
+      "image": "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "command": [
+        "serve-native",
+        "--dspark",
+        "--native-lib",
+        "/audit/cmake/libds41rt_native.so",
+        "--snapshot",
+        "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "127.0.0.1:18056",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "2",
+        "--max-context-tokens",
+        "32768"
+      ],
+      "mounts": [
+        "/tmp/ds41-native-vision-serving/daemon:/daemon:ro",
+        "/tmp/ds41-native-vision-serving/cmake:/audit/cmake:ro",
+        "/home/tj/.cache/huggingface:/hf:ro"
+      ],
+      "environment": [
+        "CUDA_VISIBLE_DEVICES=1",
+        "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+        "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+        "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+        "DS41RT_PROTOCOL_V2_TCP_TIMING=0"
+      ]
+    },
+    {
+      "name": "ds41-retained24-target-api-dev",
+      "id": "b7a9197dea34bb51eadc1b916554fa0d16b8143b9a8ff567aad41abea4dc190b",
+      "image": "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "command": [
+        "serve-native",
+        "--native-lib",
+        "/audit/cmake/libds41rt_native.so",
+        "--snapshot",
+        "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "127.0.0.1:18053",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--max-context-tokens",
+        "32768"
+      ],
+      "mounts": [
+        "/tmp/ds41-native-retained24/daemon:/daemon:ro",
+        "/tmp/ds41-native-release-pool/cmake:/audit/cmake:ro",
+        "/home/tj/.cache/huggingface:/hf:ro"
+      ],
+      "environment": [
+        "CUDA_VISIBLE_DEVICES=0",
+        "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+        "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+        "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+        "DS41RT_PROTOCOL_V2_TCP_TIMING=0"
+      ]
+    },
+    {
+      "name": "ds41-retained24-spec-api-dev",
+      "id": "9f1a4e62f247345ab92f886773a51d46ffffcdd2abb5c4ef24b78d285b870dcc",
+      "image": "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "command": [
+        "serve-native",
+        "--dspark",
+        "--native-lib",
+        "/audit/cmake/libds41rt_native.so",
+        "--snapshot",
+        "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "127.0.0.1:18054",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "2",
+        "--max-context-tokens",
+        "32768"
+      ],
+      "mounts": [
+        "/tmp/ds41-native-retained24/daemon:/daemon:ro",
+        "/tmp/ds41-native-release-pool/cmake:/audit/cmake:ro",
+        "/home/tj/.cache/huggingface:/hf:ro"
+      ],
+      "environment": [
+        "CUDA_VISIBLE_DEVICES=1",
+        "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+        "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+        "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+        "DS41RT_PROTOCOL_V2_TCP_TIMING=0"
+      ]
+    }
+  ],
+  "hardware": "index, uuid, name, driver_version, power.limit [W], enforced.power.limit [W], clocks.current.memory [MHz], clocks.max.memory [MHz], memory.total [MiB], memory.used [MiB]\n0, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 405 MHz, 14001 MHz, 97887 MiB, 71737 MiB\n1, GPU-95f8f212-9131-df99-fd53-7535965197d7, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 405 MHz, 14001 MHz, 97887 MiB, 87249 MiB\n",
+  "memory_speed": "standard settings, no memory overclock; current memory clocks vary between idle and load",
+  "build": "Pinned development Docker image; CUDA SM120 Release with RDMA, V4.1 expert/FP8 AOT and XGrammar enabled",
+  "stages": {
+    "first_canary": "Image semantics, maximum spans, cancellation and text AB/BA. Precedes API-only earlier conversation drop and decoder waiting policy.",
+    "final_daemon": "Nine API tests; C16 target and C2 dSpark bursts with sixteen maximum-length images per request; repeated full semantic/replay suite; default-high-thinking image requests."
+  },
+  "validation": {
+    "native_api_tests": 9,
+    "final_semantic_cases_per_mode": 10,
+    "max_span_image_tokens": 16384,
+    "concurrent_max_span_cases": 18,
+    "concurrent_max_span_passed": true,
+    "maximum_span_cancellation_recovery_passed": true,
+    "default_thinking_image_requests": 2,
+    "within_mode_exact_hit_text_equal": true,
+    "cross_mode_long_description_token_parity": false,
+    "first_placeholder_failures": 2,
+    "initial_live_failure_details_preserved": true
+  },
+  "performance": {
+    "target": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.759833779057416,
+            "first_content_seconds": 0.0013207735028117895,
+            "finish_seconds": 2.2228090810240246
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.628800222819436,
+            "first_content_seconds": 0.0013002735213376582,
+            "finish_seconds": 2.229836290993262
+          }
+        },
+        "candidate_decode_ratio": 0.9969355924787959
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 42.49767631339614,
+            "first_content_seconds": 0.00400543597061187,
+            "finish_seconds": 2.239179925469216
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 42.64199335746659,
+            "first_content_seconds": 0.0031759710400365293,
+            "finish_seconds": 2.2310305454884656
+          }
+        },
+        "candidate_decode_ratio": 1.0033958808243113
+      }
+    ],
+    "spec": [
+      {
+        "workload": "counting",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 141.59243325903418,
+            "first_content_seconds": 0.003995371051132679,
+            "finish_seconds": 0.6738950880244374
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 140.72875340316148,
+            "first_content_seconds": 0.002214802021626383,
+            "finish_seconds": 0.6772664624731988
+          }
+        },
+        "candidate_decode_ratio": 0.9939002400340655
+      },
+      {
+        "workload": "code",
+        "arms": {
+          "reference": {
+            "observed_decode_tokens_per_second": 115.27571090476884,
+            "first_content_seconds": 0.006560304027516395,
+            "finish_seconds": 0.8307945359847508
+          },
+          "candidate": {
+            "observed_decode_tokens_per_second": 114.6982915605694,
+            "first_content_seconds": 0.003924775053746998,
+            "finish_seconds": 0.8294804124743678
+          }
+        },
+        "candidate_decode_ratio": 0.994990971301175
+      }
+    ]
+  },
+  "remaining": "Broader long-context/pool-pressure prefix qualification, Unicode/tool/schema correctness, native launch scripts, full release performance/reporting and publication."
+}

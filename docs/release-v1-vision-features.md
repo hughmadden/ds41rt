@@ -16,7 +16,7 @@ recycled request slots.
 
 Features are prepared lazily by span: a complete prefix hit can require no image
 encoder work, while a replay beginning inside an image requires that image's
-complete feature span. The owner exposes this preparation range to the upcoming
+complete feature span. The owner exposes this preparation range to the
 API integration. Image layout and feature storage are separate, so replay can
 recover routing masks from layout even when it consumes an already-produced
 encoder suffix. The dSpark reference seeds draft windows from target hidden
@@ -60,12 +60,11 @@ CPU image-layout tests and all ten cache-identity/radix tests pass. The first
 new request-fixture run used the wrong start position in its independent Engram
 comparison; that fixture error and the corrected run are preserved.
 
-These are component and request-plumbing checks. They do **not** qualify live
-vision answers or a full decoder replay through the model. API image admission
-remains disabled until encoder preparation, expanded token accounting and serving
-integration are connected. Cached/uncached target/dSpark image parity, sixteen
-images in one API prompt, cancellation under live vision load, final memory
-accounting and text-performance regression checks remain required.
+These are component and request-plumbing checks. The separate
+[serving qualification](release-v1-vision-serving.md) covers live image answers,
+API admission, expanded token accounting, cache replay, maximum spans,
+cancellation, concurrent ownership and focused text-performance comparisons.
+The full release memory/performance report remains open.
 
 ## Reproduction
 

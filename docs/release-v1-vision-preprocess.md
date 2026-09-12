@@ -30,9 +30,10 @@ for chunked prefill and image masks for routing/Engram integration.
 
 Each prepared image has a SHA-256 identity over its exact BF16 patches and
 two-dimensional grid. Different image content must not share a prefix merely
-because its placeholder and expanded token IDs match. The identity is available
-to the upcoming cache integration; this component does not yet change cache
-lookup or serving admission.
+because its placeholder and expanded token IDs match. The
+[cache integration](release-v1-vision-cache-identity.md) and
+[serving report](release-v1-vision-serving.md) describe how lookup and admission
+consume this identity.
 
 ## Qualification
 

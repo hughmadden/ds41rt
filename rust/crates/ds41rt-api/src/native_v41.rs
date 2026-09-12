@@ -23,9 +23,11 @@ use tokio::sync::mpsc;
 
 pub const MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
 mod limits;
+mod images;
 pub use limits::{NativeLimits, MAX_CONTEXT_TOKENS, MAX_OUTPUT_TOKENS};
 pub struct NativeRequest {
     pub prompt: String,
+    pub images: Vec<ds41rt_loader::V41Image>,
     pub max_tokens: usize,
     pub events: mpsc::Sender<Result<InferenceChunk, String>>,
 }
@@ -33,16 +35,19 @@ pub struct NativeRequest {
 struct NativeState {
     queue: mpsc::Sender<NativeRequest>,
     limits: NativeLimits,
+    images: images::ImageDecoder,
 }
 pub fn router(queue: mpsc::Sender<NativeRequest>) -> Router {
     router_with_limits(queue, NativeLimits::default())
 }
 pub fn router_with_limits(queue: mpsc::Sender<NativeRequest>, limits: NativeLimits) -> Router {
+    let images = images::ImageDecoder::new(queue.max_capacity());
     Router::new()
         .route("/health", get(health))
         .route("/v1/models", get(models))
         .route("/v1/chat/completions", post(chat))
-        .with_state(NativeState { queue, limits })
+        .layer(axum::extract::DefaultBodyLimit::max(images::BODY_BYTES))
+        .with_state(NativeState { queue, limits, images })
 }
 async fn models(State(state): State<NativeState>) -> Json<Value> {
     Json(json!({"object":"list","data":[{"id":MODEL,"object":"model","owned_by":"deepseek-ai",
@@ -88,23 +93,52 @@ async fn chat(State(state): State<NativeState>, Json(body): Json<Value>) -> Resp
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
     let rendered = DeepseekV41Encoding::new().render_conversation(&converted.conversation);
-    if !rendered.image_sources.is_empty() {
-        return error(
-            StatusCode::BAD_REQUEST,
-            "native vision input is not integrated yet",
-        );
-    }
     let streaming = converted.stream;
     let id = format!("chatcmpl-{}", uuid::Uuid::new_v4());
     let generator = ChatCompletionRequest::chunk_generator(&converted, id.clone(), MODEL.into())
         .with_include_usage(!streaming || include_usage);
     let processor = StreamProcessor::new(generator, converted.parsing_options);
+    // Rendered sources own the image payloads needed by preprocessing. Do not
+    // retain another copy of their data URLs throughout the generated response.
+    drop(converted.conversation);
+    let (prepared, permit) = if rendered.image_sources.is_empty() { (Vec::new(), None) } else {
+        if rendered.image_sources.len() > ds41rt_loader::V41_MAX_IMAGES {
+            return error(StatusCode::BAD_REQUEST, "at most 16 images are supported");
+        }
+        let permit = match state.queue.clone().try_reserve_owned() {
+            Ok(permit) => permit,
+            Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e),
+        };
+        // The queue permit bounds waiters while up to four decoders run. A C16
+        // burst should wait here instead of imposing a hidden C4 image limit.
+        let slot = match state.images.slots.clone().acquire_owned().await {
+            Ok(slot) => slot,
+            Err(_) => return error(StatusCode::SERVICE_UNAVAILABLE, "image preparation is closed"),
+        };
+        let decoder = state.images.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            let _slot = slot;
+            decoder.decode(rendered.image_sources)
+        }).await;
+        match result {
+            Ok(Ok(images)) => (images, Some(permit)),
+            Ok(Err(e)) => return error(StatusCode::BAD_REQUEST, format!("{e:#}")),
+            Err(e) => return error(StatusCode::INTERNAL_SERVER_ERROR, e),
+        }
+    };
     let (events, mut receive) = mpsc::channel(16);
-    if let Err(e) = state.queue.try_send(NativeRequest {
-        prompt: rendered.prompt,
+    // Recipe 0.1.0 uses a protocol placeholder; the pinned model tokenizer
+    // spells token 129264 differently. Preserve the text-only prompt verbatim.
+    let prompt = if prepared.is_empty() { rendered.prompt }
+        else { rendered.prompt.replace("<｜image｜>", "<｜deepseek_image｜>") };
+    let job = NativeRequest {
+        prompt,
+        images: prepared,
         max_tokens,
         events,
-    }) {
+    };
+    if let Some(permit) = permit { permit.send(job); }
+    else if let Err(e) = state.queue.try_send(job) {
         return error(StatusCode::SERVICE_UNAVAILABLE, e);
     }
     // Never let a failed/disconnected backend be converted to a successful EOF.

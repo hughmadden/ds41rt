@@ -92,8 +92,10 @@ wiring remains under qualification.
 The migration retains the OpenAI-compatible API, streaming, reasoning controls,
 tool calls, JSON/JSON Schema constraints, admission, continuous batching,
 prefix reuse, cancellation, metrics, health/readiness, and restart tooling.
-V4.1 native vision and the dSpark-disabled `-full` control are part of the release
-scope and must pass the full-model serving gates.
+Native `serve-native` now accepts up to sixteen images in both target-only and
+dSpark modes, including image-aware prefix reuse. See the
+[vision serving qualification](docs/release-v1-vision-serving.md).
+Standard launch-script integration and the remaining release gates are still open.
 
 There are no qualified V4.1 end-to-end throughput claims yet.
 

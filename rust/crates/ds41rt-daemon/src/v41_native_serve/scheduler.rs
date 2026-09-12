@@ -59,6 +59,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
     first: &mut TargetPass<'w, 'a>, second: &mut TargetPass<'w, 'a>,
     requests: &mut Requests<'a>, first_transport: &mut NativeTp4Wave<'a>,
     second_transport: &mut NativeTp4Wave<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>,
+    vision: &mut crate::v41_vision::VisionRuntime<'a>,
 ) -> Result<()> {
     let mut active: Vec<Option<Active>> = (0..args.concurrency).map(|_| None).collect();
     let mut id = 0u64;
@@ -108,14 +109,39 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             let events = job.events.clone();
             let result = (|| -> Result<Active> {
                 let prompt = ds41rt_loader::encode_tokenizer_text(&args.snapshot, &job.prompt, false)?.token_ids;
+                let (prompt, images) = if job.images.is_empty() { (prompt, Vec::new()) } else {
+                    let expanded = ds41rt_loader::V41VisionPrompt::expand(&prompt,
+                        std::mem::take(&mut job.images), limits.context() as usize)?;
+                    (expanded.tokens, expanded.images)
+                };
                 job.max_tokens = limits.output_for_prompt(prompt.len(), job.max_tokens)?;
                 let decoder = ds41rt_loader::streaming_token_decoder(&args.snapshot, false)?;
                 if let Some(draft) = draft.as_deref_mut() { draft.admit(id)?; }
-                let image_keys = prefixes.prepare_key(&prompt, &[])?;
+                let image_keys = prefixes.prepare_key(&prompt, &images)?;
+                if !images.is_empty() {
+                    requests.attach_images(lease, crate::v41_requests::RequestImages::new(&images)?)?;
+                }
                 let hit = prefixes.restore(&prompt, &image_keys, id, lease, requests, draft.as_deref_mut())?;
                 let cached = hit.map_or(0, |(end, _)| end);
                 let source_end = requests.cache().committed_end(lease)? as usize;
                 prefixes.make_room(requests, &[(lease, (prompt.len() - source_end) as u32)])?;
+                if !images.is_empty() {
+                    let start = if requests.cache().stage(lease)? == crate::v41_backbone_cache::CacheStage::EncoderReplay {
+                        requests.cache().history_end(lease)? as usize
+                    } else { source_end };
+                    let needed = requests.images(lease)?.needed(start, prompt.len())?;
+                    let started = Instant::now();
+                    for &index in &needed {
+                        ensure!(!job.events.is_closed(), "client disconnected");
+                        let features = vision.encode(&images[index].image)?;
+                        let mut bytes = vec![0; features.bytes];
+                        lib.copy_d2h(&mut bytes, features)?;
+                        requests.install_image_features(lease, index, bytes)?;
+                    }
+                    tracing::info!(request_id=id, images=images.len(), encoded_images=needed.len(),
+                        encoder_ms=started.elapsed().as_secs_f64()*1000.0, "native vision preparation");
+                }
+                drop(images);
                 job.events.blocking_send(Ok(InferenceChunk::Ready {
                     system_fingerprint: Some(if draft.is_some() { "ds41rt-native-fp8-kv-dspark" }
                         else { "ds41rt-native-fp8-kv" }.into()),

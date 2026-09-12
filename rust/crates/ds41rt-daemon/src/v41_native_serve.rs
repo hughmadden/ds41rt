@@ -255,7 +255,9 @@ fn worker(
         .as_ref()
         .map(|weights| DraftRuntime::with_requests(&lib, weights, &table, &vocabulary, capacity, args.concurrency))
         .transpose()?;
-    // Size after both lanes, transports and optional draft allocations are live.
+    let mut vision = crate::v41_vision::VisionRuntime::new(&lib, &catalog, 9216,
+        crate::v41_vision::VisionRuntime::device_bytes(&catalog, 9216)?)?;
+    // Size after vision, both lanes, transports and optional draft allocations are live.
     let (free, total) = lib.cuda_memory_info()?;
     let pool = memory::PoolPlan::new(args.concurrency as usize, args.max_context_tokens as usize,
         args.prefix_cache_entries as usize, args.kv_pool_size, args.memory_reservation, free, total)?;
@@ -273,7 +275,7 @@ fn worker(
         .send(Ok(()))
         .map_err(|_| anyhow::anyhow!("API startup cancelled"))?;
     scheduler::serve(&lib, &args, &runtime, &mut receive, &mut pass, &mut prefill_pass,
-        &mut requests, &mut transport, &mut prefill_transport, draft.as_mut())
+        &mut requests, &mut transport, &mut prefill_transport, draft.as_mut(), &mut vision)
 }
 
 fn prefill<'w, 'a>(

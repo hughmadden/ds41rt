@@ -16,11 +16,10 @@ text requests borrow the original token slice and allocate no additional token
 buffer. The registry's live identities are bounded by active requests and the
 configured retention banks, with at most sixteen image bindings per request.
 
-The scheduler and cache retention/restore interfaces now carry those pins. Image
-API admission is still disabled: feature replacement, routing/Engram masks and
-replay integration must be completed before requests can use these keys in live
-vision serving. This checkpoint establishes cache identity and lifetime behavior;
-it does not claim end-to-end image-cache or performance qualification.
+The scheduler and cache retention/restore interfaces carry those pins. This
+checkpoint establishes cache identity and lifetime behavior; the separate
+[serving qualification](release-v1-vision-serving.md) covers their live use with
+image feature replacement, routing/Engram masks and bounded replay.
 
 ## Validation
 
@@ -41,5 +40,5 @@ cargo test --manifest-path rust/Cargo.toml -p ds41rt-daemon --bin ds41rt \
 
 [Evidence metadata](release-v1-vision-cache-identity.json) records the source and
 test artifact hashes and complete build/test logs. These checks are CPU-side;
-full live image-cache parity and text-performance checks remain part of serving
-integration.
+live image-cache behavior and focused text-performance checks are recorded in
+the serving report.

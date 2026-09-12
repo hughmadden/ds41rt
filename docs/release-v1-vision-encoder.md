@@ -3,9 +3,9 @@
 The native coordinator now has a complete V4.1 vision encoder and aligner:
 32 transformer blocks, 2D rotary positions, 3×3 spatial merging, the language
 projection and learned image delimiters. Its owner loads the 266 official BF16
-tensors and reuses one bounded workspace between images. API admission,
-image-aware prefix reuse, routing and image-answer qualification remain open.
-This component checkpoint does not enable vision requests in the live server.
+tensors and reuses one bounded workspace between images. This report covers the
+component's numerical checks; [native serving qualification](release-v1-vision-serving.md)
+covers API admission, image-aware prefix reuse, routing and image answers.
 
 ## Execution and memory
 
@@ -117,5 +117,5 @@ under `compute-sanitizer --tool memcheck --error-exitcode 99` for device checks.
 [Evidence metadata](release-v1-vision-encoder.json) records source, artifact and
 input hashes with the complete comparison reports, logs and reproduction
 settings. The native library for this checkpoint was built separately with
-expert AOT and XGrammar disabled; integration into the complete serving build
-remains part of the next gate.
+expert AOT and XGrammar disabled; the serving report records the separate full
+AOT/XGrammar build used for live image requests.
