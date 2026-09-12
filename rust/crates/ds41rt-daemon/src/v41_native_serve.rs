@@ -258,6 +258,9 @@ fn worker(
         .as_ref()
         .map(|weights| DraftRuntime::with_requests(&lib, weights, &table, &vocabulary, capacity, args.concurrency))
         .transpose()?;
+    if let Some(draft) = &mut draft {
+        draft.set_draft_limit(args.dspark_draft_limit)?;
+    }
     let mut vision = crate::v41_vision::VisionRuntime::new(&lib, &catalog, 9216,
         crate::v41_vision::VisionRuntime::device_bytes(&catalog, 9216)?)?;
     // Size after vision, both lanes, transports and optional draft allocations are live.

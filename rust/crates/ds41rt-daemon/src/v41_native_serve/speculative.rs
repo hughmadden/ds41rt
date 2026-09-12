@@ -11,6 +11,7 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     requests: std::collections::BTreeMap<u64, DraftRequest>,
     captured: std::collections::BTreeSet<usize>,
     request_limit: usize,
+    draft_limit: usize,
     // Diagnostic-only downloads; production proposal generation adds no copies.
     confidence_trace: std::collections::BTreeMap<u64, Vec<f32>>,
 }
@@ -47,6 +48,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             requests: Default::default(),
             captured: Default::default(),
             request_limit: requests as usize,
+            draft_limit: 5,
             confidence_trace: Default::default(),
         })
     }
@@ -71,6 +73,11 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             rng: ds41rt_core::DsparkRng::new(id),
             slot,
         });
+        Ok(())
+    }
+    pub fn set_draft_limit(&mut self, limit: u8) -> Result<()> {
+        ensure!((1..=5).contains(&limit), "draft limit must be one through five");
+        self.draft_limit = limit as usize;
         Ok(())
     }
     pub fn release(&mut self, id: u64) -> Result<()> {
@@ -217,7 +224,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         for (row, &(output, &(_, anchor, _, remaining))) in active.iter().enumerate() {
             let tokens: Vec<_> = (0..6).map(|step| packed[step * count + row]).collect();
             ensure!(tokens[0] == anchor && tokens.iter().all(|&token| token < 129280), "invalid draft tokens");
-            outputs[output] = tokens[..remaining.min(6)].to_vec();
+            outputs[output] = tokens[..remaining.min(self.draft_limit + 1)].to_vec();
         }
         Ok(outputs)
     }

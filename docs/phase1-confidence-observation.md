@@ -49,3 +49,18 @@ trajectory and does not simulate all alternative shorter-policy frontiers.
 
 Raw local records: `/tmp/ds41-phase1-confidence-corpus.json` and
 `/tmp/ds41-phase1-observation.log`. Concurrent observation is the next step.
+
+## Fixed-length cost controls
+
+The native binary accepts `--dspark-draft-limit 1..5`, default 5. The control
+retains the emitted anchor, generates the same five-position draft graph, and
+verifies only the selected prefix (also bounded by remaining output budget).
+It measures the cost of changing verifier rows without changing draft generation.
+This is a fixed-policy comparison control, not adaptive selection.
+
+`scripts/summarize-ds41-native-policy.py TRACE --output SUMMARY` groups complete
+scheduler times by request count and total verifier rows, and reports per-position
+confidence bins with conditional acceptance. It excludes constrained and terminal
+observations from calibration and never labels unverified suffix positions.
+The timings include instrumentation and first-use effects. They do not constitute
+a counterfactual shorter-policy trajectory or a held-out throughput prediction.

@@ -388,6 +388,13 @@ mod tests {
         assert_eq!(args.max_output_tokens, 393_216);
         assert_eq!(args.concurrency, 16);
         assert_eq!(args.prefix_cache_entries, 24);
+        assert_eq!(args.dspark_draft_limit, 5);
+        for limit in ["1", "2", "3", "4", "5"] {
+            assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_ok());
+        }
+        for limit in ["0", "6"] {
+            assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_err());
+        }
         for entries in ["0", "2", "24", "128"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--prefix-cache-entries", entries])).is_ok());
         }
@@ -487,6 +494,9 @@ pub(crate) struct NativeServeArgs {
 
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
+    /// Maximum verified draft tokens per request; fixed-length policy control.
+    #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=5))]
+    pub dspark_draft_limit: u8,
 
     #[arg(long)] pub snapshot: PathBuf,
     #[arg(long)] pub native_lib: PathBuf,
