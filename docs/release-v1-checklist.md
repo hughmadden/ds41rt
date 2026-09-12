@@ -45,22 +45,23 @@ gate below is satisfied merely by an older component test.
   focused text regression checks. Longer target/dSpark descriptions are
   semantically consistent, not necessarily token-identical. The broader
   long-context/pool-pressure prefix gate and release performance suite remain open.
-- [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
+- [x] Qualify tools, structured outputs, streaming, cancellation and recovery.
   Complete native XGrammar enforcement before the compressed-cache migration.
   [Retained-logit preparation](release-v1-constraints.md) enables first-token
   reselection under a changed grammar on exact hits. [Response constraint
   enforcement](release-v1-response-constraints.md) now covers JSON schemas,
   thinking, SSE and dSpark. [Native tool serving](release-v1-tool-serving.md)
   now enforces strict arguments, selection and parallel-call policy, including
-  high thinking and independent JSON/SSE completion validation. Remaining
-  parameter-schema generation cases and broader tool-eval qualification keep
-  this gate open. [Additional-name exclusions](release-v1-tool-exclusions.md)
+  high thinking and independent JSON/SSE completion validation. Model misses on
+  some parameter-schema scenarios remain recorded rather than hidden.
+  [Additional-name exclusions](release-v1-tool-exclusions.md)
   prevent additional arguments from bypassing declared value constraints.
   [Pattern intersections](release-v1-tool-patterns.md) apply all matching regular
   value constraints and preserve native admission errors. The broader
   [high-thinking agentic run](release-v1-tools-agentic-high.md) now scores
-  124/138 basic and 35/38 hard. Remaining schema limitations and final
-  qualification on the corrected FP4 serving build keep the release gate open.
+  124/138 basic and 35/38 hard. The [three final corrected-FP4 runs](release-v1-tool-eval-final.md)
+  score 119–123/138 basic and 34–36/38 hard with no serving failures, completing
+  this gate at the quality level accepted by the user.
 - [ ] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
   scales; retain FP8 SWA and the independent FP4 index format. The previous
   FP8-only interpretation was incorrect (user clarification September 12).
@@ -78,6 +79,9 @@ gate below is satisfied merely by an older component test.
   broader performance and subsequent quality gates remain open.
   [Long-context retrieval](release-v1-needle.md) now passes fresh and exact-reuse
   checks through 1.04M source tokens in both target and dSpark modes.
+  [Final tool evaluation](release-v1-tool-eval-final.md) completes three C16
+  hard-mode runs with thinking enabled at high effort. Broader prefix and final
+  performance qualification remain open.
   Track this work in order:
 
   1. Integrate architectural FP4 throughout compressed-cache serving and retention.
@@ -135,10 +139,11 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   contexts and repeats each with a full prompt-cache hit in target and dSpark
   modes; see the [preserved evidence](release-v1-needle.md).
 - [ ] Concurrency scaling through C16, reporting aggregate tokens per second.
-- [ ] Three tool-eval-bench hard-mode runs at the measured best concurrency,
+- [x] Three tool-eval-bench hard-mode runs at the measured best concurrency,
   with thinking enabled at high effort and sufficient timeout; points split
   into basic, hard and total scores. The user reduced the original five-run
-  requirement to three on September 12, 2026.
+  requirement to three on September 12, 2026. The [final corrected-FP4 campaign](release-v1-tool-eval-final.md)
+  records 119/34/153, 123/36/159, and 120/36/156 basic/hard/total points at C16.
 - [ ] Startup time, including phase-level I/O and graph preparation evidence.
 - [ ] dsh generates a single-file WebGL Frogger game; retain execution metrics
   and publish a playable link to the actual generated artifact.

@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "campaign": "three final corrected-FP4 hard-mode tool-eval runs",
+  "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+  "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "tool_eval_version": "tool-eval-bench 2.6.1.dev45+gcf54b4bfe",
+  "mode": "dspark",
+  "concurrency": 16,
+  "thinking": true,
+  "reasoning_effort": "high",
+  "temperature": 0,
+  "timeout_seconds": 900,
+  "max_turns": 12,
+  "output_cap": null,
+  "reference_date": "2026-09-12",
+  "runs": [
+    {"run_id": "2026-09-12T15-37-55.080777Z_6eaf1162", "basic": 119, "hard": 34, "total": 153, "pass": 68, "partial": 17, "fail": 3},
+    {"run_id": "2026-09-12T15-45-17.431401Z_c68ec84b", "basic": 123, "hard": 36, "total": 159, "pass": 73, "partial": 13, "fail": 2},
+    {"run_id": "2026-09-12T15-52-24.110309Z_b63e8c5b", "basic": 120, "hard": 36, "total": 156, "pass": 71, "partial": 14, "fail": 3}
+  ],
+  "max_points": {"basic": 138, "hard": 38, "total": 176},
+  "mean_points": {"basic": 120.666667, "hard": 35.333333, "total": 156.0},
+  "failure_frequency": {"TC-33": 1, "TC-43": 3, "TC-61": 1, "TC-68": 3},
+  "infrastructure": {
+    "request_timeouts": 0,
+    "server_failures": 0,
+    "pool_exhaustions": 0,
+    "worker_failures": 0
+  },
+  "hardware": {
+    "coordinator": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+    "coordinator_driver": "595.91.07",
+    "coordinator_power_limit_watts": 400,
+    "coordinator_max_memory_clock_mhz": 14001,
+    "memory_overclock": false,
+    "workers": "four NVIDIA GB10 hosts",
+    "worker_driver": "580.159.03"
+  },
+  "artifact_sha256": {
+    "source_commit": "30f1ea5",
+    "daemon": "1da2bfd1f6913ce13fc21e23fb46b58e2603f9f9d31eca4b1ee615f4166dece3",
+    "native_library": "289139172e7e1d6643dae673e0f3ecdbbc60db6be8c64373e6bf4ba2d228f51d",
+    "evidence_archive": "fe8ec94fe3328db64d04b7cd384d8b86cd61b52314ede4a23fae7f580e363dbc"
+  },
+  "qualification_completed": true
+}
