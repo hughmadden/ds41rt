@@ -1,5 +1,10 @@
 # Fixed FP8 source KV and paired publication
 
+> Historical FP8-policy qualification. The user clarified that compressed KV
+> should retain its architectural FP4 format; the earlier FP8-only interpretation
+> was incorrect. See the [restoration plan](release-v1-compressed-kv.md). Serving
+> integration of that correction follows native XGrammar enforcement.
+
 Serving KV uses one fixed representation: E4M3 values with one E8M0 scale per 32 coordinates, across the full 512-wide vector including its rotary tail. Each row occupies 512 value bytes plus 16 scale bytes. `ds41rt_v41_kv_pack` optionally rotates the last 64 coordinates, rounds them to BF16, then applies the official K32 FP8 activation quantization arithmetic. The scale is the next power of two at or above `max(amax,1e-4)/448`. Values/scales are separate contiguous arrays suitable for paged attention consumers. There are no serving-format profiles.
 
 **Reference distinction:** this matches the reference window-KV quantization policy. The pinned reference compresses source KV with FP4, groups of 16 and E4M3 scales. The user's FP8-only serving policy replaces that compressed-KV quantization with K32 FP8; it is not claimed byte-equivalent to reference compressed FP4. Index keys and learned index queries retain their independent architectural FP4/E8M0 encoding. Full-model logit and generation qualification remains required for the serving policy.

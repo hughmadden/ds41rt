@@ -1,0 +1,1848 @@
+{
+  "scope": "Packing/scatter primitives only; serving still uses FP8 compressed KV",
+  "runs": {
+    "rtx0": {
+      "scope": "Compressed FP4 primitive only; serving integration pending",
+      "device": 0,
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "compiler_overrides": {
+        "tir.disable_vectorize": true
+      },
+      "cases": [
+        {
+          "case": "c0",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c1",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c10",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c11",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c12",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c13",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c14",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c15",
+          "rows": 1024,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c16",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c17",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c18",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c19",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c2",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c20",
+          "rows": 4096,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c21",
+          "rows": 16,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c22",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c23",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c24",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c25",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c26",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c27",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c28",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c29",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c3",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c30",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c31",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c32",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c33",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c34",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c35",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c36",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c37",
+          "rows": 1024,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c38",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c39",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c4",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c40",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c41",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c42",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c43",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c44",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c45",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c46",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c47",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c48",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c49",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c5",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c50",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c51",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c52",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c53",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c54",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c55",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c56",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c57",
+          "rows": 1024,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c58",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c59",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c6",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c60",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c61",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c62",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c63",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c64",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c65",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c66",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c67",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c68",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c69",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c7",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c70",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c71",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c72",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c73",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c74",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c75",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c76",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c77",
+          "rows": 512,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c78",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c79",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c8",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c80",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c81",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c82",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c83",
+          "rows": 4096,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c84",
+          "rows": 16,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c9",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-1",
+          "rows": 1,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-35",
+          "rows": 35,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-129",
+          "rows": 129,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-4096",
+          "rows": 4096,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "zeros",
+          "rows": 1,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "bf16-sweep",
+          "rows": 70,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        }
+      ]
+    },
+    "rtx1": {
+      "scope": "Compressed FP4 primitive only; serving integration pending",
+      "device": 1,
+      "reference_revision": "df42c109f1defefcbfcedbe7d905718a12266e40",
+      "compiler_overrides": {
+        "tir.disable_vectorize": true
+      },
+      "cases": [
+        {
+          "case": "c0",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c1",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c10",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c11",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c12",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c13",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c14",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c15",
+          "rows": 1024,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c16",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c17",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c18",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c19",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c2",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c20",
+          "rows": 4096,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c21",
+          "rows": 16,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c22",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c23",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c24",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c25",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c26",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c27",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c28",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c29",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c3",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c30",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c31",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c32",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c33",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c34",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c35",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c36",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c37",
+          "rows": 1024,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c38",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c39",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c4",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c40",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c41",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c42",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c43",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c44",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c45",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c46",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c47",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c48",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c49",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c5",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c50",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c51",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c52",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c53",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c54",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c55",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c56",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c57",
+          "rows": 1024,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c58",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c59",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c6",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c60",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c61",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c62",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c63",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c64",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c65",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c66",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c67",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c68",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c69",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c7",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c70",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c71",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c72",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c73",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c74",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c75",
+          "rows": 80,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c76",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c77",
+          "rows": 512,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c78",
+          "rows": 4,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c79",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c8",
+          "rows": 15,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c80",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c81",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c82",
+          "rows": 2,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c83",
+          "rows": 4096,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c84",
+          "rows": 16,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "c9",
+          "rows": 5,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-1",
+          "rows": 1,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-35",
+          "rows": 35,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-129",
+          "rows": 129,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "random-4096",
+          "rows": 4096,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "zeros",
+          "rows": 1,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        },
+        {
+          "case": "bf16-sweep",
+          "rows": 70,
+          "decoded_values_exact": true,
+          "scales_exact": true,
+          "window_exact": true,
+          "scatter_exact": true
+        }
+      ]
+    }
+  },
+  "library_sha256": "ebc9dd2d8edff954483588c58e35ff6325491d6a71a19c908a23658bad34ac35",
+  "source_vectors": {
+    "rtx0": {
+      "c0-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c0-latent.bin": "8f68f4ff4d18c1ec23b05e39681bad7d1e861d06e80aa9eaa4fb7ab41a9d412a",
+      "c1-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c1-latent.bin": "2e08ffd2c95e6a7a992578a7e815b94ad6d3b1edd76fba06be8884deacd256e5",
+      "c10-freq.bin": "79b528d764c3f4e412be9c8c941d489838feecd6c31f9900e4b7c4e92da65655",
+      "c10-latent.bin": "395f3761c12f55795bc9a6852dda0c8f92308aed2b9c046aa035948ee0da3308",
+      "c11-freq.bin": "5b70b9cf7612b2adffacd670e5b47cd98b3f881240bb30d377ecddf5842d9ba7",
+      "c11-latent.bin": "8765a802c1ecda59991231a9e270fe5bbedfbda96e2551471ca37b845abab2e6",
+      "c12-freq.bin": "5f9fa6162f7f6f00d0d8775fd617eeb05a746d120cc9f88afa365151b8154a2f",
+      "c12-latent.bin": "bc3c73774c391d191b15d7b94228346e2234921677e550050c26c59f9ebb6ac3",
+      "c13-freq.bin": "6758396c0735db1cfa6616f68490f966bc68fea6759a93590533ee6d372b0db9",
+      "c13-latent.bin": "01add06308fb90382f195b98704c96c026263f3680a95f33b7faba031e77f20f",
+      "c14-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c14-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c15-freq.bin": "b8d90df3fa5303d74a7aa5a61a9d63975b264473e6adae39d37d2555ca9e1091",
+      "c15-latent.bin": "0b6b3f68582cda8680bddef0ed5b149bfa4aa37faa37e232c34220a4cb8ec1c5",
+      "c16-freq.bin": "f01be6dd1b606bbe02e491c6c609db8609adadebc459a06652019d6cca36fe30",
+      "c16-latent.bin": "a35fe9ab18d79e50c68924b64b843a15fcfc38b74b3d7c96560b6ed96bae69fc",
+      "c17-freq.bin": "9c14feb3702beab69682ae1c3a35329da16bede98329aa62c5f73a30de089396",
+      "c17-latent.bin": "e2a5b1504e47e362823767a67ff8515c2834b5dedff6ad243f2c9979e59cc9a1",
+      "c18-freq.bin": "ff99c3a950d588a3d972860fdcf2471407c24132b549d6cd01fc8d0235c4fd5d",
+      "c18-latent.bin": "d75caf48785599e9a0bf2a073a1592e83b5ca7f7890fb57da4c1f2ac33d33354",
+      "c19-freq.bin": "affbbb603f8f8351a41943f6706f13452ff0643ca100ba4910f6f08578dbbf73",
+      "c19-latent.bin": "e2a5b1504e47e362823767a67ff8515c2834b5dedff6ad243f2c9979e59cc9a1",
+      "c2-freq.bin": "37b6d528effb45ec34c581fe6113b88a0d5b77e369e6723a5619cf340139a0c8",
+      "c2-latent.bin": "3b6896fd3e69128e5d664e4494ed9eaa1f8be45d94e5cd294ebb3b2903cb23ab",
+      "c20-freq.bin": "10a06e6fb08b3bb65c770a87c6e93b24e6aea26b07eadbe6b2fe37758224ce3f",
+      "c20-latent.bin": "fd34bb3b8da527f5701626019b40a01e509b339127d59a22d8e8468bc48fcbd3",
+      "c21-freq.bin": "2737662c788affb63e4291a2edadf613e67aa5ce38e14996942a8b0a9b6362fe",
+      "c21-latent.bin": "61b9aa0694124c6ef4f65fad76c1fb132733a311fa4d64d362412ac8317378d4",
+      "c22-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c22-latent.bin": "72ead68102f84557c2bda126927b9033ff4e605aefe5b7ba1efa6af9b14ccc25",
+      "c23-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c23-latent.bin": "8b83226fa5f880d290b4f41beeeb1e44e85aadd0b87811c6f45d561f81a1a20e",
+      "c24-freq.bin": "37b6d528effb45ec34c581fe6113b88a0d5b77e369e6723a5619cf340139a0c8",
+      "c24-latent.bin": "f2353138f4e62bbdc8f0fbf6e2377e47bc4508b0bfbf1b3d41cd45b0c9c16cb1",
+      "c25-freq.bin": "ddd776b21d5cbb3de22f9b7a335bada704f927868d1380649c23585393fab98a",
+      "c25-latent.bin": "e620a2935a30abab0401b3b996e03387c5616dd126a88c859916e39701d36f60",
+      "c26-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c26-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c27-freq.bin": "e5bccbf40024a35b07a5fdbf27e4a0ff3a87bfabfef32793c7d7f6a18e9570bb",
+      "c27-latent.bin": "581fc369c3fbfcd927b2898f6d76303bbcf352232dfffc6e3e7428d7262f7f66",
+      "c28-freq.bin": "56be72dd80df3d570834a8e57af6acca0c7a373077727dae5e921eb2795f9951",
+      "c28-latent.bin": "1c3e2c48bb568385274aa85178315908cdf9a70f530e5e00f275937778f84e94",
+      "c29-freq.bin": "b78a6b3e4707e99d848bbbcfc5860210fc198365e348474a077c0af5ca35ab4f",
+      "c29-latent.bin": "219b73d27b77344499c193905e7aa6ae5cf234f8a07a6588442518cd07dcf603",
+      "c3-freq.bin": "ddd776b21d5cbb3de22f9b7a335bada704f927868d1380649c23585393fab98a",
+      "c3-latent.bin": "6005689de46194717a671f725778398e75e99176a6342455ed1511e2dfba084f",
+      "c30-freq.bin": "556535015bb59e34e8783025c0727a1f470ce188cfd5afec0291f6ff09f8450c",
+      "c30-latent.bin": "ae3dec72de8e3d666690571699e3d8565707b8c0e5ba68042f3937b61a9b40b8",
+      "c31-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c31-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c32-freq.bin": "79b528d764c3f4e412be9c8c941d489838feecd6c31f9900e4b7c4e92da65655",
+      "c32-latent.bin": "f5e09dfc2684c7f92b7215260729e821df5d20b612e0bc7a6664a00f0ae39445",
+      "c33-freq.bin": "5b70b9cf7612b2adffacd670e5b47cd98b3f881240bb30d377ecddf5842d9ba7",
+      "c33-latent.bin": "6b64176640d641c7f93edb9563c60f5c7de07b43f1aa14180ba049aed6decc28",
+      "c34-freq.bin": "5f9fa6162f7f6f00d0d8775fd617eeb05a746d120cc9f88afa365151b8154a2f",
+      "c34-latent.bin": "b442957fdb813f14a6ab20326d5206e7d4c497f9feae09bede7cc00c40bc9857",
+      "c35-freq.bin": "6758396c0735db1cfa6616f68490f966bc68fea6759a93590533ee6d372b0db9",
+      "c35-latent.bin": "1bcee58d214d8997eb1d074f053b26315544f81dc3983c1fe7566af52508360a",
+      "c36-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c36-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c37-freq.bin": "b8d90df3fa5303d74a7aa5a61a9d63975b264473e6adae39d37d2555ca9e1091",
+      "c37-latent.bin": "8898c933c1bf75ed16ba62557ef5a67b92f1956c8355a8af7a3be900fc89ac26",
+      "c38-freq.bin": "f01be6dd1b606bbe02e491c6c609db8609adadebc459a06652019d6cca36fe30",
+      "c38-latent.bin": "2f73fb5f41abaa840dc0e2947bfabff49793683825da555df1ed3f4140959876",
+      "c39-freq.bin": "9c14feb3702beab69682ae1c3a35329da16bede98329aa62c5f73a30de089396",
+      "c39-latent.bin": "0e3b05280d1f58680dfeada0c3fb14933f14561d61d1a1dbdf2e8feff3564fc6",
+      "c4-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c4-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c40-freq.bin": "ff99c3a950d588a3d972860fdcf2471407c24132b549d6cd01fc8d0235c4fd5d",
+      "c40-latent.bin": "64f594e5796ddf202bcc2aa4fda6a48d691b276f59978accd37e0bdefbe06c02",
+      "c41-freq.bin": "affbbb603f8f8351a41943f6706f13452ff0643ca100ba4910f6f08578dbbf73",
+      "c41-latent.bin": "0e3b05280d1f58680dfeada0c3fb14933f14561d61d1a1dbdf2e8feff3564fc6",
+      "c42-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c42-latent.bin": "76c916aea43b2f4ca4dd04e1e509ea69a309cb41592e7ea375ddfdec3d9ad88c",
+      "c43-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c43-latent.bin": "29bfbec1f422bb37cb019177ab55b299a45638e5bab3030b5f23e6acc997227d",
+      "c44-freq.bin": "37b6d528effb45ec34c581fe6113b88a0d5b77e369e6723a5619cf340139a0c8",
+      "c44-latent.bin": "69ed129b3ea308f18eddc7d9298dbe64fadda99fcd48a7abfd6716f29a736c07",
+      "c45-freq.bin": "ddd776b21d5cbb3de22f9b7a335bada704f927868d1380649c23585393fab98a",
+      "c45-latent.bin": "37141a0fc8788caebe6c78c305d402ceb702187039ba69833086786cb0396676",
+      "c46-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c46-latent.bin": "ffa1834867e9f7ad3bfe1d98c42001409c0ff30072dc24962df82960763493d9",
+      "c47-freq.bin": "e5bccbf40024a35b07a5fdbf27e4a0ff3a87bfabfef32793c7d7f6a18e9570bb",
+      "c47-latent.bin": "798f21070abb119c6d99005592ea1a40bfe00a8db037b8d23d24c8a617ca4512",
+      "c48-freq.bin": "56be72dd80df3d570834a8e57af6acca0c7a373077727dae5e921eb2795f9951",
+      "c48-latent.bin": "287f06fd89f137490642bc1c8eb6f1ade973a4a6573d5e3b91167f86ec266fba",
+      "c49-freq.bin": "b78a6b3e4707e99d848bbbcfc5860210fc198365e348474a077c0af5ca35ab4f",
+      "c49-latent.bin": "cf06f7f2b74a95877b2207bc944c36e86a3bd663a8f68d08e33c7befe11ac958",
+      "c5-freq.bin": "e5bccbf40024a35b07a5fdbf27e4a0ff3a87bfabfef32793c7d7f6a18e9570bb",
+      "c5-latent.bin": "af6ea2cf004e58c4b8db033225f038e492504c5733d30e07b0bec718c3d6cb65",
+      "c50-freq.bin": "556535015bb59e34e8783025c0727a1f470ce188cfd5afec0291f6ff09f8450c",
+      "c50-latent.bin": "f57280f28891c1191eabf0c568426d1eb5d4570adf7fd4c5ed490160fde16540",
+      "c51-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c51-latent.bin": "ffa1834867e9f7ad3bfe1d98c42001409c0ff30072dc24962df82960763493d9",
+      "c52-freq.bin": "79b528d764c3f4e412be9c8c941d489838feecd6c31f9900e4b7c4e92da65655",
+      "c52-latent.bin": "868a702f7f91fd9d46a4fe17c42c7a185f68047d909e17f17703166dbbed19c8",
+      "c53-freq.bin": "5b70b9cf7612b2adffacd670e5b47cd98b3f881240bb30d377ecddf5842d9ba7",
+      "c53-latent.bin": "c15d054fcaeafdd88f69620dead26ef34c2979760074745e9e4c1613bfad53da",
+      "c54-freq.bin": "5f9fa6162f7f6f00d0d8775fd617eeb05a746d120cc9f88afa365151b8154a2f",
+      "c54-latent.bin": "e22ca08fda07e735c287b69f276207eb345c605e7914dab1d2b0d1a5e7891d25",
+      "c55-freq.bin": "6758396c0735db1cfa6616f68490f966bc68fea6759a93590533ee6d372b0db9",
+      "c55-latent.bin": "8c91884a516b2a13545eead319013134083a1e00422871c5ae34a0f77a025f1b",
+      "c56-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c56-latent.bin": "ffa1834867e9f7ad3bfe1d98c42001409c0ff30072dc24962df82960763493d9",
+      "c57-freq.bin": "b8d90df3fa5303d74a7aa5a61a9d63975b264473e6adae39d37d2555ca9e1091",
+      "c57-latent.bin": "ccc861caef98a59fe1e843e1b6f87bd37b83cbab2cb9565353c2a53adf64b26a",
+      "c58-freq.bin": "f01be6dd1b606bbe02e491c6c609db8609adadebc459a06652019d6cca36fe30",
+      "c58-latent.bin": "9f429ef74e614f7b995147ef9a1f0a7534abcb8249b40b5c7b1baf531cbdf5fc",
+      "c59-freq.bin": "9c14feb3702beab69682ae1c3a35329da16bede98329aa62c5f73a30de089396",
+      "c59-latent.bin": "dc76c9d5b10e0a0a3c3ea19dbfd46d0babb3a5a0e18f578e27d3a99e50097a13",
+      "c6-freq.bin": "56be72dd80df3d570834a8e57af6acca0c7a373077727dae5e921eb2795f9951",
+      "c6-latent.bin": "b4a75960f3c758fdd9eef1dd29f8a2ceb4820082ab596be1043e93f5fd7c859a",
+      "c60-freq.bin": "ff99c3a950d588a3d972860fdcf2471407c24132b549d6cd01fc8d0235c4fd5d",
+      "c60-latent.bin": "d405cd109944f2674491cef868d5efb08d48f721c11e91828a019ef74335dc9c",
+      "c61-freq.bin": "affbbb603f8f8351a41943f6706f13452ff0643ca100ba4910f6f08578dbbf73",
+      "c61-latent.bin": "dc76c9d5b10e0a0a3c3ea19dbfd46d0babb3a5a0e18f578e27d3a99e50097a13",
+      "c62-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c62-latent.bin": "4e1b4ce5e00abc8494925e85b2fd0c9827dbe9f6df5540490d543ada79b391df",
+      "c63-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c63-latent.bin": "27395f6ee782065d57693b8a9e04ea43d0930078c767c9aeebdb2587a98c18c1",
+      "c64-freq.bin": "50ad90bc0b52993848dca3d5912b10cd4e52fc3f745f5eeb188af34bba6cdf48",
+      "c64-latent.bin": "06b5d6b4de8b40afa953e2edb6949aad9f24586b704cfb2ea2848a4bb8beb779",
+      "c65-freq.bin": "d30982e32f575cc6305bc87de01b6a7f18b81ea6ed286514e9830d7d5802ebba",
+      "c65-latent.bin": "78cdfe0aab32156c66d5951fbcc1aa8ad4dff9498877c0b35adb8fc3eaaa5d3b",
+      "c66-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c66-latent.bin": "0bec6720f4574e36115a09c9007f4c8f462a9ce7e191d5984bf00e4592504356",
+      "c67-freq.bin": "987ca4fc7bb823372f0ebe0f0127bfe427ed35826e825c524c174f3779b765ef",
+      "c67-latent.bin": "46dcbd688dd528c8180cfa7aaea74f6b5c036f29f9a3c52dbf3737b05a3c64e3",
+      "c68-freq.bin": "589060353b0b53132b63d4e1d90e7653e0305fd47e7b4bcc7de2de068e6ea0ba",
+      "c68-latent.bin": "fa1a034fa73e0df1449890838c668412a52c0d159c55d503144d5890d1866512",
+      "c69-freq.bin": "9ffdcb9acb3aa9787b732fa7460cc8bf122e7c14653e099b3c990c4da7a8c099",
+      "c69-latent.bin": "4e48ae61baa4b07057d83969d3aee7dc7b22eca1f33be689a90a61e30c48f06c",
+      "c7-freq.bin": "b78a6b3e4707e99d848bbbcfc5860210fc198365e348474a077c0af5ca35ab4f",
+      "c7-latent.bin": "08e2dc7c0681073929eee9559d8ec1bb31d187e07280172ba5ad746df30be80a",
+      "c70-freq.bin": "6324ad54d59d89cbb0d4b6be01221ded9d1938d8c0f3fb7cb6c75d47378878a3",
+      "c70-latent.bin": "fef22514e202e0d46cf63b5dc9b0c8ebfc123d3cada0989f4a41310df76ac038",
+      "c71-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c71-latent.bin": "0bec6720f4574e36115a09c9007f4c8f462a9ce7e191d5984bf00e4592504356",
+      "c72-freq.bin": "20d4cd95339ebaa962929c22e3c40d4b13acbb636d5997c4dfbb556488c126e6",
+      "c72-latent.bin": "edba5c1779c84aec9ee458157673373adb9a3a348e4acec89ab3aa782485e681",
+      "c73-freq.bin": "335429b355a19f42ebd05945cfa6a1d1b7409eb4acfee4d24f1c8b3e9cb7a1d0",
+      "c73-latent.bin": "3d41e5c646d6fea929293583bd6f7cb4a78057d3e9c164d01bfbcbf898b425ff",
+      "c74-freq.bin": "299427b0da0313c34388439ae791ff7356a1d3630834c935ae01908d0ba923ec",
+      "c74-latent.bin": "92beb588180ceff5376a7a8adf2d9d6ec4b589c9d5a488a1bb051549c1d26907",
+      "c75-freq.bin": "3b6cddd194748f3255ff56b2e5b947869226f82940e58714914826c0fa5121e3",
+      "c75-latent.bin": "bd9b8f4f8041d17d114bd32c37f5043335749455306c4adb30ccb8847c279f75",
+      "c76-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c76-latent.bin": "0bec6720f4574e36115a09c9007f4c8f462a9ce7e191d5984bf00e4592504356",
+      "c77-freq.bin": "607af821e9abf05bb383a085fe7becb1509cbd5d3cf33634cda7095043ed6d3f",
+      "c77-latent.bin": "579182c11288996addfe4dcbbde312b3d27c8c4dac370d58d74913fe92bccae8",
+      "c78-freq.bin": "a68be9011e116c78ab6f430871f7b740e339f935efd6363b70683bfc7e2e8576",
+      "c78-latent.bin": "c96fc2337374d6dd1cad43d60b1ea2a93f72f67d5c566ca6a062f6dfd0e93636",
+      "c79-freq.bin": "ce571dddea51548799cb9223a756a402385b182df362c7df408a9f46949f2424",
+      "c79-latent.bin": "f5c014fec18e3c7434cc9512df33796419e22b3986ff2e573412261028318e3b",
+      "c8-freq.bin": "556535015bb59e34e8783025c0727a1f470ce188cfd5afec0291f6ff09f8450c",
+      "c8-latent.bin": "b5dfb5cabc0fc0dbed69d2b574b3926fbefcd7cba148146350fb228fa783164c",
+      "c80-freq.bin": "f97bbebf3ea2909a194b61daa8c4d59375af223b339b4650d3edd82314e55ac6",
+      "c80-latent.bin": "f5c014fec18e3c7434cc9512df33796419e22b3986ff2e573412261028318e3b",
+      "c81-freq.bin": "b50a45b77f4480dd8a9b214d1cd9f6ae1b94fe2c7c40dff28a6c763cde15fe4b",
+      "c81-latent.bin": "f5c014fec18e3c7434cc9512df33796419e22b3986ff2e573412261028318e3b",
+      "c82-freq.bin": "b50a45b77f4480dd8a9b214d1cd9f6ae1b94fe2c7c40dff28a6c763cde15fe4b",
+      "c82-latent.bin": "19fbb3b297be9582982c7ec4d00182aa1a0f4eed8ec5966ea9f57308c0f7b0a4",
+      "c83-freq.bin": "a946ae00bb69618391d6f24b8b63eba07df260996cf290d12cf6af0e9e6f3a38",
+      "c83-latent.bin": "9a5252bf0bbaa016d951eb5fd65db69c9f42577646f26fc1f838e4691524e163",
+      "c84-freq.bin": "8a315ed3edbeee439802d1e7d18fda5f86cd9a441f815189a32933167f31a194",
+      "c84-latent.bin": "df667e49be5c04b7525a83f6c0fc43a5284cb1c0cb7e5ea044f408493bc445ad",
+      "c9-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c9-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d"
+    },
+    "rtx1": {
+      "c0-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c0-latent.bin": "8f68f4ff4d18c1ec23b05e39681bad7d1e861d06e80aa9eaa4fb7ab41a9d412a",
+      "c1-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c1-latent.bin": "2e08ffd2c95e6a7a992578a7e815b94ad6d3b1edd76fba06be8884deacd256e5",
+      "c10-freq.bin": "79b528d764c3f4e412be9c8c941d489838feecd6c31f9900e4b7c4e92da65655",
+      "c10-latent.bin": "395f3761c12f55795bc9a6852dda0c8f92308aed2b9c046aa035948ee0da3308",
+      "c11-freq.bin": "5b70b9cf7612b2adffacd670e5b47cd98b3f881240bb30d377ecddf5842d9ba7",
+      "c11-latent.bin": "8765a802c1ecda59991231a9e270fe5bbedfbda96e2551471ca37b845abab2e6",
+      "c12-freq.bin": "5f9fa6162f7f6f00d0d8775fd617eeb05a746d120cc9f88afa365151b8154a2f",
+      "c12-latent.bin": "bc3c73774c391d191b15d7b94228346e2234921677e550050c26c59f9ebb6ac3",
+      "c13-freq.bin": "6758396c0735db1cfa6616f68490f966bc68fea6759a93590533ee6d372b0db9",
+      "c13-latent.bin": "01add06308fb90382f195b98704c96c026263f3680a95f33b7faba031e77f20f",
+      "c14-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c14-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c15-freq.bin": "b8d90df3fa5303d74a7aa5a61a9d63975b264473e6adae39d37d2555ca9e1091",
+      "c15-latent.bin": "0b6b3f68582cda8680bddef0ed5b149bfa4aa37faa37e232c34220a4cb8ec1c5",
+      "c16-freq.bin": "f01be6dd1b606bbe02e491c6c609db8609adadebc459a06652019d6cca36fe30",
+      "c16-latent.bin": "a35fe9ab18d79e50c68924b64b843a15fcfc38b74b3d7c96560b6ed96bae69fc",
+      "c17-freq.bin": "9c14feb3702beab69682ae1c3a35329da16bede98329aa62c5f73a30de089396",
+      "c17-latent.bin": "e2a5b1504e47e362823767a67ff8515c2834b5dedff6ad243f2c9979e59cc9a1",
+      "c18-freq.bin": "ff99c3a950d588a3d972860fdcf2471407c24132b549d6cd01fc8d0235c4fd5d",
+      "c18-latent.bin": "d75caf48785599e9a0bf2a073a1592e83b5ca7f7890fb57da4c1f2ac33d33354",
+      "c19-freq.bin": "affbbb603f8f8351a41943f6706f13452ff0643ca100ba4910f6f08578dbbf73",
+      "c19-latent.bin": "e2a5b1504e47e362823767a67ff8515c2834b5dedff6ad243f2c9979e59cc9a1",
+      "c2-freq.bin": "37b6d528effb45ec34c581fe6113b88a0d5b77e369e6723a5619cf340139a0c8",
+      "c2-latent.bin": "3b6896fd3e69128e5d664e4494ed9eaa1f8be45d94e5cd294ebb3b2903cb23ab",
+      "c20-freq.bin": "10a06e6fb08b3bb65c770a87c6e93b24e6aea26b07eadbe6b2fe37758224ce3f",
+      "c20-latent.bin": "fd34bb3b8da527f5701626019b40a01e509b339127d59a22d8e8468bc48fcbd3",
+      "c21-freq.bin": "2737662c788affb63e4291a2edadf613e67aa5ce38e14996942a8b0a9b6362fe",
+      "c21-latent.bin": "61b9aa0694124c6ef4f65fad76c1fb132733a311fa4d64d362412ac8317378d4",
+      "c22-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c22-latent.bin": "72ead68102f84557c2bda126927b9033ff4e605aefe5b7ba1efa6af9b14ccc25",
+      "c23-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c23-latent.bin": "8b83226fa5f880d290b4f41beeeb1e44e85aadd0b87811c6f45d561f81a1a20e",
+      "c24-freq.bin": "37b6d528effb45ec34c581fe6113b88a0d5b77e369e6723a5619cf340139a0c8",
+      "c24-latent.bin": "f2353138f4e62bbdc8f0fbf6e2377e47bc4508b0bfbf1b3d41cd45b0c9c16cb1",
+      "c25-freq.bin": "ddd776b21d5cbb3de22f9b7a335bada704f927868d1380649c23585393fab98a",
+      "c25-latent.bin": "e620a2935a30abab0401b3b996e03387c5616dd126a88c859916e39701d36f60",
+      "c26-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c26-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c27-freq.bin": "e5bccbf40024a35b07a5fdbf27e4a0ff3a87bfabfef32793c7d7f6a18e9570bb",
+      "c27-latent.bin": "581fc369c3fbfcd927b2898f6d76303bbcf352232dfffc6e3e7428d7262f7f66",
+      "c28-freq.bin": "56be72dd80df3d570834a8e57af6acca0c7a373077727dae5e921eb2795f9951",
+      "c28-latent.bin": "1c3e2c48bb568385274aa85178315908cdf9a70f530e5e00f275937778f84e94",
+      "c29-freq.bin": "b78a6b3e4707e99d848bbbcfc5860210fc198365e348474a077c0af5ca35ab4f",
+      "c29-latent.bin": "219b73d27b77344499c193905e7aa6ae5cf234f8a07a6588442518cd07dcf603",
+      "c3-freq.bin": "ddd776b21d5cbb3de22f9b7a335bada704f927868d1380649c23585393fab98a",
+      "c3-latent.bin": "6005689de46194717a671f725778398e75e99176a6342455ed1511e2dfba084f",
+      "c30-freq.bin": "556535015bb59e34e8783025c0727a1f470ce188cfd5afec0291f6ff09f8450c",
+      "c30-latent.bin": "ae3dec72de8e3d666690571699e3d8565707b8c0e5ba68042f3937b61a9b40b8",
+      "c31-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c31-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c32-freq.bin": "79b528d764c3f4e412be9c8c941d489838feecd6c31f9900e4b7c4e92da65655",
+      "c32-latent.bin": "f5e09dfc2684c7f92b7215260729e821df5d20b612e0bc7a6664a00f0ae39445",
+      "c33-freq.bin": "5b70b9cf7612b2adffacd670e5b47cd98b3f881240bb30d377ecddf5842d9ba7",
+      "c33-latent.bin": "6b64176640d641c7f93edb9563c60f5c7de07b43f1aa14180ba049aed6decc28",
+      "c34-freq.bin": "5f9fa6162f7f6f00d0d8775fd617eeb05a746d120cc9f88afa365151b8154a2f",
+      "c34-latent.bin": "b442957fdb813f14a6ab20326d5206e7d4c497f9feae09bede7cc00c40bc9857",
+      "c35-freq.bin": "6758396c0735db1cfa6616f68490f966bc68fea6759a93590533ee6d372b0db9",
+      "c35-latent.bin": "1bcee58d214d8997eb1d074f053b26315544f81dc3983c1fe7566af52508360a",
+      "c36-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c36-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c37-freq.bin": "b8d90df3fa5303d74a7aa5a61a9d63975b264473e6adae39d37d2555ca9e1091",
+      "c37-latent.bin": "8898c933c1bf75ed16ba62557ef5a67b92f1956c8355a8af7a3be900fc89ac26",
+      "c38-freq.bin": "f01be6dd1b606bbe02e491c6c609db8609adadebc459a06652019d6cca36fe30",
+      "c38-latent.bin": "2f73fb5f41abaa840dc0e2947bfabff49793683825da555df1ed3f4140959876",
+      "c39-freq.bin": "9c14feb3702beab69682ae1c3a35329da16bede98329aa62c5f73a30de089396",
+      "c39-latent.bin": "0e3b05280d1f58680dfeada0c3fb14933f14561d61d1a1dbdf2e8feff3564fc6",
+      "c4-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c4-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d",
+      "c40-freq.bin": "ff99c3a950d588a3d972860fdcf2471407c24132b549d6cd01fc8d0235c4fd5d",
+      "c40-latent.bin": "64f594e5796ddf202bcc2aa4fda6a48d691b276f59978accd37e0bdefbe06c02",
+      "c41-freq.bin": "affbbb603f8f8351a41943f6706f13452ff0643ca100ba4910f6f08578dbbf73",
+      "c41-latent.bin": "0e3b05280d1f58680dfeada0c3fb14933f14561d61d1a1dbdf2e8feff3564fc6",
+      "c42-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c42-latent.bin": "76c916aea43b2f4ca4dd04e1e509ea69a309cb41592e7ea375ddfdec3d9ad88c",
+      "c43-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c43-latent.bin": "29bfbec1f422bb37cb019177ab55b299a45638e5bab3030b5f23e6acc997227d",
+      "c44-freq.bin": "37b6d528effb45ec34c581fe6113b88a0d5b77e369e6723a5619cf340139a0c8",
+      "c44-latent.bin": "69ed129b3ea308f18eddc7d9298dbe64fadda99fcd48a7abfd6716f29a736c07",
+      "c45-freq.bin": "ddd776b21d5cbb3de22f9b7a335bada704f927868d1380649c23585393fab98a",
+      "c45-latent.bin": "37141a0fc8788caebe6c78c305d402ceb702187039ba69833086786cb0396676",
+      "c46-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c46-latent.bin": "ffa1834867e9f7ad3bfe1d98c42001409c0ff30072dc24962df82960763493d9",
+      "c47-freq.bin": "e5bccbf40024a35b07a5fdbf27e4a0ff3a87bfabfef32793c7d7f6a18e9570bb",
+      "c47-latent.bin": "798f21070abb119c6d99005592ea1a40bfe00a8db037b8d23d24c8a617ca4512",
+      "c48-freq.bin": "56be72dd80df3d570834a8e57af6acca0c7a373077727dae5e921eb2795f9951",
+      "c48-latent.bin": "287f06fd89f137490642bc1c8eb6f1ade973a4a6573d5e3b91167f86ec266fba",
+      "c49-freq.bin": "b78a6b3e4707e99d848bbbcfc5860210fc198365e348474a077c0af5ca35ab4f",
+      "c49-latent.bin": "cf06f7f2b74a95877b2207bc944c36e86a3bd663a8f68d08e33c7befe11ac958",
+      "c5-freq.bin": "e5bccbf40024a35b07a5fdbf27e4a0ff3a87bfabfef32793c7d7f6a18e9570bb",
+      "c5-latent.bin": "af6ea2cf004e58c4b8db033225f038e492504c5733d30e07b0bec718c3d6cb65",
+      "c50-freq.bin": "556535015bb59e34e8783025c0727a1f470ce188cfd5afec0291f6ff09f8450c",
+      "c50-latent.bin": "f57280f28891c1191eabf0c568426d1eb5d4570adf7fd4c5ed490160fde16540",
+      "c51-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c51-latent.bin": "ffa1834867e9f7ad3bfe1d98c42001409c0ff30072dc24962df82960763493d9",
+      "c52-freq.bin": "79b528d764c3f4e412be9c8c941d489838feecd6c31f9900e4b7c4e92da65655",
+      "c52-latent.bin": "868a702f7f91fd9d46a4fe17c42c7a185f68047d909e17f17703166dbbed19c8",
+      "c53-freq.bin": "5b70b9cf7612b2adffacd670e5b47cd98b3f881240bb30d377ecddf5842d9ba7",
+      "c53-latent.bin": "c15d054fcaeafdd88f69620dead26ef34c2979760074745e9e4c1613bfad53da",
+      "c54-freq.bin": "5f9fa6162f7f6f00d0d8775fd617eeb05a746d120cc9f88afa365151b8154a2f",
+      "c54-latent.bin": "e22ca08fda07e735c287b69f276207eb345c605e7914dab1d2b0d1a5e7891d25",
+      "c55-freq.bin": "6758396c0735db1cfa6616f68490f966bc68fea6759a93590533ee6d372b0db9",
+      "c55-latent.bin": "8c91884a516b2a13545eead319013134083a1e00422871c5ae34a0f77a025f1b",
+      "c56-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c56-latent.bin": "ffa1834867e9f7ad3bfe1d98c42001409c0ff30072dc24962df82960763493d9",
+      "c57-freq.bin": "b8d90df3fa5303d74a7aa5a61a9d63975b264473e6adae39d37d2555ca9e1091",
+      "c57-latent.bin": "ccc861caef98a59fe1e843e1b6f87bd37b83cbab2cb9565353c2a53adf64b26a",
+      "c58-freq.bin": "f01be6dd1b606bbe02e491c6c609db8609adadebc459a06652019d6cca36fe30",
+      "c58-latent.bin": "9f429ef74e614f7b995147ef9a1f0a7534abcb8249b40b5c7b1baf531cbdf5fc",
+      "c59-freq.bin": "9c14feb3702beab69682ae1c3a35329da16bede98329aa62c5f73a30de089396",
+      "c59-latent.bin": "dc76c9d5b10e0a0a3c3ea19dbfd46d0babb3a5a0e18f578e27d3a99e50097a13",
+      "c6-freq.bin": "56be72dd80df3d570834a8e57af6acca0c7a373077727dae5e921eb2795f9951",
+      "c6-latent.bin": "b4a75960f3c758fdd9eef1dd29f8a2ceb4820082ab596be1043e93f5fd7c859a",
+      "c60-freq.bin": "ff99c3a950d588a3d972860fdcf2471407c24132b549d6cd01fc8d0235c4fd5d",
+      "c60-latent.bin": "d405cd109944f2674491cef868d5efb08d48f721c11e91828a019ef74335dc9c",
+      "c61-freq.bin": "affbbb603f8f8351a41943f6706f13452ff0643ca100ba4910f6f08578dbbf73",
+      "c61-latent.bin": "dc76c9d5b10e0a0a3c3ea19dbfd46d0babb3a5a0e18f578e27d3a99e50097a13",
+      "c62-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c62-latent.bin": "4e1b4ce5e00abc8494925e85b2fd0c9827dbe9f6df5540490d543ada79b391df",
+      "c63-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c63-latent.bin": "27395f6ee782065d57693b8a9e04ea43d0930078c767c9aeebdb2587a98c18c1",
+      "c64-freq.bin": "50ad90bc0b52993848dca3d5912b10cd4e52fc3f745f5eeb188af34bba6cdf48",
+      "c64-latent.bin": "06b5d6b4de8b40afa953e2edb6949aad9f24586b704cfb2ea2848a4bb8beb779",
+      "c65-freq.bin": "d30982e32f575cc6305bc87de01b6a7f18b81ea6ed286514e9830d7d5802ebba",
+      "c65-latent.bin": "78cdfe0aab32156c66d5951fbcc1aa8ad4dff9498877c0b35adb8fc3eaaa5d3b",
+      "c66-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c66-latent.bin": "0bec6720f4574e36115a09c9007f4c8f462a9ce7e191d5984bf00e4592504356",
+      "c67-freq.bin": "987ca4fc7bb823372f0ebe0f0127bfe427ed35826e825c524c174f3779b765ef",
+      "c67-latent.bin": "46dcbd688dd528c8180cfa7aaea74f6b5c036f29f9a3c52dbf3737b05a3c64e3",
+      "c68-freq.bin": "589060353b0b53132b63d4e1d90e7653e0305fd47e7b4bcc7de2de068e6ea0ba",
+      "c68-latent.bin": "fa1a034fa73e0df1449890838c668412a52c0d159c55d503144d5890d1866512",
+      "c69-freq.bin": "9ffdcb9acb3aa9787b732fa7460cc8bf122e7c14653e099b3c990c4da7a8c099",
+      "c69-latent.bin": "4e48ae61baa4b07057d83969d3aee7dc7b22eca1f33be689a90a61e30c48f06c",
+      "c7-freq.bin": "b78a6b3e4707e99d848bbbcfc5860210fc198365e348474a077c0af5ca35ab4f",
+      "c7-latent.bin": "08e2dc7c0681073929eee9559d8ec1bb31d187e07280172ba5ad746df30be80a",
+      "c70-freq.bin": "6324ad54d59d89cbb0d4b6be01221ded9d1938d8c0f3fb7cb6c75d47378878a3",
+      "c70-latent.bin": "fef22514e202e0d46cf63b5dc9b0c8ebfc123d3cada0989f4a41310df76ac038",
+      "c71-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c71-latent.bin": "0bec6720f4574e36115a09c9007f4c8f462a9ce7e191d5984bf00e4592504356",
+      "c72-freq.bin": "20d4cd95339ebaa962929c22e3c40d4b13acbb636d5997c4dfbb556488c126e6",
+      "c72-latent.bin": "edba5c1779c84aec9ee458157673373adb9a3a348e4acec89ab3aa782485e681",
+      "c73-freq.bin": "335429b355a19f42ebd05945cfa6a1d1b7409eb4acfee4d24f1c8b3e9cb7a1d0",
+      "c73-latent.bin": "3d41e5c646d6fea929293583bd6f7cb4a78057d3e9c164d01bfbcbf898b425ff",
+      "c74-freq.bin": "299427b0da0313c34388439ae791ff7356a1d3630834c935ae01908d0ba923ec",
+      "c74-latent.bin": "92beb588180ceff5376a7a8adf2d9d6ec4b589c9d5a488a1bb051549c1d26907",
+      "c75-freq.bin": "3b6cddd194748f3255ff56b2e5b947869226f82940e58714914826c0fa5121e3",
+      "c75-latent.bin": "bd9b8f4f8041d17d114bd32c37f5043335749455306c4adb30ccb8847c279f75",
+      "c76-freq.bin": "825e0574e7f06e39167a13026757e99a5da29ea5f61bc5b3dffb69f68334145a",
+      "c76-latent.bin": "0bec6720f4574e36115a09c9007f4c8f462a9ce7e191d5984bf00e4592504356",
+      "c77-freq.bin": "607af821e9abf05bb383a085fe7becb1509cbd5d3cf33634cda7095043ed6d3f",
+      "c77-latent.bin": "579182c11288996addfe4dcbbde312b3d27c8c4dac370d58d74913fe92bccae8",
+      "c78-freq.bin": "a68be9011e116c78ab6f430871f7b740e339f935efd6363b70683bfc7e2e8576",
+      "c78-latent.bin": "c96fc2337374d6dd1cad43d60b1ea2a93f72f67d5c566ca6a062f6dfd0e93636",
+      "c79-freq.bin": "ce571dddea51548799cb9223a756a402385b182df362c7df408a9f46949f2424",
+      "c79-latent.bin": "f5c014fec18e3c7434cc9512df33796419e22b3986ff2e573412261028318e3b",
+      "c8-freq.bin": "556535015bb59e34e8783025c0727a1f470ce188cfd5afec0291f6ff09f8450c",
+      "c8-latent.bin": "b5dfb5cabc0fc0dbed69d2b574b3926fbefcd7cba148146350fb228fa783164c",
+      "c80-freq.bin": "f97bbebf3ea2909a194b61daa8c4d59375af223b339b4650d3edd82314e55ac6",
+      "c80-latent.bin": "f5c014fec18e3c7434cc9512df33796419e22b3986ff2e573412261028318e3b",
+      "c81-freq.bin": "b50a45b77f4480dd8a9b214d1cd9f6ae1b94fe2c7c40dff28a6c763cde15fe4b",
+      "c81-latent.bin": "f5c014fec18e3c7434cc9512df33796419e22b3986ff2e573412261028318e3b",
+      "c82-freq.bin": "b50a45b77f4480dd8a9b214d1cd9f6ae1b94fe2c7c40dff28a6c763cde15fe4b",
+      "c82-latent.bin": "19fbb3b297be9582982c7ec4d00182aa1a0f4eed8ec5966ea9f57308c0f7b0a4",
+      "c83-freq.bin": "a946ae00bb69618391d6f24b8b63eba07df260996cf290d12cf6af0e9e6f3a38",
+      "c83-latent.bin": "9a5252bf0bbaa016d951eb5fd65db69c9f42577646f26fc1f838e4691524e163",
+      "c84-freq.bin": "8a315ed3edbeee439802d1e7d18fda5f86cd9a441f815189a32933167f31a194",
+      "c84-latent.bin": "df667e49be5c04b7525a83f6c0fc43a5284cb1c0cb7e5ea044f408493bc445ad",
+      "c9-freq.bin": "43ca65c557a8440394c03dbb9826d297456295a0930a4c63df31f6032802e9d9",
+      "c9-latent.bin": "a11937f356a9b0ba592c82f5290bac8016cb33a3f9bc68d3490147c158ebb10d"
+    }
+  },
+  "fp8_sm120_sass_comparison": {
+    "store": {
+      "identical": true,
+      "instruction_lines": 48,
+      "sass_sha256": "d6beb3f16877c308083945b0f4e581c539e050c5824a4271d4e0fd3304fe89fe"
+    },
+    "pack": {
+      "identical": true,
+      "instruction_lines": 208,
+      "sass_sha256": "a9964a638cf38663f63225d38b0c28a008029624f5b17447b645e339f1841c7e"
+    }
+  },
+  "compute_sanitizer": {
+    "tool": "memcheck",
+    "device": 0,
+    "exit_code": 0,
+    "errors": 0,
+    "cases": 91,
+    "log_sha256": "99632dd8563e1f1992d90da6ed29a5f4c08a2382f21f5a6d9f4fb985e2729c02"
+  }
+}

@@ -46,6 +46,20 @@ gate below is satisfied merely by an older component test.
   semantically consistent, not necessarily token-identical. The broader
   long-context/pool-pressure prefix gate and release performance suite remain open.
 - [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
+  Complete native XGrammar enforcement before the compressed-cache migration.
+- [ ] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
+  scales; retain FP8 SWA and the independent FP4 index format. The previous
+  FP8-only interpretation was incorrect (user clarification September 12).
+  Optimize compressed packing, paged attention reads/dequantization and their
+  interaction with prefill, decode and dSpark; update allocations, exact-pool
+  sizing, retained snapshots and cache-format identity. Compare with the FP8
+  baseline under matched hardware/power/clocks, contexts and concurrency;
+  match or improve runtime performance, recording all regressions and tradeoffs.
+  After performance qualification, run long-context needle checks through 1M
+  and thinking-enabled high-effort tool-call evaluation, plus cold/partial/exact/
+  divergent prefix and target/dSpark correctness. Final release measurements
+  must use the corrected cache. [Packing primitive evidence](release-v1-compressed-kv.md)
+  is preparation only; serving integration and these gates remain open.
 - [x] Verify official maximum context/output limits. Default to those limits;
   clamp each output allowance to remaining context and the model output cap.
   Keep configurable smaller development storage reservations for side-by-side APIs.
@@ -124,7 +138,9 @@ The user set the next work order on September 12: finish and push the 24-turn
 retention qualification, then native vision through sixteen images together
 with Unicode and tool/schema correctness. Standard `run.sh` and deployment
 qualification follow those correctness gates, before the final performance
-suite, reports, containers and GitHub release.
+suite, reports, containers and GitHub release. The latest user ordering puts
+the optimized architectural FP4 compressed-cache migration immediately after
+XGrammar/tool-schema correctness and before launcher/final release qualification.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
