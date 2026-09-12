@@ -66,7 +66,9 @@ retain the measurements. Native kernels and all four Spark workers are unchanged
 The [I/O-method comparison](ds41-engram-io-comparison.md) remains separate: io_uring
 is not selected or required by this change.
 
-The four-slot daemon is selected on target port 18041 and dSpark port 18042 as
+The four-slot daemon was initially selected on target port 18041 and dSpark port 18042 as
 `ds41-engram-slots-live-target-api-dev` and `ds41-engram-slots-live-spec-api-dev`.
 Both modes passed the native API qualifier after rollout. The stopped
-`ds41-staged-live-*` containers retain the previous daemon for rollback.
+`ds41-staged-live-*` containers retain the previous daemon for rollback. The later
+[sampler rollout](ds41-draft-sampling.md) changed the selected container names and
+native library while retaining this Rust daemon.

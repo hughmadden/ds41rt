@@ -138,42 +138,84 @@ extern "C" int32_t ds41rt_v41_vocabulary_head_launch(void* handle, const uint16_
 namespace {
 // Position-local logits remain raw for verification. Sampling uses log-space
 // exponential racing, equivalent in distribution to softmax(logits/T)/Exp(1).
-__global__ void draft_step(const float* shared, const float* bias,
-    const uint64_t* rng, const float* temperatures, float* adjusted, uint32_t* tokens, int position) {
-  const int row = blockIdx.x, tid = threadIdx.x;
+constexpr int kDraftVocab = 129280;
+constexpr int kDraftTile = 512;
+constexpr int kDraftTiles = (kDraftVocab + kDraftTile - 1) / kDraftTile;
+static_assert(kDraftTiles <= 256 && 2 * kDraftTiles < kDraftTile);
+
+__device__ void draft_argmax(float& best, uint32_t& id) {
+  const int lane = threadIdx.x % 32, warp = threadIdx.x / 32;
+  for (int offset = 16; offset; offset >>= 1) {
+    const float score = __shfl_down_sync(0xffffffffu, best, offset);
+    const uint32_t candidate = __shfl_down_sync(0xffffffffu, id, offset);
+    if (score > best || (score == best && candidate < id)) { best = score; id = candidate; }
+  }
+  __shared__ float scores[8];
+  __shared__ uint32_t indices[8];
+  if (lane == 0) { scores[warp] = best; indices[warp] = id; }
+  __syncthreads();
+  if (warp == 0) {
+    best = lane < 8 ? scores[lane] : -CUDART_INF_F;
+    id = lane < 8 ? indices[lane] : UINT32_MAX;
+    for (int offset = 16; offset; offset >>= 1) {
+      const float score = __shfl_down_sync(0xffffffffu, best, offset);
+      const uint32_t candidate = __shfl_down_sync(0xffffffffu, id, offset);
+      if (score > best || (score == best && candidate < id)) { best = score; id = candidate; }
+    }
+  }
+}
+
+__global__ void draft_step_tiles(const float* shared, const float* bias,
+    const uint64_t* rng, const float* temperatures, float* adjusted, int position) {
+  const int row = blockIdx.y, tile = blockIdx.x, tid = threadIdx.x;
   const float temperature = temperatures[row];
   curandStatePhilox4_32_10_t state;
-  if (temperature != 0)
-    curand_init(rng[uint64_t(row)*2], rng[uint64_t(row)*2+1] + uint64_t(position)*256 + tid, 0, &state);
+  if (temperature != 0) {
+    // Preserve the original 256 logical RNG lanes: each tile skips exactly
+    // the uint32 draws consumed by earlier columns in that lane.
+    curand_init(rng[uint64_t(row)*2], rng[uint64_t(row)*2+1] + uint64_t(position)*256 + tid,
+        uint64_t(tile) * (kDraftTile / 256), &state);
+  }
   float best = -CUDART_INF_F;
   uint32_t id = UINT32_MAX;
-  for (uint32_t col = tid; col < 129280; col += 256) {
-    const uint64_t offset = uint64_t(row) * 129280 + col;
+  for (uint32_t col = tile * kDraftTile + tid;
+       col < kDraftVocab && col < (tile + 1) * kDraftTile; col += 256) {
+    const uint64_t offset = uint64_t(row) * kDraftVocab + col;
     const float value = shared[offset] + bias[offset];
-    adjusted[offset] = value;
+    // Reserve a small prefix for partial argmax results. The finish kernel
+    // restores its raw logits after reading all partials; no extra allocation.
+    if (col >= 2 * kDraftTiles) adjusted[offset] = value;
     float score = value;
     if (temperature != 0) {
-      // Exactly representable 23-bit midpoints lie strictly inside (0,1).
-      // This avoids zero/infinite exponential values at float endpoints.
       const float uniform = (float(curand(&state) >> 9) + 0.5f) * 0x1p-23f;
       const float exponential = -logf(uniform);
       score = value / fmaxf(temperature, 1e-5f) - logf(exponential);
     }
     if (score > best || (score == best && col < id)) { best = score; id = col; }
   }
-  __shared__ float scores[256];
-  __shared__ uint32_t indices[256];
-  scores[tid] = best; indices[tid] = id;
-  __syncthreads();
-  for (int stride = 128; stride; stride >>= 1) {
-    if (tid < stride && (scores[tid + stride] > scores[tid] ||
-        (scores[tid + stride] == scores[tid] && indices[tid + stride] < indices[tid]))) {
-      scores[tid] = scores[tid + stride]; indices[tid] = indices[tid + stride];
-    }
-    __syncthreads();
+  draft_argmax(best, id);
+  if (tid == 0) {
+    const uint64_t base = uint64_t(row) * kDraftVocab;
+    adjusted[base + 2 * tile] = best;
+    adjusted[base + 2 * tile + 1] = __uint_as_float(id);
   }
-  if (tid == 0) tokens[row] = indices[0];
 }
+
+__global__ void draft_step_finish(const float* shared, const float* bias,
+    float* adjusted, uint32_t* tokens) {
+  const int row = blockIdx.x, tid = threadIdx.x;
+  const uint64_t base = uint64_t(row) * kDraftVocab;
+  float best = tid < kDraftTiles ? adjusted[base + 2 * tid] : -CUDART_INF_F;
+  uint32_t id = tid < kDraftTiles
+      ? __float_as_uint(adjusted[base + 2 * tid + 1]) : UINT32_MAX;
+  // The block barrier inside argmax ensures every prefix read finishes before
+  // any thread restores it. Both kernels run on the caller's ordered stream.
+  draft_argmax(best, id);
+  if (tid == 0) tokens[row] = id;
+  for (int col = tid; col < 2 * kDraftTiles; col += 256)
+    adjusted[base + col] = shared[base + col] + bias[base + col];
+}
+
 }
 extern "C" int32_t ds41rt_v41_draft_step_rng(const float* shared, const float* bias,
     const uint64_t* rng, const float* temperatures, float* adjusted, uint32_t* tokens,
@@ -186,7 +228,11 @@ extern "C" int32_t ds41rt_v41_draft_step_rng(const float* shared, const float* b
   for (int i = 4; i < 6; ++i)
     for (int j = 0; j < i; ++j)
       if (!disjoint(pointers[i], bytes[i], pointers[j], bytes[j])) return cudaErrorInvalidValue;
-  draft_step<<<rows, 256, 0, reinterpret_cast<cudaStream_t>(stream)>>>(
-      shared, bias, rng, temperatures, adjusted, tokens, position);
+  const auto cuda_stream = reinterpret_cast<cudaStream_t>(stream);
+  draft_step_tiles<<<dim3(kDraftTiles, rows), 256, 0, cuda_stream>>>(
+      shared, bias, rng, temperatures, adjusted, position);
+  auto status = cudaGetLastError();
+  if (status != cudaSuccess) return status;
+  draft_step_finish<<<rows, 256, 0, cuda_stream>>>(shared, bias, adjusted, tokens);
   return cudaGetLastError();
 }

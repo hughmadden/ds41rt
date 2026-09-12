@@ -1,0 +1,209 @@
+{
+  "scope": "Nsight graph-node C1 counting capture; selected four-slot daemon and RMSNorm native; analysis after 5 seconds, no throughput claim",
+  "draft_stream": 623,
+  "draft_graphs": 231,
+  "kernel_time_per_draft_ms": 7.215739748917749,
+  "kernels": [
+    {
+      "name": "kernel_cutlass_kernel_b12xmoe_sharedkernelssiluMoEDynamicKernelSiluV41_object_at__tensorptrbf16gmemalign16o512051201_tensorptri32gmemo1_tensorptrf32gmemo1_tensorptri8gmemalign16o1_tensorp_0",
+      "calls": 693,
+      "total_ms": 932.373944,
+      "per_draft_ms": 4.03625083982684
+    },
+    {
+      "name": "gemmSN_TN_kernel",
+      "calls": 231,
+      "total_ms": 200.106328,
+      "per_draft_ms": 0.8662611601731601
+    },
+    {
+      "name": "draft_step",
+      "calls": 1155,
+      "total_ms": 197.419572,
+      "per_draft_ms": 0.8546301818181817
+    },
+    {
+      "name": "attend",
+      "calls": 693,
+      "total_ms": 167.821687,
+      "per_draft_ms": 0.7265008095238095
+    },
+    {
+      "name": "nvjet_sm120_tss_mma_384x8x64_2_96x8x64_tmaAB_alignCD4_bz_TNNN",
+      "calls": 1155,
+      "total_ms": 20.671314,
+      "per_draft_ms": 0.08948620779220778
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o8192111100_tensorptrf8E4M3FNgmemalign1_0",
+      "calls": 693,
+      "total_ms": 20.099583,
+      "per_draft_ms": 0.08701118181818182
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o1280111100_tensorptrf8E4M3FNgmemalign1_0",
+      "calls": 693,
+      "total_ms": 19.654341,
+      "per_draft_ms": 0.08508372727272728
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+      "calls": 1386,
+      "total_ms": 18.522288,
+      "per_draft_ms": 0.08018306493506493
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1819201_TVLayoutDst1819201_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+      "calls": 1386,
+      "total_ms": 16.395009,
+      "per_draft_ms": 0.07097406493506493
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor000o40968111012_tensorptrf8E4M3FNgmemalig_0",
+      "calls": 693,
+      "total_ms": 15.690886,
+      "per_draft_ms": 0.06792591341991341
+    },
+    {
+      "name": "ds41_rmsnorm_cached_bf16_kernel",
+      "calls": 1617,
+      "total_ms": 12.661877,
+      "per_draft_ms": 0.054813320346320346
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12xnormmhc_v41_project_V41Project_object_at__ptrbf16gmemalign16_ptrf32gmemalign16_ptrf32gmemalign16_0",
+      "calls": 1386,
+      "total_ms": 7.183441,
+      "per_draft_ms": 0.031097147186147187
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o2304111100_tensorptrf8E4M3FNgmemalign1_0",
+      "calls": 693,
+      "total_ms": 6.823826,
+      "per_draft_ms": 0.029540372294372293
+    },
+    {
+      "name": "score_kernel",
+      "calls": 693,
+      "total_ms": 5.597695,
+      "per_draft_ms": 0.024232445887445886
+    },
+    {
+      "name": "finish_mixes_kernel",
+      "calls": 1386,
+      "total_ms": 4.74529,
+      "per_draft_ms": 0.020542380952380954
+    },
+    {
+      "name": "dspark_terminal_layout_kernel",
+      "calls": 231,
+      "total_ms": 2.751843,
+      "per_draft_ms": 0.01191274025974026
+    },
+    {
+      "name": "norm_kernel",
+      "calls": 1386,
+      "total_ms": 2.610659,
+      "per_draft_ms": 0.011301554112554114
+    },
+    {
+      "name": "select_kernel",
+      "calls": 693,
+      "total_ms": 2.34545,
+      "per_draft_ms": 0.010153463203463203
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o512051201_tensorptri32gmemalign16o1280i641_tensorptri8gmemalign16o160i641_tensorptri_0",
+      "calls": 2772,
+      "total_ms": 2.274116,
+      "per_draft_ms": 0.00984465800865801
+    },
+    {
+      "name": "embed_kernel",
+      "calls": 231,
+      "total_ms": 1.856717,
+      "per_draft_ms": 0.008037735930735932
+    },
+    {
+      "name": "post_kernel",
+      "calls": 1386,
+      "total_ms": 1.617611,
+      "per_draft_ms": 0.007002645021645022
+    },
+    {
+      "name": "pre_kernel",
+      "calls": 1617,
+      "total_ms": 1.153013,
+      "per_draft_ms": 0.004991398268398268
+    },
+    {
+      "name": "embedding_lookup_bf16_kernel",
+      "calls": 1155,
+      "total_ms": 1.020599,
+      "per_draft_ms": 0.004418177489177489
+    },
+    {
+      "name": "dspark_frequencies_kernel",
+      "calls": 693,
+      "total_ms": 0.630397,
+      "per_draft_ms": 0.002728991341991342
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12xgemmwo_projection_quant_cute_WOQuantCuTeLaunch_object_at__tensorptrbf16gmemalign16o1_tensorptri64gmemo1_tensorptrf32gmemo1_tensorptri32gmemalign16o1_tensorptri8g_0",
+      "calls": 693,
+      "total_ms": 0.609212,
+      "per_draft_ms": 0.0026372813852813854
+    },
+    {
+      "name": "confidence",
+      "calls": 231,
+      "total_ms": 0.598074,
+      "per_draft_ms": 0.002589064935064935
+    },
+    {
+      "name": "reduce_routes",
+      "calls": 693,
+      "total_ms": 0.572922,
+      "per_draft_ms": 0.002480181818181818
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o230423041_tensorptri32gmemalign16o576i641_tensorptri8gmemalign16o72i641_tensorptri8g_0",
+      "calls": 693,
+      "total_ms": 0.571387,
+      "per_draft_ms": 0.0024735367965367963
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o128012801_tensorptri32gmemalign16o320i641_tensorptri8gmemalign16o40i641_tensorptri8g_0",
+      "calls": 693,
+      "total_ms": 0.564218,
+      "per_draft_ms": 0.002442502164502164
+    },
+    {
+      "name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o819281921_tensorptri32gmemalign16o2048i641_tensorptri8gmemalign16o256i641_tensorptri_0",
+      "calls": 693,
+      "total_ms": 0.559353,
+      "per_draft_ms": 0.0024214415584415585
+    },
+    {
+      "name": "rope_kernel",
+      "calls": 693,
+      "total_ms": 0.524732,
+      "per_draft_ms": 0.0022715670995670993
+    },
+    {
+      "name": "shared_swiglu",
+      "calls": 693,
+      "total_ms": 0.431832,
+      "per_draft_ms": 0.0018694025974025975
+    },
+    {
+      "name": "grouped_output_rows",
+      "calls": 693,
+      "total_ms": 0.376666,
+      "per_draft_ms": 0.0016305887445887445
+    }
+  ],
+  "daemon_sha256": "7263fabe67cc09bd0aa21cd3879145a31504e24b6b48c49e30d8df555e235fd1",
+  "native_sha256": "d56c464ce91bf68ca349838fb7854ce273512c4ba80f6ecd139f9a4994446f4b",
+  "report": "/tmp/ds41-dspark-node-profile/spec.nsys-rep"
+}

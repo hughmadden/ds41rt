@@ -6,6 +6,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
+- [x] Parallelize [dSpark vocabulary adjustment and sampling](docs/ds41-draft-sampling.md) without extra allocation or ABI changes. Two hundred exact cases, graph reuse, racecheck, memcheck, full-model lanes and concurrent API recovery pass. Warm counting improves 131.2→133.9 C1 TPS, 323.3→326.8 C6 aggregate and 629.1→632.6 C16 aggregate. Both live API modes pass rollout checks. The [dSpark graph profile](docs/ds41-dspark-node-profile.md) identifies local routed experts as the largest remaining draft-side kernel cost.
+
 - [x] Reserve [Engram staging for both lanes and both layers](docs/ds41-engram-staging-slots.md). Per-thread tracing identified late admission from a two-slot pool; four slots eliminate 200 pending polls per measured C6 run. Full-model lane and C2/C6/C16 recovery checks pass. Warm C6 improves 318.9→323.9 aggregate TPS and C16 620.3→623.8 in the bounded comparison. Both live API modes pass post-rollout checks; io_uring remains unselected.
 
 - [x] Start [first-lane Engram preparation](docs/ds41-early-engram.md) as soon as its proposals are known, overlapping second-lane draft generation. Isolated C2/C6/C16 recovery qualification passes; warm C6 is unchanged, C16 is slightly lower in the measured sample, and no standalone throughput gain is claimed. [Combined index graph retention](docs/ds41-index-graph-retention.md) was not selected after slower concurrency measurements. Subsequent tracing identified insufficient staging slots, corrected and rolled out separately.
