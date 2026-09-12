@@ -4,9 +4,11 @@ DS41RT is an attention–FFN-disaggregated engine being adapted for the official
 [DeepSeek V4.1 Flash checkpoint](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)
 on one RTX PRO 6000 Blackwell coordinator and four DGX Spark workers.
 
-The migration is in progress: the V4.1 full-model execution path is not ready,
-and inherited release configuration and deployment gates are still being replaced.
-The first release will support the official checkpoint's native representations only.
+Native target-only and dSpark serving are under release qualification. Vision,
+long-context prefix replay, deployment and the full performance report remain
+release gates. The engine uses the official checkpoint's native representations.
+
+[![DS41RT native execution across one coordinator and four expert workers](docs/native-path-execution.svg)](docs/native-path-execution.svg)
 
 ## Execution design
 
