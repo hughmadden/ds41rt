@@ -13,6 +13,7 @@ pub(super) fn qualify<'w, 'a>(
 ) -> Result<()> {
     for per_lane in [1usize, 3, 8] {
         let mut expected = Vec::new();
+        let mut expected_proposals = Vec::new();
         for overlap in [false, true] {
             let leases = (0..2 * per_lane)
                 .map(|slot| requests.admit(slot, 9000 + slot as u64))
@@ -90,6 +91,16 @@ pub(super) fn qualify<'w, 'a>(
                         draft.validate_position(9000 + slot as u64, 8 + step as u64)?;
                     }
                 }
+                let proposal_inputs: Vec<_> = members.iter().flatten().map(|&slot|
+                    (9000 + slot as u64, tokens[slot][0], 8 + step as u64,
+                     if step == 2 && slot % 2 == 0 { 1 } else { 6 })).collect();
+                let proposals = draft.propose(lib, &proposal_inputs)?;
+                for (proposal, &(_, anchor, _, remaining)) in proposals.iter().zip(&proposal_inputs) {
+                    assert_eq!(proposal[0], anchor);
+                    assert_eq!(proposal.len(), remaining);
+                }
+                if overlap { assert_eq!(proposals, expected_proposals[step], "draft batch changed after overlap/migration"); }
+                else { expected_proposals.push(proposals); }
                 eprintln!("decode lanes per_lane={per_lane} overlap={overlap} step={step} members={:?} execute_us={}",
                     members.each_ref().map(|m| m.len()), elapsed.as_micros());
             }

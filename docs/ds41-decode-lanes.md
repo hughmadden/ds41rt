@@ -44,8 +44,25 @@ format check; this is not full quality qualification. Artifacts are in
 `/tmp/ds41-draft-requests/{component.log,api.json,quality.json}`. The temporary API
 was stopped after validation; the normal selected APIs were left unchanged.
 
-This fixture covers target execution and target/draft cache ownership across
-retirement and migration. It does not qualify batched draft proposals, HTTP admission, mixed prefill scheduling,
+The draft runtime now generates proposals for up to 16 request identities in
+caller order. Requests with short histories or one remaining output token use
+their anchor alone; eligible requests form a compact draft batch. The packed
+`[6, request_count]` output is unpacked back into caller order. Request RNGs follow
+that same order. A single 16-request workspace retains graph executables lazily
+by active count, so retirement does not require recapturing a previously used
+shape or duplicating execution workspaces.
+
+The extended fixture generates proposals after every committed step, including
+mixed one-token budgets, retirement and membership swaps. Both target logits and
+draft token lists match between serial and overlapping runs at C2/C6/C16. It
+passes in 11.40 seconds; artifacts are in `/tmp/ds41-batch-draft/component.log`.
+The release candidate also passes the native C1 API lifecycle check and preserves
+all eight comparison texts and token usages against the selected speculative API.
+The inherited Unicode format failure remains in both versions. Candidate API and
+quality records are in the same directory; the temporary API was stopped afterward.
+
+This fixture covers target execution, batched proposals and target/draft cache
+ownership across retirement and migration. It does not qualify HTTP admission, mixed prefill scheduling,
 concurrent cancellation or production C16 throughput. Production APIs remain on
 their previously selected frozen binaries and still serialize whole requests.
 
@@ -84,7 +101,7 @@ indiscriminately. The counting fixture already has almost maximal acceptance;
 reducing round latency is the immediate opportunity for that workload.
 
 Outstanding serving work: replace whole-request serialization with per-request
-generation state, batch dSpark proposals, size head workspaces for
+generation state, integrate batched proposals and verification, size head workspaces for
 verification batches, overlap the two lanes and rebalance at committed boundaries.
 Admission, retirement, cancellation and lane reuse then need API-level C1–C16
 qualification and simultaneous aggregate/per-stream measurements.

@@ -9,7 +9,7 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     chain: DsparkChain<'w, 'a>,
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
-    captured: bool,
+    captured: std::collections::BTreeSet<usize>,
 }
 struct DraftRequest {
     leases: [WindowLease; 3],
@@ -27,10 +27,10 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let window = || DsparkWindow::new(lib, 16, capacity, DsparkWindow::device_bytes(16, capacity)?);
         Ok(Self {
             main: weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?,
-            chain: weights.draft(table, head, 1, weights.draft_bytes(1)?)?,
+            chain: weights.draft(table, head, 16, weights.draft_bytes(16)?)?,
             windows: [window()?, window()?, window()?],
             requests: Default::default(),
-            captured: false,
+            captured: Default::default(),
         })
     }
     pub fn admit(&mut self, id: u64) -> Result<()> {
@@ -118,6 +118,52 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             )
         }
     }
+    /// Inputs are (request identity, anchor, committed end, remaining output budget).
+    /// Returned rows retain input order; short histories/budgets use the anchor only.
+    pub fn propose(&mut self, lib: &'a NativeLibrary,
+        inputs: &[(u64, u32, u64, usize)],
+    ) -> Result<Vec<Vec<u32>>> {
+        ensure!(!inputs.is_empty() && inputs.len() <= 16, "invalid draft batch size");
+        let mut seen = std::collections::BTreeSet::new();
+        for &(id, anchor, _, remaining) in inputs {
+            ensure!(seen.insert(id) && self.requests.contains_key(&id), "invalid draft request identity");
+            ensure!(anchor < 129280 && remaining > 0, "invalid draft request input");
+        }
+        let active: Vec<_> = inputs.iter().enumerate()
+            .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
+        let mut outputs: Vec<_> = inputs.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect();
+        if active.is_empty() { return Ok(outputs); }
+        let count = active.len();
+        let tokens: Vec<_> = active.iter().map(|(_, (_, anchor, _, _))| *anchor as i32).collect();
+        let bindings: [Vec<_>; 3] = std::array::from_fn(|stage| active.iter()
+            .map(|(_, (id, _, end, _))| (self.requests[id].leases[stage], *end)).collect());
+        self.chain.set_tokens(&tokens)?;
+        let mut rngs: Vec<_> = self.requests.iter_mut().filter_map(|(id, request)|
+            active.iter().position(|(_, (active_id, _, _, _))| active_id == id)
+                .map(|index| (index, &mut request.rng))).collect();
+        rngs.sort_by_key(|(index, _)| *index);
+        self.chain.prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
+            &vec![0.0; count])?;
+        let windows = self.windows.each_ref();
+        let bindings = bindings.each_ref().map(|rows| rows.as_slice());
+        if !self.captured.contains(&count) {
+            unsafe { self.chain.capture(windows, bindings)?; }
+            self.captured.insert(count);
+        }
+        unsafe { self.chain.replay(windows, bindings)?; }
+        let buffer = self.chain.draft_output()?[0];
+        let mut bytes = vec![0; buffer.bytes];
+        lib.copy_d2h(&mut bytes, buffer)?;
+        ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
+        let packed: Vec<_> = bytes.chunks_exact(4)
+            .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
+        for (row, &(output, &(_, anchor, _, remaining))) in active.iter().enumerate() {
+            let tokens: Vec<_> = (0..6).map(|step| packed[step * count + row]).collect();
+            ensure!(tokens[0] == anchor && tokens.iter().all(|&token| token < 129280), "invalid draft tokens");
+            outputs[output] = tokens[..remaining.min(6)].to_vec();
+        }
+        Ok(outputs)
+    }
     pub fn verify(
         &mut self,
         lib: &'a NativeLibrary,
@@ -134,40 +180,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let start = Instant::now();
         let end = requests.cache().committed_end(lease)?;
         let id = requests.cache().request_id(lease)?;
-        let request = self.requests.get_mut(&id).context("draft request not admitted")?;
-        let leases = request.leases;
-        let mut inputs = vec![anchor];
-        if end >= 2 && remaining > 1 {
-            self.chain.set_tokens(&[anchor as i32])?;
-            self.chain.prepare_sampling(&mut [&mut request.rng], &[0.0])?;
-            let windows = [&self.windows[0], &self.windows[1], &self.windows[2]];
-            let bindings = [
-                &[(leases[0], end)][..],
-                &[(leases[1], end)][..],
-                &[(leases[2], end)][..],
-            ];
-            if !self.captured {
-                unsafe {
-                    self.chain.capture(windows, bindings)?;
-                }
-                self.captured = true;
-            }
-            unsafe {
-                self.chain.replay(windows, bindings)?;
-            }
-            let tokens = self.chain.draft_output()?[0];
-            let mut bytes = vec![0; tokens.bytes];
-            lib.copy_d2h(&mut bytes, tokens)?;
-            inputs = bytes
-                .chunks_exact(4)
-                .map(|b| u32::from_ne_bytes(b.try_into().unwrap()))
-                .collect();
-            ensure!(
-                inputs.len() == 6 && inputs[0] == anchor && inputs.iter().all(|&id| id < 129280),
-                "invalid draft tokens"
-            );
-            inputs.truncate(remaining.min(6));
-        }
+        let inputs = self.propose(lib, &[(id, anchor, end, remaining)])?
+            .pop().context("draft proposal missing")?;
         let draft_us = start.elapsed().as_micros() as u64;
         ensure!(!job.events.is_closed(), "client disconnected");
         let mut batch = requests.prepare(&[RequestTokens {

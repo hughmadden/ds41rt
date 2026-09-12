@@ -11,7 +11,7 @@ use std::ffi::c_void;
 pub(crate) struct DsparkChain<'weights, 'library> {
     stream: LoadStream<'library>,
     stages: [DsparkStage<'weights, 'library>; 3],
-    graph: Option<(*mut c_void, usize, [u64; 3])>,
+    graphs: std::collections::BTreeMap<usize, (*mut c_void, [u64; 3])>,
     ready: Option<usize>,
     embedding: Option<&'weights NativeRtxTensors<'library>>,
     tokens: DeviceAllocation<'library>,
@@ -86,7 +86,7 @@ impl<'library> DsparkWeights<'library> {
                 self.stage(1, requests, bytes)?,
                 self.stage(2, requests, bytes)?,
             ],
-            graph: None,
+            graphs: Default::default(),
             ready: None,
             embedding: None,
             tokens: DeviceAllocation::new(library, requests as usize * 4)?,
@@ -301,7 +301,7 @@ impl DsparkChain<'_, '_> {
         bindings: [&[(WindowLease, u64)]; 3],
     ) -> Result<()> {
         self.invalidate();
-        ensure!(self.graph.is_none(), "dSpark chain already captured");
+        ensure!(!self.graphs.contains_key(&bindings[0].len()), "dSpark chain count already captured");
         unsafe {
             self.execute(windows, bindings)?;
         }
@@ -316,7 +316,7 @@ impl DsparkChain<'_, '_> {
         self.invalidate();
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graph = Some((graph, bindings[0].len(), reads.each_ref().map(|r| r.owner)));
+                self.graphs.insert(bindings[0].len(), (graph, reads.each_ref().map(|r| r.owner)));
                 Ok(())
             }
             (Err(error), Ok(graph)) => {
@@ -336,7 +336,8 @@ impl DsparkChain<'_, '_> {
         bindings: [&[(WindowLease, u64)]; 3],
     ) -> Result<[Ds41rtDeviceBuffer; 2]> {
         let reads = self.prepare(windows, bindings)?;
-        let (graph, count, owners) = self.graph.context("dSpark chain not captured")?;
+        let count = bindings[0].len();
+        let &(graph, owners) = self.graphs.get(&count).context("dSpark chain count not captured")?;
         ensure!(
             count == bindings[0].len() && owners == reads.each_ref().map(|r| r.owner),
             "dSpark chain capture binding differs"
@@ -365,7 +366,7 @@ impl Drop for DsparkChain<'_, '_> {
         if let Err(error) = self.synchronize() {
             tracing::error!(%error,"draining dSpark chain");
         }
-        if let Some((graph, _, _)) = self.graph.take() {
+        for (_, (graph, _)) in std::mem::take(&mut self.graphs) {
             if let Err(error) = unsafe { self.stream.library.cuda_graph_exec_destroy(graph) } {
                 tracing::error!(%error,"destroying dSpark chain graph");
             }
