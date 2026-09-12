@@ -1,0 +1,138 @@
+{
+  "source_repository": "glmrt-release",
+  "source_commit": "dc6d9b8e1600e001cb1d4228bd911f4df8091f99",
+  "source_files": {
+    "python/tools/bench_real_full_mtp_acceptance.py": "ae462a12aaaa9d0af98a5f0b7df0720355ff18c8dfbdf8a15ecc147aebde05da",
+    "python/tools/bench_real_full_repeat_decode.py": "567cbadc5555817426633328b1e448dc21303fb013a039f8e5d54ae20c6f4aca"
+  },
+  "quality_contract": "glmrt-semantic-decode-contract-v3",
+  "weighted_case_ids": [
+    "code",
+    "math",
+    "fable",
+    "hello",
+    "topic",
+    "structured-json",
+    "structured-json-schema",
+    "multilingual"
+  ],
+  "cases": {
+    "count": {
+      "category": "low-entropy",
+      "prompt": "Count from 1 to 64, one number per line. Do not add any other text.",
+      "max_tokens": 160,
+      "weight": 1.0,
+      "json_schema": false
+    },
+    "repeat": {
+      "category": "repetition",
+      "prompt": "Repeat the exact text \"red green blue\" 24 times, one repetition per line. Do not number the lines.",
+      "max_tokens": 160,
+      "weight": 1.0,
+      "json_schema": false
+    },
+    "code": {
+      "category": "code",
+      "prompt": "Write a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block.",
+      "max_tokens": 320,
+      "weight": 1.0,
+      "json_schema": false
+    },
+    "math": {
+      "category": "reasoning",
+      "prompt": "A shop discounts a $240 jacket by 25%, then applies 8% sales tax to the discounted price. What is the final price? Show the calculation briefly.",
+      "max_tokens": 128,
+      "weight": 1.0,
+      "json_schema": false
+    },
+    "fable": {
+      "category": "creative-prose",
+      "prompt": "Write a self-contained fable of exactly 150 words about two parrots who disagree about sharing credit. Output no title or preamble. Include the final one-sentence moral in the 150-word total. Before responding, silently revise the draft until the entire response is between 140 and 170 words.",
+      "max_tokens": 256,
+      "weight": 1.0,
+      "json_schema": false
+    },
+    "hello": {
+      "category": "short-response",
+      "prompt": "hi",
+      "max_tokens": 32,
+      "weight": 1.0,
+      "json_schema": false
+    },
+    "topic": {
+      "category": "exposition",
+      "prompt": "Explain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB.",
+      "max_tokens": 384,
+      "weight": 1.0,
+      "json_schema": false
+    },
+    "structured-json": {
+      "category": "structured-output-natural",
+      "prompt": "Return only a JSON object describing a file edit with keys path, operation, line_start, line_end, and rationale. Use path src/cache.rs, operation replace, lines 41 through 47, and a one-sentence rationale about removing a redundant copy.",
+      "max_tokens": 128,
+      "weight": 0.5,
+      "json_schema": false
+    },
+    "structured-json-schema": {
+      "category": "structured-output-constrained",
+      "prompt": "Return only a JSON object describing a file edit with keys path, operation, line_start, line_end, and rationale. Use path src/cache.rs, operation replace, lines 41 through 47, and a one-sentence rationale about removing a redundant copy.",
+      "max_tokens": 128,
+      "weight": 0.5,
+      "json_schema": true
+    },
+    "multilingual": {
+      "category": "multilingual",
+      "prompt": "請用繁體中文，以四個簡短條列解釋什麼是寫入時複製（copy-on-write），並包含一個行程 fork 後修改記憶體頁面的例子。",
+      "max_tokens": 384,
+      "weight": 1.0,
+      "json_schema": false
+    }
+  },
+  "structured_edit_schema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string"
+      },
+      "operation": {
+        "type": "string"
+      },
+      "line_start": {
+        "type": "integer"
+      },
+      "line_end": {
+        "type": "integer"
+      },
+      "rationale": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "operation",
+      "line_start",
+      "line_end",
+      "rationale"
+    ],
+    "additionalProperties": false
+  },
+  "orchid": {
+    "word": "orchid",
+    "requested_repetitions": 100,
+    "max_tokens": 1500,
+    "prompt_template": "orchid {nonce}\nRepeat only the single word \"orchid\" exactly 100 times, separated by spaces. Do not repeat the nonce or add any other text."
+  },
+  "measurement_contract": {
+    "temperature": 0,
+    "thinking": "disabled",
+    "weighted_tps": "sum(weight * (completion_tokens - 1)) / sum(weight * post_first_token_seconds)",
+    "excluded_from_weighted": [
+      "count",
+      "repeat",
+      "orchid",
+      "syntax-rust",
+      "syntax-python"
+    ],
+    "quality_failures": "Retain all outputs and failed checks; never silently exclude failures from throughput."
+  }
+}

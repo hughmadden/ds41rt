@@ -118,6 +118,8 @@ Preserve raw machine-readable output alongside reports.
 Run the shared four-Spark target/dSpark workloads sequentially to avoid contention.
 
 - [ ] Reuse the located eight content types and Orchid from ../glmrt-release (sources below).
+  The [self-contained corpus and original quality checks](release-v1-corpus.md)
+  are preserved; final serving measurements remain open.
 - [ ] Headline maximum prefill, low-entropy decode and weighted eight-type
   decode throughput; KV size and total GPU RAM requirement.
 - [ ] Memory accounting by arena, tensor, KV cache, graphs and other allocations.
