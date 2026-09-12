@@ -1,9 +1,9 @@
 {
-  "scope": "Initial FP4 context comparison and direct-conversion optimization; optimized serving performance still pending.",
+  "scope": "Direct-conversion optimization and short serving comparison; retained-context, prefill and broader gates remain open.",
   "source_base": "2eab99f",
   "archive": {
     "path": "docs/evidence/native-fp4-unpack.json.gz",
-    "sha256": "7fc4800cdb5914f92424e366bb1b5554614d94636ced2addb1d779ed397da789"
+    "sha256": "e925d57637619094d31d6694e5eb69fac5c76de6f152ee00123abd0e6c243480"
   },
   "native_library": {
     "path": "/tmp/ds41-native-fp4-serving/direct-build/cmake/libds41rt_native.so",
@@ -56,5 +56,36 @@
       "all_full_prompt_hits": true
     }
   ],
-  "optimized_serving_performance_complete": false
+  "optimized_serving_performance_complete": false,
+  "optimized_short_serving_comparison_complete": true,
+  "optimized_short_serving_summaries": {
+    "target": [
+      {
+        "name": "counting",
+        "median_decode_change_percent": 0.2634719906397409,
+        "reference_tps": 42.9168959990111,
+        "candidate_tps": 43.00348089597931
+      },
+      {
+        "name": "code",
+        "median_decode_change_percent": 0.21855745837111584,
+        "reference_tps": 42.76597333930313,
+        "candidate_tps": 42.84220717463539
+      }
+    ],
+    "spec": [
+      {
+        "name": "counting",
+        "median_decode_change_percent": -1.1412045855731634,
+        "reference_tps": 145.11510057228577,
+        "candidate_tps": 141.91959975778485
+      },
+      {
+        "name": "code",
+        "median_decode_change_percent": 1.2177620610313022,
+        "reference_tps": 124.19894560856429,
+        "candidate_tps": 125.63076888346393
+      }
+    ]
+  }
 }

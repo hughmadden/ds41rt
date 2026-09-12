@@ -39,8 +39,34 @@ are retained in the archive but are single observations, not a qualified prefill
 comparison. Hardware remains the 400 W RTX configuration with standard memory
 speed documented in the [integration report](release-v1-compressed-serving.md).
 
-The optimized serving comparison is pending. The full performance gate and the
-subsequent needle/high-thinking tool qualification remain open.
+## Optimized short serving comparison
+
+Four alternating pairs with 512 output tokens produce these median changes
+against the preserved FP8 build:
+
+| Mode | Counting | Code |
+| --- | ---: | ---: |
+| Target | +0.26% | +0.22% |
+| dSpark | −1.14% | +1.22% |
+
+All paired outputs match. The dSpark counting regression remains visible;
+individual pair ratios range from 0.970 to 1.002. These measurements do not
+establish a general speedup. Retained-context and repeated prefill comparisons
+are next. The full performance gate and subsequent needle/high-thinking tool
+qualification remain open.
+
+The first optimized server launch exhausted GPU memory with three development
+servers resident on that GPU. The preceding FP4 servers were stopped before
+relaunching; the FP8 baselines were preserved. Only the successful relaunch is
+used for the paired results.
+
+`scripts/qualify-ds41-native-context-performance.py` records paired retained
+prompt tests and requires full prompt-cache hits. Its `--cold-prefill` mode
+uses fresh prefixes per pair, bounds shared cache hits to 32 tokens, and records
+first-content latency separately from decode rate. Both modes retain actual
+usage, outputs, parity and request bodies. Use a unique `--label` per run and a
+short output budget for prefill; completion flags do not impose a performance
+acceptance threshold.
 
 For comparisons between FP4 implementations, use
 `scripts/compare-ds41-sparse-attention.py --fp4-source --baseline-fp4-source`
