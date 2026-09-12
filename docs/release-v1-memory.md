@@ -9,7 +9,7 @@ The qualified artifacts are coordinator image `sha256:a13258e92dd25ddb889bd31bb7
 | Allocation class | Bytes | GiB |
 |---|---:|---:|
 | Resident owners before the cache pool | 46,216,249,344 | 43.04 |
-| Eager architectural cache pool | 22,471,251,456 | 20.93 |
+| Eager architectural cache pool (25,165,824 tokens total; 24 × 1,048,576) | 22,471,251,456 | 20.93 |
 | Planned total at readiness | 68,687,500,800 | 63.97 |
 | Reserved runtime headroom, not eagerly allocated | 2,147,483,648 | 2.00 |
 | CUDA allocatable device ceiling | 101,973,491,712 | 94.97 |

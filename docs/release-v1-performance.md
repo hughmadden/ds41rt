@@ -1,6 +1,6 @@
 # DS41RT v1 performance report
 
-DS41RT serves DeepSeek V4.1 Flash on one RTX PRO 6000 Blackwell workstation GPU plus four DGX Spark expert workers. The corrected standard build reaches **7,743 prompt tok/s** at its best median prefill cell, **150.51 tok/s** warm counting dSpark decode, **70.43 tok/s** across the weighted eight-type dSpark corpus, and **742.91 aggregate tok/s at C16**. Its default C16 cache has 24 maximum-context equivalents, or 20.93 GiB, and the warmed coordinator process uses 64.23 GiB.
+DS41RT serves DeepSeek V4.1 Flash on one RTX PRO 6000 Blackwell workstation GPU plus four DGX Spark expert workers. The corrected standard build reaches **7,743 prompt tok/s** at its best median prefill cell, **150.51 tok/s** warm counting dSpark decode, **70.43 tok/s** across the weighted eight-type dSpark corpus, and **742.91 aggregate tok/s at C16**. Its default C16 cache reserves **20.93 GiB for 25,165,824 tokens total** (24 × 1,048,576-token contexts: sixteen active plus eight spare), and the warmed coordinator process uses 64.23 GiB.
 
 All measurements use an enforced **400 W RTX power limit** and **standard memory speed with no overclock**: 14,001 MHz maximum and 13,365 MHz observed under load. The RTX driver is 595.91.07. The four NVIDIA GB10 workers use driver 580.159.03. Target-only and dSpark arms ran sequentially across the shared workers. Throughput sampling used temperature 0 and disabled thinking; the agentic tool evaluation used thinking enabled at high effort.
 
@@ -20,7 +20,7 @@ The earlier 2.6K prefill regression came from the standard Spark AOT export omit
 | Weighted eight-type dSpark median | **70.43 tok/s** |
 | dSpark gain on weighted mix | 70.04% |
 | C16 aggregate warm decode median | **742.91 tok/s** |
-| Default architectural cache | 24 × 1,048,576 tokens; 20.93 GiB |
+| Default architectural cache | 20.93 GiB for 25,165,824 tokens total (24 × 1,048,576) |
 | Exact prompt / completed-turn retention | 24 / 24 entries |
 | Warmed C16 coordinator process | 64.23 GiB |
 | Clean standard dSpark launch readiness | 56.77 s |

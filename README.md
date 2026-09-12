@@ -22,7 +22,7 @@ The corrected standard `v1` build uses architectural FP4 compressed KV, the stan
 | Weighted eight-type dSpark median | **70.43 tok/s** |
 | dSpark gain on weighted mix | 70.04% |
 | C16 aggregate warm decode median | **742.91 tok/s** |
-| Default architectural cache | 24 × 1,048,576 tokens; 20.93 GiB |
+| Default architectural cache | 20.93 GiB for 25,165,824 tokens total (24 × 1,048,576) |
 | Exact prompt / completed-turn retention | 24 / 24 entries |
 | Warmed C16 coordinator process | 64.23 GiB |
 | Clean standard dSpark launch readiness | 56.77 s |

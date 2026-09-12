@@ -19,7 +19,7 @@ The packed resident-output rate is 2.12–2.17 GB/s per worker, including H2D tr
 
 ## Coordinator phases
 
-The coordinator's backbone, index, and embedding weights load in 2.712 seconds after cold-cache advice. dSpark residency, Engram, vocabulary/head, vision, two execution lanes, transports, and the 20.93 GiB cache pool take the remaining 2.725 seconds. The native API then binds port 8000.
+The coordinator's backbone, index, and embedding weights load in 2.712 seconds after cold-cache advice. dSpark residency, Engram, vocabulary/head, vision, two execution lanes, transports, and the 20.93 GiB cache pool (25,165,824 tokens total; 24 × 1,048,576-token contexts) take the remaining 2.725 seconds. The native API then binds port 8000.
 
 The earlier clean `run.sh` campaign measured 56.481 seconds, and a restored standard launch measured 55.152 seconds. Its one-second remote port and health polling plus SSH and container creation account for the difference from the 44.65-second core launch.
 

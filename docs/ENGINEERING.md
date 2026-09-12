@@ -76,7 +76,7 @@ XGrammar compiles response constraints and masks logits on the native path. Stri
 
 ## Memory and startup
 
-The coordinator reserves model owners before sizing its shared cache. At the standard C16 launch, resident owners occupy 43.04 GiB and the eager architectural cache occupies 20.93 GiB, for 63.97 GiB at readiness. A warmed C16 process uses 64.05 GiB. Exact pool bytes, total occupancy ceilings, context size, concurrency, and retention are independently configurable; insufficient plans fail startup instead of silently shrinking the requested service.
+The coordinator reserves model owners before sizing its shared cache. At the standard C16 launch, resident owners occupy 43.04 GiB and the eager architectural cache occupies 20.93 GiB for 25,165,824 tokens total (24 × 1,048,576-token contexts), for 63.97 GiB at readiness. A warmed C16 process uses 64.05 GiB. Exact pool bytes, total occupancy ceilings, context size, concurrency, and retention are independently configurable; insufficient plans fail startup instead of silently shrinking the requested service.
 
 Each Spark reads and packs its own checkpoint shard in parallel. A cold-cache phase run brings the four workers to readiness in 38–39 seconds and the coordinator in another 5.44 seconds, for 44.65 seconds of measured core startup. The standard clean launch reaches the API in 55–56 seconds. Startup performs no weight RDMA exchange because every rank owns a local snapshot; the network path is reserved for inference activations and expert results.
 
