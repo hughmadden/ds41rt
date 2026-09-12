@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "comparison": "optimized FP4 candidate versus preserved FP8 baseline",
+  "pairs_per_case": 4,
+  "power_limit_watts": 400,
+  "memory_overclock": false,
+  "retained_decode_change_percent": {
+    "target": {"32768": -0.071368, "65536": -0.121501, "131072": -0.175917, "262144": 0.374751},
+    "dspark": {"32768": -0.718713, "65536": 2.837920, "131072": 0.324111, "262144": -0.154881}
+  },
+  "cold_ttfc_change_percent": {
+    "target": {"32768": 1.915347, "65536": 0.246519, "131072": -0.611126, "262144": -6.545810},
+    "dspark": {"32768": -0.539742, "65536": -0.587757, "131072": -0.230843, "262144": -6.059202}
+  },
+  "dspark_counting_followup_decode_change_percent": 2.802663,
+  "raw_sha256": {
+    "target-long-context.json": "58d314e797aa6d6e55133e9e3531660ace24f201ffa499f07576fdbda21f0c30",
+    "target-long-prefill.json": "069928de2ba002755500e51bc2a0f31ba08f98ae34d437cf3d1f60b90bb309c0",
+    "spec-long-context.json": "38b0b90301a3513c4f1cf9a1e46e2abe372bc98ca33ca42f84c617bb5a65e6ff",
+    "spec-long-prefill.json": "99e14feb0a1f3cac54743f721f27a0d77848abd8f1a0b75768805d6bc58ae3d4",
+    "spec-direct-counting-followup.json": "73374e3deadae01b2f4392d4da4602445acc01a09640b4ea1cc2472fb7a31b80"
+  },
+  "artifact_sha256": {
+    "fp4_daemon": "791d08ce9c1d224559151d8b177d24c1a00d51390c101eac83ce7fb542869863",
+    "fp4_native_library": "289139172e7e1d6643dae673e0f3ecdbbc60db6be8c64373e6bf4ba2d228f51d"
+  },
+  "passed": true,
+  "conclusion": "performance parity with a smaller compressed source pool"
+}

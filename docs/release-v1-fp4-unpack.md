@@ -49,11 +49,9 @@ against the preserved FP8 build:
 | Target | +0.26% | +0.22% |
 | dSpark | −1.14% | +1.22% |
 
-All paired outputs match. The dSpark counting regression remains visible;
-individual pair ratios range from 0.970 to 1.002. These measurements do not
-establish a general speedup. Retained-context and repeated prefill comparisons
-are next. The full performance gate and subsequent needle/high-thinking tool
-qualification remain open.
+All paired outputs match. The initial dSpark counting result was noisy: an
+eight-pair follow-up records +2.80% for the candidate with matching text. These
+measurements do not establish a general speedup.
 
 The first optimized server launch exhausted GPU memory with three development
 servers resident on that GPU. The preceding FP4 servers were stopped before
@@ -72,3 +70,29 @@ For comparisons between FP4 implementations, use
 `scripts/compare-ds41-sparse-attention.py --fp4-source --baseline-fp4-source`
 with the baseline and candidate libraries. Omit `--baseline-fp4-source` when
 comparing with the independently decoded BF16 reference reader.
+
+## Long-context serving qualification
+
+Four alternating pairs at 32K, 64K, 128K, and 256K compare optimized FP4 with
+the preserved FP8 server. Retained decode uses 512 generated tokens and requires
+a full prompt-cache hit. Cold prefill uses unique nonce prefixes, two generated
+tokens, and permits at most 32 cached prompt tokens. All token counts and texts
+match between arms.
+
+| Mode | Context | Retained decode change | Cold TTFC change |
+| --- | ---: | ---: | ---: |
+| Target | 32K | −0.07% | +1.92% |
+| Target | 64K | −0.12% | +0.25% |
+| Target | 128K | −0.18% | −0.61% |
+| Target | 256K | +0.37% | −6.55% |
+| dSpark | 32K | −0.72% | −0.54% |
+| dSpark | 64K | +2.84% | −0.59% |
+| dSpark | 128K | +0.32% | −0.23% |
+| dSpark | 256K | −0.15% | −6.06% |
+
+Positive decode values mean higher candidate tokens/s; negative cold TTFC
+values mean lower candidate latency. The mixed sub-percent decode changes show
+performance parity. The 256K cold-prefill improvement appears in both modes,
+but is not a headline claim without the broader final prefill matrix. Hardware
+used a 400 W power limit and standard memory speed. The [machine-readable summary](release-v1-fp4-performance.json)
+identifies raw results and preserved artifacts by SHA-256.
