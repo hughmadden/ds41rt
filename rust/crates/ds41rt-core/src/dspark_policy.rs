@@ -18,10 +18,22 @@ pub struct DsparkPrefixSelection {
 /// regression from the original full prefixes. At most 1 + 5*16*16 cost calls.
 pub fn select_dspark_prefixes(
     confidence: &[&[f64]],
+    cost_us: impl FnMut(&[usize]) -> f64,
+) -> Result<DsparkPrefixSelection, &'static str> {
+    select_dspark_prefixes_bounded(confidence, &vec![0; confidence.len()], cost_us)
+}
+
+/// Restrict exploration to caller-qualified minimum prefix lengths.
+pub fn select_dspark_prefixes_bounded(
+    confidence: &[&[f64]],
+    minimum: &[usize],
     mut cost_us: impl FnMut(&[usize]) -> f64,
 ) -> Result<DsparkPrefixSelection, &'static str> {
     if confidence.is_empty() || confidence.len() > 16 {
         return Err("policy requires one to sixteen requests");
+    }
+    if minimum.len() != confidence.len() || minimum.iter().zip(confidence).any(|(&n, p)| n > p.len()) {
+        return Err("invalid minimum draft prefixes");
     }
     let mut expected = Vec::with_capacity(confidence.len());
     for probabilities in confidence {
@@ -43,11 +55,11 @@ pub fn select_dspark_prefixes(
     let cost = valid_cost(cost_us(&lengths))?;
     let mut best = DsparkPrefixSelection { lengths: lengths.clone(), expected_tokens: tokens, cost_us: cost, evaluated_shapes: 1 };
     let mut evaluations = 1;
-    while lengths.iter().any(|&n| n != 0) {
+    while lengths.iter().zip(minimum).any(|(&n, &min)| n > min) {
         let mut choice: Option<(usize, f64, f64)> = None;
         for i in 0..lengths.len() {
             let n = lengths[i];
-            if n == 0 { continue; }
+            if n == minimum[i] { continue; }
             let candidate_tokens = tokens - expected[i][n] + expected[i][n - 1];
             lengths[i] -= 1;
             let candidate_cost = valid_cost(cost_us(&lengths))?;
@@ -104,5 +116,11 @@ mod tests {
         assert!(select_dspark_prefixes(&[&[1.1]], |_| 1.).is_err());
         assert!(select_dspark_prefixes(&[&[0.5]], |_| 0.).is_err());
         assert!(select_dspark_prefixes(&[&[0.5]], |n| if n[0] == 1 { 1. } else { f64::INFINITY }).is_err());
+    }
+    #[test]
+    fn qualified_minimum_prevents_entering_another_kernel_path() {
+        let p = select_dspark_prefixes_bounded(&[&[0., 0.]], &[1], |n| 1. + n[0] as f64).unwrap();
+        assert_eq!(p.lengths, [1]);
+        assert!(select_dspark_prefixes_bounded(&[&[0.]], &[2], |_| 1.).is_err());
     }
 }

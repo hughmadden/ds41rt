@@ -1,0 +1,175 @@
+{
+  "scope": "Experimental adaptive serving pilots with debug timing/confidence/route instrumentation; no production throughput gain or complete A4 qualification claim.",
+  "model_fit": {
+    "scope": "Fit exploratory adaptive costs from corrected native route/confidence traces.",
+    "trace_sha256": "1c351ae1cd3427cfae3892b2b6f50fe114788789cb24de609a0edc0b0a388a82",
+    "rounds": 961,
+    "warm_rounds": 921,
+    "cost_features": [
+      "intercept",
+      "total_rows",
+      "sum_of_lane_mean_unique_experts",
+      "extra_lane"
+    ],
+    "fitted_cost_us": [
+      19863.97309512346,
+      802.9573497750515,
+      636.4534796635917,
+      3167.6249985374634
+    ],
+    "cost_validation": {
+      "training_rounds": 741,
+      "heldout_rounds": 180,
+      "coefficients": [
+        19959.168208746516,
+        796.4360949980285,
+        633.4093010071264,
+        3313.8466914338246
+      ],
+      "median_absolute_relative_error": 0.026941539725822104,
+      "p90_absolute_relative_error": 0.06557374255615984
+    },
+    "route_history": {
+      "median_absolute_unique_error": 1.3500000000000014,
+      "p90_absolute_unique_error": 3.799999999999997
+    },
+    "confidence": {
+      "conditional_labels": 16603,
+      "heldout_transform": [
+        0.11576970694259833,
+        0.7970215754445426
+      ],
+      "validation": [
+        {
+          "group": "all",
+          "samples": 5581,
+          "raw_brier": 0.00543637282160106,
+          "fitted_brier": 0.005531272946649786
+        },
+        {
+          "group": "initial_mixed_requests_1_to_8",
+          "samples": 191,
+          "raw_brier": 0.15885024427089486,
+          "fitted_brier": 0.16162319828350952
+        }
+      ]
+    },
+    "limitations": "Exploratory same-workload validation: every fifth contiguous ten-round block for costs; request IDs divisible by three for confidence. Homogeneous counting dominates. No heterogeneous-workload or shorter-prefix counterfactual accuracy claim. Route forecasts use only previously accepted inputs, not current target routes. Initial mixed labels assume the documented eight-case collection order."
+  },
+  "pilots": [
+    {
+      "minimum_proposals": 0,
+      "cases": 9,
+      "exact_outputs_vs_fixed_five": 6,
+      "objective_checks_passed": true,
+      "median_instrumented_tps": {
+        "code": 116.73583341416268,
+        "fable": 45.351742082924645,
+        "topic": 57.51925829216853
+      },
+      "selection_samples": 1070,
+      "selection_us_median": 3.0,
+      "selection_us_max": 1199,
+      "selection_timing_scope": "search only; includes C1/C4/C16 counting",
+      "trimmed_observations": 502,
+      "raw_sha256": "6c32f07dacf96033f0bbf996a8ff5c98061f87b4e2eef114c8b04d1b25a90507",
+      "trace_sha256": "5b656418c8b28c9b4d365f007571c1562d374b6ebfb89873aaa90de805b67182",
+      "binary_sha256": "a753786887574b55c347197a7d8786c03c69feccb0bec16d4d9fe9bccc46b332"
+    },
+    {
+      "minimum_proposals": 1,
+      "cases": 9,
+      "exact_outputs_vs_fixed_five": 9,
+      "objective_checks_passed": true,
+      "median_instrumented_tps": {
+        "code": 115.28492945403984,
+        "fable": 44.05500612427473,
+        "topic": 56.166429526124034
+      },
+      "selection_samples": 679,
+      "selection_us_median": 6,
+      "selection_us_max": 15,
+      "selection_timing_scope": "complete forecast and selection at C1",
+      "trimmed_observations": 505,
+      "raw_sha256": "22615b5cdfbab39ce28bb7c228e4a8fd41ac343a4b4b7e6cd38022111aacc0db",
+      "trace_sha256": "dd0ec4cc6a5cd4ecd137e2bc6dd581585b079ea224959ad33800377bdaa0947a",
+      "binary_sha256": "f7e7c0c718f91108970585fd5bdabf9384a08306a3fb06853c32e235c12fe073"
+    }
+  ],
+  "shape_transition_timing": [
+    {
+      "rows": 1,
+      "shape_changed": true,
+      "samples": 6,
+      "median_verify_us": 34341.5
+    },
+    {
+      "rows": 2,
+      "shape_changed": false,
+      "samples": 82,
+      "median_verify_us": 26953.0
+    },
+    {
+      "rows": 2,
+      "shape_changed": true,
+      "samples": 82,
+      "median_verify_us": 38444.5
+    },
+    {
+      "rows": 3,
+      "shape_changed": false,
+      "samples": 69,
+      "median_verify_us": 30172
+    },
+    {
+      "rows": 3,
+      "shape_changed": true,
+      "samples": 121,
+      "median_verify_us": 41794
+    },
+    {
+      "rows": 4,
+      "shape_changed": false,
+      "samples": 35,
+      "median_verify_us": 32995
+    },
+    {
+      "rows": 4,
+      "shape_changed": true,
+      "samples": 77,
+      "median_verify_us": 45153
+    },
+    {
+      "rows": 5,
+      "shape_changed": false,
+      "samples": 1,
+      "median_verify_us": 36258
+    },
+    {
+      "rows": 5,
+      "shape_changed": true,
+      "samples": 29,
+      "median_verify_us": 48575
+    },
+    {
+      "rows": 6,
+      "shape_changed": false,
+      "samples": 124,
+      "median_verify_us": 39477.0
+    },
+    {
+      "rows": 6,
+      "shape_changed": true,
+      "samples": 48,
+      "median_verify_us": 51453.5
+    }
+  ],
+  "remaining": [
+    "Retain graphs across verified small row shapes, with bounded memory and exact owner/buffer identity",
+    "Repeat adaptive performance/lifecycle/constraint/heterogeneous-concurrency qualification",
+    "Resolve or explicitly qualify M1 numerical-path differences before optional anchor-only adaptive steps",
+    "Calibrate grammar-conditioned confidence before selecting constrained proposals",
+    "Phase 1 target-only/codegen targets and prefill preservation remain unproven"
+  ],
+  "standard_service_restored": true
+}

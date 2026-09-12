@@ -12,8 +12,9 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     captured: std::collections::BTreeSet<usize>,
     request_limit: usize,
     draft_limit: usize,
-    // Diagnostic-only downloads; production proposal generation adds no copies.
+    // Downloaded only for the experimental adaptive policy or explicit diagnostics.
     confidence_trace: std::collections::BTreeMap<u64, Vec<f32>>,
+    adaptive: Option<ds41rt_core::DsparkRouteHistory>,
 }
 struct DraftRequest {
     leases: [WindowLease; 3],
@@ -50,6 +51,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             request_limit: requests as usize,
             draft_limit: 5,
             confidence_trace: Default::default(),
+            adaptive: None,
         })
     }
     pub fn admit(&mut self, id: u64) -> Result<()> {
@@ -80,7 +82,63 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         self.draft_limit = limit as usize;
         Ok(())
     }
+    pub fn set_adaptive(&mut self, enabled: bool) {
+        self.adaptive = enabled.then(ds41rt_core::DsparkRouteHistory::default);
+    }
+    pub fn adaptive_enabled(&self) -> bool { self.adaptive.is_some() }
+    pub fn observe_accepted_routes(&mut self, id: u64, offset: usize, accepted: usize,
+        routes: &[Vec<[u32; 6]>]) -> Result<()> {
+        let Some(history) = &mut self.adaptive else { return Ok(()); };
+        ensure!(routes.len() == 40 && routes.iter().all(|r| offset + accepted <= r.len()),
+            "adaptive route capture is incomplete");
+        for (layer, rows) in routes.iter().enumerate() {
+            history.observe_accepted(id, layer, &rows[offset..offset + accepted])
+                .map_err(anyhow::Error::msg)?;
+        }
+        Ok(())
+    }
+    pub fn select_prefixes(&self, requests: &[(u64, usize, usize)], draft_us: u64)
+        -> Result<Option<Vec<usize>>> {
+        let started = std::time::Instant::now();
+        let Some(history) = &self.adaptive else { return Ok(None); };
+        let Some(forecast) = history.forecast(requests) else { return Ok(None); };
+        let mut probabilities = Vec::with_capacity(requests.len());
+        for &(id, _, maximum) in requests {
+            let Some(confidence) = self.confidence_trace(id) else { return Ok(None); };
+            probabilities.push(confidence[..maximum].iter().map(|&x| {
+                let x = f64::from(x);
+                if x >= 0. { 1. / (1. + (-x).exp()) } else { x.exp() / (1. + x.exp()) }
+            }).collect::<Vec<_>>());
+        }
+        // Preliminary corrected-path fit in microseconds. Both lanes' expert
+        // unions are counted separately. These coefficients are experimental;
+        // missing routing history keeps the full fixed-length policy.
+        let cost = |lengths: &[usize]| draft_us as f64 + 1000. + 19864.
+            + 803. * (requests.len() + lengths.iter().sum::<usize>()) as f64
+            + 636. * forecast.mean_unique_experts(lengths)
+            + 3168. * (forecast.lane_count() - 1) as f64;
+        let full: Vec<_> = requests.iter().map(|r| r.2).collect();
+        let expected_full: f64 = probabilities.iter().map(|p| {
+            let mut product = 1.;
+            1. + p.iter().map(|v| { product *= v; product }).sum::<f64>()
+        }).sum();
+        let full_cost = cost(&full);
+        // The pilot qualifies 2..6 verifier rows. M1 uses separate numerical
+        // specializations and is not entered voluntarily by this policy.
+        let minimum: Vec<_> = probabilities.iter().map(|p| usize::from(!p.is_empty())).collect();
+        let result = ds41rt_core::select_dspark_prefixes_bounded(
+            &probabilities.iter().map(Vec::as_slice).collect::<Vec<_>>(), &minimum, cost)
+            .map_err(anyhow::Error::msg)?;
+        let enabled = result.expected_tokens / result.cost_us > 1.02 * expected_full / full_cost;
+        tracing::debug!(target: "ds41rt::adaptive_policy", full=?full, selected=?result.lengths,
+            predicted_full_us=full_cost, predicted_selected_us=result.cost_us,
+            expected_full, expected_selected=result.expected_tokens, enabled,
+            evaluated_shapes=result.evaluated_shapes, selection_us=started.elapsed().as_micros() as u64,
+            "native adaptive prefix selection");
+        Ok(enabled.then_some(result.lengths))
+    }
     pub fn release(&mut self, id: u64) -> Result<()> {
+        if let Some(history) = &mut self.adaptive { history.release(id); }
         self.confidence_trace.remove(&id);
         let mut failure = None;
         if let Some(request) = self.requests.remove(&id) {
@@ -209,7 +267,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
         let packed: Vec<_> = bytes.chunks_exact(4)
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
-        if tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
+        if self.adaptive.is_some() || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
             let confidence = self.chain.draft_output()?[2];
             ensure!(confidence.bytes == 5 * count * 4, "draft confidence extent differs");
             let mut bytes = vec![0; confidence.bytes];

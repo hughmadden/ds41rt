@@ -1,7 +1,8 @@
 # Bounded adaptive prefix selection
 
 The core selector now explores joint draft suffix removals for up to sixteen
-requests, with at most five proposals each. It is not enabled in serving yet.
+requests, with at most five proposals each. Serving now exposes an experimental
+`--dspark-adaptive` switch; see the [pilot status](phase1-adaptive-pilot.md).
 The caller supplies calibrated conditional acceptance probabilities and a cost
 function that sees all selected prefix lengths together.
 
@@ -68,9 +69,9 @@ preserves artifact identities, fixed-policy results, and trace summaries.
 
 ## Remaining integration
 
-Fit and validate confidence calibration and costs on the corrected path. Estimate
-future expert reuse from previously observed routing without reading future
-routes or counting rejected histories as accepted. Integrate joint selection
-across both lanes while measuring any loss of existing Engram overlap. Publish
-confidence with bounded transfer overhead, then qualify retained state, changing
-concurrency, constraints, cancellation, performance and the full Phase 1 targets.
+The experimental path now fits costs, forecasts from accepted routing history,
+and selects across both lanes. The first pilot identified graph recapture as a
+major missing cost. Retain bounded compatible captures before repeating adaptive
+performance checks. Broaden route/confidence validation to heterogeneous and
+constrained traffic, measure transfer and Engram-overlap costs, and qualify
+retained state, changing concurrency, cancellation and the full Phase 1 targets.

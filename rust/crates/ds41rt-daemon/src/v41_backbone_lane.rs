@@ -101,6 +101,7 @@ pub(crate) struct LaneFfn<'s, 'w, 'a> {
     router: &'s mut BackboneRouterWave<'w, 'a>,
     library: &'a NativeLibrary,
     phase: &'s mut Phase,
+    route_capture: Option<&'s mut Vec<Vec<[u32; 6]>>>,
 }
 impl LaneFfn<'_, '_, '_> {
     /// # Safety
@@ -117,10 +118,17 @@ impl LaneFfn<'_, '_, '_> {
         let router = &mut self.router;
         let shared = &mut self.shared;
         let library = self.library;
+        let route_capture = &mut self.route_capture;
         complete_ffn(self.phase, async {
             let timing = std::time::Instant::now();
             let routed = unsafe { router.execute_ffn(input, image_mask)? };
             let request = unsafe { routed.expert_request(library, placement, rows)? };
+            if let Some(capture) = route_capture.as_deref_mut() {
+                let output = &mut capture[input.layer];
+                output.clear();
+                output.extend(request.request().routes.chunks_exact(6)
+                    .map(|routes| std::array::from_fn(|i| routes[i].expert_id)));
+            }
             let routed_us = timing.elapsed().as_micros() as u64;
             let pending = transport.dispatch_ffn(&request).await?;
             let dispatched_us = timing.elapsed().as_micros() as u64;
@@ -179,6 +187,8 @@ pub(crate) struct BackboneLane<'w, 'a> {
     sparse: SparseAttentionWave<'a>,
     layer: usize,
     phase: Phase,
+    capture_routes: bool,
+    route_capture: Vec<Vec<[u32; 6]>>,
 }
 impl<'w, 'a> BackboneLane<'w, 'a> {
     pub fn workspace_bytes(library: &NativeLibrary, capacity: u32) -> Result<[usize; 6]> {
@@ -219,6 +229,8 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             router: first.router.wave(capacity, sizes[5])?,
             layer: 0,
             phase: Phase::Idle,
+            capture_routes: false,
+            route_capture: Vec::new(),
         })
     }
     fn enter(&mut self, expected: Phase) -> Result<()> {
@@ -347,6 +359,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             router: &mut self.router,
             library: self.weights.library,
             phase: &mut self.phase,
+            route_capture: if self.capture_routes { Some(&mut self.route_capture) } else { None },
         })
     }
     /// Produce learned index selections from this lane's completed query.
@@ -407,6 +420,14 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         );
         self.block.output()
     }
+    pub fn set_route_capture(&mut self, enabled: bool) {
+        self.capture_routes = enabled;
+        if enabled {
+            self.route_capture.resize_with(40, Vec::new);
+            for rows in &mut self.route_capture { rows.clear(); }
+        }
+    }
+    pub fn captured_routes(&self) -> &[Vec<[u32; 6]>] { &self.route_capture }
     /// Opt-in diagnostic at a completed layer boundary; never used by normal serving.
     pub fn trace_output(&self, directory: &std::path::Path) -> Result<()> {
         use std::io::Write;

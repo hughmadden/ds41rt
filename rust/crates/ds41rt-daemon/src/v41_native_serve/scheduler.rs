@@ -234,13 +234,28 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
 
 async fn execute_logits<'a>(lib: &'a NativeLibrary, pass: &mut TargetPass<'_, 'a>,
     requests: &Requests<'a>, batch: &mut Option<RequestBatch>, transport: &mut NativeTp4Wave<'a>,
+    capture_routes: bool,
 ) -> Result<BatchScores> {
     let Some(batch) = batch else { return BatchScores::new(Vec::new()); };
-    let selected: Vec<_> = (0..batch.cache()?.positions().len()).collect();
-    let logits = unsafe { pass.execute(requests, batch, transport, 0, &selected).await? };
-    let mut bytes = vec![0; logits.logits.bytes];
-    lib.copy_d2h(&mut bytes, logits.logits)?;
-    BatchScores::new(bytes)
+    pass.set_route_capture(capture_routes);
+    let result = async {
+        let selected: Vec<_> = (0..batch.cache()?.positions().len()).collect();
+        let logits = unsafe { pass.execute(requests, batch, transport, 0, &selected).await? };
+        let mut bytes = vec![0; logits.logits.bytes];
+        lib.copy_d2h(&mut bytes, logits.logits)?;
+        BatchScores::new(bytes)
+    }.await;
+    pass.set_route_capture(false);
+    result
+}
+
+fn prepare_decode_lane<'a>(requests: &mut Requests<'a>, active: &[Option<Active<'a>>],
+    members: &[usize], inputs: &[Vec<u32>], speculative: bool) -> Result<RequestBatch> {
+    let work: Vec<_> = members.iter().zip(inputs).map(|(&slot, tokens)| RequestTokens {
+        lease: active[slot].as_ref().unwrap().lease, tokens, image_mask: None,
+        kind: if speculative { ExpertV2SourceKind::MtpVerify } else { ExpertV2SourceKind::Decode },
+    }).collect();
+    requests.prepare(&work)
 }
 
 fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
@@ -250,6 +265,7 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
 ) -> Result<()> {
     let started = Instant::now();
     let speculative = draft.is_some();
+    let adaptive = draft.as_deref().is_some_and(DraftRuntime::adaptive_enabled);
     let mut inputs = [Vec::new(), Vec::new()];
     let mut batches = [None, None];
     let mut draft_us = 0u64;
@@ -270,17 +286,34 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
             }
         }
         draft_us += draft_start.elapsed().as_micros() as u64;
-        if !members[lane].is_empty() {
+        if !members[lane].is_empty() && !adaptive {
             // Token IDs are now known: start this lane's mapped Engram reads
             // while the other lane generates its draft proposals. RequestBatch
             // cancels its I/O on drop if subsequent preparation fails.
             let prepare_start = Instant::now();
-            let work: Vec<_> = members[lane].iter().zip(&inputs[lane]).map(|(&slot, tokens)| RequestTokens {
-                lease: active[slot].as_ref().unwrap().lease, tokens, image_mask: None,
-                kind: if draft.is_some() { ExpertV2SourceKind::MtpVerify } else { ExpertV2SourceKind::Decode },
-            }).collect();
-            batches[lane] = Some(requests.prepare(&work)?);
+            batches[lane] = Some(prepare_decode_lane(requests, active, &members[lane], &inputs[lane], speculative)?);
             prepare_us += prepare_start.elapsed().as_micros() as u64;
+        }
+    }
+    if adaptive {
+        // Both proposals must be available to price their joint row/expert cost.
+        // Keep the existing early Engram preparation unchanged for fixed mode.
+        let identities: Vec<_> = (0..2).flat_map(|lane| members[lane].iter().zip(&inputs[lane])
+            .map(move |(&slot, input)| (slot, lane, input.len() - 1))).collect();
+        let candidates: Vec<_> = identities.iter().map(|&(slot, lane, length)|
+            (active[slot].as_ref().unwrap().id, lane, length)).collect();
+        // Grammar-conditioned acceptance has not been calibrated yet.
+        if identities.iter().all(|&(slot, _, _)| active[slot].as_ref().unwrap().constraint.is_none()) {
+            if let Some(lengths) = draft.as_deref().unwrap().select_prefixes(&candidates, draft_us)? {
+                for (input, length) in inputs.iter_mut().flatten().zip(lengths) { input.truncate(length + 1); }
+            }
+        }
+        for lane in 0..2 {
+            if !members[lane].is_empty() {
+                let start = Instant::now();
+                batches[lane] = Some(prepare_decode_lane(requests, active, &members[lane], &inputs[lane], speculative)?);
+                prepare_us += start.elapsed().as_micros() as u64;
+            }
         }
     }
     let prepared_us = started.elapsed().as_micros() as u64;
@@ -288,8 +321,8 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     let [a, b] = &mut batches;
     // Drain both futures even if one fails, before discarding private device state.
     let results = runtime.block_on(async { tokio::join!(
-        execute_logits(lib, first, requests, a, first_transport),
-        execute_logits(lib, second, requests, b, second_transport),
+        execute_logits(lib, first, requests, a, first_transport, adaptive),
+        execute_logits(lib, second, requests, b, second_transport, adaptive),
     ) });
     let executed_us = started.elapsed().as_micros() as u64;
     let result = (|| -> Result<()> {
@@ -347,7 +380,17 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
                 } else { None });
                 offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
             }
-            if let Some(draft) = draft.as_deref_mut() { draft.commit_batch(pass, requests, batch, &accepted)?; }
+            if let Some(draft) = draft.as_deref_mut() {
+                draft.commit_batch(pass, requests, batch, &accepted)?;
+                if adaptive {
+                    let mut offset = 0;
+                    for ((&slot, input), &count) in members[lane].iter().zip(&inputs[lane]).zip(&accepted) {
+                        draft.observe_accepted_routes(active[slot].as_ref().unwrap().id, offset,
+                            count as usize, pass.captured_routes())?;
+                        offset += input.len();
+                    }
+                }
+            }
             else { pass.commit(requests, batch, &accepted)?; }
             batches[lane] = None; // Only successful commits relinquish cleanup ownership.
             for ((&slot, tokens), next_token) in members[lane].iter().zip(emissions).zip(next_after_commit) {

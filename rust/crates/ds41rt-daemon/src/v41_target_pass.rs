@@ -70,6 +70,8 @@ pub(crate) struct TargetPass<'w, 'a> {
     state: State,
 }
 impl<'w, 'a> TargetPass<'w, 'a> {
+    pub fn set_route_capture(&mut self, enabled: bool) { self.lane.set_route_capture(enabled); }
+    pub fn captured_routes(&self) -> &[Vec<[u32; 6]>] { self.lane.captured_routes() }
     pub fn new(
         embedding: TargetEmbeddingWave<'w, 'a>,
         lane: BackboneLane<'w, 'a>,

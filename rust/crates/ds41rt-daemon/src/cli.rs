@@ -389,6 +389,9 @@ mod tests {
         assert_eq!(args.concurrency, 16);
         assert_eq!(args.prefix_cache_entries, 24);
         assert_eq!(args.dspark_draft_limit, 5);
+        assert!(!args.dspark_adaptive);
+        assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-adaptive"])).is_err());
+        assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark", "--dspark-adaptive"])).is_ok());
         for limit in ["1", "2", "3", "4", "5"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_ok());
         }
@@ -497,6 +500,9 @@ pub(crate) struct NativeServeArgs {
     /// Maximum verified draft tokens per request; fixed-length policy control.
     #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=5))]
     pub dspark_draft_limit: u8,
+    /// Experimental history-based joint draft-prefix selection.
+    #[arg(long, requires = "dspark")]
+    pub dspark_adaptive: bool,
 
     #[arg(long)] pub snapshot: PathBuf,
     #[arg(long)] pub native_lib: PathBuf,
