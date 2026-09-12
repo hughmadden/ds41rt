@@ -1,70 +1,53 @@
-# Clean release build and launcher qualification
+# Clean build, launcher, and container qualification
 
-The candidate at `d5fb015d00aa7b302e3ce179b097482da678db76` was
-qualified from a clean DS41RT container/image state on the RTX coordinator and
-all four Spark hosts. The build used the pinned DeepSeek-V4.1-Flash model
-snapshot `dba1be0a40aa45a94ad051997016db3960a90277`, SparkInfer revision
-`7299b3b92e70d539b2c0a63aaadce36932ceef4d`, and XGrammar revision
-`557becfb64c503ae9c04344b0047661f43f44320`.
+The v3 release pair was built from source revision `23a6670c6b3695df2e81b67b8ef08d28343f8dae` with model revision `dba1be0a40aa45a94ad051997016db3960a90277`, SparkInfer `7299b3b92e70d539b2c0a63aaadce36932ceef4d`, and XGrammar `557becfb64c503ae9c04344b0047661f43f44320`. Both images carry the correct V4.1 Flash description, v3 version, source, role, architecture, and dependency labels.
 
-## Clean build
+## Final v3 build
 
-The first clean build exposed a release-only defect: the release artifact build
-still enabled the legacy DS4 Flash/Pro AOT bridge, whose generated wrapper no
-longer matched the pinned SparkInfer ABI. That build stopped in
-`ds4_flash_aot.cu` after 182.778 seconds. Release images serve the native V4.1
-path, so the fix excludes that legacy bridge from release artifacts while
-leaving it enabled for development builds. The fix also makes the V4.1 router
-qualification import the pinned SparkInfer bootstrap. The focused release
-launcher, namespace, and provenance suite passes 29/29 cases inside the freshly
-built coordinator image.
+Before the final build, the running five-host service was stopped and the v3 release and development image references were removed from the coordinator and all four Sparks. Unmodified `./build.sh` completed in 286.081 seconds. Every exported artifact, dependency tree, provenance file, license, and checksum passed. The 24.47 GB logical Spark image was then distributed from ostrich to dodo, emu, and kiwi through the two-rail RDMA path.
 
-After removing the partial images and build products again, unmodified
-`./build.sh` completed in 374.439 seconds. It built both architecture-specific
-images, verified every exported artifact, and distributed the 24,729,185,792-byte
-Spark image to the other three workers at 8.95–9.34 Gb/s over two RDMA channels.
+| Role | Local image identity | Executable SHA-256 | Native library SHA-256 |
+|---|---|---|---|
+| amd64 coordinator | `sha256:0d8a29160924dc62694d65f46e5101bf39071fb28e7611344489dde416bfe950` | `e6629684c95533917c2ecacb1031f71d0fa87a5cf652a25aaa9a459b8d906b76` | `ee89310d1f0ddab9ea56c52bcacb7711af7850cc68ae013bea901e8bd01984f3` |
+| arm64 Spark expert | `sha256:d9feacd00d79baa451537555b98b73834397e007c7fd509ce53dfbb1b64b59c2` | `4d183e0d800278afe6544cf7668f983e24a6c9f074fcbae34d523c2f32e7ccaf` | `473ee4d93a7c84521a61f35241fd33a810ad38eb41cee1b5063353ed7a5aa977` |
 
-| Role | Qualified local image ID | Native executable SHA-256 | Native library SHA-256 |
-| --- | --- | --- | --- |
-| amd64 coordinator | `sha256:a13258e92dd25ddb889bd31bb77c8813c7881868b103ceec0c140e30e893c213` | `8bf754f1f11f2026f395e46f9e04b26be4f0b9fd9b667687224046416b7dc344` | `bfed8269593ed3ffffb13e0cec4841ff312cf672a9642b9bfa4ab421afdb08b2` |
-| arm64 Spark expert | `sha256:2f5d328a14f1a52a0d3b2356b041415d744635f3f3557e41403246429984093b` | `0865699b9e355b5eb456398e13c79b14c70886ee863e9175f8c9dc899e9b050f` | `903a4a4a9e92033f4489280677b33541a22333ee3520bf6a65514c651e96332b` |
+All four Spark hosts report the same ARM64 image identity. The release commit differs from the performance image source only in documentation, release scripts/tests, benchmark tooling, and embedded revision metadata; no Rust or CUDA inference implementation changed.
 
-All four Spark hosts report the same arm64 image ID and the expected ranks
-0–3. Both images carry the exact engine and SparkInfer revisions above. These
-are the locally qualified image IDs; registry digests will be recorded after
-publication and verified against this pair.
+## Standard launcher and performance equivalence
 
-## Standard launcher
+Unmodified `./run.sh` brought the exact final pair up on port 8000 in 56.758 seconds. It verified the configured model through `/v1/models` before declaring readiness and reported the standard FP4 compressed source, FP8 SWA, FP4 index, C16, 24 retained turns, 1,048,576-token context, 393,216-token output maximum, 2,048-token prefill batch, and dSpark.
 
-Both a default and an option-override dry run passed. Unmodified `./run.sh`
-then brought the five-host service up on port 8000 in 56.481 seconds with the
-release defaults: concurrency 16, 24 retained turns, 1,048,576 context tokens,
-393,216 output tokens, a 2,048-token prefill batch, and dSpark enabled. The API
-returned the `ds41rt-native-fp4-kv-dspark` fingerprint and included
-`reasoning_content` when the request omitted thinking controls, proving the
-default high-thinking path was active. The coordinator used about 65.5 GiB of
-GPU memory; its target backbone/index/embedding weight phase took 1.768 seconds.
+A request with omitted thinking controls returned `36` for 17+19 with separate reasoning content and the `ds41rt-native-fp4-kv-dspark` fingerprint. The protocol-matched concurrency canary then ran one warmup plus three timed repetitions at C1, C2, C4, C8, and C16. Every timed request was a complete prompt hit and returned the identical 599-token sequence.
 
-A real override launch then passed with concurrency 2, a 2 GiB KV pool, three
-retained turns, 65,536 context tokens, 8,192 output tokens, a 1,024-token
-prefill batch, and dSpark disabled. It became ready in 53.628 seconds, exposed
-the requested model limits and returned the `ds41rt-native-fp4-kv`
-fingerprint. Coordinator GPU use fell to about 20.8 GiB. A separate dry run
-also accepted concurrency 7, an 80 GiB memory reservation, five retained turns,
-and explicit context/output/prefill values.
+| Concurrency | Final v3 median tok/s | Release-suite median tok/s | Change |
+|---:|---:|---:|---:|
+| 1 | 126.96 | 124.81 | +1.72% |
+| 2 | 179.37 | 176.58 | +1.58% |
+| 4 | 289.45 | 288.89 | +0.19% |
+| 8 | 416.94 | 416.34 | +0.15% |
+| 16 | 694.90 | 683.70 | +1.64% |
 
-The standard launch was restored afterward in 55.152 seconds. Its final API
-response again reported the FP4 compressed source, FP8 SWA and FP4 index dSpark
-fingerprint, the official model limits, and default reasoning. The coordinator
-and four rank-specific expert containers remain running on the exact qualified
-image pair.
+Two shorter jump-to-C16 diagnostics are also retained. They show first-use/setup samples as low as 600.57 tok/s, followed by 668.76–690.69 tok/s. The matched progression above is the comparison to the release protocol; no sample is omitted from the evidence.
 
-The RTX campaign used driver 595.91.07, a 400 W enforced power limit, and the
-standard 14,001 MHz maximum memory clock. The four GB10 workers used driver
-580.159.03; their platform does not expose power and clock limits through the
-queried NVIDIA interface. Phase-level Spark storage/transform and graph-capture
-accounting remains part of the startup performance report even though the
-observed end-to-end launch is already inside the requested 60–90 second range.
+The focused release configuration, launcher, corpus, and provenance suite passes 29/29 tests. Shell parsing passes for build, run, stop, publish, and shared release helpers.
 
-[Machine-readable summary](release-v1-build-run.json) records the commands,
-settings, timings, revisions, hashes, and raw-evidence archive.
+## Registry publication
+
+`./push-containers.sh v3` published the final v3 and `latest` tags in 37.534 seconds. Both tag names resolve to identical raw manifests for each role.
+
+| Role | Published digest | Platform manifest/config |
+|---|---|---|
+| coordinator | `sha256:0d8a29160924dc62694d65f46e5101bf39071fb28e7611344489dde416bfe950` | amd64 manifest `sha256:45b4f5a351dbcc8ef891291c4fbccb8d664429b76830cf56ae7136fe416c9857` |
+| Spark expert | `sha256:672f82a1a99872cdc8014811b99c0967e0955c8c3e1e29b91bd48e7b06d3566d` | arm64 config `sha256:d9feacd00d79baa451537555b98b73834397e007c7fd509ce53dfbb1b64b59c2` |
+
+The coordinator top-level object is an OCI index containing its amd64 image manifest plus a BuildKit attestation manifest. Pull-by-digest on the coordinator and ostrich verified the published architecture, role, CUDA architecture, source revision, v3 version, and V4.1 Flash description. The GHCR packages remain private for the repository owner’s requested final manual visibility change.
+
+## Earlier empty-state gate and issues caught
+
+The earlier release gate removed all DS41RT containers, images, and build products, then ran the same standard scripts from an empty image state. That build completed in 374.439 seconds, distributed one identical worker image to all four Sparks at 8.95–9.34 Gb/s, and launched in 55–56 seconds. It also exercised a real C2/2 GiB/three-turn/65,536-token target-only override before restoring defaults. This proves the scripts do not depend on an inherited image; the final v3 pass above proves the release metadata and commit.
+
+The first empty-state attempt exposed and fixed a legacy DS4 AOT target that no longer matched the pinned SparkInfer ABI. During v3 packaging, the stricter readiness check initially reused an old helper that required a removed `-full` model alias; the native helper now validates the one configured model. Registry inspection then caught an inherited “DeepSeek V4 Pro” OCI description. Both superseded private tags were overwritten, and the exact corrected images were rebuilt, relaunched, remeasured, republished, and pulled by digest.
+
+All measurements use the RTX driver 595.91.07, enforced 400 W limit, and standard 14,001 MHz maximum memory clock. The four GB10 workers use driver 580.159.03.
+
+The original empty-state evidence is in [`evidence/native-clean-build-run.tar.gz`](evidence/native-clean-build-run.tar.gz). Final v3 build, launch, canary, local/remote image inspection, registry manifests, pull-by-digest output, package visibility, tests, hardware state, and superseded diagnostic attempts are preserved in [`evidence/native-release-v3-build-run.tar.gz`](evidence/native-release-v3-build-run.tar.gz). The public bundle replaces local paths, private RDMA addresses, and GPU UUIDs with explicit placeholders; performance data and artifact identities are unchanged.

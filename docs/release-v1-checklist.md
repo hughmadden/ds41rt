@@ -22,7 +22,8 @@ gate below is satisfied merely by an older component test.
   reuse, eviction and focused parity/concurrency/performance checks in both modes.
 - [x] Measure reuse performance and expose one exact KV pool sizing option.
   [Native pool evidence](release-v1-pool.md) covers focused reuse/performance
-  checks; the full retained-context release matrix remains open.
+  checks; the [final prefix campaign](release-v1-prefix-final.md) completes the
+  retained-context matrix.
 - [x] Run an initial tool-eval-bench and basic dsh agentic task after prefix
   correctness, before the full qualification campaign.
 - [x] Repeat tool-eval with thinking enabled at high effort (user correction);
@@ -45,8 +46,8 @@ gate below is satisfied merely by an older component test.
   covers image answers, changed/reordered images, partial replay, exact hits,
   maximum spans, cancellation/recovery, C16 target and C2 dSpark admission, and
   focused text regression checks. Longer target/dSpark descriptions are
-  semantically consistent, not necessarily token-identical. The broader
-  long-context/pool-pressure prefix gate and release performance suite remain open.
+  semantically consistent, not necessarily token-identical. The final prefix,
+  pool-pressure and performance campaigns complete the broader release gate.
 - [x] Qualify tools, structured outputs, streaming, cancellation and recovery.
   Complete native XGrammar enforcement before the compressed-cache migration.
   [Retained-logit preparation](release-v1-constraints.md) enables first-token
@@ -97,13 +98,13 @@ gate below is satisfied merely by an older component test.
   clamp each output allowance to remaining context and the model output cap.
   Keep configurable smaller development storage reservations for side-by-side APIs.
   [Native defaults and output clamping](release-v1-model-limits.md) now have
-  focused API/CLI and live target/dSpark verification; full-context qualification
-  remains part of the release suite.
+  focused API/CLI and live target/dSpark verification; the release suite adds
+  full-context qualification.
 - [x] Reserve 16 maximum-context requests plus eight additional 1M-context KV
   equivalents; support total memory percentage and MB/GB reservation options.
   [Pool allocation and high-address GPU checks](release-v1-pool.md) pass.
-  Configured-pool exhaustion/admission isolation and launcher wiring still
-  belong to the remaining API/run-script qualification.
+  The final API and standard-launcher campaigns cover configured-pool
+  exhaustion, admission isolation and launcher wiring.
 - [x] Measure and improve startup reads/transforms/exchange/capture. Aim for
   NVMe line rate (coordinator about 14 GB/s, Sparks about 6 GB/s) and roughly
   60–90 seconds load time without sacrificing runtime performance. The
@@ -178,8 +179,11 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   memory/storage, transport, optimizations, prefix caching, vision and API.
 - [x] Complete performance report covering every suite item above.
 - [x] Record dev/main/release branch practice in the operation manual.
-- [ ] Validate and publish final amd64 and arm64 containers to GitHub; record
+- [x] Validate and publish final amd64 and arm64 containers to GitHub; record
   digests and verify the published artifacts match the qualified pair.
+  The [v3 build and registry report](release-v1-build-run.md) records clean-tag
+  rebuilding, standard launch, a matched no-regression canary, v3/`latest`
+  identity, registry manifests and native-host pull-by-digest verification.
 - [ ] After documentation and image gates, advance main to qualified dev and
   create release/vX for the chosen numbered release.
 - [ ] Publish a formal first-release package on GitHub with qualified artifacts
@@ -189,15 +193,16 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
   references and actual GitHub publication remain pending.
 - [ ] Tell the user to make the images public manually after all other work.
 
-## Current evidence and next action
+## Evidence and audit trail
 
 The implementation, corrected-FP4 prefix/performance suite, memory/startup,
 three-run tool evaluation, dsh artifact, README, execution diagram, engineering
 report and clean standard launcher gates are complete. The release is numbered
 v3 because local repository history already contains the DS4RT v1 and v2 tags.
-Remaining work is a clean v3 metadata build/run equivalence check, registry
-publication and digest verification, then the release branch, main, tag and
-GitHub release.
+The final v3 images have also passed clean-tag rebuild, standard launch,
+performance equivalence, registry publication and pull-by-digest verification.
+Remaining work is advancing main and `release/v3`, creating the v3 tag and
+formal GitHub release, then recording those publication results.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
@@ -223,15 +228,15 @@ now passes focused GPU, API and C16 checks. [Large exact-resume suffixes](releas
 use encoder continuation and bounded decoder prefill. [Pool sizing](release-v1-pool.md)
 and [24 completed-turn retention](release-v1-retained-turns.md) now have focused
 qualification. Constrained-pool admission isolation and the full release suite
-remain open.
+were the next gates at that checkpoint and are complete above.
 [Retained-state component evidence](release-v1-retained-state.json) remains
 separate from these API results.
 
 [Initial agentic qualification](release-v1-initial-agentic.md) records 123/138
 basic and 32/38 hard points (155/176 total) from one C16 tool-eval-bench run.
 A real dsh coding task passed independent file/test checks and reused complete
-committed turns across five tool continuations. This satisfies the initial
-agentic check, not the three final release runs or arbitrary partial-prefix reuse.
+committed turns across five tool continuations. This satisfied the initial
+agentic check; the final three-run and prefix campaigns are recorded above.
 
 The [thinking-enabled high-effort rerun](release-v1-thinking.md) records 120/138
 basic and 35/38 hard points (155/176 total). It preserves the forced-tool API

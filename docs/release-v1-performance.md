@@ -1,10 +1,12 @@
-# Release v1 performance report
+# DS41RT v3 performance report
 
 DS41RT serves DeepSeek V4.1 Flash on one RTX PRO 6000 Blackwell workstation GPU plus four DGX Spark expert workers. The clean-built corrected-FP4 candidate reaches **2,668 prompt tok/s** at the best median prefill cell, **128.03 tok/s** single-request low-entropy dSpark decode, **60.68 tok/s** across the weighted eight-type dSpark corpus, and **683.70 aggregate tok/s at C16**. Its default C16 cache is 20.93 GiB and the warmed coordinator process uses 64.05 GiB.
 
 All release measurements use an enforced **400 W RTX power limit** and **standard memory speed**: 14,001 MHz maximum, with 13,365 MHz observed under load. The RTX driver is 595.91.07. The four NVIDIA GB10 workers use driver 580.159.03. Target-only and dSpark arms ran sequentially across the shared workers. Sampling used temperature 0 and disabled thinking for throughput; the agentic tool evaluation used thinking enabled at high effort.
 
 The exact clean-built artifacts are coordinator image `sha256:a13258e92dd25ddb889bd31bb77c8813c7881868b103ceec0c140e30e893c213` and Spark image `sha256:2f5d328a14f1a52a0d3b2356b041415d744635f3f3557e41403246429984093b`. They contain engine revision `d5fb015d00aa7b302e3ce179b097482da678db76`, model revision `dba1be0a40aa45a94ad051997016db3960a90277`, SparkInfer `7299b3b92e70d539b2c0a63aaadce36932ceef4d`, and XGrammar `557becfb64c503ae9c04344b0047661f43f44320`.
+
+The published v3 package is rebuilt from release-metadata revision `23a6670c6b3695df2e81b67b8ef08d28343f8dae`; no Rust or CUDA inference source changed after the measured image. A protocol-matched v3 canary meets or exceeds every C1/C2/C4/C8/C16 median below, ending at 694.90 tok/s for C16. The [final build and registry report](release-v1-build-run.md) records the v3 images, artifact hashes, manifests, pull-by-digest checks, and all canary samples.
 
 ## Headline results
 

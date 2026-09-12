@@ -15,11 +15,11 @@ DS41RT v3 is the first public release of the DeepSeek V4.1 runtime. It serves th
 
 The release candidate reaches 2,668 prompt tok/s at its best median prefill cell and 683.70 aggregate decode tok/s at C16. Measurements use a 400 W RTX power limit and standard memory speed with no memory overclock.
 
-Read the [README](../README.md), [engineering report](ENGINEERING.md), [performance report](release-v1-performance.md), and [release checklist](release-v1-checklist.md). The agentic qualification also produced a [playable single-file WebGL Frogger](https://tpurtell.github.io/ds41rt/frogger.html).
+Read the [README](https://github.com/tpurtell/ds41rt/blob/v3/README.md), [engineering report](https://github.com/tpurtell/ds41rt/blob/v3/docs/ENGINEERING.md), [performance report](https://github.com/tpurtell/ds41rt/blob/v3/docs/release-v1-performance.md), and [release checklist](https://github.com/tpurtell/ds41rt/blob/v3/docs/release-v1-checklist.md). The agentic qualification also produced a [playable single-file WebGL Frogger](https://tpurtell.github.io/ds41rt/frogger.html).
 
 Container images:
 
-- `ghcr.io/tpurtell/ds41rt-coordinator:v3` (`linux/amd64`)
-- `ghcr.io/tpurtell/ds41rt-spark-expert:v3` (`linux/arm64`)
+- `ghcr.io/tpurtell/ds41rt-coordinator:v3` (`linux/amd64`), digest `sha256:0d8a29160924dc62694d65f46e5101bf39071fb28e7611344489dde416bfe950`
+- `ghcr.io/tpurtell/ds41rt-spark-expert:v3` (`linux/arm64`), digest `sha256:672f82a1a99872cdc8014811b99c0967e0955c8c3e1e29b91bd48e7b06d3566d`
 
-Registry digests are recorded in the final publication report.
+The v3 and `latest` tags are identical for each role. See the [container qualification](https://github.com/tpurtell/ds41rt/blob/v3/docs/release-v1-build-run.md) for platform manifests and pull-by-digest verification.
