@@ -8,72 +8,72 @@ All reported RTX measurements use an enforced **400 W power limit** and **standa
 
 ## Performance
 
-The release candidate uses architectural FP4 compressed KV and the standard C16 launch. Local target-only and dSpark workloads ran sequentially. Throughput tests use temperature zero and thinking disabled; tool evaluation uses high thinking.
+The corrected standard `v1` build uses architectural FP4 compressed KV, the standard C16 launch, and the qualified fused Spark expert kernels. Local target-only and dSpark workloads ran sequentially. Throughput tests use temperature zero and thinking disabled; tool evaluation uses high thinking. The earlier release regression is fixed: standard-build prefill rose from 2,668 to 7,743 tok/s at the headline cell, and warm counting decode rose from 127.70 to 150.51 tok/s.
 
-**Performance qualification is reopened:** development-to-release prefill regression remains unresolved. These candidate measurements do not establish parity with the earlier ~7K prefill and ~145 counting decode results.
-
-**Headline results.** Median throughput, cache size, memory use, and startup time for the measured release candidate.
+**Headline results.** Median throughput, the 24-context cache policy, memory use, and measured clean-launch time.
 
 | Measurement | Result |
 |---|---:|
-| Best median prefill, 0 base + 32K new | 2,667.95 tok/s |
-| Best observed prefill sample | 2,738.47 tok/s |
-| Low-entropy dSpark decode, counting 1–200 warm median | 127.70 tok/s |
-| Weighted eight-type target-only median | 37.89 tok/s |
-| Weighted eight-type dSpark median | 60.68 tok/s |
-| dSpark gain on weighted mix | 60.16% |
-| C16 aggregate warm decode median | 683.70 tok/s |
-| Default architectural cache | 20.93 GiB |
-| Warmed C16 coordinator process | 64.05 GiB |
-| Clean standard-launch readiness | 55–56 s |
+| Best median prefill, 0 base + 32K new | **7,743.47 tok/s** |
+| Best observed prefill sample | **8,023.26 tok/s** |
+| Low-entropy target-only decode, counting 1–200 warm median | 43.08 tok/s |
+| Low-entropy dSpark decode, counting 1–200 warm median | **150.51 tok/s** |
+| Weighted eight-type target-only median | 41.42 tok/s |
+| Weighted eight-type dSpark median | **70.43 tok/s** |
+| dSpark gain on weighted mix | 70.04% |
+| C16 aggregate warm decode median | **742.91 tok/s** |
+| Default architectural cache | 24 × 1,048,576 tokens; 20.93 GiB |
+| Exact prompt / completed-turn retention | 24 / 24 entries |
+| Warmed C16 coordinator process | 64.23 GiB |
+| Clean standard dSpark launch readiness | 56.77 s |
 
-**Eight content types and counting.** Local eight-case results use five samples per mode; official Flash uses one request per case. Completion columns count finished serving requests, not prose quality. Official JSON Schema returned HTTP 400, so no full official weighted score is available. Historical word-count and keyword failures are excluded from this serving metric.
+**Eight content types and counting.** Three local samples per mode and the preserved one-request official reference. Completion counts report serving success; open-ended prose is unscored. The official schema request returned HTTP 400, so it has no full weighted aggregate.
 
 | Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target completed | dSpark completed | Official completed |
 |---|---:|---:|---:|---:|---:|---:|
-| Code | 38.35 | 99.57 | 345.90 | 5/5 | 5/5 | 1/1 |
-| Math | 37.79 | 96.52 | 285.33 | 5/5 | 5/5 | 1/1 |
-| Fable | 37.89 | 38.32 | 123.63 | 5/5 | 5/5 | 1/1 |
-| Hello | 37.64 | 50.00 | 141.10 | 5/5 | 5/5 | 1/1 |
-| Topic | 37.66 | 56.82 | 169.24 | 5/5 | 5/5 | 1/1 |
-| Natural JSON | 38.05 | 81.74 | 175.33 | 5/5 | 5/5 | 1/1 |
-| Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | 0/1 (HTTP 400) |
-| Multilingual | 37.58 | 57.20 | 183.61 | 5/5 | 5/5 | 1/1 |
-| Counting 1–200 | Not measured | **127.70** | **427.29** | N/A | 3/3 warm | 1/1 |
+| Code | 42.62 | 113.73 | 345.90 | 3/3 | 3/3 | 1/1 |
+| Math | 41.08 | 109.54 | 285.33 | 3/3 | 3/3 | 1/1 |
+| Fable | 40.42 | 47.10 | 123.63 | 3/3 | 3/3 | 1/1 |
+| Hello | 39.96 | 57.14 | 141.10 | 3/3 | 3/3 | 1/1 |
+| Topic | 41.24 | 63.48 | 169.24 | 3/3 | 3/3 | 1/1 |
+| Natural JSON | 42.34 | 93.24 | 175.33 | 3/3 | 3/3 | 1/1 |
+| Schema JSON | 41.89 | 85.78 | HTTP 400 | 3/3 | 3/3 | 0/1 (HTTP 400) |
+| Multilingual | 40.99 | 62.70 | 183.61 | 3/3 | 3/3 | 1/1 |
+| Counting 1–200 | **43.08** | **150.51** | **427.29** | 3/3 warm | 3/3 warm | 1/1 |
 
-Counting is outside the weighted score: local dSpark uses three warm samples; official Flash uses one fresh request. Both pass the 1–200 sequence check. Official timings include network streaming on unknown provider hardware and use provider-reported token counts.
+Counting is outside the weighted score. Local values are three warm exact-sequence samples after one prime. The official API was called once and was not rerun.
 
-**Prefill.** Median new prompt tokens/s above each retained base, target-only; two timed samples per cell after one warmup.
+**Prefill.** Median new prompt tokens/s above each retained base, target-only; three timed samples per cell after one warmup.
 
 | Retained base | +1K | +2K | +4K | +8K | +16K | +32K |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0 | 1,472 | 1,815 | 2,490 | 2,233 | 2,573 | **2,668** |
-| 32K | 1,384 | 1,719 | 2,440 | 2,595 | 2,545 | 2,654 |
-| 64K | 1,308 | 1,649 | 2,388 | 2,568 | 2,539 | 2,647 |
-| 128K | 1,209 | 1,535 | 2,256 | 2,507 | 2,594 | 2,598 |
-| 256K | 989 | 1,346 | 2,001 | 1,902 | 2,326 | 2,264 |
+| 0 | 2,818 | 3,757 | 6,922 | 7,414 | 7,660 | **7,743** |
+| 32K | 2,440 | 3,319 | 6,055 | 6,736 | 7,086 | 7,119 |
+| 64K | 2,251 | 3,112 | 5,557 | 6,255 | 6,594 | 6,768 |
+| 128K | 1,942 | 2,724 | 4,724 | 5,432 | 5,785 | 5,961 |
+| 256K | 1,477 | 2,148 | 3,565 | 4,123 | 4,444 | 4,612 |
 
-**Decode over retained context.** Weighted dSpark tokens/s across eight content types, with two samples per type and verified prefix reuse at each base.
+**Decode over retained context.** Weighted dSpark tokens/s across eight content types, with three samples per type and verified prefix reuse at each base.
 
 | Retained base | Weighted dSpark tok/s | Completed with verified cache reuse |
 |---:|---:|---:|
-| 0 | 59.59 | 16/16 |
-| 32K | 53.75 | 16/16 |
-| 64K | 55.06 | 16/16 |
-| 128K | 54.04 | 16/16 |
-| 256K | 51.87 | 16/16 |
+| 0 | 73.43 | 24/24 |
+| 32K | 68.08 | 24/24 |
+| 64K | 64.82 | 24/24 |
+| 128K | 62.71 | 24/24 |
+| 256K | 61.27 | 24/24 |
 
 **Concurrency scaling.** Three samples per concurrency with a fully cached prompt and exact 599-token counting output. Aggregate timing includes scheduler admission gaps.
 
 | Concurrency | Median aggregate tok/s | Range | Scale vs C1 |
 |---:|---:|---:|---:|
-| 1 | 124.81 | 123.20–124.98 | 1.00× |
-| 2 | 176.58 | 174.10–176.86 | 1.41× |
-| 4 | 288.89 | 288.72–289.02 | 2.31× |
-| 8 | 416.34 | 411.79–416.79 | 3.34× |
-| 16 | **683.70** | 683.64–689.58 | **5.48×** |
+| 1 | 149.16 | 148.89–149.24 | 1.00× |
+| 2 | 188.47 | 187.82–188.66 | 1.26× |
+| 4 | 325.90 | 323.81–326.08 | 2.18× |
+| 8 | 467.10 | 463.93–467.14 | 3.13× |
+| 16 | **742.91** | 735.48–745.69 | **4.98×** |
 
-The [performance report](docs/release-v1-performance.md) provides methodology, artifact identities, quality misses, and the memory, startup, needle-retrieval, and agentic results. [Machine-readable results](docs/release-v1-performance.json) and [raw evidence](docs/evidence/native-release-performance.tar.gz) preserve samples, inputs, outputs, cache counters, hardware state, and errors.
+The [performance report](docs/release-v1-performance.md) provides methodology, artifact identities, per-case retained-context results, memory, startup, needle retrieval, and agentic results. [Machine-readable results](docs/release-v1-performance.json) and [raw evidence](docs/evidence/native-release-performance.tar.gz) preserve samples, inputs, outputs, cache counters, hardware state, and errors.
 
 ## Getting started
 

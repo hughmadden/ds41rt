@@ -125,10 +125,12 @@ gate below is satisfied merely by an older component test.
 
 ## Release performance suite
 
-**Reopened September 13:** the published candidate does not establish parity
-with development prefill (roughly 7K versus 2.6K code tok/s). Resolve this
-regression before claiming the performance gate complete again. Historical
-measurements below remain evidence, not approval of the unresolved regression.
+**Resolved September 13:** the standard Spark build omitted the qualified
+fused-slice width map and direct token-accumulation defaults. The corrected
+standard build reaches 7,743 tok/s median at 0/+32K prefill, 150.51 tok/s warm
+counting decode, and 742.91 aggregate tok/s at C16. All README performance
+tables were rerun with three measured local samples; the full qualification
+suite was not repeated.
 
 The low-entropy release requirement now replaces Orchid with:
 `Count from 1 to 200, separated by commas. Output only the sequence.`
@@ -193,15 +195,15 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 - [x] Record dev/main/release branch practice in the operation manual.
 - [x] Validate and publish final amd64 and arm64 containers to GitHub; record
   digests and verify the published artifacts match the qualified pair.
-  The [v3 build and registry report](release-v1-build-run.md) records clean-tag
-  rebuilding, standard launch, a matched no-regression canary, v3/`latest`
+  The [v1 build and registry report](release-v1-build-run.md) records clean-tag
+  rebuilding, standard launch, restored performance, v1/`latest`
   identity, registry manifests and native-host pull-by-digest verification.
 - [x] After documentation and image gates, advance main to qualified dev and
-  create `release/v3` for the chosen numbered release.
+  create `release/v1` for the first DS41RT release.
 - [x] Publish a formal first-release package on GitHub with qualified artifacts
   and container references. Release notes: a short high-level overview and
   bulleted key features, linking detailed reports (user addition September 12).
-  The [v3 release](https://github.com/tpurtell/ds41rt/releases/tag/v3) and
+  The [v1 release](https://github.com/tpurtell/ds41rt/releases/tag/v1) and
   [publication record](release-v1-publication.md) preserve the final state.
 - [ ] Repository owner action after handoff: make both GHCR packages public.
 
@@ -209,15 +211,13 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 The implementation, corrected-FP4 prefix/performance suite, memory/startup,
 three-run tool evaluation, dsh artifact, README, execution diagram, engineering
-report and clean standard launcher gates were recorded complete at publication;
-performance parity is reopened by the September 13 correction above. The release is numbered
-v3 because local repository history already contains the DS4RT v1 and v2 tags.
-The final v3 images have also passed clean-tag rebuild, standard launch,
-performance equivalence, registry publication and pull-by-digest verification.
-The qualified source is now on `main`, `release/v3` and tag `v3`; the formal
+report and clean standard launcher gates are complete. Legacy local DS4RT tags
+were not used to continue DS41RT numbering; this first DS41RT release is v1.
+The final v1 images have passed clean-tag rebuild, standard launch, restored
+performance, registry publication and manifest verification. The qualified
+source is on `main`, `release/v1` and tag `v1`; the formal
 GitHub release and main-backed Pages deployment are public. Package visibility
-was reserved for the owner. Development-to-release prefill and counting decode
-performance now require investigation and renewed qualification.
+is reserved for the owner.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
