@@ -12,7 +12,7 @@ mod source_cache;
 mod prefix;
 pub(crate) use prefix::{CompressorPrefix, COMPRESSOR_PREFIX_BYTES};
 use source_cache::SourceCache;
-pub(crate) use source_cache::{IndexCacheView, KvCacheView};
+pub(crate) use source_cache::{IndexCacheView, KvCacheView, SourcePoolExhausted};
 static NEXT_PROPOSAL: AtomicU64 = AtomicU64::new(1);
 pub(crate) fn reserve_source_snapshot() -> Result<u64> {
     NEXT_PROPOSAL.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))

@@ -8,6 +8,22 @@ mod ownership;
 use ownership::PagePool;
 pub(crate) use ownership::SourcePrefix;
 
+/// Capacity failure for one entry in the caller's ordered append transaction.
+/// Binding/ownership failures deliberately use different error types.
+#[derive(Debug)]
+pub(crate) struct SourcePoolExhausted {
+    pub work_index: usize,
+    pub needed: usize,
+    pub available: usize,
+}
+impl std::fmt::Display for SourcePoolExhausted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "compressed KV pool exhausted at work item {}: need {} pages, {} available",
+            self.work_index, self.needed, self.available)
+    }
+}
+impl std::error::Error for SourcePoolExhausted {}
+
 pub(super) const PAGE_ROWS: usize = 256;
 const KV_VALUES: usize = V41Kv::COMPRESSED_VALUE_BYTES;
 const KV_SCALES: usize = V41Kv::COMPRESSED_SCALE_BYTES;
@@ -289,7 +305,7 @@ impl<'a> SourceCache<'a> {
                     if writers != pool.references(source) || position != last {
                         ensure!(
                             plan.used < pool.free.len(),
-                            "index cache copy-on-write pool exhausted"
+                            SourcePoolExhausted { work_index: position, needed: 1, available: pool.free.len() - plan.used }
                         );
                         let destination = pool.free[pool.free.len() - plan.used - 1];
                         plan.used += 1;
@@ -300,7 +316,7 @@ impl<'a> SourceCache<'a> {
             let extra = new.div_ceil(PAGE_ROWS) - self.pages[slot].len();
             ensure!(
                 extra <= pool.free.len() - plan.used,
-                "index cache pool exhausted"
+                SourcePoolExhausted { work_index: position, needed: extra, available: pool.free.len() - plan.used }
             );
             let end = pool.free.len() - plan.used;
             plan.additions.push((
@@ -587,7 +603,14 @@ mod tests {
         append(&mut cache, 1, 256, 257, 0x22, stream.raw)?;
         assert_eq!(cache.pages[1][0], full);
         let partial = cache.retain_prefix(1, 257)?;
-        assert!(cache.reserve(&[(1, 257, 258)]).is_err());
+        let error = cache.reserve(&[(1, 257, 258)]).err().expect("shared tail must need a page");
+        let pressure = error.downcast_ref::<SourcePoolExhausted>().expect("typed pool pressure");
+        assert_eq!((pressure.work_index, pressure.needed, pressure.available), (0, 1, 0));
+        let error = cache.reserve(&[(0, 256, 256), (1, 257, 513)]).err().expect("joint append cannot fit");
+        assert_eq!(error.downcast_ref::<SourcePoolExhausted>().unwrap().work_index, 1);
+        // Invalid binding must never be classified as recoverable pool pressure.
+        let error = cache.reserve(&[(1, 256, 258)]).err().expect("wrong committed end");
+        assert!(error.downcast_ref::<SourcePoolExhausted>().is_none());
         let before = read(&cache, 1, 257)?;
         drop(partial);
         // The tail is now exclusive: append succeeds with no free pages.

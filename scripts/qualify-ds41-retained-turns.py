@@ -41,7 +41,11 @@ def completed_frontiers(response):
     usage = response['usage']
     frontiers = [usage['total_tokens'] - 1]
     fingerprint = response['system_fingerprint']
-    assert fingerprint in ('ds41rt-native-fp8-kv', 'ds41rt-native-fp8-kv-dspark')
+    assert fingerprint in (
+        'ds41rt-native-fp4-kv', 'ds41rt-native-fp4-kv-dspark',
+        # Preserve replay support for the pre-migration baseline evidence.
+        'ds41rt-native-fp8-kv', 'ds41rt-native-fp8-kv-dspark',
+    )
     if fingerprint.endswith('-dspark'):
         frontiers.append(usage['total_tokens'])
     assert min(frontiers) > usage['prompt_tokens']

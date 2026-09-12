@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "pool": {
+    "concurrency": 2,
+    "prefix_cache_entries": 0,
+    "global_bytes": 1822720,
+    "source_pages": [4, 4, 4, 8]
+  },
+  "candidate_daemon_sha256": "1da2bfd1f6913ce13fc21e23fb46b58e2603f9f9d31eca4b1ee615f4166dece3",
+  "results": {
+    "target_baseline": {
+      "sha256": "890dcb3e57e182877b03f9ec07fc59a34b2aafc68e3cd07d43e53e7b399bcc8f",
+      "decode_survivors": 0,
+      "passed": true
+    },
+    "target_candidate": {
+      "sha256": "9bc96f68392cb9bd7f35ae38f9ee0e3198e421a59c5a478dc80e7a72ae6410a0",
+      "decode_survivors": 1,
+      "passed": true
+    },
+    "dspark_baseline": {
+      "sha256": "3bc733476b61f0f87436e7ba9bdb7bcc9c10ab1ae60bfaa8d19cd4c7330e05fc",
+      "decode_survivors": 0,
+      "passed": true
+    },
+    "dspark_candidate": {
+      "sha256": "ddcd7d733fd8743ec59241e4e28c4a97c8a4690b6801d59007272bd9ac137cff",
+      "decode_survivors": 1,
+      "passed": true
+    }
+  },
+  "cases_per_arm": ["decode-json", "decode-sse", "admission-json", "admission-sse", "cancel-sse"],
+  "component_tests": {
+    "source_cache_gpu": "4 passed",
+    "real_backbone_commit": "1 passed",
+    "test_compile": "passed",
+    "release_build": "passed"
+  }
+}

@@ -155,8 +155,8 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 }
                 drop(images);
                 job.events.blocking_send(Ok(InferenceChunk::Ready {
-                    system_fingerprint: Some(if draft.is_some() { "ds41rt-native-fp8-kv-dspark" }
-                        else { "ds41rt-native-fp8-kv" }.into()),
+                    system_fingerprint: Some(if draft.is_some() { "ds41rt-native-fp4-kv-dspark" }
+                        else { "ds41rt-native-fp4-kv" }.into()),
                     prompt_usage: PromptUsage { prompt_tokens: prompt.len(), prompt_cache_hit_tokens: cached },
                 }))?;
                 first_transport.begin_request(); second_transport.begin_request();
@@ -204,7 +204,21 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             let r = active[slot].as_ref().unwrap();
             (r.lease, if draft.is_some() { (r.job.max_tokens - r.generated).min(6) as u32 } else { 1 })
         }).collect();
-        let result = prefixes.make_room(requests, &capacity).and_then(|_| round(lib, runtime,
+        let room = prefixes.make_room(requests, &capacity);
+        if let Err(error) = &room {
+            if let Some(pressure) = error.downcast_ref::<crate::v41_compressor::SourcePoolExhausted>() {
+                let slot = *members.iter().flatten().nth(pressure.work_index)
+                    .context("pool pressure references an invalid append participant")?;
+                let request = active[slot].as_mut().unwrap();
+                let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
+                request.finished = true;
+                request.cacheable = false;
+                // No layer stack started. The next completed-boundary cleanup
+                // releases only this owner's pages, then retries remaining work.
+                continue;
+            }
+        }
+        let result = room.and_then(|_| round(lib, runtime,
             first, second, requests, first_transport, second_transport, &mut active, &members, draft.as_deref_mut()));
         if let Err(error) = result {
             first_transport.reset_connections(); second_transport.reset_connections();

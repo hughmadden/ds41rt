@@ -375,7 +375,8 @@ impl<'a> PrefixCache<'a> {
             match requests.cache().check_append_capacity(work) {
                 Ok(()) => return Ok(()),
                 Err(error) => {
-                    if !self.retained.evict_one() {
+                    if error.downcast_ref::<crate::v41_compressor::SourcePoolExhausted>().is_none()
+                        || !self.retained.evict_one() {
                         return Err(error);
                     }
                 }

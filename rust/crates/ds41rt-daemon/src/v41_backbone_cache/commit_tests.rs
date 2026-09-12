@@ -33,7 +33,7 @@ fn committed_bytes(lib: &NativeLibrary, bank: &BackboneCache<'_>, lease: CacheLe
         let key_scales = read(lib, index.scales)?;
         for logical in 0..view.rows {
             let physical = view.pages[logical / 256] as usize * 256 + logical % 256;
-            result.extend(row(&[(&values, 512), (&scales, 16), (&keys, 64), (&key_scales, 4)], physical));
+            result.extend(row(&[(&values, ds41rt_ffi::V41Kv::COMPRESSED_VALUE_BYTES), (&scales, ds41rt_ffi::V41Kv::COMPRESSED_SCALE_BYTES), (&keys, 64), (&key_scales, 4)], physical));
         }
     }
     Ok(result)
@@ -321,7 +321,7 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
                     .unwrap();
                 if latent.position + ratio <= ends[slot] + u64::from(accepted[slot]) {
                     expected_sources[source][slot].push(row(
-                        &[(&values, 512), (&scales, 16), (&keys, 64), (&key_scales, 4)],
+                        &[(&values, ds41rt_ffi::V41Kv::COMPRESSED_VALUE_BYTES), (&scales, ds41rt_ffi::V41Kv::COMPRESSED_SCALE_BYTES), (&keys, 64), (&key_scales, 4)],
                         latent.source_row as usize,
                     ));
                 }
@@ -382,7 +382,7 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
                     let physical = view.pages[logical / 256] as usize * 256 + logical % 256;
                     assert_eq!(
                         row(
-                            &[(&values, 512), (&scales, 16), (&keys, 64), (&key_scales, 4)],
+                            &[(&values, ds41rt_ffi::V41Kv::COMPRESSED_VALUE_BYTES), (&scales, ds41rt_ffi::V41Kv::COMPRESSED_SCALE_BYTES), (&keys, 64), (&key_scales, 4)],
                             physical
                         ),
                         expected_sources[source][slot][logical],
@@ -644,7 +644,7 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
     } else {
         limited.commit(&batch, &mut windows, &mut sources, &[2; 16]).unwrap_err()
     };
-    assert!(error.to_string().contains("index cache pool exhausted"));
+    assert!(error.downcast_ref::<crate::v41_compressor::SourcePoolExhausted>().is_some());
     eprintln!("expected late source exhaustion: {error}");
     for lease in leases {
         assert!(limited.request_id(lease).is_err());
