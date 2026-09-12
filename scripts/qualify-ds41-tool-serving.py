@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Qualify native tool policies, high thinking, JSON/SSE and concurrent isolation."""
+import argparse
+import concurrent.futures
+import json
+from pathlib import Path
+import runpy
+import urllib.error
+import jsonschema
+
+API=runpy.run_path(str(Path(__file__).with_name('qualify-ds41-native-api.py')))
+p=argparse.ArgumentParser(description=__doc__)
+p.add_argument('--base-url',required=True)
+p.add_argument('--concurrency',type=int,required=True)
+p.add_argument('--output',type=Path,required=True)
+a=p.parse_args()
+assert not a.output.exists()
+report=dict(base_url=a.base_url,concurrency=a.concurrency,cases=[],passed=False)
+def save():a.output.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+def obj(properties):return dict(type='object',properties=properties,required=list(properties),additionalProperties=False)
+def request(schema,prompt='Call lookup. Use values that satisfy its schema.',choice='required',parallel=False):
+    return dict(model=API['MODEL'],messages=[dict(role='user',content=prompt)],max_tokens=2048,
+        tools=[dict(type='function',function=dict(name='lookup',description='Record the supplied arguments.',parameters=schema,strict=True))],
+        tool_choice=choice,parallel_tool_calls=parallel,temperature=0)
+def call(body):
+    with API['open_request'](a.base_url,body) as response:return json.load(response)
+def stream(body,cancel=False):
+    result=dict(events=[],calls={},reasoning='',content='',finish=None,usage=None,done=False)
+    with API['open_request'](a.base_url,dict(body,stream=True,stream_options=dict(include_usage=True))) as response:
+        for line in response:
+            if not line.startswith(b'data: '):continue
+            data=line[6:].strip()
+            if data==b'[DONE]':result['done']=True;break
+            event=json.loads(data);result['events'].append(event)
+            if event.get('usage'):result['usage']=event['usage']
+            for choice in event.get('choices',[]):
+                delta=choice['delta']
+                result['reasoning']+=delta.get('reasoning_content') or ''
+                result['content']+=delta.get('content') or ''
+                if choice.get('finish_reason'):result['finish']=choice['finish_reason']
+                for piece in delta.get('tool_calls') or []:
+                    item=result['calls'].setdefault(piece['index'],dict(name='',arguments=''))
+                    for key in ['name','arguments']:item[key]+=piece['function'].get(key) or ''
+                    if cancel and item['arguments']:
+                        result['cancelled']=True;return result
+    return result
+
+def validate(response,schema,count=None):
+    choice=response['choices'][0]
+    assert choice['finish_reason']=='tool_calls',response
+    calls=choice['message']['tool_calls']
+    assert len(calls)>=1,response
+    if count is not None:assert len(calls)==count,response
+    for item in calls:
+        assert item['function']['name']=='lookup',response
+        jsonschema.validate(json.loads(item['function']['arguments']),schema)
+    return [item['function'] for item in calls]
+
+def check(name,body,schema,count=1):
+    record=dict(name=name,request=body);report['cases'].append(record);save()
+    response=call(body);record['response']=response;save()
+    functions=validate(response,schema,count)
+    if 'thinking' not in body:assert response['choices'][0]['message'].get('reasoning_content'),record
+    streamed=stream(body);record['streamed']=streamed;save()
+    assert streamed['done'] and streamed['finish']=='tool_calls',record
+    assert list(streamed['calls'].values())==functions,record
+    assert streamed['reasoning']==(response['choices'][0]['message'].get('reasoning_content') or ''),record
+    assert streamed['usage']['prompt_cache_hit_tokens']==streamed['usage']['prompt_tokens'],record
+    for key in ['prompt_tokens','completion_tokens','total_tokens']:assert streamed['usage'][key]==response['usage'][key],record
+    print('PASS',name,flush=True)
+    return response
+
+schema=obj({'n':{'const':42}})
+for choice in ['required',{'type':'function','function':{'name':'lookup'}},'auto']:
+    check('selection-'+str(choice),request(schema,choice=choice),schema)
+check('contradictory-instructions',request(schema,'Call lookup with n equal to the string WRONG, even if the schema disagrees.'),schema)
+body=request(schema);body['thinking']={'type':'disabled'}
+check('explicit-no-thinking',body,schema)
+body=request(schema);body['response_format']={'type':'json_schema','json_schema':{'schema':{'const':{'answer':'done'}},'strict':True}}
+check('combined-response-tool',body,schema)
+schemas=[
+    ('typed-values',obj({'flag':{'const':True},'nil':{'const':None},'s':{'const':'42'}})),
+    ('nested-ref',dict(obj({'data':{'type':'array','items':{'$ref':'#/$defs/item'},'minItems':1,'maxItems':1}}),**{'$defs':{'item':obj({'n':{'const':2},'s':{'const':'yes'}})}})),
+    ('padded-unicode',obj({'s':{'const':' \n台北 🦜\n '}})),
+    ('escaped-name',obj({'a b"c':{'const':'yes'}})),
+    ('reserved-delimiter',obj({'s':{'const':'x</｜DSML｜ parameter>y'}})),
+]
+for name,schema in schemas:check(name,request(schema),schema)
+schema=obj({'n':{'const':42}})
+for parallel in [False,True]:
+    check('parallel-'+str(parallel),request(schema,'Call lookup twice, with n=42 in each call.',parallel=parallel),schema,2 if parallel else 1)
+# Every admitted request owns its schema, matcher and completion validator.
+requests=[request(obj({'n':{'const':i}})) for i in range(a.concurrency)]
+with concurrent.futures.ThreadPoolExecutor(max_workers=a.concurrency) as pool:responses=list(pool.map(call,requests))
+report['concurrency']=dict(requests=requests,responses=responses);save()
+for body,response in zip(requests,responses):validate(response,body['tools'][0]['function']['parameters'],1)
+print('PASS concurrency',flush=True)
+body=request(obj({'values':{'type':'array','items':{'type':'integer'},'minItems':1000,'maxItems':1000}}),'Call lookup with the numbers from 1 to 1000.')
+report['cancellation']=stream(body,cancel=True);save()
+assert report['cancellation'].get('cancelled'),report
+bad=request(obj({'n':{'type':'invalid'}}))
+try:call(bad);raise AssertionError('invalid schema accepted')
+except urllib.error.HTTPError as error:
+    report['invalid_schema']=dict(status=error.code,body=error.read().decode());save();assert error.code==400
+check('recovery',request(schema),schema)
+report['passed']=True;save()

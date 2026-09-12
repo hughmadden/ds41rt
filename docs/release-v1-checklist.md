@@ -50,7 +50,11 @@ gate below is satisfied merely by an older component test.
   [Retained-logit preparation](release-v1-constraints.md) enables first-token
   reselection under a changed grammar on exact hits. [Response constraint
   enforcement](release-v1-response-constraints.md) now covers JSON schemas,
-  thinking, SSE and dSpark; strict tool-argument/selection enforcement remains open.
+  thinking, SSE and dSpark. [Native tool serving](release-v1-tool-serving.md)
+  now enforces strict arguments, selection and parallel-call policy, including
+  high thinking and independent JSON/SSE completion validation. Remaining
+  parameter-schema generation cases and broader tool-eval qualification keep
+  this gate open.
 - [ ] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
   scales; retain FP8 SWA and the independent FP4 index format. The previous
   FP8-only interpretation was incorrect (user clarification September 12).

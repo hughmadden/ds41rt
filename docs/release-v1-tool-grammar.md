@@ -1,9 +1,9 @@
 # V4.1 tool grammar component
 
 The native grammar adapter accepts an internal `ds41_tool_schema` structural
-node and converts argument objects to V4.1 DSML parameters. This component is
-not yet connected to native API tool requests and does not close the strict
-tool release gate.
+node and converts argument objects to V4.1 DSML parameters. The component is
+connected to [native tool serving](release-v1-tool-serving.md); remaining schema
+cases still keep the complete tool release gate open.
 
 Outer strings use `string="true"` with their original content; numbers,
 booleans, nulls, arrays and objects use `string="false"` with JSON content.
@@ -33,13 +33,13 @@ inference, tool-eval or performance qualification.
 
 - Implement root `patternProperties` and `propertyNames`; the component currently
   rejects them explicitly.
-- Enforce duplicate-key rules and named-property exclusions for additional
-  arguments, including alternate escaped spellings.
-- Handle reserved DSML delimiters in constrained strings and independently
-  validate completed arguments. The inherited schema converter does not enforce
-  every combination of string pattern, format and length constraints.
-- Wire tool selection, strict schemas, parallel-call limits and reasoning into
-  native requests, then qualify JSON/SSE, cancellation, error isolation, exact
-  cache hits and dSpark against live inference and high-thinking tool evals.
+- Enforce named-property exclusions for additional arguments in the grammar,
+  including alternate escaped spellings. Completed-argument validation now
+  rejects duplicate keys recursively.
+- Handle reserved DSML delimiters in general constrained strings. The inherited
+  schema converter does not enforce every combination of string pattern, format
+  and length constraints; independent validation now checks completed arguments.
+- Finish broader high-thinking tool-eval/agentic qualification after these
+  remaining generation cases, in addition to the native serving checks.
 
 The architectural compressed FP4 migration follows this completed tool gate.

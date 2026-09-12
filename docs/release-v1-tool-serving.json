@@ -1,0 +1,288 @@
+{
+  "scope": "Native tool policies and independent completion validation; root patternProperties/propertyNames and further grammar coverage remain open.",
+  "parent_commit": "19839b5c1bb252b5c4aa77126e8c102594bff928",
+  "baseline_commit": "f594511ecfbb45ba31f972e9ecb787bb2aab0f72",
+  "source_sha256": {
+    "rust/crates/ds41rt-api/src/native_v41.rs": "20cf864284d475de778821333963fd7ee5195f9a6cf0ab7a6e173e776e06d746",
+    "rust/crates/ds41rt-api/src/native_v41/constraints.rs": "9d42b966dd6782479c837521ced52409c9d174ecc92d697aeadb9ab83f3b086a",
+    "rust/crates/ds41rt-api/src/native_v41/tools.rs": "e1fe862004675099a4a517ec192467dc5d29ded20683ff4214ea6b1748ca22d9",
+    "scripts/qualify-ds41-tool-grammar.py": "d622daf7f5cd44abd24d6ca3a6e79dc5508bc5218287be28479709e6a8bb7fa2",
+    "scripts/qualify-ds41-tool-serving.py": "800e9ca69a9501703c5dc4738653b7b94a9d8b1c0b68ea35d60847506f5eb6b6",
+    "scripts/qualify-ds41-native-text-performance.py": "daa8cb32937f48ba40d6fffcac0b8d52ba9b8886eb8141203dca9efca1508525"
+  },
+  "binary_sha256": "d4a920166f9b6128836c6e342d5cda33e6de5aa8e001a141fe7a4e1153dce1ab",
+  "native_library_sha256": "816c9c1b5706dd6f0f75b4ad941a59f0c5fcba0d4709e59d4373c658903f0015",
+  "baseline_binary_sha256": "b1fe10bdb177217449a2d3a39bad877f26c7e8f03788335eb443d7460bba6649",
+  "hardware": "index, name, driver_version, power.limit [W], clocks.current.memory [MHz], clocks.max.memory [MHz], clocks.current.graphics [MHz], memory.total [MiB]\n0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 13365 MHz, 14001 MHz, 2805 MHz, 97887 MiB\n1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 405 MHz, 14001 MHz, 180 MHz, 97887 MiB\n",
+  "launch": [
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-tools-final-target-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1",
+      "--entrypoint",
+      "/daemon",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=0",
+      "-e",
+      "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "-v",
+      "/tmp/ds41-native-tools/daemon-tools-final:/daemon:ro",
+      "-v",
+      "/tmp/ds41-native-tools/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18069",
+      "--prefill-batch-tokens",
+      "2048",
+      "--concurrency",
+      "16",
+      "--max-context-tokens",
+      "32768"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "ds41-tools-final-spec-api-dev",
+      "--gpus",
+      "all",
+      "--network",
+      "host",
+      "--device",
+      "/dev/infiniband",
+      "--ulimit",
+      "memlock=-1",
+      "--entrypoint",
+      "/daemon",
+      "-e",
+      "CUDA_VISIBLE_DEVICES=1",
+      "-e",
+      "RUST_LOG=info,ds41rt::v41_native_serve::scheduler=debug",
+      "-e",
+      "DS41RT_SPARKINFER_COMMIT=e53fd5a1f4a8380377fef91a5b3e69414f192223",
+      "-e",
+      "DS41RT_NATIVE_LIB=/audit/cmake/libds41rt_native.so",
+      "-e",
+      "DS41RT_PROTOCOL_V2_TCP_TIMING=0",
+      "-v",
+      "/tmp/ds41-native-tools/daemon-tools-final:/daemon:ro",
+      "-v",
+      "/tmp/ds41-native-tools/cmake:/audit/cmake:ro",
+      "-v",
+      "/home/tj/.cache/huggingface:/hf:ro",
+      "sha256:95d754b417e090f31d8e7ec092f3c14dfa82944937a2080241b4bfbedecb54d9",
+      "serve-native",
+      "--dspark",
+      "--native-lib",
+      "/audit/cmake/libds41rt_native.so",
+      "--snapshot",
+      "/hf/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+      "--peers",
+      "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+      "--listen",
+      "127.0.0.1:18070",
+      "--prefill-batch-tokens",
+      "2048",
+      "--concurrency",
+      "2",
+      "--max-context-tokens",
+      "32768"
+    ]
+  ],
+  "cross_mode_tools": [
+    {
+      "name": "selection-required",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "selection-{'type': 'function', 'function': {'name': 'lookup'}}",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "selection-auto",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "contradictory-instructions",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "explicit-no-thinking",
+      "arguments_equal": true,
+      "reasoning_equal": true
+    },
+    {
+      "name": "combined-response-tool",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "typed-values",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "nested-ref",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "padded-unicode",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "escaped-name",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "reserved-delimiter",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    },
+    {
+      "name": "parallel-False",
+      "arguments_equal": true,
+      "reasoning_equal": true
+    },
+    {
+      "name": "parallel-True",
+      "arguments_equal": true,
+      "reasoning_equal": true
+    },
+    {
+      "name": "recovery",
+      "arguments_equal": true,
+      "reasoning_equal": false
+    }
+  ],
+  "performance_followup": [
+    {
+      "name": "counting",
+      "median_decode_change_percent": 0.4951169449331605,
+      "reference_tps": 143.41498824919552,
+      "candidate_tps": 144.09548386183434
+    },
+    {
+      "name": "code",
+      "median_decode_change_percent": 0.097568881318022,
+      "reference_tps": 125.11880361566028,
+      "candidate_tps": 125.30331750157515
+    }
+  ],
+  "evidence": {
+    "path": "docs/evidence/native-tool-serving.json.gz",
+    "sha256": "2883b24afb6d789fe17763170cb0c2f42a3749eed7497629f9747bf00377c9e3"
+  },
+  "checks": {
+    "api_tests": 16,
+    "grammar_groups": 61,
+    "grammar_checks": 101,
+    "release_build": true
+  },
+  "live": {
+    "target": {
+      "tool_json_sse_pairs": 14,
+      "concurrent_requests": 16,
+      "response_json_sse_pairs": 16,
+      "cache": [
+        {
+          "name": "non-strict",
+          "cached": 102,
+          "prompt": 301
+        },
+        {
+          "name": "same-prompt-new-strictness",
+          "cached": 301,
+          "prompt": 301
+        },
+        {
+          "name": "agentic-resume",
+          "cached": 312,
+          "prompt": 499
+        }
+      ],
+      "performance": [
+        {
+          "name": "counting",
+          "median_decode_change_percent": -0.11407925365732874,
+          "reference_tps": 42.681307668886845,
+          "candidate_tps": 42.680921421185296
+        },
+        {
+          "name": "code",
+          "median_decode_change_percent": 0.24743009678900307,
+          "reference_tps": 42.49833110092155,
+          "candidate_tps": 42.61981530113978
+        }
+      ]
+    },
+    "spec": {
+      "tool_json_sse_pairs": 14,
+      "concurrent_requests": 2,
+      "response_json_sse_pairs": 16,
+      "cache": [
+        {
+          "name": "non-strict",
+          "cached": 102,
+          "prompt": 301
+        },
+        {
+          "name": "same-prompt-new-strictness",
+          "cached": 301,
+          "prompt": 301
+        },
+        {
+          "name": "agentic-resume",
+          "cached": 301,
+          "prompt": 470
+        }
+      ],
+      "performance": [
+        {
+          "name": "counting",
+          "median_decode_change_percent": -0.5649120965065979,
+          "reference_tps": 144.53082323746838,
+          "candidate_tps": 143.62462189911412
+        },
+        {
+          "name": "code",
+          "median_decode_change_percent": -0.09346096399761583,
+          "reference_tps": 125.0870364986143,
+          "candidate_tps": 124.68681312954567
+        }
+      ]
+    }
+  }
+}

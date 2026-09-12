@@ -11,6 +11,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--native-lib', type=Path, required=True)
 p.add_argument('--tokenizer', type=Path, required=True)
 p.add_argument('--output', type=Path, required=True)
+p.add_argument('--api-cases', type=Path, help='Directory of actual API grammar/request fixtures emitted by Rust policy tests')
 a = p.parse_args()
 assert not a.output.exists()
 tokenizer = Tokenizer.from_file(str(a.tokenizer))
@@ -87,6 +88,14 @@ case('recursive-arguments',schema,
 case('root-reference',{'$ref':'#/$defs/args','$defs':{'args':object_schema({'x':{'const':2}})}},
     [arguments({'x':2})],[arguments({'x':'2'}),''])
 
+api_specs={}
+if a.api_cases:
+    for path in sorted(a.api_cases.glob('*.json')):
+        entry=json.loads(path.read_text())
+        name='api-'+entry['name']
+        api_specs[name]=entry['grammar']
+        case(name,None,[entry['text']] if entry['expected'] else [],[] if entry['expected'] else [entry['text']])
+
 compiler=P();stop=(c.c_int32*1)(1)
 invoke('compiler_create',str(a.tokenizer).encode(),129280,stop,1,c.byref(compiler))
 report=dict(scope=__doc__,native_lib_sha256=hashlib.sha256(a.native_lib.read_bytes()).hexdigest(),tokenizer_sha256=hashlib.sha256(a.tokenizer.read_bytes()).hexdigest(),cases=[],passed=False)
@@ -94,9 +103,9 @@ def save():a.output.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\
 try:
     for name,schema,good,bad in cases:
         grammar=P()
-        spec=dict(type='structural_tag',format=dict(type='ds41_tool_schema',json_schema=schema,strict=True))
+        spec=api_specs.get(name,dict(type='structural_tag',format=dict(type='ds41_tool_schema',json_schema=schema,strict=True)))
         invoke('compile',compiler,3,json.dumps(spec,ensure_ascii=False).encode(),1,c.byref(grammar))
-        record=dict(name=name,schema=schema,checks=[]);report['cases'].append(record);save()
+        record=dict(name=name,schema=schema,grammar=spec,checks=[]);report['cases'].append(record);save()
         try:
             for expected,texts in [(True,good),(False,bad)]:
                 for text in texts:

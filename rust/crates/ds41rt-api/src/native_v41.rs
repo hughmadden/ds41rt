@@ -24,6 +24,7 @@ use tokio::sync::mpsc;
 pub const MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
 mod limits;
 mod constraints;
+mod tools;
 pub use constraints::NativeConstraint;
 mod images;
 #[cfg(test)]
@@ -73,23 +74,33 @@ fn error(status: StatusCode, message: impl ToString) -> Response {
         .into_response()
 }
 async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> Response {
+    let assistance = match body.get("tool_decoding_assistance") {
+        None | Some(Value::Null) => true,
+        Some(Value::Bool(value)) => *value,
+        _ => return error(StatusCode::BAD_REQUEST, "tool_decoding_assistance must be boolean"),
+    };
     let response_format = body.get("response_format").cloned().filter(|v| !v.is_null());
     // The recipe rejects its regex variant, while native XGrammar supports it.
     // Keep the original format for enforcement and render it as ordinary text.
     if response_format.as_ref().and_then(|v| v.get("type")).and_then(Value::as_str) == Some("regex") {
         body["response_format"] = json!({"type":"text"});
     }
-    let parsed: ChatCompletionRequest = match serde_json::from_value(body) {
+    let mut parsed: ChatCompletionRequest = match serde_json::from_value(body) {
         Ok(r) => r,
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
     let include_usage = parsed.include_usage();
+    let parallel = parsed.parallel_tool_calls.unwrap_or(true);
+    let selection = tools::Selection::extract(&mut parsed);
     // Native serving defaults to thinking at the adapter's high effort. Explicit
     // thinking/effort settings retain the official conversion precedence.
-    let converted = match parsed.convert(ConversionOptions::default().with_default_thinking_mode(true)) {
+    let mut converted = match parsed.convert(ConversionOptions::default().with_default_thinking_mode(true)) {
         Ok(r) => r,
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
+    if let Err(e) = selection.apply(&mut converted.conversation.tools) {
+        return error(StatusCode::BAD_REQUEST, e);
+    }
     if converted.model.as_deref() != Some(MODEL) {
         return error(StatusCode::BAD_REQUEST, format!("model must be {MODEL}"));
     }
@@ -107,13 +118,17 @@ async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> 
         Ok(validator) => validator,
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
-    let required_tools = if converted.conversation.tools.is_empty()
-        || matches!(converted.conversation.tool_choice, deepseek_recipe_core::tools::ToolChoice::None) { None }
-        else { Some(matches!(converted.conversation.tool_choice, deepseek_recipe_core::tools::ToolChoice::Required)) };
-    let constraint = match constraints::response_constraint(response_format, converted.conversation.thinking_mode, required_tools) {
+    let tool_constraints = match tools::ToolConstraints::new(&converted.conversation.tools,
+        converted.conversation.tool_choice, selection.required, parallel,
+        assistance || response_format.as_ref().is_some_and(|v| v["type"] != "text")) {
+        Ok(tools) => tools,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e),
+    };
+    let constraint = match constraints::response_constraint(response_format, converted.conversation.thinking_mode, tool_constraints.as_ref()) {
         Ok(constraint) => constraint,
         Err(e) => return error(StatusCode::BAD_REQUEST, e),
     };
+    let mut validator = tools::CompletionValidator::new(response_validator, tool_constraints);
     let rendered = DeepseekV41Encoding::new().render_conversation(&converted.conversation);
     let streaming = converted.stream;
     let id = format!("chatcmpl-{}", uuid::Uuid::new_v4());
@@ -184,10 +199,25 @@ async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> 
         }
     };
     let chunks = processor.process(input);
+    let chunks = async_stream::stream! {
+        futures::pin_mut!(chunks);
+        while let Some(chunk) = chunks.next().await {
+            match chunk {
+                Ok(chunk) => {
+                    if validator.enabled() {
+                        if let Err(e) = validator.observe(&serde_json::to_value(&chunk).unwrap()) {
+                            yield Err(e); return;
+                        }
+                    }
+                    yield Ok(chunk);
+                }
+                Err(e) => { yield Err(anyhow::anyhow!(e.to_string())); return; }
+            }
+        }
+    };
     if streaming {
         let stream = async_stream::stream! {
             futures::pin_mut!(chunks);
-            let mut content = String::new();
             while let Some(chunk) = chunks.next().await {
                 let failed = failure.lock().unwrap().clone();
                 if let Some(message) = failed {
@@ -195,19 +225,6 @@ async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> 
                 }
                 match chunk {
                     Ok(chunk) => {
-                        if let Some(validator) = &response_validator {
-                            let value = serde_json::to_value(&chunk).unwrap();
-                            if let Some(choices) = value["choices"].as_array() {
-                                for choice in choices {
-                                    if let Some(text) = choice["delta"]["content"].as_str() { content.push_str(text); }
-                                    if choice["finish_reason"].as_str() == Some("stop") {
-                                        if let Err(error) = constraints::validate_complete(validator, &content) {
-                                            yield Err(std::io::Error::other(error.to_string())); return;
-                                        }
-                                    }
-                                }
-                            }
-                        }
                         yield Ok(format!("data: {}\n\n",serde_json::to_string(&chunk).unwrap()));
                     },
                     Err(e) => { yield Err(std::io::Error::other(e.to_string())); return; }
@@ -241,19 +258,6 @@ async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> 
     }
     if let Some(message) = failure.lock().unwrap().clone() {
         return error(StatusCode::INTERNAL_SERVER_ERROR, message);
-    }
-    if let Some(validator) = response_validator {
-        let value = serde_json::to_value(response).unwrap();
-        if let Some(choices) = value["choices"].as_array() {
-            for choice in choices {
-                if choice["finish_reason"].as_str() == Some("stop") {
-                    if let Err(e) = constraints::validate_complete(&validator, choice["message"]["content"].as_str().unwrap_or("")) {
-                        return error(StatusCode::INTERNAL_SERVER_ERROR, e);
-                    }
-                }
-            }
-        }
-        return Json(value).into_response();
     }
     Json(response).into_response()
 }

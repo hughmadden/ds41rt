@@ -1,8 +1,9 @@
 # Native constrained decoding
 
-Native response schemas are now enforced through XGrammar; see the
-[response qualification](release-v1-response-constraints.md). Strict tool-argument,
-selection and parallel-call enforcement remain open release work. The initial
+Native response schemas and tool policies are enforced through XGrammar; see the
+[response qualification](release-v1-response-constraints.md) and
+[tool serving](release-v1-tool-serving.md). Remaining tool-schema cases and
+broader qualification keep the full tools release gate open. The initial
 API audit found that a strict schema requesting `value: "allowed"` returned
 `DISALLOWED` with HTTP 200. Preserving the schema across protocol conversion and
 masking generation now fixes that reproducer, including exact cached prompts.
@@ -54,13 +55,10 @@ tokens advance authoritative matcher state. Thinking precedes the constrained
 answer and defaults to high effort. Completed JSON answers receive independent
 schema validation before a successful completion is emitted.
 
-Strict tool arguments, required/named selection, parallel-call limits and their
-streaming behavior still need the V4.1 DSML grammar. Combined response/tool
-requests currently preserve a permissive tool-block alternative: the response
-schema applies to the final answer, and this is not strict argument enforcement.
-Finish and qualify those tool policies before the architectural FP4 compressed
-cache migration and its separate performance/needle/tool-eval gates.
-
-The [typed DSML grammar component](release-v1-tool-grammar.md) now has 17
-official-tokenizer test groups. API integration and the documented remaining
-schema cases are still open; this component does not establish strict serving.
+Strict tool arguments, required/named selection and parallel-call limits now
+use the V4.1 DSML grammar. Combined requests constrain the final answer and tool
+arguments separately. Independent completion validation is shared by JSON/SSE.
+The [typed DSML grammar component](release-v1-tool-grammar.md) and
+[serving report](release-v1-tool-serving.md) identify remaining generation cases
+and qualification. Finish those before the architectural FP4 compressed cache
+migration and its separate performance/needle/tool-eval gates.

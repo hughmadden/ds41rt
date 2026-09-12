@@ -5,14 +5,14 @@ use serde_json::{json, Value};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NativeConstraint(pub String);
 
-pub(super) fn response_constraint(format: Option<Value>, thinking: bool, required_tools: Option<bool>) -> Result<Option<NativeConstraint>> {
-    let Some(format) = format else { return Ok(None); };
-    let content = match format.get("type").and_then(Value::as_str) {
-        Some("text") => return Ok(None),
-        Some("json_object") => json!({"type":"ds41_json_schema", "strict":false,
-            "json_schema":{"type":"object", "additionalProperties":true}}),
+pub(super) fn response_constraint(format: Option<Value>, thinking: bool, tools: Option<&super::tools::ToolConstraints>) -> Result<Option<NativeConstraint>> {
+    let content = match format.as_ref().and_then(|v| v.get("type")).and_then(Value::as_str) {
+        None if format.is_none() => None,
+        Some("text") => None,
+        Some("json_object") => Some(json!({"type":"ds41_json_schema", "strict":false,
+            "json_schema":{"type":"object", "additionalProperties":true}})),
         Some("json_schema") => {
-            let definition = format.get("json_schema").context("response_format.json_schema is required")?;
+            let definition = format.as_ref().unwrap().get("json_schema").context("response_format.json_schema is required")?;
             let schema = definition.get("schema").context("response_format.json_schema.schema is required")?;
             ensure!(schema.is_object() || schema.is_boolean(), "JSON schema must be an object or boolean");
             compile_schema(schema)?;
@@ -21,21 +21,22 @@ pub(super) fn response_constraint(format: Option<Value>, thinking: bool, require
                 Some(Value::Bool(strict)) => *strict,
                 _ => anyhow::bail!("response_format.json_schema.strict must be boolean"),
             };
-            json!({"type":"ds41_json_schema", "strict":strict, "json_schema":schema})
+            Some(json!({"type":"ds41_json_schema", "strict":strict, "json_schema":schema}))
         }
         Some("regex") => {
-            let regex = format.get("regex").and_then(Value::as_str).context("response_format.regex must be a string")?;
-            json!({"type":"regex", "pattern":regex})
+            let regex = format.as_ref().unwrap().get("regex").and_then(Value::as_str).context("response_format.regex must be a string")?;
+            Some(json!({"type":"regex", "pattern":regex}))
         }
         _ => anyhow::bail!("unsupported response_format type"),
     };
-    // A response schema constrains answers, not tool-call arguments. Preserve
-    // tool dispatch while its separate strict DSML grammar is implemented.
-    let content = if let Some(required) = required_tools {
-        let calls = json!({"type":"tag", "begin":if required { "" } else { "<｜DSML｜ calls>" },
-            "content":{"type":"any_text", "excludes":["</｜DSML｜ calls>"]}, "end":"</｜DSML｜ calls>"});
-        if required { calls } else { json!({"type":"or", "elements":[content, calls]}) }
-    } else { content };
+    let content = match (content, tools.and_then(|t| t.format.as_ref())) {
+        (Some(answer), Some(calls)) if !tools.unwrap().required => json!({"type":"or", "elements":[answer,calls]}),
+        (_, Some(calls)) if tools.unwrap().required => calls.clone(),
+        (None, Some(calls)) => json!({"type":"triggered_tags", "triggers":["<｜DSML｜ calls>"],
+            "tags":[calls], "at_least_one":false, "stop_after_first":true}),
+        (Some(answer), _) => answer,
+        (None, None) => return Ok(None),
+    };
     let format = if thinking {
         json!({"type":"sequence", "elements":[
             {"type":"any_tokens", "exclude_tokens":[128822]},
@@ -55,12 +56,12 @@ pub(super) fn response_validator(format: Option<&Value>) -> Result<Option<jsonsc
     compile_schema(&schema).map(Some)
 }
 
-fn compile_schema(schema: &Value) -> Result<jsonschema::JSONSchema> {
+pub(super) fn compile_schema(schema: &Value) -> Result<jsonschema::JSONSchema> {
     let mut options = jsonschema::JSONSchema::options();
     // Match modern prefixItems/$defs schemas unless the caller declares an
     // older dialect. HTTP/file resolution remains disabled by crate features.
     if schema.get("$schema").is_none() { options.with_draft(jsonschema::Draft::Draft202012); }
-    options.compile(schema).map_err(|error| anyhow::anyhow!("invalid response schema: {error}"))
+    options.compile(schema).map_err(|error| anyhow::anyhow!("invalid JSON schema: {error}"))
 }
 
 pub(super) fn validate_complete(validator: &jsonschema::JSONSchema, content: &str) -> Result<()> {
