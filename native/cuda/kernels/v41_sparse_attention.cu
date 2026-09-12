@@ -21,11 +21,11 @@ __device__ __forceinline__ uint16_t fp4_bf16_bits(unsigned value) {
   return uint16_t(((value&8)<<12) | (magnitude<2?(magnitude?0x3f00:0):0x3f00+magnitude*64));
 }
 __device__ __forceinline__ uint64_t packed_fp4_quad(uint16_t input,uint8_t scale) {
-  const uint32_t low=uint32_t(fp4_bf16_bits(input&15))|
-      (uint32_t(fp4_bf16_bits((input>>4)&15))<<16);
-  const uint32_t high=uint32_t(fp4_bf16_bits((input>>8)&15))|
-      (uint32_t(fp4_bf16_bits(input>>12))<<16);
 #if defined(__CUDA_ARCH_SPECIFIC__) && __CUDA_ARCH_SPECIFIC__ == 1200
+  uint32_t low,high;
+  const uint16_t packed_low=input&255,packed_high=input>>8;
+  asm("{ .reg .b8 x; cvt.u8.u16 x, %1; cvt.rn.bf16x2.e2m1x2 %0, x; }" : "=r"(low) : "h"(packed_low));
+  asm("{ .reg .b8 x; cvt.u8.u16 x, %1; cvt.rn.bf16x2.e2m1x2 %0, x; }" : "=r"(high) : "h"(packed_high));
   uint32_t factors,a,b;
   const uint16_t scales=uint16_t(scale)|(uint16_t(scale)<<8);
   asm("cvt.rn.bf16x2.e4m3x2 %0, %1;" : "=r"(factors) : "h"(scales));

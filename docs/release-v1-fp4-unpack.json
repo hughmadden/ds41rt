@@ -1,0 +1,60 @@
+{
+  "scope": "Initial FP4 context comparison and direct-conversion optimization; optimized serving performance still pending.",
+  "source_base": "2eab99f",
+  "archive": {
+    "path": "docs/evidence/native-fp4-unpack.json.gz",
+    "sha256": "7fc4800cdb5914f92424e366bb1b5554614d94636ced2addb1d779ed397da789"
+  },
+  "native_library": {
+    "path": "/tmp/ds41-native-fp4-serving/direct-build/cmake/libds41rt_native.so",
+    "sha256": "289139172e7e1d6643dae673e0f3ecdbbc60db6be8c64373e6bf4ba2d228f51d"
+  },
+  "attention_checks": 1470,
+  "sanitizer_cases": 96,
+  "sanitizer_errors": 0,
+  "initial_context_comparison": [
+    {
+      "mode": "target",
+      "filler_tokens": 4096,
+      "median_decode_change_percent": -0.4147543086401084,
+      "all_text_equal": true,
+      "all_full_prompt_hits": true
+    },
+    {
+      "mode": "target",
+      "filler_tokens": 16384,
+      "median_decode_change_percent": -0.43534421920687905,
+      "all_text_equal": true,
+      "all_full_prompt_hits": true
+    },
+    {
+      "mode": "target",
+      "filler_tokens": 24576,
+      "median_decode_change_percent": -0.43334452919070454,
+      "all_text_equal": true,
+      "all_full_prompt_hits": true
+    },
+    {
+      "mode": "spec",
+      "filler_tokens": 4096,
+      "median_decode_change_percent": 0.055064052416353704,
+      "all_text_equal": true,
+      "all_full_prompt_hits": true
+    },
+    {
+      "mode": "spec",
+      "filler_tokens": 16384,
+      "median_decode_change_percent": -0.144556416490893,
+      "all_text_equal": true,
+      "all_full_prompt_hits": true
+    },
+    {
+      "mode": "spec",
+      "filler_tokens": 24576,
+      "median_decode_change_percent": -0.7391115136908599,
+      "all_text_equal": true,
+      "all_full_prompt_hits": true
+    }
+  ],
+  "optimized_serving_performance_complete": false
+}

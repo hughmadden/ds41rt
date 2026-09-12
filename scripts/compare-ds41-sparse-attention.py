@@ -16,7 +16,9 @@ parser.add_argument("--device", type=int, default=0)
 parser.add_argument("--unaligned-values", action="store_true")
 parser.add_argument("--window-only", action="store_true")
 parser.add_argument("--fp4-source", action="store_true",
-                    help="Candidate uses FP4 source rows; baseline must be the test-only decoded-BF16 reader")
+                    help="Candidate uses FP4 source rows; default baseline is the test-only decoded-BF16 reader")
+parser.add_argument("--baseline-fp4-source", action="store_true",
+                    help="With --fp4-source, compare two FP4 kernels using identical packed source buffers")
 parser.add_argument("--window-begin", type=int,
                     help="Exercise bounded replay with this device lower bound (2049 tests invalid metadata)")
 parser.add_argument("--repeats", type=int, default=20,
@@ -25,6 +27,8 @@ parser.add_argument("--rows", type=int, nargs="+", default=[1, 2, 6, 16, 80])
 parser.add_argument("--parts", type=int, choices=range(0, 11), default=0,
                     help="0 uses unsplit attention; 1–10 compare the same split count")
 args = parser.parse_args()
+if args.baseline_fp4_source and not args.fp4_source:
+    parser.error("--baseline-fp4-source requires --fp4-source")
 if not args.rows or min(args.rows) < 1 or max(args.rows) > 4096:
     parser.error("rows must be between 1 and 4096")
 if args.repeats < 1:parser.error("repeats must be positive")
@@ -111,7 +115,7 @@ for rows in args.rows:
         (2 if args.fp4_source else 1)*int(not args.window_only),
     )
     reference_view=View.from_buffer_copy(v)
-    if args.fp4_source:
+    if args.fp4_source and not args.baseline_fp4_source:
         reference_view.compressed=int(not args.window_only)
         reference_view.values[2]=decoded[0].data_ptr()
         reference_view.values[3]=decoded[1].data_ptr()
@@ -222,13 +226,14 @@ for rows in args.rows:
             elapsed.append(a.elapsed_time(b) * 1000 / args.repeats)
         results.append(
             dict(
-                rows=rows,parts=args.parts,scope=("FP4 source versus independently decoded BF16 source with identical attention arithmetic" if args.fp4_source else "Byte-exact regression against baseline; graph microbenchmark, not independent reference math"),
+                rows=rows,parts=args.parts,scope=("Identical packed FP4 source regression and graph timing" if args.baseline_fp4_source else "FP4 source versus independently decoded BF16 source with identical attention arithmetic" if args.fp4_source else "Byte-exact regression against baseline; graph microbenchmark, not independent reference math"),
                 pattern=pattern,
                 bit_exact=bit_exact,
                 **metrics,
                 unaligned_values=args.unaligned_values,
                 window_only=args.window_only,
                 fp4_source=args.fp4_source,
+                baseline_fp4_source=args.baseline_fp4_source,
                 window_begin=args.window_begin,
                 timing_repeats=args.repeats,
                 baseline_us=elapsed[0],

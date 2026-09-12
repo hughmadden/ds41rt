@@ -71,3 +71,6 @@ should the requested needle checks through 1M and high-thinking tool-call
 qualification follow, including agentic reuse, cancellation and recovery.
 Final release measurements and the three final tool-eval runs must use the
 corrected serving build.
+
+The [direct-conversion optimization](release-v1-fp4-unpack.md) records the next
+kernel improvement and the completed initial retained-context comparison.
