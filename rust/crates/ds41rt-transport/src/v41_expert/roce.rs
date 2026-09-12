@@ -112,9 +112,12 @@ impl V41Tp4RocePending<'_, '_> {
     where
         F: FnMut(usize, u32, crate::VerbsHostProtocolV2ResponsePayload) -> Result<()>,
     {
-        // Progress all four QPs on the inference owner. Yield for cancellation
-        // and other work after bounded polling; no blocking completion wait.
+        // Give the other execution lane its first opportunity as soon as this
+        // wave must wait. A 250us initial spin can consume an entire small-row
+        // FFN and serialize two otherwise independent decode stacks. Subsequent
+        // polls retain the bounded spin quantum; ready responses never yield.
         let mut quantum = std::time::Instant::now();
+        let mut first_wait = true;
         loop {
             let receiver = &mut self.receiver;
             if self.owner.clients.poll(|chunk| {
@@ -132,7 +135,8 @@ impl V41Tp4RocePending<'_, '_> {
             })? {
                 break;
             }
-            if quantum.elapsed() >= std::time::Duration::from_micros(250) {
+            if first_wait || quantum.elapsed() >= std::time::Duration::from_micros(250) {
+                first_wait = false;
                 tokio::task::yield_now().await;
                 quantum = std::time::Instant::now();
             } else {
