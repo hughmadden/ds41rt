@@ -1,0 +1,20 @@
+{
+  "scope": "Component prerequisites for compression-boundary prefix restoration; partial replay is not wired into serving yet.",
+  "base_commit": "e9a415462e8c3821c954df48db524e104d0c0606",
+  "source_sha256": {
+    "rust/crates/ds41rt-core/src/engram.rs": "1ea4fb3e49244a212694571aa82fcdbee9933ac477350c565bcc3e387bb586ec",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/prefix.rs": "69709302a43dc7e66a19727434f417872792fa83460411fa33f50013d03d75c8",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache.rs": "53d2f0aa1f75db3a14fba8bd4d8cdd4728e7aaa0650b94e2e647ed0696f99f3d",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache/ownership.rs": "a492bca678224274b25c4397907c9a1e281808581c99f444d5cd37230438a0fb",
+    "rust/crates/ds41rt-loader/src/engram_pipeline.rs": "3e7ed22693ecb221fa3912f2344ae92b01a99a1e7314c1509ab2731265471509"
+  },
+  "native_library_sha256": "ccd82d862473f71d01622bcf5decd9d5789444210db1be4cc245dbdcb44b8a07",
+  "reference_pdf_sha256": "ba68e2e40408125ae6d2f63a9a241b61c73910691c74ec1a2a7023c851eac08d",
+  "qualification_logs": {
+    "engram-tests": "running 1 test\ntest engram::tests::bounded_resume_matches_full_history_hashes_and_rejects_foreign_batches ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 126 filtered out; finished in 0.00s\n\n",
+    "compressor-tests": "running 1 test\ntest v41_compressor::prefix::tests::compressed_prefix_restore_requires_complete_groups_and_bounds_views ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 780 filtered out; finished in 0.15s\n\n",
+    "source-memcheck": "running 1 test\ntest v41_compressor::source_cache::tests::retained_source_truncation_preserves_future_rows_after_original_release ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 780 filtered out; finished in 0.23s\n\n========= ERROR SUMMARY: 0 errors\n",
+    "compressor-memcheck": "running 1 test\ntest v41_compressor::prefix::tests::compressed_prefix_restore_requires_complete_groups_and_bounds_views ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 780 filtered out; finished in 0.19s\n\n========= ERROR SUMMARY: 0 errors\n"
+  },
+  "live_serving_changed": false
+}

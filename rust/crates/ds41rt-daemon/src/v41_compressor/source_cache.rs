@@ -438,6 +438,40 @@ mod tests {
 
     #[test]
     #[ignore = "requires a CUDA native library in DS41RT_NATIVE_LIB"]
+    fn retained_source_truncation_preserves_future_rows_after_original_release() -> Result<()> {
+        let library = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let stream = LoadStream {
+            library: &library,
+            raw: library.cuda_stream_create()?,
+        };
+        let mut cache = SourceCache::new(&library, 3, 2)?;
+        append(&mut cache, 0, 0, 300, 0x11, stream.raw)?;
+        let saved = cache.retain_prefix(0, 300)?;
+        cache.release(0)?;
+        assert!(saved.truncate(301).is_err());
+        let empty = saved.truncate(0)?;
+        assert!(empty.pages.is_empty());
+        let short = saved.truncate(100)?;
+        assert_eq!(short.pages.len(), 1);
+        cache.restore_prefix(1, &short)?;
+        assert!(cache.retain_prefix(1, 101).is_err());
+        append(&mut cache, 1, 100, 130, 0x22, stream.raw)?;
+        cache.restore_prefix(0, &saved)?;
+        assert!(read(&cache, 0, 300)?.iter().all(|&v| v == 0x11));
+        let branch = read(&cache, 1, 130)?;
+        assert!(branch[..100 * 596].iter().all(|&v| v == 0x11));
+        assert!(branch[100 * 596..].iter().all(|&v| v == 0x22));
+        drop(short);
+        drop(saved);
+        drop(empty);
+        cache.release(0)?;
+        cache.release(1)?;
+        assert_eq!(cache.pool.borrow().free.len(), 3);
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "requires a CUDA native library in DS41RT_NATIVE_LIB"]
     fn native_source_shared_writers_fit_exact_pool_and_preserve_nonwriters() -> Result<()> {
         let library = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let stream = LoadStream {

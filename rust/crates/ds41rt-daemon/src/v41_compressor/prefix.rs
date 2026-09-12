@@ -16,6 +16,32 @@ fn slice(mut buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtD
 }
 
 impl CompressorState<'_> {
+    /// Restore only complete compression groups from a retained source. There
+    /// is no pending group at this frontier, so no saved carry is read. This is
+    /// the global backing for a later bounded local-window reconstruction.
+    pub fn restore_compressed_prefix(
+        &mut self,
+        lease: CompressorLease,
+        prefix: &CompressorPrefix,
+        end: u64,
+    ) -> Result<()> {
+        let slot = self.validate(lease)?;
+        let step = ratio(self.layer)? as u64;
+        ensure!(
+            prefix.owner == self.owner
+                && end <= prefix.end
+                && end % step == 0
+                && self.slots[slot].end == 0
+                && self.slots[slot].version == 0,
+            "foreign, unaligned or nonfresh compressed prefix restore"
+        );
+        let source = prefix.source.truncate((end / step) as usize)?;
+        self.index.restore_prefix(slot, &source)?;
+        self.slots[slot].end = end;
+        self.slots[slot].version = 1;
+        Ok(())
+    }
+
     /// # Safety
     /// Producers are drained. Destination remains live until stream completion,
     /// including on error. Only odd ratio-two frontiers have a live pending row.
@@ -97,6 +123,71 @@ impl CompressorState<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB and CUDA"]
+    fn compressed_prefix_restore_requires_complete_groups_and_bounds_views() -> Result<()> {
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let saved = DeviceAllocation::new(&lib, COMPRESSOR_PREFIX_BYTES)?;
+        let stream = LoadStream {
+            library: &lib,
+            raw: lib.cuda_stream_create()?,
+        };
+        for layer in [2, 20] {
+            let mut state = CompressorState::new(&lib, layer, 2, 4, usize::MAX)?;
+            let original = state.begin_request(0, 1)?;
+            let rows = 601 / ratio(layer)?;
+            let plan = state.index.reserve(&[(0, 0, rows)])?;
+            for buffer in [
+                state.index.packed.buffer,
+                state.index.scales.buffer,
+                state.index.kv_values.buffer,
+                state.index.kv_scales.buffer,
+            ] {
+                lib.copy_h2d(buffer, &vec![0x11; buffer.bytes])?;
+            }
+            unsafe {
+                state.index.upload(&plan, stream.raw)?;
+                lib.cuda_stream_synchronize(stream.raw)?;
+            }
+            state.index.apply(plan);
+            state.slots[0].end = 601;
+            if let Some(pending) = &state.pending {
+                for buffer in pending {
+                    lib.copy_h2d(buffer.buffer, &vec![0x33; buffer.buffer.bytes])?;
+                }
+            }
+            let prefix = unsafe { state.retain_prefix(original, saved.buffer, stream.raw)? };
+            unsafe {
+                lib.cuda_stream_synchronize(stream.raw)?;
+            }
+            state.release(original)?;
+            let resumed = state.begin_request(1, 2)?;
+            assert!(state
+                .restore_compressed_prefix(resumed, &prefix, 602)
+                .is_err());
+            if layer == 2 {
+                assert!(state
+                    .restore_compressed_prefix(resumed, &prefix, 513)
+                    .is_err());
+            }
+            let end = if layer == 2 { 514 } else { 513 };
+            state.restore_compressed_prefix(resumed, &prefix, end)?;
+            assert_eq!(state.committed_end(resumed)?, end);
+            assert_eq!(
+                state.index_cache(resumed)?.rows,
+                end as usize / ratio(layer)?
+            );
+            assert_eq!(state.kv_cache(resumed)?.rows, end as usize / ratio(layer)?);
+            assert!(state.committed_proposal(resumed, 0..end + 1, 1).is_err());
+            assert!(state.committed_proposal(resumed, end - 128..end, 1).is_ok());
+            assert!(state
+                .restore_compressed_prefix(resumed, &prefix, end)
+                .is_err());
+            state.release(resumed)?;
+        }
+        Ok(())
+    }
+
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB and CUDA"]
     fn native_compressor_prefix_preserves_pending_odd_row() -> Result<()> {

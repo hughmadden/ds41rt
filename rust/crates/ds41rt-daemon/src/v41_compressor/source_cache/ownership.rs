@@ -41,6 +41,24 @@ pub(crate) struct SourcePrefix {
     pub(super) pages: Vec<u32>,
     pub(super) rows: usize,
 }
+impl SourcePrefix {
+    /// Retain a shorter initialized frontier after the original request was
+    /// released. Future rows in its physical tail remain owned by the original
+    /// snapshot; an appending branch must still use copy-on-write.
+    pub fn truncate(&self, rows: usize) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            rows <= self.rows,
+            "source prefix truncation exceeds initialized rows"
+        );
+        let pages = self.pages[..rows.div_ceil(super::PAGE_ROWS)].to_vec();
+        self.pool.borrow_mut().retain(&pages);
+        Ok(Self {
+            pool: Rc::clone(&self.pool),
+            pages,
+            rows,
+        })
+    }
+}
 impl Drop for SourcePrefix {
     fn drop(&mut self) {
         self.pool.borrow_mut().release(&self.pages);

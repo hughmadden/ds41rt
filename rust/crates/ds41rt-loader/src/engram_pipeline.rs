@@ -104,6 +104,17 @@ impl EngramPipeline {
     pub fn new_history(&self) -> Result<EngramHistory> {
         Ok(EngramHistory::new(self.token_map.pad_id())?)
     }
+    /// Normalize only the bounded suffix needed to resume Engram at a retained
+    /// compression boundary. Tokens are chronological, immediately before it.
+    pub fn history_at(&self, position: u64, recent: &[u32], image_mask: Option<&[u8]>) -> Result<EngramHistory> {
+        ensure!(recent.len() == position.min(3) as usize
+            && image_mask.is_none_or(|mask| mask.len() == recent.len()),
+            "engram resume token or image lookback differs");
+        let compressed = recent.iter().enumerate().map(|(i, &token)|
+            self.token_map.compress(token, image_mask.is_some_and(|mask| mask[i] != 0)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(EngramHistory::from_recent(self.token_map.pad_id(), position, &compressed)?)
+    }
     /// Call as soon as decode, prefill or verification token IDs and image spans are known.
     /// Prepare all hashes before starting I/O, preserving committed request histories.
     pub fn prepare(&self, requests: &[EngramRequestTokens<'_>]) -> Result<EngramWave> {

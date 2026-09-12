@@ -176,6 +176,22 @@ impl EngramHistory {
         Ok(fork)
     }
 
+    /// Restore the complete three-token lookback at an absolute frontier under
+    /// a fresh identity. `recent` is chronological and uses None for image
+    /// barriers. No hashes or table reads for the older prefix are necessary.
+    pub fn from_recent(pad: u32, position: u64, recent: &[Option<u32>]) -> Result<Self> {
+        ensure!(recent.len() == position.min(3) as usize,
+            "engram resume requires the complete bounded lookback");
+        ensure!(recent.iter().flatten().all(|&t| t < ENGRAM_COMPRESSED_VOCAB),
+            "compressed engram resume ID out of range");
+        let mut history = Self::new(pad)?;
+        for &token in recent {
+            history.recent = [token, history.recent[0], history.recent[1]];
+        }
+        history.position = position;
+        Ok(history)
+    }
+
     pub fn pad_id(&self) -> u32 {
         self.pad
     }
@@ -268,6 +284,34 @@ impl EngramHistory {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bounded_resume_matches_full_history_hashes_and_rejects_foreign_batches() -> super::Result<()> {
+        let tokens: Vec<_> = (0..137).map(|i| if i % 17 == 0 { None }
+            else { Some(i * 19) }).collect();
+        let mut full = super::EngramHistory::new(2)?;
+        for position in 0..=tokens.len() {
+            let recent = &tokens[position.saturating_sub(3)..position];
+            let mut resumed = super::EngramHistory::from_recent(2, position as u64, recent)?;
+            let next = [Some(71), None, Some(83), Some(97)];
+            let expected = full.prepare(position as u64, &next, next.len())?;
+            let actual = resumed.prepare(position as u64, &next, next.len())?;
+            assert_eq!(actual.hashes, expected.hashes);
+            assert!(resumed.commit(&expected, 1).is_err());
+            assert!(full.commit(&actual, 1).is_err());
+            resumed.commit(&actual, 2)?;
+            if position < tokens.len() {
+                let step = full.prepare(position as u64, &tokens[position..position + 1], 1)?;
+                full.commit(&step, 1)?;
+            }
+        }
+        assert!(super::EngramHistory::from_recent(2, 1000, &[Some(1); 2]).is_err());
+        assert!(super::EngramHistory::from_recent(2, 1, &[Some(1); 3]).is_err());
+        assert!(super::EngramHistory::from_recent(2, 3, &[Some(super::ENGRAM_COMPRESSED_VOCAB); 3]).is_err());
+        let long = super::EngramHistory::from_recent(2, 1048576, &[Some(1), None, Some(3)])?;
+        assert_eq!(long.position(), 1048576);
+        Ok(())
+    }
+
     #[test]
     fn fork_preserves_image_barriers_but_rejects_original_batches() -> super::Result<()> {
         let mut history = super::EngramHistory::new(0)?;
