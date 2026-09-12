@@ -8,6 +8,8 @@ use crate::v41_target_embedding::TargetEmbeddingWave;
 use anyhow::{ensure, Context, Result};
 use ds41rt_core::{EngramHistory, EngramPrefillCursor};
 mod reservation;
+mod images;
+pub(crate) use images::RequestImages;
 use ds41rt_ffi::NativeLibrary;
 use ds41rt_loader::{EngramPipeline, EngramRequestTokens, EngramWave};
 use ds41rt_transport::ExpertV2SourceKind;
@@ -16,6 +18,7 @@ struct Request {
     lease: CacheLease,
     history: EngramHistory,
     prefill: Option<EngramPrefillCursor>,
+    images: RequestImages,
 }
 pub(crate) struct RequestPrefix<'a> {
     cache: crate::v41_backbone_cache::BackbonePrefix<'a>,
@@ -61,6 +64,7 @@ pub(crate) struct Requests<'a> {
     cache: BackboneCache<'a>,
     pipeline: EngramPipeline,
     slots: Vec<Option<Request>>,
+    image_requests: usize,
 }
 impl<'a> Requests<'a> {
     pub fn new(
@@ -74,6 +78,7 @@ impl<'a> Requests<'a> {
             cache: BackboneCache::new(library, slots, pages, cache_budget)?,
             pipeline,
             slots: (0..slots).map(|_| None).collect(),
+            image_requests: 0,
         })
     }
     pub fn cache(&self) -> &BackboneCache<'a> {
@@ -94,8 +99,32 @@ impl<'a> Requests<'a> {
         );
         let history = self.pipeline.new_history()?;
         let lease = self.cache.begin_request(slot, id)?;
-        self.slots[slot] = Some(Request { lease, history, prefill: None });
+        self.slots[slot] = Some(Request { lease, history, prefill: None, images: RequestImages::default() });
         Ok(lease)
+    }
+    pub fn attach_images(&mut self, lease: CacheLease, images: RequestImages) -> Result<()> {
+        let request = self.request(lease)?;
+        ensure!(request.history.position() == 0 && self.cache.committed_end(lease)? == 0
+            && request.prefill.is_none() && request.images.is_empty(),
+            "request images must be attached before prefix restoration or prefill");
+        self.image_requests += usize::from(!images.is_empty());
+        self.slots.iter_mut().flatten().find(|r| r.lease == lease).unwrap().images = images;
+        Ok(())
+    }
+    pub fn images(&self, lease: CacheLease) -> Result<&RequestImages> { Ok(&self.request(lease)?.images) }
+    pub fn install_image_features(&mut self, lease: CacheLease, index: usize, features: Vec<u8>) -> Result<()> {
+        ensure!(self.request(lease)?.prefill.is_none(), "image preparation cannot race reserved prefill");
+        self.slots.iter_mut().flatten().find(|r| r.lease == lease).unwrap().images.install(index, features)
+    }
+    fn resolved_masks<'m>(&self, requests: &[RequestTokens<'m>], reserved: bool)
+        -> Result<Option<Vec<Option<std::borrow::Cow<'m, [bool]>>>>> {
+        if self.image_requests == 0 { return Ok(None); }
+        requests.iter().map(|r| {
+            let request = self.request(r.lease)?;
+            let history = if reserved { request.prefill.as_ref().map_or(&request.history, |p| p.history()) }
+                else { &request.history };
+            request.images.resolve_mask(history.position(), r.tokens.len(), r.image_mask)
+        }).collect::<Result<Vec<_>>>().map(Some)
     }
     pub fn release(&mut self, lease: CacheLease) -> Result<()> {
         let slot = self
@@ -104,6 +133,7 @@ impl<'a> Requests<'a> {
             .position(|r| r.as_ref().is_some_and(|r| r.lease == lease))
             .context("request already released")?;
         // Revoke the history owner even if device-cache cleanup fails.
+        if !self.slots[slot].as_ref().unwrap().images.is_empty() { self.image_requests -= 1; }
         self.slots[slot] = None;
         // Cache failure invalidation may already have revoked its root lease.
         if self.cache.request_id(lease).is_ok() {
@@ -150,6 +180,13 @@ impl<'a> Requests<'a> {
             .expect("validated restored request").history = history;
         Ok(())
     }
+    fn encoder_history_at(&self, lease: CacheLease, start: usize, prompt: &[u32]) -> Result<EngramHistory> {
+        ensure!(start <= prompt.len(), "encoder history position exceeds prompt");
+        let recent_start = start.saturating_sub(3);
+        let image_mask = self.request(lease)?.images.mask(recent_start as u64, start - recent_start)?
+            .map(|m| m.into_iter().map(u8::from).collect::<Vec<_>>());
+        self.pipeline.history_at(start as u64, &prompt[recent_start..start], image_mask.as_deref())
+    }
     pub fn restore_encoder_prefix(
         &mut self,
         lease: CacheLease,
@@ -163,11 +200,7 @@ impl<'a> Requests<'a> {
             "invalid encoder history restore"
         );
         let start = end.saturating_sub(128);
-        let history = self.pipeline.history_at(
-            start as u64,
-            &prompt[start.saturating_sub(3)..start],
-            None,
-        )?;
+        let history = self.encoder_history_at(lease, start, prompt)?;
         if let Err(error) =
             self.cache
                 .restore_encoder_prefix(lease, &prefix.cache, end as u64, prompt.len() as u64)
@@ -211,8 +244,18 @@ impl<'a> Requests<'a> {
     pub fn prepare_replay(&self, work: &[CacheWork]) -> Result<RequestBatch> {
         let cache = self.cache.plan_replay(work)?;
         let rows = cache.positions().len();
+        let mut image_mask = vec![0; rows];
+        if self.image_requests != 0 {
+            let mut offset = 0;
+            for (w, chunk) in work.iter().zip(cache.window_chunks(20)?) {
+                if let Some(mask) = self.request(w.lease)?.images.mask(chunk.position, chunk.tokens as usize)? {
+                    for (dst, src) in image_mask[offset..offset + mask.len()].iter_mut().zip(mask) { *dst = u8::from(src); }
+                }
+                offset += chunk.tokens as usize;
+            }
+        }
         let batch = RequestBatch { cache, prepared: Vec::new(), engram: None, leases: work.iter().map(|w| w.lease).collect(),
-            tokens: Vec::new(), image_mask: vec![0; rows], finished: false };
+            tokens: Vec::new(), image_mask, finished: false };
         self.validate(&batch)?;
         Ok(batch)
     }
@@ -229,10 +272,12 @@ impl<'a> Requests<'a> {
             })
             .collect::<Result<Vec<_>>>()?;
         let cache = self.cache.plan(&work)?;
+        let masks = self.resolved_masks(requests, false)?;
         let mut inputs = Vec::with_capacity(requests.len());
         let mut tokens = Vec::new();
         let mut mask = Vec::new();
-        for r in requests {
+        for (i, r) in requests.iter().enumerate() {
+            let image_mask = masks.as_ref().map_or(r.image_mask, |m| m[i].as_deref());
             let request = self.request(r.lease)?;
             ensure!(request.prefill.is_none(), "reserved encoder requires reservation preparation");
             let history = &request.history;
@@ -247,10 +292,10 @@ impl<'a> Requests<'a> {
             inputs.push(EngramRequestTokens {
                 history,
                 token_ids: r.tokens,
-                image_mask: r.image_mask,
+                image_mask,
             });
             tokens.extend_from_slice(r.tokens);
-            mask.extend((0..r.tokens.len()).map(|i| u8::from(r.image_mask.is_some_and(|m| m[i]))));
+            mask.extend((0..r.tokens.len()).map(|i| u8::from(image_mask.is_some_and(|m| m[i]))));
         }
         let engram = self.pipeline.prepare(&inputs)?;
         Ok(RequestBatch {
@@ -263,22 +308,39 @@ impl<'a> Requests<'a> {
             finished: false,
         })
     }
+    fn embedding_features(&self, batch: &RequestBatch) -> Result<Vec<(usize, &[u8])>> {
+        self.validate(batch)?;
+        let mut features = Vec::new();
+        let mut offset = 0;
+        for (&lease, chunk) in batch.leases.iter().zip(batch.cache.window_chunks(batch.cache.stage().windows().start)?) {
+            let images = &self.request(lease)?.images;
+            for i in 0..chunk.tokens as usize {
+                if batch.image_mask[offset+i] != 0 {
+                    features.push((offset+i, images.row(chunk.position+i as u64)
+                        .context("request image embedding not prepared")?));
+                }
+            }
+            offset += chunk.tokens as usize;
+        }
+        Ok(features)
+    }
     /// # Safety
-    /// No external writes race embedding or lane buffers. This text entry rejects
-    /// images; vision replacement must be implemented before admitting them here.
-    pub unsafe fn begin_text(
+    /// No external writes race embedding or lane buffers. Image rows require
+    /// completed features owned by the corresponding admitted request.
+    pub unsafe fn begin_input(
         &self,
         batch: &RequestBatch,
         embedding: &mut TargetEmbeddingWave<'_, '_>,
         lane: &mut BackboneLane<'_, '_>,
     ) -> Result<()> {
         self.validate(batch)?;
-        ensure!(
-            batch.image_mask.iter().all(|&b| b == 0),
-            "image batch requires vision embedding replacement"
-        );
         let positions = batch.cache.positions();
-        let embedded = embedding.execute(&batch.tokens, &positions)?;
+        let embedded = if batch.image_mask.iter().all(|&b| b == 0) {
+            embedding.execute(&batch.tokens, &positions)?
+        } else {
+            let features = self.embedding_features(batch)?;
+            embedding.execute_with_images(&batch.tokens, &positions, &features)?
+        };
         unsafe {
             lane.begin_embedded(&embedded)?;
         }
@@ -552,3 +614,6 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod image_tests;

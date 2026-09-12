@@ -37,6 +37,11 @@ int32_t ds41rt_v41_vision_merge(const uint16_t* x,uint16_t* y,int height,int wid
 // Aligned [llm_h*llm_w,5120] -> complete delimiter/newline span [tokens,5120].
 int32_t ds41rt_v41_vision_span(const uint16_t* features,const uint16_t* start,
     const uint16_t* newline,const uint16_t* end,uint16_t* y,int llm_h,int llm_w,void* stream);
+// Replace selected target rows with BF16 image features, replicated across all
+// four mHC lanes. Features[image_rows,5120], indices[image_rows], residual[rows,4,5120].
+// Indices must be unique and less than rows; buffers remain live through stream completion.
+int32_t ds41rt_v41_vision_embed(const uint16_t* features,const uint32_t* indices,
+    uint16_t* residual,int image_rows,int rows,void* stream);
 #ifdef __cplusplus
 }
 #endif

@@ -1,0 +1,99 @@
+{
+  "scope": "Native image embedding replacement and request-owned masks/features; vision API and whole-model replay qualification remain open",
+  "source_parent": "17e9290fb90538cf40cb6ecb0850dbafbbb895c7",
+  "source_sha256": {
+    "native/cuda/kernels/v41_vision.cu": "4c365516032bdf51c0e59b438ac84c743a48c3247790d24c0f21bdeb699b66cf",
+    "native/include/ds41rt_v41_vision.h": "1b0f48ac59759bde87441c696334a196dd7dfda5c695f43c2456e56ab51ebad4",
+    "rust/crates/ds41rt-ffi/src/v41_vision.rs": "58f979d176ea22bb2275c157622158753ab95ed885ece0f0543f56649b812b06",
+    "rust/crates/ds41rt-daemon/src/v41_requests.rs": "7af804f567bd169c4c735d4581b165644a7477f8168b1570ebbebb7750d53b27",
+    "rust/crates/ds41rt-daemon/src/v41_requests/images.rs": "956f655e122d878f4bdc6d4c53d14be832d81e0dd96343fdb087aedaf25c8326",
+    "rust/crates/ds41rt-daemon/src/v41_requests/image_tests.rs": "ddc5aa358ff358bdf5e51981739619e209ae0b7bc6c5f84fd5508b7edbeafd7c",
+    "rust/crates/ds41rt-daemon/src/v41_requests/reservation.rs": "3f148c6fecb2b19cdfe32dca95a388669c2ebc745d2b360bdeddc7815d2a2c07",
+    "rust/crates/ds41rt-daemon/src/v41_target_embedding.rs": "245d9e7c5a21c4287594e45467336191b3460a7315865c062baaff1141b64ea4",
+    "rust/crates/ds41rt-daemon/src/v41_target_embedding/tests.rs": "f7855e3ea162d87c73f10aa1a028d4e0a03525fc0bb53e8825c19fdca82fbb71",
+    "rust/crates/ds41rt-daemon/src/v41_target_pass.rs": "5c27de25ff626ee3a400ec6fd20490de410fb5eff19c911843ea1c4dd85ccfca",
+    "rust/crates/ds41rt-daemon/src/v41_target_pass/encoder_pair.rs": "72d3ca6c82a7d0edbd5d8d3842a3ae3cecb21d361b851f65ec3d2871a2dc9d0e",
+    "rust/crates/ds41rt-daemon/src/v41_target_pass/encoder_stream.rs": "f8223bcc267aabd5ed6897adcd8b2612716b42c52007539698b601a56e0c6740",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_execution/distributed_tests.rs": "84a459576685094c1f345dd0e638800bd8b655cae244a15e108e8c6f7868d6ea"
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/ds41-native-vision/cmake/libds41rt_native.so",
+      "sha256": "c8832098045ff164e396e3e0989f1c2955dccac3ddf157a81f8f45fc1ae2021f",
+      "bytes": 9055968
+    },
+    {
+      "path": "/home/tj/Developer/ds41rt/rust/target/debug/deps/ds41rt-13312f7b1c44a5b6",
+      "sha256": "628667e6bb94201295a5d629479af453edb5124232c88985f020a3d7249364e9",
+      "bytes": 414499008
+    },
+    {
+      "path": "/tmp/ds41-native-release-pool/cmake/libds41rt_native.so",
+      "sha256": "6578932177c4871c9b2aef91f09bc36f4ded1213b19e220ca3fc47e543cae157",
+      "bytes": 14046432
+    }
+  ],
+  "hardware": "index, name, driver_version, power.limit [W], enforced.power.limit [W], clocks.current.memory [MHz], clocks.max.memory [MHz]\n0, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 13365 MHz, 14001 MHz\n1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07, 400.00 W, 400.00 W, 405 MHz, 14001 MHz\n",
+  "builds": {
+    "native_component": "CUDA 13.3, SM120, Release, expert/FP8 AOT and XGrammar disabled",
+    "rust": "test, unoptimized + debuginfo",
+    "existing_request_fixture": "unchanged full AOT native library"
+  },
+  "validation": {
+    "cpu_layout_tests": 3,
+    "cache_identity_and_radix_tests": 10,
+    "cuda_embedding_shapes": [
+      1,
+      35,
+      129,
+      4096,
+      35
+    ],
+    "maximum_image_rows_in_one_gpu_batch": 4096,
+    "cuda_memcheck_errors": 0,
+    "gpu_request_owners": 16,
+    "gpu_request_batch_rows": 3040,
+    "gpu_request_image_rows": 2944,
+    "all_channels_and_four_hc_lanes_exact": true,
+    "text_rows_and_pre_mix_exact": true,
+    "reversed_request_order": true,
+    "engram_resume_boundary_cases": 112,
+    "reserved_chunk_rows_per_request": [
+      128,
+      62
+    ],
+    "explicit_mask_conflicts_rejected": true,
+    "invalid_image_indices_and_features_rejected": true,
+    "cancellation_and_generation_reuse": true,
+    "existing_request_lifecycle_passed": true,
+    "whole_model_decoder_replay_qualified": false,
+    "vision_api_enabled": false,
+    "performance_campaign_run": false
+  },
+  "memory": {
+    "additional_gpu_bytes_per_lane_at_capacity_4096": 41959424,
+    "additional_gpu_bytes_two_lanes_at_capacity_4096": 83918848,
+    "max_host_image_feature_bytes_per_request": 167772160
+  },
+  "notes": [
+    "The initial independent Engram comparison passed zero instead of the restored history position; the fixture was corrected and failed logs retained.",
+    "The native vision encoder is not yet invoked by API admission. The request owner exposes ranges needing features so a complete cache hit can avoid encoder work.",
+    "The dSpark reference uses target hidden states to seed its windows and treats draft tokens as text; live image target/dSpark parity remains required."
+  ],
+  "evidence": {
+    "path": "docs/evidence/native-vision-features.json.gz",
+    "sha256": "18dfa323d98796e8fa3172afd3569eb8ea09d008fff040e91818f8be340fcbe8",
+    "bytes": 76623
+  },
+  "remaining": [
+    "API decoding/admission through sixteen images",
+    "expanded prompt accounting",
+    "vision owner startup and lazy feature preparation",
+    "live target/dSpark cached and uncached image parity",
+    "whole-model decoder replay image routing",
+    "image-answer qualification",
+    "complete serving memory qualification",
+    "mixed-request cancellation",
+    "text-performance regression checks"
+  ]
+}

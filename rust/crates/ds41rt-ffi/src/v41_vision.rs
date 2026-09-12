@@ -392,3 +392,46 @@ impl Drop for V41VisionOps<'_> {
         }
     }
 }
+
+impl NativeLibrary {
+    /// # Safety
+    /// Initialized same-device features and unique in-range row indices; output
+    /// is exclusive and disjoint. Retain buffers until this stream completes.
+    pub unsafe fn v41_vision_embed(
+        &self,
+        features: Buffer,
+        indices: Buffer,
+        residual: Buffer,
+        image_rows: usize,
+        rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!(
+            image_rows > 0 && image_rows <= rows && rows <= 4096,
+            "invalid image embedding rows"
+        );
+        ensure!(
+            features.bytes >= image_rows * 10240
+                && indices.bytes >= image_rows * 4
+                && residual.bytes >= rows * 40960
+                && features.device_id == residual.device_id
+                && indices.device_id == residual.device_id,
+            "image embedding buffer extent or device differs"
+        );
+        type Embed =
+            unsafe extern "C" fn(*const u16, *const u32, *mut u16, i32, i32, *mut c_void) -> i32;
+        let status = unsafe {
+            let function = self.lib.get::<Embed>(b"ds41rt_v41_vision_embed")?;
+            function(
+                features.ptr.cast(),
+                indices.ptr.cast(),
+                residual.ptr.cast(),
+                image_rows as i32,
+                rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native image embedding CUDA status {status}");
+        Ok(())
+    }
+}

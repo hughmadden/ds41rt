@@ -1,4 +1,4 @@
-//! One target text pass from request-owned tokens through layer 39 and logits.
+//! One target pass from request-owned text/image rows through layer 39 and logits.
 use crate::v41_backbone_execution::BackboneExecution;
 use crate::v41_backbone_cache::CacheStage;
 use crate::v41_block::{BlockOutput, EncoderSuffix};
@@ -103,7 +103,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     /// All components belong to the same device, capacity and official model.
     /// The caller exclusively owns CUDA buffers and polls on the owning thread.
     /// Selected rows are in this batch's flattened request order, at most 80.
-    /// Produces private dSpark taps for every input row; image replacement is separate.
+    /// Produces private dSpark taps for every input row, including prepared image spans.
     pub async unsafe fn execute(
         &mut self,
         requests: &Requests<'a>,
@@ -209,7 +209,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         } else {
             self.lane.restart()?;
             self.index.restart()?;
-            unsafe { requests.begin_text(guard.batch, &mut self.embedding, &mut self.lane)?; }
+            unsafe { requests.begin_input(guard.batch, &mut self.embedding, &mut self.lane)?; }
         }
         for layer in stage.windows() {
             if layer != stage.windows().start {

@@ -106,6 +106,14 @@ __global__ void merge_kernel(const B* x,B* y,int height,int width,int merged_wid
     y[row*9216+col]=(h<height && w<width)?x[(uint64_t(h)*width+w)*1024+channel]:__float2bfloat16_rn(0);
   }
 }
+__global__ void image_embed_kernel(const B* features,const uint32_t* indices,B* residual,int rows) {
+  const int image=blockIdx.x;const uint32_t row=indices[image];
+  if(row>=uint32_t(rows))return;
+  for(int col=threadIdx.x;col<5120;col+=256) {
+    const B value=features[uint64_t(image)*5120+col];
+    for(int hc=0;hc<4;++hc)residual[(uint64_t(row)*4+hc)*5120+col]=value;
+  }
+}
 __global__ void span_kernel(const B* features,const B* start,const B* newline,const B* end,B* y,int width,int tokens) {
   const int row=blockIdx.x;
   const B* source=row==0?start:(row==tokens-1?end:((row-1)%(width+1)==width?newline:
@@ -222,4 +230,15 @@ extern "C" int32_t ds41rt_v41_vision_span(const uint16_t* features,const uint16_
   for(int i=0;i<4;++i)if(!valid(p[i],sizes[i],2)||!apart(p[i],sizes[i],y,out))return cudaErrorInvalidValue;
   span_kernel<<<tokens,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(reinterpret_cast<const B*>(features),reinterpret_cast<const B*>(start),
       reinterpret_cast<const B*>(newline),reinterpret_cast<const B*>(end),reinterpret_cast<B*>(y),width,tokens);return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_vision_embed(const uint16_t* features,const uint32_t* indices,
+    uint16_t* residual,int image_rows,int rows,void* stream) {
+  if(image_rows<1 || rows<1 || image_rows>rows || rows>4096)return cudaErrorInvalidValue;
+  const uint64_t fb=uint64_t(image_rows)*10240,ib=uint64_t(image_rows)*4,rb=uint64_t(rows)*40960;
+  if(!valid(features,fb,2)||!valid(indices,ib,4)||!valid(residual,rb,2)||
+      !apart(features,fb,residual,rb)||!apart(indices,ib,residual,rb))return cudaErrorInvalidValue;
+  image_embed_kernel<<<image_rows,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const B*>(features),indices,reinterpret_cast<B*>(residual),rows);
+  return cudaGetLastError();
 }

@@ -72,7 +72,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             pass.state.begin()?;
             pass.execution.restart_for(CacheStage::Encoder);
             pass.lane.restart()?; pass.index.restart()?; pass.taps.reset();
-            unsafe { requests.borrow_mut().begin_text(batch, &mut pass.embedding, &mut pass.lane)?; }
+            unsafe { requests.borrow_mut().begin_input(batch, &mut pass.embedding, &mut pass.lane)?; }
             unsafe { pass.execute_encoder_chunk(requests, batch, transport,
                 index.checked_sub(1).map(|i| &published[i]),
                 (index + 1 < chunks.len()).then_some(&published[index])).await?; }

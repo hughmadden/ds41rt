@@ -34,8 +34,9 @@ gate below is satisfied merely by an older component test.
   spans. The [native encoder/aligner component](release-v1-vision-encoder.md)
   now has GPU operation, full-vector and precision-control evidence.
   [Image cache identity and ownership](release-v1-vision-cache-identity.md) have
-  focused radix tests. Feature replacement, routing/replay masks, live image-cache
-  parity, API serving and image-answer qualification remain open.
+  focused radix tests. [Feature replacement and request masks](release-v1-vision-features.md)
+  pass CUDA and request-plumbing checks. API preparation, live image-cache/replay
+  parity and image-answer qualification remain open.
 - [ ] Qualify tools, structured outputs, streaming, cancellation and recovery.
 - [x] Verify official maximum context/output limits. Default to those limits;
   clamp each output allowance to remaining context and the model output cap.

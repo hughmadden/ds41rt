@@ -22,6 +22,7 @@ impl Requests<'_> {
 
     pub fn reserve_encoder(&mut self, requests: &[RequestTokens<'_>]) -> Result<RequestBatch> {
         ensure!(!requests.is_empty() && requests.len() <= 16, "invalid encoder request count");
+        let masks = self.resolved_masks(requests, true)?;
         let mut prepared = Vec::with_capacity(requests.len());
         let mut work = Vec::with_capacity(requests.len());
         let mut tokens = Vec::new();
@@ -40,10 +41,12 @@ impl Requests<'_> {
             prepared.push(history.prefill_cursor());
             work.push(CacheWork { lease: r.lease, tokens: u32::try_from(r.tokens.len())?, kind: r.kind });
             tokens.extend_from_slice(r.tokens);
-            mask.extend((0..r.tokens.len()).map(|i| u8::from(r.image_mask.is_some_and(|m| m[i]))));
+            let image_mask = masks.as_ref().map_or(r.image_mask, |m| m[i].as_deref());
+            mask.extend((0..r.tokens.len()).map(|i| u8::from(image_mask.is_some_and(|m| m[i]))));
         }
-        let inputs = requests.iter().zip(&prepared).map(|(r, p)| EngramRequestTokens {
-            history: p.history(), token_ids: r.tokens, image_mask: r.image_mask,
+        let inputs = requests.iter().zip(&prepared).enumerate().map(|(i, (r, p))| EngramRequestTokens {
+            history: p.history(), token_ids: r.tokens,
+            image_mask: masks.as_ref().map_or(r.image_mask, |m| m[i].as_deref()),
         }).collect::<Vec<_>>();
         let mut engram = self.pipeline.prepare(&inputs)?;
         let advanced = prepared.iter().zip(engram.batches()).map(|(p, b)| {

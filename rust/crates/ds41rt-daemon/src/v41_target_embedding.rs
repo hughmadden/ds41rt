@@ -1,4 +1,4 @@
-//! Text-token initialization using the coordinator table shared with dSpark.
+//! Token initialization and image replacement before the first target mHC block.
 use crate::v41_memory::{DeviceAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{Context, Result, ensure};
@@ -20,6 +20,8 @@ pub(crate) struct TargetEmbeddingWave<'w, 'a> {
     ids: DeviceAllocation<'a>,
     residual: DeviceAllocation<'a>,
     pre: DeviceAllocation<'a>,
+    image_features: DeviceAllocation<'a>,
+    image_indices: DeviceAllocation<'a>,
     capacity: usize,
     graph: Option<(*mut c_void, usize)>,
     tokens: Vec<u32>,
@@ -32,7 +34,7 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
             (1..=4096).contains(&capacity),
             "invalid target embedding capacity"
         );
-        Ok(capacity * (4 + 40960 + 16))
+        Ok(capacity * (4 + 40960 + 16 + 10240 + 4))
     }
     pub fn new(
         library: &'a NativeLibrary,
@@ -63,6 +65,8 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
             ids,
             residual: DeviceAllocation::new(library, capacity * 40960)?,
             pre: DeviceAllocation::new(library, capacity * 16)?,
+            image_features: DeviceAllocation::new(library, capacity * 10240)?,
+            image_indices: DeviceAllocation::new(library, capacity * 4)?,
             capacity,
             graph: None,
             tokens: Vec::with_capacity(capacity),
@@ -140,6 +144,33 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
         self.ready = true;
         self.output()
     }
+    /// Complete image span rows include learned delimiters. The row indices are
+    /// sorted, unique positions within this flattened multi-request batch.
+    pub fn execute_with_images(&mut self, tokens: &[u32], positions: &[u64],
+        images: &[(usize, &[u8])]) -> Result<TargetEmbedding<'_>> {
+        self.invalidate();
+        ensure!(images.iter().enumerate().all(|(i, (row, bytes))|
+            *row < tokens.len() && tokens[*row] == ds41rt_loader::V41_IMAGE_TOKEN_ID
+                && bytes.len() == 10240 && (i == 0 || images[i-1].0 < *row)),
+            "invalid target image rows or feature extent");
+        self.execute(tokens, positions)?;
+        if images.is_empty() { return self.output(); }
+        self.ready = false;
+        let mut features = Vec::with_capacity(images.len()*10240);
+        let mut indices = Vec::with_capacity(images.len()*4);
+        for &(row, data) in images {
+            features.extend_from_slice(data);
+            indices.extend_from_slice(&(row as u32).to_ne_bytes());
+        }
+        self.stream.library.copy_h2d(self.image_features.buffer, &features)?;
+        self.stream.library.copy_h2d(self.image_indices.buffer, &indices)?;
+        let launched = unsafe { self.stream.library.v41_vision_embed(
+            self.image_features.buffer, self.image_indices.buffer, self.residual.buffer,
+            images.len(), tokens.len(), self.stream.raw) };
+        launched.and(self.synchronize())?;
+        self.ready = true;
+        self.output()
+    }
     pub fn output(&self) -> Result<TargetEmbedding<'_>> {
         ensure!(self.ready, "target embeddings unpublished");
         let mut residual = self.residual.buffer;
@@ -172,3 +203,6 @@ impl Drop for TargetEmbeddingWave<'_, '_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

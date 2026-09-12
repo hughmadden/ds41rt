@@ -150,7 +150,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         let mut batch = if cycle == 1 { requests.reserve_encoder(&work)? } else { requests.prepare(&work)? };
         let positions = batch.cache()?.positions();
         unsafe {
-            requests.begin_text(&batch, &mut embedding, &mut lane)?;
+            requests.begin_input(&batch, &mut embedding, &mut lane)?;
         }
         let start = Instant::now();
         let mut successor = None;
@@ -261,7 +261,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             for &lease in &leases { assert_eq!(requests.cache().committed_end(lease)?, 5); }
             execution.restart_for(CacheStage::Encoder);
             lane.restart()?; index.restart()?;
-            unsafe { requests.begin_text(&successor, &mut embedding, &mut lane)?; }
+            unsafe { requests.begin_input(&successor, &mut embedding, &mut lane)?; }
             for layer in 0..20 {
                 if layer != 0 {
                     lane.advance()?;
@@ -327,8 +327,8 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
     execution.restart_for(CacheStage::Encoder); execution1.restart_for(CacheStage::Encoder);
     lane.restart()?; lane1.restart()?; index.restart()?; index1.restart()?;
     unsafe {
-        requests.begin_text(&first, &mut embedding, &mut lane)?;
-        requests.begin_text(&second, &mut embedding, &mut lane1)?;
+        requests.begin_input(&first, &mut embedding, &mut lane)?;
+        requests.begin_input(&second, &mut embedding, &mut lane1)?;
     }
     for layer in 0..20 {
         if layer != 0 {

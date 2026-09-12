@@ -29,7 +29,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         self.state.begin()?;
         self.execution.restart_for(CacheStage::Encoder);
         self.lane.restart()?; self.index.restart()?; self.taps.reset();
-        unsafe { guard.requests.begin_text(batch, &mut self.embedding, &mut self.lane)?; }
+        unsafe { guard.requests.begin_input(batch, &mut self.embedding, &mut self.lane)?; }
         {
             let requests = RefCell::new(&mut *guard.requests);
             unsafe { self.execute_encoder_chunk(&requests, batch, transport, None, None).await?; }
@@ -63,7 +63,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             pass.state.begin()?;
             pass.execution.restart_for(CacheStage::Encoder);
             pass.lane.restart()?; pass.index.restart()?; pass.taps.reset();
-            unsafe { guard.requests.begin_text(batch, &mut pass.embedding, &mut pass.lane)?; }
+            unsafe { guard.requests.begin_input(batch, &mut pass.embedding, &mut pass.lane)?; }
         }
         {
             // These futures are polled on the CUDA owner. Cache borrows are
