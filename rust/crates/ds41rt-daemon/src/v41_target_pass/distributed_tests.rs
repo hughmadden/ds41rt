@@ -195,12 +195,18 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
         for (left, right, tail) in [(65usize, 65usize, 0usize), (79, 1, 0), (65, 65, 1), (64, 64, 27)] {
             let tokens: Vec<u32> = (0..left + right + tail).map(|i| ((i * 7919 + 17) % 129280) as u32).collect();
             let mut expected = None;
-            for paired in [false, true] {
-                let lease = requests.admit(0, 7000 + paired as u64)?;
+            for mode in 0..3 {
+                let paired = mode == 1;
+                let lease = requests.admit(0, 7000 + mode as u64)?;
                 let end = tokens.len() as u64;
                 requests.begin_encoder(lease, end)?;
                 let mut suffix = EncoderSuffix::new(&lib, end, EncoderSuffix::device_bytes(end)?)?;
-                if paired {
+                if mode == 2 {
+                    let chunks: Vec<_> = [&tokens[..left], &tokens[left..left + right], &tokens[left + right..]]
+                        .into_iter().filter(|c| !c.is_empty()).collect();
+                    runtime.block_on(unsafe { pass.execute_encoder_stream(&mut other, &mut requests,
+                        lease, &chunks, [&mut transport, &mut second_transport], &mut suffix, &|| true) })?;
+                } else if paired {
                     let mut first = requests.reserve_encoder(&[RequestTokens { lease,
                         tokens: &tokens[..left], image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
                     let mut second = requests.reserve_encoder(&[RequestTokens { lease,
@@ -240,6 +246,60 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             }
             eprintln!("PASS independent encoder chunks {left}+{right}+{tail}: suffix residual/pre byte-identical to serial, ordered commits and decoder replay ready");
         }
+        // Five chunks reuse both lanes, crossing more than one former pair boundary.
+        // Drop a live stream first, then reuse the same owners for exact comparisons.
+        let tokens: Vec<u32> = (0..175).map(|i| ((i * 7919 + 17) % 129280) as u32).collect();
+        let chunks = [&tokens[..31], &tokens[31..64], &tokens[64..99], &tokens[99..136], &tokens[136..]];
+        {
+            use std::future::Future;
+            let lease = requests.admit(0, 7100)?;
+            requests.begin_encoder(lease, 175)?;
+            let mut suffix = EncoderSuffix::new(&lib, 175, EncoderSuffix::device_bytes(175)?)?;
+            {
+                let mut pending = Box::pin(unsafe { pass.execute_encoder_stream(&mut other,
+                    &mut requests, lease, &chunks, [&mut transport, &mut second_transport],
+                    &mut suffix, &|| true) });
+                runtime.block_on(std::future::poll_fn(|cx| {
+                    assert!(pending.as_mut().poll(cx).is_pending());
+                    std::task::Poll::Ready(())
+                }));
+            }
+            assert!(requests.cache().request_id(lease).is_err());
+            assert_eq!(pass.state, State::Idle);
+            assert_eq!(other.state, State::Idle);
+            transport.reset_connections(); second_transport.reset_connections();
+            eprintln!("PASS cancelled encoder stream revoked admission and reset both owners");
+        }
+        let mut expected = None;
+        for streaming in [false, true] {
+            let lease = requests.admit(0, 7101 + streaming as u64)?;
+            requests.begin_encoder(lease, 175)?;
+            let mut suffix = EncoderSuffix::new(&lib, 175, EncoderSuffix::device_bytes(175)?)?;
+            if streaming {
+                runtime.block_on(unsafe { pass.execute_encoder_stream(&mut other, &mut requests,
+                    lease, &chunks, [&mut transport, &mut second_transport], &mut suffix, &|| true) })?;
+            } else {
+                for chunk in chunks {
+                    let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
+                        image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
+                    runtime.block_on(unsafe { pass.execute_encoder(&requests, &mut batch,
+                        &mut transport, 0, &mut suffix) })?;
+                    pass.commit(&mut requests, &mut batch, &[chunk.len() as u32])?;
+                }
+            }
+            let output = suffix.output()?;
+            let mut bytes = Vec::new();
+            for buffer in [output.residual, output.pre] {
+                let mut value = vec![0; buffer.bytes]; lib.copy_d2h(&mut value, buffer)?;
+                bytes.extend_from_slice(&value);
+            }
+            if let Some(expected) = &expected { assert!(&bytes == expected, "five-chunk encoder stream differs"); }
+            else { expected = Some(bytes); }
+            assert_eq!(requests.cache().committed_end(lease)?, 175);
+            assert_eq!(requests.begin_decoder_replay(lease)?, 47);
+            requests.release(lease)?;
+        }
+        eprintln!("PASS five-chunk stream: serial-exact suffix and ordered decoder replay");
         return Ok(());
     }
     let dspark_weights = if std::env::var_os("DS41RT_TARGET_PASS_DSPARK").is_some() {

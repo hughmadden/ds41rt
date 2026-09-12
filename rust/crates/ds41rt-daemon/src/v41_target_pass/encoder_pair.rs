@@ -92,7 +92,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     /// Each following attention waits for its predecessor's publication at that
     /// layer, not for the predecessor's expert output. Completed chunks retain
     /// their lane output until the caller captures and commits them in order.
-    async unsafe fn execute_encoder_chunk(&mut self,
+    pub(super) async unsafe fn execute_encoder_chunk(&mut self,
         requests: &RefCell<&mut Requests<'a>>, batch: &mut RequestBatch,
         transport: &mut NativeTp4Wave<'a>, predecessor: Option<&[Notify; 20]>,
         successor: Option<&[Notify; 20]>,

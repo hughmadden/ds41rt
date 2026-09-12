@@ -13,6 +13,7 @@ use anyhow::{ensure, Context, Result};
 use std::time::{Duration, Instant};
 mod taps;
 mod encoder_pair;
+mod encoder_stream;
 pub(crate) use taps::{TargetTapWave, TargetTaps};
 
 #[derive(Default, Debug, PartialEq, Eq)]

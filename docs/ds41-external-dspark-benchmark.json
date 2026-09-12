@@ -217,5 +217,10 @@
     }
   ],
   "counting_note": "Published C1 per-stream also lists 92.2 back-to-back.",
-  "follow_up": "After planned prefill work, compare matching prompt categories, context/output lengths, thinking settings and concurrency; report acceptance, target verification time, draft time, per-stream decode and wall-clock aggregate separately. Current DS41RT counting results are not a comparable category suite."
+  "follow_up": "After planned prefill work, compare matching prompt categories, context/output lengths, thinking settings and concurrency; report acceptance, target verification time, draft time, per-stream decode and wall-clock aggregate separately. Current DS41RT counting results are not a comparable category suite.",
+  "source_links": [
+    "https://huggingface.co/bot-lab-21/DeepSeek-V4.1-Flash-EXL3-3.5bpw-Pollard",
+    "https://github.com/tonyd2wild/DeepSeek-V4.1-Flash-vLLM-DGX-Spark"
+  ],
+  "investigation_order": "User requested finishing overlap before this external implementation review. Inspect GB10 slow-state/spin-wait reports, one-shot RoCE reduction, dSpark acceptance/graphs and V4.1 vLLM PRs against local profiles; no speedup inferred from hardware totals or quantization format alone."
 }
