@@ -3,6 +3,10 @@ use crate::v41_memory::{DeviceAllocation, HostAllocation};
 use anyhow::{ensure, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 use std::ffi::c_void;
+use std::{cell::RefCell, rc::Rc};
+mod ownership;
+use ownership::PagePool;
+pub(crate) use ownership::SourcePrefix;
 
 pub(super) const PAGE_ROWS: usize = 256;
 pub(super) struct SourceCache<'a> {
@@ -16,12 +20,15 @@ pub(super) struct SourceCache<'a> {
     staging: HostAllocation<'a>,
     stride: usize,
     pages: [Vec<u32>; 16],
-    free: Vec<u32>,
+    rows: [usize; 16],
+    pool: Rc<RefCell<PagePool>>,
 }
 pub(super) struct IndexPlan {
     additions: Vec<(usize, Vec<u32>)>,
     used: usize,
     lengths: Vec<(usize, u64)>,
+    // Shared partial pages are copied before accepted rows are appended.
+    replacements: Vec<(usize, usize, u32, u32)>,
 }
 /// Only rows below `rows` are initialized. Logical row r uses physical page
 /// pages[r / 256], offset r % 256. Drain device consumers before mutating owner.
@@ -69,7 +76,8 @@ impl<'a> SourceCache<'a> {
             kv_scales: DeviceAllocation::new(library, pages * PAGE_ROWS * 16)?,
             capacity: pages * PAGE_ROWS,
             pages: std::array::from_fn(|_| vec![]),
-            free: (0..pages as u32).rev().collect(),
+            rows: [0; 16],
+            pool: Rc::new(RefCell::new(PagePool::new(pages))),
         })
     }
     pub fn view(&self, slot: usize, rows: usize) -> IndexCacheView<'_> {
@@ -99,7 +107,9 @@ impl<'a> SourceCache<'a> {
     }
     pub fn release(&mut self, slot: usize) -> Result<()> {
         // Caller first revokes the host lease, and has drained all consumers.
-        self.free.extend(self.pages[slot].drain(..));
+        self.pool.borrow_mut().release(&self.pages[slot]);
+        self.pages[slot].clear();
+        self.rows[slot] = 0;
         self.lengths
             .library
             .copy_h2d(slice(self.lengths.buffer, slot * 8, 8), &[0; 8])
@@ -109,12 +119,94 @@ impl<'a> SourceCache<'a> {
             .library
             .copy_h2d(slice(self.lengths.buffer, slot * 8, 8), &[0; 8])
     }
+    /// Retain initialized source rows without copying GPU data. Callers drain
+    /// consumers and supply the authoritative committed row count.
+    pub fn retain_prefix(&self, slot: usize, rows: usize) -> Result<SourcePrefix> {
+        ensure!(
+            slot < self.lengths.buffer.bytes / 8 && rows <= self.rows[slot],
+            "source prefix exceeds initialized page table"
+        );
+        let pages = self.pages[slot][..rows.div_ceil(PAGE_ROWS)].to_vec();
+        self.pool.borrow_mut().retain(&pages);
+        Ok(SourcePrefix {
+            pool: Rc::clone(&self.pool),
+            pages,
+            rows,
+        })
+    }
+    /// Attach a retained source to a fresh request. Device metadata is installed
+    /// before host publication; a later append privately copies a shared tail.
+    pub fn restore_prefix(&mut self, slot: usize, prefix: &SourcePrefix) -> Result<()> {
+        ensure!(
+            slot < self.lengths.buffer.bytes / 8
+                && self.pages[slot].is_empty()
+                && Rc::ptr_eq(&self.pool, &prefix.pool)
+                && prefix.pages.len() <= self.stride,
+            "foreign source prefix or occupied destination"
+        );
+        let library = self.lengths.library;
+        let bytes: Vec<u8> = prefix.pages.iter().flat_map(|p| p.to_ne_bytes()).collect();
+        if !bytes.is_empty() {
+            library.copy_h2d(
+                slice(self.page_table.buffer, slot * self.stride * 4, bytes.len()),
+                &bytes,
+            )?;
+        }
+        library.copy_h2d(
+            slice(self.lengths.buffer, slot * 8, 8),
+            &(prefix.rows as u64).to_ne_bytes(),
+        )?;
+        self.pool.borrow_mut().retain(&prefix.pages);
+        self.pages[slot] = prefix.pages.clone();
+        self.rows[slot] = prefix.rows;
+        Ok(())
+    }
+    /// # Safety
+    /// Serialize with all pool mutations and enqueue before accepted row writes.
+    /// The caller drains the stream before applying or discarding the plan.
+    pub unsafe fn copy_shared_tails(&self, plan: &IndexPlan, stream: *mut c_void) -> Result<()> {
+        for &(_, _, source, destination) in &plan.replacements {
+            for (buffer, row_bytes) in [
+                (self.packed.buffer, 64),
+                (self.scales.buffer, 4),
+                (self.kv_values.buffer, 512),
+                (self.kv_scales.buffer, 16),
+            ] {
+                let bytes = PAGE_ROWS * row_bytes;
+                unsafe {
+                    self.lengths.library.copy_d2d_async(
+                        slice(buffer, destination as usize * bytes, bytes),
+                        slice(buffer, source as usize * bytes, bytes),
+                        bytes,
+                        stream,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
     /// # Safety
     /// Value/scales writes precede this call on stream. Drain the stream before
     /// reusing staging, releasing a slot or publishing the plan on the host.
     pub unsafe fn upload(&mut self, plan: &IndexPlan, stream: *mut c_void) -> Result<()> {
         let library = self.lengths.library;
         let mut offset = 0;
+        for &(slot, logical, _, destination) in &plan.replacements {
+            let staging = &mut self.staging.bytes_mut()[offset..offset + 4];
+            staging.copy_from_slice(&destination.to_ne_bytes());
+            unsafe {
+                library.copy_h2d_async(
+                    slice(
+                        self.page_table.buffer,
+                        (slot * self.stride + logical) * 4,
+                        4,
+                    ),
+                    staging,
+                    stream,
+                )?;
+            }
+            offset += 4;
+        }
         for (slot, pages) in &plan.additions {
             let bytes = pages.len() * 4;
             if bytes == 0 {
@@ -151,25 +243,46 @@ impl<'a> SourceCache<'a> {
             additions: vec![],
             used: 0,
             lengths: vec![],
+            replacements: vec![],
         };
+        let pool = self.pool.borrow();
         let mut seen = [false; 16];
         for &(slot, old, new) in appends {
-            ensure!(slot < 16 && !seen[slot], "duplicate or invalid index slot");
+            ensure!(
+                slot < self.lengths.buffer.bytes / 8 && !seen[slot],
+                "duplicate or invalid index slot"
+            );
             seen[slot] = true;
             ensure!(
-                old <= new && new <= 1048576 && self.pages[slot].len() == old.div_ceil(PAGE_ROWS),
+                old == self.rows[slot]
+                    && old <= new
+                    && new <= 1048576
+                    && self.pages[slot].len() == old.div_ceil(PAGE_ROWS),
                 "index history binding differs"
             );
             plan.lengths.push((slot, new as u64));
+            if new > old && old % PAGE_ROWS != 0 {
+                let logical = old / PAGE_ROWS;
+                let source = self.pages[slot][logical];
+                if pool.shared(source) {
+                    ensure!(
+                        plan.used < pool.free.len(),
+                        "index cache copy-on-write pool exhausted"
+                    );
+                    let destination = pool.free[pool.free.len() - plan.used - 1];
+                    plan.used += 1;
+                    plan.replacements.push((slot, logical, source, destination));
+                }
+            }
             let extra = new.div_ceil(PAGE_ROWS) - self.pages[slot].len();
             ensure!(
-                extra <= self.free.len() - plan.used,
+                extra <= pool.free.len() - plan.used,
                 "index cache pool exhausted"
             );
-            let end = self.free.len() - plan.used;
+            let end = pool.free.len() - plan.used;
             plan.additions.push((
                 slot,
-                self.free[end - extra..end].iter().rev().copied().collect(),
+                pool.free[end - extra..end].iter().rev().copied().collect(),
             ));
             plan.used += extra;
         }
@@ -178,7 +291,13 @@ impl<'a> SourceCache<'a> {
     pub fn destination(&self, plan: &IndexPlan, slot: usize, row: usize) -> Result<u64> {
         let logical_page = row / PAGE_ROWS;
         let old = &self.pages[slot];
-        let page = if logical_page < old.len() {
+        let page = if let Some(&(_, _, _, destination)) = plan
+            .replacements
+            .iter()
+            .find(|&&(s, logical, _, _)| s == slot && logical == logical_page)
+        {
+            destination
+        } else if logical_page < old.len() {
             old[logical_page]
         } else {
             let new = plan
@@ -193,9 +312,20 @@ impl<'a> SourceCache<'a> {
         Ok(u64::from(page) * PAGE_ROWS as u64 + (row % PAGE_ROWS) as u64)
     }
     pub fn apply(&mut self, plan: IndexPlan) {
-        self.free.truncate(self.free.len() - plan.used);
+        let mut pool = self.pool.borrow_mut();
+        let remaining = pool.free.len() - plan.used;
+        pool.free.truncate(remaining);
+        for (slot, logical, old, new) in plan.replacements {
+            pool.retain(&[new]);
+            pool.release(&[old]);
+            self.pages[slot][logical] = new;
+        }
         for (slot, pages) in plan.additions {
+            pool.retain(&pages);
             self.pages[slot].extend(pages);
+        }
+        for (slot, rows) in plan.lengths {
+            self.rows[slot] = rows as usize;
         }
     }
 }
@@ -206,5 +336,147 @@ fn slice(buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDevic
         ptr: unsafe { buffer.ptr.cast::<u8>().add(offset).cast() },
         bytes,
         ..buffer
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::v41_memory::LoadStream;
+
+    fn append(
+        cache: &mut SourceCache<'_>,
+        slot: usize,
+        old: usize,
+        new: usize,
+        value: u8,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let plan = cache.reserve(&[(slot, old, new)])?;
+        let library = cache.lengths.library;
+        unsafe {
+            cache.copy_shared_tails(&plan, stream)?;
+            library.cuda_stream_synchronize(stream)?;
+        }
+        for row in old..new {
+            let destination = cache.destination(&plan, slot, row)? as usize;
+            for (buffer, width) in [
+                (cache.packed.buffer, 64),
+                (cache.scales.buffer, 4),
+                (cache.kv_values.buffer, 512),
+                (cache.kv_scales.buffer, 16),
+            ] {
+                library.copy_h2d(
+                    slice(buffer, destination * width, width),
+                    &vec![value; width],
+                )?;
+            }
+        }
+        unsafe {
+            cache.upload(&plan, stream)?;
+            library.cuda_stream_synchronize(stream)?;
+        }
+        cache.apply(plan);
+        Ok(())
+    }
+
+    fn read(cache: &SourceCache<'_>, slot: usize, rows: usize) -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        for row in 0..rows {
+            let physical =
+                cache.pages[slot][row / PAGE_ROWS] as usize * PAGE_ROWS + row % PAGE_ROWS;
+            for (buffer, width) in [
+                (cache.packed.buffer, 64),
+                (cache.scales.buffer, 4),
+                (cache.kv_values.buffer, 512),
+                (cache.kv_scales.buffer, 16),
+            ] {
+                let start = bytes.len();
+                bytes.resize(start + width, 0);
+                cache
+                    .lengths
+                    .library
+                    .copy_d2h(&mut bytes[start..], slice(buffer, physical * width, width))?;
+            }
+        }
+        Ok(bytes)
+    }
+
+    #[test]
+    #[ignore = "requires a CUDA native library in DS41RT_NATIVE_LIB"]
+    fn native_source_prefix_copy_on_write_and_eviction() -> Result<()> {
+        let library = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let stream = LoadStream {
+            library: &library,
+            raw: library.cuda_stream_create()?,
+        };
+        let mut cache = SourceCache::new(&library, 5, 2)?;
+        append(&mut cache, 0, 0, 270, 0x31, stream.raw)?;
+        let original = read(&cache, 0, 270)?;
+        assert!(cache.retain_prefix(0, 271).is_err());
+        assert!(original.iter().all(|&v| v == 0x31));
+        let prefix = cache.retain_prefix(0, 270)?;
+        cache.restore_prefix(1, &prefix)?;
+        let original_pages = cache.pages[0].clone();
+        // Only the partial last page is copied. The first page stays shared.
+        append(&mut cache, 1, 270, 300, 0x72, stream.raw)?;
+        assert_eq!(cache.pages[1][0], original_pages[0]);
+        assert_ne!(cache.pages[1][1], original_pages[1]);
+        assert_eq!(read(&cache, 0, 270)?, original);
+        let branch = read(&cache, 1, 300)?;
+        assert_eq!(&branch[..original.len()], original.as_slice());
+        assert!(branch[original.len()..].iter().all(|&v| v == 0x72));
+        // A divergent shorter prefix can share a physical page containing
+        // future rows; appending must not overwrite those retained rows.
+        let shorter = cache.retain_prefix(0, 259)?;
+        cache.release(1)?;
+        cache.restore_prefix(1, &shorter)?;
+        append(&mut cache, 1, 259, 280, 0x53, stream.raw)?;
+        assert_eq!(read(&cache, 0, 270)?, original);
+        let branch = read(&cache, 1, 280)?;
+        assert!(branch[..259 * 596].iter().all(|&v| v == 0x31));
+        assert!(branch[259 * 596..].iter().all(|&v| v == 0x53));
+        cache.release(0)?;
+        cache.release(1)?;
+        assert_eq!(cache.pool.borrow().free.len(), 3);
+        drop(shorter);
+        assert_eq!(cache.pool.borrow().free.len(), 3);
+        // Restore after every original request lease was released.
+        cache.restore_prefix(1, &prefix)?;
+        assert_eq!(read(&cache, 1, 270)?, original);
+        drop(prefix);
+        assert_eq!(cache.pool.borrow().free.len(), 3);
+        cache.release(1)?;
+        assert_eq!(cache.pool.borrow().free.len(), 5);
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "requires a CUDA native library in DS41RT_NATIVE_LIB"]
+    fn native_source_prefix_exhaustion_and_page_boundary() -> Result<()> {
+        let library = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let stream = LoadStream {
+            library: &library,
+            raw: library.cuda_stream_create()?,
+        };
+        let mut cache = SourceCache::new(&library, 2, 2)?;
+        append(&mut cache, 0, 0, 256, 0x11, stream.raw)?;
+        let prefix = cache.retain_prefix(0, 256)?;
+        cache.restore_prefix(1, &prefix)?;
+        let full = cache.pages[0][0];
+        append(&mut cache, 1, 256, 257, 0x22, stream.raw)?;
+        assert_eq!(cache.pages[1][0], full);
+        let partial = cache.retain_prefix(1, 257)?;
+        assert!(cache.reserve(&[(1, 257, 258)]).is_err());
+        let before = read(&cache, 1, 257)?;
+        drop(partial);
+        // The tail is now exclusive: append succeeds with no free pages.
+        append(&mut cache, 1, 257, 258, 0x33, stream.raw)?;
+        assert_eq!(read(&cache, 1, 257)?, before);
+        cache.release(0)?;
+        cache.release(1)?;
+        drop(prefix);
+        assert_eq!(cache.pool.borrow().free.len(), 2);
+        Ok(())
     }
 }

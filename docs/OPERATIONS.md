@@ -5,6 +5,8 @@
 Develop and apply documentation changes on `dev`. Keep `main` at the latest
 qualified open-source release. Preserve unrelated local changes when switching
 branches, and use isolated checkouts for builds that must freeze source.
+Push each development commit to `origin/dev` so the repository owner can monitor
+progress remotely.
 
 Before promotion, complete [the release checklist](release-v1-checklist.md),
 validate the final amd64 coordinator and arm64 worker container pair on the

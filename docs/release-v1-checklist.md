@@ -73,17 +73,22 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
-on September 12. Source contains a token-based target radix and a byte-bounded
-dSpark tail snapshot cache; this alone does not prove full release cache behavior.
-The dSpark tail cache currently has no explicit entry-count bound or radix
-eviction coupling in its implementation. Audit target SWA restoration and the
-publication lifecycle before implementing the missing ownership policy.
+on September 12. Docker inspection confirms both run `serve-native`, which enters
+v41_native_serve.rs and its scheduler.rs. The native scheduler currently reports
+zero cache-hit tokens and releases all request state on completion. It has four
+source pools (ratio-two layers 2/8/14 and ratio-one layer 20), forty SWA rings,
+and CED decoder replay bounded to 128 tokens. It needs a native prefix index,
+shared source pages, retained SWA/compressor/history state and admission wiring.
 
-The admission path in real_full/entry.rs explicitly disables external target
-radix hits for models with sequence-local compression state. C4/C128 compressor
-accumulators are lane-local and are not restored at a hit. Implement and qualify
-that recovery before enabling hits; changing the admission guard alone would
-permit stale-state corruption.
+Correction to the initial source audit: the token radix and dSpark tail cache
+in commands/real_full belong to the older execution path. Their C4/C128 reuse
+guard does not explain native serving behavior. Uncommitted changes to that
+inactive path were discarded. Native release implementation must be verified
+through the actual serve-native dispatch and APIs.
+
+[Native source prefix ownership](release-v1-native-prefix.md) implements shared
+KV/index page retention and copy-on-write. Native radix admission, full retained
+state and end-to-end performance qualification remain open.
 
 [Initial paired quality evidence](release-v1-initial-quality.json) records eight
 cases per mode against the existing development artifacts. Both modes pass five

@@ -1,0 +1,75 @@
+//! Host ownership for immutable source prefixes. Active request tables own one
+//! reference per page; retained prefixes release their references on eviction.
+use std::{cell::RefCell, rc::Rc};
+
+pub(super) struct PagePool {
+    pub free: Vec<u32>,
+    references: Vec<usize>,
+}
+impl PagePool {
+    pub fn new(pages: usize) -> Self {
+        Self {
+            free: (0..pages as u32).rev().collect(),
+            references: vec![0; pages],
+        }
+    }
+    pub fn shared(&self, page: u32) -> bool {
+        self.references[page as usize] > 1
+    }
+    pub fn retain(&mut self, pages: &[u32]) {
+        for &page in pages {
+            self.references[page as usize] += 1;
+        }
+    }
+    pub fn release(&mut self, pages: &[u32]) {
+        for &page in pages {
+            let count = &mut self.references[page as usize];
+            assert!(*count > 0, "source page released without ownership");
+            *count -= 1;
+            if *count == 0 {
+                self.free.push(page);
+            }
+        }
+    }
+}
+
+pub(crate) struct SourcePrefix {
+    pub(super) pool: Rc<RefCell<PagePool>>,
+    pub(super) pages: Vec<u32>,
+    pub(super) rows: usize,
+}
+impl Drop for SourcePrefix {
+    fn drop(&mut self) {
+        self.pool.borrow_mut().release(&self.pages);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn prefix_eviction_frees_only_pages_without_active_owners() {
+        let pool = Rc::new(RefCell::new(PagePool::new(3)));
+        let pages = {
+            let mut pool = pool.borrow_mut();
+            vec![pool.free.pop().unwrap(), pool.free.pop().unwrap()]
+        };
+        pool.borrow_mut().retain(&pages);
+        pool.borrow_mut().retain(&pages);
+        let prefix = SourcePrefix {
+            pool: Rc::clone(&pool),
+            pages: pages.clone(),
+            rows: 300,
+        };
+        assert!(pool.borrow().shared(pages[0]));
+        pool.borrow_mut().release(&pages[..1]);
+        assert_eq!(pool.borrow().free.len(), 1);
+        drop(prefix);
+        assert_eq!(pool.borrow().free.len(), 2);
+        assert!(!pool.borrow().shared(pages[1]));
+        pool.borrow_mut().release(&pages[1..]);
+        let mut free = pool.borrow().free.clone();
+        free.sort_unstable();
+        assert_eq!(free, vec![0, 1, 2]);
+    }
+}

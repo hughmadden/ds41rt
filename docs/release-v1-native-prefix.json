@@ -1,0 +1,20 @@
+{
+  "scope": "Native compressed-source page ownership component; API reuse and performance not yet qualified. Live development containers unchanged.",
+  "base_commit": "549a9502390a0d0d54ebc6a6b0e96a0ea1b7a5c2",
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_compressor.rs": "5de2024487ffe3007dd8df9a17542505734ea603ad27956b9e62b3cb6413356b",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache.rs": "20981a99935e2d4930cfc7335a8d61f5f850c9089920e2277fa5ff02c024cf0c",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/source_cache/ownership.rs": "48a97013239821f8bb56c7b1bbd1964cfd750eb0613cfe67df35e822beae6559"
+  },
+  "native_library_sha256": "ccd82d862473f71d01622bcf5decd9d5789444210db1be4cc245dbdcb44b8a07",
+  "cuda_tests": "running 3 tests\ntest v41_compressor::source_cache::ownership::tests::prefix_eviction_frees_only_pages_without_active_owners ... ok\ntest v41_compressor::source_cache::tests::native_source_prefix_copy_on_write_and_eviction ... ok\ntest v41_compressor::source_cache::tests::native_source_prefix_exhaustion_and_page_boundary ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 769 filtered out; finished in 0.22s\n\n",
+  "memcheck": "========= COMPUTE-SANITIZER\n\nrunning 3 tests\ntest v41_compressor::source_cache::ownership::tests::prefix_eviction_frees_only_pages_without_active_owners ... ok\ntest v41_compressor::source_cache::tests::native_source_prefix_copy_on_write_and_eviction ... ok\ntest v41_compressor::source_cache::tests::native_source_prefix_exhaustion_and_page_boundary ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 769 filtered out; finished in 0.32s\n\n========= ERROR SUMMARY: 0 errors\n",
+  "gpu": "NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07\nNVIDIA RTX PRO 6000 Blackwell Workstation Edition, 595.91.07",
+  "required_next": [
+    "native token radix and request admission",
+    "compressor pending and Engram history restoration",
+    "last-turn SWA and dSpark retention with eviction",
+    "bounded replay and sizing",
+    "API correctness/concurrency and controlled performance comparison"
+  ]
+}
