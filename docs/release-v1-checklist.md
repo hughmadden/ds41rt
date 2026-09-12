@@ -156,6 +156,8 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 - [ ] Publish a formal first-release package on GitHub with qualified artifacts
   and container references. Release notes: a short high-level overview and
   bulleted key features, linking detailed reports (user addition September 12).
+  [Draft feature notes](release-v1-notes.md) are prepared; final artifact/report
+  references and actual GitHub publication remain pending.
 - [ ] Tell the user to make the images public manually after all other work.
 
 ## Current evidence and next action
