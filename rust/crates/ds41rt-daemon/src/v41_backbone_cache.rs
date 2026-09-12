@@ -13,6 +13,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 mod ced;
 mod publication;
+mod prefix;
+pub(crate) use prefix::BackbonePrefix;
 use ced::CachePhase;
 pub(crate) use ced::CacheStage;
 
@@ -153,6 +155,7 @@ impl CacheAttention<'_> {
 }
 
 pub(crate) struct BackboneCache<'a> {
+    prefix_stream: crate::v41_memory::LoadStream<'a>,
     windows: Vec<WindowState<'a>>,
     sources: Vec<CompressorState<'a>>,
     requests: Vec<Option<Request>>,
@@ -215,6 +218,7 @@ impl<'a> BackboneCache<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .map_err(|_| anyhow::anyhow!("backbone cache IDs exhausted"))?;
         Ok(Self {
+            prefix_stream: crate::v41_memory::LoadStream { library, raw: library.cuda_stream_create()? },
             windows,
             sources,
             requests: (0..slots).map(|_| None).collect(),

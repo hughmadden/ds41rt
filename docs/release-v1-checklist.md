@@ -88,7 +88,10 @@ through the actual serve-native dispatch and APIs.
 
 [Native source prefix ownership](release-v1-native-prefix.md) implements shared
 KV/index page retention and copy-on-write. Native radix admission, full retained
-state and end-to-end performance qualification remain open.
+state scheduling and end-to-end performance qualification remain open. The
+native owners now support GPU retention of SWA/compressor/dSpark state and
+independent Engram history restoration; [component evidence](release-v1-retained-state.json)
+does not yet establish API prefix reuse.
 
 [Initial paired quality evidence](release-v1-initial-quality.json) records eight
 cases per mode against the existing development artifacts. Both modes pass five

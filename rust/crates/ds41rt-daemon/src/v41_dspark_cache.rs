@@ -9,6 +9,8 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
+mod prefix;
+pub(crate) use prefix::DsparkPrefix;
 #[derive(Clone, Copy)]
 pub(crate) struct WindowLease {
     owner: u64,

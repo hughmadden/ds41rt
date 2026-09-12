@@ -29,6 +29,43 @@ is not an end-to-end performance result.
 
 ## Qualification and remaining integration
 
+### Retained request state
+
+Native request owners now expose retention/restoration of all forty SWA rings,
+four compressed-source prefixes and the live odd-token compressor carry. The
+bounded tail uses one GPU allocation and a dedicated stream; capture and restore
+drain before publishing state, including error paths. Only initialized ring
+spans and live pending rows are copied. Source pages stay shared through the
+previously qualified copy-on-write owner.
+
+The backbone tail reserves 2,720,064 bytes per saved request. Three saved dSpark
+rings add at most 202,752 bytes. Sixteen complete tails therefore need at most
+46,765,056 GPU bytes, excluding shared source pages and small host metadata.
+These are allocation sizes, not measured total server memory.
+
+Engram history forks preserve absolute position and the three-token lookback,
+including image barriers, while obtaining a fresh identity. Old prepared batches
+cannot be committed into a resumed request. The native request owner restores
+that history with its backbone state; the draft owner separately verifies all
+three saved draft rings end at the same target position before reuse. New request
+RNG identities are preserved.
+
+The real-weight cache-producer qualification compares every initialized byte
+across all 44 backbone owners after restoring a 129-token prefix into a recycled
+slot. The following commit, which completes an odd compressor group, is exact
+against continuation of the original request. The snapshot also survives release
+of every original request. The same qualification retains its 16-request CED,
+ordered encoder publication and late-source-failure recovery coverage. This is
+component execution with official producer weights, not full-model/API quality.
+
+The restored and original continuations both need private partial pages while
+the original prefix stays retained. The qualification bank includes two spare
+pages per source. The release pool sizing and eviction policy must provision
+these live copy-on-write needs in addition to retained capacity.
+
+See [retained-state evidence](release-v1-retained-state.json) for focused GPU,
+Engram identity and real-weight results, source hashes and memcheck output.
+
 The component qualification uses the selected native library whose SHA256 is
 `ccd82d862473f71d01622bcf5decd9d5789444210db1be4cc245dbdcb44b8a07`.
 Tests cover exact and divergent retained prefixes, all four stored planes,
@@ -36,10 +73,10 @@ copy-on-write isolation, completed page sharing, restoration after original
 request release, eviction, pool exhaustion and recovery when an exclusive tail
 can be appended without free pages. See the accompanying JSON evidence.
 
-This is a source-pool prerequisite, not enabled API prefix reuse. Still required:
-native token radix publication and lookup; compressor pending-row and Engram
-history restoration; retained last-turn SWA/dSpark windows; bounded replay for
-other hits; eviction coupling and pool sizing; API numerical/agentic/concurrency
+These are native ownership prerequisites, not enabled API prefix reuse. Still
+required: native token radix publication and lookup; scheduler admission and
+completion integration for retained state; bounded replay for other hits;
+eviction coupling and pool sizing; API numerical/agentic/concurrency
 qualification; controlled ordinary decode and prefix-resume performance checks.
 The existing development containers have not been replaced by this change.
 

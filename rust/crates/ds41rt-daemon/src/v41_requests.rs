@@ -17,6 +17,13 @@ struct Request {
     history: EngramHistory,
     prefill: Option<EngramPrefillCursor>,
 }
+pub(crate) struct RequestPrefix<'a> {
+    cache: crate::v41_backbone_cache::BackbonePrefix<'a>,
+    history: EngramHistory,
+}
+impl RequestPrefix<'_> {
+    pub fn end(&self) -> u64 { self.cache.end() }
+}
 pub(crate) struct RequestTokens<'a> {
     pub lease: CacheLease,
     pub tokens: &'a [u32],
@@ -102,6 +109,29 @@ impl<'a> Requests<'a> {
         if self.cache.request_id(lease).is_ok() {
             self.cache.release(&[lease])?;
         }
+        Ok(())
+    }
+    pub fn retain_prefix(&mut self, lease: CacheLease, budget: usize) -> Result<RequestPrefix<'a>> {
+        let request = self.request(lease)?;
+        ensure!(request.prefill.is_none() && request.history.position() == self.cache.committed_end(lease)?,
+            "request prefix has pending or inconsistent history");
+        let history = request.history.fork()?;
+        let cache = self.cache.retain_prefix(lease, budget)?;
+        Ok(RequestPrefix { cache, history })
+    }
+    pub fn restore_prefix(&mut self, lease: CacheLease, prefix: &RequestPrefix<'a>) -> Result<()> {
+        let request = self.request(lease)?;
+        ensure!(request.history.position() == 0 && request.prefill.is_none()
+            && prefix.history.position() == prefix.cache.end(), "invalid request prefix restore");
+        let history = prefix.history.fork()?;
+        if let Err(error) = self.cache.restore_prefix(lease, &prefix.cache) {
+            if let Err(cleanup) = self.release(lease) {
+                tracing::error!(%cleanup, "releasing failed request prefix restore");
+            }
+            return Err(error);
+        }
+        self.slots.iter_mut().flatten().find(|r| r.lease == lease)
+            .expect("validated restored request").history = history;
         Ok(())
     }
     pub fn validate(&self, batch: &RequestBatch) -> Result<()> {

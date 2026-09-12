@@ -9,6 +9,8 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 mod source_cache;
+mod prefix;
+pub(crate) use prefix::{CompressorPrefix, COMPRESSOR_PREFIX_BYTES};
 use source_cache::SourceCache;
 pub(crate) use source_cache::{IndexCacheView, KvCacheView};
 static NEXT_PROPOSAL: AtomicU64 = AtomicU64::new(1);

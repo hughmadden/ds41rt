@@ -10,6 +10,8 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
+mod prefix;
+pub(crate) use prefix::{WindowPrefix, WINDOW_PREFIX_BYTES};
 static NEXT_SNAPSHOT: AtomicU64 = AtomicU64::new(1);
 fn next(counter: &AtomicU64) -> Result<u64> {
     counter

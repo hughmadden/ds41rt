@@ -16,6 +16,9 @@ struct DraftRequest {
     rng: ds41rt_core::DsparkRng,
     slot: usize,
 }
+pub(crate) struct DraftPrefix<'a> {
+    windows: Vec<crate::v41_dspark_cache::DsparkPrefix<'a>>,
+}
 impl<'w, 'a> DraftRuntime<'w, 'a> {
     pub fn new(
         lib: &'a NativeLibrary,
@@ -68,6 +71,30 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             }
         }
         failure.map_or(Ok(()), Err)
+    }
+    pub fn retain_prefix(&mut self, id: u64, end: u64) -> Result<DraftPrefix<'a>> {
+        let request = self.requests.get(&id).context("draft request not admitted")?;
+        for (window, lease) in self.windows.iter().zip(request.leases) {
+            ensure!(window.committed_end(lease)? == Some(end), "draft and target prefix frontiers differ");
+        }
+        let windows = self.windows.iter_mut().zip(request.leases)
+            .map(|(window, lease)| window.retain_prefix(lease)).collect::<Result<Vec<_>>>()?;
+        Ok(DraftPrefix { windows })
+    }
+    pub fn restore_prefix(&mut self, id: u64, end: u64, prefix: &DraftPrefix<'a>) -> Result<()> {
+        let request = self.requests.get(&id).context("draft request not admitted")?;
+        ensure!(prefix.windows.len() == 3 && prefix.windows.iter().all(|p| p.end() == end),
+            "retained draft and target frontiers differ");
+        let leases = request.leases;
+        for (stage, saved) in prefix.windows.iter().enumerate() {
+            if let Err(error) = self.windows[stage].restore_prefix(leases[stage], saved) {
+                if let Err(cleanup) = self.release(id) {
+                    tracing::error!(%cleanup, "releasing failed draft prefix restore");
+                }
+                return Err(error);
+            }
+        }
+        Ok(())
     }
     #[cfg(test)]
     pub(crate) fn validate_position(&self, id: u64, end: u64) -> Result<()> {

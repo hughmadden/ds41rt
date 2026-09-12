@@ -13,6 +13,31 @@ fn row(buffers: &[(&[u8], usize)], index: usize) -> Vec<u8> {
         .flat_map(|(b, width)| b[index * width..(index + 1) * width].iter().copied())
         .collect()
 }
+fn committed_bytes(lib: &NativeLibrary, bank: &BackboneCache<'_>, lease: CacheLease) -> Result<Vec<u8>> {
+    let request = bank.request(lease)?;
+    let mut result = Vec::new();
+    for (state, &lease) in bank.windows.iter().zip(&request.windows) {
+        let view = state.view(lease)?;
+        let values = read(lib, view.values)?;
+        let scales = read(lib, view.scales)?;
+        for position in view.begin.max(view.end.saturating_sub(128))..view.end {
+            result.extend(row(&[(&values, 512), (&scales, 16)], position as usize % 128));
+        }
+    }
+    for (state, &lease) in bank.sources.iter().zip(&request.sources) {
+        let view = state.kv_cache(lease)?;
+        let index = state.index_cache(lease)?;
+        let values = read(lib, view.values)?;
+        let scales = read(lib, view.scales)?;
+        let keys = read(lib, index.packed)?;
+        let key_scales = read(lib, index.scales)?;
+        for logical in 0..view.rows {
+            let physical = view.pages[logical / 256] as usize * 256 + logical % 256;
+            result.extend(row(&[(&values, 512), (&scales, 16), (&keys, 64), (&key_scales, 4)], physical));
+        }
+    }
+    Ok(result)
+}
 fn produce(
     lib: &NativeLibrary,
     bank: &BackboneCache<'_>,
@@ -99,8 +124,10 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
             )
         })
         .collect::<Result<Vec<_>>>()?;
+    // Two spare pages per source cover the private tails of both continuations
+    // while their original source page remains retained by the prefix.
     let mut bank =
-        BackboneCache::new(&lib, 16, [16; 4], BackboneCache::device_bytes(16, [16; 4])?)?;
+        BackboneCache::new(&lib, 16, [18; 4], BackboneCache::device_bytes(16, [18; 4])?)?;
     let leases = (0..16)
         .map(|s| bank.begin_request(s, 100 + s as u64))
         .collect::<Result<Vec<_>>>()?;
@@ -225,7 +252,33 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         }
         eprintln!("PASS cache prefix cycle={cycle} proposed={tokens} all 44 owners, 16 requests, packed bytes and device histories");
     }
-    bank.release(&leases)?;
+    // Slot 1 ends at 129 tokens: an odd compressor group and a wrapped SWA.
+    // Restore into a recycled slot, then compare the next real-weight commit.
+    let saved = bank.retain_prefix(leases[1], BackbonePrefix::device_bytes())?;
+    let expected = committed_bytes(&lib, &bank, leases[1])?;
+    assert_eq!(saved.end(), 129);
+    assert!(bank.retain_prefix(leases[1], BackbonePrefix::device_bytes() - 1).is_err());
+    bank.release(&leases[..1])?;
+    let restored = bank.begin_request(0, 900)?;
+    let stale = bank.plan(&[CacheWork { lease: restored, tokens: 1, kind: ExpertV2SourceKind::Decode }])?;
+    bank.restore_prefix(restored, &saved)?;
+    assert!(bank.validate_batch(&stale).is_err());
+    assert_eq!(committed_bytes(&lib, &bank, restored)?, expected);
+    for lease in [leases[1], restored] {
+        let batch = bank.plan(&[CacheWork { lease, tokens: 1, kind: ExpertV2SourceKind::Decode }])?;
+        produce(&lib, &bank, &batch, &mut windows, &mut sources, 77)?;
+        bank.commit(&batch, &mut windows, &mut sources, &[1])?;
+    }
+    assert_eq!(committed_bytes(&lib, &bank, restored)?, committed_bytes(&lib, &bank, leases[1])?);
+    bank.release(&[restored])?;
+    bank.release(&leases[1..])?;
+    // Snapshot outlives every original admission and remains immutable.
+    let restored = bank.begin_request(0, 901)?;
+    bank.restore_prefix(restored, &saved)?;
+    assert_eq!(committed_bytes(&lib, &bank, restored)?, expected);
+    bank.release(&[restored])?;
+    drop(saved);
+    eprintln!("PASS retained full backbone prefix: all 44 owners, odd carry, slot reuse, exact next commit");
     // CED publishes all global sources during encoder work, then only decoder
     // windows during replay. Reuse the same real-weight producers and bank.
     let ced = (0..16).map(|slot| bank.begin_request(slot, 1000 + slot as u64))

@@ -1,0 +1,33 @@
+{
+  "scope": "GPU-native retained SWA/compressor/source/dSpark state and independent Engram history. Official cache-producer test is not a full-model or API benchmark. Native radix/scheduler integration and performance qualification remain open.",
+  "base_commit": "38d3b4e0798212bf0b2b3e7c3a09347ddfb1ee78",
+  "source_sha256": {
+    "rust/crates/ds41rt-core/src/engram.rs": "31ea0ccbb168546b03e7eb92a71d4f2d4a02a08eb14ba0053c1744ea70253c82",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache.rs": "423b203c9c66f42614130a618d395d3ae6f332cbb12a0ac18382bd7ba9c0a743",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/prefix.rs": "60f69772c65d101c92bfb0772a2116af38fe7f4f799f7ae65ea3350566bd53b2",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_cache/commit_tests.rs": "17aa292880d1218d347c120447153a94e41e0b65804d942eec2ed6b29a59c5fc",
+    "rust/crates/ds41rt-daemon/src/v41_compressor.rs": "b1c81f163224354d1657fdf33f628b33f4a7030793b89c4d9298fa669b7f6954",
+    "rust/crates/ds41rt-daemon/src/v41_compressor/prefix.rs": "0607d0b1cebb0676eb5c76d51d02f157ead381d90cde1baeaf36e134b4d8d199",
+    "rust/crates/ds41rt-daemon/src/v41_dspark_cache.rs": "2252502ef4741bd8b30e8395eafa814e5b3352c7178ff728545c2354b2703e6f",
+    "rust/crates/ds41rt-daemon/src/v41_dspark_cache/prefix.rs": "7562491d6e6141a70369969dfae9cf4bf7671c7e6416d6868b3dbfb32687320f",
+    "rust/crates/ds41rt-daemon/src/v41_window.rs": "419a8f42ec3e07bc0b2e7305f2517a8f55d821d373dd1d2c627ae236e2fc44d0",
+    "rust/crates/ds41rt-daemon/src/v41_window/prefix.rs": "b5bd1d9cf045c7221954535d5aa90673fce9ebd61c2b9831eca761725db1289d",
+    "rust/crates/ds41rt-daemon/src/v41_requests.rs": "36ab14378145c37380187becac0b5b1edd13248f238c49ad1b439b508aaa9d08",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/speculative.rs": "2720086ead845caef8f452199bf863273a947581f358ff8b00843b175f1914b4"
+  },
+  "native_library_sha256": "ccd82d862473f71d01622bcf5decd9d5789444210db1be4cc245dbdcb44b8a07",
+  "snapshot_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "retained_device_bytes": {
+    "backbone_per_request": 2720064,
+    "draft_per_request_max": 202752,
+    "sixteen_complete_tails_max": 46765056
+  },
+  "qualification_logs": {
+    "focused": "running 4 tests\ntest v41_compressor::prefix::tests::native_compressor_prefix_preserves_pending_odd_row ... ok\ntest v41_dspark_cache::prefix::tests::native_draft_prefix_survives_slot_reuse ... ok\ntest v41_window::prefix::tests::native_window_prefix_restores_after_slot_reuse ... ok\ntest v41_window::prefix::tests::retained_window_spans_cover_only_initialized_ring_positions ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 772 filtered out; finished in 0.18s\n\n",
+    "engram": "running 1 test\ntest engram::tests::fork_preserves_image_barriers_but_rejects_original_batches ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 125 filtered out; finished in 0.00s\n\n",
+    "real_weights": "running 1 test\ntest v41_backbone_cache::commit_tests::real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure ... PASS cache prefix cycle=0 proposed=9 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=1 proposed=129 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=2 proposed=3 all 44 owners, 16 requests, packed bytes and device histories\nPASS retained full backbone prefix: all 44 owners, odd carry, slot reuse, exact next commit\nPASS committed encoder source views: all 16 requests/all 4 sources, causal ratios, odd carry, stable snapshots across append\nPASS 16 CED transactions: encoder 64+65, replay 63+65, untouched global/encoder bytes, full decode readiness\nPASS 16-request encoder reservations: layer-major 64+65, ordered completion, generation survival, capacity and release\nexpected late source exhaustion: index cache pool exhausted\nPASS late source failure early=false revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nexpected late source exhaustion: index cache pool exhausted\nPASS late source failure early=true revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nPASS early encoder publication: mixed/all windows, all sources, deferred logical end, stale/duplicate/partial guards\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 774 filtered out; finished in 4.13s\n\n",
+    "focused_memcheck": "========= COMPUTE-SANITIZER\n\nrunning 4 tests\ntest v41_compressor::prefix::tests::native_compressor_prefix_preserves_pending_odd_row ... ok\ntest v41_dspark_cache::prefix::tests::native_draft_prefix_survives_slot_reuse ... ok\ntest v41_window::prefix::tests::native_window_prefix_restores_after_slot_reuse ... ok\ntest v41_window::prefix::tests::retained_window_spans_cover_only_initialized_ring_positions ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 772 filtered out; finished in 0.20s\n\n========= ERROR SUMMARY: 0 errors\n",
+    "real_weights_memcheck": "========= COMPUTE-SANITIZER\n\nrunning 1 test\ntest v41_backbone_cache::commit_tests::real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure ... PASS cache prefix cycle=0 proposed=9 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=1 proposed=129 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=2 proposed=3 all 44 owners, 16 requests, packed bytes and device histories\nPASS retained full backbone prefix: all 44 owners, odd carry, slot reuse, exact next commit\nPASS committed encoder source views: all 16 requests/all 4 sources, causal ratios, odd carry, stable snapshots across append\nPASS 16 CED transactions: encoder 64+65, replay 63+65, untouched global/encoder bytes, full decode readiness\nPASS 16-request encoder reservations: layer-major 64+65, ordered completion, generation survival, capacity and release\nexpected late source exhaustion: index cache pool exhausted\nPASS late source failure early=false revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nexpected late source exhaustion: index cache pool exhausted\nPASS late source failure early=true revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nPASS early encoder publication: mixed/all windows, all sources, deferred logical end, stale/duplicate/partial guards\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 775 filtered out; finished in 7.81s\n\n========= ERROR SUMMARY: 0 errors\n"
+  },
+  "live_containers_replaced": false
+}

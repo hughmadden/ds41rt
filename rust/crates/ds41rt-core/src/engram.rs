@@ -167,6 +167,15 @@ impl EngramHistory {
         } }
     }
 
+    /// Copy the committed token lookback under a fresh request identity. Batches
+    /// prepared for the original request must never be accepted by its fork.
+    pub fn fork(&self) -> Result<Self> {
+        let mut fork = Self::new(self.pad)?;
+        fork.position = self.position;
+        fork.recent = self.recent;
+        Ok(fork)
+    }
+
     pub fn pad_id(&self) -> u32 {
         self.pad
     }
@@ -259,6 +268,22 @@ impl EngramHistory {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fork_preserves_image_barriers_but_rejects_original_batches() -> super::Result<()> {
+        let mut history = super::EngramHistory::new(0)?;
+        let batch = history.prepare(0, &[Some(12), None, Some(34)], 3)?;
+        history.commit(&batch, 3)?;
+        let pending = history.prepare(3, &[Some(56), Some(78)], 2)?;
+        let mut fork = history.fork()?;
+        let own = fork.prepare(3, &[Some(56), Some(78)], 2)?;
+        assert_eq!(pending.hashes, own.hashes);
+        assert!(fork.commit(&pending, 1).is_err());
+        assert!(history.commit(&own, 1).is_err());
+        fork.commit(&own, 1)?;
+        assert_eq!(fork.position(), 4);
+        assert_eq!(history.position(), 3);
+        Ok(())
+    }
     use super::*;
     #[test]
     fn prefill_lookahead_matches_sequential_hashes_without_early_acceptance() -> Result<()> {
