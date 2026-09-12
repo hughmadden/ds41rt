@@ -4,7 +4,7 @@ The first DS41RT release is published as [DS41RT v1](https://github.com/tpurtell
 
 The release remains final rather than draft or prerelease. It retains GitHub release ID `387678878` and its original publication time, `2026-09-12T19:22:30Z`. Its notes identify the project as the first DS41RT release, summarize the high-level features, link the detailed reports, and cite the exact corrected container digests.
 
-The attached `native-release-v1-build-run.tar.gz` asset is 196,134 bytes with SHA-256 `fb36216bb997906f273a08332fc3578cabebb668c274b75065255252f5e9f52e`. GitHub asset ID `560045671` reports the same digest. The obsolete v3-named asset was removed.
+The attached `native-release-v1-build-run.tar.gz` asset is 182,245 bytes with SHA-256 `ce65c575ef311599498eea24c8b47c50547e179da4b46aa9065a3bba262957ea`. GitHub asset ID `560049283` reports the same digest. The obsolete v3-named asset was removed.
 
 Published containers:
 

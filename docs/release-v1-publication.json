@@ -31,11 +31,11 @@
     "prerelease": false,
     "published_at": "2026-09-12T19:22:30Z",
     "asset": {
-      "id": 560045671,
+      "id": 560049283,
       "name": "native-release-v1-build-run.tar.gz",
       "url": "https://github.com/tpurtell/ds41rt/releases/download/v1/native-release-v1-build-run.tar.gz",
-      "bytes": 196134,
-      "sha256": "fb36216bb997906f273a08332fc3578cabebb668c274b75065255252f5e9f52e"
+      "bytes": 182245,
+      "sha256": "ce65c575ef311599498eea24c8b47c50547e179da4b46aa9065a3bba262957ea"
     }
   },
   "containers": {

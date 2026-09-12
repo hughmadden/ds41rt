@@ -93,7 +93,7 @@
   },
   "evidence": {
     "archive": "evidence/native-release-v1-build-run.tar.gz",
-    "archive_sha256": "fb36216bb997906f273a08332fc3578cabebb668c274b75065255252f5e9f52e",
-    "archive_bytes": 196134
+    "archive_sha256": "ce65c575ef311599498eea24c8b47c50547e179da4b46aa9065a3bba262957ea",
+    "archive_bytes": 182245
   }
 }

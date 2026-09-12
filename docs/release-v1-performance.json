@@ -984,8 +984,8 @@
   },
   "evidence": {
     "archive": "evidence/native-release-performance.tar.gz",
-    "archive_sha256": "3c7c8f6851ade0c6d1aae9e84fad01d6ca449019dae891f91c7c2b4e874e5ee1",
-    "archive_bytes": 11602961,
+    "archive_sha256": "a8451078577a46bfb34733ec0770a56f4389785f792af4773aaabf36f5a9c037",
+    "archive_bytes": 11545113,
     "local_raw_sha256": {
       "ds41-v1-target-eight.json": "9b5faeef02764e40011a093d8c424c1e2ecf348ad3492f6400cf11dfbec581df",
       "ds41-v1-dspark-eight.json": "ee0001e2b3a7784c68200634cb4cf8fc41e25a709ad2fac4e34481976042787a",
