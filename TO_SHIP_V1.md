@@ -6,6 +6,8 @@ Completion means a working, qualified release with measured performance, not com
 
 ## Required release contract
 
+- [x] Evaluate [combined attention-input mHC/query capture](docs/ds41-prepared-query.md). Real-weight and concurrent API correctness pass, but small/inconclusive C1 gains and variable C6 results do not justify the standalone change. Candidate is not selected; running RMSNorm artifacts remain unchanged. Larger coordinator graph capture remains open.
+
 - [x] Compact fitting expert responses directly into [registered worker send slots](docs/ds41-registered-worker-output.md), removing download and CPU staging copies before the existing asynchronous send. Real mapped/host-output, guard/fallback, four-Spark recovery and API checks pass. Warm 16k code prefill reaches about 6.94–6.96k tok/s, repeated text about 8k; the single long decode sample is slightly lower and no decode gain is claimed. Mid-kernel row streaming, mixed C16 scheduling and broad quality remain separate open work.
 
 - [x] Remove the encoder pair-completion barrier with [continuous alternating lanes](docs/ds41-encoder-stream.md). Real five-chunk serial-byte comparisons and cancellation/reuse pass with two bounded active batches. Controlled warm 16k code prefill reaches 6.5–6.6k tok/s; repeated text reaches 7.9k target / 8.0k dSpark. Eight quality-case outputs per mode and long counting outputs are preserved. This closes same-prompt pair-boundary overlap, not worker response streaming, mixed-request C16 scheduling or broad quality qualification.

@@ -1,0 +1,143 @@
+{
+  "source_parent": "4848292",
+  "daemon_sha256": "830770eb6b0cdef054a9e16cb8e2829bc0b9a3deb18e9ac5a96d1be1dc15f746",
+  "native_sha256": "d56c464ce91bf68ca349838fb7854ce273512c4ba80f6ecd139f9a4994446f4b",
+  "scope": "Same GPU per mode, sequential baseline/candidate calls, 599-token counting after 16k code context. Small samples; no statistically established target-only gain. Cold results retained.",
+  "results": {
+    "target": {
+      "gpu": 0,
+      "outputs_and_usage_equal": true,
+      "baseline": {
+        "decode_tps": [
+          38.552958590552834,
+          39.91892034170922
+        ],
+        "prefill_tps": [
+          3924.770614858406,
+          6884.810290532038
+        ],
+        "all_mean_decode_tps": 39.23593946613103,
+        "warm_mean_decode_tps": 39.91892034170922
+      },
+      "candidate": {
+        "decode_tps": [
+          39.168217992869536,
+          39.575186296209296
+        ],
+        "prefill_tps": [
+          2291.7220943574953,
+          7093.202441145643
+        ],
+        "all_mean_decode_tps": 39.37170214453941,
+        "warm_mean_decode_tps": 39.575186296209296
+      }
+    },
+    "speculative": {
+      "gpu": 1,
+      "outputs_and_usage_equal": true,
+      "baseline": {
+        "decode_tps": [
+          120.42165639855062,
+          121.25795851573898,
+          121.22803374770352
+        ],
+        "prefill_tps": [
+          3988.9036915464562,
+          7088.23805096097,
+          7235.247894934781
+        ],
+        "all_mean_decode_tps": 120.96921622066438,
+        "warm_mean_decode_tps": 121.24299613172124
+      },
+      "candidate": {
+        "decode_tps": [
+          121.6278551566042,
+          121.78441864329895,
+          121.85867456359782
+        ],
+        "prefill_tps": [
+          3998.320524126616,
+          7186.227996371633,
+          7154.298006607348
+        ],
+        "all_mean_decode_tps": 121.75698278783365,
+        "warm_mean_decode_tps": 121.82154660344838
+      }
+    }
+  },
+  "component_query_bit_exact_cases": 56,
+  "component_full_model_lanes_pass": true,
+  "api_lifecycle_pass": true,
+  "distinct_sequence_c2_c6_c16_cancellation_replacement_pass": true,
+  "quality_equal_pairs": 8,
+  "inherited_quality_failure": "Unicode answer format fails in baseline and candidate",
+  "raw_artifacts": "/tmp/ds41-prepared-query",
+  "selected": false,
+  "decision": "Do not select standalone combined mHC/query graph: small/inconclusive C1 gains and inconsistent C6 throughput do not justify added ownership/cache complexity. Candidate source patch retained outside repository; production source restored.",
+  "concurrency_scope": "Short counting prompt, 599 output tokens per request. Sequential same-GPU batches. Aggregate spans earliest content through last finish and includes admission gaps. Initial baseline C1/C6/C16 followed by candidate C1/C6/C16; repeat C6 order candidate, baseline, baseline, candidate after candidate restart.",
+  "concurrent_benchmarks": {
+    "baseline": [
+      {
+        "concurrency": 1,
+        "aggregate_tps": 127.07909906334247,
+        "per_stream_mean": 127.07909906334247
+      },
+      {
+        "concurrency": 6,
+        "aggregate_tps": 314.2293521665939,
+        "per_stream_mean": 53.25694675249804
+      },
+      {
+        "concurrency": 16,
+        "aggregate_tps": 613.5652357356262,
+        "per_stream_mean": 39.81561108811573
+      }
+    ],
+    "candidate": [
+      {
+        "concurrency": 1,
+        "aggregate_tps": 128.0872755001536,
+        "per_stream_mean": 128.0872755001536
+      },
+      {
+        "concurrency": 6,
+        "aggregate_tps": 303.01094336007236,
+        "per_stream_mean": 51.31852713510172
+      },
+      {
+        "concurrency": 16,
+        "aggregate_tps": 611.5380001788424,
+        "per_stream_mean": 39.66129933825448
+      }
+    ],
+    "candidate-repeat0": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 297.63826544969,
+        "per_stream_mean": 50.41098027718476
+      }
+    ],
+    "baseline-repeat0": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 312.2002387968189,
+        "per_stream_mean": 52.91825338308072
+      }
+    ],
+    "baseline-repeat1": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 314.0402915665494,
+        "per_stream_mean": 53.23523866335536
+      }
+    ],
+    "candidate-repeat1": [
+      {
+        "concurrency": 6,
+        "aggregate_tps": 315.6519177350218,
+        "per_stream_mean": 53.499052324967664
+      }
+    ]
+  },
+  "selected_daemon_sha256": "42e91194af2610140ec7fd4f7a42d021683cf36095a50a3c0cf7592d91e54dc8"
+}
