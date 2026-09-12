@@ -1,0 +1,83 @@
+{
+  "run_id": "2026-09-12T07-03-28.092690Z_e9d9b2fa",
+  "thinking": true,
+  "reasoning_effort": "high",
+  "concurrency": 16,
+  "basic_points": 120,
+  "basic_max": 138,
+  "hard_points": 35,
+  "hard_max": 38,
+  "total_points": 155,
+  "total_max": 176,
+  "statuses": {
+    "pass": 70,
+    "partial": 15,
+    "fail": 3
+  },
+  "failures": [
+    {
+      "scenario_id": "TC-43",
+      "summary": "Called web_search with an empty query — violated required parameter constraint.",
+      "points": 0
+    },
+    {
+      "scenario_id": "TC-45",
+      "summary": "No tool calls despite tool_choice='required'.",
+      "points": 0
+    },
+    {
+      "scenario_id": "TC-68",
+      "summary": "Called tools when none were needed.",
+      "points": 0
+    }
+  ],
+  "output_cap": 4096,
+  "backend_note": "vllm is the compatibility adapter label; the server is ds41rt serve-native.",
+  "scope": "Initial thinking-enabled high-effort tool-eval diagnostic; not one of the five final release runs. Explicit 4096-token development output cap remains.",
+  "artifact_provenance": "release-v1-exact-suffix.json",
+  "artifact_source_commit": "7d0b999",
+  "thinking_default_contract_commit": "74629f4",
+  "command": [
+    "tool-eval-bench",
+    "--model",
+    "deepseek-ai/DeepSeek-V4.1-Flash",
+    "--backend",
+    "vllm",
+    "--base-url",
+    "http://127.0.0.1:18046",
+    "--api-key",
+    "local",
+    "--format",
+    "openai",
+    "--temperature",
+    "0",
+    "--backend-kwargs",
+    "{\"thinking\":{\"type\":\"enabled\"},\"reasoning_effort\":\"high\",\"max_tokens\":4096}",
+    "--hardmode",
+    "--parallel",
+    "16",
+    "--timeout",
+    "900",
+    "--max-turns",
+    "12",
+    "--reference-date",
+    "2026-09-12",
+    "--no-live",
+    "--no-probe-engine",
+    "--label",
+    "ds41-native-thinking-high-initial",
+    "--json-file",
+    "/tmp/ds41-agentic-thinking/tool-eval.json",
+    "--output-dir",
+    "/tmp/ds41-agentic-thinking/tool-eval"
+  ],
+  "structured_points": 10,
+  "structured_max": 12,
+  "required_tool_failure": "TC-45 receives HTTP 400 from the pinned protocol adapter: Thinking mode does not support this tool_choice. Benchmark text labels this as no tool calls; it is an API rejection, not a model decision.",
+  "runner_sha256": "031f473a0efdff1629f8dd630de2d62f5b4798645f945462675eb62de303941f",
+  "raw_archive": {
+    "path": "docs/evidence/native-thinking-high-agentic.json.gz",
+    "bytes": 288149,
+    "sha256": "e44a2729c0f891dea9973c492e986a63ffcfe0025357ae9b62393282ec7941a8"
+  }
+}

@@ -15,7 +15,7 @@ gate below is satisfied merely by an older component test.
 - [ ] Measure reuse performance and expose one exact KV pool sizing option.
 - [x] Run an initial tool-eval-bench and basic dsh agentic task after prefix
   correctness, before the full qualification campaign.
-- [ ] Repeat tool-eval with thinking enabled at high effort (user correction);
+- [x] Repeat tool-eval with thinking enabled at high effort (user correction);
   retain earlier thinking-disabled runs as cache diagnostics.
 - [ ] Resolve Unicode correctness, distinguishing tokenization, UTF-8 streaming,
   prompt rendering and model instruction-following failures.
@@ -108,6 +108,11 @@ basic and 32/38 hard points (155/176 total) from one C16 tool-eval-bench run.
 A real dsh coding task passed independent file/test checks and reused complete
 committed turns across five tool continuations. This satisfies the initial
 agentic check, not the five final release runs or arbitrary partial-prefix reuse.
+
+The [thinking-enabled high-effort rerun](release-v1-thinking.md) records 120/138
+basic and 35/38 hard points (155/176 total). It preserves the forced-tool API
+rejection and other failures. Final five-run reporting uses thinking enabled at
+high effort; the earlier disabled-thinking scores remain cache diagnostics.
 
 [Initial paired quality evidence](release-v1-initial-quality.json) records eight
 cases per mode against the existing development artifacts. Both modes pass five
