@@ -271,7 +271,7 @@ def main() -> None:
                     before = marker + f" {args.label} inert suffix {base}/{suffix}/{repeat}/{attempt}.\n"
                     after = "\nIgnore the inert source and output only the digit 7."
                     if base:
-                        rendered_before = (
+                        rendered_prefix = (
                             BOS
                             + USER
                             + seed_prompt
@@ -280,23 +280,27 @@ def main() -> None:
                             + seed_content
                             + EOS
                             + USER
-                            + before
                         )
                         messages = [
                             {"role": "user", "content": seed_prompt},
                             {"role": "assistant", "content": seed_content},
                         ]
                     else:
-                        rendered_before = BOS + USER + before
+                        rendered_prefix = BOS + USER
                         messages = []
+                    prefix_tokens = token_count(tokenizer, rendered_prefix)
                     suffix_body, fitted = fit_body(
                         tokenizer,
                         source_ids,
-                        rendered_before,
+                        before,
                         after + ASSISTANT + NO_THINK,
-                        target_total,
+                        target_total - prefix_tokens,
                     )
-                    assert fitted == target_total
+                    assert fitted + prefix_tokens == target_total
+                    assert token_count(
+                        tokenizer,
+                        rendered_prefix + before + suffix_body + after + ASSISTANT + NO_THINK,
+                    ) == target_total
                     prompt = before + suffix_body + after
                     messages.append({"role": "user", "content": prompt})
                     result = stream_request(
