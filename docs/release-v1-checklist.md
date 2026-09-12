@@ -125,6 +125,18 @@ gate below is satisfied merely by an older component test.
 
 ## Release performance suite
 
+**Reopened September 13:** the published candidate does not establish parity
+with development prefill (roughly 7K versus 2.6K code tok/s). Resolve this
+regression before claiming the performance gate complete again. Historical
+measurements below remain evidence, not approval of the unresolved regression.
+
+The low-entropy release requirement now replaces Orchid with:
+`Count from 1 to 200, separated by commas. Output only the sequence.`
+Use temperature zero, thinking disabled, a 640-token allowance, and validate
+the exact ordered 1–200 sequence. It remains outside the eight-case weighted
+score. Add one official `deepseek-flash` API run of the eight cases as a
+reference, with request settings, timing, cache counters and failures retained.
+
 Every result must identify source and artifact hashes, model revision, hardware,
 launch settings, sampling, input data, cache state, concurrency, warmup, all
 samples and errors. State the RTX power limit and standard memory speed up
@@ -134,7 +146,7 @@ reset power caps; do not attribute cross-campaign differences solely to code.
 Preserve raw machine-readable output alongside reports.
 Run the shared four-Spark target/dSpark workloads sequentially to avoid contention.
 
-- [x] Reuse the located eight content types and Orchid from ../glmrt-release (sources below).
+- [x] Reuse the located eight content types from ../glmrt-release (sources below).
   The [self-contained corpus and original quality checks](release-v1-corpus.md)
   are preserved; [final serving measurements](release-v1-performance.md) retain
   every strict quality miss and raw response.
@@ -197,13 +209,15 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 The implementation, corrected-FP4 prefix/performance suite, memory/startup,
 three-run tool evaluation, dsh artifact, README, execution diagram, engineering
-report and clean standard launcher gates are complete. The release is numbered
+report and clean standard launcher gates were recorded complete at publication;
+performance parity is reopened by the September 13 correction above. The release is numbered
 v3 because local repository history already contains the DS4RT v1 and v2 tags.
 The final v3 images have also passed clean-tag rebuild, standard launch,
 performance equivalence, registry publication and pull-by-digest verification.
 The qualified source is now on `main`, `release/v3` and tag `v3`; the formal
-GitHub release and main-backed Pages deployment are public. The sole remaining
-owner action is changing both GHCR packages from private to public.
+GitHub release and main-backed Pages deployment are public. Package visibility
+was reserved for the owner. Development-to-release prefill and counting decode
+performance now require investigation and renewed qualification.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running
@@ -259,5 +273,6 @@ structured-json-schema and multilingual. The two JSON cases each have weight
 0.5; all six other cases have weight 1.0. Preserve its actual prompts, token
 budgets and schema. Counting/repetition and syntax diagnostics are excluded from
 the weighted score. `../glmrt-release/python/tools/bench_real_full_repeat_decode.py`
-provides Orchid. Port the corpus and measurement contract, not the other engine's
+provides the historical Orchid diagnostic, now superseded by the counting
+requirement above. Port the corpus and measurement contract, not the other engine's
 numbers or model-specific launch assumptions.

@@ -14,15 +14,15 @@ def payload(prompt, stream=False):
                 thinking=dict(type='disabled'), temperature=0, max_tokens=96,
                 stream=stream, **({'stream_options': {'include_usage': True}} if stream else {}))
 
-def open_request(base, body):
+def open_request(base, body, api_key=None):
     return urllib.request.urlopen(urllib.request.Request(base + '/v1/chat/completions',
-        data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'}), timeout=180)
+        data=json.dumps(body).encode(), headers={'Content-Type': 'application/json', **({'Authorization': 'Bearer ' + api_key} if api_key else {})}), timeout=180)
 
-def stream_case(base, body, cancel=False):
+def stream_case(base, body, cancel=False, api_key=None):
     start = time.perf_counter()
     events, text, first, finish, usage = [], '', None, None, None
     done = False
-    with open_request(base, body) as response:
+    with open_request(base, body, api_key=api_key) as response:
         for line in response:
             if not line.startswith(b'data: '):
                 continue

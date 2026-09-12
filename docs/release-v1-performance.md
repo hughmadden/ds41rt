@@ -1,6 +1,6 @@
 # DS41RT v3 performance report
 
-DS41RT serves DeepSeek V4.1 Flash on one RTX PRO 6000 Blackwell workstation GPU plus four DGX Spark expert workers. The clean-built corrected-FP4 candidate reaches **2,668 prompt tok/s** at the best median prefill cell, **128.03 tok/s** single-request low-entropy dSpark decode, **60.68 tok/s** across the weighted eight-type dSpark corpus, and **683.70 aggregate tok/s at C16**. Its default C16 cache is 20.93 GiB and the warmed coordinator process uses 64.05 GiB.
+DS41RT serves DeepSeek V4.1 Flash on one RTX PRO 6000 Blackwell workstation GPU plus four DGX Spark expert workers. The clean-built corrected-FP4 candidate reaches **2,668 prompt tok/s** at the best median prefill cell, **127.70 tok/s** warm counting dSpark decode, **60.68 tok/s** across the weighted eight-type dSpark corpus, and **683.70 aggregate tok/s at C16**. Its default C16 cache is 20.93 GiB and the warmed coordinator process uses 64.05 GiB.
 
 All release measurements use an enforced **400 W RTX power limit** and **standard memory speed**: 14,001 MHz maximum, with 13,365 MHz observed under load. The RTX driver is 595.91.07. The four NVIDIA GB10 workers use driver 580.159.03. Target-only and dSpark arms ran sequentially across the shared workers. Sampling used temperature 0 and disabled thinking for throughput; the agentic tool evaluation used thinking enabled at high effort.
 
@@ -8,13 +8,26 @@ The exact clean-built artifacts are coordinator image `sha256:a13258e92dd25ddb88
 
 The published v3 package is rebuilt from release-metadata revision `23a6670c6b3695df2e81b67b8ef08d28343f8dae`; no Rust or CUDA inference source changed after the measured image. A protocol-matched v3 canary meets or exceeds every C1/C2/C4/C8/C16 median below, ending at 694.90 tok/s for C16. The [final build and registry report](release-v1-build-run.md) records the v3 images, artifact hashes, manifests, pull-by-digest checks, and all canary samples.
 
+**September 13 correction:** performance parity with the earlier development
+build is unresolved. A repeat of frozen 16K workloads found roughly 2.6K code
+prefill tok/s versus the earlier 7K. The final-image canary above only establishes
+parity with the later release candidate. It does not close this regression.
+
+The low-entropy release requirement now uses counting 1–200, replacing Orchid.
+The current release image passes the sequence check and reaches **127.70 tok/s**
+median over three warm samples after one initial request. This remains below
+the earlier ~145 counting measurement. [Counting evidence](release-counting-reference.json)
+preserves every request, sample, output and cache count. The older Orchid
+figures below are historical measurements.
+
 ## Headline results
 
 | Measurement | Result |
 |---|---:|
 | Best median prefill, 0 base + 32K new | 2,667.95 tok/s |
 | Best observed prefill sample | 2,738.47 tok/s |
-| Low-entropy dSpark decode, Orchid median | 128.03 tok/s |
+| Low-entropy dSpark decode, counting 1–200 warm median | 127.70 tok/s |
+| Historical Orchid median | 128.03 tok/s |
 | Weighted eight-type target-only median | 37.89 tok/s |
 | Weighted eight-type dSpark median | 60.68 tok/s |
 | dSpark gain on weighted mix | 60.16% |
@@ -25,19 +38,29 @@ The published v3 package is rebuilt from release-metadata revision `23a6670c6b36
 
 ## Eight content types and low-entropy decode
 
-Each arm ran five repetitions with unique one-token Unicode nonces to prevent unintended complete-prefix reuse. The eight-type weighted score gives the two structured JSON cases weight 0.5 and the other six cases weight 1.0, matching the preserved GLMRT corpus contract. Decode timing starts after first content. All 90 requests completed without server errors and reported zero cache hits.
+Each local arm ran five repetitions with unique one-token Unicode nonces to prevent unintended complete-prefix reuse. The eight-type weighted score gives the two structured JSON cases weight 0.5 and the other six cases weight 1.0, matching the preserved GLMRT corpus contract. Decode timing starts after first content. All 90 requests completed without server errors and reported zero cache hits.
 
-| Case | Target tok/s | dSpark tok/s | Target quality | dSpark quality |
-|---|---:|---:|---:|---:|
-| Code | 38.35 | 99.57 | 5/5 | 5/5 |
-| Math | 37.79 | 96.52 | 5/5 | 5/5 |
-| Fable | 37.89 | 38.32 | 1/5 | 0/5 |
-| Hello | 37.64 | 50.00 | 5/5 | 5/5 |
-| Topic | 37.66 | 56.82 | 2/5 | 1/5 |
-| Natural JSON | 38.05 | 81.74 | 5/5 | 5/5 |
-| Schema JSON | 37.78 | 70.74 | 5/5 | 5/5 |
-| Multilingual | 37.58 | 57.20 | 5/5 | 5/5 |
-| Orchid, low entropy | 38.53 | **128.03** | 0/5 | 0/5 |
+| Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target quality | dSpark quality | Official quality |
+|---|---:|---:|---:|---:|---:|---:|
+| Code | 38.35 | 99.57 | 345.90 | 5/5 | 5/5 | 1/1 |
+| Math | 37.79 | 96.52 | 285.33 | 5/5 | 5/5 | 1/1 |
+| Fable | 37.89 | 38.32 | 123.63 | 1/5 | 0/5 | 0/1 |
+| Hello | 37.64 | 50.00 | 141.10 | 5/5 | 5/5 | 1/1 |
+| Topic | 37.66 | 56.82 | 169.24 | 2/5 | 1/5 | 0/1 |
+| Natural JSON | 38.05 | 81.74 | 175.33 | 5/5 | 5/5 | 1/1 |
+| Schema JSON | 37.78 | 70.74 | HTTP 400 | 5/5 | 5/5 | N/A |
+| Multilingual | 37.58 | 57.20 | 183.61 | 5/5 | 5/5 | 1/1 |
+| Orchid, historical | 38.53 | **128.03** | Not run | 0/5 | 0/5 | N/A |
+
+The official `deepseek-flash` column is a single sequential API run of the
+same eight definitions, temperature zero and thinking disabled, measured from
+this client after first content. It uses provider-reported token counts; network
+streaming and unknown provider hardware make it a reference rather than a
+controlled hardware comparison. All seven completed requests reported zero
+cache hits. Fable returned 126 words; topic omitted paging; JSON Schema returned
+HTTP 400 and was not retried or downgraded. There is no complete official
+eight-case aggregate. [Official raw reference](release-official-flash-reference.json)
+records requests, outputs, timings, fingerprint and failures.
 
 The target weighted repetitions were 37.82, 37.62, 37.89, 37.96, and 37.93 tok/s. dSpark produced 62.68, 60.68, 59.04, 61.91, and 59.12 tok/s. The strict quality contract passed 33/40 target and 31/40 dSpark weighted samples. Preserved misses are mostly exact word-count failures in the fable case and omission of a required literal in the topic case. Orchid is a throughput diagnostic and generated 99 words instead of the contract length, so its 0/5 quality result is retained rather than hidden.
 

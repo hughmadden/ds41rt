@@ -134,5 +134,15 @@
       "syntax-python"
     ],
     "quality_failures": "Retain all outputs and failed checks; never silently exclude failures from throughput."
+  },
+  "counting": {
+    "category": "low-entropy",
+    "prompt": "Count from 1 to 200, separated by commas. Output only the sequence.",
+    "max_tokens": 640,
+    "count_to": 200,
+    "weight": 0.0,
+    "thinking": "disabled",
+    "source": "scripts/qualify-ds41-native-text-performance.py",
+    "supersedes": "orchid as the release low-entropy qualification; orchid retained as historical evidence"
   }
 }

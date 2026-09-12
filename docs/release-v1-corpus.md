@@ -14,9 +14,15 @@ diagnostics do not enter the weighted score. Weighted throughput is the sum of
 weighted post-first-token counts divided by the sum of weighted decode times;
 it is not an arithmetic average of the case throughput values.
 
-Orchid retains the original 100-word repetition request, a 1,500-token output
-budget and the original nonce-bearing prompt template. Its nonce must be
-instantiated and recorded per sample. The original workload controls are
+The release low-entropy qualification now uses the earlier development prompt:
+`Count from 1 to 200, separated by commas. Output only the sequence.`
+It has a 640-token output allowance and must return every integer from 1 to 200
+in order, with no additional text. Run `--counting-only` for this diagnostic or
+`--include-counting` alongside the eight cases. Counting has zero weight in
+the eight-case score. Record cold versus retained prompt cache state explicitly.
+
+Orchid is superseded for future release qualification. Its original definition
+and measured results remain available as historical evidence. The original workload controls are
 zero temperature and disabled thinking. The final tool-eval suite separately
 uses high thinking, as requested.
 

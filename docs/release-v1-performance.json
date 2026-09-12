@@ -1115,5 +1115,16 @@
       "dspark-retained-decode.json": "551d42b3964f0a1163f84d314f7c5ad479f03698bbef2bab6e7564d2c3db0405",
       "dspark-concurrency.json": "5082216fdf98be7b86d0d283a98d05c0e59c30f6265c3a8f70d11064cce5a709"
     }
+  },
+  "september_13_amendment": {
+    "performance_parity_with_development": "unresolved; prior final-image canary used the later release candidate as baseline",
+    "official_flash_reference": "release-official-flash-reference.json",
+    "official_reference_repeats": 1,
+    "official_completed_cases": 7,
+    "official_schema_case": "HTTP 400; not retried or downgraded",
+    "official_full_eight_case_weighted_tps": null,
+    "low_entropy_requirement": "counting 1 through 200 replaces historical Orchid",
+    "counting_reference": "release-counting-reference.json",
+    "counting_warm_median_tps": 127.70215665499619
   }
 }

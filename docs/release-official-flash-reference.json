@@ -1,0 +1,494 @@
+{
+  "scope": "Run the preserved eight-type and counting release decode workloads.",
+  "label": "official-deepseek-flash-single-run",
+  "base_url": "https://api.deepseek.com",
+  "model": "deepseek-flash",
+  "corpus_sha256": "db260fb037f3b49794109822f407f0cb010dda2cad9fead90301a344e35ad95a",
+  "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+  "repeats": 1,
+  "nonce_seed": 9132026,
+  "selected_cases": [
+    "code",
+    "math",
+    "fable",
+    "hello",
+    "topic",
+    "structured-json",
+    "structured-json-schema",
+    "multilingual"
+  ],
+  "include_orchid": false,
+  "include_counting": false,
+  "remote_reference": true,
+  "controls": {
+    "temperature": 0,
+    "thinking": "disabled"
+  },
+  "samples": [
+    {
+      "repeat": 1,
+      "case": "code",
+      "category": "code",
+      "weight": 1.0,
+      "nonce": {
+        "prefix": "俺 request nonce 9132026-0.\n",
+        "marker": "俺",
+        "first_content_token_id": 47203
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "俺 request nonce 9132026-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 320,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "started_ns": 1789246374246143634,
+      "first_content_seconds": 0.4737338969716802,
+      "finish_seconds": 1.0866322809597477,
+      "observed_decode_tokens_per_second": 345.89746936602694,
+      "usage": {
+        "prompt_tokens": 55,
+        "completion_tokens": 213,
+        "total_tokens": 268,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 55
+      },
+      "content": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+      "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+      "finish_reason": "stop",
+      "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669",
+      "cached_tokens": 0,
+      "quality_contract_version": "glmrt-semantic-decode-contract-v3",
+      "quality_contract_passed": true,
+      "quality_contract_issues": [],
+      "bounded_static_prefix_hit": true,
+      "passed": true
+    },
+    {
+      "repeat": 1,
+      "case": "math",
+      "category": "reasoning",
+      "weight": 1.0,
+      "nonce": {
+        "prefix": "俾 request nonce 9132026-1.\n",
+        "marker": "俾",
+        "first_content_token_id": 116653
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "俾 request nonce 9132026-1.\nA shop discounts a $240 jacket by 25%, then applies 8% sales tax to the discounted price. What is the final price? Show the calculation briefly."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 128,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "started_ns": 1789246375337643195,
+      "first_content_seconds": 0.5452321880729869,
+      "finish_seconds": 0.7485060290200636,
+      "observed_decode_tokens_per_second": 285.329384881848,
+      "usage": {
+        "prompt_tokens": 49,
+        "completion_tokens": 59,
+        "total_tokens": 108,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 49
+      },
+      "content": "Discount: 25% of $240 = $60, so discounted price = $240 − $60 = $180.  \nSales tax: 8% of $180 = $14.40.  \nFinal price = $180 + $14.40 = **$194.40**.",
+      "content_sha256": "a48dea7f021d030f526c1103a0a447d600b9aa3143b879dd03e94fcd1479728d",
+      "finish_reason": "stop",
+      "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669",
+      "cached_tokens": 0,
+      "quality_contract_version": "glmrt-semantic-decode-contract-v3",
+      "quality_contract_passed": true,
+      "quality_contract_issues": [],
+      "bounded_static_prefix_hit": true,
+      "passed": true
+    },
+    {
+      "repeat": 1,
+      "case": "fable",
+      "category": "creative-prose",
+      "weight": 1.0,
+      "nonce": {
+        "prefix": "倆 request nonce 9132026-2.\n",
+        "marker": "倆",
+        "first_content_token_id": 73835
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "倆 request nonce 9132026-2.\nWrite a self-contained fable of exactly 150 words about two parrots who disagree about sharing credit. Output no title or preamble. Include the final one-sentence moral in the 150-word total. Before responding, silently revise the draft until the entire response is between 140 and 170 words."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 256,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "started_ns": 1789246376096663856,
+      "first_content_seconds": 0.7974310030695051,
+      "finish_seconds": 2.2129292130703107,
+      "observed_decode_tokens_per_second": 123.63138205586316,
+      "usage": {
+        "prompt_tokens": 76,
+        "completion_tokens": 176,
+        "total_tokens": 252,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 76
+      },
+      "content": "Two parrots, crimson and jade, found a mango tree heavy with fruit. “I spotted it first,” said Crimson, puffing his chest. “But I led us here,” said Jade, “through the storm.” They argued while the mangoes ripened, each claiming the greater share. A rat passed and asked, “Who planted the seed?” Neither knew. “Who watered the sapling?” Silence. “Then neither of you made the tree,” said the rat. “You only found it together.” Still they squabbled, and while they squabbled, a flock of monkeys descended and stripped every branch bare. The parrots flew off hungry, each blaming the other. Only when they perched side by side, sharing a single fallen scrap, did they understand. Credit is a fruit that rots when hoarded, but multiplies when divided.",
+      "content_sha256": "7c10496f3fbc0e007539a344468e0007fcb47eeaf8c893f60a4533e6844ec1bf",
+      "finish_reason": "stop",
+      "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669",
+      "cached_tokens": 0,
+      "quality_contract_version": "glmrt-semantic-decode-contract-v3",
+      "quality_contract_passed": false,
+      "quality_contract_issues": [
+        "fable has 126 words, outside 140..170"
+      ],
+      "bounded_static_prefix_hit": true,
+      "passed": false
+    },
+    {
+      "repeat": 1,
+      "case": "hello",
+      "category": "short-response",
+      "weight": 1.0,
+      "nonce": {
+        "prefix": "倉 request nonce 9132026-3.\n",
+        "marker": "倉",
+        "first_content_token_id": 66436
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "倉 request nonce 9132026-3.\nhi"
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 32,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "started_ns": 1789246378320041354,
+      "first_content_seconds": 0.29592556704301387,
+      "finish_seconds": 0.5156278640497476,
+      "observed_decode_tokens_per_second": 141.10002681970082,
+      "usage": {
+        "prompt_tokens": 16,
+        "completion_tokens": 32,
+        "total_tokens": 48,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 16
+      },
+      "content": "Hi! I see you've sent what looks like a request nonce: `9132026-3`.\n\nI don't have any context for what this non",
+      "content_sha256": "c443c39cc4be43abe5872902c6431c2bdbaf2d7fe69a4fdaea2007f10339cd24",
+      "finish_reason": "length",
+      "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669",
+      "cached_tokens": 0,
+      "quality_contract_version": "glmrt-semantic-decode-contract-v3",
+      "quality_contract_passed": true,
+      "quality_contract_issues": [],
+      "bounded_static_prefix_hit": true,
+      "passed": true
+    },
+    {
+      "repeat": 1,
+      "case": "topic",
+      "category": "exposition",
+      "weight": 1.0,
+      "nonce": {
+        "prefix": "個 request nonce 9132026-4.\n",
+        "marker": "個",
+        "first_content_token_id": 2946
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "個 request nonce 9132026-4.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 384,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "started_ns": 1789246378845876809,
+      "first_content_seconds": 0.6931926269317046,
+      "finish_seconds": 2.3830927899107337,
+      "observed_decode_tokens_per_second": 169.24076715622468,
+      "usage": {
+        "prompt_tokens": 43,
+        "completion_tokens": 287,
+        "total_tokens": 330,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 43
+      },
+      "content": "- **Virtual memory gives each process its own fake address space.** The CPU emits virtual addresses; the OS + MMU translate them to physical RAM. This isolates processes, lets them use more memory than physically installed, and simplifies linking/loading.\n\n- **Memory is split into fixed-size pages (virtual) and frames (physical).** A per-process page table maps virtual page numbers → physical frame numbers. This avoids external fragmentation and makes allocation/swapping easy.\n\n- **A page fault happens when the needed page isn't in RAM.** The MMU raises a trap; the OS finds the page on disk (swap), loads it into a free frame, updates the page table, and retries the instruction. If RAM is full, a victim page is evicted (possibly written back if dirty).\n\n- **The TLB is a small hardware cache of recent translations.** It sits in front of the page table so most accesses skip the (multi-level) page-table walk. On a TLB miss, hardware or the OS walks the page table and fills the TLB; on a context switch, the TLB is flushed or tagged with an ASID.\n\n- **Performance hinges on locality.** Good temporal/spatial locality → high TLB hit rate and few page faults. Thrashing (too many faults) happens when the working set exceeds available frames; the fix is more RAM, better replacement policy, or reducing the working set.",
+      "content_sha256": "6e2b4325617f1fc249e907325784b7756f20dfd07da45bd6274ee182bc0fb60f",
+      "finish_reason": "stop",
+      "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669",
+      "cached_tokens": 0,
+      "quality_contract_version": "glmrt-semantic-decode-contract-v3",
+      "quality_contract_passed": false,
+      "quality_contract_issues": [
+        "response omits paging"
+      ],
+      "bounded_static_prefix_hit": true,
+      "passed": false
+    },
+    {
+      "repeat": 1,
+      "case": "structured-json",
+      "category": "structured-output-natural",
+      "weight": 0.5,
+      "nonce": {
+        "prefix": "倍 request nonce 9132026-5.\n",
+        "marker": "倍",
+        "first_content_token_id": 8122
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "倍 request nonce 9132026-5.\nReturn only a JSON object describing a file edit with keys path, operation, line_start, line_end, and rationale. Use path src/cache.rs, operation replace, lines 41 through 47, and a one-sentence rationale about removing a redundant copy."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 128,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "started_ns": 1789246381239620236,
+      "first_content_seconds": 0.4470589269185439,
+      "finish_seconds": 0.6694941589375958,
+      "observed_decode_tokens_per_second": 175.33193660912312,
+      "usage": {
+        "prompt_tokens": 68,
+        "completion_tokens": 40,
+        "total_tokens": 108,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 68
+      },
+      "content": "{\"path\":\"src/cache.rs\",\"operation\":\"replace\",\"line_start\":41,\"line_end\":47,\"rationale\":\"Removing a redundant copy to avoid unnecessary duplication and simplify the code.\"}",
+      "content_sha256": "e6d7b893c3e00afe83d10d16e5cea7595d040953f1a8a2c509f219e904303bea",
+      "finish_reason": "stop",
+      "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669",
+      "cached_tokens": 0,
+      "quality_contract_version": "glmrt-semantic-decode-contract-v3",
+      "quality_contract_passed": true,
+      "quality_contract_issues": [],
+      "bounded_static_prefix_hit": true,
+      "passed": true
+    },
+    {
+      "repeat": 1,
+      "case": "structured-json-schema",
+      "category": "structured-output-constrained",
+      "weight": 0.5,
+      "nonce": {
+        "prefix": "倏 request nonce 9132026-6.\n",
+        "marker": "倏",
+        "first_content_token_id": 93103
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "倏 request nonce 9132026-6.\nReturn only a JSON object describing a file edit with keys path, operation, line_start, line_end, and rationale. Use path src/cache.rs, operation replace, lines 41 through 47, and a one-sentence rationale about removing a redundant copy."
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 128,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "file_edit",
+            "strict": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "operation": {
+                  "type": "string"
+                },
+                "line_start": {
+                  "type": "integer"
+                },
+                "line_end": {
+                  "type": "integer"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "operation",
+                "line_start",
+                "line_end",
+                "rationale"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "started_ns": 1789246381919901495,
+      "error": "<HTTPError 400: 'Bad Request'>",
+      "passed": false,
+      "http_status": 400
+    },
+    {
+      "repeat": 1,
+      "case": "multilingual",
+      "category": "multilingual",
+      "weight": 1.0,
+      "nonce": {
+        "prefix": "們 request nonce 9132026-7.\n",
+        "marker": "們",
+        "first_content_token_id": 3942
+      },
+      "request": {
+        "model": "deepseek-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "們 request nonce 9132026-7.\n請用繁體中文，以四個簡短條列解釋什麼是寫入時複製（copy-on-write），並包含一個行程 fork 後修改記憶體頁面的例子。"
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        },
+        "temperature": 0,
+        "max_tokens": 384,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "started_ns": 1789246382084900475,
+      "first_content_seconds": 0.6818245950853452,
+      "finish_seconds": 1.8963333930587396,
+      "observed_decode_tokens_per_second": 183.6133261217307,
+      "usage": {
+        "prompt_tokens": 54,
+        "completion_tokens": 224,
+        "total_tokens": 278,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 54
+      },
+      "content": "- **定義**：寫入時複製（copy-on-write, COW）是一種資源管理策略，讓多個行程共享同一份實體記憶體頁面，直到某一方嘗試寫入時才複製出私有副本。\n- **共享唯讀**：`fork()` 後，父子行程的頁表都指向相同的實體頁面，並標記為唯讀；此時不會立即複製整份記憶體，節省時間與空間。\n- **觸發複製**：當任一 process 對共享頁面寫入時，CPU 觸發保護例外，核心介入並為該行程複製一份新的實體頁面，再將寫入導向新頁。\n- **例子**：行程 A 有變數 `x = 10`，`fork()` 後 A 與 B 共享該頁；若 B 執行 `x = 20`，核心複製該頁給 B，B 看到 `x = 20`，A 仍看到 `x = 10`。",
+      "content_sha256": "22a4581613634f63fb72da21804302151dbf9080a11509d5bc76560700c87ed4",
+      "finish_reason": "stop",
+      "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669",
+      "cached_tokens": 0,
+      "quality_contract_version": "glmrt-semantic-decode-contract-v3",
+      "quality_contract_passed": true,
+      "quality_contract_issues": [],
+      "bounded_static_prefix_hit": true,
+      "passed": true
+    }
+  ],
+  "repeat_summaries": [
+    {
+      "repeat": 1,
+      "weighted_cases": 7,
+      "quality_passed": 5,
+      "weighted_observed_decode_tokens_per_second": null,
+      "all_samples_passed": false,
+      "partial_weighted_observed_decode_tokens_per_second": 183.7388196416768,
+      "complete_weighted_corpus": false
+    }
+  ],
+  "passed": false,
+  "median_weighted_observed_decode_tokens_per_second": null,
+  "interpretation": "One request per case, no retry or schema fallback. Seven completed; JSON Schema returned HTTP 400. No complete eight-case weighted score. Server token counts and client-observed stream timings; provider hardware unknown.",
+  "model_list_verification": {
+    "endpoint": "https://api.deepseek.com/models",
+    "available_models": [
+      "deepseek-flash",
+      "deepseek-v4-pro"
+    ],
+    "selected_model": "deepseek-flash"
+  }
+}

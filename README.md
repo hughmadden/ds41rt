@@ -13,7 +13,7 @@ The release candidate uses corrected architectural FP4 compressed KV and the sta
 | Measurement | Result |
 |---|---:|
 | Best median prefill, 0 base + 32K new | **2,668 prompt tok/s** |
-| Low-entropy dSpark decode | **128.03 tok/s** |
+| Low-entropy dSpark decode, counting 1–200 | **127.70 tok/s** |
 | Weighted eight-type target decode | 37.89 tok/s |
 | Weighted eight-type dSpark decode | **60.68 tok/s** |
 | dSpark gain on the weighted mix | 60.16% |
@@ -23,6 +23,14 @@ The release candidate uses corrected architectural FP4 compressed KV and the sta
 | Clean standard-launch readiness | 55–56 s |
 
 The [performance report](docs/release-v1-performance.md) contains every sample, the 30-cell prefill matrix, retained-context decode through 256K, concurrency scaling, memory, startup, 1.04M-token needle retrieval, and three high-thinking tool-eval runs. The [machine-readable results](docs/release-v1-performance.json) and [raw evidence](docs/evidence/native-release-performance.tar.gz) preserve inputs, outputs, cache counters, hardware state, and errors.
+
+The [eight-case comparison table](docs/release-v1-performance.md#eight-content-types-and-low-entropy-decode)
+also includes one official `deepseek-flash` API reference run. Seven cases
+completed; JSON Schema returned HTTP 400.
+
+**Performance qualification is reopened:** development-to-release prefill
+regression remains unresolved. The published candidate figures above do not
+establish parity with the earlier ~7K prefill and ~145 counting decode results.
 
 ## Getting started
 
