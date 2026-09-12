@@ -100,8 +100,8 @@ for 25.52 ms per verification round. Nested timings overlap and must not be summ
 indiscriminately. The counting fixture already has almost maximal acceptance;
 reducing round latency is the immediate opportunity for that workload.
 
-Outstanding serving work: replace whole-request serialization with per-request
-generation state, integrate batched proposals and verification, size head workspaces for
-verification batches, overlap the two lanes and rebalance at committed boundaries.
-Admission, retirement, cancellation and lane reuse then need API-level C1–C16
-qualification and simultaneous aggregate/per-stream measurements.
+The subsequent [two-lane API scheduler](ds41-concurrent-serving.md) integrates
+per-request generation state, batched proposals and verification, 48-row head
+workspaces and boundary rebalancing. It has separate API-level C1–C16 checks and
+aggregate/per-stream counting measurements. Mixed prefill scheduling, independent
+lane progress and sustained concurrent qualification remain open.

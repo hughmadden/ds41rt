@@ -1,4 +1,5 @@
 pub(crate) mod speculative;
+mod scheduler;
 use crate::v41_backbone_cache::BackboneCache;
 use crate::v41_backbone_execution::BackboneExecution;
 use crate::v41_backbone_execution::CacheProducerWeights;
@@ -195,7 +196,7 @@ fn worker(
         TargetHeadWeights::device_bytes(&catalog)?,
         16 * 1024 * 1024,
     )?;
-    let head = head_weights.wave(&vocabulary, 16, TargetHeadWave::device_bytes(16)?)?;
+    let head = head_weights.wave(&vocabulary, 48, TargetHeadWave::device_bytes(48)?)?;
     let mut pass = TargetPass::new(
         embedding,
         lane,
@@ -232,7 +233,7 @@ fn worker(
         EngramDeviceRows::new(&lib, rows, EngramDeviceRows::device_bytes(rows)?)?,
         [EngramGate::new(&engram_weights[0], rows, 1024 * 1024 * 1024)?,
          EngramGate::new(&engram_weights[1], rows, 1024 * 1024 * 1024)?],
-        head_weights.wave(&vocabulary, 16, TargetHeadWave::device_bytes(16)?)?,
+        head_weights.wave(&vocabulary, 48, TargetHeadWave::device_bytes(48)?)?,
         crate::v41_target_pass::TargetTapWave::new(&lib, rows, crate::v41_target_pass::TargetTapWave::device_bytes(rows)?)?,
         Duration::from_secs(120),
     )?;
@@ -264,157 +265,10 @@ fn worker(
         .context("startup readiness missing")?
         .send(Ok(()))
         .map_err(|_| anyhow::anyhow!("API startup cancelled"))?;
-    let mut id = 0u64;
-    while let Some(job) = receive.blocking_recv() {
-        if job.events.is_closed() {
-            continue;
-        }
-        id = id.checked_add(1).context("request ID exhausted")?;
-        // Keep healthy QPs across admissions; request/output ownership is fresh.
-        transport.begin_request();
-        prefill_transport.begin_request();
-        let lease = requests.admit(0, id)?;
-        if let Some(draft) = &mut draft {
-            draft.admit(id)?;
-        }
-        let result = generate(
-            &lib,
-            &args.snapshot,
-            args.max_context_tokens as usize,
-            args.prefill_batch_tokens as usize,
-            &runtime,
-            &mut pass,
-            &mut prefill_pass,
-            &mut prefill_transport,
-            &mut requests,
-            &mut transport,
-            lease,
-            &job,
-            draft.as_mut(),
-        );
-        let cleanup = if requests.cache().request_id(lease).is_ok() {
-            requests.release(lease)
-        } else {
-            Ok(())
-        };
-        if let Some(draft) = &mut draft {
-            draft.release(id)?;
-        }
-        if let Err(error) = result {
-            // Also reset failures outside a pending transport borrow (for example
-            // client cancellation between completed model steps).
-            transport.reset_connections();
-            prefill_transport.reset_connections();
-            let _ = job.events.blocking_send(Err(format!("{error:#}")));
-        }
-        cleanup?;
-    }
-    Ok(())
+    scheduler::serve(&lib, &args, &runtime, &mut receive, &mut pass, &mut prefill_pass,
+        &mut requests, &mut transport, &mut prefill_transport, draft.as_mut())
 }
-fn generate<'w, 'a>(
-    lib: &'a NativeLibrary,
-    snapshot: &std::path::Path,
-    max_context_tokens: usize,
-    prefill_batch_tokens: usize,
-    runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'w, 'a>,
-    prefill_pass: &mut TargetPass<'w, 'a>,
-    prefill_transport: &mut NativeTp4Wave<'a>,
-    requests: &mut Requests<'a>,
-    transport: &mut NativeTp4Wave<'a>,
-    lease: crate::v41_backbone_cache::CacheLease,
-    job: &NativeRequest,
-    mut draft: Option<&mut DraftRuntime<'_, 'a>>,
-) -> Result<()> {
-    let prompt = ds41rt_loader::encode_tokenizer_text(snapshot, &job.prompt, false)?.token_ids;
-    ensure!(
-        !prompt.is_empty() && prompt.len().checked_add(job.max_tokens).is_some_and(|total| total <= max_context_tokens),
-        "native text request exceeds {max_context_tokens}-token context limit"
-    );
-    let mut decoder = ds41rt_loader::streaming_token_decoder(snapshot, false)?;
-    job.events.blocking_send(Ok(InferenceChunk::Ready {
-        system_fingerprint: Some(
-            if draft.is_some() {
-                "ds41rt-native-fp8-kv-dspark"
-            } else {
-                "ds41rt-native-fp8-kv"
-            }
-            .into(),
-        ),
-        prompt_usage: PromptUsage {
-            prompt_tokens: prompt.len(),
-            prompt_cache_hit_tokens: 0,
-        },
-    }))?;
-    let mut next = prefill(lib, runtime, pass, prefill_pass, requests, transport, prefill_transport, lease, &prompt,
-        prefill_batch_tokens, job, draft.as_deref_mut())?;
-    let mut buffered = 0usize;
-    let mut pending = std::collections::VecDeque::new();
-    for generated in 0..job.max_tokens {
-        ensure!(!job.events.is_closed(), "client disconnected");
-        buffered += 1;
-        if next == 1 {
-            job.events.blocking_send(Ok(InferenceChunk::Text {
-                content: String::new(),
-                content_tokens: buffered,
-            }))?;
-            job.events.blocking_send(Ok(InferenceChunk::Finish {
-                finish_reason: InferenceFinishReason::Stop,
-            }))?;
-            return Ok(());
-        }
-        if let Some(content) = decoder.step(next)? {
-            job.events.blocking_send(Ok(InferenceChunk::Text {
-                content,
-                content_tokens: buffered,
-            }))?;
-            buffered = 0;
-        }
-        if generated + 1 < job.max_tokens {
-            if pending.is_empty() {
-                if let Some(draft) = draft.as_deref_mut() {
-                    pending.extend(draft.verify(
-                        lib,
-                        runtime,
-                        pass,
-                        requests,
-                        transport,
-                        lease,
-                        next,
-                        job.max_tokens - generated - 1,
-                        job,
-                    )?);
-                } else {
-                    pending.push_back(step(
-                        lib,
-                        runtime,
-                        pass,
-                        requests,
-                        transport,
-                        lease,
-                        &[next],
-                        ExpertV2SourceKind::Decode,
-                        job,
-                        None,
-                    )?);
-                }
-            }
-            next = pending
-                .pop_front()
-                .context("generation produced no next token")?;
-        }
-    }
-    if buffered > 0 {
-        job.events.blocking_send(Ok(InferenceChunk::Text {
-            content: String::new(),
-            content_tokens: buffered,
-        }))?;
-    }
-    job.events.blocking_send(Ok(InferenceChunk::Finish {
-        finish_reason: InferenceFinishReason::Length,
-    }))?;
-    Ok(())
-}
+
 fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     pass: &mut TargetPass<'w, 'a>, other: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
     transport: &mut NativeTp4Wave<'a>, other_transport: &mut NativeTp4Wave<'a>,
@@ -473,57 +327,5 @@ fn prefill<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     })();
     if result.is_err() { pass.discard(&mut batch)?; }
     tracing::debug!(target: "ds41rt::timing", rows, total_us=started.elapsed().as_micros() as u64, "target decoder replay");
-    result
-}
-
-fn step<'a>(
-    lib: &'a NativeLibrary,
-    runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'_, 'a>,
-    requests: &mut Requests<'a>,
-    transport: &mut NativeTp4Wave<'a>,
-    lease: crate::v41_backbone_cache::CacheLease,
-    tokens: &[u32],
-    kind: ExpertV2SourceKind,
-    job: &NativeRequest,
-    draft: Option<&mut DraftRuntime<'_, 'a>>,
-) -> Result<u32> {
-    ensure!(!job.events.is_closed(), "client disconnected");
-    let timing = Instant::now();
-    let mut batch = requests.prepare(&[RequestTokens {
-        lease,
-        tokens,
-        image_mask: None,
-        kind,
-    }])?;
-    let prepared_us = timing.elapsed().as_micros() as u64;
-    let result = (|| -> Result<u32> {
-        let logits = runtime.block_on(unsafe {
-            pass.execute(requests, &mut batch, transport, 0, &[tokens.len() - 1])
-        })?;
-        let executed_us = timing.elapsed().as_micros() as u64;
-        let mut bytes = vec![0; logits.logits.bytes];
-        lib.copy_d2h(&mut bytes, logits.logits)?;
-        let mut best = (0u32, f32::NEG_INFINITY);
-        for (i, b) in bytes.chunks_exact(4).enumerate() {
-            let v = f32::from_ne_bytes(b.try_into().unwrap());
-            ensure!(v.is_finite(), "non-finite target logit");
-            if v > best.1 {
-                best = (i as u32, v);
-            }
-        }
-        ensure!(!job.events.is_closed(), "client disconnected");
-        let sampled_us = timing.elapsed().as_micros() as u64;
-        if let Some(draft) = draft {
-            draft.commit(pass, requests, &mut batch, tokens.len() as u32)?;
-        } else {
-            pass.commit(requests, &mut batch, &[tokens.len() as u32])?;
-        }
-        tracing::debug!(target: "ds41rt::timing", rows=tokens.len(), prepared_us, execute_us=executed_us-prepared_us, sample_us=sampled_us-executed_us, commit_us=timing.elapsed().as_micros() as u64-sampled_us, total_us=timing.elapsed().as_micros() as u64, "target step");
-        Ok(best.0)
-    })();
-    if result.is_err() {
-        pass.discard(&mut batch)?;
-    }
     result
 }

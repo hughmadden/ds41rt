@@ -146,7 +146,11 @@ Completion means a working, qualified release with measured performance, not com
 - [x] Compose and qualify the complete three-stage dSpark attention/mHC/FFN proposal graph with embedding, Markov, confidence and terminal sampling on both RTX GPUs.
 - [x] Requalify the complete chain with real committed target context and the current FP8 windows/head on RTX. [Real draft runs](docs/ds41-real-draft-chain.md) cover one and sixteen requests, changed-position replay equality and greedy consistency; broad numerical and stochastic qualification remain open.
 - [ ] Wire proposal verification, acceptance, RNG ownership, cancellation and rollback across all caches and engram histories.
-- [ ] Complete concurrency-16 admission, mixed prefill/decode/verification scheduling, graph capacity management and alternating-wave overlap.
+- [x] Implement concurrency-16 API admission, two-lane decode/verification batches,
+  request-owned dSpark state and count-specific graph reuse, with retirement and
+  boundary migration. See [concurrent serving](docs/ds41-concurrent-serving.md).
+- [ ] Complete mixed prefill/decode scheduling, independent lane progress,
+  slow-client isolation and sustained concurrent lifecycle/quality qualification.
 
 ## Integrated qualification and release
 
@@ -194,8 +198,9 @@ Completion means a working, qualified release with measured performance, not com
   rounds, principally after retirement; admit new requests to the lighter lane.
   Request-owned draft caches and batched commits also pass this fixture and C1
   API regression checks. This is execution qualification, not concurrent API
-  serving. Batched draft proposals also pass C2/C6/C16 execution fixtures; the
-  serving scheduler and batched verification still require integration.
+  serving. Batched proposals and verification are now integrated in the
+  [two-lane API scheduler](docs/ds41-concurrent-serving.md), with separate live
+  C2/C6/C16 qualification and counting throughput measurements.
 
 - [KV sharing across attention heads](docs/ds41-attention-head-reuse.md) is selected with 2048-token chunks. Isolated warm 16k prefill reaches 5.32/5.28k code and 6.56/6.46k repeated tok/s, about 27–28% and 45–46% above the preceding library. The 599-token decode comparison preserves text and usage at 38.02 target / 117.97 dSpark tok/s versus 37.87 / 118.78. All 34 reference cases, 220 byte-exact kernel comparisons, two shared-memory racecheck fixtures and both API lifecycle checks pass; inherited quality failures remain. A 4096-token chunk retest still loses and is not selected. Live ports are 18041/18042. Reprofile prefill before choosing expert grouping/ordering or remaining scheduling/transfer work; adjacent-query reuse and wider concurrency remain open.
 

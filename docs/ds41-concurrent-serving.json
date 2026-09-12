@@ -1,0 +1,202 @@
+{
+  "scope": "Short-prompt counting; aggregate includes admission gaps; not 16k context or broad category performance.",
+  "benchmark_daemon_sha256": "2886c16a62d79ba3c3cce45095969b7987e2083a8a30237ea0617166841ecb17",
+  "benchmarks": [
+    {
+      "concurrency": 1,
+      "repeat": 0,
+      "aggregate_tps": 124.69481390008137,
+      "per_stream_mean": 124.69481390008137,
+      "completion_tokens": [
+        599
+      ]
+    },
+    {
+      "concurrency": 1,
+      "repeat": 1,
+      "aggregate_tps": 126.70871700288677,
+      "per_stream_mean": 126.70871700288677,
+      "completion_tokens": [
+        599
+      ]
+    },
+    {
+      "concurrency": 2,
+      "repeat": 0,
+      "aggregate_tps": 151.99827312417315,
+      "per_stream_mean": 76.37159356454919,
+      "completion_tokens": [
+        599,
+        599
+      ]
+    },
+    {
+      "concurrency": 2,
+      "repeat": 1,
+      "aggregate_tps": 152.19766961948355,
+      "per_stream_mean": 76.46969582073639,
+      "completion_tokens": [
+        599,
+        599
+      ]
+    },
+    {
+      "concurrency": 6,
+      "repeat": 0,
+      "aggregate_tps": 310.15505658965066,
+      "per_stream_mean": 52.55681344437079,
+      "completion_tokens": [
+        599,
+        599,
+        599,
+        599,
+        599,
+        599
+      ]
+    },
+    {
+      "concurrency": 6,
+      "repeat": 1,
+      "aggregate_tps": 310.34422450645565,
+      "per_stream_mean": 52.59331674300921,
+      "completion_tokens": [
+        599,
+        599,
+        599,
+        599,
+        599,
+        599
+      ]
+    },
+    {
+      "concurrency": 16,
+      "repeat": 0,
+      "aggregate_tps": 603.6548929886144,
+      "per_stream_mean": 39.14666838477378,
+      "completion_tokens": [
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599
+      ]
+    },
+    {
+      "concurrency": 16,
+      "repeat": 1,
+      "aggregate_tps": 605.7173664468665,
+      "per_stream_mean": 39.2943114282994,
+      "completion_tokens": [
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599,
+        599
+      ]
+    }
+  ],
+  "speculative_lifecycle_pass": true,
+  "target_lifecycle_pass": true,
+  "speculative_c2_c6_c16_retirement_cancellation_replacement_pass": true,
+  "target_c2_c6_c16_retirement_cancellation_replacement_pass": true,
+  "quality_text_and_usage_pairs_equal": 8,
+  "inherited_quality_failure": "Unicode answer format in both baseline and candidate",
+  "selected_production_apis_changed": false,
+  "raw_artifacts": "/tmp/ds41-scheduler",
+  "target_distinct_sequences_pass": true,
+  "speculative_distinct_sequences_pass": true,
+  "observed_lane_sizes": [
+    {
+      "lane0": 0,
+      "lane1": 1,
+      "rounds": 26
+    },
+    {
+      "lane0": 1,
+      "lane1": 0,
+      "rounds": 88
+    },
+    {
+      "lane0": 1,
+      "lane1": 1,
+      "rounds": 17
+    },
+    {
+      "lane0": 2,
+      "lane1": 2,
+      "rounds": 46
+    },
+    {
+      "lane0": 2,
+      "lane1": 3,
+      "rounds": 1
+    },
+    {
+      "lane0": 3,
+      "lane1": 3,
+      "rounds": 6
+    },
+    {
+      "lane0": 4,
+      "lane1": 4,
+      "rounds": 11
+    },
+    {
+      "lane0": 4,
+      "lane1": 5,
+      "rounds": 10
+    },
+    {
+      "lane0": 5,
+      "lane1": 5,
+      "rounds": 1
+    },
+    {
+      "lane0": 6,
+      "lane1": 6,
+      "rounds": 5
+    },
+    {
+      "lane0": 6,
+      "lane1": 7,
+      "rounds": 1
+    },
+    {
+      "lane0": 7,
+      "lane1": 7,
+      "rounds": 4
+    },
+    {
+      "lane0": 8,
+      "lane1": 7,
+      "rounds": 1
+    },
+    {
+      "lane0": 8,
+      "lane1": 8,
+      "rounds": 11
+    }
+  ]
+}
