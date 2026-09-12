@@ -1,11 +1,10 @@
 # DS41RT development
 
-DS41RT is being adapted for the official `deepseek-ai/DeepSeek-V4.1-Flash`
-checkpoint. Full-model execution and release qualification are unfinished.
-[TO_SHIP_V1.md](TO_SHIP_V1.md) is the implementation and qualification plan;
-[architecture.md](architecture.md) defines ownership and execution contracts.
-Do not interpret an inherited launcher, passing component fixture or build as
-proof that V4.1 serving is ready.
+DS41RT serves the official `deepseek-ai/DeepSeek-V4.1-Flash` checkpoint through
+the native five-host path. [architecture.md](architecture.md) defines ownership
+and execution contracts; [docs/ENGINEERING.md](docs/ENGINEERING.md) describes
+the selected release implementation; the [release checklist](docs/release-v1-checklist.md)
+links the full qualification evidence.
 
 ## Execution contract
 
@@ -16,8 +15,8 @@ proof that V4.1 serving is ready.
   routed experts stay on RTX and use their separate top-3 routing.
 - The only release checkpoint is the official native V4.1 Flash snapshot.
   The target concurrency is 16 requests with measured wave scheduling.
-- Persistent serving KV uses fixed FP8 encoding. Architectural index keys
-  retain their separate encoding; they are not interchangeable with KV.
+- Compressed global KV uses FP4 E2M1 values with group-16 E4M3 scales. Local
+  128-token windows use FP8, while index keys retain their separate FP4 format.
 - Engram tables and scales stay memory-mapped with bounded background
   prefetch and GPU staging. Do not preload the entire tables onto a GPU.
 - Request leases, execution bindings, source selections and accepted-prefix
@@ -56,10 +55,9 @@ automatic source manifest. Keep source unchanged until the build finishes.
 `./build.sh --spark-hosts ostrich,dodo` restricts build/distribution hosts;
 serving still requires four ranks. See [docker/README.md](docker/README.md).
 
-`./wip.sh --slot NAME` and `./run.sh --wip --wip-slot NAME` retain the existing
-fingerprinted iteration workflow. Their inherited model defaults and release
-gates still need migration. Do not use the current Pro/EXL3 defaults as a
-V4.1 launch configuration or bypass a mismatched artifact identity.
+`./wip.sh --slot NAME` retains the fingerprinted iteration workflow. The
+standard `./run.sh` path uses the qualified V4.1 release images and validates
+their source and dependency identity before launch.
 
 ## Focused checks
 
@@ -95,15 +93,11 @@ Full integration must cover 40-layer CED execution, engram prefetch, vision,
 request-safe cache transactions, target sampling, dSpark verification and
 rollback, concurrency 16, API behavior and restart readiness.
 
-Performance targets are 90 tokens/s target-only decode, approximately 270
-with optimized dSpark, and 8,000 tokens/s prefill at 8K or larger prompts.
-They remain unqualified. Record source/model revisions, input shapes,
-concurrency, KV encoding, sampling, acceptance, warmup, every timed sample,
-memory and graph setup. Component timing cannot establish serving throughput.
-
-Publish only after the complete V4.1 build/run/API and five-host gates pass.
-Inherited `v2` image tags and Pro-era release checks are migration work, not
-an approved V4.1 release contract.
+The qualified v3 baseline is recorded in
+[docs/release-v1-performance.md](docs/release-v1-performance.md). New performance
+work must record source/model revisions, input shapes, concurrency, KV encoding,
+sampling, acceptance, warmup, every timed sample, memory and graph setup.
+Component timing alone does not establish serving throughput.
 
 Keep weights, generated catalogs, build artifacts, benchmark runs and local
 configuration out of Git. Small useful fixtures and caches under `/tmp` may

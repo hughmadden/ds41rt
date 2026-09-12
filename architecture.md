@@ -1,7 +1,8 @@
 # DS41RT architecture
 
-This document describes the V4.1 target architecture; implementation and qualification
-status is tracked in TO_SHIP_V1.md rather than inferred from these contracts.
+This document describes the qualified V4.1 release architecture. Detailed
+implementation rationale is in [docs/ENGINEERING.md](docs/ENGINEERING.md), and
+the [release checklist](docs/release-v1-checklist.md) links the evidence.
 
 ## Ownership
 
@@ -35,8 +36,9 @@ contracts; their layouts and scales must not be treated interchangeably.
 Each request owns its cache references, source selections, candidate blocks,
 compression tail, and speculative transaction state.
 
-Exact prefill establishes the baseline for CED decoder SWA replay, while bounded
-replay is an explicitly approximate execution policy requiring separate qualification.
+Partial prefix reuse rebuilds no more than the last 128 encoder tokens needed
+for CED decoder SWA state. Exact hits restore retained windows and first-token
+logits; compressed pages remain shared through copy-on-write ownership.
 
 ## Engram and speculative execution
 
@@ -59,11 +61,12 @@ It runs entirely on the RTX, while target verification still traverses backbone 
 
 The target topology is four expert TP ranks and one coordinator, with 16-request
 admission and alternating execution waves around remote expert boundaries.
-Production graph shapes and workspaces must be prepared before readiness and
-reused without request-time capture or allocation.
+Resident workspaces are prepared before readiness. Request-shape CUDA graphs
+are captured lazily, then reused while their owner and binding identities match.
 Readiness must verify checkpoint/dependency identity, weight residency, mapped
 table access, transport, numerical startup probes, and prepared graph shapes.
 
-The official checkpoint is the only release weight source; EXL3, GPTQ, alternate
-model variants, and old Pro optimization settings are being removed.
-See docs/ds41-architecture-audit.md for pinned source evidence and outstanding work.
+The official checkpoint is the release weight source; EXL3, GPTQ, alternate
+model variants, and old Pro optimization settings are outside this release.
+See [docs/ds41-architecture-audit.md](docs/ds41-architecture-audit.md) for pinned
+source evidence.

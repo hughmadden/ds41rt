@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
 <title id="title">DS41RT native execution across one coordinator and four expert workers</title>
-<desc id="desc">The RTX coordinator owns admission, prefix state, attention, Engram projections, shared experts, dSpark and greedy verification. Four DGX Spark workers provide intermediate-dimension tensor-parallel routed experts. Two execution lanes serve up to sixteen requests. Partial matches replay at most 128 encoder tokens. Compressed source KV uses FP4 and window KV uses FP8. Vision accepts up to sixteen images. Final release qualification remains open.</desc>
+<desc id="desc">The RTX coordinator owns admission, prefix state, attention, Engram projections, shared experts, dSpark and greedy verification. Four DGX Spark workers provide intermediate-dimension tensor-parallel routed experts. Two execution lanes serve up to sixteen requests. Partial matches replay at most 128 encoder tokens. Compressed source KV uses FP4 and window KV uses FP8. Vision accepts up to sixteen images. The corrected FP4 release reaches 2668 prompt tokens per second, 60.68 weighted dSpark decode tokens per second, 128.03 low-entropy dSpark tokens per second, and 683.70 aggregate tokens per second at concurrency sixteen.</desc>
 <defs>
 <linearGradient id="panel" x2="1" y2="1"><stop stop-color="#10243a"/><stop offset="1" stop-color="#0d1b2d"/></linearGradient>
 <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 Z" fill="#46d7e8"/></marker>
@@ -13,17 +13,17 @@ text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#b9cde0}
 <text x="44" y="54" class="title" text-anchor="start">DS41RT · NATIVE EXECUTION</text>
 <text x="44" y="83" class="sub" text-anchor="start">DeepSeek V4.1 Flash · one RTX PRO 6000 Blackwell coordinator · four DGX Spark expert workers</text>
 <rect x="44" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#5d8cff" stroke-width="1.3"/>
-<text x="62" y="138" class="badge" text-anchor="start">16 requests</text>
-<text x="62" y="160" class="small" text-anchor="start">TWO EXECUTION LANES</text>
+<text x="62" y="138" class="badge" text-anchor="start">2,668 tok/s</text>
+<text x="62" y="160" class="small" text-anchor="start">BEST MEDIAN PREFILL</text>
 <rect x="426" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#46d7e8" stroke-width="1.3"/>
-<text x="444" y="138" class="badge" text-anchor="start">40 target layers</text>
-<text x="444" y="160" class="small" text-anchor="start">ATTENTION ON THE RTX</text>
+<text x="444" y="138" class="badge" text-anchor="start">60.68 tok/s</text>
+<text x="444" y="160" class="small" text-anchor="start">WEIGHTED DSPARK DECODE</text>
 <rect x="808" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#a978ff" stroke-width="1.3"/>
-<text x="826" y="138" class="badge" text-anchor="start">4 expert TP ranks</text>
-<text x="826" y="160" class="small" text-anchor="start">ROUTED FFN ON SPARKS</text>
+<text x="826" y="138" class="badge" text-anchor="start">128.03 tok/s</text>
+<text x="826" y="160" class="small" text-anchor="start">LOW-ENTROPY DSPARK</text>
 <rect x="1190" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#56d69c" stroke-width="1.3"/>
-<text x="1208" y="138" class="badge" text-anchor="start">3 dSpark stages</text>
-<text x="1208" y="160" class="small" text-anchor="start">DRAFTING ON THE RTX</text>
+<text x="1208" y="138" class="badge" text-anchor="start">683.70 tok/s</text>
+<text x="1208" y="160" class="small" text-anchor="start">C16 AGGREGATE DECODE</text>
 <rect x="326" y="207" width="844" height="782" rx="18" fill="url(#panel)" stroke="#5d8cff" stroke-width="1.3"/>
 <text x="350" y="242" class="section" text-anchor="start">RTX COORDINATOR</text>
 <text x="350" y="267" class="small" text-anchor="start">Rust request ownership · native GPU execution · independent lane workspaces</text>
@@ -128,5 +128,5 @@ text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#b9cde0}
 <text x="66" y="1056" class="label" text-anchor="start">TWO LANES · UP TO EIGHT REQUESTS PER LANE</text>
 <text x="66" y="1082" class="body" text-anchor="start">Independent target stacks overlap around remote expert work. Admission, migration and retirement occur after both stacks drain.</text>
 <text x="66" y="1107" class="body" text-anchor="start">Speculative proposals stay private until verification commits the same accepted prefix to target, draft and Engram state.</text>
-<text x="44" y="1178" class="small" text-anchor="start">Native serving design · FP4 compressed KV / FP8 SWA · release qualification in progress · schematic, not a measured timeline</text>
+<text x="44" y="1178" class="small" text-anchor="start">Qualified release design · FP4 compressed KV / FP8 SWA · headline metrics use release workloads · schematic, not a measured timeline</text>
 </svg>

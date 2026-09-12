@@ -11,7 +11,7 @@ RELEASE_COMMON = ROOT / "scripts" / "release-common.sh"
 PRO_MODEL_ID = "wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1"
 
 BASE_CONFIG = """\
-MODEL_ID=deepseek-ai/DeepSeek-V4-Flash-0731
+MODEL_ID=deepseek-ai/DeepSeek-V4.1-Flash
 MODEL_VARIANT=flash
 EXPERT_FORMAT=native
 SPARKINFER_EXL3=disable
@@ -127,23 +127,23 @@ def test_release_config_has_safe_flash_defaults(tmp_path: Path) -> None:
     result = load_config(tmp_path)
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == [
-        "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "deepseek-ai/DeepSeek-V4.1-Flash",
         "flash",
         "native",
         "on",
         "adaptive",
-        "4",
+        "16",
         "16",
         "0",
         "",
         "",
         "disable",
-        "deepseek-ai/DeepSeek-V4-Flash-0731",
-        "",
+        "deepseek-ai/DeepSeek-V4.1-Flash",
+        "dba1be0a40aa45a94ad051997016db3960a90277",
     ]
 
 
-def test_release_config_defaults_to_public_calibrated_pro_k2(tmp_path: Path) -> None:
+def test_release_config_defaults_to_official_v41_flash(tmp_path: Path) -> None:
     result = load_config(
         tmp_path,
         config_text="""\
@@ -159,19 +159,19 @@ SPARK_3_LANE_A=10.55.0.4
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == [
-        "wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1",
-        "pro",
-        "exl3",
+        "deepseek-ai/DeepSeek-V4.1-Flash",
+        "flash",
+        "native",
         "on",
         "adaptive",
-        "4",
+        "16",
         "16",
         "0",
         "",
         "",
-        "force",
-        "wrldsuksgo2mars/DeepSeek-V4-Pro-0813-EXL3-K2-calibrated-v1",
-        "7a63f24905223aff19212d65226be708950823ac",
+        "disable",
+        "deepseek-ai/DeepSeek-V4.1-Flash",
+        "dba1be0a40aa45a94ad051997016db3960a90277",
     ]
 
 
@@ -209,25 +209,16 @@ def test_release_facing_helpers_default_to_public_calibrated_pro_k2() -> None:
 
 def test_release_settings_resolution_has_selected_gpu_access() -> None:
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
-    resolver = release.split("resolve_settings() {", maxsplit=1)[1].split(
-        "\n}", maxsplit=1
-    )[0]
-
-    assert '--gpus device="$RELEASE_COORDINATOR_GPU_UUID"' in resolver
+    assert "release_resolve_coordinator_gpu_identity" in release
+    assert '--gpus device="$RELEASE_COORDINATOR_GPU_UUID"' in release
 
 
-def test_release_benchmark_probe_has_explicit_startup_timeout() -> None:
+def test_native_release_has_explicit_startup_timeout() -> None:
     release = (ROOT / "run.sh").read_text(encoding="utf-8")
 
-    for name in (
-        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE",
-        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_PREFIX_ROWS",
-        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_NEW_ROWS",
-        "DS41RT_REAL_FULL_SERVE_PREFIX_PREFILL_PROBE_REPEATS",
-    ):
-        assert name in release
-    assert '"${DS41RT_RELEASE_READY_TIMEOUT_SECONDS:-900}"' in release
-    assert "must be a positive integer" in release
+    assert "DS41RT_RELEASE_READY_TIMEOUT_SECONDS:-900" in release
+    assert "native expert did not become ready" in release
+    assert "native API did not become ready" in release
 
 
 def test_spark_collective_receive_uses_active_deadline() -> None:
@@ -265,7 +256,7 @@ def test_release_config_accepts_future_pro_exl3_identity(tmp_path: Path) -> None
         "exl3",
         "off",
         "adaptive",
-        "4",
+        "16",
         "16",
         "0",
         "",
@@ -293,7 +284,7 @@ def test_release_config_accepts_dedicated_flash_k2_identity(tmp_path: Path) -> N
         "exl3",
         "on",
         "adaptive",
-        "4",
+        "16",
         "16",
         "0",
         "",
@@ -435,9 +426,9 @@ def test_release_config_rejects_old_glm_and_out_of_range_controls(
     assert old.returncode == 2
     assert "unknown configuration key" in old.stderr
 
-    concurrency = load_config(tmp_path, "CONCURRENCY=5\n")
+    concurrency = load_config(tmp_path, "CONCURRENCY=17\n")
     assert concurrency.returncode == 2
-    assert "CONCURRENCY must be in 1..4" in concurrency.stderr
+    assert "CONCURRENCY must be in 1..16" in concurrency.stderr
 
 
 def test_release_config_rejects_exl3_kernel_mode_format_mismatches(
@@ -455,8 +446,20 @@ def test_release_config_rejects_exl3_kernel_mode_format_mismatches(
     assert "disable requires EXPERT_FORMAT=native" in disabled_exl3.stderr
 
 
-def test_launchers_fingerprint_and_export_ds4_format_controls() -> None:
-    for launcher_name in ("run.sh", "scripts/run-wip.sh"):
+def test_launchers_fingerprint_and_export_model_controls() -> None:
+    release = (ROOT / "run.sh").read_text(encoding="utf-8")
+    assert "release_api_advertises_model" in release
+    assert "release_resolve_coordinator_gpu_identity" in release
+    assert '"$RELEASE_COORDINATOR_GPU_UUID"' in release
+    assert '"$RELEASE_MODEL_ID"' in release
+    assert '"$RELEASE_MODEL_REVISION"' in release
+    assert '"$CONCURRENCY"' in release
+    assert '"$KV_POOL_SIZE"' in release
+    assert '"$MEMORY_RESERVATION"' in release
+    assert '"$PREFIX_CACHE_ENTRIES"' in release
+    assert "SPARKINFER_GLM_H64" not in release
+
+    for launcher_name in ("scripts/run-wip.sh",):
         launcher = (ROOT / launcher_name).read_text(encoding="utf-8")
         assert "SPARKINFER_EXL3" in launcher
         assert "DS41RT_SPARKINFER_EXL3=$SPARKINFER_EXL3" in launcher

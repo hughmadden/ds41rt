@@ -155,13 +155,15 @@ args=(serve-native --snapshot "/root/.cache/huggingface/$snapshot_rel" --native-
 [[ -z "$MEMORY_RESERVATION" ]] || args+=(--memory-reservation "$MEMORY_RESERVATION")
 [[ "$DSPARK" != on ]] || args+=(--dspark)
 docker run -d --name "$coordinator" --restart no --gpus device="$RELEASE_COORDINATOR_GPU_UUID" --network host --ipc host --ulimit memlock=-1:-1 --device=/dev/infiniband -e "DS41RT_RELEASE_CONFIG_SHA256=$fingerprint" -v "$hf_home:/root/.cache/huggingface:ro" "$COORDINATOR_DOCKER_INFERENCE" ds41rt "${args[@]}" >/dev/null
-until curl -fsS "http://127.0.0.1:${ADDR##*:}/health" >/dev/null 2>&1; do
+api_url="http://127.0.0.1:${ADDR##*:}"
+until curl -fsS "$api_url/health" >/dev/null 2>&1 &&
+  release_api_advertises_model "$api_url" "$RELEASE_MODEL_ID"; do
   [[ "$(docker inspect -f '{{.State.Status}}' "$coordinator" 2>/dev/null)" == running ]] || { docker logs --tail 200 "$coordinator" >&2 || true; release_die "native coordinator exited during startup"; }
   ((SECONDS < deadline)) || { docker logs --tail 200 "$coordinator" >&2 || true; release_die "native API did not become ready"; }
   sleep 1
 done
 trap - ERR
-echo "DS41RT native API is ready at http://127.0.0.1:${ADDR##*:}/v1/"
+echo "DS41RT native API is ready at $api_url/v1/"
 echo "  model: $RELEASE_MODEL_ID@$RELEASE_MODEL_REVISION"
 echo "  cache: FP4 compressed source, FP8 SWA, FP4 index"
 echo "  concurrency: $CONCURRENCY; retained turns: $PREFIX_CACHE_ENTRIES"

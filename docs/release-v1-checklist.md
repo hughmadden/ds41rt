@@ -169,14 +169,14 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 
 ## Documentation and publication
 
-- [ ] README: headline numbers, short intro, Docker and source getting started,
+- [x] README: headline numbers, short intro, Docker and source getting started,
   host configuration, options, performance report, engineering report, thanks.
-- [ ] Place an execution-path SVG immediately below the README short intro,
+- [x] Place an execution-path SVG immediately below the README short intro,
   using `../glmrt-release/docs/balanced-path-execution.svg` as the visual reference
   and showing the final qualified native serving design (user addition September 12).
-- [ ] Concise engineering report covering the final design: kernels, scheduling,
+- [x] Concise engineering report covering the final design: kernels, scheduling,
   memory/storage, transport, optimizations, prefix caching, vision and API.
-- [ ] Complete performance report covering every suite item above.
+- [x] Complete performance report covering every suite item above.
 - [x] Record dev/main/release branch practice in the operation manual.
 - [ ] Validate and publish final amd64 and arm64 containers to GitHub; record
   digests and verify the published artifacts match the qualified pair.
@@ -192,10 +192,12 @@ Run the shared four-Spark target/dSpark workloads sequentially to avoid contenti
 ## Current evidence and next action
 
 The implementation, corrected-FP4 prefix/performance suite, memory/startup,
-three-run tool evaluation, dsh artifact and clean standard launcher gates are
-complete on the exact clean-built candidate. Remaining work is the README and
-engineering report, registry publication and digest verification, then the
-release branch, main, tag and GitHub release.
+three-run tool evaluation, dsh artifact, README, execution diagram, engineering
+report and clean standard launcher gates are complete. The release is numbered
+v3 because local repository history already contains the DS4RT v1 and v2 tags.
+Remaining work is a clean v3 metadata build/run equivalence check, registry
+publication and digest verification, then the release branch, main, tag and
+GitHub release.
 
 Release work began on branch dev from main. Existing user edits to .gitignore
 and run-agent.sh are preserved. The two development APIs were observed running

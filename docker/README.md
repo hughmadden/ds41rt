@@ -34,19 +34,23 @@ This changes build/distribution targets only; serving still requires four
 Spark ranks. `./wip.sh --slot NAME` provides the fingerprinted incremental
 workflow. Use each script's `--help` for its current options.
 
-## Runtime and release status
+## Runtime
 
-The full V4.1 execution path, inherited deployment defaults and release gates
-are still being migrated. The current `ds41rt.config` Pro EXL3 checkpoint and
-`v2` release tags are legacy configuration, not a qualified V4.1 deployment.
-[TO_SHIP_V1.md](../TO_SHIP_V1.md) tracks the remaining build/run work.
+[`../ds41rt.config`](../ds41rt.config) selects the official V4.1 Flash
+checkpoint and the v3 coordinator/worker images. `./run.sh` validates image,
+source, dependency, model, host and device identity before starting all five
+containers. The standard launch uses port 8000, concurrency 16, dSpark, the
+official 1,048,576/393,216 context/output limits, and 24 retained turns.
+
+Run `./run.sh --help` for per-launch concurrency, KV pool, total memory,
+retention, context, output, prefill and dSpark controls. Command-line values
+override the config without changing its defaults.
 
 Weights are mounted read-only from the host Hugging Face cache; containers do
 not bundle them. Preserve the cache's blob/snapshot symlink layout when
 mounting a checkpoint. Engram tables are mapped from host storage.
 
-Release artifacts must identify the same engine revision, verified b12x and
+Release artifacts identify the same engine revision, verified SparkInfer and
 XGrammar source, native architecture and checkpoint revision across all five
-hosts. Startup, model execution, API behavior, restart and performance must
-pass on those artifacts before container publication. An image build or a
-component fixture alone does not satisfy those gates.
+hosts. The [clean build/run report](../docs/release-v1-build-run.md) records the
+qualified workflow and artifact hashes.

@@ -11,6 +11,11 @@ Use the arrow keys, WASD or the on-screen direction pad. The game renders its
 lanes, vehicles, logs, turtles and frog directly through WebGL2 with a WebGL1
 fallback and inline shaders; it never requests a Canvas 2D context.
 
+GitHub Pages deployment `34711176539` completed successfully. A direct fetch of
+the public page returned 15,763 bytes with SHA-256
+`187d2e5a22e7477d59752b1e3982b98e6fa0a5df760f4b03cc2acceb8db6c185`,
+identical to the committed artifact.
+
 ## Measured execution
 
 | Measurement | Result |

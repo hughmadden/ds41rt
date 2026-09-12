@@ -105,5 +105,17 @@
     "All aggregate usage fields are sums reported by the harness across model steps; cached context is therefore counted once per step in cache_read_tokens.",
     "The successful run fixed swept platform overlap/carry and teleport wrap handling before its final checks.",
     "The browser screenshot visibly contains the WebGL game board; a shader or program initialization exception would have prevented those draw calls."
-  ]
+  ],
+  "publication": {
+    "provider": "GitHub Pages",
+    "source_branch": "dev",
+    "source_path": "/docs",
+    "deployment_run": 34711176539,
+    "deployment_status": "success",
+    "http_status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "published_bytes": 15763,
+    "published_sha256": "187d2e5a22e7477d59752b1e3982b98e6fa0a5df760f4b03cc2acceb8db6c185",
+    "matches_committed_artifact": true
+  }
 }
