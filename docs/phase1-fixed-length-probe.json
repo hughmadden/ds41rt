@@ -1,0 +1,108 @@
+{
+  "scope": "Instrumented fixed-length C1 probe; three code/fable/topic samples per limit; no uninstrumented throughput or output-equivalence claim.",
+  "source": "adefb75",
+  "limits": [
+    {
+      "draft_limit": 1,
+      "passed": true,
+      "costs": [
+        {
+          "requests": 1,
+          "verifier_rows": 2,
+          "samples": 1028,
+          "draft_us": {
+            "median": 2875.5,
+            "minimum": 2391,
+            "maximum": 7956
+          },
+          "verify_us": {
+            "median": 27124.0,
+            "minimum": 25413,
+            "maximum": 51173
+          },
+          "total_us": {
+            "median": 30562.0,
+            "minimum": 28922,
+            "maximum": 54358
+          }
+        }
+      ],
+      "case_median_instrumented_tps": {
+        "code": 63.9868034862713,
+        "fable": 49.91690997060223,
+        "topic": 55.143180595278565
+      },
+      "raw_sha256": "2d8c09a94c0601ef831f817d2350d9008f3aa505057b9d7434406653c5cba21e",
+      "trace_sha256": "6d19231165de95eec33f7036107dba238eecb3920d3ac25d5d3fe116ef00e0ae"
+    },
+    {
+      "draft_limit": 3,
+      "passed": true,
+      "costs": [
+        {
+          "requests": 1,
+          "verifier_rows": 4,
+          "samples": 689,
+          "draft_us": {
+            "median": 2874,
+            "minimum": 2397,
+            "maximum": 7912
+          },
+          "verify_us": {
+            "median": 33125,
+            "minimum": 30273,
+            "maximum": 58840
+          },
+          "total_us": {
+            "median": 36500,
+            "minimum": 33793,
+            "maximum": 67525
+          }
+        }
+      ],
+      "case_median_instrumented_tps": {
+        "code": 99.36357082278604,
+        "fable": 50.36554859687915,
+        "topic": 66.67537113115702
+      },
+      "raw_sha256": "becb9a75360cd08a6d5002f7e013075496435dd45a746250eb8e3989d3c8c5b7",
+      "trace_sha256": "194075b1ed26d52b554c13185080a8405d188aeb17a0065df0429288a37312bf"
+    },
+    {
+      "draft_limit": 5,
+      "passed": true,
+      "costs": [
+        {
+          "requests": 1,
+          "verifier_rows": 6,
+          "samples": 643,
+          "draft_us": {
+            "median": 2881,
+            "minimum": 2398,
+            "maximum": 7960
+          },
+          "verify_us": {
+            "median": 38993,
+            "minimum": 35041,
+            "maximum": 65538
+          },
+          "total_us": {
+            "median": 42466,
+            "minimum": 38508,
+            "maximum": 74018
+          }
+        }
+      ],
+      "case_median_instrumented_tps": {
+        "code": 116.90361426971617,
+        "fable": 44.09323003117886,
+        "topic": 62.11917566659898
+      },
+      "raw_sha256": "6ca7aadd326460edecf7fa9c968210fda104bed9f7eb14a0847e49cfcf0026d9",
+      "trace_sha256": "0cd958b5d4a886e9d6b8c9ec66380fb711b819aa157d2e78becfa93e10e77cf4"
+    }
+  ],
+  "exact_output_matches_limit1_vs5": 1,
+  "paired_samples": 9,
+  "next_gate": "Investigate earliest divergence and logits before enabling adaptive policy."
+}
