@@ -54,7 +54,9 @@ gate below is satisfied merely by an older component test.
   now enforces strict arguments, selection and parallel-call policy, including
   high thinking and independent JSON/SSE completion validation. Remaining
   parameter-schema generation cases and broader tool-eval qualification keep
-  this gate open.
+  this gate open. [Additional-name exclusions](release-v1-tool-exclusions.md)
+  now prevent additional arguments from bypassing declared value constraints;
+  overlapping pattern-value constraints remain open.
 - [ ] Restore architectural compressed KV to FP4 E2M1 with group-16 E4M3
   scales; retain FP8 SWA and the independent FP4 index format. The previous
   FP8-only interpretation was incorrect (user clarification September 12).

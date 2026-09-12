@@ -121,6 +121,7 @@ if(DS41RT_ENABLE_XGRAMMAR)
   list(FILTER DS41RT_XGRAMMAR_SOURCES EXCLUDE REGEX "/cpp/grammar_functor\\.cc$")
   list(APPEND DS41RT_XGRAMMAR_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_unicode.cc")
   list(APPEND DS41RT_XGRAMMAR_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/v41_xgrammar_schema.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/xgrammar_regular.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/xgrammar_v41_tools.cc")
   add_library(ds41rt_xgrammar STATIC ${DS41RT_XGRAMMAR_SOURCES})
   target_include_directories(ds41rt_xgrammar PRIVATE
@@ -898,6 +899,11 @@ enable_testing()
 add_test(NAME ds41rt_native_selftest COMMAND ds41rt_native_selftest)
 
 if(DS41RT_ENABLE_XGRAMMAR)
+  add_executable(ds41rt_xgrammar_regular_selftest tests/xgrammar_regular_selftest.cc)
+  target_link_libraries(ds41rt_xgrammar_regular_selftest PRIVATE ds41rt_xgrammar)
+  target_include_directories(ds41rt_xgrammar_regular_selftest PRIVATE
+    "${DS41RT_XGRAMMAR_SOURCE_DIR}/cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  add_test(NAME ds41rt_xgrammar_regular_selftest COMMAND ds41rt_xgrammar_regular_selftest)
   add_executable(ds41rt_xgrammar_selftest tests/xgrammar_selftest.cc)
   target_link_libraries(ds41rt_xgrammar_selftest PRIVATE ds41rt_native)
   target_compile_definitions(ds41rt_xgrammar_selftest PRIVATE

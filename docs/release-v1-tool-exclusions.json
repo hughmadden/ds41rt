@@ -1,0 +1,21 @@
+{
+  "scope": "Fixed-name exclusion and bounded regular-language component qualification; overlapping patternProperties and serving performance remain open.",
+  "parent_commit": "e9628e34f075f9b15221baa957e466e8f949dda8",
+  "source_sha256": {
+    "native/CMakeLists.txt": "a0501bafffdb41d87906ede71007fc981f03f2713eff7adbed91bdf85bd374c8",
+    "native/src/xgrammar_regular.cc": "d721f5fff25dbabc4f535744e3f66551a65474f263928e53c603d7bf1fa4fde1",
+    "native/src/xgrammar_regular.h": "be5b70bdbd97c9f882fb183601bd5f1354bba8b9dd4e65c9bf46e7461add402c",
+    "native/src/xgrammar_v41_tools.cc": "005a64cb96bdc017f926d8a1aaaae5011037d862ac3323fba4580d053d20ca69",
+    "native/src/xgrammar_v41_tools.h": "e1b306e5e4e7ada4d420fac6c4da6d4d9256edc7531bfd0050513229ec3061ad",
+    "native/tests/xgrammar_regular_selftest.cc": "e0fa8d9c31557dc9cd6a02969e2cb87afe37abebf8453462bd21333cf189758b",
+    "scripts/qualify-ds41-tool-grammar.py": "0e6fa8f3ebe3b7df9ba850a2bc3cd2da0f2c27fbb8f83b3cce52c173b423d902"
+  },
+  "native_library_sha256": "5748398ae44ecf1a8dd81babd291388ecaabef39ff76daaae2cb350dd1e6c235",
+  "regular_selftest_sha256": "83b2002981cfa001480a5886a800e85b8aaa4628e793606c64ff634a17c6d7e7",
+  "regular_language_comparisons": 135945,
+  "tokenizer_groups": 79,
+  "tokenizer_sequences": 181,
+  "compile_errors": 3,
+  "passed": true,
+  "evidence_sha256": "d51f81cb72965138f78dce50637784575d2071c61a7c4fb0383c2aa5cc071059"
+}

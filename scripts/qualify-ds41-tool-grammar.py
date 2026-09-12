@@ -46,6 +46,21 @@ def object_schema(properties):return dict(type='object',properties=properties,re
 
 cases=[]
 def case(name,schema,good,bad): cases.append((name,schema,good,bad))
+for names in [False, True]:
+    schema = dict(type='object', properties={'a':{'const':1},'台北':{'const':2}}, additionalProperties={'type':'integer'})
+    if names: schema['propertyNames'] = {'pattern':'^[^]*$'}
+    case('additional-excludes-fixed'+('-names' if names else ''), schema,
+         [arguments({'a':1,'台北':2})+'\n'+parameter('other',3), arguments({'other':3})],
+         [arguments({'a':9}), arguments({'台北':9}),
+          parameter('a',1)+'\n'+parameter('a',9),
+         parameter('台北',2)+'\n'+parameter('台北',9)])
+case('additional-excludes-escaped-fixed',
+     dict(type='object', properties={'a b"\\\n😀':{'const':1}}, additionalProperties={'type':'integer'}),
+     [parameter('a b"\\\n😀',1), parameter('other',2)],
+     [parameter('a b"\\\n😀',2), parameter('a b"\\\n😀',1)+'\n'+parameter('a b"\\\n😀',2)])
+case('property-names-no-remaining-additional',
+     dict(type='object', properties={'a':{'const':1}}, propertyNames={'enum':['a']}, additionalProperties={'type':'integer'}),
+     ['', parameter('a',1)], [parameter('a',2), parameter('b',1), parameter('a',1)+'\n'+parameter('a',1)])
 case('typed-scalars',object_schema({'flag':{'type':'boolean'},'n':{'type':'integer','minimum':42,'maximum':42},'nil':{'type':'null'},'s':{'type':'string','enum':['42']}}),
     [arguments(dict(flag=True,n=42,nil=None,s='42'))],
     [arguments(dict(flag=True,n='42',nil=None,s='42')),arguments(dict(flag='true',n=42,nil=None,s='42')),arguments(dict(flag=True,n=42,nil=None,s=42)),arguments(dict(flag=True,n=41,nil=None,s='42'))])

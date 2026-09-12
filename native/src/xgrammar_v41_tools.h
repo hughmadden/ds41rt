@@ -36,6 +36,8 @@ class V41ToolCallingConverter : public JSONSchemaConverter {
   std::string Flag(const std::string&, bool string = false) const;
   std::string EncodedString(const StringSpec&);
   std::string GenerateNamedObject(const ObjectSpec&, const std::string&);
+  std::string NamePatternExcluding(const SchemaSpecPtr&,
+      const std::vector<ObjectSpec::Property>&);
 };
 std::string V41ToolSchemaToEBNF(const picojson::value& schema, bool strict);
 }  // namespace xgrammar

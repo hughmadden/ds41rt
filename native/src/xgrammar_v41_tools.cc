@@ -1,4 +1,5 @@
 #include "xgrammar_v41_tools.h"
+#include "xgrammar_regular.h"
 #include "regex_converter.h"
 #include "grammar_functor.h"
 #include "grammar_printer.h"
@@ -297,9 +298,7 @@ std::string V41ToolCallingConverter::GenerateNamedObject(const ObjectSpec& spec,
   indent_manager_.StartIndent();
   std::string other;
   if (additional) {
-    key_context_ = true;
-    auto key = CreateRule(spec.property_names, name + "_name");
-    key_context_ = false;
+    auto key = NamePatternExcluding(spec.property_names, properties);
     auto value = CreateRule(additional, name + "_additional");
     other = FormatOtherProperty(key, value, name, "name");
   }
@@ -353,7 +352,26 @@ std::string V41ToolCallingConverter::GetKeyPattern() const {
 }
 std::string V41ToolCallingConverter::GetKeyPatternExcluding(
     const std::vector<ObjectSpec::Property>& properties, const std::string& name) {
-  return level_ == 1 ? kKey : JSONSchemaConverter::GetKeyPatternExcluding(properties, name);
+  return level_ == 1 ? NamePatternExcluding(SchemaSpec::Make(StringSpec{}), properties)
+      : JSONSchemaConverter::GetKeyPatternExcluding(properties, name);
+}
+std::string V41ToolCallingConverter::NamePatternExcluding(const SchemaSpecPtr& spec,
+    const std::vector<ObjectSpec::Property>& properties) {
+  V41ToolCallingConverter names(resolver_);
+  names.key_context_ = true;
+  names.level_ = 1;
+  auto allowed = V41RegularFSM(Grammar::FromEBNF(names.Convert(spec)));
+  if (!properties.empty()) {
+    EnumSpec excluded;
+    for (const auto& property : properties)
+      excluded.json_values.push_back(picojson::value(property.name).serialize(false));
+    V41ToolCallingConverter fixed(resolver_);
+    fixed.key_context_ = true;
+    fixed.level_ = 1;
+    allowed = V41Subtract(allowed,
+        V41RegularFSM(Grammar::FromEBNF(fixed.Convert(SchemaSpec::Make(excluded)))));
+  }
+  return V41EmitFSM(allowed, ebnf_script_creator_);
 }
 std::string V41ToolCallingConverter::NextSeparator(bool end) {
   return level_ == 1 ? GetWhitespacePattern() : JSONSchemaConverter::NextSeparator(end);
