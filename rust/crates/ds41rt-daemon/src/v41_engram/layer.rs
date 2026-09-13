@@ -388,7 +388,7 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready_rows = None;
-        self.synchronize()?;
+        self.stream.require_complete()?;
         if let Some((graph, _)) = self.graph.take() {
             unsafe {
                 self.weights.library.cuda_graph_exec_destroy(graph)?;

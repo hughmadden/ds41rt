@@ -176,7 +176,7 @@ impl<'w, 'a> AttentionOutputWave<'w, 'a> {
                 && weights.grouped_scales.buffer.device_id == self.b(0).device_id,
             "attention rebound weight library or device differs"
         );
-        self.synchronize()?;
+        self.stream.require_complete()?;
         self.weights = weights;
         Ok(())
     }
@@ -212,13 +212,16 @@ impl AttentionOutputWave<'_, '_> {
         Ok(())
     }
     unsafe fn enqueue(&mut self, rows: u32) -> Result<()> {
+        unsafe { self.enqueue_on(rows, self.stream.raw) }
+    }
+    unsafe fn enqueue_on(&mut self, rows: u32, stream: *mut std::ffi::c_void) -> Result<()> {
         unsafe {
             self.norm.backbone_frequencies(
                 self.b(3),
                 self.b(4),
                 rows,
                 self.weights.layer as u32,
-                self.stream.raw,
+                stream,
             )?;
             self.grouped.launch_rope(
                 self.b(0),
@@ -229,7 +232,7 @@ impl AttentionOutputWave<'_, '_> {
                 self.alpha.buffer,
                 self.b(1),
                 rows,
-                self.stream.raw,
+                stream,
             )?;
             self.kernel.launch(
                 self.b(1),
@@ -239,7 +242,7 @@ impl AttentionOutputWave<'_, '_> {
                 self.alpha.buffer,
                 self.b(2),
                 rows,
-                self.stream.raw,
+                stream,
             )?;
         }
         Ok(())
@@ -267,15 +270,18 @@ impl AttentionOutputWave<'_, '_> {
         unsafe {
             self.execute(rows)?;
         }
+        unsafe { self.capture_ready_on(rows, self.stream.raw) }
+    }
+    unsafe fn capture_ready_on(&mut self, rows: u32, stream: *mut std::ffi::c_void) -> Result<()> {
         self.ready = None;
         self.origin = None;
         unsafe {
             self.stream
                 .library
-                .cuda_graph_begin_capture(self.stream.raw)?;
+                .cuda_graph_begin_capture(stream)?;
         }
-        let launched = unsafe { self.enqueue(rows) };
-        let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+        let launched = unsafe { self.enqueue_on(rows, stream) };
+        let captured = unsafe { self.stream.library.cuda_graph_end_capture(stream) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
                 if let Err(error) = unsafe {
@@ -396,6 +402,47 @@ impl AttentionOutputWave<'_, '_> {
         unsafe { self.stream.library.cuda_graph_launch(graph, stream)?; }
         let mut output = self.b(2);
         output.bytes = attention.rows * ROW_BYTES[2];
+        Ok(output)
+    }
+    /// # Safety
+    /// Retain attention and this wave through the containing stream's completion.
+    /// None means warmup is queued and finish_prepared must follow a cooperative wait.
+    pub unsafe fn enqueue_attention_prepared(&mut self,
+        attention: &crate::v41_sparse_attention::QueuedSparseAttention, tokens: &[u64],
+        stream: *mut std::ffi::c_void) -> Result<Option<Ds41rtDeviceBuffer>> {
+        self.ready = None;
+        self.origin = None;
+        ensure!(attention.layer == self.weights.layer && attention.rows == tokens.len()
+            && attention.rows > 0 && attention.rows <= self.capacity as usize
+            && attention.values.device_id == self.b(0).device_id,
+            "queued attention output origin differs");
+        for (dst, token) in self.position_staging.bytes_mut().chunks_exact_mut(8).zip(tokens) {
+            dst.copy_from_slice(&token.to_ne_bytes());
+        }
+        unsafe {
+            self.stream.library.copy_d2d_async(self.b(0), attention.values, attention.values.bytes, stream)?;
+            self.stream.library.copy_host_buffer_h2d_async(self.positions(), self.position_staging.buffer,
+                tokens.len() * 8, stream)?;
+        }
+        let rows = attention.rows as u32;
+        if self.graphs.get_shape(self.weights.layer, self.weights, rows).is_none() {
+            unsafe { self.enqueue_on(rows, stream)?; }
+            return Ok(None);
+        }
+        unsafe { self.replay_prepared(rows, stream).map(Some) }
+    }
+    /// # Safety
+    /// Queued warmup on stream has completed; retain all storage through replay.
+    pub unsafe fn finish_prepared(&mut self, rows: u32,
+        stream: *mut std::ffi::c_void) -> Result<Ds41rtDeviceBuffer> {
+        unsafe { self.capture_ready_on(rows, stream)?; self.replay_prepared(rows, stream) }
+    }
+    unsafe fn replay_prepared(&self, rows: u32, stream: *mut std::ffi::c_void) -> Result<Ds41rtDeviceBuffer> {
+        let (graph, count) = self.graphs.get_shape(self.weights.layer, self.weights, rows)
+            .context("prepared output graph missing")?;
+        ensure!(count == rows, "prepared output graph shape differs");
+        unsafe { self.stream.library.cuda_graph_launch(graph, stream)?; }
+        let mut output = self.b(2); output.bytes = rows as usize * ROW_BYTES[2];
         Ok(output)
     }
     pub fn output(&self) -> Result<AttentionOutput<'_>> {

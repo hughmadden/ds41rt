@@ -31,19 +31,19 @@ is fully asynchronous.
 | --- | --- | --- |
 | Token upload, embedding and mHC/query | Candidate writes embeddings directly into block inputs and waits cooperatively after the query chain; subsequent queries also wait cooperatively | Accepted after broader sweep; finish adjacent blocking work |
 | Cache production and index selection | [Production and index now poll together](phase1-queued-index.md), with projection overlapping production and guarded selection completion | Combined checkpoint versus e9c07ae: C1 −1.3%, median C2–C14 −0.34%, C16 −12.5%; costs remain unresolved |
-| Attention through FFN input preparation | [Queued completion](phase1-queued-attention.md) retains lane consumers and drains before cancellation/reuse, with no shared bank borrow across the wait | Implemented; cold attention graph setup still blocks |
+| Attention through FFN input preparation | [Queued completion](phase1-queued-attention.md) retains lane consumers and drains before cancellation/reuse, with no shared bank borrow across the wait | Implemented; [cold sparse/projection warmup now yields](phase1-queued-sparse.md) |
 | Router, shared FFN and local experts | [Cooperative router/shared/local completion](phase1-queued-ffn.md) retains inputs and drains cancellation; route exports keep their existing owned staging | Implemented, including cold router/shared warmup; remaining final mHC and advance follow below |
 | FFN completion and layer advance | [Queued layer completion](phase1-queued-layer.md) chains final mHC and next-input copies, waits once, and marks copies ready for advance | Implemented with exact output/copy and cancellation/reuse checks; high-concurrency cost remains unresolved |
 | Engram gate at layers 1 and 14 | [Owned gather leases leave the shared request borrow](phase1-queued-layer.md); pinned H2D/dequantization and gate/residual completion now wait cooperatively | Implemented with direct output parity, cold/warm and cancellation/reuse checks |
 | dSpark taps at layers 37–39 | `TargetTapWave::capture_cooperative` retains prepared input and waits cooperatively before the next query | Implemented; batch/order check and full serving checks pass |
-| Weight rebind | Query/projection/shared/router owners synchronize their own streams before rebinding | Establish already-complete ownership before removing redundant waits; a source search alone cannot establish their measured cost |
+| Weight rebind | Query/projection/shared/router/mHC owners require already-complete streams through nonblocking queries | Fixture cancellation/reuse checks pass; aggregate dynamic wait counts are recorded separately |
 | Cold graph setup and eviction | LayerGraphs retains small shapes per layer; insertion/eviction requires completed launches, and capture remains synchronous | Never suspend between begin/end capture; containing owners must drain before replacing or destroying captured storage |
 
 The combined attention graph archived in
-`phase1-attention-graph-candidate.patch` still applies cleanly to the current
-worktree. It is a later performance experiment, not evidence that these host
-waits have disappeared. Keep its original rejected results intact and record the
-new independent-lane comparison separately.
+`phase1-attention-graph-candidate.patch` now needs adaptation to the changed block,
+mHC and sparse-preparation interfaces (`git apply --check` reports conflicts in
+those three files). It remains a later performance experiment. Keep its original
+rejected results intact and record the new independent-lane comparison separately.
 
 ## Current candidate evidence
 
@@ -53,18 +53,30 @@ and C16 181.77 → 162.87. The two follow-up C16 pairs also decline: 167.66 → 
 165.10 → 159.84 tok/s. See [the accepted change and both sets of evidence](phase1-chained-query.md). Exact embedding/image and 56 real-weight query cases,
 cache reuse, cancellation/recovery and high-thinking constrained checks pass.
 
+## Dynamic audit follow-up
+
+[The CUDA trace](phase1-queued-sparse.md) finds 37,046 → 3,404 stream-synchronize
+calls and 981 → 101 ms API time in matched four-second C16 windows. Cold sparse,
+projection and head warmup now yield; completed-owner rebind/eviction checks no
+longer synchronize. This is measured host API time, not a throughput gain.
+
+Draft replay completion already polls, but its setup does not: `poll_propose`
+calls synchronous seed upload, terminal RNG/temperature preparation and cold
+chain capture; replay uploads stage descriptors synchronously. These must become
+owned queued work. The remaining 3,404 calls also require further attribution;
+draft setup alone has not been shown to explain them all.
+
 ## Remaining completion order
 
-1. Convert cold sparse graph staging/warmup to owned pending work, with completed
-   launches before graph eviction. Capture must remain synchronous with no await
-   between begin/end; replay completion is already cooperative.
-2. Recheck warm decode and shape changes, including rebind and cancellation.
-   Own-stream synchronizations after already-completed work must be distinguished
-   from waits for unfinished GPU work; audit both explicitly.
-3. Resolve the [latest accumulated C14–C16 loss](phase1-queued-layer.md), retaining
-   frozen e9c07ae and earlier curves. Then revisit the plausible C1 candidates and
-   perform the scoped v2 qualification. Do not treat the current checkpoint as
-   release-qualified merely because its functional checks pass.
+1. Queue draft seeds, sampling inputs and stage descriptors with owned pinned
+   staging; convert cold chain warmup into pending work. Keep request RNG and
+   window reservations alive, including cancellation and error cleanup.
+2. Repeat the dynamic audit through warm decode and shape changes. Remove or
+   explain remaining host-blocking GPU waits; never suspend inside graph capture.
+3. Resolve accumulated high-concurrency performance uncertainty, retaining
+   frozen e9c07ae and every earlier curve. The latest intermediate C16 result is
+   −3.1%, versus −18.5% in the preceding checkpoint; neither gets discarded.
+   Then revisit plausible C1 candidates and run the scoped release qualification.
 
 The mHC/layer, Engram and tap work is now implemented. These steps preserve the
 full asynchronous-loop objective rather than narrowing it to explicit round joins.

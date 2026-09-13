@@ -97,13 +97,31 @@ enum Phase {
 /// caller also retains the batch cache producers and index storage while pending.
 pub(crate) struct PendingLaneFfn<'s, 'w, 'a> {
     lane: Option<&'s mut BackboneLane<'w, 'a>>,
-    values: Ds41rtDeviceBuffer,
+    values: Option<Ds41rtDeviceBuffer>,
+    projection_warmup: Option<u32>,
 }
 impl<'s, 'w, 'a> PendingLaneFfn<'s, 'w, 'a> {
     pub async fn complete(mut self) -> Result<LaneFfn<'s, 'w, 'a>> {
+        if self.values.is_none() && self.projection_warmup.is_none() {
+            let lane = self.lane.as_deref_mut().unwrap();
+            let attention = unsafe { lane.sparse.finish_prepare().await? };
+            let stream = lane.sparse.chain_stream();
+            let query = lane.query.output()?;
+            if let Some(projected) = unsafe { lane.projection.enqueue_attention_prepared(&attention, query.tokens()?, stream)? } {
+                self.values = Some(unsafe { lane.block.enqueue_ffn(query.binding()?, attention.rows, projected, stream)? });
+            } else { self.projection_warmup = Some(attention.rows as u32); }
+        }
+        if let Some(rows) = self.projection_warmup.take() {
+            let lane = self.lane.as_deref_mut().unwrap();
+            lane.sparse.wait_chain().await?;
+            let stream = lane.sparse.chain_stream();
+            let projected = unsafe { lane.projection.finish_prepared(rows, stream)? };
+            let binding = lane.query.output()?.binding()?;
+            self.values = Some(unsafe { lane.block.enqueue_ffn(binding, rows as usize, projected, stream)? });
+        }
         self.lane.as_ref().unwrap().sparse.wait_chain().await?;
         let lane = self.lane.take().unwrap();
-        let input = unsafe { lane.block.complete_queued_ffn(self.values)? };
+        let input = unsafe { lane.block.complete_queued_ffn(self.values.unwrap())? };
         lane.phase = Phase::Ffn;
         Ok(LaneFfn { input, cooperative: true, shared: &mut lane.shared, router: &mut lane.router,
             library: lane.weights.library, phase: &mut lane.phase,
@@ -523,17 +541,21 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         let requests = cache.attention_requests();
         let query = self.query.output()?;
         let binding = query.binding()?;
-        let tokens = query.tokens()?;
-        let result = unsafe { self.sparse.enqueue_query_then(&query, sink, &requests, selection.as_ref(),
-            |attention, stream| {
-                let projected = self.projection.enqueue_attention(&attention, tokens, stream)?;
-                self.block.enqueue_ffn(binding, attention.rows, projected, stream)
-            }) };
-        match result {
-            Ok(values) => Ok(PendingLaneFfn { lane: Some(self), values }),
-            Err(error) => { self.block.reset(); self.phase = Phase::Invalid; Err(error) }
+        query.tokens()?;
+        // Construct the guard before submitting so partial failures and unwinding
+        // drain before any external query/cache/selection owner can be reused.
+        let mut pending = PendingLaneFfn { lane: Some(self), values: None, projection_warmup: None };
+        let lane = pending.lane.as_deref_mut().unwrap();
+        let query = lane.query.output()?;
+        if let Some(attention) = unsafe { lane.sparse.enqueue_query_prepared(&query, sink, &requests, selection.as_ref())? } {
+            let stream = lane.sparse.chain_stream();
+            if let Some(projected) = unsafe { lane.projection.enqueue_attention_prepared(&attention, query.tokens()?, stream)? } {
+                pending.values = Some(unsafe { lane.block.enqueue_ffn(binding, attention.rows, projected, stream)? });
+            } else { pending.projection_warmup = Some(attention.rows as u32); }
         }
+        Ok(pending)
     }
+
     /// Produce learned index selections from this lane's completed query.
     /// # Safety
     /// Cache proposals correspond to the same admitted query batch, with all

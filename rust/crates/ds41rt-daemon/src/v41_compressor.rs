@@ -706,7 +706,7 @@ impl CompressorWave<'_, '_> {
             && query.tokens()?.iter().copied().eq(chunks.iter().flat_map(|c|
                 c.position..c.position + u64::from(c.tokens))), "queued cache query differs");
         let capture = self.graph.is_none_or(|(_, rows, owner)| rows != prepared.rows || owner != state.owner);
-        if capture { self.clear_graph()?; }
+        if capture { self.clear_graph_inner(false)?; }
         let result = (|| -> Result<()> {
             unsafe { self.stream.library.copy_d2d_async(self.input.buffer, query.hidden,
                 query.hidden.bytes, self.stream.raw)?; }
@@ -969,10 +969,13 @@ impl CompressorWave<'_, '_> {
         Ok(())
     }
     pub fn clear_graph(&mut self) -> Result<()> {
+        self.clear_graph_inner(true)
+    }
+    fn clear_graph_inner(&mut self, drain: bool) -> Result<()> {
         ensure!(self.pending_query.is_none(), "cannot clear pending cache query");
         ensure!(self.pending_commit.is_none(), "cannot reset a pending source commit");
         self.ready = None;
-        self.synchronize()?;
+        if drain { self.synchronize()?; } else { self.stream.require_complete()?; }
         if let Some((graph, _, _)) = self.graph.take() {
             unsafe {
                 self.stream.library.cuda_graph_exec_destroy(graph)?;

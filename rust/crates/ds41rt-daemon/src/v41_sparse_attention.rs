@@ -65,12 +65,25 @@ pub(crate) struct SparseAttentionWave<'a> {
     graphs: [VecDeque<(*mut c_void, Vec<usize>)>; 40],
     graph_limit: usize,
     warmed_kernels: u16,
+    cold: Option<ColdSparse>,
 }
 struct RequestLaunch {
     window: V41SparseWindow,
     source: Option<V41SparseSource>,
     rows: usize,
     width: usize,
+}
+// Owned launch description; the containing lane guard retains all referenced
+// query/cache/selection allocations until warmup, replay and consumers finish.
+struct ColdSparse {
+    layer: usize,
+    rows: usize,
+    sink: Ds41rtDeviceBuffer,
+    launches: Vec<RequestLaunch>,
+    selected: Option<Ds41rtDeviceBuffer>,
+    batch: Option<V41SparseBatch>,
+    fingerprint: Vec<usize>,
+    needed: u16,
 }
 fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {
     debug_assert!(offset + bytes <= b.bytes);
@@ -114,6 +127,7 @@ impl<'a> SparseAttentionWave<'a> {
             graphs: std::array::from_fn(|_| VecDeque::new()),
             graph_limit: 1,
             warmed_kernels: 0,
+            cold: None,
         })
     }
     pub fn enable_small_graph_shapes(&mut self) { self.graph_limit = 48; }
@@ -124,7 +138,7 @@ impl<'a> SparseAttentionWave<'a> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
     pub fn clear_graph(&mut self) -> Result<()> {
-        self.synchronize()?;
+        self.drain_chain()?;
         // Attempt every destruction even if one CUDA call reports an error.
         let mut failure = None;
         for graph in &mut self.graphs {
@@ -247,22 +261,63 @@ impl<'a> SparseAttentionWave<'a> {
         requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
         consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>,
     ) -> Result<T> {
-        unsafe { self.query_then(query, sink, requests, selection, consume, false) }
-    }
-    /// # Safety
-    /// Same inputs as execute_query_then, but the caller must retain all cache,
-    /// selection and consumer storage until completion or a drained abort.
-    pub unsafe fn enqueue_query_then<T>(&mut self, query: &AttentionQueryOutput<'_>,
-        sink: Ds41rtDeviceBuffer, requests: &[AttentionRequest<'_>],
-        selection: Option<&IndexSelectionOutput<'_>>,
-        consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>) -> Result<T> {
-        unsafe { self.query_then(query, sink, requests, selection, consume, true) }
+        unsafe { self.query_then(query, sink, requests, selection, consume) }
     }
     pub async fn wait_chain(&self) -> Result<()> { self.stream.wait().await }
-    pub fn drain_chain(&self) -> Result<()> { self.synchronize() }
+    pub fn drain_chain(&mut self) -> Result<()> {
+        let drained = self.synchronize(); self.cold = None; drained
+    }
+    pub fn chain_stream(&self) -> *mut c_void { self.stream.raw }
+    /// # Safety
+    /// Retain query/cache/selection buffers until warmup and downstream consumers
+    /// complete or drain. No new submission may reuse this owner while pending.
+    pub unsafe fn enqueue_query_prepared(&mut self, query: &AttentionQueryOutput<'_>,
+        sink: Ds41rtDeviceBuffer, requests: &[AttentionRequest<'_>],
+        selection: Option<&IndexSelectionOutput<'_>>) -> Result<Option<QueuedSparseAttention>> {
+        ensure!(self.cold.is_none(), "cold attention preparation already pending");
+        let binding = query.binding()?;
+        let tokens = query.tokens()?;
+        ensure!(query.rows == tokens.len() && query.rows <= self.capacity
+            && query.rotated.device_id == self.query.buffer.device_id
+            && requests.iter().flat_map(|r| r.positions.iter().copied()).eq(tokens.iter().copied()),
+            "attention query token order or device differs");
+        if let Some(s) = selection { s.validate_query(binding)?; }
+        let result = (|| unsafe {
+            self.stream.library.copy_d2d_async(self.query.buffer, query.rotated, query.rotated.bytes, self.stream.raw)?;
+            self.execute_staged_inner(query.layer, sink, requests, selection, true)
+        })();
+        if result.is_err() { self.drain_chain()?; }
+        result
+    }
+    /// # Safety
+    /// The caller retains the external inputs represented by the owned cold plan.
+    /// Returned attention is queued, ready for consumers on chain_stream().
+    pub async unsafe fn finish_prepare(&mut self) -> Result<QueuedSparseAttention> {
+        let plan = self.cold.take().context("cold attention preparation absent")?;
+        #[cfg(test)]
+        eprintln!("queued sparse warmup layer={} rows={} batched={}", plan.layer, plan.rows, plan.batch.is_some());
+        self.stream.wait().await?;
+        self.warmed_kernels |= plan.needed;
+        let graph = unsafe { self.capture_plan(&plan)? };
+        self.graphs[plan.layer].push_back((graph, plan.fingerprint));
+        let launched = unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw) };
+        if let Err(error) = launched { self.synchronize()?; return Err(error); }
+        Ok(QueuedSparseAttention { values: slice(self.output.buffer, 0, plan.rows * 65536),
+            layer: plan.layer, rows: plan.rows })
+    }
+    unsafe fn capture_plan(&self, plan: &ColdSparse) -> Result<*mut c_void> {
+        unsafe { self.stream.library.cuda_graph_begin_capture(self.stream.raw)?; }
+        let launched = unsafe { self.enqueue(plan.sink, &plan.launches, plan.selected, plan.batch.as_ref()) };
+        let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+        match (launched, captured) {
+            (Ok(()), Ok(graph)) => Ok(graph),
+            (Err(error), Ok(graph)) => { unsafe { self.stream.library.cuda_graph_exec_destroy(graph)?; } Err(error) }
+            (Err(error), Err(_)) | (Ok(()), Err(error)) => Err(error),
+        }
+    }
     unsafe fn query_then<T>(&mut self, query: &AttentionQueryOutput<'_>, sink: Ds41rtDeviceBuffer,
         requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
-        consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>, defer: bool) -> Result<T> {
+        consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>) -> Result<T> {
         let binding = query.binding()?;
         let tokens = query.tokens()?;
         ensure!(query.rows == tokens.len() && query.rows <= self.capacity
@@ -287,10 +342,6 @@ impl<'a> SparseAttentionWave<'a> {
             let queued = self.execute_staged(query.layer, sink, requests, selection)?;
             consume(queued, stream)
         })();
-        if defer && result.is_ok() {
-            drain.2 = true;
-            return result;
-        }
         let drained = unsafe { library.cuda_stream_synchronize(stream) };
         drain.2 = true;
         result.and_then(|v| drained.map(|()| v))
@@ -302,6 +353,13 @@ impl<'a> SparseAttentionWave<'a> {
         requests: &'s [AttentionRequest<'s>],
         selection: Option<&'s IndexSelectionOutput<'s>>,
     ) -> Result<QueuedSparseAttention> {
+        unsafe { self.execute_staged_inner(layer, sink, requests, selection, false)? }
+            .context("direct attention unexpectedly deferred")
+    }
+    unsafe fn execute_staged_inner(&mut self, layer: usize, sink: Ds41rtDeviceBuffer,
+        requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
+        defer_warmup: bool) -> Result<Option<QueuedSparseAttention>> {
+        ensure!(self.cold.is_none(), "attention warmup is pending");
         ensure!(
             layer < 40 && !requests.is_empty() && requests.len() <= 16,
             "invalid attention layer or request count"
@@ -495,7 +553,7 @@ impl<'a> SparseAttentionWave<'a> {
             graph
         } else {
             tracing::debug!(target: "ds41rt::timing", layer, rows, batched = batch.is_some(), "sparse graph capture");
-            self.synchronize()?;
+            if !defer_warmup { self.synchronize()?; }
             let limit = if batch.is_some() { 48 } else { self.graph_limit };
             if self.graphs[layer].len() >= limit {
                 let (old, _) = self.graphs[layer].pop_front().unwrap();
@@ -510,31 +568,23 @@ impl<'a> SparseAttentionWave<'a> {
                     else if launch.rows < 256 { 2 } else { 3 };
                 mask | (1 << (recipe + 4 * usize::from(launch.source.is_some())))
             }) };
-            if (batch.is_none() && self.graph_limit == 1) || self.warmed_kernels & needed != needed {
-                let launched = unsafe { self.enqueue(sink, &launches, selected, batch.as_ref()) };
+            let needs_warmup = (batch.is_none() && self.graph_limit == 1) || self.warmed_kernels & needed != needed;
+            let plan = ColdSparse { layer, rows, sink, launches, selected, batch, fingerprint, needed };
+            if needs_warmup {
+                let launched = unsafe { self.enqueue(plan.sink, &plan.launches, plan.selected, plan.batch.as_ref()) };
+                if defer_warmup {
+                    launched?;
+                    self.cold = Some(plan);
+                    return Ok(None);
+                }
                 launched.and(self.synchronize())?;
                 self.warmed_kernels |= needed;
             }
-            unsafe {
-                self.stream
-                    .library
-                    .cuda_graph_begin_capture(self.stream.raw)?;
-            }
-            let launched = unsafe { self.enqueue(sink, &launches, selected, batch.as_ref()) };
-            let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
-            match (launched, captured) {
-                (Ok(()), Ok(g)) => {
-                    self.graphs[layer].push_back((g, fingerprint));
-                    g
-                },
-                (Err(e), Ok(g)) => {
-                    unsafe {
-                        self.stream.library.cuda_graph_exec_destroy(g)?;
-                    }
-                    return Err(e);
-                }
-                (Err(e), Err(_)) | (Ok(()), Err(e)) => return Err(e),
-            }
+            // Metadata uploads remain ordered on this stream; capture itself
+            // contains no await. Previous uses of an evicted graph are complete.
+            let graph = unsafe { self.capture_plan(&plan)? };
+            self.graphs[layer].push_back((graph, plan.fingerprint));
+            graph
         };
         let launched = unsafe {
             self.stream
@@ -542,9 +592,9 @@ impl<'a> SparseAttentionWave<'a> {
                 .cuda_graph_launch(graph, self.stream.raw)
         };
         launched?;
-        Ok(QueuedSparseAttention {
+        Ok(Some(QueuedSparseAttention {
             values: slice(self.output.buffer, 0, rows * 65536), layer, rows,
-        })
+        }))
     }
 }
 impl Drop for SparseAttentionWave<'_> {

@@ -86,7 +86,7 @@ impl<'weights, 'library> HcSublayer<'weights, 'library> {
                 && value.device_id == self.residual.buffer.device_id,
                 "mHC rebound weight extent or device differs");
         }
-        self.synchronize()?;
+        self.stream.require_complete()?;
         Ok(HcBinding { weights, names })
     }
     /// # Safety

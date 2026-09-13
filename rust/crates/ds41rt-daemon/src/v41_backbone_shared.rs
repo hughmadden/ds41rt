@@ -146,7 +146,7 @@ impl<'w, 'a> BackboneSharedWave<'w, 'a> {
             std::ptr::eq(self.stream.library, weights.library),
             "shared FFN rebound weight library differs"
         );
-        self.synchronize()?;
+        self.stream.require_complete()?;
         // LayerGraphs retains the full owner, including packed scales, for
         // every cached graph. Only this drained stream consumes the workspace.
         unsafe {

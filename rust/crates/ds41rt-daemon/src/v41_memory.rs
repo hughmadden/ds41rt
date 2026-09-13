@@ -61,6 +61,12 @@ pub(crate) struct LoadStream<'a> {
     pub(crate) raw: *mut c_void,
 }
 impl LoadStream<'_> {
+    /// Rebinding requires a completed owner, not a hidden host-thread wait.
+    pub(crate) fn require_complete(&self) -> Result<()> {
+        anyhow::ensure!(unsafe { self.library.cuda_stream_query(self.raw)? },
+            "cannot rebind an unfinished V4.1 stream");
+        Ok(())
+    }
     /// Yield the owner thread while retaining stream/buffer ownership. Cancellation
     /// and errors still drain before the caller can release queued input storage.
     pub(crate) async fn wait(&self) -> Result<()> {

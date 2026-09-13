@@ -182,7 +182,7 @@ impl<'w, 'a> IndexQueryWave<'w, 'a> {
                     == self.hidden.buffer.device_id,
             "index query rebound library or device differs"
         );
-        self.synchronize()?;
+        self.stream.require_complete()?;
         self.weights = weights;
         Ok(())
     }

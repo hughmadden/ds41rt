@@ -140,7 +140,7 @@ impl<'a> IndexSelectionWave<'a> {
     pub fn clear_graph(&mut self) -> Result<()> {
         ensure!(!self.in_flight, "index selection pending");
         self.ready = None;
-        self.synchronize()?;
+        self.stream.require_complete()?;
         if let Some((g, _)) = self.graph.take() {
             unsafe {
                 self.stream.library.cuda_graph_exec_destroy(g)?;

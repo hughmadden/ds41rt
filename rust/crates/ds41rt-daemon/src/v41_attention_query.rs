@@ -184,7 +184,7 @@ impl<'w, 'a> AttentionQueryWave<'w, 'a> {
                 && weights.tensors.get(&weights.names[0])?.device_id == self.b(0).device_id,
             "attention rebound weight library or device differs"
         );
-        self.synchronize()?;
+        self.stream.require_complete()?;
         self.weights = weights;
         Ok(())
     }

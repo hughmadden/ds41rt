@@ -191,6 +191,9 @@ impl TargetHeadWave<'_, '_> {
         unsafe {
             self.execute(rows)?;
         }
+        unsafe { self.capture_ready(rows) }
+    }
+    unsafe fn capture_ready(&mut self, rows: usize) -> Result<()> {
         self.invalidate();
         unsafe {
             self.stream
@@ -300,6 +303,15 @@ impl TargetHeadWave<'_, '_> {
         }
         Ok(())
     }
+    async unsafe fn prepare_head_cooperative(&mut self, rows: usize) -> Result<()> {
+        // copy_block has already queued inputs on this stream. Warmup consumes
+        // them in order, then capture executes without suspension.
+        let launched = unsafe { self.enqueue(rows) };
+        let drained = self.stream.wait().await;
+        launched.and(drained)?;
+        self.clear_graph()?;
+        unsafe { self.capture_ready(rows) }
+    }
     fn publish_block(&mut self, block: &BlockOutput<'_>, selected: &[usize]) {
         self.ready = Some(selected.len());
         self.origin = Some(block.binding());
@@ -316,15 +328,13 @@ impl TargetHeadWave<'_, '_> {
         self.output()
     }
     /// Same ownership contract, yielding the owner thread during GPU completion.
-    /// First-use graph capture still drains its warmup; steady replay is cooperative.
+    /// First-use warmup and steady replay both complete cooperatively.
     pub async unsafe fn execute_block_cooperative(&mut self, block: &BlockOutput<'_>, selected: &[usize])
         -> Result<TargetLogits<'_>> {
         unsafe { self.copy_block(block, selected)?; }
-        // A warm graph consumes the copies on this same stream; only first-use
-        // capture needs a completed input before its synchronous warmup.
+        // Warmup and replay consume input copies on this same stream.
         if self.graph.as_ref().is_none_or(|(_, n)| *n != selected.len()) {
-            self.stream.wait().await?;
-            unsafe { self.capture_block_head(selected.len())?; }
+            unsafe { self.prepare_head_cooperative(selected.len()).await?; }
         }
         self.invalidate();
         let graph = self.graph.context("target head graph missing")?.0;
@@ -340,8 +350,8 @@ impl TargetHeadWave<'_, '_> {
         unsafe { self.copy_block(block, selected)?; }
         let rows = selected.len();
         if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
-            if cooperative { self.stream.wait().await?; } else { self.synchronize()?; }
-            unsafe { self.capture_block_head(rows)?; }
+            if cooperative { unsafe { self.prepare_head_cooperative(rows).await?; } }
+            else { self.synchronize()?; unsafe { self.capture_block_head(rows)?; } }
         }
         self.invalidate();
         let graph = self.graph.context("target head graph missing")?.0;
@@ -397,7 +407,7 @@ impl TargetHeadWave<'_, '_> {
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.invalidate();
-        self.synchronize()?;
+        self.stream.require_complete()?;
         if let Some((graph, _)) = self.graph.take() {
             unsafe {
                 self.stream.library.cuda_graph_exec_destroy(graph)?;

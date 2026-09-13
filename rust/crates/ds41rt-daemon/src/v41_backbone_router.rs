@@ -323,7 +323,7 @@ impl<'w, 'a> BackboneRouterWave<'w, 'a> {
                 "router rebound weight device differs"
             );
         }
-        self.synchronize()?;
+        self.stream.require_complete()?;
         self.weights = weights;
         self.layer = weights.layer;
         Ok(())
@@ -332,7 +332,7 @@ impl<'w, 'a> BackboneRouterWave<'w, 'a> {
 impl BackboneRouterWave<'_, '_> {
     pub fn set_local_mode(&mut self, local: bool) -> Result<()> {
         if self.full_request == !local { return Ok(()); }
-        self.synchronize()?;
+        self.stream.require_complete()?;
         self.invalidate();
         std::mem::swap(&mut self.graphs, &mut self.other_graphs);
         self.full_request = !local;

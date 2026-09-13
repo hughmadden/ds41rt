@@ -222,12 +222,15 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         let leases = (0..16)
             .map(|slot| requests.admit(slot, 1000 + slot as u64))
             .collect::<Result<Vec<_>>>()?;
-        let tokens = (0..80u32)
+        let token_count = if cycle == 0 { std::env::var("DS41RT_LAYER0_TOKENS_PER_REQUEST")
+            .ok().map(|s| s.parse::<usize>()).transpose()?.unwrap_or(5) } else { 5 };
+        ensure!((1..=5).contains(&token_count), "fixture tokens per request exceed capacity");
+        let tokens = (0..(16 * token_count) as u32)
             .map(|i| (i * 7919 + cycle * 113 + 17) % 129280)
             .collect::<Vec<_>>();
         let work = leases
             .iter()
-            .zip(tokens.chunks_exact(5))
+            .zip(tokens.chunks_exact(token_count))
             .map(|(&lease, tokens)| RequestTokens {
                 lease,
                 tokens,
@@ -377,7 +380,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 lane.begin_prepared()?;
                 requests.publish_encoder_boundary(&batch, &mut execution, &lane)?;
             }
-            requests.commit(&mut batch, &mut execution, &[5; 16])?;
+            requests.commit(&mut batch, &mut execution, &[token_count as u32; 16])?;
             let mut successor = successor.take().context("queued encoder successor missing")?;
             requests.validate(&successor)?;
             for &lease in &leases { assert_eq!(requests.cache().committed_end(lease)?, 5); }
@@ -407,7 +410,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 lane.begin_prepared()?;
                 requests.publish_encoder_boundary(&successor, &mut execution, &lane)?;
             }
-            requests.commit(&mut successor, &mut execution, &[5; 16])?;
+            requests.commit(&mut successor, &mut execution, &[token_count as u32; 16])?;
             for &lease in &leases {
                 assert_eq!(requests.cache().committed_end(lease)?, 10);
                 assert_eq!(requests.begin_decoder_replay(lease)?, 0);
@@ -419,7 +422,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         }
         assert!(
             requests
-                .commit(&mut batch, &mut execution, &[5; 16])
+                .commit(&mut batch, &mut execution, &[token_count as u32; 16])
                 .is_err(),
             "partial model pass committed"
         );
@@ -428,7 +431,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         }
         if let Some(successor) = successor { assert!(requests.validate(&successor).is_err()); }
 
-        eprintln!("PASS cycle={cycle} rows=80 requests=16 actual distributed layer0 -> mapped layer1 engram -> prepared query; incomplete commit revoked request histories; elapsed={:.3}s", start.elapsed().as_secs_f64());
+        eprintln!("PASS cycle={cycle} rows={} requests=16 actual distributed layer0 -> mapped layer1 engram -> prepared query; incomplete commit revoked request histories; elapsed={:.3}s", 16 * token_count, start.elapsed().as_secs_f64());
     }
     assert_eq!(reference_encoder.len(), 2);
     let mut lane1 = BackboneLane::new(&weights, 80, BackboneLane::workspace_bytes(&lib, 80)?.into_iter().sum())?;
