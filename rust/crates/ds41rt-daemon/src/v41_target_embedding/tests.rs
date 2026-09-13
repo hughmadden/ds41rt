@@ -21,6 +21,9 @@ fn native_image_replacement_and_reuse() -> Result<()> {
     )?;
     let mut wave =
         TargetEmbeddingWave::new(&lib, &table, 4096, TargetEmbeddingWave::device_bytes(4096)?)?;
+    let peer = TargetEmbeddingWave::new(&lib, &table, 4096, TargetEmbeddingWave::device_bytes(4096)?)?;
+    let stream = LoadStream { library: &lib, raw: lib.cuda_stream_create()? };
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     let copy = |value: TargetEmbedding<'_>| -> Result<(Vec<u8>, Vec<u8>)> {
         let mut residual = vec![0; value.residual.bytes];
         let mut pre = vec![0; value.pre.bytes];
@@ -38,6 +41,13 @@ fn native_image_replacement_and_reuse() -> Result<()> {
             tokens[row] = V41_IMAGE_TOKEN_ID;
         }
         let (baseline, pre) = copy(wave.execute(&tokens, &positions)?)?;
+        unsafe { wave.enqueue_into(&tokens, stream.raw, [peer.residual.buffer, peer.pre.buffer])?; }
+        runtime.block_on(stream.wait())?;
+        let mut residual = peer.residual.buffer; residual.bytes = rows * 40960;
+        let mut incoming = peer.pre.buffer; incoming.bytes = rows * 16;
+        let queued = copy(TargetEmbedding { residual, pre: incoming, token_ids: &tokens,
+            positions: &positions, _owner: PhantomData })?;
+        assert_eq!(queued, (baseline.clone(), pre.clone()));
         let features: Vec<Vec<u8>> = selected
             .iter()
             .map(|&row| {

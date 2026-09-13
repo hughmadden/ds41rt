@@ -39,16 +39,20 @@ Remaining synchronization work, based on the current serving source:
 The [separate cooperative embedding/handoff candidate](phase1-cooperative-embedding.md)
 was rejected after a consistent 2.3% C8 decline across three pairs. Its patch and
 exact-byte checks are archived; serving remains on the prior implementation.
-The subsequent [chained embedding/query candidate](phase1-chained-query.md)
-improved median C8 by 4.1% but declined at C16 in all three pairs (median −4.7%);
-it too is archived with serving source restored. Next address adjacent blocking
-cache/index/attention work identified in the [wait audit](phase1-lane-wait-audit.md).
-Do not re-enable either archived candidate unchanged.
-The [completed C2–C16 curve](phase1-chained-query-curve.md) compares the same frozen
-artifacts and reverses the C16 result: 132.30 → 162.05 tok/s. This limits the
-earlier rejection to its workload/history; it is not a general C16 regression.
-Keep both sets of evidence. Intermediate batches change nonce consumption and
-warmup history, and one curve observation per point does not establish causality.
+The subsequent [chained embedding/query change](phase1-chained-query.md)
+was initially rejected after three C16 losses, then **accepted by the user**
+after the [complete C2–C16 curve](phase1-chained-query-curve.md) reversed the C16
+result (132.30 → 162.05 tok/s). It is now integrated into serving source. Keep
+both sets of evidence: the initial gate does not establish a general regression,
+and the wider sweep does not establish a uniform speedup. Intermediate batches
+change nonce consumption and warmup history.
+
+When a narrow performance gate is unclear but a change advances the required
+larger design, investigate a broader workload/concurrency curve before rejecting
+it. Distinguish workload-sensitive variation from a repeatable implementation
+problem; preserve correctness and performance evidence without abandoning the
+required asynchronous design. Next finish adjacent blocking cache/index/attention
+work identified in the [wait audit](phase1-lane-wait-audit.md).
 Remaining blocking decode waits on the shared host thread are unfinished work,
 even when they synchronize only one lane’s stream; removing the scheduler’s
 round barrier alone is insufficient.

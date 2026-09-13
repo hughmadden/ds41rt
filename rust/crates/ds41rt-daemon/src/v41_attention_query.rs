@@ -299,6 +299,10 @@ impl AttentionQueryWave<'_, '_> {
         self.ready = None;
         self.binding = None;
         self.tokens.clear();
+        unsafe { self.capture_ready(rows) }
+    }
+    /// Capture only after the input producer and warmup have completed.
+    unsafe fn capture_ready(&mut self, rows: u32) -> Result<()> {
         unsafe {
             self.stream
                 .library
@@ -406,6 +410,43 @@ impl AttentionQueryWave<'_, '_> {
             }
             return Err(error);
         }
+        self.tokens.extend_from_slice(tokens);
+        self.binding = Some(binding);
+        self.output()
+    }
+    /// # Safety
+    /// Same producer/ownership contract as execute_tokens_prepared, retained
+    /// across suspension. All producer and query work uses this one stream.
+    pub(crate) async unsafe fn execute_tokens_prepared_cooperative(&mut self, tokens: &[u64],
+        prepare: impl FnOnce(*mut std::ffi::c_void, Ds41rtDeviceBuffer) -> Result<()>)
+        -> Result<AttentionQueryOutput<'_>> {
+        ensure!(tokens.len() <= self.capacity as usize, "query rows exceed capacity");
+        self.validate(tokens.len() as u32)?;
+        ensure!(tokens.iter().all(|&p| p < 1048576), "invalid query tokens");
+        let binding = QueryBinding::new(self.weights.layer)?;
+        let rows = tokens.len() as u32;
+        for (dst, token) in self.position_staging.bytes_mut().chunks_exact_mut(8).zip(tokens) {
+            dst.copy_from_slice(&token.to_ne_bytes());
+        }
+        let graph = self.graphs.get_shape(self.weights.layer, self.weights, rows);
+        let queued = (|| -> Result<()> { unsafe {
+            self.stream.library.copy_host_buffer_h2d_async(self.positions(), self.position_staging.buffer,
+                tokens.len()*8, self.stream.raw)?;
+            prepare(self.stream.raw, self.input())?;
+            if let Some((graph, _)) = graph { self.stream.library.cuda_graph_launch(graph, self.stream.raw) }
+            else { self.enqueue(rows) }
+        } })();
+        let drained = self.stream.wait().await;
+        queued.and(drained)?;
+        if graph.is_none() {
+            unsafe { self.capture_ready(rows)?; }
+            let graph = self.graphs.get_shape(self.weights.layer, self.weights, rows)
+                .context("attention query graph missing")?.0;
+            let queued = unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw) };
+            let drained = self.stream.wait().await;
+            queued.and(drained)?;
+        }
+        self.ready = Some(rows);
         self.tokens.extend_from_slice(tokens);
         self.binding = Some(binding);
         self.output()

@@ -357,6 +357,12 @@ impl<'a> Requests<'a> {
         }
         Ok(features)
     }
+    /// The token borrow belongs to the owned batch, not the shared request bank.
+    pub fn text_embedding_input<'b>(&self, batch: &'b RequestBatch) -> Result<Option<(&'b [u32], Vec<u64>)>> {
+        self.validate(batch)?;
+        Ok(batch.image_mask.iter().all(|&b| b == 0)
+            .then(|| (batch.tokens.as_slice(), batch.cache.positions())))
+    }
     /// # Safety
     /// No external writes race embedding or lane buffers. Image rows require
     /// completed features owned by the corresponding admitted request.

@@ -43,9 +43,10 @@ graph warmup and cache history. This sweep does not isolate which factor caused
 the reversal, and a single observation per point is not a statistical estimate
 of expected improvement. There is no smoothing or fitted scaling law in the plot.
 
-The candidate remains archived pending integration with the remaining blocking
-work. Its rejection was an initial workload-specific promotion decision, not a
-reason to abandon cooperative query completion. Preserve both sets of evidence.
+After reviewing this curve, the user accepted the chained-query change and it
+has been integrated into serving source. Its rejection was an initial
+workload-specific promotion decision, not a reason to abandon cooperative query
+completion. Preserve both sets of evidence; do not claim a uniform speedup.
 
 [Machine-readable data and commands](phase1-chained-query-curve.json).
 Raw reports, monitor logs and plotting script:

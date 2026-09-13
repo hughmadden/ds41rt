@@ -1,4 +1,4 @@
-# Chained embedding/query: initial gate and follow-up
+# Chained embedding/query: accepted after broader analysis
 
 One RTX PRO 6000 Blackwell, 400 W power limit, standard memory speed,
 four Spark workers, five RTX resident expert layers and unchanged default KV
@@ -19,8 +19,10 @@ repeats, with median throughput 129.83 → 129.84 tok/s.
 
 A subsequent [complete C2–C16 sweep](phase1-chained-query-curve.md) reverses the
 C16 result (132.30 → 162.05 tok/s). The initial gate below remains recorded,
-but does not establish a general C16 regression. The candidate stays archived
-for further integration with the remaining blocking path.
+but does not establish a general C16 regression. Following review of that broader
+evidence, the user accepted the change as part of removing blocking lane work.
+The archived patch is now integrated into serving source. This is an ownership
+and scheduling improvement, not a claim of uniform throughput gains.
 
 ## Ordered mixed comparisons
 
@@ -36,9 +38,9 @@ No builds overlap inference. Each cell lists control → candidate tok/s.
 | 8 | 152.14 → 159.20 | 158.82 → 159.53 | 152.88 → 155.53 | +4.1% |
 | 16 | 181.77 → 162.87 | 167.66 → 158.38 | 165.10 → 159.84 | −4.7% |
 
-C16 declines in all three pairs. The C8 improvement does not justify adopting
-this version. The serving source has been restored, and the standard service
-was restored after both runners. These are exploratory comparisons, not the
+C16 declined in all three initial pairs, leading to an initial rejection and
+source restoration. The broader sweep and subsequent acceptance above supersede
+that promotion decision. The standard service was restored after both runners. These are exploratory comparisons, not the
 final release tables. Mixed prose outputs can differ under changing batch shapes;
 this evidence establishes neither a numerical defect nor the cause of the
 throughput decline.

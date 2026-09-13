@@ -27,6 +27,7 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
         OFFICIAL_V41_MODEL_ID,
         std::path::Path::new(&std::env::var("DS41RT_V41_SNAPSHOT")?),
     )?;
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     let mut cases = 0;
     let mut layers = Vec::new();
     for layer in [0, 14, 39] {
@@ -93,10 +94,10 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
                 .collect::<Result<Vec<_>>>()?;
                 lib.copy_h2d(q.input(), &vec![0; q.input().bytes])?;
                 let o = unsafe {
-                    q.execute_tokens_prepared(&tokens, |stream, input| {
+                    runtime.block_on(q.execute_tokens_prepared_cooperative(&tokens, |stream, input| {
                         hc.enqueue_begin(rows, Some(input), stream)?;
                         Ok(())
-                    })?
+                    }))?
                 };
                 for (b, expected) in [
                     o.hidden,
@@ -115,27 +116,27 @@ fn query_preparation_preserves_values_and_drains_producer_errors() -> Result<()>
                     );
                 }
                 let failed = unsafe {
-                    q.execute_tokens_prepared(&tokens, |stream, input| {
+                    runtime.block_on(q.execute_tokens_prepared_cooperative(&tokens, |stream, input| {
                         hc.enqueue_begin(rows, Some(input), stream)?;
                         anyhow::bail!("injected producer failure")
-                    })
+                    }))
                 };
                 ensure!(failed.is_err(), "producer error lost");
                 ensure!(q.output().is_err(), "failed output published");
                 lib.copy_h2d(q.input(), &vec![0; q.input().bytes])?;
                 let o = unsafe {
-                    q.execute_tokens_prepared(&tokens, |stream, input| {
+                    runtime.block_on(q.execute_tokens_prepared_cooperative(&tokens, |stream, input| {
                         hc.enqueue_begin(rows, Some(input), stream)?;
                         Ok(())
-                    })?
+                    }))?
                 };
                 ensure!(read(&lib, o.rotated)? == baseline[4], "recovery differs");
                 // Switch normalized destinations without changing weights/rows.
                 lib.copy_h2d(alternate.input(), &vec![0; alternate.input().bytes])?;
                 let alt = unsafe {
-                    alternate.execute_tokens_prepared(&tokens, |stream, input| {
+                    runtime.block_on(alternate.execute_tokens_prepared_cooperative(&tokens, |stream, input| {
                         hc.enqueue_begin(rows, Some(input), stream).map(|_| ())
-                    })?
+                    }))?
                 };
                 ensure!(
                     read(&lib, alt.rotated)? == baseline[4],

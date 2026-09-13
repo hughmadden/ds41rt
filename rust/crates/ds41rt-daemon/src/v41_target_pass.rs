@@ -263,11 +263,19 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             ensure!(encoder.tokens == guard.batch.cache()?.positions(), "encoder suffix/replay row order differs");
             self.lane.restart_decoder(encoder)?;
             self.index.restart_decoder()?;
-            unsafe { self.lane.begin_prepared()?; }
+            unsafe { if requests.cooperative_completion() { self.lane.begin_prepared_cooperative().await?; }
+                    else { self.lane.begin_prepared()?; } }
         } else {
             self.lane.restart()?;
             self.index.restart()?;
-            unsafe { requests.with_requests(|requests| requests.begin_input(guard.batch, &mut self.embedding, &mut self.lane))?; }
+            let text = if requests.cooperative_completion() {
+                requests.with_requests(|requests| requests.text_embedding_input(guard.batch))?
+            } else { None };
+            if let Some((tokens, positions)) = text {
+                unsafe { self.lane.begin_tokens_cooperative(&mut self.embedding, tokens, &positions).await?; }
+            } else {
+                unsafe { requests.with_requests(|requests| requests.begin_input(guard.batch, &mut self.embedding, &mut self.lane))?; }
+            }
         }
         for layer in stage.windows() {
             if layer != stage.windows().start {
@@ -300,7 +308,8 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 }
                 let tapped_us = prepare_timing.elapsed().as_micros() as u64;
                 unsafe {
-                    self.lane.begin_prepared()?;
+                    if requests.cooperative_completion() { self.lane.begin_prepared_cooperative().await?; }
+                    else { self.lane.begin_prepared()?; }
                 }
                 tracing::debug!(target: "ds41rt::timing", layer, rows, advance_us, engram_us, taps_us=tapped_us-advance_us-engram_us, begin_us=prepare_timing.elapsed().as_micros() as u64-tapped_us, "target layer preparation");
             }
@@ -323,7 +332,8 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             if stage == CacheStage::Encoder {
                 self.lane.advance()?;
                 unsafe {
-                    self.lane.begin_prepared()?;
+                    if requests.cooperative_completion() { self.lane.begin_prepared_cooperative().await?; }
+                    else { self.lane.begin_prepared()?; }
                     requests.with_requests(|requests| self.execution.produce_decoder_source(
                         requests.cache(),
                         guard.batch.cache()?,

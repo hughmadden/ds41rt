@@ -1,9 +1,10 @@
 # Remaining lane waits
 
-Source inspected at `d92caad` with the subsequently rejected chained embedding/query
-candidate. This is a source audit, not a latency measurement or a completion
-claim. The candidate passes functional checks but declines at C16 in all three
-paired comparisons; its source has been restored.
+Initial source audit at `d92caad` with the chained embedding/query candidate.
+That change passed functional checks, was initially rejected for three C16 losses,
+then accepted after the broader C2–C16 sweep contradicted a general C16 regression.
+The query change is now integrated. This remains a source audit, not a latency
+measurement or a claim that the complete loop is asynchronous.
 
 ## Scheduler and ownership
 
@@ -28,7 +29,7 @@ is fully asynchronous.
 
 | Path | Current behavior | Next consideration |
 | --- | --- | --- |
-| Token upload, embedding and mHC/query | Candidate writes embeddings directly into block inputs and waits cooperatively after the query chain; subsequent queries also wait cooperatively | Rejected after three pairs; revisit the adjacent blocking work |
+| Token upload, embedding and mHC/query | Candidate writes embeddings directly into block inputs and waits cooperatively after the query chain; subsequent queries also wait cooperatively | Accepted after broader sweep; finish adjacent blocking work |
 | Cache production and index selection | `BackboneExecution::prepare_layer_with_cache` produces window/source data and calls index selection synchronously, under a short shared cache borrow | Separate enqueue/completion/publication with explicit cache lifetimes before introducing an await |
 | Attention through FFN input preparation | `SparseAttentionWave::execute_query_then` queues sparse attention and its projection/mHC continuation, then synchronizes the stream | Cooperative completion must retain query, cache, selection and consumer owners without a shared bank borrow across suspension |
 | FFN completion and layer advance | `complete_layer` finishes mHC; `BackboneBlockWave::advance` copies residual/pre values and synchronizes before taps/Engram/query consume them | Preserve those producer dependencies when moving completion to a cooperative wait |
@@ -46,5 +47,5 @@ new independent-lane comparison separately.
 Raw evidence: `/home/tj/.cache/ds41rt-experiments/chained-query`.
 The first pair reports C1 code 129.83 → 129.84 tok/s, C8 152.14 → 159.20,
 and C16 181.77 → 162.87. The two follow-up C16 pairs also decline: 167.66 → 158.38 and
-165.10 → 159.84 tok/s. See [the rejected candidate](phase1-chained-query.md). Exact embedding/image and 56 real-weight query cases,
+165.10 → 159.84 tok/s. See [the accepted change and both sets of evidence](phase1-chained-query.md). Exact embedding/image and 56 real-weight query cases,
 cache reuse, cancellation/recovery and high-thinking constrained checks pass.

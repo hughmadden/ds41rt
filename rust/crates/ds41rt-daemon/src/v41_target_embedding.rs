@@ -1,5 +1,5 @@
 //! Token initialization and image replacement before the first target mHC block.
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::NativeRtxTensors;
 use anyhow::{Context, Result, ensure};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps};
@@ -18,6 +18,7 @@ pub(crate) struct TargetEmbeddingWave<'w, 'a> {
     ops: V41AttentionOps<'a>,
     table: &'w NativeRtxTensors<'a>,
     ids: DeviceAllocation<'a>,
+    staging: HostAllocation<'a>,
     residual: DeviceAllocation<'a>,
     pre: DeviceAllocation<'a>,
     image_features: DeviceAllocation<'a>,
@@ -63,6 +64,7 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
             ops: library.v41_attention_ops()?,
             table,
             ids,
+            staging: HostAllocation::new(library, capacity * 4)?,
             residual: DeviceAllocation::new(library, capacity * 40960)?,
             pre: DeviceAllocation::new(library, capacity * 16)?,
             image_features: DeviceAllocation::new(library, capacity * 10240)?,
@@ -143,6 +145,28 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
         self.positions.extend_from_slice(positions);
         self.ready = true;
         self.output()
+    }
+    /// # Safety
+    /// The caller owns the supplied stream and destinations and drains it before
+    /// reusing this embedding owner, its staging, or either destination. Text
+    /// embeddings are produced directly into the block, without an intermediate copy.
+    pub unsafe fn enqueue_into(&mut self, tokens: &[u32], stream: *mut c_void,
+        destination: [Ds41rtDeviceBuffer; 2]) -> Result<()> {
+        self.invalidate();
+        ensure!(!tokens.is_empty() && tokens.len() <= self.capacity
+            && tokens.iter().all(|&id| id < 129280)
+            && destination[0].bytes >= tokens.len()*40960 && destination[1].bytes >= tokens.len()*16
+            && destination.iter().all(|b| b.device_id == self.ids.buffer.device_id),
+            "invalid direct embedding producer input");
+        for (dst, token) in self.staging.bytes_mut().chunks_exact_mut(4).zip(tokens) {
+            dst.copy_from_slice(&token.to_ne_bytes());
+        }
+        unsafe {
+            self.stream.library.copy_host_buffer_h2d_async(self.ids.buffer, self.staging.buffer,
+                tokens.len()*4, stream)?;
+            self.ops.target_embed(self.table.get("embed.weight")?, self.ids.buffer,
+                destination[0], destination[1], tokens.len(), stream)
+        }
     }
     /// Complete image span rows include learned delimiters. The row indices are
     /// sorted, unique positions within this flattened multi-request batch.

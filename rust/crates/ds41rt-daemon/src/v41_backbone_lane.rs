@@ -313,6 +313,26 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.phase = Phase::Query;
         Ok(result)
     }
+    /// # Safety
+    /// Own embedding, block and query storage through the drained producer chain.
+    pub async unsafe fn begin_tokens_cooperative(&mut self,
+        embedding: &mut crate::v41_target_embedding::TargetEmbeddingWave<'_, '_>,
+        tokens: &[u32], positions: &[u64]) -> Result<AttentionQueryOutput<'_>> {
+        self.enter(Phase::Idle)?;
+        ensure!(self.layer == 0 && tokens.len() == positions.len(), "invalid token entry");
+        let result = unsafe { self.block.begin_attention_cooperative(&mut self.query, positions,
+            |stream, destination| embedding.enqueue_into(tokens, stream, destination)).await? };
+        self.phase = Phase::Query;
+        Ok(result)
+    }
+    /// # Safety
+    /// Same ownership contract as begin_prepared, retained across suspension.
+    pub async unsafe fn begin_prepared_cooperative(&mut self) -> Result<AttentionQueryOutput<'_>> {
+        self.enter(Phase::Prepared)?;
+        let result = unsafe { self.block.begin_prepared_attention_cooperative(&mut self.query).await? };
+        self.phase = Phase::Query;
+        Ok(result)
+    }
     pub fn pending_engram(&self) -> Result<(usize, &[u64])> {
         ensure!(self.phase == Phase::Prepared, "backbone lane input not prepared");
         self.block.pending_engram()

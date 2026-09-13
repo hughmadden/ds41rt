@@ -317,6 +317,36 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         Ok(out)
     }
     /// # Safety
+    /// Producer, block and query storage stay owned through completion. The
+    /// producer initializes block inputs on the query stream before mHC/query.
+    pub async unsafe fn begin_attention_cooperative<'q>(&mut self,
+        query: &'q mut AttentionQueryWave<'_, '_>, tokens: &[u64],
+        prepare: impl FnOnce(*mut std::ffi::c_void, [Ds41rtDeviceBuffer; 2]) -> Result<()>)
+        -> Result<AttentionQueryOutput<'q>> {
+        self.reset();
+        ensure!(query.layer() == self.layer && !tokens.is_empty() && tokens.len() <= self.capacity
+            && tokens.iter().all(|&p| p < 1048576), "block attention layer or tokens differ");
+        ensure!(query.input().device_id == self.inputs()[0].device_id, "block query device differs");
+        let out = unsafe { query.execute_tokens_prepared_cooperative(tokens, |stream, input| {
+            prepare(stream, self.inputs())?;
+            self.attention.enqueue_begin(tokens.len(), Some(input), stream)?;
+            Ok(())
+        }).await? };
+        self.tokens.extend_from_slice(tokens);
+        self.phase = Phase::Attention(out.binding()?, tokens.len());
+        Ok(out)
+    }
+    /// # Safety
+    /// Same contract as begin_prepared_attention, retained across completion waits.
+    pub async unsafe fn begin_prepared_attention_cooperative<'q>(&mut self,
+        query: &'q mut AttentionQueryWave<'_, '_>) -> Result<AttentionQueryOutput<'q>> {
+        let tokens = match self.prepared_input() {
+            Ok(input) => input.tokens.to_vec(),
+            Err(error) => { self.reset(); return Err(error); }
+        };
+        unsafe { self.begin_attention_cooperative(query, &tokens, |_, _| Ok(())).await }
+    }
+    /// # Safety
     /// Attention output is complete and immutable; no external writes race the
     /// preserved residual or mixing coefficients. A rejected finish resets phase.
     pub unsafe fn begin_ffn(&mut self, output: &AttentionOutput<'_>) -> Result<FfnInput<'_>> {
