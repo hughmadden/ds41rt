@@ -359,8 +359,20 @@ impl NativeLibrary {
     }
 
     pub fn v41_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
-        let function = unsafe { self.lib.get::<InfoFn>(b"ds41rt_v41_expert_info") }
-            .context("native library must be built with DS41RT_ENABLE_V41_EXPERT_AOT=ON")?;
+        self.expert_info_for(capacity, false)
+    }
+
+    pub fn v41_local_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
+        self.expert_info_for(capacity, true)
+    }
+
+    fn expert_info_for(&self, capacity: u32, local: bool) -> Result<V41ExpertInfo> {
+        let function = unsafe { self.lib.get::<InfoFn>(if local {
+            b"ds41rt_v41_local_expert_info" as &[u8]
+        } else { b"ds41rt_v41_expert_info" }) }
+            .context(if local {
+                "native library must be built with DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT=ON"
+            } else { "native library must be built with DS41RT_ENABLE_V41_EXPERT_AOT=ON" })?;
         let mut info = V41ExpertInfo::default();
         let status = unsafe { function(i32::try_from(capacity)?, &mut info) };
         ensure!(
@@ -394,26 +406,36 @@ impl NativeLibrary {
             info.capacity_rows == capacity && info.scratch_bytes > 0,
             "native expert capacity does not match requested variant"
         );
+        ensure!(!local || info.role == 2, "local expert entry has incompatible role");
         Ok(info)
     }
 
     /// Load the chosen variant on the current CUDA device before graph capture.
     pub fn v41_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
-        let info = self.v41_expert_info(capacity)?;
+        self.expert_kernel_for(capacity, false)
+    }
+
+    pub fn v41_local_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
+        self.expert_kernel_for(capacity, true)
+    }
+
+    fn expert_kernel_for(&self, capacity: u32, local: bool) -> Result<V41ExpertKernel<'_>> {
+        let info = self.expert_info_for(capacity, local)?;
+        let symbol = |ordinary: &'static [u8], full: &'static [u8]| if local { full } else { ordinary };
         let initialize = unsafe {
             self.lib
-                .get::<InitializeFn>(b"ds41rt_v41_expert_initialize")?
+                .get::<InitializeFn>(symbol(b"ds41rt_v41_expert_initialize", b"ds41rt_v41_local_expert_initialize"))?
         };
-        let launch = unsafe { *self.lib.get::<LaunchFn>(b"ds41rt_v41_expert_launch")? };
+        let launch = unsafe { *self.lib.get::<LaunchFn>(symbol(b"ds41rt_v41_expert_launch", b"ds41rt_v41_local_expert_launch"))? };
         let bind_scratch = unsafe {
             *self
                 .lib
-                .get::<BindScratchFn>(b"ds41rt_v41_expert_bind_scratch")?
+                .get::<BindScratchFn>(symbol(b"ds41rt_v41_expert_bind_scratch", b"ds41rt_v41_local_expert_bind_scratch"))?
         };
         let initialize_scratch = unsafe {
             *self
                 .lib
-                .get::<InitScratchFn>(b"ds41rt_v41_expert_initialize_scratch_async")?
+                .get::<InitScratchFn>(symbol(b"ds41rt_v41_expert_initialize_scratch_async", b"ds41rt_v41_local_expert_initialize_scratch_async"))?
         };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { initialize(i32::try_from(capacity)?, &mut handle) };
@@ -423,7 +445,7 @@ impl NativeLibrary {
         );
         let token_accumulation = if info.abi_version == 3 {
             type OutputKindFn = unsafe extern "C" fn(i32, *mut u32) -> i32;
-            let query = unsafe { self.lib.get::<OutputKindFn>(b"ds41rt_v41_expert_output_kind")? };
+            let query = unsafe { self.lib.get::<OutputKindFn>(symbol(b"ds41rt_v41_expert_output_kind", b"ds41rt_v41_local_expert_output_kind"))? };
             let mut kind = u32::MAX;
             let status = unsafe { query(i32::try_from(capacity)?, &mut kind) };
             ensure!(status == 0 && kind == 1 && matches!(info.role, 1 | 2), "unsupported V4.1 ABI 3 output layout");

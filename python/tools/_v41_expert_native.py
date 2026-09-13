@@ -61,7 +61,7 @@ class Launch(C.Structure):
 assert C.sizeof(Info) == 64 and C.sizeof(Launch) == 392
 
 
-def library(path):
+def library(path, *, local=False):
     lib = C.CDLL(path)
     for name, args in {
         "ds41rt_v41_expert_info": [I, C.POINTER(Info)],
@@ -72,9 +72,14 @@ def library(path):
         "ds41rt_v41_pack_expert_async": [C.POINTER(P), C.POINTER(P), U, P],
         "ds41rt_v41_compact_routes_bf16_async": [P, P, U, P],
     }.items():
-        fn = getattr(lib, name)
+        selected = name.replace("ds41rt_v41_expert_", "ds41rt_v41_local_expert_", 1) if local and name.startswith("ds41rt_v41_expert_") else name
+        fn = getattr(lib, selected)
+        if selected != name:
+            setattr(lib, name, fn)
         fn.argtypes = args
         fn.restype = I
+    if local:
+        lib.ds41rt_v41_expert_output_kind = lib.ds41rt_v41_local_expert_output_kind
     return lib
 
 

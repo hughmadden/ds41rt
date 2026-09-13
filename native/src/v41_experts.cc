@@ -3,8 +3,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <mutex>
+#ifdef DS41RT_V41_LOCAL_EXPERTS
+#include "v41_local_expert_variants.h"
+#else
 #include "v41_expert_variants.h"
 #include "v41_input_quant_dispatch.h"
+#endif
 #ifndef DS41RT_V41_OUTPUT_KIND
 #define DS41RT_V41_OUTPUT_KIND(capacity) 0
 #endif
@@ -157,6 +161,7 @@ extern "C" int32_t ds41rt_v41_expert_launch(void* kernel, const ds41rt_v41_exper
   return result;
 }
 
+#ifndef DS41RT_V41_LOCAL_EXPERTS
 namespace {
 struct InputQuantModule {
   cudaLibrary_t library = nullptr;
@@ -217,3 +222,5 @@ extern "C" int32_t ds41rt_v41_expert_input_quantize_async(void* kernel,
   DS41RT_V41_INPUT_QUANT_ENTRY(args, 8);
   return result;
 }
+
+#endif // DS41RT_V41_LOCAL_EXPERTS

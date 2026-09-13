@@ -280,6 +280,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--atomic-min-capacity", type=int, choices=[256, 1024, 4096],
                         help="Use ABI 3 direct FP32 token accumulation at these larger capacities")
+    parser.add_argument("--standard-names", action="store_true")
     args = parser.parse_args()
     capacities = tuple(int(x) for x in args.rows.split(","))
     if (
@@ -302,4 +303,5 @@ if __name__ == "__main__":
             raise ValueError("width must be 64, 128 or 192")
     except (ValueError, TypeError) as error:
         parser.error(str(error))
-    export(args.output_dir, capacities, width, args.atomic_min_capacity, args.role)
+    export(args.output_dir, capacities, width, args.atomic_min_capacity, args.role,
+           standard_names=args.standard_names)

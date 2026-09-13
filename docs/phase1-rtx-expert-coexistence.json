@@ -1,0 +1,135 @@
+{
+  "scope": "Combined native library, not serving qualification",
+  "gpu": "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+  "native_checks": [
+    {
+      "case": "one",
+      "rows": 1,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 1614880
+    },
+    {
+      "case": "shared2",
+      "rows": 2,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "mixed6",
+      "rows": 6,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "shared16",
+      "rows": 16,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "shared80",
+      "rows": 80,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 128580496
+    },
+    {
+      "case": "return_one",
+      "rows": 1,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 1614880
+    },
+    {
+      "case": "draft5",
+      "rows": 5,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "draft15",
+      "rows": 15,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "draft40",
+      "rows": 40,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 128580496
+    }
+  ],
+  "handle_checks": [
+    {
+      "capacity": 1,
+      "distinct_handles": true,
+      "crossed_handles_rejected_without_slot_mutation": true,
+      "draft_scratch": 808384,
+      "local_scratch": 1614880
+    },
+    {
+      "capacity": 16,
+      "distinct_handles": true,
+      "crossed_handles_rejected_without_slot_mutation": true,
+      "draft_scratch": 12895184,
+      "local_scratch": 25722256
+    },
+    {
+      "capacity": 80,
+      "distinct_handles": true,
+      "crossed_handles_rejected_without_slot_mutation": true,
+      "draft_scratch": 64465616,
+      "local_scratch": 128580496
+    },
+    {
+      "capacity": 256,
+      "distinct_handles": true,
+      "crossed_handles_rejected_without_slot_mutation": true,
+      "draft_scratch": 206284304,
+      "local_scratch": 7738912
+    },
+    {
+      "capacity": 1024,
+      "distinct_handles": true,
+      "crossed_handles_rejected_without_slot_mutation": true,
+      "draft_scratch": 825129488,
+      "local_scratch": 30932512
+    },
+    {
+      "capacity": 4096,
+      "distinct_handles": true,
+      "crossed_handles_rejected_without_slot_mutation": true,
+      "draft_scratch": 3300510224,
+      "local_scratch": 123706912
+    }
+  ],
+  "build": "Clean CMake configure and complete native build with CUDA, V41_EXPERT_AOT and V41_LOCAL_EXPERT_AOT enabled on SM120",
+  "rust_checks": [
+    "daemon cargo check --release passed",
+    "native ABI layout test passed"
+  ],
+  "limits": [
+    "No official-weight model quality or performance measurements",
+    "Large-row atomic outputs have initialization/handle checks only",
+    "dSpark numerical serving regression checks remain pending",
+    "Resident layer dispatch and auto placement are not integrated"
+  ],
+  "sha256": {
+    "native/src/v41_experts.cc": "3b2e5b278285ee5c41a7ab44382ec5bf34880fabb02230d6ae4276a0eccf2741",
+    "native/src/v41_local_experts.cc": "612b1e733807c41370ace7ed39660424f6affaed04d306934c83bf52e1c771c6",
+    "native/cmake/v41_local_experts.cmake": "bb95fff59d035e5ca829fc450f19bb7b16b37d318f300c9e7ee9df37d85a2233",
+    "python/tools/export_b12x_v41_slices_aot.py": "9fc90aeaca892b41c593bd1beb2e3417b394fd0febe2389c64d9af9f8bff3e16",
+    "python/tools/qualify_v41_expert_handles.py": "7ab9ad338e839aa790742e1f8b6be7395db6eb8375d14260d6782e9c5895d46a",
+    "python/tools/qualify_v41_slice_native.py": "69c087b18dba99311300a4b2c20df63a29269a22c1b7318fd2cb327dc2167bde",
+    "/tmp/ds41-rtx-full-experts/cmake/libds41rt_native.so": "ab1b32c6b19a8ade72ba88438c4403baf73768bf7190651df40c4657fd75f8ba",
+    "/tmp/ds41-rtx-full-experts/cmake/v41_local_experts/v41_experts.json": "9fe2585ce9211e8d5a612adb30ff2b2c403c3c8194875ffde8bb644c81733f0e",
+    "/tmp/ds41-rtx-full-experts/cmake/v41_experts/v41_experts.json": "9a08c45e0894c3fee4b90679e1435f5f925574f936929d74701dcc876ae697c0"
+  }
+}

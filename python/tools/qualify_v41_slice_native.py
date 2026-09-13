@@ -19,12 +19,15 @@ def main():
         help="Only check these native capacity variants",
     )
     parser.add_argument("--full-backbone", action="store_true", help="Check full-width RTX backbone geometry")
+    parser.add_argument("--local-entrypoints", action="store_true", help="Use namespaced full-backbone symbols in a combined library")
     options = parser.parse_args()
+    if options.local_entrypoints and not options.full_backbone:
+        parser.error("local entrypoints require --full-backbone")
     capacities = {int(x) for x in options.capacities.split(",")}
     if not capacities or not capacities <= {1, 16, 80}:
         parser.error("capacities must be a nonempty subset of 1,16,80")
     checked = set()
-    lib = library(options.native_lib)
+    lib = library(options.native_lib, local=options.local_entrypoints)
     owners = {}
     full_weights = None
 

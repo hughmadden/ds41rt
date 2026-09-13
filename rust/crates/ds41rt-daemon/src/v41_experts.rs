@@ -17,6 +17,7 @@ const EXPERT_READ_LANES: usize = 16;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ExpertLayer {
     Backbone { layer: usize, rank: usize },
+    BackboneFull { layer: usize },
     Dspark { stage: usize },
 }
 impl ExpertLayer {
@@ -27,11 +28,26 @@ impl ExpertLayer {
                 rank,
                 expert,
             },
+            Self::BackboneFull { layer } => V41ExpertSelection::BackboneFull { layer, expert },
             Self::Dspark { stage } => V41ExpertSelection::Dspark { stage, expert },
         }
     }
     fn role(self) -> u32 {
-        u32::from(matches!(self, Self::Backbone { .. }))
+        match self {
+            Self::Dspark { .. } => 0,
+            Self::Backbone { .. } => 1,
+            Self::BackboneFull { .. } => 2,
+        }
+    }
+    fn info(self, library: &NativeLibrary, capacity: u32) -> Result<ds41rt_ffi::V41ExpertInfo> {
+        if matches!(self, Self::BackboneFull { .. }) {
+            library.v41_local_expert_info(capacity)
+        } else { library.v41_expert_info(capacity) }
+    }
+    fn kernel(self, library: &NativeLibrary, capacity: u32) -> Result<V41ExpertKernel<'_>> {
+        if matches!(self, Self::BackboneFull { .. }) {
+            library.v41_local_expert_kernel(capacity)
+        } else { library.v41_expert_kernel(capacity) }
     }
 }
 
@@ -65,7 +81,7 @@ impl<'a> ExpertWeights<'a> {
         layer: ExpertLayer,
     ) -> Result<(ExpertLoadBudget, [usize; 4], u32, usize)> {
         let first = catalog.expert_staging(layer.expert(0))?;
-        let info = library.v41_expert_info(16)?;
+        let info = layer.info(library, 16)?;
         ensure!(
             info.role == layer.role(),
             "native expert role does not match layer placement"
@@ -119,7 +135,7 @@ impl<'a> ExpertWeights<'a> {
         ensure!(budget.peak_device_bytes()? <= available_device_bytes,
             "expert layer needs {} device bytes including staging, budget is {available_device_bytes}", budget.peak_device_bytes()?);
         // Fail role/device checks and allocation admission before opening payloads.
-        let _kernel = library.v41_expert_kernel(16)?;
+        let _kernel = layer.kernel(library, 16)?;
         let mut owned = Vec::with_capacity(4);
         for size in sizes {
             owned.push(DeviceAllocation::new(library, size)?);
