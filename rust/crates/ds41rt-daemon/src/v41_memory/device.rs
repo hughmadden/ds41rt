@@ -1,6 +1,7 @@
 //! Explicit device owners for the dual-RTX path. Legacy owners stay unchanged.
 use super::*;
 use anyhow::ensure;
+use std::{future::Future, mem::ManuallyDrop, pin::Pin, task::{Context as TaskContext, Poll}};
 
 #[derive(Clone, Copy)]
 pub(crate) struct Device<'a> {
@@ -8,7 +9,28 @@ pub(crate) struct Device<'a> {
     pub id: i32,
 }
 
-impl Device<'_> {
+#[cfg(test)]
+pub(crate) fn cache_test_device(library: &NativeLibrary) -> Result<Device<'_>> {
+    let id: i32 = std::env::var("DS41RT_CACHE_TEST_DEVICE").unwrap_or_else(|_| "0".into()).parse()?;
+    ensure!(matches!(id,0 | 1), "invalid cache fixture GPU");
+    library.cuda_set_device(0)?;
+    if id == 1 {
+        for gpu in 0..2 { Device { library, id: gpu }.run(|| library.cuda_enable_peer(1-gpu))?; }
+    }
+    Ok(Device { library,id })
+}
+
+impl<'a> Device<'a> {
+    /// Scope every poll and cancellation cleanup, never an entire async wait.
+    pub fn future<F: Future>(&self, future: F) -> DeviceFuture<'a, F> {
+        DeviceFuture { device: *self, future: ManuallyDrop::new(future) }
+    }
+
+    /// Legacy components may own streams without storing their device ordinal.
+    /// Construct and destroy the entire component on its selected device.
+    pub fn own<T>(&self, initialize: impl FnOnce() -> Result<T>) -> Result<DeviceOwner<'a, T>> {
+        Ok(DeviceOwner { device: *self, value: ManuallyDrop::new(self.run(initialize)?) })
+    }
     /// Only synchronous enqueue/query work belongs inside this closure. The
     /// previous device is restored before the caller can yield its async task.
     pub fn run<T>(&self, work: impl FnOnce() -> Result<T>) -> Result<T> {
@@ -30,6 +52,49 @@ impl Device<'_> {
         self.library.cuda_set_device(previous)?;
         restore.armed = false;
         result
+    }
+}
+
+pub(crate) struct DeviceOwner<'a, T> { pub device: Device<'a>, value: ManuallyDrop<T> }
+impl<T> DeviceOwner<'_, T> {
+    /// Metadata access is ordinary; GPU work must use this owner's device scope.
+    pub fn get(&self) -> &T { &self.value }
+    pub fn get_mut(&mut self) -> &mut T { &mut self.value }
+}
+impl<T> std::ops::Deref for DeviceOwner<'_, T> {
+    type Target = T;
+    fn deref(&self) -> &T { self.get() }
+}
+impl<T> std::ops::DerefMut for DeviceOwner<'_, T> {
+    fn deref_mut(&mut self) -> &mut T { self.get_mut() }
+}
+impl<T> Drop for DeviceOwner<'_, T> {
+    fn drop(&mut self) {
+        if let Err(error) = self.device.run(|| {
+            unsafe { ManuallyDrop::drop(&mut self.value); }
+            Ok(())
+        }) { tracing::error!(%error, "dropping device-owned component"); }
+    }
+}
+
+pub(crate) struct DeviceFuture<'a, F: Future> { device: Device<'a>, future: ManuallyDrop<F> }
+impl<T, F: Future<Output = Result<T>>> Future for DeviceFuture<'_, F> {
+    type Output = Result<T>;
+    fn poll(self: Pin<&mut Self>, context: &mut TaskContext<'_>) -> Poll<Self::Output> {
+        // The field is never moved after pinning; Drop destroys it in place.
+        let this = unsafe { self.get_unchecked_mut() };
+        match this.device.run(|| Ok(unsafe { Pin::new_unchecked(&mut *this.future) }.poll(context))) {
+            Ok(poll) => poll,
+            Err(error) => Poll::Ready(Err(error)),
+        }
+    }
+}
+impl<F: Future> Drop for DeviceFuture<'_, F> {
+    fn drop(&mut self) {
+        if let Err(error) = self.device.run(|| {
+            unsafe { ManuallyDrop::drop(&mut self.future); }
+            Ok(())
+        }) { tracing::error!(%error, "dropping device-scoped future"); }
     }
 }
 
@@ -177,6 +242,56 @@ impl<'a> PeerTransfer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB and two CUDA GPUs"]
+    fn device_scoped_futures_restore_poll_and_cancellation_context() -> Result<()> {
+        use std::{cell::Cell, rc::Rc, task::Waker};
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        lib.cuda_set_device(0)?;
+        let d1 = Device { library: &lib, id: 1 };
+        let dropped_on = Rc::new(Cell::new(-1));
+        struct Probe<'a> { library: &'a NativeLibrary, dropped_on: Rc<Cell<i32>> }
+        impl Drop for Probe<'_> {
+            fn drop(&mut self) { self.dropped_on.set(self.library.cuda_get_device().unwrap()); }
+        }
+        let mut owner = d1.own(|| {
+            assert_eq!(lib.cuda_get_device()?,1);
+            Ok(Probe { library: &lib, dropped_on: dropped_on.clone() })
+        })?;
+        assert_eq!(lib.cuda_get_device()?,0);
+        let mut context = TaskContext::from_waker(Waker::noop());
+        let future = d1.future(async {
+            assert_eq!(lib.cuda_get_device()?,1);
+            let _guard = Probe { library: &lib, dropped_on: dropped_on.clone() };
+            let _stream = LoadStream { library: &lib, raw: lib.cuda_stream_create()? };
+            tokio::task::yield_now().await;
+            assert_eq!(lib.cuda_get_device()?,1);
+            Ok(())
+        });
+        let mut future = Box::pin(future);
+        assert!(future.as_mut().poll(&mut context).is_pending());
+        assert_eq!(lib.cuda_get_device()?,0);
+        drop(future);
+        assert_eq!(dropped_on.get(),1);
+        assert_eq!(lib.cuda_get_device()?,0);
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        let d0 = Device { library: &lib, id: 0 };
+        runtime.block_on(async {
+            tokio::try_join!(d0.future(async {
+                for _ in 0..8 { assert_eq!(lib.cuda_get_device()?,0); tokio::task::yield_now().await; }
+                Ok(())
+            }), d1.future(async {
+                for _ in 0..8 { assert_eq!(lib.cuda_get_device()?,1); tokio::task::yield_now().await; }
+                Ok(())
+            }))?;
+            Ok::<_,anyhow::Error>(())
+        })?;
+        owner.get_mut().dropped_on.set(-1);
+        drop(owner);
+        assert_eq!(dropped_on.get(),1);
+        assert_eq!(lib.cuda_get_device()?,0);
+        Ok(())
+    }
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB, libcudart.so.13 and two CUDA devices"]
     fn cancelled_peer_chain_drains_before_releasing_borrows() -> Result<()> {

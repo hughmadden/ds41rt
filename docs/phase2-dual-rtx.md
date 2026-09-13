@@ -425,3 +425,39 @@ shared/routed backends. At capacity 4096, two complete FFN lanes require
 2,920,271,968 explicit workspace bytes on each GPU. Full placement must also
 account for attention, cache/snapshots, auxiliary components, loading peaks,
 weights, and CUDA overhead; these FFN numbers alone are not a serving budget.
+
+## Distributed cache storage and scoped device execution
+
+`BackboneCache::new_distributed` now allocates each layer's FP8 SWA and each
+compressed source's FP4 KV, index data, page tables, lengths, and pending carry
+on its assigned GPU. Per-device cache byte accounting checks both budgets before
+allocation. The existing constructor retains its single-device placement.
+Shared request leases, versions, and publication metadata remain one CPU bank.
+
+`CachePlacement` derives source owners from the attention map and validates
+colocation across each source's consumer group: 2–7, 8–13, 14–19, and 20–39.
+The original 0–19/20–39 split and a rebalanced map moving source 14 with its six
+consumers both pass allocation and request lease/reuse checks on the actual GPUs.
+Moving only part of a source's consumer group is rejected by this colocated path;
+such a placement would need a separate, measured remote-KV implementation.
+
+Device owners now construct and destroy cache components in the proper context.
+`Device::future` scopes every future poll and cancellation cleanup, restoring the
+caller's device before yielding. A two-GPU fixture verifies alternating polls,
+owned stream cleanup on cancellation, and owner destruction without leaving the
+thread on another device. This allows existing attention components to be placed
+without holding a thread-local CUDA device selection across an await.
+
+Non-empty prefix fixtures also pass with cache storage on GPU1 and retained
+snapshot storage/streams on GPU0: wrapped SWA spans survive slot reuse, odd
+compressor carry rows survive, and complete-group compressed-prefix restoration
+preserves its bounds. The initial distributed constructor therefore retains
+snapshot-copy coordination on GPU0, while retained compressed pages stay on
+their source GPU. Snapshot arena bytes must be charged to GPU0 separately.
+
+The existing single-device request-bank lifecycle/isolation check and daemon
+compile check pass. Running that previously environment-gated lifecycle test
+exposed a stale assertion rejecting page counts above 65,536; it now checks the
+existing 262,144-page limit and accepts 65,537, matching the current source cache.
+The allocation and snapshot evidence does not yet cover full distributed
+attention execution, end-to-end cache reuse, startup selection, or performance.

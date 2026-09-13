@@ -9,11 +9,14 @@ use crate::v41_window::{WindowChunk, WindowLease, WindowProposal, WindowState, W
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::NativeLibrary;
 use ds41rt_transport::ExpertV2SourceKind;
+use crate::v41_memory::device::{Device, DeviceOwner};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 mod ced;
 mod publication;
 mod prefix;
+mod placement;
+pub(crate) use placement::CachePlacement;
 pub(crate) use prefix::BackbonePrefix;
 use ced::CachePhase;
 pub(crate) use ced::CacheStage;
@@ -158,14 +161,45 @@ pub(crate) struct BackboneCache<'a> {
     prefix_copies: [crate::v41_memory::SnapshotCopies<'a, (CacheLease, BackbonePrefix<'a>)>; 2],
     prefix_pool: Option<crate::v41_memory::SnapshotPool<'a>>,
     prefix_stream: crate::v41_memory::LoadStream<'a>,
-    windows: Vec<WindowState<'a>>,
-    sources: Vec<CompressorState<'a>>,
+    windows: Vec<DeviceOwner<'a, WindowState<'a>>>,
+    sources: Vec<DeviceOwner<'a, CompressorState<'a>>>,
     requests: Vec<Option<Request>>,
     generations: Vec<u64>,
     owner: u64,
     poisoned: bool,
 }
 impl<'a> BackboneCache<'a> {
+    /// Explicit cache storage only; snapshots and CUDA state are budgeted separately.
+    pub fn distributed_device_bytes(placement: CachePlacement, slots: usize,
+        source_pages: [usize; 4]) -> Result<[usize; 2]> {
+        let mut bytes = [0usize;2];
+        for layer in 0..40 {
+            let gpu = placement.attention(layer)?;
+            bytes[gpu] = bytes[gpu].checked_add(WindowState::device_bytes(layer,slots)?)
+                .context("distributed window budget overflow")?;
+        }
+        for ((layer,pages),gpu) in SOURCES.into_iter().zip(source_pages).zip(placement.sources()) {
+            bytes[gpu] = bytes[gpu].checked_add(CompressorState::device_bytes(layer,slots,pages)?)
+                .context("distributed source budget overflow")?;
+        }
+        Ok(bytes)
+    }
+    pub fn new_distributed(library: &'a NativeLibrary, placement: CachePlacement,
+        slots: usize, source_pages: [usize;4], budgets: [usize;2]) -> Result<Self> {
+        let bytes = Self::distributed_device_bytes(placement,slots,source_pages)?;
+        ensure!(bytes.into_iter().zip(budgets).all(|(need,budget)| need <= budget),
+            "distributed backbone cache exceeds a device budget");
+        for id in 0..2 {
+            let device = Device { library, id };
+            device.run(|| library.cuda_enable_peer(1-id))?;
+        }
+        // Prefix-copy coordination remains on GPU0; per-source retained pages
+        // stay owned by their source GPU. Snapshot pool placement is separate.
+        Device { library, id: 0 }.run(|| Self::new_inner(library,slots,source_pages,Some(placement)))
+    }
+    pub fn attention_device(&self, layer: usize) -> Result<Device<'a>> {
+        self.windows.get(layer).map(|window| window.device).context("invalid cache attention layer")
+    }
     pub fn pages_for_context(slots: usize, context: usize) -> Result<[usize; 4]> {
         let mut pages = [0; 4];
         for (i, layer) in SOURCES.into_iter().enumerate() {
@@ -193,27 +227,34 @@ impl<'a> BackboneCache<'a> {
             Self::device_bytes(slots, source_pages)? <= budget,
             "backbone cache exceeds budget"
         );
+        Self::new_inner(library, slots, source_pages, None)
+    }
+    fn new_inner(library: &'a NativeLibrary, slots: usize, source_pages: [usize;4],
+        placement: Option<CachePlacement>) -> Result<Self> {
+        let original_device = library.cuda_get_device()?;
         let windows = (0..40)
             .map(|layer| {
-                WindowState::new(
+                let id = match placement { Some(p) => p.attention(layer)? as i32, None => original_device };
+                Device { library, id }.own(|| WindowState::new(
                     library,
                     layer,
                     slots,
                     WindowState::device_bytes(layer, slots)?,
-                )
+                ))
             })
             .collect::<Result<Vec<_>>>()?;
         let sources = SOURCES
             .into_iter()
             .zip(source_pages)
             .map(|(layer, pages)| {
-                CompressorState::new(
+                let id = match placement { Some(p) => p.attention(layer)? as i32, None => original_device };
+                Device { library, id }.own(|| CompressorState::new(
                     library,
                     layer,
                     slots,
                     pages,
                     CompressorState::device_bytes(layer, slots, pages)?,
-                )
+                ))
             })
             .collect::<Result<Vec<_>>>()?;
         let owner = NEXT_OWNER
@@ -447,6 +488,7 @@ impl<'a> BackboneCache<'a> {
         ensure!(batch.stage.windows().contains(&layer), "window outside cache phase");
         self.windows
             .get(layer)
+            .map(DeviceOwner::get)
             .context("invalid backbone window layer")
     }
     pub fn source(&self, batch: &CacheBatch, layer: usize) -> Result<&CompressorState<'a>> {
@@ -721,7 +763,8 @@ mod tests {
         assert!(BackboneCache::device_bytes(0, pages).is_err());
         assert!(BackboneCache::device_bytes(17, pages).is_err());
         assert!(BackboneCache::device_bytes(16, [0, 1, 1, 1]).is_err());
-        assert!(BackboneCache::device_bytes(16, [1, 1, 1, 65537]).is_err());
+        assert!(BackboneCache::device_bytes(16, [1, 1, 1, 65537]).is_ok());
+        assert!(BackboneCache::device_bytes(16, [1, 1, 1, 262145]).is_err());
         assert!(BackboneCache::new(&library, 16, pages, budget - 1).is_err());
         let mut bank = BackboneCache::new(&library, 16, pages, budget)?;
         let mut other = BackboneCache::new(&library, 16, pages, budget)?;

@@ -127,13 +127,16 @@ mod tests {
     #[ignore = "requires DS41RT_NATIVE_LIB and CUDA"]
     fn compressed_prefix_restore_requires_complete_groups_and_bounds_views() -> Result<()> {
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let device = crate::v41_memory::device::cache_test_device(&lib)?;
         let saved = DeviceAllocation::new(&lib, COMPRESSOR_PREFIX_BYTES)?;
         let stream = LoadStream {
             library: &lib,
             raw: lib.cuda_stream_create()?,
         };
         for layer in [2, 20] {
-            let mut state = CompressorState::new(&lib, layer, 2, 4, usize::MAX)?;
+            let mut state = device.own(|| CompressorState::new(&lib, layer, 2, 4, usize::MAX))?;
+            assert_eq!(state.index.kv_values.buffer.device_id,device.id);
+            assert_eq!(saved.buffer.device_id,0);
             let original = state.begin_request(0, 1)?;
             let rows = 601 / ratio(layer)?;
             let plan = state.index.reserve(&[(0, 0, rows)])?;
@@ -192,7 +195,9 @@ mod tests {
     #[ignore = "requires DS41RT_NATIVE_LIB and CUDA"]
     fn native_compressor_prefix_preserves_pending_odd_row() -> Result<()> {
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
-        let mut state = CompressorState::new(&lib, 2, 2, 4, usize::MAX)?;
+        let device = crate::v41_memory::device::cache_test_device(&lib)?;
+        let mut state = device.own(|| CompressorState::new(&lib, 2, 2, 4, usize::MAX))?;
+        assert_eq!(state.index.kv_values.buffer.device_id,device.id);
         let saved = DeviceAllocation::new(&lib, COMPRESSOR_PREFIX_BYTES)?;
         let stream = LoadStream {
             library: &lib,
