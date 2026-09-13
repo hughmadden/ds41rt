@@ -910,3 +910,14 @@ fixture checks finite full-vocabulary downloads, exact agreement with GPU
 argmax, compact-row bounds, and restoration of the caller's GPU. Ordinary
 serving still selects its existing target pass; installing the distributed
 pass and placing the actual draft runtime remain outstanding.
+
+Further isolation: separate-cache encoder requests also match exactly when the
+second starts only after the first completes five layers
+(`independent-encoder-staggered.log`). The native prefix test now queues 64
+attention reads while another stream stores different FP4 values beyond the
+prefix and updates its length; all outputs match on both GPUs, with ordinary
+and split attention. This checks the primitive, not the complete cache
+publication lifecycle. Capturing mHC pre output at layers 1 and 4 also matched
+in runs that later failed (`interleave-pre1.log`, `interleave-pre4.log`). The
+next useful boundary is attention/projection versus FFN within an affected
+encoder layer; a residual-only end-of-layer trace cannot distinguish them.

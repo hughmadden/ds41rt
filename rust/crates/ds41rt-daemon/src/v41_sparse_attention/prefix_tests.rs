@@ -59,6 +59,18 @@ fn committed_prefix_survives_append_but_private_boundary_stays_exact() -> Result
                 library: &lib,
                 raw: unsafe { lib.cuda_stream_create()? },
             };
+            let append_stream = LoadStream {
+                library: &lib,
+                raw: unsafe { lib.cuda_stream_create()? },
+            };
+            let appended_values = allocate(V41Kv::COMPRESSED_VALUE_BYTES, 0x66)?;
+            let appended_scales = allocate(V41Kv::COMPRESSED_SCALE_BYTES, 0x40)?;
+            let destination = allocate(8, 0)?;
+            lib.copy_h2d(destination.buffer, &1u64.to_ne_bytes())?;
+            let mut append_end = HostAllocation::new(&lib, 8)?;
+            append_end.bytes_mut().copy_from_slice(&2u64.to_ne_bytes());
+            let outputs = allocate(64 * 65536, 0)?;
+            let kv = lib.v41_compressed_kv()?;
             for split in [None, Some((scratch.buffer, 10))] {
                 let run = |end: u64, private: u64| -> Result<Vec<u8>> {
                     let values = [0u64, 0, 1, 0, 0, 1, 1, private, 0, 1];
@@ -112,6 +124,34 @@ fn committed_prefix_survives_append_but_private_boundary_stays_exact() -> Result
                     run(2, 1)?.iter().all(|&byte| byte == 0),
                     "stale private boundary accepted"
                 );
+                let prefix = run(1, 0)?;
+                // A follower writes distinct values to the next physical row
+                // and extends the shared length while prefix kernels execute.
+                for iteration in 0..64 {
+                    let out = Ds41rtDeviceBuffer {
+                        ptr: unsafe { outputs.buffer.ptr.cast::<u8>().add(iteration * 65536).cast() },
+                        bytes: 65536, ..outputs.buffer
+                    };
+                    unsafe {
+                        kernel.launch(query.buffer, sink.buffer, metadata.buffer,
+                            Some(selected.buffer), &window, Some(&source), out,
+                            1, 0, split, stream.raw)?;
+                        kv.store(appended_values.buffer, appended_scales.buffer,
+                            destination.buffer, source_values.buffer, source_scales.buffer,
+                            1, 256, append_stream.raw)?;
+                        lib.copy_h2d_async(source_end.buffer, append_end.bytes_mut(), append_stream.raw)?;
+                    }
+                }
+                unsafe {
+                    lib.cuda_stream_synchronize(stream.raw)?;
+                    lib.cuda_stream_synchronize(append_stream.raw)?;
+                }
+                let mut bytes = vec![0; outputs.buffer.bytes];
+                lib.copy_d2h(&mut bytes, outputs.buffer)?;
+                for (iteration, actual) in bytes.chunks_exact(65536).enumerate() {
+                    assert!(actual == prefix,
+                        "concurrent append changed prefix attention: gpu={gpu}, iteration={iteration}, split={}", split.is_some());
+                }
             }
             Ok(())
         })?;

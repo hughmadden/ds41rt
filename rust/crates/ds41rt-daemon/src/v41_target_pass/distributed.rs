@@ -26,6 +26,8 @@ pub(crate) struct DistributedTargetPass<'w, 'a> {
     #[cfg(test)]
     trace_records: Vec<(u64, usize, usize)>,
     #[cfg(test)]
+    observed_layer: Option<std::rc::Rc<std::cell::Cell<usize>>>,
+    #[cfg(test)]
     trace_buffers: [DeviceOwner<'a, crate::v41_memory::HostAllocation<'a>>; 2],
 }
 /// Execution futures drain their borrowed GPU work before this guard revokes
@@ -115,6 +117,8 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             trace: false,
             #[cfg(test)]
             trace_records: Vec::new(),
+            #[cfg(test)]
+            observed_layer: None,
             #[cfg(test)]
             trace_buffers,
         })
@@ -400,18 +404,23 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                     .await?;
             }
             #[cfg(test)]
+            if let Some(progress) = &self.observed_layer { progress.set(layer + 1); }
+            #[cfg(test)]
             if self.trace && std::env::var("DS41RT_TRACE_LAYER").ok()
                 .map_or(true, |value| value.split(',').any(|v| v.parse::<usize>().ok() == Some(layer))) {
                 let output = self.lanes[gpu].output()?;
+                let captured = if std::env::var_os("DS41RT_TRACE_PRE").is_some() {
+                    output.pre
+                } else { output.residual };
                 let position = output.tokens[0];
                 let offset = (layer * 16 + position as usize) * 40960;
                 ensure!(position as usize + output.tokens.len() <= 16, "trace extent exceeded");
-                let bytes = &mut self.trace_buffers[gpu].bytes_mut()[offset..offset + output.residual.bytes];
+                let bytes = &mut self.trace_buffers[gpu].bytes_mut()[offset..offset + captured.bytes];
                 // Queue behind this producer and before its next overwrite. No
                 // host wait is added between layers; read back after the run.
-                device.run(|| unsafe { device.library.copy_d2h_async(bytes, output.residual,
+                device.run(|| unsafe { device.library.copy_d2h_async(bytes, captured,
                     self.lanes[gpu].trace_stream()) })?;
-                self.trace_records.push((position, layer, output.residual.bytes));
+                self.trace_records.push((position, layer, captured.bytes));
             }
             if reserved {
                 unsafe {
@@ -1036,6 +1045,8 @@ mod tests {
             let counts = [3usize, 7];
             let mut reference: [Option<Vec<u8>>; 2] = [None, None];
             for concurrent in [false, true, true, true, true] {
+                let progress = std::rc::Rc::new(std::cell::Cell::new(0));
+                pass.observed_layer = Some(progress.clone());
                 let leases = [requests.admit(0, 94000)?, requests.admit(1, 94001)?];
                 for (lease, count) in leases.into_iter().zip(counts) { requests.begin_encoder(lease, count as u64)?; }
                 let mut batches = leases.into_iter().zip(counts).map(|(lease, count)| requests.reserve_encoder(&[
@@ -1054,8 +1065,11 @@ mod tests {
                             tokio::try_join!(
                                 unsafe { pass.execute(&bank, &mut b0[0], &mut transport, 0,
                                     &[], Some(&mut s0[0]), None, false) },
-                                unsafe { other.execute(&bank, &mut b1[0], &mut other_transport, 0,
-                                    &[], Some(&mut s1[0]), None, false) },
+                                async {
+                                    while progress.get() < 5 { tokio::task::yield_now().await; }
+                                    unsafe { other.execute(&bank, &mut b1[0], &mut other_transport, 0,
+                                        &[], Some(&mut s1[0]), None, false).await }
+                                },
                             )?;
                         } else {
                             unsafe { pass.execute(&bank, &mut b0[0], &mut transport, 0,
@@ -1084,6 +1098,7 @@ mod tests {
                 }
             }
             eprintln!("PASS independent encoder cache leases: sequential and concurrent residuals exact");
+            pass.observed_layer = None;
         }
         for (case, chunks) in [
             vec![&prompt[..3], &prompt[3..]],
