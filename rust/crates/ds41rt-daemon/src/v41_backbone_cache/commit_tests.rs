@@ -2,6 +2,104 @@ use super::*;
 use crate::v41_compressor::CompressorWeights;
 use crate::v41_window::WindowWeights;
 use ds41rt_ffi::Ds41rtDeviceBuffer;
+
+#[test]
+#[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, and two CUDA GPUs"]
+fn placed_cache_commits_match_direct_and_preserve_peer_requests() -> Result<()> {
+    use crate::v41_backbone_execution::{CacheProducerWeights,PlacedProducerWaves};
+    let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+    let catalog = ds41rt_loader::read_official_v41_catalog(ds41rt_loader::OFFICIAL_V41_MODEL_ID,
+        std::path::Path::new(&std::env::var("DS41RT_SNAPSHOT")?))?;
+    lib.cuda_set_device(0)?;
+    // Move source 14 with its consumers, exercising ratio-two compression on
+    // GPU1 as well as the decoder's ratio-one source 20.
+    let placement = CachePlacement::new(std::array::from_fn(|layer| usize::from(layer >= 14)))?;
+    let weights = CacheProducerWeights::load_distributed(&lib,&catalog,placement,
+        CacheProducerWeights::distributed_device_bytes(&lib,&catalog,placement)?,1024*1024)?;
+    let reference_weights = (0..40).map(|layer| WindowWeights::load(&lib,&catalog,layer,
+        WindowWeights::device_bytes(&lib,&catalog,layer)?,1024*1024)).collect::<Result<Vec<_>>>()?;
+    let reference_sources = SOURCES.into_iter().map(|layer| CompressorWeights::load(&lib,&catalog,layer,
+        CompressorWeights::device_bytes(&catalog,layer)?,1024*1024)).collect::<Result<Vec<_>>>()?;
+    let pages = [4,4,4,8];
+    let mut bank = BackboneCache::new_distributed(&lib,placement,2,pages,
+        BackboneCache::distributed_device_bytes(placement,2,pages)?)?;
+    let mut reference = BackboneCache::new(&lib,2,pages,BackboneCache::device_bytes(2,pages)?)?;
+    let mut lanes = [PlacedProducerWaves::new(&weights,16,PlacedProducerWaves::device_bytes(&lib,placement,16)?)?,
+        PlacedProducerWaves::new(&weights,16,PlacedProducerWaves::device_bytes(&lib,placement,16)?)?];
+    let mut rw = reference_weights.iter().map(|weights| weights.wave(16,WindowWave::device_bytes(&lib,16)?))
+        .collect::<Result<Vec<_>>>()?;
+    let mut rs = reference_sources.iter().zip(SOURCES).map(|(weights,layer)| weights.wave(16,CompressorWave::device_bytes(layer,16)?))
+        .collect::<Result<Vec<_>>>()?;
+    let leases = [bank.begin_request(0,11)?,bank.begin_request(1,22)?];
+    let refs = [reference.begin_request(0,11)?,reference.begin_request(1,22)?];
+    let mut batches = Vec::new();
+    let mut expected = Vec::new();
+    for lane in 0..2 {
+        let batch = bank.plan(&[CacheWork { lease: leases[lane],tokens:5,kind:ExpertV2SourceKind::Prefill }])?;
+        let rb = reference.plan(&[CacheWork { lease:refs[lane],tokens:5,kind:ExpertV2SourceKind::Prefill }])?;
+        produce(&lib,&bank,&batch,&mut lanes[lane].windows,&mut lanes[lane].sources,41+lane)?;
+        produce(&lib,&reference,&rb,&mut rw,&mut rs,41+lane)?;
+        reference.commit(&rb,&mut rw,&mut rs,&[3-lane as u32])?;
+        expected.push(committed_bytes(&lib,&reference,refs[lane])?);
+        unsafe { lanes[lane].enqueue_cache_commit(&bank,&batch,&[3-lane as u32])?; }
+        assert_eq!(bank.committed_end(leases[lane])?,0);
+        batches.push(batch);
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime.block_on(async {
+        while !lanes[0].poll_cache_commit()? || !lanes[1].poll_cache_commit()? { tokio::task::yield_now().await; }
+        Ok::<_,anyhow::Error>(())
+    })?;
+    assert!(lanes[0].finish_cache_commit(&mut bank,&batches[0],&[2]).is_err());
+    for lane in 0..2 {
+        lanes[lane].finish_cache_commit(&mut bank,&batches[lane],&[3-lane as u32])?;
+        assert_eq!(bank.committed_end(leases[lane])?,3-lane as u64);
+        assert!(committed_bytes(&lib,&bank,leases[lane])? == expected[lane], "distributed accepted cache bytes differ");
+    }
+    let continued = bank.plan(&[CacheWork { lease:leases[0],tokens:3,kind:ExpertV2SourceKind::Decode }])?;
+    let rc = reference.plan(&[CacheWork { lease:refs[0],tokens:3,kind:ExpertV2SourceKind::Decode }])?;
+    produce(&lib,&bank,&continued,&mut lanes[0].windows,&mut lanes[0].sources,63)?;
+    produce(&lib,&reference,&rc,&mut rw,&mut rs,63)?;
+    reference.commit(&rc,&mut rw,&mut rs,&[2])?;
+    unsafe { lanes[0].enqueue_cache_commit(&bank,&continued,&[2])?; }
+    runtime.block_on(async {
+        while !lanes[0].poll_cache_commit()? { tokio::task::yield_now().await; }
+        Ok::<_,anyhow::Error>(())
+    })?;
+    lanes[0].finish_cache_commit(&mut bank,&continued,&[2])?;
+    expected[0] = committed_bytes(&lib,&reference,refs[0])?;
+    assert_eq!(bank.committed_end(leases[0])?,5);
+    assert!(committed_bytes(&lib,&bank,leases[0])? == expected[0], "odd-boundary continuation differs");
+    let saved = bank.retain_prefix(leases[0],BackbonePrefix::device_bytes())?;
+    let batch = bank.plan(&[CacheWork { lease:leases[0],tokens:3,kind:ExpertV2SourceKind::Decode }])?;
+    produce(&lib,&bank,&batch,&mut lanes[0].windows,&mut lanes[0].sources,77)?;
+    unsafe { lanes[0].enqueue_cache_commit(&bank,&batch,&[2])?; }
+    lanes[0].abort_cache_commit(&mut bank)?;
+    assert!(bank.committed_end(leases[0]).is_err());
+    assert_eq!(bank.committed_end(leases[1])?,2);
+    assert!(committed_bytes(&lib,&bank,leases[1])? == expected[1]);
+    bank.release(&[leases[0]])?;
+    let replacement = bank.begin_request(0,33)?;
+    bank.restore_prefix(replacement,&saved)?;
+    assert_eq!(bank.committed_end(replacement)?,5);
+    assert!(committed_bytes(&lib,&bank,replacement)? == expected[0], "aborted copy-on-write changed retained pages");
+    let batch = bank.plan(&[CacheWork { lease:replacement,tokens:1,kind:ExpertV2SourceKind::Prefill }])?;
+    produce(&lib,&bank,&batch,&mut lanes[0].windows,&mut lanes[0].sources,91)?;
+    unsafe { lanes[0].enqueue_cache_commit(&bank,&batch,&[1])?; }
+    runtime.block_on(async {
+        while !lanes[0].poll_cache_commit()? { tokio::task::yield_now().await; }
+        Ok::<_,anyhow::Error>(())
+    })?;
+    lanes[0].finish_cache_commit(&mut bank,&batch,&[1])?;
+    let rb = reference.plan(&[CacheWork { lease:refs[0],tokens:1,kind:ExpertV2SourceKind::Prefill }])?;
+    produce(&lib,&reference,&rb,&mut rw,&mut rs,91)?;
+    reference.commit(&rb,&mut rw,&mut rs,&[1])?;
+    assert_eq!(bank.committed_end(replacement)?,6);
+    assert!(committed_bytes(&lib,&bank,replacement)? == committed_bytes(&lib,&reference,refs[0])?,
+        "restored odd carry changed the next accepted row");
+    assert_eq!(lib.cuda_get_device()?,0);
+    Ok(())
+}
 fn read(lib: &NativeLibrary, buffer: Ds41rtDeviceBuffer) -> Result<Vec<u8>> {
     let mut bytes = vec![0; buffer.bytes];
     lib.copy_d2h(&mut bytes, buffer)?;
@@ -38,12 +136,12 @@ fn committed_bytes(lib: &NativeLibrary, bank: &BackboneCache<'_>, lease: CacheLe
     }
     Ok(result)
 }
-fn produce(
+fn produce<'w,'wa:'w,'s,'sa:'s,W: CacheWave<WindowWave<'w,'wa>>,C: CacheWave<CompressorWave<'s,'sa>>>(
     lib: &NativeLibrary,
     bank: &BackboneCache<'_>,
     batch: &CacheBatch,
-    windows: &mut [WindowWave<'_, '_>],
-    sources: &mut [CompressorWave<'_, '_>],
+    windows: &mut [W],
+    sources: &mut [C],
     seed: usize,
 ) -> Result<()> {
     let rows = batch.positions().len();
@@ -55,20 +153,24 @@ fn produce(
         .collect::<Vec<_>>();
     for layer in batch.stage.windows() {
         let wave = &mut windows[layer];
-        lib.copy_h2d(wave.input(), &input)?;
-        unsafe {
-            wave.execute(bank.window(batch, layer)?, &batch.window_chunks(layer)?)?;
-        }
+        wave.on_device_mut(|wave| {
+            lib.copy_h2d(wave.input(), &input)?;
+            unsafe { wave.execute(bank.window(batch, layer)?, &batch.window_chunks(layer)?)?; }
+            Ok(())
+        })?;
     }
     for i in 0..batch.stage.source_count() {
         let wave = &mut sources[i];
-        lib.copy_h2d(wave.input(), &input)?;
-        unsafe {
+        wave.on_device_mut(|wave| {
+            lib.copy_h2d(wave.input(), &input)?;
+            unsafe {
             wave.execute(
                 bank.source(batch, SOURCES[i])?,
                 &batch.source_chunks(SOURCES[i])?,
             )?;
-        }
+            }
+            Ok(())
+        })?;
     }
     Ok(())
 }

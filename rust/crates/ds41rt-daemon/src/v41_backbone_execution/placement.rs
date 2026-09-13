@@ -1,10 +1,12 @@
 //! Load each cache producer beside its SWA/compressed storage.
 use super::*;
+use crate::v41_backbone_cache::CacheWave;
 
 /// One lane's per-layer producer workspaces, owned by the assigned GPUs.
 pub(crate) struct PlacedProducerWaves<'w, 'a> {
     pub windows: Vec<DeviceOwner<'a, WindowWave<'w, 'a>>>,
     pub sources: Vec<DeviceOwner<'a, CompressorWave<'w, 'a>>>,
+    pending_commit: Option<(u64, [u32; 16], usize)>,
 }
 impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
     pub fn device_bytes(
@@ -69,7 +71,67 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        Ok(Self { windows, sources })
+        Ok(Self {
+            windows,
+            sources,
+            pending_commit: None,
+        })
+    }
+    /// # Safety
+    /// Retain the bank and this lane through publication or explicit abort.
+    /// Producers/attention consumers have completed; no conflicting writes.
+    pub unsafe fn enqueue_cache_commit(
+        &mut self,
+        bank: &BackboneCache<'_>,
+        batch: &CacheBatch,
+        accepted: &[u32],
+    ) -> Result<()> {
+        ensure!(
+            self.pending_commit.is_none() && accepted.len() <= 16,
+            "placed commit already pending or too many requests"
+        );
+        let mut counts = [0; 16];
+        counts[..accepted.len()].copy_from_slice(accepted);
+        self.pending_commit = Some((batch.identity(), counts, accepted.len()));
+        unsafe { bank.enqueue_cache_commit(batch, &mut self.windows, &mut self.sources, accepted) }
+    }
+    pub fn poll_cache_commit(&self) -> Result<bool> {
+        ensure!(self.pending_commit.is_some(), "placed commit not enqueued");
+        for wave in &self.windows {
+            if !wave.on_device(|wave| wave.poll_commit())? {
+                return Ok(false);
+            }
+        }
+        for wave in &self.sources {
+            if !wave.on_device(|wave| wave.poll_commit())? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+    pub fn finish_cache_commit(
+        &mut self,
+        bank: &mut BackboneCache<'_>,
+        batch: &CacheBatch,
+        accepted: &[u32],
+    ) -> Result<()> {
+        let (identity, counts, len) = self.pending_commit.context("placed commit not enqueued")?;
+        ensure!(
+            identity == batch.identity() && &counts[..len] == accepted,
+            "placed commit identity or acceptance changed"
+        );
+        ensure!(
+            self.poll_cache_commit()?,
+            "placed cache writes remain pending"
+        );
+        bank.commit(batch, &mut self.windows, &mut self.sources, accepted)?;
+        self.pending_commit = None;
+        Ok(())
+    }
+    pub fn abort_cache_commit(&mut self, bank: &mut BackboneCache<'_>) -> Result<()> {
+        let result = bank.abort_cache_commit(&mut self.windows, &mut self.sources);
+        self.pending_commit = None;
+        result
     }
 }
 

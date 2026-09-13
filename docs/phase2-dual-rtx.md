@@ -497,3 +497,35 @@ The old execution constructor rejects distributed weights to prevent silently
 allocating their workspaces on the caller's GPU. Integrating placed producer
 polling/commit with attention, index, and layer-state ownership remains next;
 no full-model quality or throughput claim follows from these component checks.
+
+## Placed cache commit and retained-prefix recovery
+
+The existing cache transaction validator and publication logic now accept both
+ordinary producer waves and device-owned waves through static dispatch. Ordinary
+waves retain their direct calls; placed waves enqueue, query, publish, and abort
+inside their GPU scope. Validation also rejects a producer/cache GPU mismatch
+before submitting accepted writes.
+
+Placed producer lanes expose separate enqueue, poll, finish, and abort methods.
+Only enqueue borrows the bank immutably; polling borrows the lane alone, and
+publication/abort take a short mutable bank borrow. No mutable request-bank
+borrow spans an async wait. A fixed-size acceptance record binds completion to
+the original batch/counts and introduces no allocation for that tracking state.
+The underlying existing commit operations retain their existing staging and
+reservation behavior.
+
+The real-weight two-lane fixture uses the rebalanced map with source 14 and its
+consumers on GPU1, covering both compression ratios there. Accepted bytes across
+all forty SWA windows and all four FP4 KV/index sources exactly match direct
+single-GPU execution. It verifies distinct requests/acceptance counts, deferred
+logical publication, rejection of changed acceptance, and continuation across an
+odd compressed frontier. After retaining a prefix, an aborted copy-on-write
+append revokes only the affected request; the peer remains byte-identical.
+Restoring the retained prefix and accepting the next row matches direct
+execution, including the saved carry state.
+
+The existing larger single-GPU commit fixture also passes: 16-request CED
+transactions, bounded replay, encoder reservations/publication, late source-pool
+exhaustion, lease revocation, and recovery. These checks cover cache transactions;
+the complete distributed layer loop, attention/index placement, startup mode
+selection, and serving performance qualification still remain.

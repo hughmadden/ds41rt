@@ -13,6 +13,8 @@ use crate::v41_memory::device::{Device, DeviceOwner};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 mod ced;
+mod commit_access;
+pub(crate) use commit_access::CacheWave;
 mod publication;
 mod prefix;
 mod placement;
@@ -628,8 +630,8 @@ impl<'a> BackboneCache<'a> {
         Ok(())
     }
     /// Check every component before starting or publishing accepted cache writes.
-    fn validate_commit(&self, batch: &CacheBatch, windows: &[WindowWave<'_, '_>],
-        sources: &[CompressorWave<'_, '_>], accepted: &[u32]) -> Result<(u64, u8)> {
+    fn validate_commit<'w,'wa:'w,'s,'sa:'s,W: CacheWave<WindowWave<'w,'wa>>,C: CacheWave<CompressorWave<'s,'sa>>>
+        (&self, batch: &CacheBatch, windows: &[W], sources: &[C], accepted: &[u32]) -> Result<(u64, u8)> {
         self.validate_batch(batch)?;
         ensure!(
             windows.len() == 40 && sources.len() == 4 && accepted.len() == batch.requests.len(),
@@ -661,12 +663,16 @@ impl<'a> BackboneCache<'a> {
         }
         for layer in batch.stage.windows() {
             if published_windows & (1u64 << layer) != 0 { continue; }
-            let wave = &windows[layer];
+            let wave = windows[layer].wave_ref();
+            ensure!(wave.input().device_id == self.windows[layer].device.id,
+                "window producer and cache GPU differ at layer {layer}");
             wave.validate_batch(&self.windows[layer], &batch.window_chunks(layer)?)?;
         }
         for i in 0..batch.stage.source_count() {
             if published_sources & (1 << i) != 0 { continue; }
-            let wave = &sources[i];
+            let wave = sources[i].wave_ref();
+            ensure!(wave.input().device_id == self.sources[i].device.id,
+                "compressed producer and cache GPU differ at source {}", SOURCES[i]);
             wave.validate_batch(&self.sources[i], &batch.source_chunks(SOURCES[i])?)?;
         }
         Ok((published_windows, published_sources))
@@ -674,50 +680,51 @@ impl<'a> BackboneCache<'a> {
     /// # Safety
     /// The enclosing target pass retains bank and producer ownership until all
     /// writes finish. Abort/drain before releasing any participating request.
-    pub unsafe fn enqueue_cache_commit(&self, batch: &CacheBatch,
-        windows: &mut [WindowWave<'_, '_>], sources: &mut [CompressorWave<'_, '_>], accepted: &[u32]) -> Result<()> {
+    pub unsafe fn enqueue_cache_commit<'w,'wa:'w,'s,'sa:'s,W: CacheWave<WindowWave<'w,'wa>>,C: CacheWave<CompressorWave<'s,'sa>>>
+        (&self, batch: &CacheBatch, windows: &mut [W], sources: &mut [C], accepted: &[u32]) -> Result<()> {
         let (published, published_sources) = self.validate_commit(batch, windows, sources, accepted)?;
         for layer in batch.stage.windows() {
             if published & (1u64 << layer) == 0 {
-                unsafe { windows[layer].enqueue_commit(&self.windows[layer], accepted)?; }
+                windows[layer].on_device_mut(|wave| unsafe { wave.enqueue_commit(&self.windows[layer], accepted) })?;
             }
         }
         for i in 0..batch.stage.source_count() {
             if published_sources & (1 << i) == 0 {
-                unsafe { sources[i].enqueue_commit(&self.sources[i], accepted)?; }
+                sources[i].on_device_mut(|wave| unsafe { wave.enqueue_commit(&self.sources[i], accepted) })?;
             }
         }
         Ok(())
     }
-    pub fn abort_cache_commit(&mut self, windows: &mut [WindowWave<'_, '_>], sources: &mut [CompressorWave<'_, '_>]) -> Result<()> {
+    pub fn abort_cache_commit<'w,'wa:'w,'s,'sa:'s,W: CacheWave<WindowWave<'w,'wa>>,C: CacheWave<CompressorWave<'s,'sa>>>
+        (&mut self, windows: &mut [W], sources: &mut [C]) -> Result<()> {
         let mut result = Ok(());
         for (state, wave) in self.windows.iter_mut().zip(windows) {
-            if let Err(error) = wave.abort_commit(state) { result = Err(error); }
+            if let Err(error) = wave.on_device_mut(|wave| wave.abort_commit(state)) { result = Err(error); }
         }
         for (state, wave) in self.sources.iter_mut().zip(sources) {
-            if let Err(error) = wave.abort_commit(state) { result = Err(error); }
+            if let Err(error) = wave.on_device_mut(|wave| wave.abort_commit(state)) { result = Err(error); }
         }
         result
     }
     /// Publish this phase's window/source owners. Queued windows must have
     /// completed; direct calls retain their synchronous path.
     /// Execution failure revokes all participants after draining queued writes.
-    pub fn commit(
+    pub fn commit<'w,'wa:'w,'s,'sa:'s,W: CacheWave<WindowWave<'w,'wa>>,C: CacheWave<CompressorWave<'s,'sa>>>(
         &mut self,
         batch: &CacheBatch,
-        windows: &mut [WindowWave<'_, '_>],
-        sources: &mut [CompressorWave<'_, '_>],
+        windows: &mut [W],
+        sources: &mut [C],
         accepted: &[u32],
     ) -> Result<()> {
         let (published_windows, published_sources) = self.validate_commit(batch, windows, sources, accepted)?;
         let committed = (|| -> Result<()> {
             for layer in batch.stage.windows() {
                 if published_windows & (1u64 << layer) != 0 { continue; }
-                windows[layer].commit(&mut self.windows[layer], accepted)?;
+                windows[layer].on_device_mut(|wave| wave.commit(&mut self.windows[layer], accepted))?;
             }
             for i in 0..batch.stage.source_count() {
                 if published_sources & (1 << i) != 0 { continue; }
-                sources[i].commit(&mut self.sources[i], accepted)?;
+                sources[i].on_device_mut(|wave| wave.commit(&mut self.sources[i], accepted))?;
             }
             Ok(())
         })();
@@ -863,7 +870,7 @@ mod tests {
             assert!(bank.release(&[leases[0], leases[0]]).is_err());
             bank.validate_batch(&batch)?;
             // Commit preflight rejects missing producers without consuming history.
-            assert!(bank.commit(&batch, &mut [], &mut [], &[0; 16]).is_err());
+            assert!(bank.commit::<WindowWave<'_, '_>, CompressorWave<'_, '_>>(&batch, &mut [], &mut [], &[0; 16]).is_err());
             bank.validate_batch(&batch)?;
             bank.release(&leases[..1])?;
             assert!(bank.validate_batch(&batch).is_err());
