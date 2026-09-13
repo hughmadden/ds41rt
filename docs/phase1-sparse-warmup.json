@@ -1,0 +1,98 @@
+{
+  "scope": "Adaptive sparse warmup reuse probe; fixed-policy path unchanged",
+  "timing": {
+    "before": {
+      "rounds": 41,
+      "median_sparse_ms": 35.375,
+      "median_verify_ms": 164.875,
+      "rounds_with_captures": 34,
+      "median_sparse_ms_with_captures": 36.6145
+    },
+    "after": {
+      "rounds": 42,
+      "median_sparse_ms": 27.622500000000002,
+      "median_verify_ms": 160.729,
+      "rounds_with_captures": 36,
+      "median_sparse_ms_with_captures": 28.087
+    }
+  },
+  "configuration": {
+    "power_limit_w": 400,
+    "memory_speed": "standard: max 14001 MHz, load 13365 MHz",
+    "candidate_binary_sha256": "6d5face2b9f9e93920995a3644c9a899651f5c8cdda1419c12d1867ff5ed6d2a",
+    "native_library_sha256": "c7d680188c8e9c2610f9dbfec8b7bcfefb8b3123f79b08a4f33bed46f4c6c40a"
+  },
+  "runs": {
+    "before": {
+      "decode_median_tps": {
+        "code": 121.58067127170438,
+        "fable": 52.51602818900422,
+        "topic": 65.52188351426955
+      },
+      "mixed_tps": {
+        "4": 100.85204460729238,
+        "16": 144.70348973277038
+      },
+      "lifecycle_passed": true,
+      "decode_sha256": "e51c6a1c4cd7d1287e0f3bc1452e6c64c1aed6a5243427ca802c0f4276ab2ff4",
+      "mixed_sha256": "1774291a2d5cc043f37d5548d4f2f34058459f53090ab943c6bd1e497c173edd"
+    },
+    "after": {
+      "decode_median_tps": {
+        "code": 122.22469148899422,
+        "fable": 52.99578027174623,
+        "topic": 66.40977177006789
+      },
+      "mixed_tps": {
+        "4": 101.89744471309116,
+        "16": 151.3739677451425
+      },
+      "lifecycle_passed": true,
+      "decode_sha256": "998793af43c74ff37742431f85b590e8c1819c5d02b4cf661ccaf97946eecd50",
+      "mixed_sha256": "e4512b3296891ef4db5fc8b4ffd8018ae4bd18172ad29ae077c008b58c3ee093"
+    }
+  },
+  "group2_probes": [
+    {
+      "text": "4",
+      "first_content_seconds": 0.24278420500922948,
+      "finish_seconds": 0.3205538559705019,
+      "observed_decode_tokens_per_second": 12.858486410051887,
+      "usage": {
+        "prompt_tokens": 191,
+        "completion_tokens": 2,
+        "total_tokens": 193,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 191
+      }
+    },
+    {
+      "text": "4",
+      "first_content_seconds": 0.2084240249823779,
+      "finish_seconds": 0.29547915305010974,
+      "observed_decode_tokens_per_second": 11.48697408407654,
+      "usage": {
+        "prompt_tokens": 191,
+        "completion_tokens": 2,
+        "total_tokens": 193,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 191
+      }
+    }
+  ],
+  "memory": {
+    "before": "3161134, 65510\n",
+    "after": "3161134, 67452\n"
+  },
+  "exact_outputs_vs_previous_adaptive": {
+    "C1": 9,
+    "4": 4,
+    "16": 6
+  }
+}

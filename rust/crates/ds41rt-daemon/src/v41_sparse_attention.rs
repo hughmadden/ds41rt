@@ -53,6 +53,7 @@ pub(crate) struct SparseAttentionWave<'a> {
     // request layouts can have many more combinations than total row counts.
     graphs: [VecDeque<(*mut c_void, Vec<usize>)>; 40],
     graph_limit: usize,
+    warmed_kernels: u8,
 }
 struct RequestLaunch {
     window: V41SparseWindow,
@@ -98,6 +99,7 @@ impl<'a> SparseAttentionWave<'a> {
             capacity,
             graphs: std::array::from_fn(|_| VecDeque::new()),
             graph_limit: 1,
+            warmed_kernels: 0,
         })
     }
     pub fn enable_small_graph_shapes(&mut self) { self.graph_limit = 48; }
@@ -404,8 +406,20 @@ impl<'a> SparseAttentionWave<'a> {
                 let (old, _) = self.graphs[layer].pop_front().unwrap();
                 unsafe { self.stream.library.cuda_graph_exec_destroy(old)?; }
             }
-            let launched = unsafe { self.enqueue(sink, &launches, selected) };
-            launched.and(self.synchronize())?;
+            // Native dispatch has four row recipes per cache format: split,
+            // unsplit single-group, two-group and four-group. Changing pointers
+            // or launch dimensions does not require executing a warmed recipe
+            // again before capture. Keep the fixed-policy path unchanged.
+            let needed = launches.iter().fold(0u8, |mask, launch| {
+                let recipe = if launch.rows <= 16 { 0 } else if launch.rows < 128 { 1 }
+                    else if launch.rows < 256 { 2 } else { 3 };
+                mask | (1 << (recipe + 4 * usize::from(launch.source.is_some())))
+            });
+            if self.graph_limit == 1 || self.warmed_kernels & needed != needed {
+                let launched = unsafe { self.enqueue(sink, &launches, selected) };
+                launched.and(self.synchronize())?;
+                self.warmed_kernels |= needed;
+            }
             unsafe {
                 self.stream
                     .library
