@@ -749,3 +749,24 @@ path and become available for subsequent attention. This verifies placed GPU
 projection/application; it is not a new CPU table-lookup or full-model quality
 evaluation. The forty-layer target-pass loop still needs to invoke this owner
 along with placed taps/head and reserved encoder publication.
+
+## Full distributed pass integration
+
+`DistributedTargetPass` now sequences all forty layers through placed embedding,
+Engram, cache/index production, attention, TP2 FFNs, peer handoffs, decoder taps,
+and the target head. Each request lane owns its pass and transport; request-bank
+borrows end before asynchronous waits. The full vocabulary head is temporarily
+on the decoder GPU. Reserved encoder early publication and normal serving
+startup integration remain pending.
+
+The real-model `distributed_target_prefill_decode_commit_smoke` fixture passes
+with two RTX cards and all four live Spark endpoints. It loads all twenty encoder
+expert layers and all forty shared experts as TP2, places the attention boundary
+at layer 14, runs a four-token prefill and one-token decode, and publishes both
+cache/history commits. It also discards a subsequent completed proposal without
+advancing committed history, then successfully executes and commits another
+decode using the same owners. Discard invalidates each GPU's local lane rather
+than attempting to restart GPU1 at GPU0's layer zero. The fixture uses a small
+cache and synthetic token IDs: it establishes execution and lifecycle behavior,
+not semantic quality, throughput, or concurrent-lane performance. Its native
+build requires `DS41RT_ENABLE_RDMA=ON` for the live decoder path.

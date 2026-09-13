@@ -403,6 +403,11 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     }
     /// Cancel or start another wave. External consumers must have finished;
     /// borrowed outputs prevent safe callers from restarting during consumption.
+    pub fn invalidate(&mut self) {
+        self.phase = Phase::Invalid;
+        self.block.reset();
+    }
+    /// Start a new sequence on the GPU owning layer zero after consumers drain.
     pub fn restart(&mut self) -> Result<()> {
         self.phase = Phase::Invalid;
         self.block.reset();

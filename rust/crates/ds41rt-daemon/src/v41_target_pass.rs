@@ -12,6 +12,8 @@ use crate::v41_target_head::{TargetHeadWave, TargetLogits};
 use anyhow::{ensure, Context, Result};
 use std::time::{Duration, Instant};
 mod taps;
+mod distributed;
+pub(crate) use distributed::DistributedTargetPass;
 mod encoder_pair;
 mod encoder_stream;
 pub(crate) use taps::{TargetTapWave, TargetTaps};

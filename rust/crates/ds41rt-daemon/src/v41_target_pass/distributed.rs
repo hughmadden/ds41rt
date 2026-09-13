@@ -1,0 +1,691 @@
+//! Full target-pass sequencing with GPU-local lanes and short request borrows.
+use super::*;
+use crate::v41_backbone_cache::CachePlacement;
+use crate::v41_backbone_execution::DistributedExecution;
+use crate::v41_block::BlockTransfer;
+use crate::v41_engram::placement::PlacedEngram;
+use crate::v41_memory::device::DeviceOwner;
+
+pub(crate) struct DistributedTargetPass<'w, 'a> {
+    map: CachePlacement,
+    embedding: DeviceOwner<'a, TargetEmbeddingWave<'w, 'a>>,
+    lanes: [DeviceOwner<'a, BackboneLane<'w, 'a>>; 2],
+    indices: [Option<DeviceOwner<'a, IndexLane<'w, 'a>>>; 2],
+    execution: DistributedExecution<'w, 'a>,
+    engram: PlacedEngram<'w, 'a>,
+    head: DeviceOwner<'a, TargetHeadWave<'w, 'a>>,
+    taps: DeviceOwner<'a, TargetTapWave<'a>>,
+    transfers: [BlockTransfer<'a>; 2],
+    timeout: Duration,
+    state: State,
+}
+impl<'w, 'a> DistributedTargetPass<'w, 'a> {
+    pub fn new(
+        map: CachePlacement,
+        embedding: DeviceOwner<'a, TargetEmbeddingWave<'w, 'a>>,
+        lanes: [DeviceOwner<'a, BackboneLane<'w, 'a>>; 2],
+        indices: [Option<DeviceOwner<'a, IndexLane<'w, 'a>>>; 2],
+        execution: DistributedExecution<'w, 'a>,
+        engram: PlacedEngram<'w, 'a>,
+        head: DeviceOwner<'a, TargetHeadWave<'w, 'a>>,
+        taps: DeviceOwner<'a, TargetTapWave<'a>>,
+        timeout: Duration,
+    ) -> Result<Self> {
+        ensure!(
+            !timeout.is_zero() && lanes[0].device.id == 0 && lanes[1].device.id == 1,
+            "invalid distributed target lane devices/timeout"
+        );
+        ensure!(
+            embedding.device.id == map.attention(0)? as i32
+                && head.device.id == map.attention(39)? as i32
+                && taps.device.id == head.device.id,
+            "distributed embedding/head/tap placement differs"
+        );
+        for layer in [2, 8, 14, 20, 24, 28, 32, 36] {
+            let gpu = map.attention(layer)?;
+            ensure!(
+                indices[gpu]
+                    .as_ref()
+                    .is_some_and(|i| i.device.id == gpu as i32),
+                "distributed index owner absent"
+            );
+        }
+        let transfers = [
+            BlockTransfer::new(lanes[1].device, lanes[0].device)?,
+            BlockTransfer::new(lanes[0].device, lanes[1].device)?,
+        ];
+        Ok(Self {
+            map,
+            embedding,
+            lanes,
+            indices,
+            execution,
+            engram,
+            head,
+            taps,
+            transfers,
+            timeout,
+            state: State::Idle,
+        })
+    }
+    async unsafe fn advance(&mut self, layer: usize) -> Result<()> {
+        ensure!((1..40).contains(&layer), "invalid distributed next layer");
+        let source = self.map.attention(layer - 1)?;
+        let destination = self.map.attention(layer)?;
+        if source == destination {
+            let lane = &mut self.lanes[destination];
+            let device = lane.device;
+            device.run(|| lane.advance())
+        } else {
+            let [left, right] = &mut self.lanes;
+            let (source, destination_lane) = if source == 0 {
+                (left, right)
+            } else {
+                (right, left)
+            };
+            let output = source.output()?;
+            unsafe {
+                destination_lane
+                    .get_mut()
+                    .import_previous_cooperative(&output, &mut self.transfers[destination])
+                    .await
+            }
+        }
+    }
+    /// # Safety
+    /// All owners describe one model/capacity/map and this admitted batch. Each
+    /// concurrent request lane owns a separate pass and transport. The caller
+    /// retains suffix/head/model owners through completion or drained cancellation.
+    pub async unsafe fn execute(
+        &mut self,
+        requests: &std::cell::RefCell<&mut Requests<'a>>,
+        batch: &mut RequestBatch,
+        transport: &mut DeviceOwner<'a, NativeTp4Wave<'a>>,
+        placement: u64,
+        selected: &[usize],
+        mut suffix: Option<&mut DeviceOwner<'a, EncoderSuffix<'a>>>,
+        encoder: Option<&BlockOutput<'_>>,
+        greedy: bool,
+    ) -> Result<()> {
+        requests.with_requests(|r| r.validate(batch))?;
+        let stage = batch.cache()?.stage();
+        let id = batch.cache()?.identity();
+        let rows = batch.cache()?.positions().len();
+        ensure!(
+            !batch.cache()?.is_reserved(),
+            "distributed reserved encoder publication remains unsupported"
+        );
+        ensure!(
+            transport.device.id == self.map.attention(20)? as i32,
+            "decoder transport reduction GPU differs"
+        );
+        ensure!(
+            (stage.is_encoder() || !selected.is_empty())
+                && selected.len() <= 80
+                && selected.iter().all(|&i| i < rows)
+                && selected
+                    .iter()
+                    .enumerate()
+                    .all(|(i, row)| !selected[..i].contains(row)),
+            "invalid distributed head selection"
+        );
+        self.state.begin()?;
+        let guard = BatchGuard {
+            batch,
+            completed: false,
+        };
+        let mut guard = guard;
+        self.execution.restart_for(stage);
+        for index in self.indices.iter_mut().flatten() {
+            let device = index.device;
+            device.run(|| {
+                if stage == CacheStage::Replay {
+                    index.restart_decoder()
+                } else {
+                    index.restart()
+                }
+            })?;
+        }
+        if !stage.is_encoder() {
+            self.taps.begin(guard.batch.cache()?)?;
+        }
+        let first = stage.windows().start;
+        let gpu = self.map.attention(first)?;
+        let device = self.lanes[gpu].device;
+        if stage == CacheStage::Replay {
+            let encoder = encoder.context("distributed replay requires retained encoder suffix")?;
+            ensure!(
+                encoder.tokens == guard.batch.cache()?.positions(),
+                "distributed replay suffix rows differ"
+            );
+            if encoder.residual.device_id == device.id {
+                device.run(|| self.lanes[gpu].restart_decoder(encoder))?;
+            } else {
+                unsafe {
+                    self.lanes[gpu]
+                        .get_mut()
+                        .import_previous_cooperative(encoder, &mut self.transfers[gpu])
+                        .await?;
+                }
+            }
+            device
+                .future(unsafe { self.lanes[gpu].get_mut().begin_prepared_cooperative() })
+                .await?;
+        } else {
+            device.run(|| self.lanes[gpu].restart())?;
+            let text = requests.with_requests(|r| r.text_embedding_input(guard.batch))?;
+            if let Some((tokens, positions)) = text {
+                device
+                    .future(unsafe {
+                        self.lanes[gpu].get_mut().begin_tokens_cooperative(
+                            self.embedding.get_mut(),
+                            tokens,
+                            &positions,
+                        )
+                    })
+                    .await?;
+            } else {
+                unsafe {
+                    requests.with_requests(|r| {
+                        device.run(|| {
+                            r.begin_input(
+                                guard.batch,
+                                self.embedding.get_mut(),
+                                self.lanes[gpu].get_mut(),
+                            )
+                        })
+                    })?;
+                }
+            }
+        }
+        for layer in stage.windows() {
+            let gpu = self.map.attention(layer)?;
+            let device = self.lanes[gpu].device;
+            if layer != first {
+                unsafe {
+                    self.advance(layer).await?;
+                }
+                if [1, 14].contains(&layer) {
+                    let started = Instant::now();
+                    loop {
+                        let gathered = requests.with_requests(|r| {
+                            r.poll_engram_gather(guard.batch, &self.lanes[gpu])
+                        })?;
+                        match gathered {
+                            ds41rt_loader::EngramGatherPoll::Ready(lease) => {
+                                unsafe {
+                                    self.engram
+                                        .apply(&mut self.lanes[gpu], &lease.view()?)
+                                        .await?;
+                                }
+                                break;
+                            }
+                            ds41rt_loader::EngramGatherPoll::Cancelled => {
+                                anyhow::bail!("distributed Engram gather cancelled")
+                            }
+                            ds41rt_loader::EngramGatherPoll::Pending => {}
+                        }
+                        ensure!(
+                            started.elapsed() < self.timeout,
+                            "distributed Engram gather timed out at layer {layer}"
+                        );
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                }
+                if layer >= 37 {
+                    let input = self.lanes[gpu].prepared_input()?;
+                    device
+                        .future(unsafe {
+                            self.taps
+                                .get_mut()
+                                .capture_cooperative(guard.batch.cache()?, &input)
+                        })
+                        .await?;
+                }
+                device
+                    .future(unsafe { self.lanes[gpu].get_mut().begin_prepared_cooperative() })
+                    .await?;
+            }
+            let index = if [2, 8, 14, 20, 24, 28, 32, 36].contains(&layer) {
+                self.indices[gpu].as_mut()
+            } else {
+                None
+            };
+            let mut production = unsafe {
+                requests.with_requests(|r| {
+                    self.execution.enqueue_production(
+                        r.cache(),
+                        guard.batch.cache()?,
+                        &self.lanes[gpu],
+                        index,
+                    )
+                })?
+            };
+            while !unsafe {
+                requests.with_requests(|r| production.poll(r.cache(), guard.batch.cache()?))?
+            } {
+                tokio::task::yield_now().await;
+            }
+            drop(production);
+            let prepared = unsafe {
+                requests.with_requests(|r| {
+                    self.execution.prepare_layer(
+                        r.cache(),
+                        guard.batch.cache()?,
+                        &mut self.lanes[gpu],
+                        self.indices[gpu].as_ref().map(DeviceOwner::get),
+                    )
+                })?
+            };
+            let completed = unsafe {
+                prepared
+                    .execute(transport.get_mut(), placement, guard.batch.image_mask())
+                    .await?
+            };
+            unsafe {
+                self.execution
+                    .complete_layer(guard.batch.cache()?, &mut self.lanes[gpu], completed)
+                    .await?;
+            }
+        }
+        if stage.is_encoder() {
+            let gpu = self.map.attention(19)?;
+            let device = self.lanes[gpu].device;
+            let suffix = suffix
+                .as_mut()
+                .context("distributed encoder suffix owner missing")?;
+            ensure!(suffix.device.id == device.id, "encoder suffix GPU differs");
+            device.run(|| suffix.capture(&self.lanes[gpu].output()?))?;
+            if stage == CacheStage::Encoder {
+                unsafe {
+                    self.advance(20).await?;
+                }
+                let gpu = self.map.attention(20)?;
+                let device = self.lanes[gpu].device;
+                device
+                    .future(unsafe { self.lanes[gpu].get_mut().begin_prepared_cooperative() })
+                    .await?;
+                let mut production = unsafe {
+                    requests.with_requests(|r| {
+                        self.execution.enqueue_production(
+                            r.cache(),
+                            guard.batch.cache()?,
+                            &self.lanes[gpu],
+                            None,
+                        )
+                    })?
+                };
+                while !unsafe {
+                    requests.with_requests(|r| production.poll(r.cache(), guard.batch.cache()?))?
+                } {
+                    tokio::task::yield_now().await;
+                }
+                drop(production);
+                self.execution.finish_decoder_source(guard.batch.cache()?)?;
+            }
+            self.state = State::Encoded(id);
+        } else {
+            self.taps.output(guard.batch.cache()?)?;
+            let gpu = self.map.attention(39)?;
+            let output = self.lanes[gpu].output()?;
+            let device = self.head.device;
+            device
+                .future(async {
+                    if greedy {
+                        unsafe {
+                            self.head
+                                .execute_block_greedy(&output, selected, true)
+                                .await?;
+                        }
+                    } else {
+                        unsafe {
+                            self.head
+                                .execute_block_cooperative(&output, selected)
+                                .await?;
+                        }
+                    }
+                    Ok::<_, anyhow::Error>(())
+                })
+                .await?;
+            self.state = State::Ready(id);
+        }
+        guard.completed = true;
+        Ok(())
+    }
+    pub fn output(&self, batch: &RequestBatch) -> Result<TargetLogits<'_>> {
+        self.state.ready(batch.cache()?.identity())?;
+        self.head.output()
+    }
+    pub fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> {
+        self.state.ready(batch.cache()?.identity())?;
+        self.taps.output(batch.cache()?)
+    }
+    pub fn enqueue_cache_commit(
+        &mut self,
+        requests: &Requests<'a>,
+        batch: &RequestBatch,
+        accepted: &[u32],
+    ) -> Result<()> {
+        let id = batch.cache()?.identity();
+        ensure!(
+            self.state == State::Ready(id) || self.state == State::Encoded(id),
+            "distributed pass incomplete"
+        );
+        requests.validate_acceptance(batch, accepted)?;
+        unsafe {
+            self.execution
+                .enqueue_cache_commit(requests.cache(), batch.cache()?, accepted)
+        }
+    }
+    pub fn poll_cache_commit(&self) -> Result<bool> {
+        self.execution.poll_cache_commit()
+    }
+    pub fn commit(
+        &mut self,
+        requests: &mut Requests<'a>,
+        batch: &mut RequestBatch,
+        accepted: &[u32],
+    ) -> Result<()> {
+        let id = batch.cache()?.identity();
+        ensure!(
+            self.state == State::Ready(id) || self.state == State::Encoded(id),
+            "distributed pass incomplete"
+        );
+        self.state = State::Running;
+        self.taps.reset();
+        requests.commit_distributed(batch, &mut self.execution, accepted)?;
+        self.state = State::Idle;
+        Ok(())
+    }
+    pub fn abort_cache_commit(&mut self, requests: &mut Requests<'a>) -> Result<()> {
+        requests.abort_distributed_cache_commit(&mut self.execution)
+    }
+    /// Execution and output consumers must be dropped before discarding. Any
+    /// queued cache commit must first be completed or explicitly aborted.
+    pub fn discard(&mut self, batch: &mut RequestBatch) -> Result<()> {
+        batch.cancel();
+        self.taps.reset();
+        self.state = State::Running;
+        for lane in &mut self.lanes {
+            let device = lane.device;
+            device.run(|| { lane.invalidate(); Ok(()) })?;
+        }
+        for index in self.indices.iter_mut().flatten() {
+            let device = index.device;
+            device.run(|| index.restart())?;
+        }
+        self.execution.restart_for(CacheStage::Full);
+        self.state = State::Idle;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::v41_backbone_cache::BackboneCache;
+    use crate::v41_backbone_execution::CacheProducerWeights;
+    use crate::v41_backbone_lane::BackboneLaneWeights;
+    use crate::v41_backbone_shared::tp2::Weights as SharedWeights;
+    use crate::v41_engram::placement::PlacedEngramWeights;
+    use crate::v41_experts::{tp2::RankWeights, tp2_ffn};
+    use crate::v41_index_lane::IndexLaneWeights;
+    use crate::v41_memory::device::Device;
+    use crate::v41_target_head::TargetHeadWeights;
+    use crate::v41_tensors::{NativeRtxTensors, VocabularyHead};
+    use ds41rt_ffi::NativeLibrary;
+    use ds41rt_transport::{ExpertV2SourceKind, TcpTransportConfig, v41_expert::V41Tp4Roce};
+    use std::rc::Rc;
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, DS41RT_DUAL_PEERS, two GPUs and live Sparks"]
+    fn distributed_target_prefill_decode_commit_smoke() -> Result<()> {
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let snapshot = std::env::var("DS41RT_SNAPSHOT")?;
+        let catalog = ds41rt_loader::read_official_v41_catalog(
+            ds41rt_loader::OFFICIAL_V41_MODEL_ID,
+            std::path::Path::new(&snapshot),
+        )?;
+        lib.cuda_set_device(0)?;
+        let devices = [
+            Device {
+                library: &lib,
+                id: 0,
+            },
+            Device {
+                library: &lib,
+                id: 1,
+            },
+        ];
+        let map = CachePlacement::new(std::array::from_fn(|l| usize::from(l >= 14)))?;
+        eprintln!("loading placed backbone and auxiliary weights");
+        let weights = BackboneLaneWeights::load_distributed(
+            &lib,
+            &catalog,
+            map,
+            BackboneLaneWeights::distributed_device_bytes(&lib, &catalog, map)?,
+            16 << 20,
+        )?;
+        let producers = CacheProducerWeights::load_distributed(
+            &lib,
+            &catalog,
+            map,
+            CacheProducerWeights::distributed_device_bytes(&lib, &catalog, map)?,
+            16 << 20,
+        )?;
+        let iw = IndexLaneWeights::load_distributed(
+            &lib,
+            &catalog,
+            map,
+            IndexLaneWeights::distributed_device_bytes(&lib, &catalog, map)?,
+            16 << 20,
+        )?;
+        let ew = PlacedEngramWeights::load(
+            &lib,
+            &catalog,
+            map,
+            PlacedEngramWeights::device_bytes(&lib, &catalog, map)?,
+            16 << 20,
+        )?;
+        let names = ["embed.weight".to_string()];
+        let table = devices[0].own(|| {
+            NativeRtxTensors::load(
+                &lib,
+                &catalog,
+                &names,
+                NativeRtxTensors::plan(&catalog, &names)?,
+                16 << 20,
+            )
+        })?;
+        let vocab = devices[1].own(|| {
+            VocabularyHead::load(&lib, &catalog, VocabularyHead::plan(&catalog)?, 16 << 20)
+        })?;
+        let hw = devices[1].own(|| {
+            TargetHeadWeights::load(
+                &lib,
+                &catalog,
+                TargetHeadWeights::device_bytes(&catalog)?,
+                16 << 20,
+            )
+        })?;
+        eprintln!("loading all 20 encoder expert layers as TP2");
+        let routed = [
+            Rc::new(RankWeights::load(devices[0], &catalog, 20, 73_000_000_000)?),
+            Rc::new(RankWeights::load(devices[1], &catalog, 20, 73_000_000_000)?),
+        ];
+        let shared: [Rc<Vec<SharedWeights<'_>>>; 2] = [0, 1]
+            .map(|r| {
+                (0..40)
+                    .map(|l| {
+                        SharedWeights::load(
+                            devices[r],
+                            &catalog,
+                            l,
+                            SharedWeights::load_peak_device_bytes(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>>>()
+                    .map(Rc::new)
+            })
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?
+            .try_into()
+            .ok()
+            .expect("two ranks");
+        let lanes = [
+            BackboneLane::new_on_device(
+                &weights,
+                16,
+                BackboneLane::placed_workspace_bytes(&lib, 16)?,
+                0,
+            )?,
+            BackboneLane::new_on_device(
+                &weights,
+                16,
+                BackboneLane::placed_workspace_bytes(&lib, 16)?,
+                1,
+            )?,
+        ];
+        let indices = [
+            Some(IndexLane::new_on_device(
+                &iw,
+                16,
+                IndexLane::placed_workspace_bytes(&lib, map, 16, 0)?
+                    .iter()
+                    .sum(),
+                0,
+            )?),
+            Some(IndexLane::new_on_device(
+                &iw,
+                16,
+                IndexLane::placed_workspace_bytes(&lib, map, 16, 1)?
+                    .iter()
+                    .sum(),
+                1,
+            )?),
+        ];
+        let mut pass = DistributedTargetPass::new(
+            map,
+            devices[0].own(|| {
+                TargetEmbeddingWave::new(&lib, &table, 16, TargetEmbeddingWave::device_bytes(16)?)
+            })?,
+            lanes,
+            indices,
+            DistributedExecution::new(
+                &producers,
+                16,
+                crate::v41_backbone_execution::PlacedProducerWaves::device_bytes(&lib, map, 16)?,
+            )?,
+            PlacedEngram::new(&ew, 16, PlacedEngram::device_bytes(&lib, map, 16)?)?,
+            devices[1].own(|| hw.wave(&vocab, 16, TargetHeadWave::device_bytes(16)?))?,
+            devices[1].own(|| TargetTapWave::new(&lib, 16, TargetTapWave::device_bytes(16)?))?,
+            Duration::from_secs(120),
+        )?;
+        let token_map = ds41rt_loader::EngramTokenMap::from_file(
+            &std::path::Path::new(&snapshot).join("tokenizer.json"),
+        )?;
+        let pipeline =
+            unsafe { ds41rt_loader::EngramPipeline::new(&catalog, token_map, 16, 2, 8 << 20)? };
+        let pages = [4, 4, 4, 8];
+        let mut requests = Requests::new_distributed(
+            &lib,
+            pipeline,
+            2,
+            pages,
+            map,
+            BackboneCache::distributed_device_bytes(map, 2, pages)?,
+        )?;
+        let peers = std::env::var("DS41RT_DUAL_PEERS")?
+            .split(',')
+            .map(str::parse)
+            .collect::<std::result::Result<Vec<std::net::SocketAddr>, _>>()?
+            .try_into()
+            .ok()
+            .context("four Spark endpoints required")?;
+        let roce = V41Tp4Roce::new(
+            peers,
+            [1, 2, 3, 4],
+            16,
+            TcpTransportConfig {
+                timeout: Duration::from_secs(120),
+                max_frame_bytes: 2 << 20,
+            },
+        )?;
+        let mut transport =
+            devices[1].own(|| NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(16)?))?;
+        transport.install_tp2(tp2_ffn::Wave::new(routed, shared, 20, 16)?)?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        let lease = requests.admit(0, 91001)?;
+        let mut tokens = vec![100u32, 200, 300, 400];
+        for (step, kind) in [
+            ExpertV2SourceKind::Prefill,
+            ExpertV2SourceKind::Decode,
+            ExpertV2SourceKind::Decode,
+            ExpertV2SourceKind::Decode,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            eprintln!(
+                "executing distributed full pass step={step} rows={}",
+                tokens.len()
+            );
+            let mut batch = requests.prepare(&[crate::v41_requests::RequestTokens {
+                lease,
+                tokens: &tokens,
+                image_mask: None,
+                kind,
+            }])?;
+            runtime.block_on(unsafe {
+                pass.execute(
+                    &std::cell::RefCell::new(&mut requests),
+                    &mut batch,
+                    &mut transport,
+                    0,
+                    &[tokens.len() - 1],
+                    None,
+                    None,
+                    true,
+                )
+            })?;
+            let next = devices[1].run(|| pass.head.greedy_output())?;
+            ensure!(
+                next.len() == 1 && next[0].0 < 129280 && next[0].1.is_finite(),
+                "invalid full-pass greedy output"
+            );
+            ensure!(
+                pass.taps(&batch)?.rows().len() == tokens.len(),
+                "distributed taps lost rows"
+            );
+            if step == 2 {
+                pass.discard(&mut batch)?;
+                assert!(requests.validate(&batch).is_err());
+                assert_eq!(requests.cache().committed_end(lease)?, 5);
+                assert_eq!(lib.cuda_get_device()?, 0);
+                eprintln!("PASS discarded full distributed proposal without advancing history");
+                continue;
+            }
+            pass.enqueue_cache_commit(&requests, &batch, &[tokens.len() as u32])?;
+            runtime.block_on(async {
+                while !pass.poll_cache_commit()? {
+                    tokio::task::yield_now().await;
+                }
+                Ok::<_, anyhow::Error>(())
+            })?;
+            pass.commit(&mut requests, &mut batch, &[tokens.len() as u32])?;
+            assert_eq!(
+                requests.cache().committed_end(lease)?,
+                if step == 3 { 6 } else { 4 + step as u64 }
+            );
+            eprintln!(
+                "PASS full distributed step={step} token={} score={}",
+                next[0].0, next[0].1
+            );
+            tokens = vec![next[0].0];
+            assert_eq!(lib.cuda_get_device()?, 0);
+        }
+        requests.release(lease)?;
+        Ok(())
+    }
+}
