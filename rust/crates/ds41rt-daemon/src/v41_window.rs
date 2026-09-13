@@ -306,6 +306,7 @@ impl<'a> WindowWeights<'a> {
             capacity: rows,
             graph: None,
             ready: None,
+            pending_query: None,
             pending_commit: None,
         };
         ensure!(
@@ -391,6 +392,7 @@ pub(crate) struct WindowWave<'w, 'a> {
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
     ready: Option<Prepared>,
+    pending_query: Option<(Prepared, bool)>,
     pending_commit: Option<PendingCommit>,
 }
 impl WindowWave<'_, '_> {
@@ -408,6 +410,7 @@ impl WindowWave<'_, '_> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
     fn prepare(&mut self, state: &WindowState<'_>, chunks: &[WindowChunk]) -> Result<Prepared> {
+        ensure!(self.pending_query.is_none(), "cache query production pending");
         ensure!(self.pending_commit.is_none(), "window commit pending");
         self.ready = None;
         ensure!(
@@ -499,6 +502,69 @@ impl WindowWave<'_, '_> {
                 self.stream.raw,
             )?;
         }
+        Ok(())
+    }
+    /// # Safety
+    /// Query and admitted state slots stay alive and immutable until poll_query
+    /// completes or abort_query drains. Peer work may use only disjoint slots.
+    pub unsafe fn enqueue_query(&mut self, state: &WindowState<'_>, chunks: &[WindowChunk],
+        query: &crate::v41_attention_query::AttentionQueryOutput<'_>) -> Result<()> {
+        let prepared = self.prepare(state, chunks)?;
+        ensure!(query.binding()?.layer() == self.weights.layer && query.layer == self.weights.layer
+            && query.rows == prepared.rows && query.hidden.bytes == prepared.rows * 10240
+            && query.hidden.device_id == self.input.buffer.device_id
+            && query.tokens()?.iter().copied().eq(chunks.iter().flat_map(|c|
+                c.position..c.position + u64::from(c.tokens))), "queued cache query differs");
+        let capture = self.graph.is_none_or(|(_, rows, owner)| rows != prepared.rows || owner != state.owner);
+        if capture { self.clear_graph()?; }
+        let result = (|| -> Result<()> {
+            unsafe { self.stream.library.copy_d2d_async(self.input.buffer, query.hidden,
+                query.hidden.bytes, self.stream.raw)?; }
+            self.upload(&prepared)?;
+            unsafe {
+                if capture { self.enqueue(prepared.rows) }
+                else { self.stream.library.cuda_graph_launch(self.graph.unwrap().0, self.stream.raw) }
+            }
+        })();
+        self.pending_query = Some((prepared, capture));
+        if let Err(error) = result { self.abort_query()?; return Err(error); }
+        Ok(())
+    }
+    /// # Safety
+    /// Preserve the enqueue_query ownership contract. Capture never suspends.
+    pub unsafe fn poll_query(&mut self, state: &WindowState<'_>) -> Result<bool> {
+        let result = (|| -> Result<bool> {
+            let (prepared, capture) = self.pending_query.as_ref().context("no queued cache query")?;
+            ensure!(prepared.owner == state.owner, "queued cache owner differs");
+            if !unsafe { self.stream.library.cuda_stream_query(self.stream.raw)? } { return Ok(false); }
+            if *capture {
+                unsafe { self.stream.library.cuda_graph_begin_capture(self.stream.raw)?; }
+                let queued = unsafe { self.enqueue(prepared.rows) };
+                let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+                let graph = match (queued, captured) {
+                    (Ok(()), Ok(graph)) => graph,
+                    (Err(error), Ok(graph)) => {
+                        unsafe { self.stream.library.cuda_graph_exec_destroy(graph)?; }
+                        return Err(error);
+                    }
+                    (Err(error), Err(_)) | (Ok(()), Err(error)) => return Err(error),
+                };
+                self.graph = Some((graph, prepared.rows, state.owner));
+                self.pending_query.as_mut().unwrap().1 = false;
+                unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw)?; }
+                return Ok(false);
+            }
+            self.ready = Some(self.pending_query.take().unwrap().0);
+            self.output(state)?;
+            Ok(true)
+        })();
+        if result.is_err() { self.abort_query()?; }
+        result
+    }
+    pub fn abort_query(&mut self) -> Result<()> {
+        if self.pending_query.is_some() { self.synchronize()?; }
+        self.pending_query = None;
+        self.ready = None;
         Ok(())
     }
     /// Consume the exact normalized hidden rows used by a bound attention query.
@@ -677,6 +743,7 @@ impl WindowWave<'_, '_> {
         Ok(())
     }
     pub fn clear_graph(&mut self) -> Result<()> {
+        ensure!(self.pending_query.is_none(), "cannot clear pending cache query");
         ensure!(self.pending_commit.is_none(), "cannot reset a pending window commit");
         self.ready = None;
         self.synchronize()?;
@@ -693,6 +760,7 @@ impl Drop for WindowWave<'_, '_> {
         if let Err(error) = self.synchronize() {
             tracing::error!(%error, "draining pending window writes");
         }
+        self.pending_query = None;
         self.pending_commit = None;
         if let Err(error) = self.clear_graph() {
             tracing::error!(%error,"draining window graph");

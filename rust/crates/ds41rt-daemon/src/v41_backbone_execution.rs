@@ -201,6 +201,52 @@ pub(crate) struct BackboneExecution<'w, 'a> {
     windows: Vec<WindowWave<'w, 'a>>,
     sources: Vec<CompressorWave<'w, 'a>>,
     progress: PassProgress,
+    queued_production: Option<(u64, usize, std::time::Instant)>,
+}
+/// Scratch producers retain their wave owner; the caller retains the matching
+/// query and admitted cache slots through completion or drained cancellation.
+pub(crate) struct PendingProduction<'p, 'w, 'a> {
+    execution: &'p mut BackboneExecution<'w, 'a>,
+    batch: u64,
+    layer: usize,
+    source: Option<usize>,
+    window_ready: bool,
+    source_ready: bool,
+    complete: bool,
+    started: std::time::Instant,
+}
+impl PendingProduction<'_, '_, '_> {
+    pub unsafe fn poll(&mut self, bank: &BackboneCache<'_>, batch: &CacheBatch) -> Result<bool> {
+        ensure!(!self.complete && batch.identity() == self.batch, "queued production batch differs");
+        bank.validate_batch(batch)?;
+        if !self.window_ready {
+            self.window_ready = unsafe { self.execution.windows[self.layer].poll_query(bank.window(batch, self.layer)?)? };
+        }
+        if !self.source_ready {
+            let source = self.source.unwrap();
+            self.source_ready = unsafe { self.execution.sources[source].poll_query(bank.source(batch, self.layer)?)? };
+        }
+        if self.window_ready && self.source_ready {
+            self.execution.queued_production = Some((self.batch, self.layer, self.started));
+            self.complete = true;
+        }
+        Ok(self.complete)
+    }
+}
+impl Drop for PendingProduction<'_, '_, '_> {
+    fn drop(&mut self) {
+        if !self.complete {
+            if let Err(error) = self.execution.windows[self.layer].abort_query() {
+                tracing::error!(%error, "draining cancelled window production");
+            }
+            if let Some(source) = self.source {
+                if let Err(error) = self.execution.sources[source].abort_query() {
+                    tracing::error!(%error, "draining cancelled compressed production");
+                }
+            }
+            self.execution.queued_production = None;
+        }
+    }
 }
 impl<'w, 'a> BackboneExecution<'w, 'a> {
     pub fn workspace_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -253,15 +299,18 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             windows,
             sources,
             progress: PassProgress::default(),
+            queued_production: None,
         })
     }
     /// Discard pass progress only after all consumers finish. The caller also
     /// restarts the backbone/index lanes and initializes the next query batch.
     pub fn restart(&mut self) {
+        self.queued_production = None;
         self.progress = PassProgress::default();
     }
 
     pub fn restart_for(&mut self, stage: CacheStage) {
+        self.queued_production = None;
         self.progress = PassProgress::for_stage(stage);
     }
     /// Publish source 20 after a complete reserved encoder chunk.
@@ -297,6 +346,31 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         Ok(())
     }
 
+    /// # Safety
+    /// Keep the lane query and this batch's admitted cache slots immutable and
+    /// alive until the returned producer completes or drains on drop.
+    pub unsafe fn enqueue_production(&mut self, bank: &BackboneCache<'_>, batch: &CacheBatch,
+        lane: &BackboneLane<'_, '_>) -> Result<PendingProduction<'_, 'w, 'a>> {
+        ensure!(self.queued_production.is_none(), "prior queued production not consumed");
+        bank.validate_batch(batch)?;
+        let query = lane.query_output()?;
+        let layer = query.layer;
+        ensure!(layer == self.progress.next && batch.stage() == self.progress.stage,
+            "queued production layer or stage differs");
+        let source = SOURCES.iter().position(|&l| l == layer).filter(|_| !batch.stage().reuses_sources());
+        let pending = PendingProduction { execution: self, batch: batch.identity(), layer, source,
+            window_ready: false, source_ready: source.is_none(), complete: false,
+            started: std::time::Instant::now() };
+        unsafe {
+            pending.execution.windows[layer].enqueue_query(bank.window(batch, layer)?,
+                &batch.window_chunks(layer)?, &query)?;
+            if let Some(i) = source {
+                pending.execution.sources[i].enqueue_query(bank.source(batch, layer)?,
+                    &batch.source_chunks(layer)?, &query)?;
+            }
+        }
+        Ok(pending)
+    }
     /// Execute one already-prepared layer through completed FFN/mHC output.
     /// # Safety
     /// Lane query rows, modality mask and cache batch identify the same requests.
@@ -351,7 +425,8 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
         index: &mut IndexLane<'_, '_>, cooperative: bool) -> Result<PreparedLayer<'l, 'lw, 'la>> {
         let publishing = matches!(&bank, LayerCache::Encoder(_));
-        let timing = std::time::Instant::now();
+        let queued_production = self.queued_production.take();
+        let timing = queued_production.map_or_else(std::time::Instant::now, |p| p.2);
         // Invalidate even if obtaining the completed query or bank check fails.
         let layer = self.progress.next;
         self.progress.begin(batch.identity(), layer)?;
@@ -362,16 +437,19 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             query.layer == layer,
             "backbone query layer differs from pass"
         );
-        unsafe {
-            bank.bank().produce_window(batch, &query, &mut self.windows[layer])?;
+        if let Some((id, produced_layer, _)) = queued_production {
+            ensure!(id == batch.identity() && produced_layer == layer && !publishing,
+                "queued cache production identity differs");
+        } else {
+            unsafe { bank.bank().produce_window(batch, &query, &mut self.windows[layer])?; }
         }
         if let Some(i) = SOURCES
             .iter()
             .position(|&l| l == layer)
             .filter(|_| !batch.stage().reuses_sources())
         {
-            unsafe {
-                bank.bank().produce_source(batch, &query, &mut self.sources[i])?;
+            if queued_production.is_none() {
+                unsafe { bank.bank().produce_source(batch, &query, &mut self.sources[i])?; }
             }
             if let LayerCache::Encoder(bank) = &mut bank {
                 bank.publish_encoder_source(batch, layer, &mut self.sources[i])?;

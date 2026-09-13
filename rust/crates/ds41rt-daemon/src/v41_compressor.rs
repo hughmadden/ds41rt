@@ -324,6 +324,7 @@ impl<'a> CompressorWeights<'a> {
             capacity: rows,
             graph: None,
             ready: None,
+            pending_query: None,
             pending_commit: None,
             commit_staging: HostAllocation::new(self.library, rows*4+256)?,
         })
@@ -438,6 +439,7 @@ pub(crate) struct CompressorWave<'w, 'a> {
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
     ready: Option<Prepared>,
+    pending_query: Option<(Prepared, bool)>,
     pending_commit: Option<PendingCommit>,
     commit_staging: HostAllocation<'a>,
 }
@@ -468,6 +470,7 @@ impl CompressorWave<'_, '_> {
         state: &CompressorState<'_>,
         chunks: &[CompressorChunk],
     ) -> Result<Prepared> {
+        ensure!(self.pending_query.is_none(), "cache query production pending");
         ensure!(self.pending_commit.is_none(), "compressor commit pending");
         self.ready = None;
         ensure!(
@@ -580,6 +583,30 @@ impl CompressorWave<'_, '_> {
             .copy_h2d(self.positions.buffer, positions)?;
         Ok(())
     }
+    fn upload_queued(&mut self, prepared: &Prepared) -> Result<()> {
+        let host = self.staging.buffer;
+        let offset = if self.descriptors.is_some() { prepared.rows * 8 } else { 0 };
+        let bytes = self.staging.bytes_mut();
+        for (dst, value) in bytes[..offset].chunks_exact_mut(8).zip(&prepared.descriptors) {
+            dst.copy_from_slice(&value.to_ne_bytes());
+        }
+        let positions = &mut bytes[offset..offset + prepared.rows * 8];
+        positions.fill(0);
+        for row in &prepared.completed {
+            positions[row.source_row as usize * 8..row.source_row as usize * 8 + 8]
+                .copy_from_slice(&row.position.to_ne_bytes());
+        }
+        unsafe {
+            if let Some(device) = &self.descriptors {
+                self.stream.library.copy_host_buffer_h2d_async(device.buffer, host, offset, self.stream.raw)?;
+            }
+            let mut positions = host;
+            positions.ptr = host.ptr.cast::<u8>().add(offset).cast();
+            positions.bytes = prepared.rows * 8;
+            self.stream.library.copy_host_buffer_h2d_async(self.positions.buffer, positions,
+                prepared.rows * 8, self.stream.raw)
+        }
+    }
     unsafe fn enqueue(&self, state: &CompressorState<'_>, rows: usize) -> Result<()> {
         unsafe {
             self.norm.backbone_frequencies(
@@ -665,6 +692,69 @@ impl CompressorWave<'_, '_> {
                 self.stream.raw,
             )?;
         }
+        Ok(())
+    }
+    /// # Safety
+    /// Query and admitted state slots stay alive and immutable until poll_query
+    /// completes or abort_query drains. Peer work may use only disjoint slots.
+    pub unsafe fn enqueue_query(&mut self, state: &CompressorState<'_>, chunks: &[CompressorChunk],
+        query: &crate::v41_attention_query::AttentionQueryOutput<'_>) -> Result<()> {
+        let prepared = self.prepare(state, chunks)?;
+        ensure!(query.binding()?.layer() == self.weights.layer && query.layer == self.weights.layer
+            && query.rows == prepared.rows && query.hidden.bytes == prepared.rows * 10240
+            && query.hidden.device_id == self.input.buffer.device_id
+            && query.tokens()?.iter().copied().eq(chunks.iter().flat_map(|c|
+                c.position..c.position + u64::from(c.tokens))), "queued cache query differs");
+        let capture = self.graph.is_none_or(|(_, rows, owner)| rows != prepared.rows || owner != state.owner);
+        if capture { self.clear_graph()?; }
+        let result = (|| -> Result<()> {
+            unsafe { self.stream.library.copy_d2d_async(self.input.buffer, query.hidden,
+                query.hidden.bytes, self.stream.raw)?; }
+            self.upload_queued(&prepared)?;
+            unsafe {
+                if capture { self.enqueue(state, prepared.rows) }
+                else { self.stream.library.cuda_graph_launch(self.graph.unwrap().0, self.stream.raw) }
+            }
+        })();
+        self.pending_query = Some((prepared, capture));
+        if let Err(error) = result { self.abort_query()?; return Err(error); }
+        Ok(())
+    }
+    /// # Safety
+    /// Preserve the enqueue_query ownership contract. Capture never suspends.
+    pub unsafe fn poll_query(&mut self, state: &CompressorState<'_>) -> Result<bool> {
+        let result = (|| -> Result<bool> {
+            let (prepared, capture) = self.pending_query.as_ref().context("no queued cache query")?;
+            ensure!(prepared.owner == state.owner, "queued cache owner differs");
+            if !unsafe { self.stream.library.cuda_stream_query(self.stream.raw)? } { return Ok(false); }
+            if *capture {
+                unsafe { self.stream.library.cuda_graph_begin_capture(self.stream.raw)?; }
+                let queued = unsafe { self.enqueue(state, prepared.rows) };
+                let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+                let graph = match (queued, captured) {
+                    (Ok(()), Ok(graph)) => graph,
+                    (Err(error), Ok(graph)) => {
+                        unsafe { self.stream.library.cuda_graph_exec_destroy(graph)?; }
+                        return Err(error);
+                    }
+                    (Err(error), Err(_)) | (Ok(()), Err(error)) => return Err(error),
+                };
+                self.graph = Some((graph, prepared.rows, state.owner));
+                self.pending_query.as_mut().unwrap().1 = false;
+                unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw)?; }
+                return Ok(false);
+            }
+            self.ready = Some(self.pending_query.take().unwrap().0);
+            self.output(state)?;
+            Ok(true)
+        })();
+        if result.is_err() { self.abort_query()?; }
+        result
+    }
+    pub fn abort_query(&mut self) -> Result<()> {
+        if self.pending_query.is_some() { self.synchronize()?; }
+        self.pending_query = None;
+        self.ready = None;
         Ok(())
     }
     /// Consume the exact normalized hidden rows used by a bound attention query.
@@ -879,6 +969,7 @@ impl CompressorWave<'_, '_> {
         Ok(())
     }
     pub fn clear_graph(&mut self) -> Result<()> {
+        ensure!(self.pending_query.is_none(), "cannot clear pending cache query");
         ensure!(self.pending_commit.is_none(), "cannot reset a pending source commit");
         self.ready = None;
         self.synchronize()?;
@@ -893,6 +984,7 @@ impl CompressorWave<'_, '_> {
 impl Drop for CompressorWave<'_, '_> {
     fn drop(&mut self) {
         if let Err(error) = self.synchronize() { tracing::error!(%error, "draining pending source commit"); }
+        self.pending_query = None;
         self.pending_commit = None;
         if let Err(error) = self.clear_graph() {
             tracing::error!(%error,"draining compressor graph");

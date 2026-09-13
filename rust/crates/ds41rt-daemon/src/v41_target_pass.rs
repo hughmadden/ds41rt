@@ -315,6 +315,13 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             }
             unsafe {
                 let cooperative = requests.cooperative_completion();
+                if cooperative {
+                    let mut production = requests.with_requests(|requests| self.execution.enqueue_production(
+                        requests.cache(), guard.batch.cache()?, &self.lane))?;
+                    while !requests.with_requests(|requests| production.poll(requests.cache(), guard.batch.cache()?))? {
+                        tokio::task::yield_now().await;
+                    }
+                }
                 let prepared = requests.with_requests(|requests| {
                     if cooperative {
                         self.execution.prepare_layer_cooperative(requests.cache(), guard.batch.cache()?,

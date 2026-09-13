@@ -24,6 +24,46 @@ fn encoder_bytes(lib: &NativeLibrary, lane: &BackboneLane<'_, '_>) -> Result<Vec
     Ok(bytes)
 }
 
+fn production_bytes(lib: &NativeLibrary, bank: &BackboneCache<'_>, batch: &CacheBatch,
+    execution: &BackboneExecution<'_, '_>, layer: usize) -> Result<Vec<Vec<u8>>> {
+    let w = execution.windows[layer].output(bank.window(batch, layer)?)?;
+    let mut buffers = vec![w.values, w.scales, w.projected, w.normalized, w.frequencies];
+    if let Some(i) = SOURCES.iter().position(|&l| l == layer) {
+        let s = execution.sources[i].output(bank.source(batch, layer)?)?;
+        buffers.extend([s.buffer, s.frequencies, s.index_key, s.index_packed,
+            s.index_scales, s.kv_values, s.kv_scales]);
+    }
+    buffers.into_iter().map(|buffer| {
+        let mut bytes = vec![0; buffer.bytes]; lib.copy_d2h(&mut bytes, buffer)?; Ok(bytes)
+    }).collect()
+}
+fn check_queued_production(lib: &NativeLibrary, runtime: &tokio::runtime::Runtime,
+    bank: &BackboneCache<'_>, batch: &CacheBatch, lane: &BackboneLane<'_, '_>,
+    execution: &mut BackboneExecution<'_, '_>) -> Result<()> {
+    let query = lane.query_output()?;
+    let layer = query.layer;
+    unsafe { bank.produce_window(batch, &query, &mut execution.windows[layer])?; }
+    if let Some(i) = SOURCES.iter().position(|&l| l == layer) {
+        unsafe { bank.produce_source(batch, &query, &mut execution.sources[i])?; }
+    }
+    let reference = production_bytes(lib, bank, batch, execution, layer)?;
+    execution.windows[layer].clear_graph()?;
+    if let Some(i) = SOURCES.iter().position(|&l| l == layer) { execution.sources[i].clear_graph()?; }
+    // Unpolled cancellation must drain before staging and scratch are reused.
+    drop(unsafe { execution.enqueue_production(bank, batch, lane)? });
+    for warm in [false, true] {
+        runtime.block_on(async {
+            let mut pending = unsafe { execution.enqueue_production(bank, batch, lane)? };
+            while !unsafe { pending.poll(bank, batch)? } { tokio::task::yield_now().await; }
+            Ok::<_, anyhow::Error>(())
+        })?;
+        assert_eq!(production_bytes(lib, bank, batch, execution, layer)?, reference,
+            "queued producer differs at layer {layer}, warm={warm}");
+        if !warm { execution.queued_production = None; }
+    }
+    Ok(())
+}
+
 #[test]
 fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
     let Some(path) = std::env::var_os("DS41RT_LAYER0_LIBRARY") else {
@@ -171,6 +211,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             lane.restart()?;
             index.restart()?;
             unsafe { requests.begin_input(&batch, &mut embedding, &mut lane)?; }
+            check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution)?;
             let prepared = unsafe { execution.prepare_layer_cooperative(requests.cache(),
                 batch.cache()?, &mut lane, &mut index)? };
             let completed = runtime.block_on(unsafe {
@@ -234,6 +275,27 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             let dir = std::path::PathBuf::from(dir);
             std::fs::write(dir.join(format!("layer1-c{cycle}-gated.bin")), &gated)?;
             std::fs::write(dir.join(format!("layer1-c{cycle}-query.bin")), &rotated)?;
+        }
+        if cycle == 0 {
+            for layer in 1..21 {
+                if layer != 1 {
+                    lane.advance()?;
+                    if layer == 14 {
+                        let deadline = Instant::now() + Duration::from_secs(120);
+                        while !unsafe { requests.poll_engram(&mut batch, &mut upload, &mut gate14, &mut lane)? } {
+                            ensure!(Instant::now() < deadline, "queued layer-14 engram timed out");
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                    }
+                    unsafe { lane.begin_prepared()?; }
+                }
+                check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution)?;
+                let prepared = unsafe { execution.prepare_layer_cooperative(requests.cache(),
+                    batch.cache()?, &mut lane, &mut index)? };
+                let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, batch.image_mask()) })?;
+                unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
+            }
+            eprintln!("PASS queued production: 21 windows, all four compressed sources, cold/warm graphs, cancelled producers, exact direct-output parity");
         }
         if cycle == 1 {
             for layer in 1..20 {

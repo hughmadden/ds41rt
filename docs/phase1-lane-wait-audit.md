@@ -30,7 +30,7 @@ is fully asynchronous.
 | Path | Current behavior | Next consideration |
 | --- | --- | --- |
 | Token upload, embedding and mHC/query | Candidate writes embeddings directly into block inputs and waits cooperatively after the query chain; subsequent queries also wait cooperatively | Accepted after broader sweep; finish adjacent blocking work |
-| Cache production and index selection | `BackboneExecution::prepare_layer_with_cache` produces window/source data and calls index selection synchronously, under a short shared cache borrow | Separate enqueue/completion/publication with explicit cache lifetimes before introducing an await |
+| Cache production and index selection | [Production now polls](phase1-queued-cache-production.md), with explicit pending ownership and cold/warm completion; index still blocks | Development checkpoint has a roughly 3% C2–C14 cost; join producer/index work and compare against frozen e9c07ae |
 | Attention through FFN input preparation | [Queued completion](phase1-queued-attention.md) retains lane consumers and drains before cancellation/reuse, with no shared bank borrow across the wait | Implemented; cold graph setup and preceding cache/index work still block |
 | FFN completion and layer advance | `complete_layer` finishes mHC; `BackboneBlockWave::advance` copies residual/pre values and synchronizes before taps/Engram/query consume them | Preserve those producer dependencies when moving completion to a cooperative wait |
 | Weight rebind | Query/projection/shared/router owners synchronize their own streams before rebinding | Establish already-complete ownership before removing redundant waits; a source search alone cannot establish their measured cost |

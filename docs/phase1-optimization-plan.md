@@ -36,7 +36,12 @@ Remaining synchronization work, based on the current serving source:
   with a retained lane owner and drained cancellation. Numerical/lifecycle checks
   pass; the complete C2–C16 curve supports retention despite an initial C16
   scalar dominated by a longer prose completion tail.
-- Finish cache production and index selection, graph capture/rebind/eviction,
+- [Queued cache production](phase1-queued-cache-production.md) is a development
+  checkpoint: numerical/lifecycle checks pass, but median C2–C14 is about 3%
+  lower. It is not release-qualified. Preserve frozen e9c07ae for the combined
+  producer/index comparison; investigate a common GPU submission/completion
+  boundary rather than accumulating more host waits.
+- Finish index selection, graph capture/rebind/eviction,
   and remaining component waits on the
   shared host thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
 
