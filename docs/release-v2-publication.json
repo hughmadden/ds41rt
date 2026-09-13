@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "release": "v2",
+  "name": "DS41RT v2",
+  "refs": {
+    "branches": ["dev", "main", "release/v2"],
+    "tag": "v2",
+    "relationship": "advanced together to the commit containing this publication record"
+  },
+  "github_release": {
+    "id": 387948994,
+    "url": "https://github.com/tpurtell/ds41rt/releases/tag/v2",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "id": 561480165,
+        "name": "ds41rt-v2-coordinator-linux-amd64.tar.gz",
+        "url": "https://github.com/tpurtell/ds41rt/releases/download/v2/ds41rt-v2-coordinator-linux-amd64.tar.gz",
+        "bytes": 17028492,
+        "sha256": "63576c0dd347c675f7f62bb55c6d03c9cc15d0e4f56a23181f283b84317178e5"
+      },
+      {
+        "id": 561480168,
+        "name": "ds41rt-v2-spark-expert-linux-arm64.tar.gz",
+        "url": "https://github.com/tpurtell/ds41rt/releases/download/v2/ds41rt-v2-spark-expert-linux-arm64.tar.gz",
+        "bytes": 15435229,
+        "sha256": "41ccd1a316b623652fa8a631bff5a1a247a1448895a26d72580d1471a14cbbb2"
+      },
+      {
+        "id": 561480160,
+        "name": "ds41rt-v2-qualification-evidence.tar.gz",
+        "url": "https://github.com/tpurtell/ds41rt/releases/download/v2/ds41rt-v2-qualification-evidence.tar.gz",
+        "bytes": 13151519,
+        "sha256": "e462a1db3ab8ab9df9a0a5edaa60b89c5172da820d5afe366db3db50cee6a9"
+      },
+      {
+        "id": 561480167,
+        "name": "SHA256SUMS",
+        "url": "https://github.com/tpurtell/ds41rt/releases/download/v2/SHA256SUMS",
+        "bytes": 321,
+        "sha256": "8724d8ef0404ca4c92a2ab99742c309f4d6f7c5c5399b467e54eab891ebf3b56"
+      }
+    ]
+  },
+  "containers": {
+    "coordinator": {
+      "tag": "ghcr.io/tpurtell/ds41rt-coordinator:v2",
+      "digest": "sha256:3ffe75377cb901119b0ead470d4e047ff5b623c8c0eac6b98024e51814a222a8"
+    },
+    "spark": {
+      "tag": "ghcr.io/tpurtell/ds41rt-spark-expert:v2",
+      "digest": "sha256:d9b4bc411eb3480a956d3a993597c5b102bbd438adb9c73e57d6ba2e5cf21e39"
+    },
+    "latest_identical": true,
+    "visibility": "public"
+  },
+  "measured_image_revision": "9477b6e39f4bbe431c4cd6d48c8b303045f9238f",
+  "qualification": {
+    "scope": "README tables except prefill, plus three C16 high-thinking tool campaigns",
+    "passed": true,
+    "full_suite_rerun": false
+  },
+  "standard_service": {
+    "running": true,
+    "port": 8000,
+    "image": "ghcr.io/tpurtell/ds41rt-coordinator:v2"
+  }
+}

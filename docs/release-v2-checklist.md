@@ -1,6 +1,6 @@
 # V2 release qualification
 
-Status: scoped qualification and v2 registry publication complete; GitHub release pending.
+Status: complete.
 
 The release uses adaptive dSpark with independent execution lanes. Admission and
 prefill remain coordinated. Normal decode GPU completion and receive waits yield;
@@ -40,10 +40,11 @@ error/cancellation cleanup still drains owned work before releasing storage.
 - [x] Publish matching v2 serving images and verify `v2`/`latest` manifest
   identity, platforms, labels, and digests. The [clean build and registry report](release-v2-build-run.md)
   records the exact qualified pair.
-- [ ] Publish a GitHub v2 release with high-level optimization notes, measured
+- [x] Publish a GitHub v2 release with high-level optimization notes, measured
   impacts, source/artifact identities and assets. Verify the release and assets,
   leave the qualified standard service running, and push each final commit so
-  the branch can be monitored remotely.
+  the branch can be monitored remotely. The [publication record](release-v2-publication.md)
+  records the release, assets, refs, containers, and final live-service audit.
 
 Development evidence includes [weighted decode](phase1-async-weighted.md),
 [counting diagnosis](phase1-async-counting.md), and

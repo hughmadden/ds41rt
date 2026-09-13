@@ -88,4 +88,4 @@ The clean build completed in 304.85 seconds. The final standard dSpark launch re
 
 V2 reran only the tables present in the main README, excluding prefill, plus the requested tool campaign. The v1 prefill matrix and one-shot official API comparison remain clearly labeled prior measurements. The full needle, vision, cache, and agentic artifact suites were not repeated; their v1 evidence remains applicable to unchanged interfaces but is not represented as fresh v2 qualification.
 
-Machine-readable results are in [release-v2-performance.json](release-v2-performance.json). The release evidence archive preserves raw requests, responses, traces, build and launch logs, memory samples, image labels, and hashes.
+Machine-readable results are in [release-v2-performance.json](release-v2-performance.json). The [release evidence archive](https://github.com/tpurtell/ds41rt/releases/download/v2/ds41rt-v2-qualification-evidence.tar.gz) preserves raw requests, responses, traces, build and launch logs, memory samples, image labels, publication manifests, and hashes.

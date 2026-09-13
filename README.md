@@ -80,7 +80,7 @@ The standard `v2` build uses independent adaptive dSpark lanes, architectural FP
 | 2 | 118/138 | 35/38 | 153/176 | 69 / 15 / 4 |
 | 3 | 122/138 | 36/38 | 158/176 | 73 / 12 / 3 |
 
-The [v2 performance report](docs/release-v2-performance.md) records methodology, artifact identities, memory, startup, and qualification scope. [Machine-readable v2 results](docs/release-v2-performance.json) preserve exact samples and evidence hashes. The v1 prefill matrix and one-shot official API comparison remain clearly labeled prior measurements; the full v1 qualification was intentionally not repeated.
+The [v2 performance report](docs/release-v2-performance.md) records methodology, artifact identities, memory, startup, and qualification scope. [Machine-readable v2 results](docs/release-v2-performance.json) preserve exact summaries and evidence hashes, and the [release evidence archive](https://github.com/tpurtell/ds41rt/releases/download/v2/ds41rt-v2-qualification-evidence.tar.gz) contains the raw samples and traces. The v1 prefill matrix and one-shot official API comparison remain clearly labeled prior measurements; the full v1 qualification was intentionally not repeated.
 
 ## Getting started
 
