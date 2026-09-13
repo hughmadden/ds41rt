@@ -42,11 +42,20 @@ and SWA (0–19), and sources 2/8/14 to RTX0. RTX1 owns decoder attention and SW
 (20–39), source 20, and dSpark. Both cards hold half the vocabulary rows, TP2
 encoder routed experts, and TP2 shared experts for all layers. CPU Engram stays
 unchanged; Sparks retain decoder routed experts only in two-GPU mode.
-The user subsequently authorized rebalancing non-expert attention/dense and
-auxiliary placement instead of requiring the 19/20 boundary. Preserve expert
-TP2 and vocabulary partitioning, keep cache consumers colocated where practical,
-and account for extra transfer costs when moving layers. A reduced KV pool is
-acceptable for initial integration before selecting the final balanced budget.
+The clarified deployment baseline keeps the 19/20 attention boundary: layers
+14–19 and compressed/index source 14 stay together on RTX0. Layers 15–19 are
+not an independent balancing knob; do not introduce remote cache reads or
+cache replication to move them. Keeping three sources on RTX0 leaves a smaller
+compressed pool on RTX1 to accommodate the planned unsplit dSpark model there.
+Vision placement remains flexible. Preserve expert TP2 and vocabulary
+partitioning. A reduced KV pool is acceptable for initial integration before
+selecting the final budget, which must include dSpark and all runtime storage.
+
+The layer-14 boundary used in the integration checkpoints below exercises
+source/cache ownership on GPU1. References to that map as "rebalanced" describe
+the test arrangement, not an established memory improvement or the deployment
+baseline. It moves source 14 onto the device already carrying dSpark and changes
+compressed/index pool ownership from 60/40 to 40/60, worsening that imbalance.
 Consumer placement must follow the actual CED/index dependency map, including
 bounded decoder replay, rather than treating encoder residency as proof that
 every prefill operation is local.
@@ -438,8 +447,8 @@ Shared request leases, versions, and publication metadata remain one CPU bank.
 colocation across each source's consumer group: 2–7, 8–13, 14–19, and 20–39.
 The original 0–19/20–39 split and a rebalanced map moving source 14 with its six
 consumers both pass allocation and request lease/reuse checks on the actual GPUs.
-Moving only part of a source's consumer group is rejected by this colocated path;
-such a placement would need a separate, measured remote-KV implementation.
+Moving only part of a source's consumer group is rejected by this colocated path
+and is outside the deployment plan: source 14 and layers 14–19 remain colocated.
 
 Device owners now construct and destroy cache components in the proper context.
 `Device::future` scopes every future poll and cancellation cleanup, restoring the
@@ -835,3 +844,26 @@ work revokes both chunks, and subsequent execution reuses the owners. These
 short fixtures do not establish release quality or throughput. Publication still
 follows each layer's FFN completion; overlapping a follower's attention with that
 FFN and connecting the normal serving scheduler remain further work.
+
+### Follow-up: interleaving remains under correctness investigation
+
+A subsequent untraced integration run failed the four-chunk comparison: both
+paths selected token 200, but the winning scores were 17.553558 and 21.930965.
+The earlier passing runs therefore do not establish reliable interleaved
+execution. Layer tracing, first synchronous and then lane-local asynchronous,
+passed without reproducing the failure. Diagnostic readback changes timing and
+is not qualification evidence. `DS41RT_TRACE_ENCODER` enables the temporary
+test-only trace; ordinary runs leave it disabled. The failure log is
+`~/.cache/ds41rt-experiments/phase2-planner/distributed-serving-output.log`.
+Resolve this intermittent difference before treating the stream as qualified
+or connecting it to production serving.
+
+The investigation also exposed an independent host validation error: an older
+chunk's committed-prefix view was rejected while a follower held an append
+reservation. `committed_proposal` now permits that immutable published prefix;
+future extents and mutation/release during a pending append remain rejected.
+The native ratio-two/ratio-one compressor commit regression passes, including
+those guards and existing carry, direct-value, and abort comparisons. A later
+16-case untraced integration run passed, but a prior run with this prefix fix
+still failed. The numeric interleaving issue therefore remains unresolved;
+no throughput improvement is claimed for this correctness change.
