@@ -492,7 +492,17 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
     /// completion or cancellation drain. Next-layer copies share the mHC stream.
     pub async unsafe fn finish_ffn_cooperative(&mut self, binding: QueryBinding,
         result: Ds41rtDeviceBuffer) -> Result<BlockOutput<'_>> {
-        let copy_next = self.layer < 39;
+        unsafe { self.finish_ffn_with_next_copy(binding,result,self.layer < 39).await }
+    }
+    /// # Safety
+    /// Same completed-result ownership as finish_ffn_cooperative. A peer handoff
+    /// consumes the output directly, so no local next-input copy is required.
+    pub async unsafe fn finish_ffn_for_handoff_cooperative(&mut self,binding:QueryBinding,
+        result:Ds41rtDeviceBuffer)->Result<BlockOutput<'_>> {
+        unsafe { self.finish_ffn_with_next_copy(binding,result,false).await }
+    }
+    async unsafe fn finish_ffn_with_next_copy(&mut self,binding:QueryBinding,
+        result:Ds41rtDeviceBuffer,copy_next:bool)->Result<BlockOutput<'_>> {
         let rows = unsafe { self.enqueue_finish_ffn(binding, result, copy_next)? };
         if let Err(error) = self.ffn.wait_chain().await { self.reset(); return Err(error); }
         unsafe { self.publish_finished_ffn(binding, rows, copy_next) }

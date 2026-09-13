@@ -566,6 +566,20 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         index: &crate::v41_index_lane::IndexLane<'_, '_>) -> Result<PendingLaneFfn<'_, 'w, 'a>> {
         self.enter(Phase::Query)?;
         let selection = if self.layer >= 2 { Some(index.output(self.layer, cache)?) } else { None };
+        unsafe { self.enqueue_attention_with_selection(sink,cache,selection.as_ref()) }
+    }
+    /// # Safety
+    /// Retain all cache/query/selection storage until the returned consumer completes or drains.
+    pub unsafe fn enqueue_attention_cached_ffn(&mut self,sink:Ds41rtDeviceBuffer,
+        cache:&crate::v41_backbone_cache::CacheAttention<'_>,selection:Option<&IndexSelectionOutput<'_>>)
+        ->Result<PendingLaneFfn<'_,'w,'a>> {
+        self.enter(Phase::Query)?;
+        unsafe { self.enqueue_attention_with_selection(sink,cache,selection) }
+    }
+    unsafe fn enqueue_attention_with_selection(&mut self,sink:Ds41rtDeviceBuffer,
+        cache:&crate::v41_backbone_cache::CacheAttention<'_>,selection:Option<&IndexSelectionOutput<'_>>)
+        ->Result<PendingLaneFfn<'_,'w,'a>> {
+        ensure!(selection.is_some() == (self.layer >= 2), "attention index selection presence differs");
         let requests = cache.attention_requests();
         let query = self.query.output()?;
         let binding = query.binding()?;
@@ -577,7 +591,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         let query = lane.query.output()?;
         let mut tail = AttentionTail { projection: &mut lane.projection, block: &mut lane.block,
             binding, tokens: query.tokens()? };
-        if unsafe { lane.sparse.enqueue_query_prepared(&query, sink, &requests, selection.as_ref(), true, Some(&mut tail))? }.is_some() {
+        if unsafe { lane.sparse.enqueue_query_prepared(&query, sink, &requests, selection, true, Some(&mut tail))? }.is_some() {
             pending.values = Some(lane.block.graph_normalized_storage(query.rows));
         }
         Ok(pending)
@@ -640,7 +654,10 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     pub async unsafe fn finish_ffn_cooperative(&mut self, binding: QueryBinding,
         result: Ds41rtDeviceBuffer) -> Result<BlockOutput<'_>> {
         self.enter(Phase::SharedReady)?;
-        let output = unsafe { self.block.finish_ffn_cooperative(binding, result).await? };
+        let handoff=self.weights.placement.is_some() && self.layer<39
+            && self.weights.layers[self.layer+1].device.id != self.block.inputs()[0].device_id;
+        let output = unsafe { if handoff { self.block.finish_ffn_for_handoff_cooperative(binding,result).await? }
+            else { self.block.finish_ffn_cooperative(binding, result).await? } };
         self.phase = Phase::Complete;
         Ok(output)
     }

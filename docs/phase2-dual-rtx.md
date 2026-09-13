@@ -680,3 +680,38 @@ throughput or tool-quality claim follows from this checkpoint.
 The existing rank-upload/reduction regression also passes through 4096 rows,
 including interleaved chunks, bounds rejection, cooperative cancellation, and
 reuse. The daemon compile check passes.
+
+## Connected distributed layer execution
+
+`DistributedExecution` now owns one lane's placed cache producers and pass
+progress. It connects asynchronous producer/index work to the GPU-owned
+attention lane, returns prepared FFN work without retaining a cache-bank borrow,
+and completes the layer on its owning device. Batch/layer progress prevents a
+partial pass from publishing accepted cache writes. Encoder boundary source-only
+production has an explicit completion transition. Reserved encoder batches are
+rejected until their early-publication flow is connected, rather than silently
+changing publication semantics.
+
+Prepared attention has device-scoped destruction as well as device-scoped future
+polling: cancelling before the FFN future's first poll must still drain queued
+GPU1 attention on GPU1. Ordinary non-indexed attention now shares the same queued
+consumer implementation as indexed attention. At a placement boundary, mHC
+completion omits the local next-input copy; the directed peer transfer consumes
+its output and fills the next GPU's existing block storage directly. Same-GPU
+completion retains its local copy path.
+
+A real-weight fixture executes layer zero entirely on GPU1 through embedding,
+cache production, sparse attention, query/output projections, routed/shared TP2,
+and final mHC. Changed 1/16/1-row residual/pre outputs match the ordinary GPU0
+execution path using the same TP2 arithmetic byte-for-byte. It then transfers
+the output to GPU0 layer one and verifies the required Engram gate. Dropping an
+unpolled prepared-layer execution and restarting also passes, with caller-device
+restoration; partial-pass cache commit is rejected. The fixture supplies distinct dummy transport
+endpoints and executes the local encoder branch without using a Spark result.
+
+This is a connected single-layer check, not a complete forty-layer serving run.
+The target-pass loop still needs placed Engram/taps/head ownership, all layer
+transitions, reserved encoder publication, and startup mode selection. Indexed
+attention and live Spark-backed decoder execution need qualification through the
+connected execution owner. Full-model performance and release tables remain
+pending.

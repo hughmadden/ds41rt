@@ -2,6 +2,8 @@
 use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage, CachePlacement};
 use crate::v41_memory::device::{Device, DeviceOwner};
 mod placement;
+mod distributed;
+pub(crate) use distributed::DistributedExecution;
 pub(crate) use placement::PlacedProducerWaves;
 use crate::v41_backbone_lane::{BackboneLane, LaneFfn, PendingLaneFfn};
 use crate::v41_backbone_router::ExpertRow;
