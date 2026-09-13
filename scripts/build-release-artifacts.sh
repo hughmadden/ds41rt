@@ -108,6 +108,7 @@ cmake \
   -DCMAKE_BUILD_TYPE=Release \
   -DDS41RT_ENABLE_CUDA=ON \
   -DDS41RT_ENABLE_V41_EXPERT_AOT=ON \
+  -DDS41RT_ENABLE_V41_LOCAL_EXPERT_AOT="$coordinator_aot" \
   -DDS41RT_ENABLE_V41_FP8_AOT="$coordinator_aot" \
   -DDS41RT_ENABLE_RDMA=ON \
   -DDS41RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
@@ -129,6 +130,12 @@ install -m 0755 "$build_root/source/rust/target/release/ds41rt" "$output_dir/ds4
 install -m 0755 "$build_root/native/libds41rt_native.so" "$output_dir/libds41rt_native.so"
 install -m 0644 "$build_root/native/v41_experts/v41_experts.json" "$output_dir/V41_EXPERT_AOT.json"
 if [[ "$coordinator_aot" == ON ]]; then
+  # Automatic RTX placement requires the full local-expert ABI in release images.
+  python3 - "$output_dir/libds41rt_native.so" <<'PY_CHECK'
+import ctypes
+import sys
+getattr(ctypes.CDLL(sys.argv[1]), "ds41rt_v41_local_expert_info")
+PY_CHECK
   install -m 0644 "$build_root/native/v41_fp8/v41_fp8.json" "$output_dir/V41_FP8_AOT.json"
 else
   printf '%s\n' '{"schema":1,"role":"expert","enabled":false}' >"$output_dir/V41_FP8_AOT.json"
