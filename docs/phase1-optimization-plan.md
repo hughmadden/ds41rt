@@ -64,6 +64,15 @@ A1: larger queued dependency regions around remote FFN boundaries with explicit
 buffer lifetime and publication states. Success is lower complete verification
 latency, stable graph capture and correct cancellation, not fewer sync calls alone.
 
+The joint decode path is now removed. Continue through the remaining blocking
+completion boundaries: per-lane LM head and logits download, shared draft replay
+and confidence/token downloads, then target/draft-cache commit. Queue work and
+poll completion while retaining exclusive buffer ownership; cancellation must
+drain before releasing storage. Keep admission at complete pass boundaries and
+expert sharing within each lane. Measure complete C2–C16 serving, preserve C1 and
+prefill, and revisit earlier concurrency experiments only when the changed
+completion path provides a concrete reason.
+
 A2: pipeline Spark weight/scale loads across one, two and three stages while
 sweeping slice widths. Preserve fused FC1/SwiGLU/FC2. Use real routing at target
 M1, speculative C1, concurrent verification and prefill; inspect generated code,

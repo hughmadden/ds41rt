@@ -20,12 +20,14 @@ pub(crate) use taps::{TargetTapWave, TargetTaps};
 // Both ordinary serving and independent lane scheduling use the same execution
 // body, so cache production and numerical operation order remain identical.
 trait RequestAccess<'a> {
+    fn cooperative_completion(&self) -> bool { false }
     fn with_requests<T>(&self, operation: impl FnOnce(&Requests<'a>) -> T) -> T;
 }
 impl<'a> RequestAccess<'a> for Requests<'a> {
     fn with_requests<T>(&self, operation: impl FnOnce(&Requests<'a>) -> T) -> T { operation(self) }
 }
 impl<'a> RequestAccess<'a> for std::cell::RefCell<&mut Requests<'a>> {
+    fn cooperative_completion(&self) -> bool { true }
     fn with_requests<T>(&self, operation: impl FnOnce(&Requests<'a>) -> T) -> T {
         operation(&self.borrow())
     }
@@ -318,7 +320,11 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         } else {
             self.taps.output(guard.batch.cache()?)?;
             let output = self.lane.output()?;
-            unsafe { self.head.execute_block(&output, selected)?; }
+            if requests.cooperative_completion() {
+                unsafe { self.head.execute_block_cooperative(&output, selected).await?; }
+            } else {
+                unsafe { self.head.execute_block(&output, selected)?; }
+            }
             self.state = State::Ready(id);
         }
         guard.completed = true;

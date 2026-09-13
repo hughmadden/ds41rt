@@ -53,6 +53,28 @@ pub(crate) struct LoadStream<'a> {
     pub(crate) library: &'a NativeLibrary,
     pub(crate) raw: *mut c_void,
 }
+impl LoadStream<'_> {
+    /// Yield the owner thread while retaining stream/buffer ownership. Cancellation
+    /// and errors still drain before the caller can release queued input storage.
+    pub(crate) async fn wait(&self) -> Result<()> {
+        struct Drain<'s, 'a> { stream: &'s LoadStream<'a>, complete: bool }
+        impl Drop for Drain<'_, '_> {
+            fn drop(&mut self) {
+                if !self.complete {
+                    if let Err(error) = unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) } {
+                        tracing::error!(%error, "draining cancelled V4.1 stream wait");
+                    }
+                }
+            }
+        }
+        let mut guard = Drain { stream: self, complete: false };
+        while !unsafe { self.library.cuda_stream_query(self.raw)? } {
+            tokio::task::yield_now().await;
+        }
+        guard.complete = true;
+        Ok(())
+    }
+}
 impl Drop for LoadStream<'_> {
     fn drop(&mut self) {
         // Owners must drop this stream before releasing buffers used by queued work.

@@ -233,11 +233,11 @@ impl TargetHeadWave<'_, '_> {
     /// # Safety
     /// Completed layer-39 residual/pre storage remains immutable until all row
     /// copies drain. Selection order defines output order; each row occurs once.
-    pub unsafe fn execute_block(
+    unsafe fn copy_block(
         &mut self,
         block: &BlockOutput<'_>,
         selected: &[usize],
-    ) -> Result<TargetLogits<'_>> {
+    ) -> Result<()> {
         self.invalidate();
         ensure!(
             block.layer == 39
@@ -280,21 +280,51 @@ impl TargetHeadWave<'_, '_> {
             }
             Ok(())
         })();
-        copied.and(self.synchronize())?;
-        let rows = selected.len();
+        if let Err(error) = copied {
+            self.synchronize()?;
+            return Err(error);
+        }
+        Ok(())
+    }
+    unsafe fn capture_block_head(&mut self, rows: usize) -> Result<()> {
         if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
             self.clear_graph()?;
-            unsafe {
-                self.capture(rows)?;
-            }
+            unsafe { self.capture(rows)?; }
         }
-        unsafe {
-            self.replay(rows)?;
-        }
+        Ok(())
+    }
+    fn publish_block(&mut self, block: &BlockOutput<'_>, selected: &[usize]) {
+        self.ready = Some(selected.len());
         self.origin = Some(block.binding());
         self.selected.extend_from_slice(selected);
-        self.tokens
-            .extend(selected.iter().map(|&i| block.tokens[i]));
+        self.tokens.extend(selected.iter().map(|&i| block.tokens[i]));
+    }
+    /// Completed block inputs remain immutable through the drained head pass.
+    pub unsafe fn execute_block(&mut self, block: &BlockOutput<'_>, selected: &[usize])
+        -> Result<TargetLogits<'_>> {
+        unsafe { self.copy_block(block, selected)?; }
+        self.synchronize()?;
+        unsafe { self.capture_block_head(selected.len())?; self.replay(selected.len())?; }
+        self.publish_block(block, selected);
+        self.output()
+    }
+    /// Same ownership contract, yielding the owner thread during GPU completion.
+    /// First-use graph capture still drains its warmup; steady replay is cooperative.
+    pub async unsafe fn execute_block_cooperative(&mut self, block: &BlockOutput<'_>, selected: &[usize])
+        -> Result<TargetLogits<'_>> {
+        unsafe { self.copy_block(block, selected)?; }
+        // A warm graph consumes the copies on this same stream; only first-use
+        // capture needs a completed input before its synchronous warmup.
+        if self.graph.as_ref().is_none_or(|(_, n)| *n != selected.len()) {
+            self.stream.wait().await?;
+            unsafe { self.capture_block_head(selected.len())?; }
+        }
+        self.invalidate();
+        let graph = self.graph.context("target head graph missing")?.0;
+        let launched = unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw) };
+        let drained = self.stream.wait().await;
+        launched.and(drained)?;
+        self.publish_block(block, selected);
         self.output()
     }
     pub fn output(&self) -> Result<TargetLogits<'_>> {
