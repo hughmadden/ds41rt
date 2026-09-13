@@ -1,11 +1,24 @@
 //! TP4 dispatch through persistent RoCE QPs; TCP is used only for bootstrap.
-use super::V41Tp4ChunkReceiver;
 #[cfg(test)]
 use super::V41BackboneRequest;
+use super::V41Tp4ChunkReceiver;
 use crate::verbs::LocalTp4Client;
-use crate::{ExpertProtocolV2Request, TcpTransportConfig};
+use crate::{
+    ExpertProtocolV2Request, ExpertProtocolV2RowDescriptor, ExpertV2SourceKind, TcpTransportConfig,
+};
 use anyhow::{ensure, Result};
 use std::net::SocketAddr;
+
+fn poll_quantum(rows: &[ExpertProtocolV2RowDescriptor]) -> std::time::Duration {
+    let decode = !rows.is_empty()
+        && rows.iter().all(|row| {
+            matches!(
+                row.source_kind,
+                ExpertV2SourceKind::Decode | ExpertV2SourceKind::MtpVerify
+            )
+        });
+    std::time::Duration::from_micros(if decode { 50 } else { 250 })
+}
 
 pub struct V41Tp4Roce {
     clients: LocalTp4Client,
@@ -83,6 +96,7 @@ impl V41Tp4Roce {
         self.clients.dispatch(request)?;
         Ok(V41Tp4RocePending {
             receiver,
+            poll_quantum: poll_quantum(&request.rows),
             owner: self,
             _request: std::marker::PhantomData,
             complete: false,
@@ -94,6 +108,7 @@ impl V41Tp4Roce {
 /// Cancellation resets the QPs before another wave can reuse them.
 pub struct V41Tp4RocePending<'c, 'r> {
     receiver: V41Tp4ChunkReceiver,
+    poll_quantum: std::time::Duration,
     owner: &'c mut V41Tp4Roce,
     _request: std::marker::PhantomData<&'r ExpertProtocolV2Request>,
     complete: bool,
@@ -115,7 +130,8 @@ impl V41Tp4RocePending<'_, '_> {
         // Give the other execution lane its first opportunity as soon as this
         // wave must wait. A 250us initial spin can consume an entire small-row
         // FFN and serialize two otherwise independent decode stacks. Subsequent
-        // polls retain the bounded spin quantum; ready responses never yield.
+        // decode polls use a 50us quantum to let the peer lane progress sooner.
+        // Prefill/mixed waves retain 250us. Ready responses never yield.
         let mut quantum = std::time::Instant::now();
         let mut first_wait = true;
         loop {
@@ -135,7 +151,7 @@ impl V41Tp4RocePending<'_, '_> {
             })? {
                 break;
             }
-            if first_wait || quantum.elapsed() >= std::time::Duration::from_micros(250) {
+            if first_wait || quantum.elapsed() >= self.poll_quantum {
                 first_wait = false;
                 tokio::task::yield_now().await;
                 quantum = std::time::Instant::now();
@@ -163,6 +179,28 @@ impl Drop for V41Tp4RocePending<'_, '_> {
 mod tests {
     use super::*;
     use crate::{VerbsHostProtocolV2ResponseChunk, VerbsHostProtocolV2ResponsePayload};
+
+    #[test]
+    fn prefill_or_benchmark_rows_keep_original_polling_in_mixed_waves() {
+        let row = |kind| ExpertProtocolV2RowDescriptor {
+            row_id: 0,
+            source_kind: kind,
+            source_request_id: 1,
+            token_position: 0,
+            route_offset: 0,
+            route_count: 6,
+        };
+        use ExpertV2SourceKind::{Benchmark, Decode, MtpVerify, Prefill};
+        assert_eq!(poll_quantum(&[row(Decode), row(MtpVerify)]).as_micros(), 50);
+        for other in [Prefill, Benchmark] {
+            assert_eq!(poll_quantum(&[row(other)]).as_micros(), 250);
+            assert_eq!(
+                poll_quantum(&[row(Decode), row(other), row(MtpVerify)]).as_micros(),
+                250
+            );
+        }
+        assert_eq!(poll_quantum(&[]).as_micros(), 250);
+    }
 
     #[test]
     #[ignore = "requires four idle live V4.1 FP8 RoCE expert workers"]

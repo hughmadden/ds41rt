@@ -1,0 +1,57 @@
+diff --git a/rust/crates/ds41rt-transport/src/v41_expert/roce.rs b/rust/crates/ds41rt-transport/src/v41_expert/roce.rs
+index ec3bda5..109f5a8 100644
+--- a/rust/crates/ds41rt-transport/src/v41_expert/roce.rs
++++ b/rust/crates/ds41rt-transport/src/v41_expert/roce.rs
+@@ -98,7 +98,20 @@ pub struct V41Tp4RocePending<'c, 'r> {
+     _request: std::marker::PhantomData<&'r ExpertProtocolV2Request>,
+     complete: bool,
+ }
++// Isolated probe controls; never install this instrumentation in serving.
++static PROBE_POLL_US: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(250);
++static PROBE_POLLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
++static PROBE_YIELDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+ impl V41Tp4RocePending<'_, '_> {
++    pub fn set_probe_poll_quantum(us: u64) {
++        assert!([0,50,250].contains(&us));
++        PROBE_POLL_US.store(us,std::sync::atomic::Ordering::Relaxed);
++    }
++    pub fn take_probe_poll_counts() -> [u64;2] {
++        [PROBE_POLLS.swap(0,std::sync::atomic::Ordering::Relaxed),
++         PROBE_YIELDS.swap(0,std::sync::atomic::Ordering::Relaxed)]
++    }
++
+     pub async fn receive<F>(self, mut sink: F) -> Result<()>
+     where
+         F: FnMut(usize, u32, &[u8]) -> Result<()>,
+@@ -116,9 +129,12 @@ impl V41Tp4RocePending<'_, '_> {
+         // wave must wait. A 250us initial spin can consume an entire small-row
+         // FFN and serialize two otherwise independent decode stacks. Subsequent
+         // polls retain the bounded spin quantum; ready responses never yield.
++        let interval=std::time::Duration::from_micros(PROBE_POLL_US.load(std::sync::atomic::Ordering::Relaxed));
++        let (mut polls,mut yields)=(0u64,0u64);
+         let mut quantum = std::time::Instant::now();
+         let mut first_wait = true;
+         loop {
++            polls+=1;
+             let receiver = &mut self.receiver;
+             if self.owner.clients.poll(|chunk| {
+                 let mut location = None;
+@@ -135,7 +151,8 @@ impl V41Tp4RocePending<'_, '_> {
+             })? {
+                 break;
+             }
+-            if first_wait || quantum.elapsed() >= std::time::Duration::from_micros(250) {
++            if first_wait || quantum.elapsed() >= interval {
++                yields+=1;
+                 first_wait = false;
+                 tokio::task::yield_now().await;
+                 quantum = std::time::Instant::now();
+@@ -147,6 +164,8 @@ impl V41Tp4RocePending<'_, '_> {
+             self.receiver.complete(),
+             "native TP4 RoCE response coverage is incomplete"
+         );
++        PROBE_POLLS.fetch_add(polls,std::sync::atomic::Ordering::Relaxed);
++        PROBE_YIELDS.fetch_add(yields,std::sync::atomic::Ordering::Relaxed);
+         self.complete = true;
+         Ok(())
+     }
