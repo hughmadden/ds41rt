@@ -1062,3 +1062,27 @@ scratch differences occur exclusively in the inactive capacity-16 slice
 that captured projection and directs the next check toward GEMM execution or
 weight/output lifetime. Artifacts are in local `qb-scratch-capture`; no claim
 of resolved concurrency or performance qualification follows from this test.
+
+A small standalone reproducer now triggers the QB defect without target-pass
+or cache machinery: `native/tests/v41_fp8_overlap_stress.py` accepts the native
+library, checkpoint and paired capture directory. It retains each projection
+and replays graphs explicitly on distinct streams. This corrects the older
+standalone graph test, whose default-stream replays did not establish overlap.
+
+Without eviction traffic, 8,192 captured projections each matched exactly for
+capacity pairs 1/16, 1/80, 16/80 (three live target rows), and 1/4096. Adding a
+256 MiB tensor update on the competing stream reproduced 122 bad projections
+in the first 256 on each GPU. The GPU1 serial-eviction control passed all
+8,192. Removing the competing GEMM still reproduced 243/256 bad projections
+on GPU1, so a second GEMM is not required. The repository script's short
+32-step concurrent run reproduced 31 bad projections (during the ongoing
+sanitizer experiments); it exits 1 on a numeric mismatch by design. These are
+correctness experiments, not throughput measurements.
+
+Standalone tensor race checking and initialization checking are ongoing.
+Filtered initialization checking emitted host-copy uninitialized-access
+reports; these have not been established as kernel defects and must not be
+reported as proof of the underlying bug. The strong result is the small
+uninstrumented concurrent-memory-traffic reproduction, with a passing serial
+control. Next investigation should use it rather than another long full-model
+sanitizer run.
