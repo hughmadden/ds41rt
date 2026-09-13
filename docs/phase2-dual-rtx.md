@@ -163,3 +163,24 @@ weights and scales, partial final read batches, invalid rank/layer/expert IDs,
 undersized staging/scratch, and untouched trailing storage. All four catalog tests
 and the full daemon offline check pass. This is loader support; TP2 packing,
 kernel exports, reductions, and serving integration remain unfinished.
+
+## TP2 packed layout and initial exports
+
+The native packer accepts 1,152-channel halves. Packed sizes per expert are
+`[5,898,240, 368,640, 2,949,120, 184,320]` bytes: 9,400,320 total, with no
+intermediate padding overhead. Thus all twenty encoder layers at 384 experts
+cost exactly 72,194,457,600 packed weight bytes per GPU before other allocations.
+
+`qualify_v41_expert_packing.py` compares all four native packed arrays against
+SparkInfer's independent tensor converters for widths 576, 1152, and 2304 on
+both GPUs, including trailing canaries. All six cases pass byte-for-byte. The
+scale test spans bytes 0–247; SparkInfer clamps larger values, whereas the native
+packer preserves raw checkpoint bytes, so that intentionally different domain
+is excluded from exact equality. Existing native representations are unchanged.
+
+The slice exporter supports role `rtx_tp2` (ABI role 3, 384 experts, top-6,
+FP8 K32 input, 1,152 intermediate channels). C1 and C16 SM120 kernels export
+successfully at width 192. They have not yet been executed or performance-qualified.
+The native expert handle table currently binds each variant to its first GPU;
+TP2 needs independent per-device handles before integration. Other capacities,
+shared-expert TP2, reductions, and complete serving remain pending.
