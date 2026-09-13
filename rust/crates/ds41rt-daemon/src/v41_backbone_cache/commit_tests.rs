@@ -269,6 +269,8 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
     // while their original source page remains retained by the prefix.
     let mut bank =
         BackboneCache::new(&lib, 16, [18; 4], BackboneCache::device_bytes(16, [18; 4])?)?;
+    bank.install_prefix_pool(crate::v41_memory::SnapshotPool::new(
+        &lib, BackbonePrefix::device_bytes(), 2)?)?;
     let leases = (0..16)
         .map(|s| bank.begin_request(s, 100 + s as u64))
         .collect::<Result<Vec<_>>>()?;

@@ -102,6 +102,7 @@ impl Drop for WriteReservation {
     }
 }
 pub(crate) struct DsparkWindow<'a> {
+    prefix_pool: Option<crate::v41_memory::SnapshotPool<'a>>,
     stream: LoadStream<'a>,
     kernel: V41DsparkCache<'a>,
     source: DeviceAllocation<'a>,
@@ -137,6 +138,7 @@ impl<'a> DsparkWindow<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| anyhow::anyhow!("dSpark cache owner IDs exhausted"))?;
         let mut value = Self {
+            prefix_pool: None,
             stream: LoadStream {
                 library,
                 raw: library.cuda_stream_create()?,

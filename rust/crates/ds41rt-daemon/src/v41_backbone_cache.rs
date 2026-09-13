@@ -155,6 +155,7 @@ impl CacheAttention<'_> {
 }
 
 pub(crate) struct BackboneCache<'a> {
+    prefix_pool: Option<crate::v41_memory::SnapshotPool<'a>>,
     prefix_stream: crate::v41_memory::LoadStream<'a>,
     windows: Vec<WindowState<'a>>,
     sources: Vec<CompressorState<'a>>,
@@ -218,6 +219,7 @@ impl<'a> BackboneCache<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .map_err(|_| anyhow::anyhow!("backbone cache IDs exhausted"))?;
         Ok(Self {
+            prefix_pool: None,
             prefix_stream: crate::v41_memory::LoadStream { library, raw: library.cuda_stream_create()? },
             windows,
             sources,

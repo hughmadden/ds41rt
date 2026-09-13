@@ -8,7 +8,7 @@ const RETAINED_CONTEXTS: usize = 2;
 // Extra pages cover retained partial tails and active copy-on-write frontiers.
 const MAX_GROUPS: usize = 131_072;
 const GROUP_BYTES: usize = 5 * 256 * (68 + ds41rt_ffi::V41Kv::COMPRESSED_ROW_BYTES);
-// Future retained windows, request scratch and graph/runtime allocations.
+// Request scratch and graph/runtime allocations. Snapshot arenas are already live.
 // Kept outside the eagerly allocated cache; this is not a CUDA process quota.
 pub(super) const RUNTIME_HEADROOM: usize = 2 * 1024 * 1024 * 1024;
 
@@ -129,6 +129,7 @@ impl PoolPlan {
         slots: usize,
         context: usize,
         retained_turns: usize,
+        snapshot_bytes: usize,
         exact: Option<ByteSize>,
         reservation: Option<Reservation>,
         free: usize,
@@ -177,7 +178,11 @@ impl PoolPlan {
             }
             low
         } else {
-            per_context * (slots + RETAINED_CONTEXTS) + spare_groups
+            // Keep the default total footprint stable when snapshot tails move
+            // from demand allocation into startup arenas. Explicit KV/total
+            // reservations above retain their own sizing policy.
+            (per_context * (slots + RETAINED_CONTEXTS) + spare_groups)
+                .saturating_sub(snapshot_bytes.div_ceil(GROUP_BYTES)).max(minimum)
         };
         ensure!(groups >= minimum,
             "KV pool needs at least {} global bytes for {slots} active owners plus copy-on-write headroom; increase the memory budget",
@@ -229,24 +234,40 @@ mod tests {
     }
     #[test]
     fn default_pool_covers_eighteen_contexts_and_twenty_four_snapshot_tails() {
-        let p = PoolPlan::new(16, 1_048_576, 24, None, None, 96 << 30, 96 << 30).unwrap();
+        let p = PoolPlan::new(16, 1_048_576, 24, 0, None, None, 96 << 30, 96 << 30).unwrap();
         assert_eq!(p.pages, [36_928, 36_928, 36_928, 73_856]);
         assert_eq!(p.global_bytes, 16_827_351_040);
         assert!(p.cache_bytes > p.global_bytes);
-        let small = PoolPlan::new(16, 32768, 24, None, None, 8 << 30, 96 << 30).unwrap();
+        let small = PoolPlan::new(16, 32768, 24, 0, None, None, 8 << 30, 96 << 30).unwrap();
         assert_eq!(small.pages, [1216, 1216, 1216, 2432]);
-        assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 32 << 30, 96 << 30).is_ok());
-        assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 16 << 30, 96 << 30).is_err());
+        assert!(PoolPlan::new(16, 1_048_576, 24, 0, None, None, 32 << 30, 96 << 30).is_ok());
+        assert!(PoolPlan::new(16, 1_048_576, 24, 0, None, None, 16 << 30, 96 << 30).is_err());
+    }
+    #[test]
+    fn snapshot_arenas_trade_default_pool_bytes_without_changing_overrides() {
+        let tail = crate::v41_backbone_cache::BackbonePrefix::device_bytes().div_ceil(256) * 256;
+        let bytes = 50 * (tail + 3 * ds41rt_ffi::V41DsparkCache::SLOT_BYTES);
+        let free = 56 << 30;
+        let total = 96 << 30;
+        let old = PoolPlan::new(16, 1_048_576, 24, 0, None, None, free, total).unwrap();
+        let pooled = PoolPlan::new(16, 1_048_576, 24, bytes, None, None, free-bytes, total).unwrap();
+        let returned = old.global_bytes - pooled.global_bytes;
+        assert!(returned >= bytes && returned - bytes < GROUP_BYTES);
+        let explicit = PoolPlan::new(16, 1_048_576, 24, bytes,
+            Some(ByteSize(old.global_bytes)), None, free-bytes, total).unwrap();
+        assert_eq!(explicit.pages, old.pages);
+        let short = PoolPlan::new(16, 128, 24, bytes, None, None, free-bytes, total).unwrap();
+        assert!(short.pages[0] >= 2*16 + 2*24);
     }
     #[test]
     fn exact_and_total_budgets_round_down_without_undercutting_admission() {
         let total = 96 << 30;
         let free = 56 << 30;
-        let default = PoolPlan::new(16, 1_048_576, 24, None, None, free, total).unwrap();
+        let default = PoolPlan::new(16, 1_048_576, 24, 0, None, None, free, total).unwrap();
         let exact = PoolPlan::new(
             16,
             1_048_576,
-            24,
+            24, 0,
             Some(ByteSize(default.global_bytes + 99)),
             None,
             free,
@@ -255,12 +276,12 @@ mod tests {
         .unwrap();
         assert_eq!(exact.pages, default.pages);
         let small =
-            PoolPlan::new(2, 1_048_576, 24, Some(ByteSize(1 << 30)), None, free, total).unwrap();
+            PoolPlan::new(2, 1_048_576, 24, 0, Some(ByteSize(1 << 30)), None, free, total).unwrap();
         assert!(small.global_bytes <= 1 << 30);
-        let c2 = PoolPlan::new(2, 1_048_576, 24, None, None, free, total).unwrap();
+        let c2 = PoolPlan::new(2, 1_048_576, 24, 0, None, None, free, total).unwrap();
         assert_eq!(c2.pages[0], 2048 * 4 + 50);
         let reservation = Some("80GiB".parse().unwrap());
-        let p = PoolPlan::new(16, 1_048_576, 24, None, reservation, free, total).unwrap();
+        let p = PoolPlan::new(16, 1_048_576, 24, 0, None, reservation, free, total).unwrap();
         assert!(p.cache_bytes + p.occupied_before + RUNTIME_HEADROOM <= 80 << 30);
         let next =
             PoolPlan::from_groups(16, p.pages[0] + 1, p.occupied_before, p.reservation_bytes)
@@ -269,7 +290,7 @@ mod tests {
         assert!(PoolPlan::new(
             16,
             1_048_576,
-            24,
+            24, 0,
             Some(ByteSize(1 << 20)),
             None,
             free,
@@ -279,7 +300,7 @@ mod tests {
         assert!(PoolPlan::new(
             16,
             1_048_576,
-            24,
+            24, 0,
             Some(ByteSize(default.global_bytes)),
             Some("50GiB".parse().unwrap()),
             free,
@@ -289,7 +310,7 @@ mod tests {
         assert!(PoolPlan::new(
             16,
             1_048_576,
-            24,
+            24, 0,
             None,
             Some("101GiB".parse().unwrap()),
             free,

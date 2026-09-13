@@ -1,9 +1,10 @@
 use super::*;
+use crate::v41_memory::{SnapshotPool, SnapshotStorage};
 
 pub(crate) struct DsparkPrefix<'a> {
     owner: u64,
     end: u64,
-    ring: DeviceAllocation<'a>,
+    ring: SnapshotStorage<'a>,
 }
 impl DsparkPrefix<'_> {
     pub fn end(&self) -> u64 {
@@ -17,6 +18,12 @@ fn slice(mut buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtD
     buffer
 }
 impl<'a> DsparkWindow<'a> {
+    pub fn reserve_prefixes(&mut self, slots: usize) -> Result<usize> {
+        ensure!(self.prefix_pool.is_none() && self.slots.iter().all(|s| s.request.is_none()),
+            "draft snapshot arena must be installed before admission");
+        if slots > 0 { self.prefix_pool = Some(SnapshotPool::new(self.stream.library, V41DsparkCache::SLOT_BYTES, slots)?); }
+        Ok(self.prefix_pool.as_ref().map_or(0, SnapshotPool::device_bytes))
+    }
     pub fn retain_prefix(&mut self, lease: WindowLease) -> Result<DsparkPrefix<'a>> {
         let slot = self.validate(lease)?;
         self.access.readable(slot)?;
@@ -25,7 +32,7 @@ impl<'a> DsparkWindow<'a> {
             .context("cannot retain an unseeded draft window")?;
         let bytes = end.min(128) as usize * V41DsparkCache::ROW_BYTES;
         ensure!(bytes > 0, "cannot retain an empty draft window");
-        let ring = DeviceAllocation::new(self.stream.library, bytes)?;
+        let ring = SnapshotStorage::new(self.stream.library, bytes, self.prefix_pool.as_ref())?;
         let copied = unsafe {
             self.stream.library.copy_d2d_async(
                 ring.buffer,
@@ -78,6 +85,7 @@ mod tests {
     fn native_draft_prefix_survives_slot_reuse() -> Result<()> {
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let mut window = DsparkWindow::new(&lib, 2, 128, usize::MAX)?;
+        window.reserve_prefixes(1)?;
         for end in [5u64, 128, 129, 1000000] {
             let old = window.begin_request(0, 1)?;
             assert!(window.retain_prefix(old).is_err());

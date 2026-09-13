@@ -266,15 +266,28 @@ fn worker(
     }
     let mut vision = crate::v41_vision::VisionRuntime::new(&lib, &catalog, 9216,
         crate::v41_vision::VisionRuntime::device_bytes(&catalog, 9216)?)?;
+    // Reserve both retention banks plus one in-flight snapshot per lane. These
+    // allocations are counted before choosing KV capacity and local expert layers.
+    ensure!(args.prefix_cache_entries <= 128, "invalid retained-turn limit");
+    let snapshot_slots = if args.prefix_cache_entries == 0 { 0 } else {
+        (args.prefix_cache_entries as usize).checked_mul(2).and_then(|n| n.checked_add(2))
+            .context("snapshot slot count overflow")?
+    };
+    let target_prefix_pool = (snapshot_slots > 0).then(|| crate::v41_memory::SnapshotPool::new(
+        &lib, crate::v41_backbone_cache::BackbonePrefix::device_bytes(), snapshot_slots)).transpose()?;
+    let draft_snapshot_bytes = draft.as_mut().map(|d| d.reserve_prefixes(snapshot_slots)).transpose()?.unwrap_or(0);
+    let snapshot_bytes = target_prefix_pool.as_ref().map_or(0, crate::v41_memory::SnapshotPool::device_bytes) + draft_snapshot_bytes;
+    tracing::info!(snapshot_slots, snapshot_bytes, "snapshot arenas reserved before serving");
     // Size after vision, both lanes, transports and optional draft allocations are live.
     let (free, total) = lib.cuda_memory_info()?;
     let pool = memory::PoolPlan::new(args.concurrency as usize, args.max_context_tokens as usize,
-        args.prefix_cache_entries as usize, args.kv_pool_size, args.memory_reservation, free, total)?;
+        args.prefix_cache_entries as usize, snapshot_bytes, args.kv_pool_size, args.memory_reservation, free, total)?;
     tracing::info!(retained_turn_limit=args.prefix_cache_entries, prompt_snapshot_limit=args.prefix_cache_entries, source_pages=?pool.pages, global_bytes=pool.global_bytes,
         cache_bytes=pool.cache_bytes, device_occupied_bytes=pool.occupied_before,
         reservation_bytes=pool.reservation_bytes, runtime_headroom_bytes=memory::RUNTIME_HEADROOM,
         "native KV pool reservation");
     let mut requests = Requests::new(&lib, pipeline, args.concurrency as usize, pool.pages, pool.cache_bytes)?;
+    if let Some(pool) = target_prefix_pool { requests.install_prefix_pool(pool)?; }
     if args.rtx_expert_layers != memory::LocalLayers::Count(0) {
         use crate::v41_experts::{ExpertLayer, ExpertWeights, local::LocalExpertWave};
         let local_started = Instant::now();

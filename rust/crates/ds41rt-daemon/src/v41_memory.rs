@@ -3,6 +3,10 @@ use anyhow::Result;
 use ds41rt_ffi::{Ds41rtDeviceBuffer, Ds41rtHostBuffer, NativeLibrary};
 use std::ffi::c_void;
 
+#[path = "v41_memory/snapshot.rs"]
+mod snapshot;
+pub(crate) use snapshot::{SnapshotPool, SnapshotStorage};
+
 pub(crate) struct DeviceAllocation<'a> {
     pub(crate) library: &'a NativeLibrary,
     pub(crate) buffer: Ds41rtDeviceBuffer,

@@ -1,13 +1,13 @@
 use super::*;
 use crate::v41_compressor::{CompressorPrefix, COMPRESSOR_PREFIX_BYTES};
-use crate::v41_memory::DeviceAllocation;
+use crate::v41_memory::{SnapshotPool, SnapshotStorage};
 use crate::v41_window::{WindowPrefix, WINDOW_PREFIX_BYTES};
 use ds41rt_ffi::Ds41rtDeviceBuffer;
 
 pub(crate) struct BackbonePrefix<'a> {
     owner: u64,
     end: u64,
-    tail: DeviceAllocation<'a>,
+    tail: SnapshotStorage<'a>,
     windows: Vec<WindowPrefix>,
     sources: Vec<CompressorPrefix>,
 }
@@ -26,6 +26,13 @@ fn slice(mut buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtD
     buffer
 }
 impl<'a> BackboneCache<'a> {
+    pub fn install_prefix_pool(&mut self, pool: SnapshotPool<'a>) -> Result<()> {
+        ensure!(self.prefix_pool.is_none() && self.requests.iter().all(Option::is_none),
+            "snapshot arena must be installed before admission");
+        self.prefix_pool = Some(pool);
+        Ok(())
+    }
+
     /// Attach a complete-group global prefix and initialize empty encoder
     /// windows at the bounded replay start. Decoder windows remain fresh.
     /// Subsequent replay reads the shared source pages without producing them.
@@ -102,7 +109,7 @@ impl<'a> BackboneCache<'a> {
             "retained backbone tail exceeds budget"
         );
         let tail =
-            DeviceAllocation::new(self.prefix_stream.library, BackbonePrefix::device_bytes())?;
+            SnapshotStorage::new(self.prefix_stream.library, BackbonePrefix::device_bytes(), self.prefix_pool.as_ref())?;
         let result = (|| -> Result<_> {
             let windows = self
                 .windows

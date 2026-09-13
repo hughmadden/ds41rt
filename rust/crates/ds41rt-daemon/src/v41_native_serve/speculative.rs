@@ -224,6 +224,11 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         }
         failure.map_or(Ok(()), Err)
     }
+    pub fn reserve_prefixes(&mut self, slots: usize) -> Result<usize> {
+        let mut bytes = 0;
+        for window in &mut self.windows { bytes += window.reserve_prefixes(slots)?; }
+        Ok(bytes)
+    }
     pub fn retain_prefix(&mut self, id: u64, end: u64) -> Result<DraftPrefix<'a>> {
         let request = self.requests.get(&id).context("draft request not admitted")?;
         for (window, lease) in self.windows.iter().zip(request.leases) {

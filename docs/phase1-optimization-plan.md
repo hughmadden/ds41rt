@@ -25,9 +25,9 @@ Remaining synchronization work, based on the current serving source:
 - Compressed-cache publication is now queued with producer-owned upload storage
   and page/slot reservations. Disjoint plans can publish out of order; partial
   errors drain before rollback. Numerical, ownership and cache-recovery tests pass.
-- Retire completed/cancelled requests within their owning lane. Preserve exact
-  turn snapshots while making snapshot copies cooperative; today retirement
-  requests a global drain and prefix retention waits on the host.
+- Completed/cancelled requests now retire within their owning lane, without a
+  peer drain. Snapshot arenas remove allocation/free calls from retention;
+  snapshot copies still need cooperative completion instead of host waits.
 - Audit constrained-logit downloads, graph capture/eviction, and remaining shared
   host waits. Retain coordinated fatal-error cleanup and admission/prefill drains.
 
@@ -60,8 +60,10 @@ other dual-device changes to Phase 2. Select placement at startup after budgetin
 mandatory weights, both execution lanes, vision, dSpark, KV, load staging and
 peak runtime workspace. Preserve explicit user memory and KV overrides.
 
-The default aggregate source pool is now 18 maximum-context equivalents at C16,
-with 24 retained completed-turn and prompt-snapshot entries, plus private tails.
+The default aggregate source pool starts from 18 maximum-context equivalents at
+C16, trading snapshot arena bytes for global pages. With dSpark it now provides
+18,710,016 tokens plus private tails in a 16.681 GB global pool, with 24 retained
+completed-turn and prompt-snapshot entries and 139.4 MiB of snapshot arenas.
 Use remaining memory aggressively, but determine headroom from measured runtime
 and loading peaks rather than adopting an unverified occupancy percentage.
 Whole-layer granularity can leave space that cannot accommodate another layer.
@@ -120,8 +122,10 @@ removes the sequential window waits. [Queued compressed-source publication](phas
 claims pages until completion/rollback, preserves shared-tail copy ownership and
 uses producer-owned upload staging. [Lane-local retirement](phase1-lane-retirement.md)
 now releases completed requests without draining the peer, and avoids redundant
-device length clears. Next make snapshot retention cooperative and finish the
-remaining blocking transfer audit.
+device length clears. [Snapshot arenas](phase1-snapshot-arenas.md) now remove CUDA
+allocation/free calls from retention, trading their bounded storage for default
+global KV pages. Next make snapshot copies cooperative and finish the remaining
+blocking transfer audit.
 Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and
