@@ -8,6 +8,20 @@ use crate::v41_engram::placement::PlacedEngram;
 use crate::v41_memory::device::DeviceOwner;
 use encoder_stream::EncoderFlow;
 
+#[cfg(test)]
+fn trace_query_component(query: &crate::v41_attention_query::AttentionQueryOutput<'_>)
+    -> Result<(ds41rt_ffi::Ds41rtDeviceBuffer, usize)> {
+    Ok(match std::env::var("DS41RT_QUERY_COMPONENT").as_deref().unwrap_or("rotated") {
+        "hidden" => (query.hidden, 10240),
+        "raw_rank" => (query.raw_rank, 2560),
+        "normalized_rank" => (query.normalized_rank, 2560),
+        "projected" | "qb_pair" => (query.projected, 65536),
+        "rotated" => (query.rotated, 65536),
+        _ => anyhow::bail!("unknown query trace component"),
+    })
+}
+
+
 pub(crate) struct DistributedTargetPass<'w, 'a> {
     map: CachePlacement,
     embedding: DeviceOwner<'a, TargetEmbeddingWave<'w, 'a>>,
@@ -25,6 +39,8 @@ pub(crate) struct DistributedTargetPass<'w, 'a> {
     trace: bool,
     #[cfg(test)]
     trace_records: Vec<(u64, usize, usize)>,
+    #[cfg(test)]
+    trace_queries: [DeviceOwner<'a, crate::v41_memory::DeviceAllocation<'a>>; 2],
     #[cfg(test)]
     observed_layer: Option<std::rc::Rc<std::cell::Cell<usize>>>,
     #[cfg(test)]
@@ -100,6 +116,11 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             lanes[0].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 40 * 16 * 40976))?,
             lanes[1].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 40 * 16 * 40976))?,
         ];
+        #[cfg(test)]
+        let trace_queries = [
+            lanes[0].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 40 * 16 * 131072))?,
+            lanes[1].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 40 * 16 * 131072))?,
+        ];
         Ok(Self {
             map,
             embedding,
@@ -117,6 +138,8 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             trace: false,
             #[cfg(test)]
             trace_records: Vec::new(),
+            #[cfg(test)]
+            trace_queries,
             #[cfg(test)]
             observed_layer: None,
             #[cfg(test)]
@@ -356,6 +379,33 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                     .future(unsafe { self.lanes[gpu].get_mut().begin_prepared_cooperative() })
                     .await?;
             }
+            #[cfg(test)]
+            let trace_stream = self.lanes[gpu].trace_stream();
+            #[cfg(test)]
+            if self.trace && std::env::var_os("DS41RT_TRACE_QUERY").is_some() {
+                let query = self.lanes[gpu].query_output()?;
+                let position = query.tokens()?[0];
+                ensure!(position as usize + query.rows <= 16, "query trace extent exceeded");
+                let (captured, width) = trace_query_component(&query)?;
+                let mut bytes = query.rows * width;
+                let offset = ((layer + 20) * 16 + position as usize) * 131072;
+                let buffer = self.trace_queries[gpu].buffer;
+                let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+                    ptr: unsafe { buffer.ptr.cast::<u8>().add(offset).cast() }, bytes, ..buffer
+                };
+                device.run(|| unsafe { device.library.copy_d2d_async(destination,
+                    captured, bytes, trace_stream) })?;
+                if std::env::var("DS41RT_QUERY_COMPONENT").as_deref() == Ok("qb_pair") {
+                    let extra = query.rows * 2560;
+                    let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+                        ptr: unsafe { buffer.ptr.cast::<u8>().add(offset + bytes).cast() }, bytes: extra, ..buffer
+                    };
+                    device.run(|| unsafe { device.library.copy_d2d_async(destination,
+                        query.normalized_rank, extra, trace_stream) })?;
+                    bytes += extra;
+                }
+                self.trace_records.push((position, layer + 120, bytes));
+            }
             let index = if [2, 8, 14, 20, 24, 28, 32, 36].contains(&layer) {
                 self.indices[gpu].as_mut()
             } else {
@@ -384,7 +434,30 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             }
             drop(production);
             #[cfg(test)]
-            let trace_stream = self.lanes[gpu].trace_stream();
+            if self.trace && std::env::var_os("DS41RT_TRACE_QUERY").is_some() {
+                let query = self.lanes[gpu].query_output()?;
+                let position = query.tokens()?[0];
+                ensure!(position as usize + query.rows <= 16, "query trace extent exceeded");
+                let (captured, width) = trace_query_component(&query)?;
+                let mut bytes = query.rows * width;
+                let offset = (layer * 16 + position as usize) * 131072;
+                let buffer = self.trace_queries[gpu].buffer;
+                let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+                    ptr: unsafe { buffer.ptr.cast::<u8>().add(offset).cast() }, bytes, ..buffer
+                };
+                device.run(|| unsafe { device.library.copy_d2d_async(destination,
+                    captured, bytes, trace_stream) })?;
+                if std::env::var("DS41RT_QUERY_COMPONENT").as_deref() == Ok("qb_pair") {
+                    let extra = query.rows * 2560;
+                    let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+                        ptr: unsafe { buffer.ptr.cast::<u8>().add(offset + bytes).cast() }, bytes: extra, ..buffer
+                    };
+                    device.run(|| unsafe { device.library.copy_d2d_async(destination,
+                        query.normalized_rank, extra, trace_stream) })?;
+                    bytes += extra;
+                }
+                self.trace_records.push((position, layer + 80, bytes));
+            }
             let prepared = unsafe {
                 requests.with_requests(|r| {
                     self.execution.prepare_layer(
@@ -1197,9 +1270,12 @@ mod tests {
                         }
                         for (position, layer, bytes) in lane.trace_records.drain(..) {
                             let gpu = map.attention(layer % 40)?;
-                            let stored_layer = if layer >= 40 { layer - 20 } else { layer };
-                            let offset = (stored_layer * 16 + position as usize) * 40976;
-                            let buffer = lane.trace_buffers[gpu].buffer;
+                            let (buffer, offset) = if layer >= 80 {
+                                (lane.trace_queries[gpu].buffer, ((if layer >= 120 { layer - 100 } else { layer - 80 }) * 16 + position as usize) * 131072)
+                            } else {
+                                let stored_layer = if layer >= 40 { layer - 20 } else { layer };
+                                (lane.trace_buffers[gpu].buffer, (stored_layer * 16 + position as usize) * 40976)
+                            };
                             let source = ds41rt_ffi::Ds41rtDeviceBuffer {
                                 ptr: unsafe { buffer.ptr.cast::<u8>().add(offset).cast() }, bytes, ..buffer
                             };
@@ -1214,8 +1290,27 @@ mod tests {
                     for (position, layer, bytes) in &trace {
                         let (_, _, expected) = expected_trace.iter().find(|(p,l,_)| p == position && l == layer).unwrap();
                         if bytes != expected {
+                            if *layer >= 80 && std::env::var("DS41RT_QUERY_COMPONENT").as_deref() == Ok("qb_pair") {
+                                let rows = bytes.len() / (65536 + 2560);
+                                let input_equal = bytes[rows*65536..] == expected[rows*65536..];
+                                eprintln!("QB_PAIR case={case} layer={} position={position} rows={rows} input_equal={input_equal}", layer % 40);
+                                if input_equal {
+                                    if let Some(directory) = std::env::var_os("DS41RT_TRACE_DUMP_DIR") {
+                                        let directory = std::path::PathBuf::from(directory);
+                                        std::fs::create_dir_all(&directory)?;
+                                        let meta = directory.join("qb.json");
+                                        if !meta.exists() {
+                                            std::fs::write(directory.join("input.bf16"), &bytes[rows*65536..])?;
+                                            std::fs::write(directory.join("expected.bf16"), &expected[..rows*65536])?;
+                                            std::fs::write(directory.join("actual.bf16"), &bytes[..rows*65536])?;
+                                            std::fs::write(meta, format!("{{\"layer\":{},\"rows\":{rows},\"position\":{position}}}\n", layer % 40))?;
+                                        }
+                                    }
+                                }
+                            }
                             let paired = std::env::var_os("DS41RT_TRACE_FFN").is_some();
-                            let is_output = !paired || *layer >= 40;
+                            let is_query = *layer >= 80;
+                            let is_output = !is_query && (!paired || *layer >= 40);
                             let pre_start = if !is_output { bytes.len() }
                                 else if std::env::var_os("DS41RT_TRACE_PRE").is_some() { 0 }
                                 else { bytes.len() / 40976 * 40960 };
@@ -1227,7 +1322,7 @@ mod tests {
                                 .map(|(a,b)| (f32::from_ne_bytes(a.try_into().unwrap()) -
                                     f32::from_ne_bytes(b.try_into().unwrap())).abs()).fold(0f32, f32::max);
                             eprintln!("TRACE case={case} position={position} layer={} stage={} bf16_peak={peak} pre_peak={pre_peak}",
-                                layer % 40, if is_output { "output" } else { "ffn_input" });
+                                layer % 40, if *layer >= 120 { "query_before" } else if is_query { "query_after" } else if is_output { "output" } else { "ffn_input" });
                         }
                     }
                 }

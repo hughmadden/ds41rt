@@ -933,3 +933,26 @@ within attention/query/projection or its input preparation. It does not prove
 a fixed offending layer or establish the root cause. Earlier trace logs
 represented paired output stages as layer+40; the current formatter labels
 stages and reports BF16 and FP32 differences separately.
+
+Query tracing further narrows one failing execution to the second query
+projection (QB). `DS41RT_TRACE_QUERY=1` captures query components before and
+after cache production; `DS41RT_QUERY_COMPONENT=qb_pair` retains both projected
+output and normalized input. In `interleave-qb-pair.log`, layer 13 has identical
+three-row normalized inputs but differing projected outputs. All 274 differing
+BF16 elements lie in columns 24832–24959, one 128-column tile. Both captures
+already contain the difference before cache production. This supersedes the
+earlier cache-overlap hypothesis for this particular failure; the underlying
+cause is not yet established.
+
+`DS41RT_TRACE_DUMP_DIR` optionally saves that first equal-input mismatch as
+`qb.json`, `input.bf16`, `expected.bf16`, and `actual.bf16`, without overwriting
+an existing capture. The local `qb-pair-capture` artifact reproduces the
+sequential result exactly in an isolated native QB test, including paired
+streams and graph replay. The isolated race check reports no hazards. Full
+fixture memory checking (`interleave-memcheck.log`) reports only 20 repeated
+`cudaErrorPeerAccessAlreadyEnabled` API results, with no reported invalid
+memory access; the instrumented fixture passes, so this is not proof that the
+concurrent mismatch is resolved. Full dense-kernel race checking with tensor
+operation checks is the next investigation. An initial filter written as
+`kns=regex:.*dense_gemm.*` matched no kernels and provides no race coverage;
+the corrected filter is `kns=dense_gemm`.
