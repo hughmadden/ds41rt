@@ -652,3 +652,7 @@ impl Drop for SparseAttentionWave<'_> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "v41_sparse_attention/prefix_tests.rs"]
+mod prefix_tests;

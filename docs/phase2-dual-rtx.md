@@ -808,3 +808,30 @@ pass. Ordinary full prefill/decode, commit, and discard/reuse checks also pass.
 These are short integration checks, not release quality or throughput results.
 Interleaving encoder chunks across two request lanes and connecting the normal
 serving scheduler remain pending.
+
+## Interleaved distributed encoder chunks
+
+The two distributed lanes can now reserve, execute and commit alternating chunks
+of one prompt. A chunk waits for its predecessor's per-layer cache publication;
+suffix capture, source-20 publication and history completion remain ordered for
+that prompt. Each lane reserves its next chunk after its own commit, without a
+pair barrier. Request-bank borrows end before waits. Suffix capture uses a stream
+owned by that lane on the encoder-output GPU, with cooperative completion and
+drained cancellation. Stream failure revokes the prompt after both active chunk
+guards drain their work.
+
+Interleaving exposed a sparse-attention validation bug: a committed source's
+device length can advance after an earlier causal view is queued. Requiring
+exact length equality caused valid prefix readers to return zero attention.
+Committed-only views now accept an appended source; private overlays still
+require an exact boundary. A focused native regression on both GPUs checks
+ordinary and split attention, equal output after append, rejection of shortened
+backing, and rejection of stale private overlays.
+
+The real-model integration fixture compares sequential and interleaved execution
+for identical 3+4 and 1+2+1+3 chunk partitions. Winning token and score match
+exactly after live Spark decoder replay. Disconnecting during active encoder
+work revokes both chunks, and subsequent execution reuses the owners. These
+short fixtures do not establish release quality or throughput. Publication still
+follows each layer's FFN completion; overlapping a follower's attention with that
+FFN and connecting the normal serving scheduler remain further work.

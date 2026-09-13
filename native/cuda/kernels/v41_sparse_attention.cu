@@ -109,7 +109,10 @@ __global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* quer
     m[2]<=1048576-m[0] && m[1]<=v.window_proposal_capacity &&
     m[2]<=v.window_proposal_capacity-m[1] && m[3]>=m[0] && m[3]-m[0]<m[2] &&
     uint64_t(width)>=(m[3]+1<128?m[3]+1:128);
-  if(valid && v.compressed)valid=m[4]==0 && m[6]==*v.source_end && m[6]<=1048576 &&
+  // A committed-only causal prefix remains valid when another encoder chunk
+  // appends rows. Private overlays still require their exact committed boundary.
+  if(valid && v.compressed)valid=m[4]==0 &&
+    (m[7]==0?m[6]<=*v.source_end:m[6]==*v.source_end) && m[6]<=1048576 &&
     m[7]<=1048576-m[6] && m[5]<=m[6]+m[7] && (m[9]==1 || m[9]==2) &&
     m[8]<=v.source_proposal_capacity && (!m[7] || (m[8]<v.source_proposal_capacity &&
       m[7]-1<=(v.source_proposal_capacity-1-m[8])/m[9]));

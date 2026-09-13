@@ -28,6 +28,27 @@ impl<'a> EncoderSuffix<'a> {
     /// The producer is a completed encoder chunk from this admitted request.
     /// Incomplete/failed captures never expose an output; discard on request failure.
     pub fn capture(&mut self, output: &BlockOutput<'_>) -> Result<()> {
+        let library = self.residual.library;
+        self.capture_with(output, |dst, src, bytes| library.copy_d2d(dst, src, bytes))
+    }
+    /// # Safety
+    /// The completed output and stream are on this suffix's GPU. Retain the
+    /// producer through completion; cancellation drains queued copies and leaves
+    /// this suffix invalid until it is dropped with its failed request.
+    pub async unsafe fn capture_cooperative(&mut self, output: &BlockOutput<'_>,
+        stream: &crate::v41_memory::LoadStream<'_>) -> Result<()> {
+        stream.require_complete()?;
+        let queued = self.capture_with(output, |dst, src, bytes| unsafe {
+            stream.library.copy_d2d_async(dst, src, bytes, stream.raw)
+        });
+        self.invalid = true;
+        stream.wait().await?;
+        queued?;
+        self.invalid = false;
+        Ok(())
+    }
+    fn capture_with(&mut self, output: &BlockOutput<'_>,
+        mut copy: impl FnMut(Ds41rtDeviceBuffer, Ds41rtDeviceBuffer, usize) -> Result<()>) -> Result<()> {
         let valid = !std::mem::replace(&mut self.invalid, true);
         let rows = output.tokens.len();
         ensure!(valid && output.layer == 19 && output.binding.layer() == 19
@@ -45,7 +66,7 @@ impl<'a> EncoderSuffix<'a> {
                 let bytes = (rows - first) * stride;
                 let src = Ds41rtDeviceBuffer { ptr: unsafe { source.ptr.cast::<u8>().add(first * stride).cast() }, bytes, ..source };
                 let dst = Ds41rtDeviceBuffer { ptr: unsafe { destination.ptr.cast::<u8>().add(offset * stride).cast() }, bytes, ..destination };
-                self.residual.library.copy_d2d(dst, src, bytes)?;
+                copy(dst, src, bytes)?;
             }
             self.next = output.tokens[rows - 1] + 1;
         }

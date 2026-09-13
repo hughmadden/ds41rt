@@ -185,7 +185,9 @@ impl<'a> CompressorState<'a> {
     /// Borrow an immutable committed source range after its producer is published.
     /// No private rows are produced; ratio-two encoder sources and ratio-one
     /// decoder sources retain their per-query causal counts. The caller owns
-    /// the snapshot identity across consumers and must drain them before append.
+    /// the snapshot identity across consumers. A committed-only causal prefix
+    /// can survive append; its backing rows must remain immutable and all
+    /// consumers must drain before request release or restoration.
     pub fn committed_proposal(&self, lease: CompressorLease, positions: std::ops::Range<u64>,
         snapshot: u64) -> Result<IndexProposal<'_>> {
         let end = self.committed_end(lease)?;
