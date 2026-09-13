@@ -49,8 +49,6 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                 let active = active.borrow();
                 let mut requests = requests.borrow_mut();
                 let mut draft = draft.borrow_mut();
-                ensure!(!draft.as_deref().is_some_and(DraftRuntime::adaptive_enabled),
-                    "cross-lane cost policy requires paired scheduling");
                 let capacity: Vec<_> = members.iter().map(|&slot| {
                     let r = active[slot].as_ref().unwrap();
                     (r.lease, if draft.is_some() { (r.job.max_tokens-r.generated).min(6) as u32 } else { 1 })
@@ -60,6 +58,7 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                     let r = active[slot].as_ref().unwrap();
                     Ok((r.id, r.anchor, requests.cache().committed_end(r.lease)?, r.job.max_tokens-r.generated))
                 }).collect::<Result<Vec<_>>>()?;
+                let draft_start = Instant::now();
                 let mut inputs = if let Some(draft) = draft.as_deref_mut() { draft.propose(lib, &seeds)? }
                     else { seeds.iter().map(|r| vec![r.1]).collect() };
                 for (&slot, input) in members.iter().zip(&mut inputs) {
@@ -70,10 +69,16 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                     }
                 }
                 if members.iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none()) {
-                    if let Some(draft) = draft.as_deref().filter(|d| d.reuse_enabled()) {
+                    if let Some(draft) = draft.as_deref().filter(|d| d.reuse_enabled() || d.adaptive_enabled()) {
                         let candidates: Vec<_> = members.iter().zip(&inputs).map(|(&slot, input)|
                             (active[slot].as_ref().unwrap().id, lane, input.len()-1)).collect();
-                        if let Some(lengths) = draft.select_reuse_prefixes(&candidates)? {
+                        // Only this lane contributes proposals, route unions and
+                        // draft time. The existing cost model's cross-lane term
+                        // is zero for this single-lane forecast.
+                        let lengths = if draft.adaptive_enabled() {
+                            draft.select_prefixes(&candidates, draft_start.elapsed().as_micros() as u64)?
+                        } else { draft.select_reuse_prefixes(&candidates)? };
+                        if let Some(lengths) = lengths {
                             for (input, length) in inputs.iter_mut().zip(lengths) { input.truncate(length+1); }
                         }
                     }

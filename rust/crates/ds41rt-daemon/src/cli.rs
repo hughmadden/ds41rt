@@ -505,7 +505,7 @@ pub(crate) struct NativeServeArgs {
     /// Maximum verified draft tokens per request; fixed-length policy control.
     #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=5))]
     pub dspark_draft_limit: u8,
-    /// Experimental history-based joint draft-prefix selection.
+    /// Experimental history-based draft-prefix selection; lane-local with independent decode.
     #[arg(long, requires = "dspark")]
     pub dspark_adaptive: bool,
     /// Experimental independent cumulative confidence cutoff, between zero and one.
@@ -515,7 +515,7 @@ pub(crate) struct NativeServeArgs {
     #[arg(long, requires = "dspark_confidence_cutoff", value_parser = parse_dspark_confidence)]
     pub dspark_reuse_floor: Option<f64>,
     /// Experimental independent decode lanes; drain together only for admission or retirement.
-    #[arg(long, conflicts_with = "dspark_adaptive")]
+    #[arg(long)]
     pub independent_decode_lanes: bool,
 
     #[arg(long)] pub snapshot: PathBuf,

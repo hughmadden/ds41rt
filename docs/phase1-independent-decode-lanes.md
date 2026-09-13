@@ -2,8 +2,12 @@
 
 `--independent-decode-lanes` is an experimental opt-in scheduler. It supports
 fixed drafts, the independent confidence cutoff and lane-local incremental reuse,
-and also target-only execution. The cross-lane `--dspark-adaptive` cost policy is
-incompatible. Defaults are unchanged; the initial functional screen passed, while performance qualification is pending.
+and also target-only execution. It now also accepts `--dspark-adaptive`: each
+lane calls the original cost selector with only its own requests and draft time.
+Its forecast contains one lane, so the cross-lane cost term is zero. The original
+coefficients, confidence model and minimum prefixes are unchanged. Single-active-
+lane execution retains the ordinary path. This new combination is under testing;
+defaults are unchanged.
 
 Each lane owns its target pass and transport and loops through preparation,
 verification, commit, token delivery and its next round independently. Request,
@@ -84,3 +88,29 @@ The uninstrumented ABBA uses persistent paths under
 text was deleted, both arms use the scheduler source at commit `49f1fb2` as a
 new frozen context corpus. Compare its prefill results within this ABBA, not
 against the earlier corpus. The benchmark records its actual context hash.
+
+
+## Uninstrumented reuse-policy ABBA
+
+The completed ABBA uses the same frozen binary and native library in all arms,
+with only independent scheduling toggled. Values below are per-arm medians for
+three C1 and three measured prefill samples; mixed traffic is one batch per cell.
+
+| Arm | C1 code tok/s | 32K prefill tok/s | C4 mixed tok/s | C16 mixed tok/s |
+|---|---:|---:|---:|---:|
+| Paired A1 | 126.13 | 7800.74 | 126.37 | 190.10 |
+| Independent B1 | 126.45 | 7760.47 | 140.33 | 180.16 |
+| Independent B2 | 126.00 | 7617.09 | 126.23 | 188.02 |
+| Paired A2 | 125.34 | 7579.84 | 126.22 | 188.19 |
+
+C1 remained level. Averaging the two mixed batches per mode gives C4
+126.30 → 133.28 tok/s (+5.5%, variable) and C16 189.14 → 184.09 (-2.7%).
+This does not justify default adoption. All benchmark checks passed, and the
+standard service was restored. A separate C4 check passed tool calls and strict
+JSON, both ordinary and streamed responses, with thinking enabled at high effort;
+each response contained reasoning and the exact request-specific object.
+
+[ABBA and grammar evidence](phase1-independent-performance.json) preserves the
+commands, artifact identities, C1/prefill samples, mixed rates and grammar replies.
+The adaptive cost comparison is a separate experiment; these numbers describe
+the 0.05–0.5 confidence/reuse policy only.
