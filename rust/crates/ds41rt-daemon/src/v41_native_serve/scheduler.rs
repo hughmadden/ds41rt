@@ -266,6 +266,7 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     let started = Instant::now();
     let speculative = draft.is_some();
     let adaptive = draft.as_deref().is_some_and(DraftRuntime::adaptive_enabled);
+    let capture_routes = draft.as_deref().is_some_and(DraftRuntime::capture_routes);
     let mut inputs = [Vec::new(), Vec::new()];
     let mut batches = [None, None];
     let mut draft_us = 0u64;
@@ -288,6 +289,16 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
                 // Engram reads; no other lane's proposals or history are needed.
                 let length = draft.confidence_prefix(active[slot].as_ref().unwrap().id, input.len() - 1)?;
                 input.truncate(length + 1);
+            }
+        }
+        if draft.as_deref().is_some_and(DraftRuntime::reuse_enabled)
+            && !members[lane].is_empty() && members[lane].iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none()) {
+            if let Some(draft) = draft.as_deref() {
+                let candidates: Vec<_> = members[lane].iter().zip(&inputs[lane])
+                    .map(|(&slot, input)| (active[slot].as_ref().unwrap().id, lane, input.len() - 1)).collect();
+                if let Some(lengths) = draft.select_reuse_prefixes(&candidates)? {
+                    for (input, length) in inputs[lane].iter_mut().zip(lengths) { input.truncate(length + 1); }
+                }
             }
         }
         draft_us += draft_start.elapsed().as_micros() as u64;
@@ -326,8 +337,8 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     let [a, b] = &mut batches;
     // Drain both futures even if one fails, before discarding private device state.
     let results = runtime.block_on(async { tokio::join!(
-        execute_logits(lib, first, requests, a, first_transport, adaptive),
-        execute_logits(lib, second, requests, b, second_transport, adaptive),
+        execute_logits(lib, first, requests, a, first_transport, capture_routes),
+        execute_logits(lib, second, requests, b, second_transport, capture_routes),
     ) });
     let executed_us = started.elapsed().as_micros() as u64;
     let result = (|| -> Result<()> {
@@ -387,7 +398,7 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
             }
             if let Some(draft) = draft.as_deref_mut() {
                 draft.commit_batch(pass, requests, batch, &accepted)?;
-                if adaptive {
+                if capture_routes {
                     let mut offset = 0;
                     for ((&slot, input), &count) in members[lane].iter().zip(&inputs[lane]).zip(&accepted) {
                         draft.observe_accepted_routes(active[slot].as_ref().unwrap().id, offset,

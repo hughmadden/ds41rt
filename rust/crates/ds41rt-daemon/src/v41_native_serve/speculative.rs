@@ -16,6 +16,7 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     confidence_trace: std::collections::BTreeMap<u64, Vec<f32>>,
     adaptive: Option<ds41rt_core::DsparkRouteHistory>,
     confidence_cutoff: Option<f64>,
+    reuse_floor: Option<f64>,
 }
 struct DraftRequest {
     leases: [WindowLease; 3],
@@ -54,6 +55,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             confidence_trace: Default::default(),
             adaptive: None,
             confidence_cutoff: None,
+            reuse_floor: None,
         })
     }
     pub fn admit(&mut self, id: u64) -> Result<()> {
@@ -91,6 +93,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         self.confidence_cutoff = threshold;
     }
     pub fn confidence_prefix(&self, id: u64, maximum: usize) -> Result<usize> {
+        if self.reuse_floor.is_some() { return Ok(maximum); }
         let Some(threshold) = self.confidence_cutoff else { return Ok(maximum); };
         if maximum == 0 { return Ok(0); }
         let logits = self.confidence_trace(id).context("missing draft confidence")?;
@@ -104,7 +107,38 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         ds41rt_core::select_dspark_confidence_prefix(&probabilities, threshold, 1)
             .map_err(anyhow::Error::msg)
     }
-    pub fn adaptive_enabled(&self) -> bool { self.adaptive.is_some() }
+    pub fn set_reuse_floor(&mut self, floor: Option<f64>) -> Result<()> {
+        if let Some(value) = floor {
+            ensure!(value.is_finite() && value > 0. && self.confidence_cutoff.is_some_and(|upper| value <= upper),
+                "reuse floor must be positive and no greater than confidence cutoff");
+            self.adaptive = Some(ds41rt_core::DsparkRouteHistory::default());
+        }
+        self.reuse_floor = floor;
+        Ok(())
+    }
+    pub fn adaptive_enabled(&self) -> bool { self.adaptive.is_some() && self.reuse_floor.is_none() }
+    pub fn reuse_enabled(&self) -> bool { self.reuse_floor.is_some() }
+    pub fn capture_routes(&self) -> bool { self.adaptive.is_some() }
+    pub fn select_reuse_prefixes(&self, requests: &[(u64, usize, usize)]) -> Result<Option<Vec<usize>>> {
+        let Some(floor) = self.reuse_floor else { return Ok(None); };
+        let Some(forecast) = self.adaptive.as_ref().unwrap().forecast_work(requests) else {
+            // Preserve full prefixes until every participating request has enough
+            // accepted history; this fallback never waits for another lane.
+            return Ok(None);
+        };
+        let probabilities = requests.iter().map(|&(id, _, maximum)| {
+            if maximum == 0 { return Ok(Vec::new()); }
+            let logits = self.confidence_trace(id).context("missing reuse confidence")?;
+            ensure!(maximum <= logits.len(), "reuse confidence extent differs");
+            Ok(logits[..maximum].iter().map(|&x| {
+                let x = f64::from(x);
+                if x >= 0. { 1. / (1. + (-x).exp()) } else { x.exp() / (1. + x.exp()) }
+            }).collect::<Vec<_>>())
+        }).collect::<Result<Vec<_>>>()?;
+        let minimum: Vec<_> = probabilities.iter().map(|p| usize::from(!p.is_empty())).collect();
+        forecast.select_confidence_prefixes(&probabilities.iter().map(Vec::as_slice).collect::<Vec<_>>(),
+            &minimum, floor, self.confidence_cutoff.unwrap()).map(Some).map_err(anyhow::Error::msg)
+    }
     pub fn observe_accepted_routes(&mut self, id: u64, offset: usize, accepted: usize,
         routes: &[Vec<[u32; 6]>]) -> Result<()> {
         let Some(history) = &mut self.adaptive else { return Ok(()); };

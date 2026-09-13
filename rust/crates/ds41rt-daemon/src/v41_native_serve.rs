@@ -262,6 +262,7 @@ fn worker(
         draft.set_draft_limit(args.dspark_draft_limit)?;
         draft.set_adaptive(args.dspark_adaptive);
         draft.set_confidence_cutoff(args.dspark_confidence_cutoff);
+        draft.set_reuse_floor(args.dspark_reuse_floor)?;
     }
     let mut vision = crate::v41_vision::VisionRuntime::new(&lib, &catalog, 9216,
         crate::v41_vision::VisionRuntime::device_bytes(&catalog, 9216)?)?;

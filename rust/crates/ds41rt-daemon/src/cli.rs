@@ -511,6 +511,9 @@ pub(crate) struct NativeServeArgs {
     /// Experimental independent cumulative confidence cutoff, between zero and one.
     #[arg(long, requires = "dspark", conflicts_with = "dspark_adaptive", value_parser = parse_dspark_confidence)]
     pub dspark_confidence_cutoff: Option<f64>,
+    /// With a confidence cutoff, lower it toward this positive floor for predicted expert reuse.
+    #[arg(long, requires = "dspark_confidence_cutoff", value_parser = parse_dspark_confidence)]
+    pub dspark_reuse_floor: Option<f64>,
 
     #[arg(long)] pub snapshot: PathBuf,
     #[arg(long)] pub native_lib: PathBuf,

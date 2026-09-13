@@ -53,6 +53,48 @@ impl DsparkWorkForecast {
         for request in 0..self.rows.len() { value.adjust::<true>(request, 0); }
         value
     }
+    /// Position-first, request-second admission within one lane. Forecasts are
+    /// accepted-history estimates, not routes from the unexecuted verifier.
+    pub fn select_confidence_prefixes(&self, probabilities: &[&[f64]], minimum: &[usize],
+        reused_cutoff: f64, new_cutoff: f64) -> Result<Vec<usize>, &'static str> {
+        if self.lanes.iter().any(|lane| *lane != self.lanes[0])
+            || probabilities.len() != self.rows.len() || minimum.len() != self.rows.len()
+            || !reused_cutoff.is_finite() || !new_cutoff.is_finite()
+            || reused_cutoff <= 0. || reused_cutoff > new_cutoff || new_cutoff > 1. {
+            return Err("invalid lane-local reuse policy parameters");
+        }
+        for ((p, &min), rows) in probabilities.iter().zip(minimum).zip(&self.rows) {
+            if p.len() + 1 != rows.len() || min > p.len()
+                || p.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)) {
+                return Err("invalid reuse confidence extent");
+            }
+        }
+        let mut lengths = minimum.to_vec();
+        let mut cumulative = vec![1.; lengths.len()];
+        let mut evaluator = self.evaluator();
+        let (mut unique, _) = evaluator.mean_expert_work(&lengths);
+        for position in 1..=5 {
+            for request in 0..lengths.len() {
+                let p = probabilities[request];
+                if position > p.len() { continue; }
+                cumulative[request] *= p[position - 1];
+                if position <= minimum[request] || lengths[request] != position - 1 { continue; }
+                lengths[request] += 1;
+                let (candidate_unique, _) = evaluator.mean_expert_work(&lengths);
+                // One row adds at most six experts per layer. Existing experts
+                // reduce the threshold, but even full reuse has positive cost.
+                let fraction = ((candidate_unique - unique) / 6.).clamp(0., 1.);
+                let cutoff = reused_cutoff + (new_cutoff - reused_cutoff) * fraction;
+                if cumulative[request] >= cutoff {
+                    unique = candidate_unique;
+                } else {
+                    lengths[request] -= 1;
+                    evaluator.mean_expert_work(&lengths);
+                }
+            }
+        }
+        Ok(lengths)
+    }
     pub fn mean_expert_work(&self, lengths: &[usize]) -> (f64, f64) {
         self.evaluator().mean_expert_work(lengths)
     }
@@ -319,5 +361,37 @@ mod tests {
         assert!(h.forecast(&[(1,0,5)]).is_none());
         assert!(h.observe_accepted(1, 40, &[[0;6]]).is_err());
         assert!(h.observe_accepted(1, 0, &[[384;6]]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod incremental_reuse_tests {
+    use super::*;
+    fn forecast(second_lane: usize) -> DsparkWorkForecast {
+        let mut h = DsparkRouteHistory::default();
+        // Reversed history predicts anchor=0..5, first draft=6..11,
+        // second draft=12..17, identically for both requests.
+        for id in 0..2 {
+            for layer in 0..40 {
+                h.observe_accepted(id, layer, &[[12,13,14,15,16,17],
+                    [6,7,8,9,10,11],[0,1,2,3,4,5]]).unwrap();
+            }
+        }
+        h.forecast_work(&[(0,0,2),(1,second_lane,2)]).unwrap()
+    }
+    #[test]
+    fn newly_admitted_token_immediately_discounts_later_request() {
+        let f = forecast(0);
+        // Request zero buys six new experts at position two; request one then
+        // reuses those experts and passes despite lower cumulative confidence.
+        assert_eq!(f.select_confidence_prefixes(&[&[1.,0.9], &[1.,0.4]], &[1,1], 0.2,0.8), Ok(vec![2,2]));
+        // A rejected token contributes no experts to the following request.
+        assert_eq!(f.select_confidence_prefixes(&[&[1.,0.4], &[1.,0.4]], &[1,1], 0.2,0.8), Ok(vec![1,1]));
+    }
+    #[test]
+    fn cross_lane_and_invalid_cutoffs_are_rejected() {
+        assert!(forecast(1).select_confidence_prefixes(&[&[1.,1.][..];2], &[1,1],0.2,0.8).is_err());
+        assert!(forecast(0).select_confidence_prefixes(&[&[1.,1.][..];2], &[1,1],0.,0.8).is_err());
+        assert!(forecast(0).select_confidence_prefixes(&[&[1.,1.][..];2], &[1,1],0.9,0.8).is_err());
     }
 }
