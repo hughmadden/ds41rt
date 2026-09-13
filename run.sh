@@ -154,7 +154,9 @@ args=(serve-native --snapshot "/root/.cache/huggingface/$snapshot_rel" --native-
 [[ -z "$KV_POOL_SIZE" ]] || args+=(--kv-pool-size "$KV_POOL_SIZE")
 [[ -z "$MEMORY_RESERVATION" ]] || args+=(--memory-reservation "$MEMORY_RESERVATION")
 [[ "$DSPARK" != on ]] || args+=(--dspark)
-docker run -d --name "$coordinator" --restart no --gpus device="$RELEASE_COORDINATOR_GPU_UUID" --network host --ipc host --ulimit memlock=-1:-1 --device=/dev/infiniband -e "DS41RT_RELEASE_CONFIG_SHA256=$fingerprint" -v "$hf_home:/root/.cache/huggingface:ro" "$COORDINATOR_DOCKER_INFERENCE" ds41rt "${args[@]}" >/dev/null
+docker run -d --name "$coordinator" --restart no --gpus device="$RELEASE_COORDINATOR_GPU_UUID" --network host --ipc host --ulimit memlock=-1:-1 --device=/dev/infiniband \
+  -e "DS41RT_RELEASE_CONFIG_SHA256=$fingerprint" -e "RUST_LOG=${RUST_LOG:-info}" \
+  -v "$hf_home:/root/.cache/huggingface:ro" "$COORDINATOR_DOCKER_INFERENCE" ds41rt "${args[@]}" >/dev/null
 api_url="http://127.0.0.1:${ADDR##*:}"
 until curl -fsS "$api_url/health" >/dev/null 2>&1 &&
   release_api_advertises_native_model "$api_url" "$RELEASE_MODEL_ID"; do

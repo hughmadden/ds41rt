@@ -76,6 +76,10 @@ printf '%s\n' "$MODEL_ID" "$MODEL_REVISION" "$EXPERT_FORMAT" "$SPARKINFER_EXL3" 
         self.assertIn("expertd-native", combined)
         self.assertIn("serve-native", combined)
 
+    def test_standard_launch_records_runtime_placement(self) -> None:
+        script = (ROOT / "run.sh").read_text()
+        self.assertIn('RUST_LOG=${RUST_LOG:-info}', script)
+
     def test_invalid_direct_overrides_fail_before_external_checks(self) -> None:
         for args, message in (
             (["--concurrency", "17"], "CONCURRENCY must be in 1..16"),
