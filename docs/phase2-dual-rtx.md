@@ -1,6 +1,6 @@
 # Phase 2: two RTX coordinators and four Sparks
 
-Status: implementation planning and ownership audit; dual-GPU serving is not yet implemented.
+Status: TP2 expert execution and peer-transfer foundations verified; dual-GPU serving is not yet implemented.
 
 ## Required outcome
 
@@ -330,3 +330,22 @@ configured on each GPU**, with separate device-bound handles. FP8, mHC and TP2
 routed expert initialization now follow that model. Separate module libraries
 per GPU described in earlier checkpoints are superseded. Both real shared and
 routed Rust layer fixtures pass after this fix, as does the daemon offline check.
+
+## Complete shared TP2 operation
+
+The Rust shared `Wave` now owns both rank workspaces plus preallocated peer
+staging and output on either GPU. It queues both halves, copies the remote
+partial, waits for the local partial on the reduction stream, and adds on GPU.
+Normal completion polls cooperatively; each lane owns its own streams, events,
+and buffers. Error/cancellation drains retain rank inputs through queued work.
+Reduction staging and output add 20,480 bytes per capacity row per GPU per lane,
+separate from the rank execution workspaces. No loop allocation is introduced.
+
+The combined official layer-0 fixture passes C1/C16, zero and changed nonzero
+inputs, and two concurrent lane owners returning on opposite GPUs. Destination
+results agree byte-for-byte, and each value matches a CPU round-to-nearest-even
+sum of the BF16 rank outputs. The first run caught that the existing residual
+addition truncates BF16; a dedicated TP2 addition entry now rounds to nearest,
+without changing that existing single-device kernel. Native build and the Rust
+fixture pass. These checks do not establish full-model quality, serving lane
+overlap, or throughput; integration and larger prefill capacities remain pending.

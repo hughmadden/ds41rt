@@ -167,6 +167,12 @@ extern "C" int32_t ds41rt_v41_reduce_routes_async(const float* const planes[4],
 }
 
 namespace {
+__global__ void add_tp2_shared(const __nv_bfloat16* a, const __nv_bfloat16* b,
+    __nv_bfloat16* output, uint64_t count) {
+  for (uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+       i < count; i += uint64_t(gridDim.x) * blockDim.x)
+    output[i] = __float2bfloat16_rn(__fadd_rn(__bfloat162float(a[i]), __bfloat162float(b[i])));
+}
 template<int Routes>
 __global__ void reduce_tp2(const float* rank0, const float* rank1,
     __nv_bfloat16* output, uint64_t count) {
@@ -199,6 +205,23 @@ __global__ void finish_local(const float* routed, const __nv_bfloat16* shared,
     output[i] = __float2bfloat16_rn(value);
   }
 }
+}
+extern "C" int32_t ds41rt_v41_add_tp2_shared_async(const uint16_t* a,
+    const uint16_t* b, uint16_t* output, size_t count, void* stream) {
+  if (!count || count > uint64_t(4096) * hidden || !a || !b || !output ||
+      reinterpret_cast<uintptr_t>(a) % 2 || reinterpret_cast<uintptr_t>(b) % 2 ||
+      reinterpret_cast<uintptr_t>(output) % 2) return cudaErrorInvalidValue;
+  const auto bytes = count * 2;
+  if (reinterpret_cast<uintptr_t>(a) > UINTPTR_MAX - bytes ||
+      reinterpret_cast<uintptr_t>(b) > UINTPTR_MAX - bytes ||
+      reinterpret_cast<uintptr_t>(output) > UINTPTR_MAX - bytes ||
+      overlaps(a, bytes, output, bytes) || overlaps(b, bytes, output, bytes))
+    return cudaErrorInvalidValue;
+  const auto blocks = static_cast<unsigned>((count + 255) / 256 < 4096 ? (count + 255) / 256 : 4096);
+  add_tp2_shared<<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(
+      reinterpret_cast<const __nv_bfloat16*>(a), reinterpret_cast<const __nv_bfloat16*>(b),
+      reinterpret_cast<__nv_bfloat16*>(output), count);
+  return cudaGetLastError();
 }
 extern "C" int32_t ds41rt_v41_reduce_tp2_experts_async(const float* rank0,
     const float* rank1, uint16_t* output, uint32_t rows, uint32_t token_sums,
