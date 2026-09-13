@@ -1,4 +1,4 @@
-# Chained embedding/query: rejected candidate
+# Chained embedding/query: initial gate and follow-up
 
 One RTX PRO 6000 Blackwell, 400 W power limit, standard memory speed,
 four Spark workers, five RTX resident expert layers and unchanged default KV
@@ -16,6 +16,11 @@ including changed inputs, cold/warm graphs and recovery after producer errors.
 Both initial arms pass cache reuse, retained turns, cancellation/recovery and
 high-thinking constrained-output checks. C1 code outputs match in all three
 repeats, with median throughput 129.83 → 129.84 tok/s.
+
+A subsequent [complete C2–C16 sweep](phase1-chained-query-curve.md) reverses the
+C16 result (132.30 → 162.05 tok/s). The initial gate below remains recorded,
+but does not establish a general C16 regression. The candidate stays archived
+for further integration with the remaining blocking path.
 
 ## Ordered mixed comparisons
 

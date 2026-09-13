@@ -44,6 +44,14 @@ improved median C8 by 4.1% but declined at C16 in all three pairs (median −4.7
 it too is archived with serving source restored. Next address adjacent blocking
 cache/index/attention work identified in the [wait audit](phase1-lane-wait-audit.md).
 Do not re-enable either archived candidate unchanged.
+The [completed C2–C16 curve](phase1-chained-query-curve.md) compares the same frozen
+artifacts and reverses the C16 result: 132.30 → 162.05 tok/s. This limits the
+earlier rejection to its workload/history; it is not a general C16 regression.
+Keep both sets of evidence. Intermediate batches change nonce consumption and
+warmup history, and one curve observation per point does not establish causality.
+Remaining blocking decode waits on the shared host thread are unfinished work,
+even when they synchronize only one lane’s stream; removing the scheduler’s
+round barrier alone is insufficient.
 
 After these changes, first revisit the combined attention graph, which previously
 showed small target/adaptive C1 gains but a C16 decline. Rank other archived
