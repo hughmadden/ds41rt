@@ -966,3 +966,17 @@ would further narrow an equal-input/different-output capture to the GEMM or
 its weight/output lifetime. This additional diagnostic is test-only and has
 compiled successfully; reproduction with it remains pending while the full
 race check uses the preceding binary.
+
+Vocabulary projection now has a native/FFI contiguous-shard constructor. Each
+rank owns its cuBLAS handle and 4 MiB workspace; the existing full-head and
+Markov constructors retain their dimensions and accumulation policy. The
+standalone `native/tests/v41_vocabulary_shard_selftest.py` compared two
+64,640-token shards on separate GPUs/streams against the full 129,280-token
+projection using synthetic BF16 inputs/weights. Rows 1/3/16/80 and three graph
+replays matched full logits exactly (maximum error zero); a separate FP32
+reference checked columns on both sides of the boundary. CPU merging of local
+winners reproduced global greedy IDs. Invalid shard sizes, row overflow, and
+wrong-device launch were rejected. This is a projection primitive check, not
+real-model quality or speed qualification. Distributed weight loading, GPU
+winner merging, sampling/constrained outputs, and target/draft integration
+remain required. Native compilation and `cargo check -p ds41rt-ffi` passed.

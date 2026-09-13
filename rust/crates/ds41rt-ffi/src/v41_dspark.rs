@@ -73,6 +73,7 @@ pub struct V41VocabularyProjection<'a> {
     destroy: MarkovDestroy,
     width: usize,
     max_rows: usize,
+    vocab_rows: usize,
 }
 impl NativeLibrary {
     /// # Safety
@@ -91,6 +92,27 @@ impl NativeLibrary {
         workspace: Ds41rtDeviceBuffer,
     ) -> Result<V41VocabularyProjection<'_>> {
         unsafe { self.v41_head_projection(workspace, true) }
+    }
+    /// Create a projection for one contiguous set of vocabulary rows.
+    ///
+    /// # Safety
+    /// Same workspace/device/graph lifetime contract as v41_vocabulary_head.
+    /// The caller retains the shard's global token offset separately.
+    pub unsafe fn v41_vocabulary_shard(
+        &self,
+        workspace: Ds41rtDeviceBuffer,
+        vocab_rows: usize,
+    ) -> Result<V41VocabularyProjection<'_>> {
+        ensure!((1..=129280).contains(&vocab_rows), "invalid vocabulary shard rows");
+        type Create = unsafe extern "C" fn(*mut c_void, u64, i32, *mut *mut c_void) -> i32;
+        let create = unsafe { *self.lib.get::<Create>(b"ds41rt_v41_vocabulary_shard_create")? };
+        let launch = unsafe { *self.lib.get::<MarkovLaunch>(b"ds41rt_v41_vocabulary_head_launch")? };
+        let destroy = unsafe { *self.lib.get::<MarkovDestroy>(b"ds41rt_v41_markov_destroy")? };
+        let mut handle = std::ptr::null_mut();
+        let status = unsafe { create(workspace.ptr, workspace.bytes as u64, vocab_rows as i32, &mut handle) };
+        ensure!(status == 0 && !handle.is_null(), "vocabulary shard initialization status {status}");
+        Ok(V41VocabularyProjection { _library: self, handle, launch, destroy,
+            width: 5120, max_rows: 80, vocab_rows })
     }
     unsafe fn v41_head_projection(
         &self,
@@ -127,6 +149,7 @@ impl NativeLibrary {
             destroy,
             width: if full { 5120 } else { 256 },
             max_rows: if full { 80 } else { 16 },
+            vocab_rows: 129280,
         })
     }
 }
@@ -149,8 +172,8 @@ impl V41VocabularyProjection<'_> {
         );
         for (buffer, bytes) in [
             (embedding, rows * self.width * 2),
-            (weight, 129280 * self.width * 2),
-            (logits, rows * 129280 * 4),
+            (weight, self.vocab_rows * self.width * 2),
+            (logits, rows * self.vocab_rows * 4),
         ] {
             ensure!(
                 !buffer.ptr.is_null() && buffer.bytes >= bytes,
