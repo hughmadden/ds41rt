@@ -1,0 +1,762 @@
+{
+  "scope": "Compare identical-input fixed/adaptive probes without claiming prose quality.",
+  "source_sha256": {
+    "fixed_decode": "f34107ad6de7b33f6df8273df3749f0606ffcda4414c2165ea7efb3e6e19b500",
+    "fixed_mixed": "745f3442b0136d44410c30d1ac946edeee9eca739551b411bd8b3471b6bf38df",
+    "adaptive_decode": "e51c6a1c4cd7d1287e0f3bc1452e6c64c1aed6a5243427ca802c0f4276ab2ff4",
+    "adaptive_mixed": "1774291a2d5cc043f37d5548d4f2f34058459f53090ab943c6bd1e497c173edd"
+  },
+  "decode": {
+    "code": {
+      "fixed_tps": 119.6051851727366,
+      "adaptive_tps": 121.58067127170438,
+      "adaptive_over_fixed": 1.016516726228171
+    },
+    "fable": {
+      "fixed_tps": 45.20608468083804,
+      "adaptive_tps": 52.51602818900422,
+      "adaptive_over_fixed": 1.1617026459994382
+    },
+    "topic": {
+      "fixed_tps": 62.489419070608285,
+      "adaptive_tps": 65.52188351426955,
+      "adaptive_over_fixed": 1.0485276465802125
+    }
+  },
+  "mixed": [
+    {
+      "concurrency": 4,
+      "fixed_tps": 101.33737847303834,
+      "adaptive_tps": 100.85204460729238,
+      "adaptive_over_fixed": 0.9952107122459746,
+      "pairs": [
+        {
+          "index": 0,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 1,
+          "case": "fable",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 2,
+          "case": "topic",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 3,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        }
+      ],
+      "scope": "one cold mixed batch per arm, includes admission gaps"
+    },
+    {
+      "concurrency": 16,
+      "fixed_tps": 167.8421103437126,
+      "adaptive_tps": 144.70348973277038,
+      "adaptive_over_fixed": 0.8621405524301489,
+      "pairs": [
+        {
+          "index": 0,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 1,
+          "case": "fable",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 2,
+          "case": "topic",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 3,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 4,
+          "case": "fable",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 5,
+          "case": "topic",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 6,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 7,
+          "case": "fable",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 8,
+          "case": "topic",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 9,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 10,
+          "case": "fable",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 11,
+          "case": "topic",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 12,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 13,
+          "case": "fable",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 14,
+          "case": "topic",
+          "exact": false,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "index": 15,
+          "case": "code",
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        }
+      ],
+      "scope": "one cold mixed batch per arm, includes admission gaps"
+    }
+  ],
+  "lifecycle": {
+    "fixed": {
+      "passed": true,
+      "cold_prompt_tokens": 32815,
+      "cold_ttft_seconds": 6.088568800943904,
+      "cold_prompt_tokens_per_ttft_second": 5389.608144842304,
+      "warm_usage": {
+        "prompt_tokens": 32815,
+        "completion_tokens": 6,
+        "total_tokens": 32821,
+        "prompt_tokens_details": {
+          "cached_tokens": 32815
+        },
+        "prompt_cache_hit_tokens": 32815,
+        "prompt_cache_miss_tokens": 0
+      },
+      "retained_usage": {
+        "prompt_tokens": 32835,
+        "completion_tokens": 2,
+        "total_tokens": 32837,
+        "prompt_tokens_details": {
+          "cached_tokens": 32821
+        },
+        "prompt_cache_hit_tokens": 32821,
+        "prompt_cache_miss_tokens": 14
+      },
+      "cancellation_count": 8,
+      "survivor_count": 8
+    },
+    "adaptive": {
+      "passed": true,
+      "cold_prompt_tokens": 32815,
+      "cold_ttft_seconds": 5.99867320805788,
+      "cold_prompt_tokens_per_ttft_second": 5470.376341875127,
+      "warm_usage": {
+        "prompt_tokens": 32815,
+        "completion_tokens": 6,
+        "total_tokens": 32821,
+        "prompt_tokens_details": {
+          "cached_tokens": 32815
+        },
+        "prompt_cache_hit_tokens": 32815,
+        "prompt_cache_miss_tokens": 0
+      },
+      "retained_usage": {
+        "prompt_tokens": 32835,
+        "completion_tokens": 2,
+        "total_tokens": 32837,
+        "prompt_tokens_details": {
+          "cached_tokens": 32821
+        },
+        "prompt_cache_hit_tokens": 32821,
+        "prompt_cache_miss_tokens": 14
+      },
+      "cancellation_count": 8,
+      "survivor_count": 8
+    }
+  },
+  "decode_pairs": [
+    {
+      "case": "code",
+      "repeat": 1,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {
+          "python_structure": {
+            "passed": true,
+            "issues": []
+          }
+        },
+        "objective_checks_passed": true,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {
+          "python_structure": {
+            "passed": true,
+            "issues": []
+          }
+        },
+        "objective_checks_passed": true,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "fable",
+      "repeat": 1,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "topic",
+      "repeat": 1,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "code",
+      "repeat": 2,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {
+          "python_structure": {
+            "passed": true,
+            "issues": []
+          }
+        },
+        "objective_checks_passed": true,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {
+          "python_structure": {
+            "passed": true,
+            "issues": []
+          }
+        },
+        "objective_checks_passed": true,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "fable",
+      "repeat": 2,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "topic",
+      "repeat": 2,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "code",
+      "repeat": 3,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {
+          "python_structure": {
+            "passed": true,
+            "issues": []
+          }
+        },
+        "objective_checks_passed": true,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {
+          "python_structure": {
+            "passed": true,
+            "issues": []
+          }
+        },
+        "objective_checks_passed": true,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "fable",
+      "repeat": 3,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      }
+    },
+    {
+      "case": "topic",
+      "repeat": 3,
+      "exact": true,
+      "fixed_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      },
+      "adaptive_checks": {
+        "response_nonempty": true,
+        "objective_checks": {},
+        "objective_checks_passed": null,
+        "prose_quality_assessed": false
+      }
+    }
+  ],
+  "limitations": [
+    "Exploratory sequential arms, not a balanced release comparison.",
+    "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+    "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+    "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+  ],
+  "diagnostic_repeat": {
+    "fixed": [
+      {
+        "concurrency": 4,
+        "aggregate_tps": 108.34069567618711,
+        "exact_outputs_vs_first_fixed": 4
+      },
+      {
+        "concurrency": 16,
+        "aggregate_tps": 167.29308153373984,
+        "exact_outputs_vs_first_fixed": 15
+      }
+    ],
+    "adaptive_instrumented": [
+      {
+        "concurrency": 4,
+        "aggregate_tps": 99.84917390036189
+      },
+      {
+        "concurrency": 16,
+        "aggregate_tps": 146.31484988738063
+      }
+    ]
+  },
+  "expert_group_observation": {
+    "mixed": {
+      "samples": 40,
+      "median_unique": 144.4125,
+      "median_groups": 145.2125,
+      "median_extra_groups": 1.0999999999999943
+    },
+    "counting": {
+      "samples": 100,
+      "median_unique": 43.15,
+      "median_groups": 50.6,
+      "median_extra_groups": 7.25
+    }
+  },
+  "configuration": {
+    "gpu_power_limit_w": 400,
+    "memory_clock_mhz": 13365,
+    "maximum_memory_clock_mhz": 14001,
+    "binary": "same frozen sparse-retention binary for both arms; hash in phase1-sparse-graph-retention.json",
+    "library": "same corrected FP4 native library for both arms",
+    "serving_defaults": "port 8000, C16, 24 prompt snapshots and 24 retained turns",
+    "adaptive_default_enabled": false
+  }
+}

@@ -60,7 +60,10 @@ def main():
  p=argparse.ArgumentParser(description=__doc__)
  p.add_argument('trace',type=Path)
  p.add_argument('--output',type=Path,required=True)
+ p.add_argument('--workload',default='unspecified',help='Description of the trace workload, recorded without inference')
+ p.add_argument('--initial-mixed-requests',type=int,default=0,help='Optional known initial mixed-request count for a separate calibration group')
  a=p.parse_args()
+ if a.initial_mixed_requests < 0: p.error('initial mixed request count must be nonnegative')
  records,confidence=observations(a.trace)
  r=[x for x in records if x['warm'] and not x['terminal'] and not x['missing']]
  if len(r)<100: p.error('insufficient complete warm observations')
@@ -79,18 +82,21 @@ def main():
   w=probability*(1-probability)
   cb-=np.linalg.solve((A[~chold].T*w)@A[~chold]+.1*np.eye(2),A[~chold].T@(probability-labels[~chold])+.1*cb)
  calibration=[]
- for name,mask in [('all',chold),('initial_mixed_requests_1_to_8',chold&(c[:,0]<=8))]:
+ groups=[('all',chold)]
+ if a.initial_mixed_requests:
+  groups.append((f'initial_mixed_requests_1_to_{a.initial_mixed_requests}',chold&(c[:,0]<=a.initial_mixed_requests)))
+ for name,mask in groups:
   if not mask.any():continue
   raw=1/(1+np.exp(-np.clip(A[mask,1],-30,30)))
   probability=1/(1+np.exp(-np.clip(A[mask]@cb,-30,30)))
   calibration.append(dict(group=name,samples=int(mask.sum()),raw_brier=float(np.mean((raw-labels[mask])**2)),fitted_brier=float(np.mean((probability-labels[mask])**2))))
- report=dict(scope=__doc__,trace_sha256=hashlib.sha256(a.trace.read_bytes()).hexdigest(),
+ report=dict(scope=__doc__,workload=a.workload,trace_sha256=hashlib.sha256(a.trace.read_bytes()).hexdigest(),
   rounds=len(records),warm_rounds=len(r),cost_features=['intercept','total_rows','sum_of_lane_mean_unique_experts','extra_lane'],
   fitted_cost_us=fit(X,y).tolist(),cost_validation=dict(training_rounds=int((~hold).sum()),heldout_rounds=int(hold.sum()),
    coefficients=b.tolist(),median_absolute_relative_error=float(np.median(error)),p90_absolute_relative_error=float(np.quantile(error,.9))),
   route_history=dict(median_absolute_unique_error=float(np.median(abs(P[:,2]-X[:,2]))),p90_absolute_unique_error=float(np.quantile(abs(P[:,2]-X[:,2]),.9))),
   confidence=dict(conditional_labels=len(c),heldout_transform=cb.tolist(),validation=calibration),
-  limitations='Exploratory same-workload validation: every fifth contiguous ten-round block for costs; request IDs divisible by three for confidence. Homogeneous counting dominates. No heterogeneous-workload or shorter-prefix counterfactual accuracy claim. Route forecasts use only previously accepted inputs, not current target routes. Initial mixed labels assume the documented eight-case collection order.')
+  limitations='Exploratory same-workload validation: every fifth contiguous ten-round block for costs; request IDs divisible by three for confidence. Workload composition is caller-described. No independent-workload or shorter-prefix counterfactual accuracy claim. Route forecasts use only previously accepted inputs, not current target routes. Any initial mixed subgroup is explicitly supplied by the caller.')
  with a.output.open('x') as f:json.dump(report,f,indent=2);f.write('\n')
 
 if __name__=='__main__':main()

@@ -1,0 +1,51 @@
+{
+  "scope": "Fit exploratory adaptive costs from corrected native route/confidence traces.",
+  "workload": "C4 then C16 mixed code, fable, topic; changing live concurrency as requests finish",
+  "trace_sha256": "46c0cf8e0b2ba011d5242b0f64e4bc26c6627c9ea9fedee244047a6c85389206",
+  "rounds": 254,
+  "warm_rounds": 228,
+  "cost_features": [
+    "intercept",
+    "total_rows",
+    "sum_of_lane_mean_unique_experts",
+    "extra_lane"
+  ],
+  "fitted_cost_us": [
+    21282.32503313026,
+    0.0,
+    917.0996403602873,
+    18511.817478224417
+  ],
+  "cost_validation": {
+    "training_rounds": 188,
+    "heldout_rounds": 40,
+    "coefficients": [
+      21721.877225166467,
+      0.0,
+      902.7614684323349,
+      18065.176134088186
+    ],
+    "median_absolute_relative_error": 0.1030510675994519,
+    "p90_absolute_relative_error": 0.2714116412220632
+  },
+  "route_history": {
+    "median_absolute_unique_error": 1.5624999999999991,
+    "p90_absolute_unique_error": 5.902499999999995
+  },
+  "confidence": {
+    "conditional_labels": 3118,
+    "heldout_transform": [
+      -0.07997904434180325,
+      1.0268915138517598
+    ],
+    "validation": [
+      {
+        "group": "all",
+        "samples": 913,
+        "raw_brier": 0.08268067541740434,
+        "fitted_brier": 0.08274464832396047
+      }
+    ]
+  },
+  "limitations": "Exploratory same-workload validation: every fifth contiguous ten-round block for costs; request IDs divisible by three for confidence. Workload composition is caller-described. No independent-workload or shorter-prefix counterfactual accuracy claim. Route forecasts use only previously accepted inputs, not current target routes. Any initial mixed subgroup is explicitly supplied by the caller."
+}
