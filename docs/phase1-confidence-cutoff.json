@@ -1,0 +1,481 @@
+{
+  "scope": "Independent confidence cutoff screen, no default change",
+  "pilot": {
+    "scope": "Independent cumulative confidence pilot versus joint cost policy, identical native artifact and Rust binary",
+    "artifacts": {
+      "libds41rt_native.so": "9d6b8efc1836b397d714ef3546fd0a489d6507a78f8a1f26cc449357b81c325b",
+      "ds41rt": "d4ea1bf1c97c865a9549f7004b2b2ac903778929e33d904438c12579445512db"
+    },
+    "arms": [
+      {
+        "label": "cost-before",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-confidence-cost-before",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-confidence-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-adaptive"
+        ],
+        "startup_seconds": 6.327827760018408,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "cutoff-025",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-confidence-cutoff-025",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-confidence-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-confidence-cutoff",
+          "0.25"
+        ],
+        "startup_seconds": 8.34141064202413,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "cutoff-050",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-confidence-cutoff-050",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-confidence-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-confidence-cutoff",
+          "0.5"
+        ],
+        "startup_seconds": 11.384426831034943,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "cutoff-075",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-confidence-cutoff-075",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-confidence-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-confidence-cutoff",
+          "0.75"
+        ],
+        "startup_seconds": 10.369531469070353,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "cost-after",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-confidence-cost-after",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-confidence-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-adaptive"
+        ],
+        "startup_seconds": 11.394041132065468,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      }
+    ],
+    "restored": true
+  },
+  "arms": {
+    "cost-before": {
+      "code_median_tps": 128.1487320485055,
+      "code_samples": [
+        {
+          "observed_decode_tokens_per_second": 114.6153187319937,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 128.1487320485055,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 128.31084595481227,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 124.87224091018498
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 182.8312358424352
+        }
+      ],
+      "prefill_passed": true
+    },
+    "cutoff-025": {
+      "code_median_tps": 119.01536802853481,
+      "code_samples": [
+        {
+          "observed_decode_tokens_per_second": 111.59141978985986,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 119.01536802853481,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 121.57842585786258,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 119.66831835724955
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 196.35236788284644
+        }
+      ],
+      "prefill_passed": true
+    },
+    "cutoff-050": {
+      "code_median_tps": 117.21475326932182,
+      "code_samples": [
+        {
+          "observed_decode_tokens_per_second": 106.58885603815816,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 117.21475326932182,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 118.88549463279327,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 114.11338478648618
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 190.38677127551168
+        }
+      ],
+      "prefill_passed": true
+    },
+    "cutoff-075": {
+      "code_median_tps": 103.0667048499456,
+      "code_samples": [
+        {
+          "observed_decode_tokens_per_second": 96.75580066669954,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 104.12056399033561,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 103.0667048499456,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 110.47807066287726
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 183.34421412733963
+        }
+      ],
+      "prefill_passed": true
+    },
+    "cost-after": {
+      "code_median_tps": 127.85536720451161,
+      "code_samples": [
+        {
+          "observed_decode_tokens_per_second": 111.25875879756752,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 127.85536720451161,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        },
+        {
+          "observed_decode_tokens_per_second": 127.86749107158954,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "passed": true,
+          "objective_checks_passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 124.56913146480724
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 179.37930771176588
+        }
+      ],
+      "prefill_passed": true
+    }
+  },
+  "raw_artifacts": {
+    "/tmp/ds41-confidence-policy/cost-after-mixed.json": "5af644b3fbdb72677d54ab6ccb0768f11b3e552f416a8798e804b0957bb3fe9c",
+    "/tmp/ds41-confidence-policy/cost-after-prefill.json": "79ca713846f7a5a0e1cfa13bb3f67aef49c085874e78701f10e1360f9f138f6b",
+    "/tmp/ds41-confidence-policy/cost-after-code.json": "72f72451c9b1b8bd79cc4b7de532e915f663ca2f01ca28c14819a03818fea7eb",
+    "/tmp/ds41-confidence-policy/cutoff-075-mixed.json": "d7af7f0b264495730a50a4d6ef5f43afb20f79be19d6ed664ef5261743c1cd21",
+    "/tmp/ds41-confidence-policy/cutoff-075-prefill.json": "51f69b0fd47ad869a83bf911bc46fd0e8e26a7945455071930f323617d8741dd",
+    "/tmp/ds41-confidence-policy/cutoff-075-code.json": "1412c81a0e28c994b27ec89e1179a0d565ca652fe12b453c4db6b1c01a1034cd",
+    "/tmp/ds41-confidence-policy/cutoff-050-mixed.json": "3334c942e5a4652a8bb3c1a5407c4808feb12000b7fc77821e133808184b23f4",
+    "/tmp/ds41-confidence-policy/cutoff-050-prefill.json": "30b05dc9b4b9e87d8f08a5b64695f07befaf66b78fbe3781949acedec827f80f",
+    "/tmp/ds41-confidence-policy/cutoff-050-code.json": "9eaebe7df302c6ad5ad0c51464716018b47dc10c50a3db0698b3dfc99bf1c975",
+    "/tmp/ds41-confidence-policy/cutoff-025-mixed.json": "84b7d8316df7686e9fb929ba81b3a75f20c4530a5dcf6a5ae8b1968586963ad8",
+    "/tmp/ds41-confidence-policy/cutoff-025-prefill.json": "a30c29917768a039a6db2ea070d7dfc65b98f3f43890e12f0f9a79eb87fbcddc",
+    "/tmp/ds41-confidence-policy/cutoff-025-code.json": "3a1e55ce1ad43ef60e510ced53d1cb7ddd9970e48f055710506cc477484e2de0",
+    "/tmp/ds41-confidence-policy/cost-before-mixed.json": "ae16df3f0ac6e155a3e74012f46ba8989640a7072c72150ce5dfef8b2c80aeca",
+    "/tmp/ds41-confidence-policy/cost-before-prefill.json": "526733b1027e1c93114938e6651d299e82c524931dceae0c3e3fc9699c05bb46",
+    "/tmp/ds41-confidence-policy/cost-before-code.json": "ad5621000fedc50cecfa9a232b01831f1bd1241694a9b7eaa9a060faad9f062c",
+    "/tmp/ds41-confidence-policy/pilot-results.json": "65162a779715b2befa3490acf37442a51a5b5bb775bba8d8c4c2302f49e62bf4"
+  }
+}

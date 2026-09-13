@@ -33,7 +33,7 @@ cost policy, NaN and out-of-range thresholds. An initial host invocation lacked
 the Python shared-library path; rerunning with the repository environment wrapper
 passed these checks.
 
-Serving comparison is pending in `/tmp/ds41-confidence-policy`. It uses the same
+Serving comparison completed in `/tmp/ds41-confidence-policy`. It uses the same
 frozen Rust binary and qualified narrow FP8 native library for all policies,
 with cost-policy controls before and after cutoffs 0.25, 0.5 and 0.75. Each arm
 runs three no-thinking code samples, one 32K prefill warmup and mixed C4/C16
@@ -42,3 +42,22 @@ Hardware is one RTX PRO 6000 Blackwell at **400 W and standard memory speed**,
 four Sparks, five complete local expert layers, 18 × 1,048,576-token KV capacity
 and 24 retained snapshots. No builds overlap timed serving. The runner restores
 standard serving on completion or failure.
+
+## Initial screen results
+
+| Policy | C1 code median tok/s | C4 mixed tok/s | C16 mixed tok/s |
+|---|---:|---:|---:|
+| Cost, before | 128.15 | 124.87 | 182.83 |
+| Cumulative cutoff 0.25 | 119.02 | 119.67 | 196.35 |
+| Cumulative cutoff 0.50 | 117.21 | 114.11 | 190.39 |
+| Cumulative cutoff 0.75 | 103.07 | 110.48 | 183.34 |
+| Cost, after | 127.86 | 124.57 | 179.38 |
+
+All code structure, prefill-answer and mixed serving completion checks passed.
+The mixed checks do not establish semantic quality or identical output tokens.
+Each cutoff has only one mixed batch at each concurrency, so its apparent C16
+advantage needs repetition before adoption. None dominates the cost policy:
+larger cutoffs lose substantial C1/C4 throughput. Defaults remain unchanged.
+The service was restored. [Evidence](phase1-confidence-cutoff.json) preserves
+commands, artifact hashes, code samples and mixed rates. The next experiment
+adjusts the threshold incrementally for predicted expert reuse within each lane.
