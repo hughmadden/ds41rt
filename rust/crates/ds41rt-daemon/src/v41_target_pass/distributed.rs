@@ -1,5 +1,6 @@
 //! Full target-pass sequencing with GPU-local lanes and short request borrows.
 use super::*;
+use crate::v41_target_head::distributed_target::{DistributedTargetHead, DistributedTargetLogits};
 mod encoder_stream;
 use crate::v41_backbone_cache::CachePlacement;
 use crate::v41_backbone_execution::DistributedExecution;
@@ -29,7 +30,7 @@ pub(crate) struct DistributedTargetPass<'w, 'a> {
     indices: [Option<DeviceOwner<'a, IndexLane<'w, 'a>>>; 2],
     execution: DistributedExecution<'w, 'a>,
     engram: PlacedEngram<'w, 'a>,
-    head: DeviceOwner<'a, TargetHeadWave<'w, 'a>>,
+    head: DistributedTargetHead<'w, 'a>,
     taps: DeviceOwner<'a, TargetTapWave<'a>>,
     transfers: [BlockTransfer<'a>; 2],
     suffix_stream: DeviceOwner<'a, crate::v41_memory::LoadStream<'a>>,
@@ -77,7 +78,7 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         indices: [Option<DeviceOwner<'a, IndexLane<'w, 'a>>>; 2],
         execution: DistributedExecution<'w, 'a>,
         engram: PlacedEngram<'w, 'a>,
-        head: DeviceOwner<'a, TargetHeadWave<'w, 'a>>,
+        head: DistributedTargetHead<'w, 'a>,
         taps: DeviceOwner<'a, TargetTapWave<'a>>,
         timeout: Duration,
     ) -> Result<Self> {
@@ -87,8 +88,8 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         );
         ensure!(
             embedding.device.id == map.attention(0)? as i32
-                && head.device.id == map.attention(39)? as i32
-                && taps.device.id == head.device.id,
+                && head.device().id == map.attention(39)? as i32
+                && taps.device.id == head.device().id,
             "distributed embedding/head/tap placement differs"
         );
         for layer in [2, 8, 14, 20, 24, 28, 32, 36] {
@@ -615,25 +616,7 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             self.taps.output(guard.batch.cache()?)?;
             let gpu = self.map.attention(39)?;
             let output = self.lanes[gpu].output()?;
-            let device = self.head.device;
-            device
-                .future(async {
-                    if greedy {
-                        unsafe {
-                            self.head
-                                .execute_block_greedy(&output, selected, true)
-                                .await?;
-                        }
-                    } else {
-                        unsafe {
-                            self.head
-                                .execute_block_cooperative(&output, selected)
-                                .await?;
-                        }
-                    }
-                    Ok::<_, anyhow::Error>(())
-                })
-                .await?;
+            unsafe { self.head.execute_block_with_greedy(&output, selected, greedy).await?; }
             self.state = State::Ready(id);
         }
         guard.completed = true;
@@ -658,7 +641,7 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             .borrow_mut()
             .finish_distributed_encoder_publication(batch, &mut self.execution)
     }
-    pub fn output(&self, batch: &RequestBatch) -> Result<TargetLogits<'_>> {
+    pub fn output(&self, batch: &RequestBatch) -> Result<DistributedTargetLogits<'_>> {
         self.state.ready(batch.cache()?.identity())?;
         self.head.output()
     }
@@ -666,13 +649,11 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
     /// Rows index the compact head output, not the original request batch.
     pub async fn download_logits(&mut self, batch: &RequestBatch, rows: &[usize]) -> Result<Vec<u8>> {
         self.state.ready(batch.cache()?.identity())?;
-        let device = self.head.device;
-        device.future(self.head.get_mut().download_rows(rows)).await
+        self.head.download_rows(rows).await
     }
     pub fn greedy_output(&mut self, batch: &RequestBatch) -> Result<Vec<(u32, f32)>> {
         self.state.ready(batch.cache()?.identity())?;
-        let device = self.head.device;
-        device.run(|| self.head.greedy_output())
+        Ok(self.head.greedy_output()?.to_vec())
     }
     pub fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> {
         self.state.ready(batch.cache()?.identity())?;
@@ -822,9 +803,10 @@ mod tests {
                 16 << 20,
             )
         })?;
-        let vocab = devices[1].own(|| {
-            VocabularyHead::load(&lib, &catalog, VocabularyHead::plan(&catalog)?, 16 << 20)
-        })?;
+        let vocab = [
+            devices[0].own(|| crate::v41_tensors::VocabularyShard::load(&lib, &catalog, 0..64640, 1 << 30, 16 << 20))?,
+            devices[1].own(|| crate::v41_tensors::VocabularyShard::load(&lib, &catalog, 64640..129280, 1 << 30, 16 << 20))?,
+        ];
         let hw = devices[1].own(|| {
             TargetHeadWeights::load(
                 &lib,
@@ -910,7 +892,8 @@ mod tests {
                     )?,
                 )?,
                 PlacedEngram::new(&ew, 16, PlacedEngram::device_bytes(&lib, map, 16)?)?,
-                devices[1].own(|| hw.wave(&vocab, 16, TargetHeadWave::device_bytes(16)?))?,
+                DistributedTargetHead::new(devices, &hw, [&vocab[0], &vocab[1]], 16,
+                    DistributedTargetHead::device_bytes(16, 64640)?)?,
                 devices[1]
                     .own(|| TargetTapWave::new(&lib, 16, TargetTapWave::device_bytes(16)?))?,
                 Duration::from_secs(120),
@@ -1054,7 +1037,7 @@ mod tests {
                 true,
             )
         })?;
-        let expected = devices[1].run(|| pass.head.greedy_output())?;
+        let expected = pass.head.greedy_output()?.to_vec();
         pass.discard(&mut baseline_batch)?;
         requests.release(baseline)?;
         let lease = requests.admit(0, 92001)?;
@@ -1110,7 +1093,7 @@ mod tests {
                 true,
             )
         })?;
-        let next = devices[1].run(|| pass.head.greedy_output())?;
+        let next = pass.head.greedy_output()?.to_vec();
         assert!(next[0].0 < 129280 && next[0].1.is_finite());
         assert_eq!(
             next[0].0, expected[0].0,
@@ -1376,7 +1359,7 @@ mod tests {
                         true,
                     )
                 })?;
-                let next = devices[1].run(|| pass.head.greedy_output())?;
+                let next = pass.head.greedy_output()?.to_vec();
                 if let Some(expected) = expected_case {
                     assert_eq!(
                         next[0], expected,

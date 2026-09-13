@@ -75,11 +75,22 @@ impl Drop for Normalize<'_, '_> {
     }
 }
 
+pub(crate) struct DistributedTargetLogits<'a> {
+    pub rows: usize,
+    pub collapsed: Ds41rtDeviceBuffer,
+    pub normalized: Ds41rtDeviceBuffer,
+    pub logits: [Ds41rtDeviceBuffer; 2],
+    pub selected_rows: &'a [usize],
+    pub token_positions: &'a [u64],
+    pub binding: QueryBinding,
+}
+
 pub(crate) struct DistributedTargetHead<'w, 'a> {
     normalize: DeviceOwner<'a, Normalize<'w, 'a>>,
     vocabulary: DistributedVocabularyWave<'w, 'a>,
     download: Stream<'a>,
     staging: HostAllocation<'a>,
+    rank_downloads: [DeviceOwner<'a, crate::v41_memory::RowDownload<'a>>; 2],
     capacity: usize,
     binding: Option<QueryBinding>,
     selected: Vec<usize>,
@@ -96,11 +107,15 @@ impl<'w, 'a> DistributedTargetHead<'w, 'a> {
         vocabulary: [&'w VocabularyShard<'a>; 2], capacity: usize, budgets: [usize; 2]) -> Result<Self> {
         let bytes = Self::device_bytes(capacity, vocabulary[0].tokens().end)?;
         ensure!(bytes.iter().zip(budgets).all(|(n, budget)| *n <= budget), "distributed target head exceeds budget");
+        let rank_downloads = [
+            devices[0].own(|| crate::v41_memory::RowDownload::new(devices[0].library, capacity * vocabulary[0].tokens().len() * 4))?,
+            devices[1].own(|| crate::v41_memory::RowDownload::new(devices[1].library, capacity * vocabulary[1].tokens().len() * 4))?,
+        ];
         let normalize = devices[1].own(|| Normalize::new(weights, capacity))?;
         let vocabulary = DistributedVocabularyWave::new(devices, vocabulary, capacity,
             [budgets[0], budgets[1] - capacity * INPUT_STRIDES.iter().sum::<usize>()])?;
         Ok(Self { normalize, vocabulary, download: Stream::new(devices[1])?,
-            staging: HostAllocation::new(devices[1].library, capacity * 8)?, capacity,
+            staging: HostAllocation::new(devices[1].library, capacity * 8)?, rank_downloads, capacity,
             binding: None, selected: Vec::with_capacity(capacity), tokens: Vec::with_capacity(capacity),
             greedy: Vec::with_capacity(capacity) })
     }
@@ -108,6 +123,13 @@ impl<'w, 'a> DistributedTargetHead<'w, 'a> {
     /// The final block is complete on RTX1 and immutable through return or
     /// cancellation. Selected rows are unique and define compact output order.
     pub async unsafe fn execute_block(&mut self, block: &BlockOutput<'_>, selected: &[usize]) -> Result<()> {
+        unsafe { self.execute_block_with_greedy(block, selected, true).await }
+    }
+    /// # Safety
+    /// Same complete-block ownership contract as execute_block. With greedy
+    /// false, retain device logits without downloading compact candidates.
+    pub async unsafe fn execute_block_with_greedy(&mut self, block: &BlockOutput<'_>,
+        selected: &[usize], greedy: bool) -> Result<()> {
         self.binding = None;
         self.selected.clear(); self.tokens.clear(); self.greedy.clear();
         let device = self.normalize.device;
@@ -121,25 +143,57 @@ impl<'w, 'a> DistributedTargetHead<'w, 'a> {
         let normalized = self.normalize.buffers[3].buffer;
         unsafe { self.vocabulary.execute(normalized, selected.len()).await?; }
         let rows = selected.len();
-        let (ids, scores) = self.vocabulary.greedy()?;
-        let host = self.staging.bytes_mut();
-        let queued = device.run(|| unsafe {
-            device.library.copy_d2h_async(&mut host[..rows * 4], ids, self.download.raw)?;
-            device.library.copy_d2h_async(&mut host[rows * 4..rows * 8], scores, self.download.raw)
-        });
-        let drained = self.download.wait().await;
-        queued.and(drained)?;
-        for i in 0..rows {
-            self.greedy.push((u32::from_ne_bytes(host[i*4..i*4+4].try_into().unwrap()),
-                f32::from_ne_bytes(host[rows*4+i*4..rows*4+i*4+4].try_into().unwrap())));
+        if greedy {
+            let (ids, scores) = self.vocabulary.greedy()?;
+            let host = self.staging.bytes_mut();
+            let queued = device.run(|| unsafe {
+                device.library.copy_d2h_async(&mut host[..rows * 4], ids, self.download.raw)?;
+                device.library.copy_d2h_async(&mut host[rows * 4..rows * 8], scores, self.download.raw)
+            });
+            let drained = self.download.wait().await;
+            queued.and(drained)?;
+            for i in 0..rows {
+                self.greedy.push((u32::from_ne_bytes(host[i*4..i*4+4].try_into().unwrap()),
+                    f32::from_ne_bytes(host[rows*4+i*4..rows*4+i*4+4].try_into().unwrap())));
+            }
         }
         self.selected.extend_from_slice(selected);
         self.tokens.extend(selected.iter().map(|&i| block.tokens[i]));
         self.binding = Some(block.binding());
         Ok(())
     }
+    pub fn device(&self) -> Device<'a> { self.normalize.device }
+    pub fn output(&self) -> Result<DistributedTargetLogits<'_>> {
+        let binding = self.binding()?;
+        let rows = self.selected.len();
+        Ok(DistributedTargetLogits { rows,
+            collapsed: part(self.normalize.buffers[2].buffer, 0, rows * 10240)?,
+            normalized: part(self.normalize.buffers[3].buffer, 0, rows * 10240)?,
+            logits: self.vocabulary.logits()?, selected_rows: &self.selected,
+            token_positions: &self.tokens, binding })
+    }
+    /// Explicit sampling/constrained readback, ordered by compact output rows.
+    /// Greedy execution does not call this or download full vocabulary logits.
+    pub async fn download_rows(&mut self, rows: &[usize]) -> Result<Vec<u8>> {
+        let logits = self.logits()?;
+        let widths = [logits[0].bytes / self.selected.len(), logits[1].bytes / self.selected.len()];
+        let [first, second] = &mut self.rank_downloads;
+        let d0 = first.device;
+        let d1 = second.device;
+        let (a, b) = tokio::join!(
+            d0.future(unsafe { first.get_mut().rows(logits[0], widths[0], rows) }),
+            d1.future(unsafe { second.get_mut().rows(logits[1], widths[1], rows) }));
+        let (a, b) = (a?, b?);
+        let mut output = Vec::with_capacity(rows.len() * 129280 * 4);
+        for row in 0..rows.len() {
+            output.extend_from_slice(&a[row*widths[0]..(row+1)*widths[0]]);
+            output.extend_from_slice(&b[row*widths[1]..(row+1)*widths[1]]);
+        }
+        Ok(output)
+    }
     pub fn greedy_output(&self) -> Result<&[(u32, f32)]> {
         ensure!(self.binding.is_some(), "distributed target head unpublished");
+        ensure!(!self.greedy.is_empty(), "distributed greedy output not requested");
         Ok(&self.greedy)
     }
     pub fn logits(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {
@@ -205,8 +259,18 @@ mod tests {
                         "complete target head logits differ at rank {rank}, row {row}");
                 }
             }
+            let chosen = [selected.len() - 1, 0];
+            let downloaded = runtime.block_on(head.download_rows(&chosen))?;
+            let expected_download: Vec<u8> = chosen.into_iter().flat_map(|row|
+                expected[row*129280*4..(row+1)*129280*4].iter().copied()).collect();
+            ensure!(downloaded == expected_download, "distributed head compact row download differs");
+            assert!(runtime.block_on(head.download_rows(&[selected.len()])).is_err());
             eprintln!("PASS complete target head selection={selected:?}: logits, greedy and metadata exact");
         }
+        runtime.block_on(unsafe { head.execute_block_with_greedy(&block, &[2, 0], false) })?;
+        assert!(head.greedy_output().is_err());
+        assert!(head.output().is_ok());
+        assert_eq!(runtime.block_on(head.download_rows(&[1]))?.len(), 129280 * 4);
         for bad in [vec![], vec![1, 1], vec![6]] {
             assert!(runtime.block_on(unsafe { head.execute_block(&block, &bad) }).is_err());
             assert!(head.greedy_output().is_err());

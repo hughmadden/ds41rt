@@ -1034,3 +1034,31 @@ prior output; a later valid call succeeded. Compilation and the fixture passed
 using the isolated native overlay. Installing this head into
 `DistributedTargetPass`, full-logit sampling adapters and dSpark integration
 are still required; this is not a serving or performance qualification.
+
+`DistributedTargetPass` now owns `DistributedTargetHead`; its fixture loads
+both vocabulary halves instead of a full RTX1 head. Explicit compact-row logit
+downloads read the shards concurrently and concatenate each selected row in
+global token order. Greedy reads only compact candidates; non-greedy head calls
+skip compact readback. The head fixture verifies reordered downloads, bounds,
+and non-greedy publication; all passed. The complete native build also passed.
+The full-model fixture passes initial full/decode/discard/replay stages with
+this head, but concurrent encoder qualification remains failing as below.
+
+The full dense-kernel tensor race check was stopped as inconclusive after its
+log stopped advancing for over five minutes in the final four-chunk
+interleaving (last logged layer pair 14/13). The process remained alive, GPU0
+busy, and a separate two-GPU head test still completed. No hazard report was
+emitted before stopping; this is not a clean race-check result. Debugger attach
+was restricted by ptrace policy; launching a child under GDB works without
+changing that policy.
+
+The subsequent uninstrumented `interleave-qb-scratch.log` reproduced a final
+mismatch at case 19 (token 200 in both paths, scores 18.999233 versus 17.553558).
+Its earlier equal-input QB capture at case 5, layer 10, position 0 contains one
+row: 32 output elements differ in columns 16960–17007, within tile 132. All
+8,192 bytes of the active capacity-1 scratch slice match exactly. The 3,841
+scratch differences occur exclusively in the inactive capacity-16 slice
+(offsets 8192–34339). This rules out differing quantized scratch inputs for
+that captured projection and directs the next check toward GEMM execution or
+weight/output lifetime. Artifacts are in local `qb-scratch-capture`; no claim
+of resolved concurrency or performance qualification follows from this test.
