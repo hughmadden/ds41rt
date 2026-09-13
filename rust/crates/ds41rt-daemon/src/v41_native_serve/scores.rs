@@ -4,7 +4,7 @@ use anyhow::{ensure, Result};
 use std::sync::Arc;
 
 pub(super) const VOCAB: usize = 129_280;
-const ROW_BYTES: usize = VOCAB * 4;
+pub(super) const ROW_BYTES: usize = VOCAB * 4;
 
 #[derive(Clone)]
 pub(super) struct TokenScores {
@@ -30,6 +30,13 @@ pub(super) struct BatchScores {
     bytes: Vec<u8>,
 }
 impl BatchScores {
+    pub fn has_full_logits(&self) -> bool { !self.bytes.is_empty() }
+    pub fn retain_downloaded(&self, row: usize, bytes: &[u8]) -> Result<TokenScores> {
+        ensure!(row < self.best.len() && bytes.len() == ROW_BYTES, "downloaded retained logit extent differs");
+        let best = argmax(bytes, None)?;
+        ensure!(best == self.best[row], "GPU and retained CPU greedy selection differ");
+        Ok(TokenScores { bytes: Arc::from(bytes), best })
+    }
     pub fn new(bytes: Vec<u8>) -> Result<Self> {
         ensure!(bytes.len() % ROW_BYTES == 0, "invalid target logit batch");
         let best = bytes.chunks_exact(ROW_BYTES).map(|row| argmax(row, None)).collect::<Result<_>>()?;
@@ -52,9 +59,7 @@ impl BatchScores {
         logits.bytes = ROW_BYTES;
         let mut bytes = vec![0; ROW_BYTES];
         lib.copy_d2h(&mut bytes, logits)?;
-        let retained = TokenScores::new(bytes)?;
-        ensure!(retained.best == self.best[row], "GPU and retained CPU greedy selection differ");
-        Ok(retained)
+        self.retain_downloaded(row, &bytes)
     }
     pub fn select(&self, row: usize, mask: Option<&[u32]>) -> Result<u32> {
         ensure!(row < self.best.len(), "selected logit row is outside batch");
@@ -147,6 +152,22 @@ mod tests {
         mask[0] = 0;
         assert!(shared.select(Some(&mask)).is_err());
         assert_eq!(scores.select(None).unwrap(), 91);
+    }
+    #[test]
+    fn downloaded_frontier_keeps_full_scores_and_checks_gpu_selection() {
+        let compact = BatchScores::from_greedy(vec![(91, 4.)]).unwrap();
+        assert!(!compact.has_full_logits());
+        let bytes = row(91);
+        let retained = compact.retain_downloaded(0, &bytes).unwrap();
+        assert!(compact.retain_downloaded(1, &bytes).is_err());
+        assert!(compact.retain_downloaded(0, &row(93)).is_err());
+        let mut invalid = bytes.clone();
+        invalid[..4].copy_from_slice(&f32::NAN.to_ne_bytes());
+        assert!(compact.retain_downloaded(0, &invalid).is_err());
+        drop(compact); drop(bytes);
+        let mut mask = vec![0; VOCAB.div_ceil(32)]; mask[0] = 1 << 17;
+        assert_eq!(retained.select(None).unwrap(), 91);
+        assert_eq!(retained.select(Some(&mask)).unwrap(), 17);
     }
     #[test]
     fn retained_scores_survive_batch_drop_and_reject_invalid_rows() {

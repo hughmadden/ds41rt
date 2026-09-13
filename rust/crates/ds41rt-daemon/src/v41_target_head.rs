@@ -80,6 +80,7 @@ impl<'a> TargetHeadWeights<'a> {
             tokens: Vec::new(),
             greedy_staging: HostAllocation::new(self.library, capacity * 8)?,
             greedy_ready: false,
+            download: crate::v41_memory::RowDownload::new(self.library, capacity * STRIDES[4])?,
         })
     }
 }
@@ -99,6 +100,7 @@ impl TargetLogits<'_> {
     }
 }
 pub(crate) struct TargetHeadWave<'w, 'a> {
+    download: crate::v41_memory::RowDownload<'a>,
     stream: LoadStream<'a>,
     projection: V41VocabularyProjection<'a>,
     _workspace: DeviceAllocation<'a>,
@@ -387,6 +389,11 @@ impl TargetHeadWave<'_, '_> {
             origin: self.origin,
             _owner: PhantomData,
         })
+    }
+    pub async fn download_rows(&mut self, rows: &[usize]) -> Result<Vec<u8>> {
+        let logits = self.output()?.logits;
+        // The head remains exclusively borrowed through transfer completion.
+        unsafe { self.download.rows(logits, STRIDES[4], rows).await }
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.invalidate();

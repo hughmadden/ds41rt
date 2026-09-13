@@ -353,10 +353,11 @@ struct CommitDecision {
     accepted: Vec<u32>,
     emissions: Vec<Vec<u32>>,
     next_after_commit: Vec<Option<TokenScores>>,
+    frontier_downloads: Vec<(usize, usize)>,
 }
-fn prepare_commit_lane<'a>(lib: &'a NativeLibrary, lane: usize, pass: &TargetPass<'_, 'a>,
+fn prepare_commit_lane<'a>(lane: usize,
     requests: &Requests<'a>, active: &[Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
-    batch: &RequestBatch, next: &BatchScores, draft: Option<&DraftRuntime<'_, 'a>>, verify_us: u64,
+    next: &BatchScores, draft: Option<&DraftRuntime<'_, 'a>>, verify_us: u64,
 ) -> Result<CommitDecision> {
     let mut accepted_drafts = 0u32;
     let mut emitted = 0usize;
@@ -364,6 +365,7 @@ fn prepare_commit_lane<'a>(lib: &'a NativeLibrary, lane: usize, pass: &TargetPas
     let mut accepted = Vec::new();
     let mut emissions = Vec::new();
     let mut next_after_commit = Vec::new();
+    let mut frontier_downloads = Vec::new();
     for (&slot, input) in members.iter().zip(inputs) {
         let request = active[slot].as_ref().unwrap();
         let constrained = request.constraint.as_ref().map(|state|
@@ -404,18 +406,23 @@ fn prepare_commit_lane<'a>(lib: &'a NativeLibrary, lane: usize, pass: &TargetPas
         emitted += decision.emitted.len();
         let finishing = decision.emitted.contains(&1)
             || request.generated + decision.emitted.len() >= request.job.max_tokens;
-        next_after_commit.push(if finishing {
-            Some(next.retain_from_device(lib, pass.output(batch)?.logits, offset + decision.accepted_inputs as usize - 1)?)
-        } else { None });
+        let frontier = offset + decision.accepted_inputs as usize - 1;
+        next_after_commit.push(if finishing && next.has_full_logits() {
+            Some(next.retain(frontier)?)
+        } else {
+            if finishing { frontier_downloads.push((next_after_commit.len(), frontier)); }
+            None
+        });
         offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
     }
-    Ok(CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit })
+    Ok(CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit, frontier_downloads })
 }
 fn publish_commit_lane<'a>(pass: &TargetPass<'_, 'a>, active: &mut [Option<Active<'a>>],
     members: &[usize], inputs: &[Vec<u32>], owned_batch: &mut Option<RequestBatch>,
     mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, decision: CommitDecision,
 ) -> Result<(u32, usize, Vec<Vec<u32>>)> {
-    let CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit } = decision;
+    let CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit, frontier_downloads } = decision;
+    ensure!(frontier_downloads.is_empty(), "retained frontier downloads are incomplete");
     if let Some(draft) = draft.as_deref_mut() {
         if capture_routes {
             let mut offset = 0;
@@ -438,8 +445,11 @@ fn commit_lane<'w, 'a>(lib: &'a NativeLibrary, lane: usize, pass: &mut TargetPas
     mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, verify_us: u64,
 ) -> Result<(u32, usize, Vec<Vec<u32>>)> {
     let Some(batch) = owned_batch else { return Ok((0, 0, Vec::new())); };
-    let decision = prepare_commit_lane(lib, lane, pass, requests, active, members, inputs,
-        batch, next, draft.as_deref(), verify_us)?;
+    let mut decision = prepare_commit_lane(lane, requests, active, members, inputs,
+        next, draft.as_deref(), verify_us)?;
+    for (member, row) in decision.frontier_downloads.drain(..) {
+        decision.next_after_commit[member] = Some(next.retain_from_device(lib, pass.output(batch)?.logits, row)?);
+    }
     if let Some(draft) = draft.as_deref_mut() { draft.commit_batch(pass, requests, batch, &decision.accepted)?; }
     else { pass.commit(requests, batch, &decision.accepted)?; }
     publish_commit_lane(pass, active, members, inputs, owned_batch, draft, capture_routes, decision)

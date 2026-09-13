@@ -126,15 +126,21 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                         pass.execute_shared_greedy(requests, current, transport, 0, &selected).await?
                     })?
                 } else {
-                    let logits = unsafe { pass.execute_shared(requests, current, transport, 0, &selected).await? };
-                    let mut bytes = vec![0; logits.logits.bytes];
-                    lib.copy_d2h(&mut bytes, logits.logits)?;
-                    BatchScores::new(bytes)?
+                    unsafe { pass.execute_shared(requests, current, transport, 0, &selected).await?; }
+                    BatchScores::new(pass.download_logits(current, &selected).await?)?
                 };
                 let verify_us = started.elapsed().as_micros() as u64 - prepared_us;
-                let decision = prepare_commit_lane(lib, lane, pass, &requests.borrow(),
-                    &active.borrow(), &members, &inputs, batch.as_ref().unwrap(), &next,
-                    draft.borrow().as_deref(), verify_us)?;
+                let mut decision = prepare_commit_lane(lane, &requests.borrow(),
+                    &active.borrow(), &members, &inputs, &next, draft.borrow().as_deref(), verify_us)?;
+                if !decision.frontier_downloads.is_empty() {
+                    let rows: Vec<_> = decision.frontier_downloads.iter().map(|&(_, row)| row).collect();
+                    let bytes = pass.download_logits(batch.as_ref().unwrap(), &rows).await?;
+                    ensure!(bytes.len() == rows.len() * scores::ROW_BYTES, "retained frontier download extent differs");
+                    for ((member, row), bytes) in decision.frontier_downloads.drain(..)
+                        .zip(bytes.chunks_exact(scores::ROW_BYTES)) {
+                        decision.next_after_commit[member] = Some(next.retain_downloaded(row, bytes)?);
+                    }
+                }
                 let committed: Result<()> = async {
                     if let Some(draft) = draft.borrow_mut().as_deref_mut() {
                         draft.begin_queued_commit(lane, pass, &requests.borrow(),

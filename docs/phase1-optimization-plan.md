@@ -29,8 +29,11 @@ Remaining synchronization work, based on the current serving source:
   peer drain. Snapshot arenas remove allocation/free calls from retention;
   [snapshot copies now complete cooperatively](phase1-queued-snapshots.md), with
   source-slot ownership retained until completion or drained abort.
-- Audit constrained/full-frontier logits downloads, token upload and embedding
-  handoff, graph capture/rebind/eviction, and remaining component waits on the
+- [Constrained/full-frontier logits downloads](phase1-queued-logits.md) now use
+  cooperative transfers with head-owned pinned storage and preserve full retained
+  scores for future grammars.
+- Audit token upload and embedding/query handoff, graph capture/rebind/eviction,
+  and remaining component waits on the
   shared host thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
 
 After these changes, first revisit the combined attention graph, which previously
@@ -129,6 +132,8 @@ allocation/free calls from retention, trading their bounded storage for default
 global KV pages. [Queued snapshot copies](phase1-queued-snapshots.md) now retain
 source ownership while polling per-lane streams and publish only after both cache
 owners complete. Next finish the remaining blocking transfer and component-wait audit.
+Constrained and retained-frontier logits transfers are now cooperative as well;
+continue with token upload and the embedding/query handoff.
 Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and

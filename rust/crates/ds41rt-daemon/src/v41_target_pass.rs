@@ -351,6 +351,10 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         self.state.ready(batch.cache()?.identity())?;
         self.head.output()
     }
+    pub async fn download_logits(&mut self, batch: &RequestBatch, rows: &[usize]) -> Result<Vec<u8>> {
+        self.state.ready(batch.cache()?.identity())?;
+        self.head.download_rows(rows).await
+    }
     pub fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> {
         self.state.ready(batch.cache()?.identity())?;
         self.taps.output(batch.cache()?)
