@@ -92,6 +92,10 @@ impl DsparkStage<'_, '_> {
     ) -> Result<()> {
         self.attention.upload(read, requests)
     }
+    pub(super) unsafe fn upload_on(&mut self, read: &WindowRead,
+        requests: &[(WindowLease, u64)], stream: *mut c_void) -> Result<()> {
+        unsafe { self.attention.upload_on(read, requests, stream) }
+    }
     /// The containing owner retains and drains the supplied stream through all children.
     pub(super) unsafe fn enqueue_on(
         &mut self,

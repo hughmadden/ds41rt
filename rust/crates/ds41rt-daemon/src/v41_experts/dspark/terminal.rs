@@ -1,5 +1,5 @@
 use super::{DsparkConfidence, DsparkMarkov, DsparkWeights};
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::VocabularyHead;
 use anyhow::{ensure, Context, Result};
 use ds41rt_core::DsparkRng;
@@ -25,6 +25,7 @@ pub(crate) struct DsparkTerminal<'weights, 'library> {
     adjusted_logits: DeviceAllocation<'library>,
     rng: DeviceAllocation<'library>,
     sampling_requests: Option<usize>,
+    sampling_staging: HostAllocation<'library>,
     temperatures: DeviceAllocation<'library>,
     tokens: DeviceAllocation<'library>,
     capacity: usize,
@@ -71,6 +72,7 @@ impl<'library> DsparkWeights<'library> {
             adjusted_logits: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
             rng: DeviceAllocation::new(library, capacity * 16)?,
             sampling_requests: None,
+            sampling_staging: HostAllocation::new(library, capacity * 20)?,
             temperatures: DeviceAllocation::new(library, capacity * 4)?,
             tokens: DeviceAllocation::new(library, capacity * 6 * 4)?,
             capacity,
@@ -113,6 +115,19 @@ impl DsparkTerminal<'_, '_> {
         rngs: &mut [&mut DsparkRng],
         temperatures: &[f32],
     ) -> Result<()> {
+        self.synchronize()?;
+        self.stage_sampling(rngs, temperatures)?;
+        let bytes = self.sampling_staging.bytes_mut();
+        let uploaded = (|| {
+            self.stream.library.copy_h2d(self.rng.buffer, &bytes[..rngs.len() * 16])?;
+            self.stream.library.copy_h2d(self.temperatures.buffer,
+                &bytes[self.capacity * 16..self.capacity * 16 + rngs.len() * 4])
+        })();
+        if uploaded.is_err() { self.sampling_requests = None; }
+        uploaded
+    }
+    /// CPU-only reservation. The containing chain excludes pending users of staging.
+    pub(super) fn stage_sampling(&mut self, rngs: &mut [&mut DsparkRng], temperatures: &[f32]) -> Result<()> {
         self.ready_requests = None;
         self.sampling_requests = None;
         ensure!(
@@ -127,23 +142,28 @@ impl DsparkTerminal<'_, '_> {
             rngs.iter().all(|rng| rng.can_reserve()),
             "dSpark RNG exhausted"
         );
-        self.synchronize()?;
-        let mut metadata = Vec::with_capacity(rngs.len() * 16);
-        for rng in rngs.iter_mut() {
+        let bytes = self.sampling_staging.bytes_mut();
+        for (i, rng) in rngs.iter_mut().enumerate() {
             let reservation = rng.reserve().context("dSpark RNG exhausted")?;
-            metadata.extend_from_slice(&reservation.seed.to_ne_bytes());
-            metadata.extend_from_slice(&reservation.first_subsequence.to_ne_bytes());
+            bytes[i * 16..i * 16 + 8].copy_from_slice(&reservation.seed.to_ne_bytes());
+            bytes[i * 16 + 8..i * 16 + 16].copy_from_slice(&reservation.first_subsequence.to_ne_bytes());
         }
-        let mut temperature_bytes = Vec::with_capacity(temperatures.len() * 4);
-        for temperature in temperatures {
-            temperature_bytes.extend_from_slice(&temperature.to_ne_bytes());
+        for (i, temperature) in temperatures.iter().enumerate() {
+            let offset = self.capacity * 16 + i * 4;
+            bytes[offset..offset + 4].copy_from_slice(&temperature.to_ne_bytes());
         }
-        self.stream.library.copy_h2d(self.rng.buffer, &metadata)?;
-        self.stream
-            .library
-            .copy_h2d(self.temperatures.buffer, &temperature_bytes)?;
         self.sampling_requests = Some(rngs.len());
         Ok(())
+    }
+    /// The chain retains this pinned staging until its stream completes.
+    pub(super) unsafe fn upload_sampling_on(&mut self, stream: *mut c_void) -> Result<()> {
+        let count = self.sampling_requests.context("draft sampling not staged")?;
+        let bytes = self.sampling_staging.bytes_mut();
+        unsafe {
+            self.stream.library.copy_h2d_async(self.rng.buffer, &bytes[..count * 16], stream)?;
+            self.stream.library.copy_h2d_async(self.temperatures.buffer,
+                &bytes[self.capacity * 16..self.capacity * 16 + count * 4], stream)
+        }
     }
     fn slice(
         buffer: Ds41rtDeviceBuffer,

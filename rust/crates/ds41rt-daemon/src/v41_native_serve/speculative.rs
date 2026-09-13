@@ -11,7 +11,6 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     chains: Vec<DsparkChain<'w, 'a>>,
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
-    captured: Vec<std::collections::BTreeSet<usize>>,
     pending: Vec<Option<(Vec<(u64, u32, u64, usize)>, Instant)>>,
     request_limit: usize,
     draft_limit: usize,
@@ -66,7 +65,6 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             chains,
             windows: [window()?, window()?, window()?],
             requests: Default::default(),
-            captured: vec![Default::default(); lane_count],
             pending: vec![None; lane_count],
             request_limit: requests as usize,
             draft_limit: 5,
@@ -427,9 +425,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             &vec![0.0; count])?;
         let windows = self.windows.each_ref();
         let bindings = bindings.each_ref().map(|rows| rows.as_slice());
-        if !self.captured[0].contains(&count) {
+        if !self.chains[0].has_graph(count) {
             unsafe { self.chains[0].capture(windows, bindings)?; }
-            self.captured[0].insert(count);
         }
         unsafe { self.chains[0].replay(windows, bindings)?; }
         let buffer = self.chains[0].draft_output()?[0];
@@ -509,19 +506,15 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let tokens: Vec<_> = active.iter().map(|(_, (_, anchor, _, _))| *anchor as i32).collect();
         let bindings: [Vec<_>; 3] = std::array::from_fn(|stage| active.iter()
             .map(|(_, (id, _, end, _))| (self.requests[id].leases[stage], *end)).collect());
-        self.chains[lane].set_tokens(&tokens)?;
+        self.chains[lane].stage_tokens(&tokens)?;
         let mut rngs: Vec<_> = self.requests.iter_mut().filter_map(|(id, request)|
             active.iter().position(|(_, (active_id, _, _, _))| active_id == id)
                 .map(|index| (index, &mut request.rng))).collect();
         rngs.sort_by_key(|(index, _)| *index);
-        self.chains[lane].prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
+        self.chains[lane].stage_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
             &vec![0.0; count])?;
         let windows = self.windows.each_ref();
         let bindings = bindings.each_ref().map(|rows| rows.as_slice());
-        if !self.captured[lane].contains(&count) {
-            unsafe { self.chains[lane].capture(windows, bindings)?; }
-            self.captured[lane].insert(count);
-        }
         unsafe { self.chains[lane].begin_replay(windows, bindings)?; }
         self.pending[lane] = Some((inputs.to_vec(), started));
         Ok(None)

@@ -13,13 +13,33 @@ pub(crate) struct DsparkChain<'weights, 'library> {
     stages: [DsparkStage<'weights, 'library>; 3],
     graphs: std::collections::BTreeMap<usize, (*mut c_void, [u64; 3])>,
     ready: Option<usize>,
-    pending: Option<(usize, [WindowRead; 3])>,
+    pending: Option<PendingDraft<'library>>,
     download: HostAllocation<'library>,
     embedding: Option<&'weights NativeRtxTensors<'library>>,
     tokens: DeviceAllocation<'library>,
+    token_staging: HostAllocation<'library>,
     token_count: Option<usize>,
     terminal: Option<DsparkTerminal<'weights, 'library>>,
     ops: V41AttentionOps<'library>,
+}
+/// Own reservations before the first upload. Errors and unwinding drain before
+/// pinned inputs or cache ring slots may be reused. Successful polls disarm it.
+struct PendingDraft<'a> {
+    count: usize,
+    reads: [WindowRead; 3],
+    warming: bool,
+    armed: bool,
+    library: &'a ds41rt_ffi::NativeLibrary,
+    stream: *mut c_void,
+}
+impl Drop for PendingDraft<'_> {
+    fn drop(&mut self) {
+        if self.armed {
+            if let Err(error) = unsafe { self.library.cuda_stream_synchronize(self.stream) } {
+                tracing::error!(%error, "draining pending draft before releasing cache readers");
+            }
+        }
+    }
 }
 impl<'library> DsparkWeights<'library> {
     pub fn draft_bytes(&self, requests: u32) -> Result<usize> {
@@ -94,6 +114,7 @@ impl<'library> DsparkWeights<'library> {
             download: HostAllocation::new(library, requests as usize * 44)?,
             embedding: None,
             tokens: DeviceAllocation::new(library, requests as usize * 4)?,
+            token_staging: HostAllocation::new(library, requests as usize * 4)?,
             token_count: None,
             terminal: None,
             ops: library.v41_attention_ops()?,
@@ -115,6 +136,13 @@ impl DsparkChain<'_, '_> {
             .context("dSpark chain has no terminal")?
             .prepare_sampling(rngs, temperatures)
     }
+    pub fn stage_sampling(&mut self, rngs: &mut [&mut DsparkRng], temperatures: &[f32]) -> Result<()> {
+        ensure!(self.pending.is_none(), "dSpark chain replay still pending");
+        self.invalidate();
+        self.terminal.as_mut().context("dSpark chain has no terminal")?
+            .stage_sampling(rngs, temperatures)
+    }
+    pub fn has_graph(&self, count: usize) -> bool { self.graphs.contains_key(&count) }
     /// Borrowed anchor + five tokens [6,R], corrected raw logits [5,R,V] and
     /// raw confidence [5,R], live until reuse/drop. No target history is committed.
     pub fn draft_output(&self) -> Result<[Ds41rtDeviceBuffer; 3]> {
@@ -128,6 +156,14 @@ impl DsparkChain<'_, '_> {
     /// Seed IDs follow cache-binding row order; invalid input clears publication
     /// and token readiness so a subsequent execution cannot consume old IDs.
     pub fn set_tokens(&mut self, tokens: &[i32]) -> Result<()> {
+        self.stage_tokens(tokens)?;
+        let uploaded = self.stream.library.copy_h2d(self.tokens.buffer,
+            &self.token_staging.bytes_mut()[..tokens.len() * 4]);
+        if uploaded.is_err() { self.token_count = None; }
+        uploaded
+    }
+    /// CPU-only seed staging; pending work excludes writes to this pinned owner.
+    pub fn stage_tokens(&mut self, tokens: &[i32]) -> Result<()> {
         ensure!(self.pending.is_none(), "dSpark chain replay still pending");
         self.invalidate();
         self.token_count = None;
@@ -145,13 +181,10 @@ impl DsparkChain<'_, '_> {
             tokens.iter().all(|&id| (0..129280).contains(&id)),
             "invalid dSpark seed token"
         );
-        let mut bytes = [0u8; 64];
+        let bytes = self.token_staging.bytes_mut();
         for (i, id) in tokens.iter().enumerate() {
             bytes[i * 4..i * 4 + 4].copy_from_slice(&id.to_ne_bytes());
         }
-        self.stream
-            .library
-            .copy_h2d(self.tokens.buffer, &bytes[..tokens.len() * 4])?;
         self.token_count = Some(tokens.len());
         Ok(())
     }
@@ -314,17 +347,21 @@ impl DsparkChain<'_, '_> {
             self.execute(windows, bindings)?;
         }
         let reads = self.prepare(windows, bindings)?;
+        unsafe { self.capture_ready(&reads, bindings[0].len()) }
+    }
+    /// Warmup completed; never suspend while capturing.
+    unsafe fn capture_ready(&mut self, reads: &[WindowRead; 3], count: usize) -> Result<()> {
         unsafe {
             self.stream
                 .library
                 .cuda_graph_begin_capture(self.stream.raw)?;
         }
-        let launched = unsafe { self.enqueue(&reads, bindings[0].len()) };
+        let launched = unsafe { self.enqueue(reads, count) };
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         self.invalidate();
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graphs.insert(bindings[0].len(), (graph, reads.each_ref().map(|r| r.owner)));
+                self.graphs.insert(count, (graph, reads.each_ref().map(|r| r.owner)));
                 Ok(())
             }
             (Err(error), Ok(graph)) => {
@@ -361,56 +398,76 @@ impl DsparkChain<'_, '_> {
         self.ready = Some(count);
         self.output()
     }
-    /// Queue a captured draft and compact output copies, retaining its cache-slot
-    /// reservations until poll completes. The caller keeps all window owners alive.
+    /// Queue warmup or replay plus compact copies. The caller keeps window
+    /// owners alive; this owner retains reservations and pinned inputs throughout.
     /// # Safety
-    /// Same inputs as replay; no raw consumer may mutate the reserved ring slots.
-    pub unsafe fn begin_replay(
-        &mut self, windows: [&DsparkWindow<'_>; 3],
-        bindings: [&[(WindowLease, u64)]; 3],
-    ) -> Result<()> {
+    /// Same inputs as replay; no raw consumer may mutate reserved ring slots.
+    pub unsafe fn begin_replay(&mut self, windows: [&DsparkWindow<'_>; 3],
+        bindings: [&[(WindowLease, u64)]; 3]) -> Result<()> {
         let reads = self.prepare(windows, bindings)?;
         let count = bindings[0].len();
-        let &(graph, owners) = self.graphs.get(&count).context("dSpark chain count not captured")?;
-        ensure!(owners == reads.each_ref().map(|r| r.owner), "dSpark chain capture binding differs");
-        self.upload(&reads, bindings)?;
-        let output = self.terminal.as_ref().context("dSpark chain has no terminal")?.output_storage(count)?;
-        self.pending = Some((count, reads));
-        let launched = (|| unsafe {
-            self.stream.library.cuda_graph_launch(graph, self.stream.raw)?;
-            let bytes = self.download.bytes_mut();
-            self.stream.library.copy_d2h_async(&mut bytes[..count*24], output[0], self.stream.raw)?;
-            self.stream.library.copy_d2h_async(&mut bytes[count*24..count*44], output[2], self.stream.raw)
-        })();
-        if let Err(error) = launched {
-            let drained = self.synchronize();
-            self.pending = None;
-            drained?;
-            return Err(error);
+        if let Some(&(_, owners)) = self.graphs.get(&count) {
+            ensure!(owners == reads.each_ref().map(|r| r.owner), "dSpark chain capture binding differs");
         }
+        self.terminal.as_ref().context("dSpark chain has no terminal")?.output_storage(count)?;
+        let pending = PendingDraft { count, reads, warming: !self.has_graph(count), armed: true,
+            library: self.stream.library, stream: self.stream.raw };
+        // The local guard already owns reservations before any partial upload.
+        unsafe {
+            self.stream.library.copy_h2d_async(self.tokens.buffer,
+                &self.token_staging.bytes_mut()[..count * 4], self.stream.raw)?;
+            self.terminal.as_mut().unwrap().upload_sampling_on(self.stream.raw)?;
+            for stage in 0..3 {
+                self.stages[stage].upload_on(&pending.reads[stage], bindings[stage], self.stream.raw)?;
+            }
+            if pending.warming { self.enqueue(&pending.reads, count)?; }
+            else { self.launch_download(count)?; }
+        }
+        self.pending = Some(pending);
         Ok(())
     }
-    /// Poll without blocking the CUDA owner; errors drain before releasing readers.
+    unsafe fn launch_download(&mut self, count: usize) -> Result<()> {
+        let graph = self.graphs.get(&count).context("dSpark chain count not captured")?.0;
+        let output = self.terminal.as_ref().context("dSpark chain has no terminal")?.output_storage(count)?;
+        unsafe {
+            self.stream.library.cuda_graph_launch(graph, self.stream.raw)?;
+            let bytes = self.download.bytes_mut();
+            self.stream.library.copy_d2h_async(&mut bytes[..count * 24], output[0], self.stream.raw)?;
+            self.stream.library.copy_d2h_async(&mut bytes[count * 24..count * 44], output[2], self.stream.raw)
+        }
+    }
+    /// Cold warmup and final replay both poll. Capture itself never suspends.
     pub fn poll_replay(&mut self) -> Result<Option<(Vec<u32>, Vec<f32>)>> {
-        let count = self.pending.as_ref().context("dSpark replay not pending")?.0;
+        ensure!(self.pending.is_some(), "dSpark replay not pending");
         match unsafe { self.stream.library.cuda_stream_query(self.stream.raw) } {
             Ok(false) => return Ok(None),
             Ok(true) => {},
-            Err(error) => {
-                let drained = self.synchronize();
-                self.pending = None;
-                drained?;
-                return Err(error);
-            },
+            Err(error) => { self.pending = None; return Err(error); },
         }
-        self.pending = None;
+        let mut pending = self.pending.take().unwrap();
+        let count = pending.count;
+        if pending.warming {
+            unsafe {
+                self.capture_ready(&pending.reads, count)?;
+                self.launch_download(count)?;
+            }
+            pending.warming = false;
+            self.pending = Some(pending);
+            return Ok(None);
+        }
+        pending.armed = false;
         self.ready = Some(count);
         let bytes = self.download.bytes_mut();
-        let tokens = bytes[..count*24].chunks_exact(4)
+        let tokens = bytes[..count * 24].chunks_exact(4)
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
-        let confidence = bytes[count*24..count*44].chunks_exact(4)
+        let confidence = bytes[count * 24..count * 44].chunks_exact(4)
             .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
         Ok(Some((tokens, confidence)))
+    }
+    #[cfg(test)]
+    pub fn cancel_pending_for_test(&mut self) {
+        self.pending = None; // guard drains before releasing reads
+        self.invalidate();
     }
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {
         let requests = self.ready.context("dSpark chain output incomplete")?;
@@ -425,6 +482,7 @@ impl Drop for DsparkChain<'_, '_> {
         if let Err(error) = self.synchronize() {
             tracing::error!(%error,"draining dSpark chain");
         }
+        if let Some(pending) = &mut self.pending { pending.armed = false; }
         self.pending = None; // GPU work has drained before read reservations release.
         for (_, (graph, _)) in std::mem::take(&mut self.graphs) {
             if let Err(error) = unsafe { self.stream.library.cuda_graph_exec_destroy(graph) } {

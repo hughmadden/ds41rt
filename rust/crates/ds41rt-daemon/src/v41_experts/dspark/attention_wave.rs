@@ -130,6 +130,22 @@ impl DsparkAttentionWave<'_, '_> {
         read: &WindowRead,
         requests: &[(WindowLease, u64)],
     ) -> Result<()> {
+        self.stage_upload(read, requests);
+        let staging = self.staging.bytes_mut();
+        self.stream.library.copy_h2d(self.descriptors.buffer, &staging[..128])?;
+        self.stream.library.copy_h2d(self.positions.buffer, &staging[128..])
+    }
+    /// The containing chain retains staging and cache reads through completion.
+    pub(super) unsafe fn upload_on(&mut self, read: &WindowRead,
+        requests: &[(WindowLease, u64)], stream: *mut c_void) -> Result<()> {
+        self.stage_upload(read, requests);
+        let staging = self.staging.bytes_mut();
+        unsafe {
+            self.stream.library.copy_h2d_async(self.descriptors.buffer, &staging[..128], stream)?;
+            self.stream.library.copy_h2d_async(self.positions.buffer, &staging[128..], stream)
+        }
+    }
+    fn stage_upload(&mut self, read: &WindowRead, requests: &[(WindowLease, u64)]) {
         let bytes =
             unsafe { std::slice::from_raw_parts(read.descriptors.as_ptr().cast::<u8>(), 128) };
         let staging = self.staging.bytes_mut();
@@ -142,12 +158,6 @@ impl DsparkAttentionWave<'_, '_> {
                 staging[offset..offset + 8].copy_from_slice(&(end + draft as u64).to_ne_bytes());
             }
         }
-        self.stream
-            .library
-            .copy_h2d(self.descriptors.buffer, &staging[..128])?;
-        self.stream
-            .library
-            .copy_h2d(self.positions.buffer, &staging[128..])
     }
     pub(super) fn output_storage(&self) -> Ds41rtDeviceBuffer {
         self.output.output_storage()

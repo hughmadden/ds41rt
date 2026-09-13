@@ -691,9 +691,10 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             ];
             let bindings = [&bindings[0][..], &bindings[1][..], &bindings[2][..]];
             chain.set_tokens(&tokens.iter().map(|&t| t as i32).collect::<Vec<_>>())?;
+            let draft_temperature = if cycle == 1 { 0.7 } else { 0.0 };
             chain.prepare_sampling(
                 &mut draft_rngs.iter_mut().collect::<Vec<_>>(),
-                &vec![0.0; request_count],
+                &vec![draft_temperature; request_count],
             )?;
             let start = Instant::now();
             unsafe {
@@ -728,7 +729,7 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                 .collect::<Vec<_>>();
             assert_eq!(logits.len(), 5 * request_count * 129280);
             assert!(logits.iter().all(|v| v.is_finite()));
-            for (i, row) in logits.chunks_exact(129280).enumerate() {
+            for (i, row) in logits.chunks_exact(129280).enumerate().filter(|_| draft_temperature == 0.0) {
                 assert_eq!(
                     row[ids[request_count + i] as usize],
                     row.iter().copied().fold(f32::NEG_INFINITY, f32::max)
@@ -737,19 +738,36 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
             assert!(expected[2]
                 .chunks_exact(4)
                 .all(|b| f32::from_ne_bytes(b.try_into().unwrap()).is_finite()));
-            if cycle == 0 {
-                unsafe {
-                    chain.capture(windows, bindings)?;
+            // Reuse the exact staged RNG reservation from eager execution. Cold
+            // warmup, warm replay and cancellation must preserve tokens, logits
+            // and confidence byte-for-byte, without reserving additional draws.
+            let seeds = tokens.iter().map(|&t| t as i32).collect::<Vec<_>>();
+            chain.stage_tokens(&seeds)?;
+            unsafe { chain.begin_replay(windows, bindings)?; }
+            assert!(chain.stage_tokens(&seeds).is_err());
+            assert!(chain.stage_sampling(&mut draft_rngs.iter_mut().collect::<Vec<_>>(),
+                &vec![0.0; request_count]).is_err());
+            chain.cancel_pending_for_test();
+            assert!(chain.draft_output().is_err());
+            let was_cold = !chain.has_graph(request_count);
+            unsafe { chain.begin_replay(windows, bindings)?; }
+            let mut pending_polls = 0usize;
+            let (queued_tokens, queued_confidence) = runtime.block_on(async {
+                loop {
+                    if let Some(output) = chain.poll_replay()? { break Ok::<_, anyhow::Error>(output); }
+                    pending_polls += 1;
+                    tokio::task::yield_now().await;
                 }
-            }
-            unsafe {
-                chain.replay(windows, bindings)?;
-            }
-            assert_eq!(
-                expected,
-                read(chain)?,
-                "draft graph replay differs from eager execution"
-            );
+            })?;
+            assert_eq!(queued_tokens, ids.iter().map(|&id| id as u32).collect::<Vec<_>>());
+            assert_eq!(queued_confidence.iter().flat_map(|v| v.to_ne_bytes()).collect::<Vec<_>>(), expected[2]);
+            assert_eq!(expected, read(chain)?, "queued cold/warm draft differs from eager");
+            assert!(chain.has_graph(request_count));
+            unsafe { chain.begin_replay(windows, bindings)?; }
+            chain.cancel_pending_for_test();
+            unsafe { chain.replay(windows, bindings)?; }
+            assert_eq!(expected, read(chain)?, "draft replay after cancellation differs");
+            eprintln!("PASS queued draft cold={was_cold} pending_polls={pending_polls} cancellation_reuse=true full_output_exact=true");
             if let Some(dir) = std::env::var_os("DS41RT_TARGET_PASS_OUTPUT") {
                 for (i, name) in ["tokens", "logits", "confidence"].iter().enumerate() {
                     std::fs::write(
@@ -759,7 +777,7 @@ fn real_target_prefill_commit_and_decode() -> Result<()> {
                     )?;
                 }
             }
-            eprintln!("PASS real dSpark draft cycle={cycle} requests={request_count} end={committed} finite_logits_confidence=true greedy_argmax=true graph_byte_exact=true qualification_seconds={:.3}", start.elapsed().as_secs_f64());
+            eprintln!("PASS real dSpark draft cycle={cycle} requests={request_count} end={committed} finite_logits_confidence=true temperature={draft_temperature} graph_byte_exact=true qualification_seconds={:.3}", start.elapsed().as_secs_f64());
             if std::env::var_os("DS41RT_TARGET_PASS_VERIFY").is_some() && cycle + 1 == cycles {
                 ensure!(
                     request_count == 1,

@@ -60,19 +60,20 @@ calls and 981 → 101 ms API time in matched four-second C16 windows. Cold spars
 projection and head warmup now yield; completed-owner rebind/eviction checks no
 longer synchronize. This is measured host API time, not a throughput gain.
 
-Draft replay completion already polls, but its setup does not: `poll_propose`
-calls synchronous seed upload, terminal RNG/temperature preparation and cold
-chain capture; replay uploads stage descriptors synchronously. These must become
-owned queued work. The remaining 3,404 calls also require further attribution;
-draft setup alone has not been shown to explain them all.
+[Draft setup and cold-chain warmup now poll](phase1-queued-draft.md), with owned
+pinned seed/sampling/descriptor staging and retained cache reservations. Synchronous
+memcpy calls disappear from the four-second trace. Remaining stream-synchronize
+API time is 82 ms across 3,448 calls. A separate stack capture confirms active-lane
+waits in TP dispatch and post-receive TP reduction; teardown stacks are excluded.
 
 ## Remaining completion order
 
-1. Queue draft seeds, sampling inputs and stage descriptors with owned pinned
-   staging; convert cold chain warmup into pending work. Keep request RNG and
-   window reservations alive, including cancellation and error cleanup.
-2. Repeat the dynamic audit through warm decode and shape changes. Remove or
-   explain remaining host-blocking GPU waits; never suspend inside graph capture.
+1. Replace TP dispatch's completed-owner synchronization with an explicit
+   completion check, and queue final TP reduction with cooperative completion.
+   Retain received frames, device planes and shared contribution through errors
+   and cancellation. Preserve the direct C1 path for comparison.
+2. Repeat dynamic and stack audits through warm decode and shape changes. Remove
+   or explain remaining host-blocking GPU waits; never suspend inside capture.
 3. Resolve accumulated high-concurrency performance uncertainty, retaining
    frozen e9c07ae and every earlier curve. The latest intermediate C16 result is
    −3.1%, versus −18.5% in the preceding checkpoint; neither gets discarded.
