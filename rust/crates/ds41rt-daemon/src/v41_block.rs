@@ -587,3 +587,13 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         })
     }
 }
+
+#[cfg(test)]
+impl<'a> BlockOutput<'a> {
+    /// # Safety
+    /// Test buffers contain complete residual/pre rows and outlive the output.
+    pub(crate) unsafe fn from_test_buffers(layer: usize, tokens: &'a [u64],
+        residual: Ds41rtDeviceBuffer, pre: Ds41rtDeviceBuffer) -> Result<Self> {
+        Ok(Self { binding: QueryBinding::new(layer)?, layer, tokens, residual, pre })
+    }
+}

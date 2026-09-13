@@ -1018,3 +1018,19 @@ restored the caller's GPU. The test used an isolated native overlay linked to
 the existing build, leaving the running full-model sanitizer library untouched.
 This validates the normalized-input vocabulary wave; final mHC/norm selection,
 target-pass integration, draft integration and sampling remain outstanding.
+
+`DistributedTargetHead` now selects final-layer rows on RTX1, performs mHC
+collapse and RMS normalization there, runs the split vocabulary wave, and
+reads back only compact greedy IDs/scores. Selection/token metadata and the
+block binding publish only after completion. Row uniqueness checking uses
+preallocated selection storage without a temporary set; shape graphs and
+output vectors are retained per lane.
+
+The real-weight complete-head fixture compared selections [5], [4,1,3],
+[0,1,2,3,4,5], and [3,0,5] against `TargetHeadWave`. All logits, greedy results,
+and row/token/binding metadata matched exactly, including repeated-shape graph
+reuse. Empty, duplicated and out-of-range selections rejected and unpublished
+prior output; a later valid call succeeded. Compilation and the fixture passed
+using the isolated native overlay. Installing this head into
+`DistributedTargetPass`, full-logit sampling adapters and dSpark integration
+are still required; this is not a serving or performance qualification.
