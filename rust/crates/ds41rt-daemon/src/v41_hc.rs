@@ -256,6 +256,26 @@ impl HcSublayer<'_, '_> {
     pub(crate) fn rearm_finish_for_test(&mut self, rows: usize) {
         self.begun = Some(rows); self.pending = None; self.ready = None;
     }
+    /// # Safety
+    /// A containing graph executes the same begin operations for these rows.
+    /// No pending GPU work may reuse this owner from another stream.
+    pub(crate) unsafe fn graph_begin_state(&mut self, rows: usize) -> Result<()> {
+        ensure!(rows > 0 && rows <= self.capacity, "invalid mHC graph rows");
+        self.invalidate(); self.begun = Some(rows); Ok(())
+    }
+    /// # Safety
+    /// The containing graph executes this owner's post for exactly these rows.
+    pub(crate) unsafe fn graph_post_state(&mut self, rows: usize) -> Result<()> {
+        ensure!(self.begun == Some(rows), "mHC graph post has no matching begin");
+        self.begun = None; self.ready = None; self.pending = Some(rows); Ok(())
+    }
+    pub(crate) fn graph_identity(&self) -> [usize; 3] {
+        [self.weights as *const _ as usize, self.residual.buffer.ptr as usize,
+            self.normalized.buffer.ptr as usize]
+    }
+    pub(crate) fn normalized_storage(&self, rows: usize) -> Ds41rtDeviceBuffer {
+        let mut value = self.normalized.buffer; value.bytes = rows * 10240; value
+    }
     /// Raw destinations for a containing owner that serializes GPU consumers.
     pub(crate) fn output_storage(&self) -> [Ds41rtDeviceBuffer; 2] {
         [self.output.buffer, self.next_pre.buffer]

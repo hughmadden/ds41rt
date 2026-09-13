@@ -231,3 +231,8 @@ The [weighted eight-type comparison](phase1-async-weighted.md) passes and improv
 real workloads for release decisions. The [exact counting loss](phase1-async-counting.md)
 is reproducible and worth explaining, but is not alone a release veto. Test the
 remaining receive-polling interval against the now-cooperative GPU completion path.
+
+The [graph comparison with yielding receives](phase1-attention-graph-yield.md)
+now supports keeping the graph: weighted 80.75 → 81.46 tok/s, mixed C6/C8/C16
+higher, C2 lower in one pair. This supersedes the earlier omission decision.
+Proceed with the [clean v2 build and scoped qualification](release-v2-checklist.md).

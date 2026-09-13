@@ -1,0 +1,202 @@
+{
+  "scope": "Combined attention graph with zero receive spin; compare frozen async-poll-yield candidate measurements",
+  "artifacts": {
+    "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+    "ds41rt": "4c65fb7af933b0dadcc63c36898eaa0562c496707ff5b39db6e54aaf305a9be4"
+  },
+  "arms": [
+    {
+      "label": "after-graph",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-attention-graph-yield-after-graph",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=info",
+        "-v",
+        "/home/tj/.cache/ds41rt-experiments/attention-graph-yield/after:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "5"
+      ],
+      "artifacts": {
+        "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+        "ds41rt": "4c65fb7af933b0dadcc63c36898eaa0562c496707ff5b39db6e54aaf305a9be4"
+      },
+      "startup_seconds": 5.303138467948884,
+      "weighted": true,
+      "mixed": true,
+      "constraints": true,
+      "indexed-context": true
+    }
+  ],
+  "restored": true,
+  "decision": "Keep graph on zero-spin decode scheduler; weighted +0.88%, mixed C6/C8/C16 improve; preserve C2 -4.74%",
+  "weighted": {
+    "before": 80.75028251663166,
+    "after": 81.4605580425661,
+    "cases": [
+      {
+        "case": "code",
+        "before_samples": [
+          118.89803612458242,
+          128.23674557553616,
+          131.1277931914601
+        ],
+        "after_samples": [
+          119.58538084956533,
+          130.3894616131293,
+          132.33636706665078
+        ]
+      },
+      {
+        "case": "math",
+        "before_samples": [
+          133.9293296255822,
+          134.86338825150895,
+          134.58749885014433
+        ],
+        "after_samples": [
+          134.14968938808704,
+          135.21738143127249,
+          135.96167537189422
+        ]
+      },
+      {
+        "case": "fable",
+        "before_samples": [
+          54.544996964631544,
+          55.280983838768066,
+          61.279016318635406
+        ],
+        "after_samples": [
+          54.96335632915856,
+          55.80579658655858,
+          61.89573227300409
+        ]
+      },
+      {
+        "case": "hello",
+        "before_samples": [
+          94.19935704609317,
+          75.19050446791682,
+          82.18817564772004
+        ],
+        "after_samples": [
+          94.71262900456067,
+          75.86958000520126,
+          82.4576069537449
+        ]
+      },
+      {
+        "case": "topic",
+        "before_samples": [
+          76.28720996361872,
+          71.18610558746526,
+          68.81601851621635
+        ],
+        "after_samples": [
+          76.59566432869838,
+          71.78161608213652,
+          69.16020469900398
+        ]
+      },
+      {
+        "case": "structured-json",
+        "before_samples": [
+          111.00050418303252,
+          90.74432931014177,
+          91.17345288832607
+        ],
+        "after_samples": [
+          111.02294765814196,
+          92.02450253741567,
+          91.8145204312329
+        ]
+      },
+      {
+        "case": "structured-json-schema",
+        "before_samples": [
+          106.66715366091367,
+          82.62219755316866,
+          95.3327508964718
+        ],
+        "after_samples": [
+          107.05124676197526,
+          83.55029970866008,
+          95.93990362666129
+        ]
+      },
+      {
+        "case": "multilingual",
+        "before_samples": [
+          70.62746987860393,
+          76.54815405901749,
+          64.59361524210676
+        ],
+        "after_samples": [
+          71.6818821009914,
+          77.20548474774318,
+          65.21043069565522
+        ]
+      }
+    ]
+  },
+  "mixed": [
+    {
+      "concurrency": 2,
+      "before_tps": 99.46295182162955,
+      "after_tps": 94.74621093029245
+    },
+    {
+      "concurrency": 6,
+      "before_tps": 141.56200704014444,
+      "after_tps": 144.4298636134407
+    },
+    {
+      "concurrency": 8,
+      "before_tps": 161.16213278982775,
+      "after_tps": 163.4626574403234
+    },
+    {
+      "concurrency": 16,
+      "before_tps": 164.56347955942343,
+      "after_tps": 176.8917888154095
+    }
+  ],
+  "raw_directory": "/home/tj/.cache/ds41rt-experiments/attention-graph-yield"
+}

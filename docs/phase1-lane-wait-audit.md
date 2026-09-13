@@ -89,3 +89,7 @@ round barrier. Those required within-lane data dependencies remain.
 3. Run the scoped README/report qualification excluding the prefill matrix, plus
    high-concurrency thinking/high tool calling; prepare and verify the v2 release
    and matching container with the requested headline and release-note updates.
+
+The [final graph recheck after removing decode receive spinning](phase1-attention-graph-yield.md)
+supports integration. Earlier omission notes describe the 50 µs scheduler; the
+selected release candidate includes the graph and zero-spin cooperative receives.

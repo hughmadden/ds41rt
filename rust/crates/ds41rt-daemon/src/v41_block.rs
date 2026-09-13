@@ -436,6 +436,30 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         unsafe { self.ffn.enqueue_begin(rows, None, stream) }
     }
     /// # Safety
+    /// A graph with enqueue_ffn's exact operations is about to replay on the
+    /// enclosing stream. Its weights/buffers match this block and rows.
+    pub unsafe fn prepare_ffn_graph_replay(&mut self, binding: QueryBinding, rows: usize) -> Result<()> {
+        ensure!(matches!(self.phase, Phase::Attention(b, n) if b == binding && n == rows),
+            "FFN graph replay query differs");
+        unsafe { self.attention.graph_post_state(rows)?; self.ffn.graph_begin_state(rows)?; }
+        self.phase = Phase::QueuedFfn(binding, rows); Ok(())
+    }
+    /// # Safety
+    /// Only the unpublished warmup of this same graph has completed. Attention
+    /// residual and mixing coefficients were read, not overwritten, by warmup.
+    pub unsafe fn restore_ffn_graph_warmup(&mut self, binding: QueryBinding, rows: usize) -> Result<()> {
+        ensure!(matches!(self.phase, Phase::QueuedFfn(b, n) if b == binding && n == rows),
+            "FFN graph warmup query differs");
+        unsafe { self.attention.graph_begin_state(rows)?; }
+        self.ffn.invalidate(); self.phase = Phase::Attention(binding, rows); Ok(())
+    }
+    pub fn chain_graph_identity(&self) -> Vec<usize> {
+        self.attention.graph_identity().into_iter().chain(self.ffn.graph_identity()).collect()
+    }
+    pub fn graph_normalized_storage(&self, rows: usize) -> Ds41rtDeviceBuffer {
+        self.ffn.normalized_storage(rows)
+    }
+    /// # Safety
     /// The enclosing chain has successfully drained its stream. Values are the
     /// buffer returned by this block's enqueue_ffn, without intervening reuse.
     pub unsafe fn complete_queued_ffn(&mut self, values: Ds41rtDeviceBuffer) -> Result<FfnInput<'_>> {

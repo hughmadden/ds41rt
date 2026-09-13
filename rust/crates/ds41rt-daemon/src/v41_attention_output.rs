@@ -445,6 +445,34 @@ impl AttentionOutputWave<'_, '_> {
         let mut output = self.b(2); output.bytes = rows as usize * ROW_BYTES[2];
         Ok(output)
     }
+    /// Prepare only mutable metadata outside a containing graph. The caller
+    /// drains stream before releasing or reusing this wave or pinned staging.
+    pub unsafe fn prepare_chain_graph(&mut self, tokens: &[u64], stream: *mut std::ffi::c_void) -> Result<()> {
+        self.validate(tokens.len() as u32)?;
+        ensure!(tokens.iter().all(|&p| p < 1048576), "projection graph positions exceed context");
+        for (dst, token) in self.position_staging.bytes_mut().chunks_exact_mut(8).zip(tokens) {
+            dst.copy_from_slice(&token.to_ne_bytes());
+        }
+        unsafe { self.stream.library.copy_host_buffer_h2d_async(self.positions(), self.position_staging.buffer,
+            tokens.len() * 8, stream) }
+    }
+    /// # Safety
+    /// Matching sparse output is ordered on stream. Capture retains all weights
+    /// and storage through graph destruction, and owners stay exclusive in flight.
+    pub unsafe fn enqueue_chain_graph(&mut self, attention: &crate::v41_sparse_attention::QueuedSparseAttention,
+        stream: *mut std::ffi::c_void) -> Result<Ds41rtDeviceBuffer> {
+        ensure!(attention.layer == self.weights.layer && attention.rows > 0
+            && attention.rows <= self.capacity as usize
+            && attention.values.device_id == self.b(0).device_id, "projection graph origin differs");
+        unsafe {
+            self.stream.library.copy_d2d_async(self.b(0), attention.values, attention.values.bytes, stream)?;
+            self.enqueue_on(attention.rows as u32, stream)?;
+        }
+        let mut value = self.b(2); value.bytes = attention.rows * 10240; Ok(value)
+    }
+    pub fn chain_graph_identity(&self) -> [usize; 2] {
+        [self.b(0).ptr as usize, self.weights as *const _ as usize]
+    }
     pub fn output(&self) -> Result<AttentionOutput<'_>> {
         let rows = self.ready.context("attention output unpublished")? as usize;
         let b = |i| {

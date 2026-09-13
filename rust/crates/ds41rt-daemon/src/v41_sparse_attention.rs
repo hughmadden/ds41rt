@@ -43,6 +43,15 @@ pub(crate) struct QueuedSparseAttention {
     pub rows: usize,
 }
 
+/// The containing lane retains captured consumer storage and immutable weights
+/// until sparse graphs are destroyed. No callback may suspend during capture.
+pub(crate) trait AttentionGraphTail {
+    fn identity(&self) -> Vec<usize>;
+    unsafe fn prepare(&mut self, stream: *mut c_void) -> Result<()>;
+    unsafe fn enqueue(&mut self, attention: &QueuedSparseAttention, stream: *mut c_void) -> Result<()>;
+    unsafe fn restore_warmup(&mut self) -> Result<()>;
+    unsafe fn replay_state(&mut self) -> Result<()>;
+}
 pub(crate) struct SparseAttentionWave<'a> {
     stream: LoadStream<'a>,
     kernel: V41SparseAttention<'a>,
@@ -84,6 +93,7 @@ struct ColdSparse {
     batch: Option<V41SparseBatch>,
     fingerprint: Vec<usize>,
     needed: u16,
+    tail_identity: Option<Vec<usize>>,
 }
 fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {
     debug_assert!(offset + bytes <= b.bytes);
@@ -273,7 +283,8 @@ impl<'a> SparseAttentionWave<'a> {
     /// complete or drain. No new submission may reuse this owner while pending.
     pub unsafe fn enqueue_query_prepared(&mut self, query: &AttentionQueryOutput<'_>,
         sink: Ds41rtDeviceBuffer, requests: &[AttentionRequest<'_>],
-        selection: Option<&IndexSelectionOutput<'_>>) -> Result<Option<QueuedSparseAttention>> {
+        selection: Option<&IndexSelectionOutput<'_>>, defer_warmup: bool,
+        tail: Option<&mut dyn AttentionGraphTail>) -> Result<Option<QueuedSparseAttention>> {
         ensure!(self.cold.is_none(), "cold attention preparation already pending");
         let binding = query.binding()?;
         let tokens = query.tokens()?;
@@ -284,7 +295,7 @@ impl<'a> SparseAttentionWave<'a> {
         if let Some(s) = selection { s.validate_query(binding)?; }
         let result = (|| unsafe {
             self.stream.library.copy_d2d_async(self.query.buffer, query.rotated, query.rotated.bytes, self.stream.raw)?;
-            self.execute_staged_inner(query.layer, sink, requests, selection, true)
+            self.execute_staged_inner(query.layer, sink, requests, selection, defer_warmup, tail)
         })();
         if result.is_err() { self.drain_chain()?; }
         result
@@ -292,28 +303,53 @@ impl<'a> SparseAttentionWave<'a> {
     /// # Safety
     /// The caller retains the external inputs represented by the owned cold plan.
     /// Returned attention is queued, ready for consumers on chain_stream().
-    pub async unsafe fn finish_prepare(&mut self) -> Result<QueuedSparseAttention> {
+    pub async unsafe fn finish_prepare(&mut self, mut tail: Option<&mut dyn AttentionGraphTail>) -> Result<QueuedSparseAttention> {
         let plan = self.cold.take().context("cold attention preparation absent")?;
         #[cfg(test)]
         eprintln!("queued sparse warmup layer={} rows={} batched={}", plan.layer, plan.rows, plan.batch.is_some());
         self.stream.wait().await?;
+        ensure!(plan.tail_identity == tail.as_ref().map(|t| t.identity()), "cold attention tail identity changed");
+        if let Some(tail) = tail.as_deref_mut() { unsafe { tail.restore_warmup()?; } }
         self.warmed_kernels |= plan.needed;
-        let graph = unsafe { self.capture_plan(&plan)? };
+        let graph = unsafe { self.capture_plan(&plan, &mut tail)? };
         self.graphs[plan.layer].push_back((graph, plan.fingerprint));
         let launched = unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw) };
         if let Err(error) = launched { self.synchronize()?; return Err(error); }
         Ok(QueuedSparseAttention { values: slice(self.output.buffer, 0, plan.rows * 65536),
             layer: plan.layer, rows: plan.rows })
     }
-    unsafe fn capture_plan(&self, plan: &ColdSparse) -> Result<*mut c_void> {
+    unsafe fn capture_plan(&self, plan: &ColdSparse, tail: &mut Option<&mut dyn AttentionGraphTail>) -> Result<*mut c_void> {
         unsafe { self.stream.library.cuda_graph_begin_capture(self.stream.raw)?; }
-        let launched = unsafe { self.enqueue(plan.sink, &plan.launches, plan.selected, plan.batch.as_ref()) };
+        let launched = (|| unsafe {
+            self.enqueue(plan.sink, &plan.launches, plan.selected, plan.batch.as_ref())?;
+            if let Some(tail) = tail.as_deref_mut() { tail.enqueue(&QueuedSparseAttention {
+                values: slice(self.output.buffer, 0, plan.rows * 65536), layer: plan.layer, rows: plan.rows }, self.stream.raw)?; }
+            Ok(())
+        })();
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => Ok(graph),
             (Err(error), Ok(graph)) => { unsafe { self.stream.library.cuda_graph_exec_destroy(graph)?; } Err(error) }
             (Err(error), Err(_)) | (Ok(()), Err(error)) => Err(error),
         }
+    }
+    /// # Safety
+    /// Retain all query/cache/selection and tail owners through this direct drain.
+    pub unsafe fn execute_query_graph(&mut self, query: &AttentionQueryOutput<'_>,
+        sink: Ds41rtDeviceBuffer, requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
+        tail: &mut dyn AttentionGraphTail) -> Result<()> {
+        struct Drain<'a>(&'a NativeLibrary, *mut c_void, bool);
+        impl Drop for Drain<'_> {
+            fn drop(&mut self) { if !self.2 {
+                if let Err(error) = unsafe { self.0.cuda_stream_synchronize(self.1) } {
+                    tracing::error!(%error, "draining direct attention graph on unwind");
+                }
+            } }
+        }
+        let mut drain = Drain(self.stream.library, self.stream.raw, false);
+        let queued = unsafe { self.enqueue_query_prepared(query, sink, requests, selection, false, Some(tail)) };
+        let drained = self.synchronize(); drain.2 = true;
+        queued.and_then(|value| value.context("direct graph unexpectedly deferred")).and(drained)
     }
     unsafe fn query_then<T>(&mut self, query: &AttentionQueryOutput<'_>, sink: Ds41rtDeviceBuffer,
         requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
@@ -353,12 +389,12 @@ impl<'a> SparseAttentionWave<'a> {
         requests: &'s [AttentionRequest<'s>],
         selection: Option<&'s IndexSelectionOutput<'s>>,
     ) -> Result<QueuedSparseAttention> {
-        unsafe { self.execute_staged_inner(layer, sink, requests, selection, false)? }
+        unsafe { self.execute_staged_inner(layer, sink, requests, selection, false, None)? }
             .context("direct attention unexpectedly deferred")
     }
     unsafe fn execute_staged_inner(&mut self, layer: usize, sink: Ds41rtDeviceBuffer,
         requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
-        defer_warmup: bool) -> Result<Option<QueuedSparseAttention>> {
+        defer_warmup: bool, mut tail: Option<&mut dyn AttentionGraphTail>) -> Result<Option<QueuedSparseAttention>> {
         ensure!(self.cold.is_none(), "attention warmup is pending");
         ensure!(
             layer < 40 && !requests.is_empty() && requests.len() <= 16,
@@ -544,12 +580,19 @@ impl<'a> SparseAttentionWave<'a> {
                 )?;
             }
         }
+        let queued = QueuedSparseAttention { values: slice(self.output.buffer, 0, rows * 65536), layer, rows };
+        let tail_identity = tail.as_ref().map(|t| t.identity());
+        if let Some(identity) = &tail_identity {
+            fingerprint.push(usize::MAX - 1); fingerprint.extend(identity);
+            unsafe { tail.as_deref_mut().unwrap().prepare(self.stream.raw)?; }
+        }
         let cached = self.graphs[layer].iter().position(|(_, f)| f == &fingerprint);
         let graph = if let Some(index) = cached {
             // Move a used binding to the newest end of the bounded LRU.
             let entry = self.graphs[layer].remove(index).unwrap();
             let graph = entry.0;
             self.graphs[layer].push_back(entry);
+            if let Some(tail) = tail.as_deref_mut() { unsafe { tail.replay_state()?; } }
             graph
         } else {
             tracing::debug!(target: "ds41rt::timing", layer, rows, batched = batch.is_some(), "sparse graph capture");
@@ -568,21 +611,26 @@ impl<'a> SparseAttentionWave<'a> {
                     else if launch.rows < 256 { 2 } else { 3 };
                 mask | (1 << (recipe + 4 * usize::from(launch.source.is_some())))
             }) };
-            let needs_warmup = (batch.is_none() && self.graph_limit == 1) || self.warmed_kernels & needed != needed;
-            let plan = ColdSparse { layer, rows, sink, launches, selected, batch, fingerprint, needed };
+            let needs_warmup = tail.is_some() || (batch.is_none() && self.graph_limit == 1) || self.warmed_kernels & needed != needed;
+            let plan = ColdSparse { layer, rows, sink, launches, selected, batch, fingerprint, needed, tail_identity };
             if needs_warmup {
-                let launched = unsafe { self.enqueue(plan.sink, &plan.launches, plan.selected, plan.batch.as_ref()) };
+                let launched = (|| unsafe {
+                    self.enqueue(plan.sink, &plan.launches, plan.selected, plan.batch.as_ref())?;
+                    if let Some(tail) = tail.as_deref_mut() { tail.enqueue(&queued, self.stream.raw)?; }
+                    Ok(())
+                })();
                 if defer_warmup {
                     launched?;
                     self.cold = Some(plan);
                     return Ok(None);
                 }
                 launched.and(self.synchronize())?;
+                if let Some(tail) = tail.as_deref_mut() { unsafe { tail.restore_warmup()?; } }
                 self.warmed_kernels |= needed;
             }
             // Metadata uploads remain ordered on this stream; capture itself
             // contains no await. Previous uses of an evicted graph are complete.
-            let graph = unsafe { self.capture_plan(&plan)? };
+            let graph = unsafe { self.capture_plan(&plan, &mut tail)? };
             self.graphs[layer].push_back((graph, plan.fingerprint));
             graph
         };

@@ -93,31 +93,49 @@ enum Phase {
     Invalid,
 }
 
+struct AttentionTail<'s, 'w, 'a> {
+    projection: &'s mut AttentionOutputWave<'w, 'a>,
+    block: &'s mut BackboneBlockWave<'w, 'a>,
+    binding: QueryBinding,
+    tokens: &'s [u64],
+}
+impl crate::v41_sparse_attention::AttentionGraphTail for AttentionTail<'_, '_, '_> {
+    fn identity(&self) -> Vec<usize> {
+        let mut identity = self.projection.chain_graph_identity().to_vec();
+        identity.extend(self.block.chain_graph_identity()); identity
+    }
+    unsafe fn prepare(&mut self, stream: *mut std::ffi::c_void) -> Result<()> {
+        unsafe { self.projection.prepare_chain_graph(self.tokens, stream) }
+    }
+    unsafe fn enqueue(&mut self, attention: &crate::v41_sparse_attention::QueuedSparseAttention,
+        stream: *mut std::ffi::c_void) -> Result<()> {
+        let projected = unsafe { self.projection.enqueue_chain_graph(attention, stream)? };
+        unsafe { self.block.enqueue_ffn(self.binding, self.tokens.len(), projected, stream)?; }
+        Ok(())
+    }
+    unsafe fn restore_warmup(&mut self) -> Result<()> {
+        unsafe { self.block.restore_ffn_graph_warmup(self.binding, self.tokens.len()) }
+    }
+    unsafe fn replay_state(&mut self) -> Result<()> {
+        unsafe { self.block.prepare_ffn_graph_replay(self.binding, self.tokens.len()) }
+    }
+}
+
 /// Retains all lane consumers until attention finishes. The unsafe constructor's
 /// caller also retains the batch cache producers and index storage while pending.
 pub(crate) struct PendingLaneFfn<'s, 'w, 'a> {
     lane: Option<&'s mut BackboneLane<'w, 'a>>,
     values: Option<Ds41rtDeviceBuffer>,
-    projection_warmup: Option<u32>,
 }
 impl<'s, 'w, 'a> PendingLaneFfn<'s, 'w, 'a> {
     pub async fn complete(mut self) -> Result<LaneFfn<'s, 'w, 'a>> {
-        if self.values.is_none() && self.projection_warmup.is_none() {
+        if self.values.is_none() {
             let lane = self.lane.as_deref_mut().unwrap();
-            let attention = unsafe { lane.sparse.finish_prepare().await? };
-            let stream = lane.sparse.chain_stream();
             let query = lane.query.output()?;
-            if let Some(projected) = unsafe { lane.projection.enqueue_attention_prepared(&attention, query.tokens()?, stream)? } {
-                self.values = Some(unsafe { lane.block.enqueue_ffn(query.binding()?, attention.rows, projected, stream)? });
-            } else { self.projection_warmup = Some(attention.rows as u32); }
-        }
-        if let Some(rows) = self.projection_warmup.take() {
-            let lane = self.lane.as_deref_mut().unwrap();
-            lane.sparse.wait_chain().await?;
-            let stream = lane.sparse.chain_stream();
-            let projected = unsafe { lane.projection.finish_prepared(rows, stream)? };
-            let binding = lane.query.output()?.binding()?;
-            self.values = Some(unsafe { lane.block.enqueue_ffn(binding, rows as usize, projected, stream)? });
+            let mut tail = AttentionTail { projection: &mut lane.projection, block: &mut lane.block,
+                binding: query.binding()?, tokens: query.tokens()? };
+            unsafe { lane.sparse.finish_prepare(Some(&mut tail)).await?; }
+            self.values = Some(lane.block.graph_normalized_storage(query.rows));
         }
         self.lane.as_ref().unwrap().sparse.wait_chain().await?;
         let lane = self.lane.take().unwrap();
@@ -308,13 +326,14 @@ async fn complete_ffn<T>(
 }
 
 pub(crate) struct BackboneLane<'w, 'a> {
+    // Destroy containing graphs before their captured consumer allocations.
+    sparse: SparseAttentionWave<'a>,
     weights: &'w BackboneLaneWeights<'a>,
     block: BackboneBlockWave<'w, 'a>,
     query: AttentionQueryWave<'w, 'a>,
     projection: AttentionOutputWave<'w, 'a>,
     shared: BackboneSharedWave<'w, 'a>,
     router: BackboneRouterWave<'w, 'a>,
-    sparse: SparseAttentionWave<'a>,
     layer: usize,
     phase: Phase,
     capture_routes: bool,
@@ -507,15 +526,10 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         let timing = std::time::Instant::now();
         let binding = query.binding()?;
         let tokens = query.tokens()?;
-        let result = unsafe { self.sparse.execute_query_then(&query, sink, requests, selection,
-            |attention, stream| {
-                let projected = self.projection.enqueue_attention(&attention, tokens, stream)?;
-                self.block.enqueue_ffn(binding, attention.rows, projected, stream)
-            }) };
-        let values = match result {
-            Ok(values) => values,
-            Err(error) => { self.block.reset(); self.phase = Phase::Invalid; return Err(error); }
-        };
+        let mut tail = AttentionTail { projection: &mut self.projection, block: &mut self.block, binding, tokens };
+        let result = unsafe { self.sparse.execute_query_graph(&query, sink, requests, selection, &mut tail) };
+        if let Err(error) = result { self.block.reset(); self.phase = Phase::Invalid; return Err(error); }
+        let values = self.block.graph_normalized_storage(tokens.len());
         let input = unsafe { self.block.complete_queued_ffn(values)? };
         tracing::debug!(target: "ds41rt::timing", layer=self.layer, rows=query.rows,
             total_us=timing.elapsed().as_micros() as u64, "target attention chain");
@@ -545,14 +559,13 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         query.tokens()?;
         // Construct the guard before submitting so partial failures and unwinding
         // drain before any external query/cache/selection owner can be reused.
-        let mut pending = PendingLaneFfn { lane: Some(self), values: None, projection_warmup: None };
+        let mut pending = PendingLaneFfn { lane: Some(self), values: None };
         let lane = pending.lane.as_deref_mut().unwrap();
         let query = lane.query.output()?;
-        if let Some(attention) = unsafe { lane.sparse.enqueue_query_prepared(&query, sink, &requests, selection.as_ref())? } {
-            let stream = lane.sparse.chain_stream();
-            if let Some(projected) = unsafe { lane.projection.enqueue_attention_prepared(&attention, query.tokens()?, stream)? } {
-                pending.values = Some(unsafe { lane.block.enqueue_ffn(binding, attention.rows, projected, stream)? });
-            } else { pending.projection_warmup = Some(attention.rows as u32); }
+        let mut tail = AttentionTail { projection: &mut lane.projection, block: &mut lane.block,
+            binding, tokens: query.tokens()? };
+        if unsafe { lane.sparse.enqueue_query_prepared(&query, sink, &requests, selection.as_ref(), true, Some(&mut tail))? }.is_some() {
+            pending.values = Some(lane.block.graph_normalized_storage(query.rows));
         }
         Ok(pending)
     }
