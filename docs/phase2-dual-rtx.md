@@ -461,3 +461,39 @@ exposed a stale assertion rejecting page counts above 65,536; it now checks the
 existing 262,144-page limit and accepts 65,537, matching the current source cache.
 The allocation and snapshot evidence does not yet cover full distributed
 attention execution, end-to-end cache reuse, startup selection, or performance.
+
+## Placed cache-producer weights and workspaces
+
+Cache producer loading now follows `CachePlacement`: each SWA projection,
+compressed-source weight set, and attention sink loads on its owning GPU.
+Per-device weight budgets are validated first, and device owners preserve the
+correct context during loading and destruction. Attention sink pointers are
+resolved once at startup instead of formatting a tensor name and looking it up
+at every layer.
+
+`PlacedProducerWaves` allocates all forty SWA producer workspaces and four
+compression workspaces on those same devices, independently for each lane.
+Its budget splits the existing workspace calculation without counting another
+GPU's free space. For the original encoder/decoder placement:
+
+| Component budget, bytes | GPU0 | GPU1 |
+| --- | ---: | ---: |
+| Cache-producer weights | 85,998,336 | 59,519,232 |
+| Producer workspaces per lane, C16 | 22,990,736 | 14,024,592 |
+
+These figures exclude attention query/output projections, FFNs, KV/SWA storage,
+snapshots, auxiliary components, and CUDA overhead. They are component budgets,
+not the complete serving memory requirement.
+
+The official-weight fixture verifies all producer/sink/input-buffer device
+assignments. Layer-20 SWA and source-20 compression graph replay on GPU1 match
+the same weights executing on GPU0 byte-for-byte, including changed inputs and
+FP4 KV/index packing. Device-scoped futures restore the calling context after
+each execution. The existing single-device loader and execution constructor also
+initialize with every producer and sink on GPU0 after the dual-device checks.
+
+The placed workspace owner is not yet selected by the complete layer loop.
+The old execution constructor rejects distributed weights to prevent silently
+allocating their workspaces on the caller's GPU. Integrating placed producer
+polling/commit with attention, index, and layer-state ownership remains next;
+no full-model quality or throughput claim follows from these component checks.

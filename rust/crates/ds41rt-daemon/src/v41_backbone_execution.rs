@@ -1,5 +1,7 @@
 //! Cache producers and the complete per-layer backbone execution handoff.
-use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage};
+use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage, CachePlacement};
+use crate::v41_memory::device::{Device, DeviceOwner};
+mod placement;
 use crate::v41_backbone_lane::{BackboneLane, LaneFfn, PendingLaneFfn};
 use crate::v41_backbone_router::ExpertRow;
 use crate::v41_compressor::{CompressorWave, CompressorWeights};
@@ -83,9 +85,11 @@ impl<'a> LayerCache<'_, 'a> {
 
 pub(crate) struct CacheProducerWeights<'a> {
     library: &'a NativeLibrary,
-    windows: Vec<WindowWeights<'a>>,
-    sources: Vec<CompressorWeights<'a>>,
-    sinks: NativeRtxTensors<'a>,
+    windows: Vec<DeviceOwner<'a, WindowWeights<'a>>>,
+    sources: Vec<DeviceOwner<'a, CompressorWeights<'a>>>,
+    _sinks: Vec<DeviceOwner<'a, NativeRtxTensors<'a>>>,
+    sink_views: [ds41rt_ffi::Ds41rtDeviceBuffer; 40],
+    placement: Option<CachePlacement>,
 }
 impl<'a> CacheProducerWeights<'a> {
     fn sinks() -> Vec<String> {
@@ -118,44 +122,9 @@ impl<'a> CacheProducerWeights<'a> {
             Self::device_bytes(library, catalog)? <= budget,
             "cache producer weights exceed budget"
         );
-        let windows = (0..40)
-            .map(|layer| {
-                WindowWeights::load(
-                    library,
-                    catalog,
-                    layer,
-                    WindowWeights::device_bytes(library, catalog, layer)?,
-                    staging,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let sources = SOURCES
-            .into_iter()
-            .map(|layer| {
-                CompressorWeights::load(
-                    library,
-                    catalog,
-                    layer,
-                    CompressorWeights::device_bytes(catalog, layer)?,
-                    staging,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let names = Self::sinks();
-        let sinks = NativeRtxTensors::load(
-            library,
-            catalog,
-            &names,
-            NativeRtxTensors::plan(catalog, &names)?,
-            staging,
-        )?;
-        Ok(Self {
-            library,
-            windows,
-            sources,
-            sinks,
-        })
+        Self::load_placed(library, catalog, staging, None)
     }
+
 }
 
 #[derive(Default)]
@@ -307,6 +276,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         capacity: u32,
         budget: usize,
     ) -> Result<Self> {
+        ensure!(weights.placement.is_none(), "distributed producer weights require placed execution workspaces");
         ensure!(
             Self::workspace_bytes(weights.library, capacity)? <= budget,
             "cache producer workspace exceeds budget"
@@ -525,10 +495,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             }
         }
         let indexed_us = timing.elapsed().as_micros() as u64;
-        let sink = self
-            .weights
-            .sinks
-            .get(&format!("layers.{layer}.attn.attn_sink"))?;
+        let sink = self.weights.sink_views[layer];
         let rows = batch.expert_rows();
         let ffn = if cooperative {
             PreparedFfn::Pending(unsafe { lane.enqueue_attention_indexed_ffn(sink, &cache, index)? })
