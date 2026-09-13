@@ -1,0 +1,2010 @@
+{
+  "scope": "Compare an isolated device-descriptor sparse probe with per-request split launches.\n\nThe candidate exports ds41rt_probe_sparse_batch{,_initialize}; this unchecked\nexperimental ABI is deliberately outside the serving library. Timing excludes\nmetadata/descriptor upload and graph capture, and is not serving throughput.\n",
+  "cases": [
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2,
+        3
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        5,
+        6,
+        1,
+        2,
+        1,
+        2,
+        3,
+        4
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        1,
+        2,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1,
+        2,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        2,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2,
+        3
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        5,
+        6,
+        1,
+        2,
+        1,
+        2,
+        3,
+        4
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        1,
+        2,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1,
+        2,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        2,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2,
+        3
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        5,
+        6,
+        1,
+        2,
+        1,
+        2,
+        3,
+        4
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        1,
+        2,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1,
+        2,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        2,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 49,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 60,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 63,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 124,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 127,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 128,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 2048,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 32768,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 131072,
+      "bit_exact": true
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "start": 4096,
+      "bit_exact": true
+    }
+  ],
+  "timings": [
+    {
+      "compressed": 0,
+      "layout": [
+        1
+      ],
+      "rows": 1,
+      "scratch_bytes": 263168,
+      "baseline_us": 16.434399783611298,
+      "candidate_us": 16.436799615621567,
+      "samples_us": [
+        [
+          16.433599591255188,
+          16.438399255275726,
+          16.42719954252243,
+          16.435199975967407,
+          16.44960045814514,
+          16.439999639987946,
+          16.42879992723465,
+          16.47679954767227,
+          16.43040031194687,
+          16.42400026321411
+        ],
+        [
+          16.462400555610657,
+          16.42400026321411,
+          16.435199975967407,
+          16.432000696659088,
+          16.42560064792633,
+          16.438399255275726,
+          16.446399688720703,
+          16.444799304008484,
+          16.433599591255188,
+          16.53439998626709
+        ]
+      ]
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6
+      ],
+      "rows": 6,
+      "scratch_bytes": 1579008,
+      "baseline_us": 16.741599887609482,
+      "candidate_us": 18.487200140953064,
+      "samples_us": [
+        [
+          17.526400089263916,
+          17.77919977903366,
+          16.53600037097931,
+          16.63520038127899,
+          16.740800440311432,
+          16.64479970932007,
+          17.668800055980682,
+          17.256000638008118,
+          16.438399255275726,
+          16.74239933490753
+        ],
+        [
+          18.484799563884735,
+          18.47199946641922,
+          18.491199612617493,
+          18.479999899864197,
+          18.489600718021393,
+          18.491199612617493,
+          18.39199960231781,
+          18.489600718021393,
+          18.489600718021393,
+          18.478399515151978
+        ]
+      ]
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "rows": 24,
+      "scratch_bytes": 6316032,
+      "baseline_us": 123.45120310783386,
+      "candidate_us": 18.488800525665283,
+      "samples_us": [
+        [
+          123.50879907608032,
+          123.80479574203491,
+          123.34239482879639,
+          123.35200309753418,
+          123.3888030052185,
+          123.44800233840942,
+          123.59839677810669,
+          123.4544038772583,
+          123.48320484161377,
+          123.34719896316528
+        ],
+        [
+          18.492799997329712,
+          18.481600284576416,
+          18.481600284576416,
+          18.491199612617493,
+          18.489600718021393,
+          18.489600718021393,
+          18.488000333309174,
+          18.488000333309174,
+          18.486399948596954,
+          18.534399569034576
+        ]
+      ]
+    },
+    {
+      "compressed": 0,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "rows": 48,
+      "scratch_bytes": 12632064,
+      "baseline_us": 127.94879674911499,
+      "candidate_us": 34.783199429512024,
+      "samples_us": [
+        [
+          127.76960134506226,
+          127.74720191955566,
+          127.89280414581299,
+          127.69440412521362,
+          127.89759635925293,
+          128.00159454345703,
+          128.27680110931396,
+          128.10239791870117,
+          127.99999713897705,
+          128.47360372543335
+        ],
+        [
+          34.47839915752411,
+          34.755200147628784,
+          34.87200140953064,
+          34.87040102481842,
+          34.672001004219055,
+          34.859201312065125,
+          34.55199897289276,
+          34.66559946537018,
+          34.811198711395264,
+          34.87679958343506
+        ]
+      ]
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        1
+      ],
+      "rows": 1,
+      "scratch_bytes": 1315840,
+      "baseline_us": 22.589600086212158,
+      "candidate_us": 23.548799753189087,
+      "samples_us": [
+        [
+          22.652800381183624,
+          22.58400022983551,
+          22.679999470710754,
+          22.593599557876587,
+          22.580799460411072,
+          22.58879989385605,
+          22.58560061454773,
+          22.58400022983551,
+          22.625599801540375,
+          22.590400278568268
+        ],
+        [
+          23.99040013551712,
+          23.388800024986267,
+          22.592000663280487,
+          24.12160038948059,
+          23.708799481391907,
+          22.87999987602234,
+          23.721599578857422,
+          23.06399941444397,
+          22.631999850273132,
+          24.01760071516037
+        ]
+      ]
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6
+      ],
+      "rows": 6,
+      "scratch_bytes": 7895040,
+      "baseline_us": 38.96880000829697,
+      "candidate_us": 39.06880021095276,
+      "samples_us": [
+        [
+          38.99039924144745,
+          38.95519971847534,
+          38.960000872612,
+          38.971200585365295,
+          38.96639943122864,
+          39.024001359939575,
+          38.96799981594086,
+          38.96160125732422,
+          38.969600200653076,
+          38.972800970077515
+        ],
+        [
+          38.998401165008545,
+          38.95840048789978,
+          39.06880021095276,
+          39.208000898361206,
+          39.01279866695404,
+          39.03999924659729,
+          39.17919993400574,
+          39.1728013753891,
+          39.1728013753891,
+          39.06880021095276
+        ]
+      ]
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "rows": 24,
+      "scratch_bytes": 31580160,
+      "baseline_us": 192.7784025669098,
+      "candidate_us": 100.4080057144165,
+      "samples_us": [
+        [
+          192.58719682693481,
+          192.77600049972534,
+          192.9152011871338,
+          192.81599521636963,
+          192.81920194625854,
+          192.6367998123169,
+          192.6800012588501,
+          192.56960153579712,
+          193.1264042854309,
+          192.78080463409424
+        ],
+        [
+          100.41919946670532,
+          100.39520263671875,
+          100.31520128250122,
+          100.4080057144165,
+          100.40160417556763,
+          100.4256010055542,
+          100.4080057144165,
+          100.40639638900757,
+          100.4080057144165,
+          100.4080057144165
+        ]
+      ]
+    },
+    {
+      "compressed": 1,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "rows": 48,
+      "scratch_bytes": 63160320,
+      "baseline_us": 302.2487998008728,
+      "candidate_us": 188.68319988250732,
+      "samples_us": [
+        [
+          302.30560302734375,
+          302.2223949432373,
+          302.32160091400146,
+          302.1903991699219,
+          302.2847890853882,
+          302.2752046585083,
+          302.0848035812378,
+          302.1359920501709,
+          302.60159969329834,
+          302.1343946456909
+        ],
+        [
+          188.69119882583618,
+          189.06400203704834,
+          188.67520093917847,
+          188.6687994003296,
+          188.74880075454712,
+          188.57120275497437,
+          188.93280029296875,
+          188.7168049812317,
+          188.46240043640137,
+          188.61440420150757
+        ]
+      ]
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        1
+      ],
+      "rows": 1,
+      "scratch_bytes": 1315840,
+      "baseline_us": 24.63199943304062,
+      "candidate_us": 24.63119998574257,
+      "samples_us": [
+        [
+          24.55199956893921,
+          24.63199943304062,
+          24.633599817752838,
+          24.63199943304062,
+          24.531200528144836,
+          24.63199943304062,
+          24.62719976902008,
+          24.633599817752838,
+          24.532799422740936,
+          24.63199943304062
+        ],
+        [
+          24.65119957923889,
+          24.620799720287323,
+          24.633599817752838,
+          24.62400048971176,
+          24.633599817752838,
+          24.63199943304062,
+          24.633599817752838,
+          24.63040053844452,
+          24.63040053844452,
+          24.63040053844452
+        ]
+      ]
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6
+      ],
+      "rows": 6,
+      "scratch_bytes": 7895040,
+      "baseline_us": 40.297600626945496,
+      "candidate_us": 41.00959897041321,
+      "samples_us": [
+        [
+          40.92319905757904,
+          40.4015988111496,
+          40.19039869308472,
+          40.4015988111496,
+          40.39680063724518,
+          40.300801396369934,
+          40.09439945220947,
+          40.29439985752106,
+          39.91360068321228,
+          40.139201283454895
+        ],
+        [
+          41.03359878063202,
+          40.99679887294769,
+          41.01920127868652,
+          41.05600118637085,
+          41.00959897041321,
+          41.00959897041321,
+          41.00959897041321,
+          41.00640118122101,
+          41.00480079650879,
+          41.01279973983765
+        ]
+      ]
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        1,
+        2
+      ],
+      "rows": 24,
+      "scratch_bytes": 31580160,
+      "baseline_us": 196.30320072174072,
+      "candidate_us": 104.29199934005737,
+      "samples_us": [
+        [
+          196.16320133209229,
+          196.28159999847412,
+          196.50239944458008,
+          196.29919528961182,
+          196.60160541534424,
+          196.25439643859863,
+          196.30240201950073,
+          196.4128017425537,
+          196.3039994239807,
+          196.39040231704712
+        ],
+        [
+          104.31040525436401,
+          104.39200401306152,
+          104.09760475158691,
+          104.03200387954712,
+          104.18720245361328,
+          104.38079833984375,
+          104.29919958114624,
+          104.2847990989685,
+          104.28320169448853,
+          104.54239845275879
+        ]
+      ]
+    },
+    {
+      "compressed": 2,
+      "layout": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "rows": 48,
+      "scratch_bytes": 63160320,
+      "baseline_us": 309.13360118865967,
+      "candidate_us": 195.36479711532593,
+      "samples_us": [
+        [
+          309.4575881958008,
+          309.0831995010376,
+          309.17279720306396,
+          309.08639430999756,
+          309.09440517425537,
+          309.0496063232422,
+          308.9888095855713,
+          309.96479988098145,
+          310.11040210723877,
+          310.2224111557007
+        ],
+        [
+          195.3503966331482,
+          195.04159688949585,
+          195.26560306549072,
+          195.37919759750366,
+          195.12159824371338,
+          195.4767942428589,
+          195.28319835662842,
+          195.47359943389893,
+          196.55840396881104,
+          195.8672046661377
+        ]
+      ]
+    }
+  ],
+  "provenance": {
+    "source_commit": "4c7468ae520be0cf4f14a34b6df53cb45dd78849",
+    "device": "RTX PRO 6000 Blackwell GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+    "power_limit_w": 400,
+    "memory_speed": "standard; configured maximum 14001 MHz; not overclocked",
+    "caveat": "Exploratory resident-idle-service microbenchmark, no locked clock/throttling gate; not serving TPS or prefill qualification.",
+    "memcheck": "132 cases; ERROR SUMMARY: 0 errors",
+    "baseline_sha256": "c7d680188c8e9c2610f9dbfec8b7bcfefb8b3123f79b08a4f33bed46f4c6c40a",
+    "candidate_sha256": "ac48df5e1e208d4caf08313b90fecf94e50d63134b49408788f1d2d931603ab4",
+    "generated_source_sha256": "f615a06755e69c221d0208c46885a7f519e6fd8b931dcca23759f4b8d8789248"
+  }
+}
