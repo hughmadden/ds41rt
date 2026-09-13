@@ -956,3 +956,13 @@ concurrent mismatch is resolved. Full dense-kernel race checking with tensor
 operation checks is the next investigation. An initial filter written as
 `kns=regex:.*dense_gemm.*` matched no kernels and provides no race coverage;
 the corrected filter is `kns=dense_gemm`.
+
+The paired QB diagnostic also retains its complete quantization scratch before
+cache production and reports byte differences, without interpreting FP8/scale
+bytes as BF16. New equal-input mismatch dumps include `actual-scratch.bin` and
+`expected-scratch.bin`. Scratch includes padding and possibly inactive rows;
+a difference alone is not evidence of corrupted live inputs. Identical scratch
+would further narrow an equal-input/different-output capture to the GEMM or
+its weight/output lifetime. This additional diagnostic is test-only and has
+compiled successfully; reproduction with it remains pending while the full
+race check uses the preceding binary.
