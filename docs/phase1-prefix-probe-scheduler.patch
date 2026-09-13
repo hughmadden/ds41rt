@@ -1,0 +1,30 @@
+diff --git a/rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs b/rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs
+index a970f96..00e168d 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_native_serve/scheduler.rs
+@@ -1,3 +1,5 @@
++#[path = "prefix_probe.rs"]
++mod prefix_probe;
+ use super::*;
+ use super::scores::BatchScores;
+ use crate::v41_backbone_cache::CacheLease;
+@@ -295,6 +297,19 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+             prepare_us += prepare_start.elapsed().as_micros() as u64;
+         }
+     }
++    if std::env::var_os("DS41RT_PREFIX_PROBE_DIR").is_some() {
++        // Cancel early Engram preparation before replaying private proposals.
++        batches=[None,None];
++        prefix_probe::run(lib,runtime,first,second,requests,first_transport,second_transport,
++            active,members,&inputs,draft.as_deref())?;
++        if !adaptive {
++            for lane in 0..2 {
++                if !members[lane].is_empty() {
++                    batches[lane]=Some(prepare_decode_lane(requests,active,&members[lane],&inputs[lane],speculative)?);
++                }
++            }
++        }
++    }
+     if adaptive {
+         // Both proposals must be available to price their joint row/expert cost.
+         // Keep the existing early Engram preparation unchanged for fixed mode.

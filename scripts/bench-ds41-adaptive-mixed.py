@@ -17,6 +17,8 @@ def main():
     p.add_argument('--tokenizer', type=Path, required=True)
     p.add_argument('--nonce-seed', type=int, default=56001)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--concurrency', type=int, nargs='+', choices=range(1,17), default=[4,16],
+                   help='Mixed batch concurrency levels, default 4 16')
     p.add_argument('--skip-lifecycle', action='store_true', help='Run only mixed traffic for focused diagnostics')
     args = p.parse_args()
     if args.output.exists():
@@ -27,7 +29,7 @@ def main():
     corpus_path = here / 'fixtures/release-semantic-corpus.json'
     corpus = json.loads(corpus_path.read_text())
     tokenizer = Tokenizer.from_file(str(args.tokenizer))
-    nonces = iter(bench['token_zero_nonces'](40, args.nonce_seed, tokenizer))
+    nonces = iter(bench['token_zero_nonces'](sum(args.concurrency)+20, args.nonce_seed, tokenizer))
     report = dict(scope=__doc__, nonce_seed=args.nonce_seed,
                   corpus_sha256=hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
                   tokenizer_sha256=hashlib.sha256(args.tokenizer.read_bytes()).hexdigest(),
@@ -44,7 +46,7 @@ def main():
 
     # All calls begin together. Each prompt has a different first content token;
     # both serving arms receive identical input order and content.
-    for concurrency in [4, 16]:
+    for concurrency in args.concurrency:
         bodies = []
         for i in range(concurrency):
             case = ['code', 'fable', 'topic'][i % 3]
