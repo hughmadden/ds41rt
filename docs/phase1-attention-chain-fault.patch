@@ -1,0 +1,19 @@
+--- a/rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs
+@@ -345,7 +345,15 @@
+         let result = unsafe { self.sparse.execute_query_then(&query, sink, requests, selection,
+             |attention, stream| {
+                 let projected = self.projection.enqueue_attention(&attention, tokens, stream)?;
+-                self.block.enqueue_ffn(binding, attention.rows, projected, stream)
++                let values = self.block.enqueue_ffn(binding, attention.rows, projected, stream)?;
++                // Isolated diagnostic binary: fail once after ALL chain work is queued.
++                static FIRED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
++                if attention.rows == 6 && attention.layer == 3
++                    && !FIRED.swap(true, std::sync::atomic::Ordering::SeqCst) {
++                    eprintln!("INJECTED_AFTER_ATTENTION_CHAIN");
++                    anyhow::bail!("injected error after queued attention/FFN work");
++                }
++                Ok(values)
+             }) };
+         let values = match result {
+             Ok(values) => values,

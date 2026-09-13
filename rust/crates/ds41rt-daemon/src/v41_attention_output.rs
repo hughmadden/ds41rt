@@ -361,6 +361,43 @@ impl AttentionOutputWave<'_, '_> {
         self.origin = Some(attention.binding()?);
         self.output()
     }
+    /// # Safety
+    /// Attention is queued on stream. All owners, including this projection's
+    /// graph and pinned staging, stay alive and exclusive until that stream is
+    /// drained by the enclosing sparse-attention continuation, including errors.
+    /// This method never publishes AttentionOutput or marks this wave ready.
+    pub unsafe fn enqueue_attention(
+        &mut self, attention: &crate::v41_sparse_attention::QueuedSparseAttention,
+        tokens: &[u64], stream: *mut std::ffi::c_void,
+    ) -> Result<Ds41rtDeviceBuffer> {
+        self.ready = None;
+        self.origin = None;
+        ensure!(attention.layer == self.weights.layer && attention.rows == tokens.len()
+            && attention.rows > 0 && attention.rows <= self.capacity as usize
+            && attention.values.device_id == self.b(0).device_id,
+            "queued attention output origin differs");
+        for (dst, token) in self.position_staging.bytes_mut().chunks_exact_mut(8).zip(tokens) {
+            dst.copy_from_slice(&token.to_ne_bytes());
+        }
+        unsafe {
+            self.stream.library.copy_d2d_async(self.b(0), attention.values, attention.values.bytes, stream)?;
+            self.stream.library.copy_host_buffer_h2d_async(self.positions(), self.position_staging.buffer,
+                tokens.len() * 8, stream)?;
+        }
+        let rows = attention.rows as u32;
+        if self.graphs.get_shape(self.weights.layer, self.weights, rows).is_none() {
+            // Cold setup uses the existing drained capture path; its input copies
+            // must complete before capture's private-stream warmup can read them.
+            unsafe { self.stream.library.cuda_stream_synchronize(stream)?; self.capture(rows)?; }
+        }
+        let (graph, count) = self.graphs.get_shape(self.weights.layer, self.weights, rows)
+            .context("queued output graph missing")?;
+        ensure!(count == rows, "queued output graph shape differs");
+        unsafe { self.stream.library.cuda_graph_launch(graph, stream)?; }
+        let mut output = self.b(2);
+        output.bytes = attention.rows * ROW_BYTES[2];
+        Ok(output)
+    }
     pub fn output(&self) -> Result<AttentionOutput<'_>> {
         let rows = self.ready.context("attention output unpublished")? as usize;
         let b = |i| {

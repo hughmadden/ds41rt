@@ -9,7 +9,7 @@ parser.add_argument('--target',type=Path,required=True)
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
 assert not args.output.exists(), 'refusing to overwrite existing evidence'
-events=['target layer preparation','target query preparation','target attention stages','target collection','target experts','target layer']
+events=['target attention chain','target layer preparation','target query preparation','target attention stages','target collection','target experts','target layer']
 out={}
 for arm in ['spec','target']:
  p=getattr(args,arm)

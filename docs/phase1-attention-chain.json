@@ -1,0 +1,1901 @@
+{
+  "scope": "Queued sparse attention, output projection and FFN preparation; preliminary measurements and quiet confirmation kept separate.",
+  "baseline_source": "8c88ecb",
+  "hardware": {
+    "rtx_count": 1,
+    "spark_workers": 4,
+    "power_limit_w": 400,
+    "memory_speed": "standard; current 13365 MHz, configured maximum 14001 MHz; no overclock"
+  },
+  "initial_c1": {
+    "spec": {
+      "before": 117.6397405346951,
+      "after": 120.07589709582395,
+      "exact_pairs": 3
+    },
+    "target": {
+      "before": 42.80573866875047,
+      "after": 43.57073259412881,
+      "exact_pairs": 3
+    }
+  },
+  "serving_with_compilation_overlap": {
+    "fixed": {
+      "scope": "Same fixed policy before/after; compilation overlapped part of serving pass, not a clean performance gate.",
+      "source_sha256": {
+        "before_decode": "de16b612aaba9978c6d371563f99b6a0221a8f3591bae5c4f376e67ef6105023",
+        "before_mixed": "d7cdfae4b938d53c0d61d7909ed6625d013e42bd269b269fe7f0eb08b1497aaf",
+        "after_decode": "5d133d5a0ca7ac4c37f4b4b7e038b6b560800927b8c129f52e82589d761c67df",
+        "after_mixed": "8dc7c667cd1505eb233f8c71d63d6636248c1f4900d5d90ad7ab0885abf1cc78"
+      },
+      "decode": {
+        "code": {
+          "before_tps": 120.32684784939055,
+          "after_tps": 117.03865717452584,
+          "after_over_before": 0.9726728428972025
+        },
+        "fable": {
+          "before_tps": 46.052665387789254,
+          "after_tps": 45.19848545987095,
+          "after_over_before": 0.981452106610429
+        },
+        "topic": {
+          "before_tps": 63.074164590307234,
+          "after_tps": 61.657586302495375,
+          "after_over_before": 0.9775410693583796
+        }
+      },
+      "mixed": [
+        {
+          "concurrency": 4,
+          "before_tps": 105.08703317126208,
+          "after_tps": 105.370394134313,
+          "after_over_before": 1.0026964407929295,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 16,
+          "before_tps": 167.83007327682986,
+          "after_tps": 168.9293426200837,
+          "after_over_before": 1.006549894913295,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 4,
+              "case": "fable",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 5,
+              "case": "topic",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 6,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 7,
+              "case": "fable",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 8,
+              "case": "topic",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 9,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 10,
+              "case": "fable",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 11,
+              "case": "topic",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 12,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 13,
+              "case": "fable",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 14,
+              "case": "topic",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 15,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        }
+      ],
+      "lifecycle": {
+        "before": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 5.971930240048096,
+          "cold_prompt_tokens_per_ttft_second": 5494.873295729543,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        },
+        "after": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 6.127261727931909,
+          "cold_prompt_tokens_per_ttft_second": 5355.57341224851,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        }
+      },
+      "decode_pairs": [
+        {
+          "case": "code",
+          "repeat": 1,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "fable",
+          "repeat": 1,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "topic",
+          "repeat": 1,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 2,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "fable",
+          "repeat": 2,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "topic",
+          "repeat": 2,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 3,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "fable",
+          "repeat": 3,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "topic",
+          "repeat": 3,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        }
+      ],
+      "limitations": [
+        "Exploratory sequential arms, not a balanced release comparison.",
+        "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+        "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+        "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+      ]
+    },
+    "adaptive": {
+      "scope": "Same adaptive policy before/after; compilation overlapped part of serving pass, not a clean performance gate.",
+      "source_sha256": {
+        "before_decode": "08fc9f4c785b46339d5e0975806557bedff0aec5034cb03ab68fba6a5252a7f6",
+        "before_mixed": "b3586b97682bc54eb18ca6866dfebda48a6957fa4b2983f36bcd2df4828d78f8",
+        "after_decode": "90d64725923e487a52523500eac507ffc35b41779248b1d0605ca16819f059ef",
+        "after_mixed": "3e8b291e54399646d8f7b3d6fd45e24317a1e5ef7e4ffbb3fd2cb36b5bc54057"
+      },
+      "decode": {
+        "code": {
+          "before_tps": 118.93102562756808,
+          "after_tps": 122.41365366715307,
+          "after_over_before": 1.0292827546151904
+        },
+        "fable": {
+          "before_tps": 51.23294180065739,
+          "after_tps": 53.50920186055057,
+          "after_over_before": 1.0444296185206363
+        },
+        "topic": {
+          "before_tps": 64.63880475075844,
+          "after_tps": 66.9277359924201,
+          "after_over_before": 1.0354111009708111
+        }
+      },
+      "mixed": [
+        {
+          "concurrency": 4,
+          "before_tps": 110.00094909161905,
+          "after_tps": 109.25457604946345,
+          "after_over_before": 0.9932148490688572,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 16,
+          "before_tps": 192.41918048294295,
+          "after_tps": 186.15454945320784,
+          "after_over_before": 0.967442793311915,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 4,
+              "case": "fable",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 5,
+              "case": "topic",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 6,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 7,
+              "case": "fable",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 8,
+              "case": "topic",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 9,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 10,
+              "case": "fable",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 11,
+              "case": "topic",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 12,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 13,
+              "case": "fable",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 14,
+              "case": "topic",
+              "exact": false,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 15,
+              "case": "code",
+              "exact": true,
+              "before_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "after_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        }
+      ],
+      "lifecycle": {
+        "before": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 6.106979005970061,
+          "cold_prompt_tokens_per_ttft_second": 5373.360538479125,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        },
+        "after": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 5.8954217249993235,
+          "cold_prompt_tokens_per_ttft_second": 5566.183647363034,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        }
+      },
+      "decode_pairs": [
+        {
+          "case": "code",
+          "repeat": 1,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "fable",
+          "repeat": 1,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "topic",
+          "repeat": 1,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 2,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "fable",
+          "repeat": 2,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "topic",
+          "repeat": 2,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 3,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "fable",
+          "repeat": 3,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "topic",
+          "repeat": 3,
+          "exact": true,
+          "before_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          },
+          "after_checks": {
+            "response_nonempty": true,
+            "objective_checks": {},
+            "objective_checks_passed": null,
+            "prose_quality_assessed": false
+          }
+        }
+      ],
+      "limitations": [
+        "Exploratory sequential arms, not a balanced release comparison.",
+        "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+        "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+        "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+      ]
+    }
+  },
+  "quiet_c1": {
+    "spec": {
+      "arms": {
+        "a1": {
+          "source_sha256": "7ac53bfac03d22b851cbab122a676f788ad77d0ba3c0550f6512d62f9630b168",
+          "sample_tps": [
+            117.81921107684906,
+            119.55593067206615,
+            118.2966937527934
+          ],
+          "median_tps": 118.2966937527934,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        },
+        "b1": {
+          "source_sha256": "1149ce84f7eae922a98c16a77ba80d5dd77289df1b2565f3bdc98334eaff92d0",
+          "sample_tps": [
+            118.87262117256029,
+            120.36178814177141,
+            119.55057255463117
+          ],
+          "median_tps": 119.55057255463117,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        },
+        "b2": {
+          "source_sha256": "fdc44141f395c4c634e60f4f50001252de1bf2196cebcb84904cd68a4c217dae",
+          "sample_tps": [
+            118.75391649249107,
+            120.3625892128044,
+            119.92978593752146
+          ],
+          "median_tps": 119.92978593752146,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        },
+        "a2": {
+          "source_sha256": "d69caa0d110776a0a0f0297d2f0c68ee5ea87e7c4fc9c1fcd341bd7eb25e1359",
+          "sample_tps": [
+            117.9856763493478,
+            119.40055111147802,
+            119.07012404506395
+          ],
+          "median_tps": 119.07012404506395,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        }
+      },
+      "pooled_median_tps": {
+        "before": 118.68340889892868,
+        "after": 119.74017924607631
+      },
+      "all_requests_and_outputs_match": true
+    },
+    "target": {
+      "arms": {
+        "a1": {
+          "source_sha256": "706947b57cbc5133e8fda3d77181609d01a769136b8bc68dc320a38d7e24d5a6",
+          "sample_tps": [
+            42.5890462756728,
+            42.833761638747795,
+            42.929968297031095
+          ],
+          "median_tps": 42.833761638747795,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "896d5c3910afcdbd73ee3468bd9723053cbe66ee5bb9751d7c1f9aa40982fdd2",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        },
+        "b1": {
+          "source_sha256": "ad348b935c3892f8add0512ef43151d731679265bf32de70907fe7c61dcc8585",
+          "sample_tps": [
+            43.423581106219935,
+            43.51011449145829,
+            43.514304205569616
+          ],
+          "median_tps": 43.51011449145829,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "896d5c3910afcdbd73ee3468bd9723053cbe66ee5bb9751d7c1f9aa40982fdd2",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        },
+        "b2": {
+          "source_sha256": "f413732c5510ceee5393034fcb54053fdd4ac95064aa4892d47c5e2ca411bcb4",
+          "sample_tps": [
+            43.199256737801406,
+            43.43299584138253,
+            43.513129479685205
+          ],
+          "median_tps": 43.43299584138253,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "896d5c3910afcdbd73ee3468bd9723053cbe66ee5bb9751d7c1f9aa40982fdd2",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        },
+        "a2": {
+          "source_sha256": "ecc00dba52bbfaf09ae3b47140f6dc91298712b3deda8ce7e5995347e85c8a8e",
+          "sample_tps": [
+            42.744248562463476,
+            42.88792310550224,
+            42.82437110596294
+          ],
+          "median_tps": 42.82437110596294,
+          "content_sha256": [
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "896d5c3910afcdbd73ee3468bd9723053cbe66ee5bb9751d7c1f9aa40982fdd2",
+            "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+          ]
+        }
+      },
+      "pooled_median_tps": {
+        "before": 42.82906637235537,
+        "after": 43.47155516642041
+      },
+      "all_requests_and_outputs_match": true
+    }
+  },
+  "fault": {
+    "source_sha256": "e473037599d356bdc29d602c81f513873b0f80c3bdf8497d14da0fb9c90f441a",
+    "injection_marker_count": 1,
+    "transport_failure": "IncompleteRead",
+    "exact_recovery_responses": 3,
+    "passed": true
+  },
+  "quiet_gate": {
+    "a1": {
+      "prefill_source_sha256": "d9d78820c1a5a0b5cb12f0b1bae4fac490a004053baac6b19fde1ac1b3ea1e61",
+      "prefill_tps": [
+        7716.588215184128,
+        7638.822624604525,
+        7691.556804008164
+      ],
+      "prefill_median_tps": 7691.556804008164,
+      "prompt_sha256": [
+        "c1ea1c5c116ab87295792c3c0df8f36016d95957a41ecb35c372e9acef7774a7",
+        "26c2013a7d249ac8b33724717b3181a4341c75269d2d938cc64f31a38a30f203",
+        "107de06a9a687043983beabd83816ba96127b7c1be77f1011ae367bf02f00168",
+        "309d39eb38b32204a6243c80165c08e3ee9b7db5c2af0143307a1fbe7457467a"
+      ],
+      "mixed_source_sha256": "16f2962c374a01d8067996f78ef9a5a88feb8a9e0e1761165412bf1d9b28d2ef",
+      "c16_tps": 177.2668895336233,
+      "exact_text_vs_a1": 16
+    },
+    "b1": {
+      "prefill_source_sha256": "812d73b823ee0e94c2a264eaad307e69f687b34abce862cdc0f7d5b757382d0e",
+      "prefill_tps": [
+        7603.91409915718,
+        7848.881201684334,
+        8022.727615649279
+      ],
+      "prefill_median_tps": 7848.881201684334,
+      "prompt_sha256": [
+        "c1ea1c5c116ab87295792c3c0df8f36016d95957a41ecb35c372e9acef7774a7",
+        "26c2013a7d249ac8b33724717b3181a4341c75269d2d938cc64f31a38a30f203",
+        "107de06a9a687043983beabd83816ba96127b7c1be77f1011ae367bf02f00168",
+        "309d39eb38b32204a6243c80165c08e3ee9b7db5c2af0143307a1fbe7457467a"
+      ],
+      "mixed_source_sha256": "59897de304a51c6308d508840e0f216c0cb1892558f8d63a01040a2fc5341c02",
+      "c16_tps": 184.2300731477233,
+      "exact_text_vs_a1": 6
+    },
+    "b2": {
+      "prefill_source_sha256": "ddc0bc91eafefc5d9dfa46316b4c2888727e081cafdd2607f99ee65654ad7f96",
+      "prefill_tps": [
+        7851.474099525167,
+        7857.078035748593,
+        7881.430025412968
+      ],
+      "prefill_median_tps": 7857.078035748593,
+      "prompt_sha256": [
+        "c1ea1c5c116ab87295792c3c0df8f36016d95957a41ecb35c372e9acef7774a7",
+        "26c2013a7d249ac8b33724717b3181a4341c75269d2d938cc64f31a38a30f203",
+        "107de06a9a687043983beabd83816ba96127b7c1be77f1011ae367bf02f00168",
+        "309d39eb38b32204a6243c80165c08e3ee9b7db5c2af0143307a1fbe7457467a"
+      ],
+      "mixed_source_sha256": "8dbbbee89947c3c61bb724f57e054058bf8470ff0ae536c3416e2b7c9b2c830e",
+      "c16_tps": 184.7478621797621,
+      "exact_text_vs_a1": 6
+    },
+    "a2": {
+      "prefill_source_sha256": "762f8747c0b4436506391a98d78c2efda1f29e1bdb3f029337b1c942993fda48",
+      "prefill_tps": [
+        7804.896243056714,
+        7517.246510784743,
+        7666.571886675842
+      ],
+      "prefill_median_tps": 7666.571886675842,
+      "prompt_sha256": [
+        "c1ea1c5c116ab87295792c3c0df8f36016d95957a41ecb35c372e9acef7774a7",
+        "26c2013a7d249ac8b33724717b3181a4341c75269d2d938cc64f31a38a30f203",
+        "107de06a9a687043983beabd83816ba96127b7c1be77f1011ae367bf02f00168",
+        "309d39eb38b32204a6243c80165c08e3ee9b7db5c2af0143307a1fbe7457467a"
+      ],
+      "mixed_source_sha256": "4905565f6d95587fc95ba03de9f7991c6fad16b6189f2420619d196f756007a7",
+      "c16_tps": 184.39962799166173,
+      "exact_text_vs_a1": 6
+    },
+    "pooled_prefill_median_tps": {
+      "before": 7679.064345342003,
+      "after": 7854.27606763688
+    },
+    "c16_median_tps": {
+      "before": 180.83325876264252,
+      "after": 184.4889676637427
+    }
+  },
+  "artifacts": {
+    "before": {
+      "ds41rt": "ef579b387d5466fc083998cca9623079f38330100a1f54067c1e755f32cb46d1",
+      "libds41rt_native.so": "afa775ee82c3f850b0415bac9d4b07c4955371700a3136c5949a6e7526595e97"
+    },
+    "after": {
+      "ds41rt": "9e0ac596edc76099404bf059e9fa283549a3238c796ace93ece7190c4ff68c85",
+      "libds41rt_native.so": "afa775ee82c3f850b0415bac9d4b07c4955371700a3136c5949a6e7526595e97"
+    },
+    "fault": {
+      "ds41rt": "371acb5660a5872fd07cfc0ad5b41cf9a0a2992a3cf5b162fb9481a9eb3ff523",
+      "libds41rt_native.so": "afa775ee82c3f850b0415bac9d4b07c4955371700a3136c5949a6e7526595e97"
+    }
+  },
+  "limitations": [
+    "Three code repeats per restart; two restarts per variant for quiet C1.",
+    "Prefill gate covers one 32768-token cell, not the full matrix; HTTP first-content proxy.",
+    "C16 gate has two cold mixed batches per variant after identical prefill requests.",
+    "Prose quality is not assessed by structure/exact-text checks.",
+    "This chain still launches separate CUDA graphs and does not resolve every full-pass recapture."
+  ],
+  "instrumented": {
+    "before": {
+      "spec": {
+        "source_sha256": "fe93745ec3db94562b6be4a836c53331ff1b41023c9745eaf633d2fd33b5c208",
+        "rounds": 123,
+        "scheduler_median_ms": {
+          "draft_us": 2.87,
+          "prepare_us": 0.008,
+          "verify_us": 39.334,
+          "total_us": 42.647
+        },
+        "stage_median_ms": {
+          "target layer preparation": {
+            "advance_us": 0.406,
+            "engram_us": 0.354,
+            "taps_us": 0.019,
+            "begin_us": 3.238
+          },
+          "target query preparation": {
+            "total_us": 3.251
+          },
+          "target attention stages": {
+            "sparse_us": 1.801,
+            "projection_us": 2.731,
+            "ffn_prepare_us": 1.284
+          },
+          "target collection": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.161,
+            "receive_us": 20.319,
+            "reduce_us": 0.343
+          },
+          "target experts": {
+            "routed_us": 1.5,
+            "dispatch_us": 0.2,
+            "shared_us": 2.264,
+            "collect_us": 20.912
+          },
+          "target layer": {
+            "produced_us": 1.287,
+            "index_us": 1.097,
+            "attention_us": 5.901,
+            "experts_us": 24.926,
+            "finish_us": 0.271
+          }
+        }
+      },
+      "target": {
+        "source_sha256": "57f32b82a494dbd8fc4668f3439f704cfe7b6101746e9f8afcc5086e26976e80",
+        "rounds": 636,
+        "scheduler_median_ms": {
+          "draft_us": 0.0,
+          "prepare_us": 0.003,
+          "verify_us": 23.047,
+          "total_us": 23.4825
+        },
+        "stage_median_ms": {
+          "target layer preparation": {
+            "advance_us": 0.385,
+            "engram_us": 0.331,
+            "taps_us": 0.019,
+            "begin_us": 3.063
+          },
+          "target query preparation": {
+            "total_us": 3.079
+          },
+          "target attention stages": {
+            "sparse_us": 1.827,
+            "projection_us": 2.805,
+            "ffn_prepare_us": 1.258
+          },
+          "target collection": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.203,
+            "receive_us": 5.523,
+            "reduce_us": 0.21
+          },
+          "target experts": {
+            "routed_us": 1.3785,
+            "dispatch_us": 0.121,
+            "shared_us": 2.084,
+            "collect_us": 6.017
+          },
+          "target layer": {
+            "produced_us": 1.194,
+            "index_us": 0.8965,
+            "attention_us": 5.974,
+            "experts_us": 9.664,
+            "finish_us": 0.253
+          }
+        }
+      },
+      "limitations": [
+        "Host wall timings include synchronization, logging and device execution.",
+        "Nested stages overlap: do not sum the entire table.",
+        "Only consecutive complete 40-layer C1 rounds at one target row or six verifier rows; excludes prefill and partial rounds.",
+        "Three nearby code-generation requests; no long-context or concurrency coverage."
+      ]
+    },
+    "after": {
+      "spec": {
+        "source_sha256": "9bee1fd6eb47c2a717d3257639e9bb6ae0540d64699ff5c68fe029a614f19556",
+        "rounds": 123,
+        "scheduler_median_ms": {
+          "draft_us": 2.879,
+          "prepare_us": 0.005,
+          "verify_us": 39.061,
+          "total_us": 42.487
+        },
+        "stage_median_ms": {
+          "target attention chain": {
+            "total_us": 5.474
+          },
+          "target layer preparation": {
+            "advance_us": 0.395,
+            "engram_us": 0.356,
+            "taps_us": 0.02,
+            "begin_us": 3.242
+          },
+          "target query preparation": {
+            "total_us": 3.255
+          },
+          "target collection": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.161,
+            "receive_us": 20.449,
+            "reduce_us": 0.32
+          },
+          "target experts": {
+            "routed_us": 1.498,
+            "dispatch_us": 0.19,
+            "shared_us": 2.282,
+            "collect_us": 21.024
+          },
+          "target layer": {
+            "produced_us": 1.309,
+            "index_us": 1.102,
+            "attention_us": 5.556,
+            "experts_us": 25.046,
+            "finish_us": 0.274
+          }
+        }
+      },
+      "target": {
+        "source_sha256": "719e348a12d2bc83c4d8d22f653c467c823d9ba278b38d9fff8ca2958c69760b",
+        "rounds": 636,
+        "scheduler_median_ms": {
+          "draft_us": 0.0,
+          "prepare_us": 0.005,
+          "verify_us": 22.7845,
+          "total_us": 23.221
+        },
+        "stage_median_ms": {
+          "target attention chain": {
+            "total_us": 5.562
+          },
+          "target layer preparation": {
+            "advance_us": 0.386,
+            "engram_us": 0.334,
+            "taps_us": 0.02,
+            "begin_us": 3.068
+          },
+          "target query preparation": {
+            "total_us": 3.084
+          },
+          "target collection": {
+            "shared_copy_us": 0.0,
+            "upload_us": 0.203,
+            "receive_us": 5.5395,
+            "reduce_us": 0.212
+          },
+          "target experts": {
+            "routed_us": 1.389,
+            "dispatch_us": 0.119,
+            "shared_us": 2.1,
+            "collect_us": 6.037
+          },
+          "target layer": {
+            "produced_us": 1.2,
+            "index_us": 0.902,
+            "attention_us": 5.6425,
+            "experts_us": 9.71,
+            "finish_us": 0.257
+          }
+        }
+      },
+      "limitations": [
+        "Host wall timings include synchronization, logging and device execution.",
+        "Nested stages overlap: do not sum the entire table.",
+        "Only consecutive complete 40-layer C1 rounds at one target row or six verifier rows; excludes prefill and partial rounds.",
+        "Three nearby code-generation requests; no long-context or concurrency coverage."
+      ]
+    }
+  },
+  "final_rebuild": {
+    "sha256": "2b2d422af6099a499fcd41af9c437a6cf274e8dbb9477bc4e1cf52b8488cbe31",
+    "differing_elf_sections_vs_frozen": [
+      ".symtab",
+      ".note.gnu.build-id",
+      ".strtab"
+    ],
+    "text_equal": true,
+    "rodata_equal": true,
+    "data_equal": true
+  }
+}

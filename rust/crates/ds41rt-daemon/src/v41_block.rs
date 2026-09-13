@@ -12,6 +12,7 @@ enum Phase {
     Idle,
     Prepared(QueryBinding, usize, bool),
     Attention(QueryBinding, usize),
+    QueuedFfn(QueryBinding, usize),
     Ffn(QueryBinding, usize),
     Ready(QueryBinding, usize),
 }
@@ -373,6 +374,44 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
                 Err(e)
             }
         }
+    }
+    /// # Safety
+    /// Projection is ordered on stream with the matching query binding. Keep
+    /// both mHC owners exclusive and alive until stream drains, including errors.
+    /// Only complete_queued_ffn may publish the resulting normalized input.
+    pub unsafe fn enqueue_ffn(
+        &mut self, binding: QueryBinding, rows: usize, projected: Ds41rtDeviceBuffer,
+        stream: *mut std::ffi::c_void,
+    ) -> Result<Ds41rtDeviceBuffer> {
+        let Phase::Attention(expected, count) = self.phase else {
+            anyhow::bail!("block attention is not pending for queued FFN");
+        };
+        ensure!(binding == expected && rows == count && binding.layer() == self.layer
+            && projected.device_id == self.inputs()[0].device_id
+            && !projected.ptr.is_null() && projected.bytes == rows * 10240,
+            "queued block attention result differs");
+        self.phase = Phase::QueuedFfn(binding, rows);
+        unsafe { self.attention.enqueue_finish(Some(projected), stream)?; }
+        for ((dst, src), bytes) in self.ffn.inputs().into_iter()
+            .zip(self.attention.output_storage()).zip([rows * 40960, rows * 16]) {
+            unsafe { self.library.copy_d2d_async(dst, src, bytes, stream)?; }
+        }
+        unsafe { self.ffn.enqueue_begin(rows, None, stream) }
+    }
+    /// # Safety
+    /// The enclosing chain has successfully drained its stream. Values are the
+    /// buffer returned by this block's enqueue_ffn, without intervening reuse.
+    pub unsafe fn complete_queued_ffn(&mut self, values: Ds41rtDeviceBuffer) -> Result<FfnInput<'_>> {
+        let Phase::QueuedFfn(binding, rows) = self.phase else {
+            anyhow::bail!("block has no queued FFN");
+        };
+        ensure!(values.bytes == rows * 10240 && values.device_id == self.inputs()[0].device_id,
+            "queued normalized FFN extent differs");
+        unsafe { self.attention.complete()?; }
+        self.phase = Phase::Ffn(binding, rows);
+        let mut residual = self.ffn.inputs()[0]; residual.bytes = rows * 40960;
+        let mut incoming_pre = self.ffn.inputs()[1]; incoming_pre.bytes = rows * 16;
+        Ok(FfnInput { residual, incoming_pre, values, layer: self.layer, tokens: &self.tokens, binding })
     }
     /// # Safety
     /// Result is the finite completed shared+routed FFN output for the returned

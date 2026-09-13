@@ -36,6 +36,13 @@ impl SparseAttentionOutput<'_> {
         self.tokens.context("attention tokens missing")
     }
 }
+/// Internal view: producer is queued on the supplied stream, not host-ready.
+pub(crate) struct QueuedSparseAttention {
+    pub values: Ds41rtDeviceBuffer,
+    pub layer: usize,
+    pub rows: usize,
+}
+
 pub(crate) struct SparseAttentionWave<'a> {
     stream: LoadStream<'a>,
     kernel: V41SparseAttention<'a>,
@@ -224,14 +231,49 @@ impl<'a> SparseAttentionWave<'a> {
     ) -> Result<SparseAttentionOutput<'s>> {
         let library = self.stream.library;
         let stream = self.stream.raw;
-        match unsafe { self.execute_staged(layer, sink, requests, selection) } {
-            Ok(output) => Ok(output),
-            Err(error) => {
-                // Includes partial input/metadata staging and graph errors.
-                unsafe { library.cuda_stream_synchronize(stream)?; }
-                Err(error)
-            }
+        let result = unsafe { self.execute_staged(layer, sink, requests, selection) };
+        let drained = unsafe { library.cuda_stream_synchronize(stream) };
+        let queued = result.and_then(|v| drained.map(|()| v))?;
+        Ok(SparseAttentionOutput { query: None, tokens: None, values: queued.values,
+            layer: queued.layer, rows: queued.rows, _inputs: PhantomData })
+    }
+    /// # Safety
+    /// Same completed query/cache inputs as execute_query. The continuation may
+    /// enqueue consumers only on the supplied stream, retaining every allocation
+    /// until this method returns. Returned values must not publish GPU results
+    /// until the successful drain performed here. No asynchronous suspension.
+    pub unsafe fn execute_query_then<T>(
+        &mut self, query: &AttentionQueryOutput<'_>, sink: Ds41rtDeviceBuffer,
+        requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
+        consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>,
+    ) -> Result<T> {
+        let binding = query.binding()?;
+        let tokens = query.tokens()?;
+        ensure!(query.rows == tokens.len() && query.rows <= self.capacity
+            && query.rotated.device_id == self.query.buffer.device_id
+            && requests.iter().flat_map(|r| r.positions.iter().copied()).eq(tokens.iter().copied()),
+            "attention query token order or device differs");
+        if let Some(s) = selection { s.validate_query(binding)?; }
+        let library = self.stream.library;
+        let stream = self.stream.raw;
+        // Also drain on unwinding before the caller can release consumer owners.
+        struct Drain<'a>(&'a NativeLibrary, *mut c_void, bool);
+        impl Drop for Drain<'_> {
+            fn drop(&mut self) { if !self.2 {
+                if let Err(error) = unsafe { self.0.cuda_stream_synchronize(self.1) } {
+                    tracing::error!(%error, "draining attention continuation on unwind");
+                }
+            }}
         }
+        let mut drain = Drain(library, stream, false);
+        let result = (|| unsafe {
+            library.copy_d2d_async(self.query.buffer, query.rotated, query.rotated.bytes, stream)?;
+            let queued = self.execute_staged(query.layer, sink, requests, selection)?;
+            consume(queued, stream)
+        })();
+        let drained = unsafe { library.cuda_stream_synchronize(stream) };
+        drain.2 = true;
+        result.and_then(|v| drained.map(|()| v))
     }
     unsafe fn execute_staged<'s>(
         &'s mut self,
@@ -239,7 +281,7 @@ impl<'a> SparseAttentionWave<'a> {
         sink: Ds41rtDeviceBuffer,
         requests: &'s [AttentionRequest<'s>],
         selection: Option<&'s IndexSelectionOutput<'s>>,
-    ) -> Result<SparseAttentionOutput<'s>> {
+    ) -> Result<QueuedSparseAttention> {
         ensure!(
             layer < 40 && !requests.is_empty() && requests.len() <= 16,
             "invalid attention layer or request count"
@@ -479,14 +521,9 @@ impl<'a> SparseAttentionWave<'a> {
                 .library
                 .cuda_graph_launch(graph, self.stream.raw)
         };
-        launched.and(self.synchronize())?;
-        Ok(SparseAttentionOutput {
-            query: None,
-            tokens: None,
-            values: slice(self.output.buffer, 0, rows * 65536),
-            layer,
-            rows,
-            _inputs: PhantomData,
+        launched?;
+        Ok(QueuedSparseAttention {
+            values: slice(self.output.buffer, 0, rows * 65536), layer, rows,
         })
     }
 }

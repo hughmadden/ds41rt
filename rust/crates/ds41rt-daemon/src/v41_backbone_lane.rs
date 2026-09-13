@@ -340,18 +340,20 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.enter(Phase::Query)?;
         let query = self.query.output()?;
         let timing = std::time::Instant::now();
-        let attention = unsafe {
-            self.sparse
-                .execute_query(&query, sink, requests, selection)?
+        let binding = query.binding()?;
+        let tokens = query.tokens()?;
+        let result = unsafe { self.sparse.execute_query_then(&query, sink, requests, selection,
+            |attention, stream| {
+                let projected = self.projection.enqueue_attention(&attention, tokens, stream)?;
+                self.block.enqueue_ffn(binding, attention.rows, projected, stream)
+            }) };
+        let values = match result {
+            Ok(values) => values,
+            Err(error) => { self.block.reset(); self.phase = Phase::Invalid; return Err(error); }
         };
-        let sparse_us = timing.elapsed().as_micros() as u64;
-        let projected = unsafe { self.projection.execute_attention(&attention)? };
-        let projected_us = timing.elapsed().as_micros() as u64;
-        let input = unsafe { self.block.begin_ffn(&projected)? };
-        tracing::debug!(target: "ds41rt::timing", layer=self.layer, rows=projected.rows,
-            sparse_us, projection_us=projected_us-sparse_us,
-            ffn_prepare_us=timing.elapsed().as_micros() as u64-projected_us,
-            "target attention stages");
+        let input = unsafe { self.block.complete_queued_ffn(values)? };
+        tracing::debug!(target: "ds41rt::timing", layer=self.layer, rows=query.rows,
+            total_us=timing.elapsed().as_micros() as u64, "target attention chain");
         self.phase = Phase::Ffn;
         Ok(LaneFfn {
             input,
