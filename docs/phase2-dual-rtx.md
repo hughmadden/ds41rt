@@ -980,3 +980,12 @@ wrong-device launch were rejected. This is a projection primitive check, not
 real-model quality or speed qualification. Distributed weight loading, GPU
 winner merging, sampling/constrained outputs, and target/draft integration
 remain required. Native compilation and `cargo check -p ds41rt-ffi` passed.
+
+`VocabularyShard` now admits and loads only its contiguous checkpoint token
+range using bounded pinned staging. For the equal split, each GPU owns
+661,913,600 bytes (631.25 MiB); no full-head device staging is allocated.
+`dual_vocabulary_shards_match_complete_checkpoint_ranges` loaded both real
+checkpoint halves with 7 MiB staging and compared every uploaded byte back to
+the corresponding checkpoint range. Both halves matched exactly, budget and
+range rejection passed, and owner destruction restored GPU 0. This validates
+shard loading, not end-to-end two-GPU head execution or startup performance.
