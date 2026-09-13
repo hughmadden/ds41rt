@@ -8,72 +8,79 @@ All reported RTX measurements use an enforced **400 W power limit** and **standa
 
 ## Performance
 
-The corrected standard `v1` build uses architectural FP4 compressed KV, the standard C16 launch, and the qualified fused Spark expert kernels. Local target-only and dSpark workloads ran sequentially. Throughput tests use temperature zero and thinking disabled; tool evaluation uses high thinking. The earlier release regression is fixed: standard-build prefill rose from 2,668 to 7,743 tok/s at the headline cell, and warm counting decode rose from 127.70 to 150.51 tok/s.
+The standard `v2` build uses independent adaptive dSpark lanes, architectural FP4 compressed KV, bottom-up RTX expert placement, and cooperative decode completion. Local target-only and dSpark workloads ran sequentially. Throughput tests use temperature zero and thinking disabled; tool evaluation uses thinking enabled at high effort and C16. Against v1, weighted dSpark decode rose from 70.43 to 79.80 tok/s and aggregate C16 decode rose from 742.91 to 934.05 tok/s.
 
-**Headline results.** Median throughput, the 24-context cache policy, memory use, and measured clean-launch time.
+**Headline results.** Median throughput, the qualified cache and placement policy, memory use, and clean startup.
 
 | Measurement | Result |
 |---|---:|
-| Best median prefill, 0 base + 32K new | **7,743.47 tok/s** |
-| Best observed prefill sample | **8,023.26 tok/s** |
-| Low-entropy target-only decode, counting 1–200 warm median | 43.08 tok/s |
-| Low-entropy dSpark decode, counting 1–200 warm median | **150.51 tok/s** |
-| Weighted eight-type target-only median | 41.42 tok/s |
-| Weighted eight-type dSpark median | **70.43 tok/s** |
-| dSpark gain on weighted mix | 70.04% |
-| C16 aggregate warm decode median | **742.91 tok/s** |
-| Benchmark architectural cache (prior default) | 20.93 GiB for 25,165,824 tokens total (24 × 1,048,576) |
+| Best median prefill, 0 base + 32K new (preserved v1) | **7,743.47 tok/s** |
+| Low-entropy target-only decode, counting 1–200 warm median | 45.08 tok/s |
+| Low-entropy dSpark decode, counting 1–200 warm median | **155.91 tok/s** |
+| Weighted eight-type target-only median | 44.29 tok/s |
+| Weighted eight-type dSpark median | **79.80 tok/s** |
+| dSpark gain on weighted mix | 80.17% |
+| C16 aggregate warm decode median | **934.05 tok/s** |
+| Standard RTX routed-expert placement | **5 layers (0–4)** |
+| Spark expert residency / configured budget | 40 layers per worker / 100 GiB |
+| Global FP4 source pool | 16.681 GB for 18,710,016 logical tokens (+32,768 private-tail tokens) |
 | Exact prompt / completed-turn retention | 24 / 24 entries |
-| Warmed C16 coordinator process | 64.23 GiB |
-| Clean standard dSpark launch readiness | 56.77 s |
+| Peak observed coordinator GPU memory used | 96,950 MiB |
+| Clean build / standard dSpark launch | 304.85 s / 57.76 s |
 
-**Eight content types and counting.** Three local samples per mode and the preserved one-request official reference. Completion counts report serving success; open-ended prose is unscored. The official schema request returned HTTP 400, so it has no full weighted aggregate.
+**Eight content types and counting.** Three local samples per mode. The official Flash column is the preserved one-request v1 reference and was not called again. Counting is outside the weighted score.
 
-| Case | Target tok/s | dSpark tok/s | Official Flash tok/s (one request) | Target completed | dSpark completed | Official completed |
+| Case | Target tok/s | dSpark tok/s | Official Flash tok/s | Target completed | dSpark completed | Official completed |
 |---|---:|---:|---:|---:|---:|---:|
-| Code | 42.62 | 113.73 | 345.90 | 3/3 | 3/3 | 1/1 |
-| Math | 41.08 | 109.54 | 285.33 | 3/3 | 3/3 | 1/1 |
-| Fable | 40.42 | 47.10 | 123.63 | 3/3 | 3/3 | 1/1 |
-| Hello | 39.96 | 57.14 | 141.10 | 3/3 | 3/3 | 1/1 |
-| Topic | 41.24 | 63.48 | 169.24 | 3/3 | 3/3 | 1/1 |
-| Natural JSON | 42.34 | 93.24 | 175.33 | 3/3 | 3/3 | 1/1 |
-| Schema JSON | 41.89 | 85.78 | HTTP 400 | 3/3 | 3/3 | 0/1 (HTTP 400) |
-| Multilingual | 40.99 | 62.70 | 183.61 | 3/3 | 3/3 | 1/1 |
-| Counting 1–200 | **43.08** | **150.51** | **427.29** | 3/3 warm | 3/3 warm | 1/1 |
+| Code | 44.87 | 126.21 | 345.90 | 3/3 | 3/3 | 1/1 |
+| Math | 44.61 | 135.07 | 285.33 | 3/3 | 3/3 | 1/1 |
+| Fable | 43.90 | 54.31 | 123.63 | 3/3 | 3/3 | 1/1 |
+| Hello | 42.48 | 77.55 | 141.10 | 3/3 | 3/3 | 1/1 |
+| Topic | 44.93 | 72.06 | 169.24 | 3/3 | 3/3 | 1/1 |
+| Natural JSON | 44.30 | 92.42 | 175.33 | 3/3 | 3/3 | 1/1 |
+| Schema JSON | 44.07 | 94.09 | HTTP 400 | 3/3 | 3/3 | 0/1 (HTTP 400) |
+| Multilingual | 43.69 | 71.33 | 183.61 | 3/3 | 3/3 | 1/1 |
+| Counting 1–200 | **45.08** | **155.91** | **427.29** | 3/3 warm | 3/3 warm | 1/1 |
 
-Counting is outside the weighted score. Local values are three warm exact-sequence samples after one prime. The official API was called once and was not rerun.
-
-**Prefill.** Median new prompt tokens/s above each retained base, target-only; three timed samples per cell after one warmup.
+**Prefill matrix.** Preserved v1 target-only measurements; this matrix was intentionally excluded from the scoped v2 rerun.
 
 | Retained base | +1K | +2K | +4K | +8K | +16K | +32K |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0 | 2,818 | 3,757 | 6,922 | 7,414 | 7,660 | **7,743** |
+| 0 | 2,818 | 3,757 | 6,922 | 7,414 | 7,660 | 7,743 |
 | 32K | 2,440 | 3,319 | 6,055 | 6,736 | 7,086 | 7,119 |
 | 64K | 2,251 | 3,112 | 5,557 | 6,255 | 6,594 | 6,768 |
 | 128K | 1,942 | 2,724 | 4,724 | 5,432 | 5,785 | 5,961 |
 | 256K | 1,477 | 2,148 | 3,565 | 4,123 | 4,444 | 4,612 |
 
-**Decode over retained context.** Weighted dSpark tokens/s across eight content types, with three samples per type and verified prefix reuse at each base.
+**Decode over retained context.** Three samples for each of eight content types, with verified exact retained-prefix reuse.
 
 | Retained base | Weighted dSpark tok/s | Completed with verified cache reuse |
 |---:|---:|---:|
-| 0 | 73.43 | 24/24 |
-| 32K | 68.08 | 24/24 |
-| 64K | 64.82 | 24/24 |
-| 128K | 62.71 | 24/24 |
-| 256K | 61.27 | 24/24 |
+| 0 | 77.97 | 24/24 |
+| 32K | 71.60 | 24/24 |
+| 64K | 71.97 | 24/24 |
+| 128K | 70.99 | 24/24 |
+| 256K | 66.82 | 24/24 |
 
-**Concurrency scaling.** Three samples per concurrency with a fully cached prompt and exact 599-token counting output. Aggregate timing includes scheduler admission gaps.
+**Concurrency scaling.** Three exact 599-token counting samples per concurrency after one fully cached prime; aggregate timing includes admission gaps.
 
 | Concurrency | Median aggregate tok/s | Range | Scale vs C1 |
 |---:|---:|---:|---:|
-| 1 | 149.16 | 148.89–149.24 | 1.00× |
-| 2 | 188.47 | 187.82–188.66 | 1.26× |
-| 4 | 325.90 | 323.81–326.08 | 2.18× |
-| 8 | 467.10 | 463.93–467.14 | 3.13× |
-| 16 | **742.91** | 735.48–745.69 | **4.98×** |
+| 1 | 151.12 | 150.21–151.73 | 1.00× |
+| 2 | 238.85 | 230.28–239.94 | 1.58× |
+| 4 | 393.38 | 382.04–420.01 | 2.60× |
+| 8 | 582.56 | 577.00–586.01 | 3.85× |
+| 16 | 934.05 | 932.59–936.37 | 6.18× |
 
-The [performance report](docs/release-v1-performance.md) provides methodology, artifact identities, per-case retained-context results, memory, startup, needle retrieval, and agentic results. [Machine-readable results](docs/release-v1-performance.json) and [raw evidence](docs/evidence/native-release-performance.tar.gz) preserve samples, inputs, outputs, cache counters, hardware state, and errors.
+**High-thinking tool evaluation.** Three hard-mode campaigns use C16, thinking enabled, high reasoning effort, temperature zero, a 900-second timeout, and the normal output policy.
+
+| Run | Basic | Hard | Total | Pass / partial / fail |
+|---:|---:|---:|---:|---:|
+| 1 | 122/138 | 33/38 | 155/176 | 71 / 13 / 4 |
+| 2 | 118/138 | 35/38 | 153/176 | 69 / 15 / 4 |
+| 3 | 122/138 | 36/38 | 158/176 | 73 / 12 / 3 |
+
+The [v2 performance report](docs/release-v2-performance.md) records methodology, artifact identities, memory, startup, and qualification scope. [Machine-readable v2 results](docs/release-v2-performance.json) preserve exact samples and evidence hashes. The v1 prefill matrix and one-shot official API comparison remain clearly labeled prior measurements; the full v1 qualification was intentionally not repeated.
 
 ## Getting started
 
@@ -100,9 +107,9 @@ Edit [`ds41rt.config`](ds41rt.config) for the deployment. At minimum, verify the
 To use the published images, pull the coordinator image locally and the Spark image on each worker:
 
 ```bash
-docker pull ghcr.io/tpurtell/ds41rt-coordinator:v1
+docker pull ghcr.io/tpurtell/ds41rt-coordinator:v2
 for host in ostrich dodo emu kiwi; do
-  ssh "$host" docker pull ghcr.io/tpurtell/ds41rt-spark-expert:v1
+  ssh "$host" docker pull ghcr.io/tpurtell/ds41rt-spark-expert:v2
 done
 ./run.sh --dry-run
 ./run.sh
@@ -150,7 +157,7 @@ Command-line values override [`ds41rt.config`](ds41rt.config) for one launch:
 | `--restart` | off | Replace the running five-host deployment |
 | `--dry-run` | off | Validate configuration, images, hosts, model, and devices without starting services |
 
-With no explicit pool setting, the planner starts from sixteen maximum-context active requests plus two additional maximum-context equivalents, then trades enough global KV pages for preallocated snapshot storage. At default C16 with dSpark, this gives a **16.681 GB global pool for 18,710,016 tokens plus private-tail headroom**, with 139.4 MiB of snapshot arenas. The 24 completed-turn and prompt-snapshot limits remain independent of this aggregate token budget. The performance tables above retain the measured prior 24-context configuration until the new placement is qualified. `--kv-pool-size` selects the exact global pool; `--memory-reservation` caps total planned device occupancy; when both are present, the exact pool must fit under the ceiling. Smaller values are useful for side-by-side development servers:
+With no explicit pool setting, the planner starts from sixteen maximum-context active requests plus two additional maximum-context equivalents, then trades enough global KV pages for preallocated snapshot storage. At default C16 with dSpark, this gives a **16.681 GB global pool for 18,710,016 tokens plus 32,768 private-tail tokens**, with 139.4 MiB of snapshot arenas. The 24 completed-turn and prompt-snapshot limits remain independent of this aggregate token budget. `--kv-pool-size` selects the exact global pool; `--memory-reservation` caps total planned device occupancy; when both are present, the exact pool must fit under the ceiling. Smaller values are useful for side-by-side development servers:
 
 ```bash
 ./run.sh --listen 0.0.0.0:18000 --concurrency 2 \
@@ -170,17 +177,16 @@ The [engineering report](docs/ENGINEERING.md) covers the final kernels, executio
 
 ## Qualification
 
-The final candidate passed:
+The clean v2 candidate passed the scoped release qualification:
 
-- cold, partial, exact, divergent, multi-chunk, cancellation, C16, and 24-turn prefix-cache cases;
-- 1.04M-token needle retrieval in target and dSpark modes, both fresh and exact-reuse;
-- native vision through sixteen images, including identity changes, reorder, reuse, cancellation, and concurrency;
-- Unicode/token-boundary streaming, tools, JSON Schema constraints, and recovery paths;
-- three C16 high-thinking tool-eval campaigns scoring 153, 159, and 156 of 176 points;
-- a clean five-host image build and standard `run.sh` launch;
-- a dsh coding run that generated and repaired a [playable single-file WebGL Frogger](https://tpurtell.github.io/ds41rt/frogger.html).
+- three-sample target-only and dSpark throughput across eight content types and warm exact counting;
+- retained-prefix decode at 0, 32K, 64K, 128K, and 256K, with verified reuse in all 120 requests;
+- warm exact counting at C1, C2, C4, C8, and C16;
+- three C16 high-thinking tool-eval campaigns scoring 155, 153, and 158 of 176 points;
+- automatic placement of routed-expert layers 0–4 on the RTX while all 40 layers remain on every Spark;
+- a clean five-host image build and standard `run.sh` launch on port 8000.
 
-The [release checklist](docs/release-v1-checklist.md) links each detailed report and its preserved evidence.
+The prefill matrix and one-shot official API comparison are preserved v1 measurements. The full needle, vision, cache, and agentic suites were intentionally not repeated; their detailed v1 evidence remains available for the unchanged serving interfaces. The [v2 release checklist](docs/release-v2-checklist.md) separates fresh coverage from inherited evidence.
 
 ## RDMA tools for DGX Spark and RoCE PCs
 
