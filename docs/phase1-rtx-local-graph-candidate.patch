@@ -1,0 +1,97 @@
+--- a/rust/crates/ds41rt-daemon/src/v41_experts/local.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_experts/local.rs
+@@ -3,7 +3,20 @@
+ use crate::{v41_backbone_router::RouterOutput, v41_backbone_shared::SharedOutput};
+ use anyhow::{ensure, Context, Result};
+ use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41ExpertKernel, V41ExpertLaunchArgs, V41LocalExpertReducer};
+-use std::{ffi::c_void, rc::Rc};
++use std::{collections::BTreeMap, ffi::c_void, rc::Rc};
++
++struct Graph<'a> {
++    library: &'a NativeLibrary,
++    raw: *mut c_void,
++    inputs: [*mut c_void; 4],
++}
++
++impl Drop for Graph<'_> {
++    fn drop(&mut self) {
++        // The containing wave drains before destruction or graph replacement.
++        let _ = unsafe { self.library.cuda_graph_exec_destroy(self.raw) };
++    }
++}
+ 
+ struct State<'a> {
+     kernel: V41ExpertKernel<'a>,
+@@ -12,6 +25,9 @@
+ pub(crate) struct LocalExpertWave<'a> {
+     // Drain before scratch, weights or output can be released on any exit.
+     stream: LoadStream<'a>,
++    // At most 48 decode shapes per resident layer. Destroy before all captured
++    // owned storage; external inputs are checked before every replay.
++    graphs: BTreeMap<(usize, u32), Graph<'a>>,
+     states: Vec<State<'a>>,
+     // Capacity variants are mutually exclusive. Every execute drains before
+     // another variant may reuse these bytes; kernels overwrite live scratch.
+@@ -54,7 +70,7 @@
+             initialized.and(drained)?;
+             states.push(State { kernel, slots });
+         }
+-        Ok(Self { stream, states, _scratch: scratch, weights, output: DeviceAllocation::new(library, capacity as usize * 10240)?,
++        Ok(Self { stream, graphs: BTreeMap::new(), states, _scratch: scratch, weights, output: DeviceAllocation::new(library, capacity as usize * 10240)?,
+             reducer: library.v41_local_expert_reducer()?, capacity })
+     }
+     pub fn contains(&self, layer: usize) -> bool { layer < self.weights.len() }
+@@ -74,6 +90,16 @@
+             ensure!(buffer.bytes == bytes && buffer.device_id == self.output.buffer.device_id,
+                 "local expert input extent or device differs");
+         }
++        let inputs = [routed.expert_input.ptr, routed.ids.ptr, routed.routing.ptr, shared.values.ptr];
++        if let Some(graph) = self.graphs.get(&(routed.layer, rows)) {
++            ensure!(graph.inputs == inputs, "local expert captured input storage changed");
++            let launched = unsafe { self.stream.library.cuda_graph_launch(graph.raw, self.stream.raw) };
++            let drained = unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) };
++            launched.and(drained)?;
++            let mut output = self.output.buffer;
++            output.bytes = rows as usize * 10240;
++            return Ok(output);
++        }
+         let state = self.states.iter_mut().find(|s| s.kernel.info().capacity_rows >= rows)
+             .context("local expert capacity state missing")?;
+         self.weights[routed.layer].bind(&state.kernel, &mut state.slots)?;
+@@ -86,13 +112,34 @@
+             max_tasks: info.max_tasks, max_phys_tiles: info.max_phys_tiles,
+             max_active_clusters: info.max_active_clusters, stream: self.stream.raw };
+         // Shared arena remains exclusive through this drain, including failure.
+-        let launched = (|| -> Result<()> {
++        let enqueue = || -> Result<()> {
+             unsafe { state.kernel.launch(&args)?; }
+             unsafe { self.reducer.finish(state.slots[41].cast(), shared.values.ptr.cast(),
+                 self.output.buffer.ptr.cast(), rows, state.kernel.accumulates_tokens(), self.stream.raw) }
+-        })();
++        };
++        let launched = enqueue();
+         let drained = unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) };
+         launched.and(drained)?;
++        // Warmup above completes any lazy kernel setup. Large prefill shapes
++        // stay on the direct path; arbitrary request lengths cannot grow graphs.
++        if rows <= 48 {
++            let library = self.stream.library;
++            unsafe { library.cuda_graph_begin_capture(self.stream.raw)?; }
++            let queued = enqueue();
++            let captured = unsafe { library.cuda_graph_end_capture(self.stream.raw) };
++            let graph = captured.map(|raw| Graph { library, raw, inputs });
++            match (queued, graph) {
++                (Ok(()), Ok(graph)) => {
++                    let launched = unsafe { library.cuda_graph_launch(graph.raw, self.stream.raw) };
++                    let drained = unsafe { library.cuda_stream_synchronize(self.stream.raw) };
++                    launched.and(drained)?;
++                    self.graphs.insert((routed.layer, rows), graph);
++                    tracing::debug!(target: "ds41rt::graph_capture", layer=routed.layer, rows,
++                        "native local expert graph captured");
++                }
++                (Err(error), _) | (Ok(()), Err(error)) => return Err(error),
++            }
++        }
+         let mut output = self.output.buffer;
+         output.bytes = rows as usize * 10240;
+         Ok(output)

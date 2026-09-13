@@ -1,0 +1,346 @@
+{
+  "scope": "ABBA local routed-expert plus reduction graph candidate; adaptive dSpark, five local layers in all arms",
+  "decision": "rejected: no demonstrated end-to-end improvement; production source restored",
+  "baseline_commit": "d257c1b",
+  "candidate_patch_sha256": "f5a4a463842521031bb26516ec88d374dfe882985aac0a527aa4f879a4491b15",
+  "candidate_artifacts": {
+    "libds41rt_native.so": "1aed37f945a4291139133b95bdef7fd5040f86164bbfcd6bf89286c98dfc9f94",
+    "ds41rt": "bdf4d3895471e40f166d564e336aad5af9b0aae2c958cebc51dfffe9a85aa7f0"
+  },
+  "raw_directory": "/tmp/ds41-rtx-local-graph",
+  "arms": {
+    "before-a1": {
+      "code_tps": [
+        124.08502158879712,
+        123.96753499811278,
+        123.93445735730236
+      ],
+      "prefill_tps": [
+        7791.963867126471,
+        7935.753591957048,
+        7792.139137314322
+      ],
+      "mixed_tps": {
+        "4": 118.80307656891115,
+        "16": 184.81768628964852
+      },
+      "checks_passed": true,
+      "local_graph_captures": 0,
+      "maximum_captures_per_layer_shape": 0,
+      "files_sha256": {
+        "before-a1-mixed.json": "6d74335659430e266efe44a3ea09e1eec0e13f7f418f334a5f116a8dba4a13b3",
+        "before-a1-prefill.json": "097efb9ad15c9ce8a86e8ca8a8ee8ec07b129f72d2d2086b877c7021bc55d3f4",
+        "before-a1-code.json": "1b3c37c5e3c8bd2b2252d969a7432c6734385b07fa7e374f0dd95f07a4587ee2"
+      }
+    },
+    "after-b1": {
+      "code_tps": [
+        118.22634774868753,
+        122.60766845443456,
+        121.37763817571137
+      ],
+      "prefill_tps": [
+        7863.177728289566,
+        7687.466312293715,
+        7883.877911921587
+      ],
+      "mixed_tps": {
+        "4": 118.91577206102997,
+        "16": 183.72482455740206
+      },
+      "checks_passed": true,
+      "local_graph_captures": 325,
+      "maximum_captures_per_layer_shape": 2,
+      "files_sha256": {
+        "after-b1-mixed.json": "f4fe22708e0847b1740ed9679c2970abe320d41838eb502c77d9fe0065bf6701",
+        "after-b1-prefill.json": "876a8cf699b7351896c4d13ebd7331a341fe9be264b526c8423abaed731b2816",
+        "after-b1-code.json": "99c3072cc857784c1b2ce92870e4784015e179549718e0ad7977f35ad0dce0d6"
+      }
+    },
+    "after-b2": {
+      "code_tps": [
+        123.28463901907429,
+        122.97225172385413,
+        123.10399005582555
+      ],
+      "prefill_tps": [
+        7699.807691514524,
+        7692.183532935818,
+        7811.19316325462
+      ],
+      "mixed_tps": {
+        "4": 118.51049856969705,
+        "16": 187.17445159761934
+      },
+      "checks_passed": true,
+      "local_graph_captures": 310,
+      "maximum_captures_per_layer_shape": 2,
+      "files_sha256": {
+        "after-b2-mixed.json": "7eb58e401d01627b1b48c1e40fbdd270a33dfdb3815785a9cceff0462a2d02b4",
+        "after-b2-prefill.json": "750dc2dc174719e8235aaebd1710a52db3ff6f27a48f58e8c6f9dade578acd27",
+        "after-b2-code.json": "55f4f5a2a89b8979ccac8be50cb6bf5186385e20d067aa32ae9bd948f9467b7d"
+      }
+    },
+    "before-a2": {
+      "code_tps": [
+        119.17515977977386,
+        121.60617316463446,
+        122.3447825611723
+      ],
+      "prefill_tps": [
+        7848.09438143202,
+        7854.210665009078,
+        7688.608551207417
+      ],
+      "mixed_tps": {
+        "4": 117.53821164572938,
+        "16": 184.91897099539372
+      },
+      "checks_passed": true,
+      "local_graph_captures": 0,
+      "maximum_captures_per_layer_shape": 0,
+      "files_sha256": {
+        "before-a2-mixed.json": "13cbbe3f5b0dd97a84e2868c4d25dae31896b97c0798f24450cf543a0f95e5b2",
+        "before-a2-prefill.json": "286131a3bf3529c4250f2e2fe24ac652d080d1de1b815604ebf6a8dd5e4aaffb",
+        "before-a2-code.json": "f94f28416a3b814ff3bb6f81fef31f44fb155e21bef48fdd662bf34005db33c6"
+      }
+    }
+  },
+  "pooled": {
+    "before": {
+      "code_tps": 123.13961995923734,
+      "prefill_tps": 7820.116759373172,
+      "mixed_tps": {
+        "4": 118.17064410732027,
+        "16": 184.86832864252113
+      }
+    },
+    "after": {
+      "code_tps": 122.78996008914434,
+      "prefill_tps": 7755.500427384572,
+      "mixed_tps": {
+        "4": 118.7131353153635,
+        "16": 185.4496380775107
+      }
+    }
+  },
+  "commands_and_startup": [
+    {
+      "label": "before-a1",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-local-graph-before-a1",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=info,ds41rt::graph_capture=debug",
+        "-v",
+        "/tmp/ds41-rtx-local-c1-profile/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "auto",
+        "--dspark-adaptive"
+      ],
+      "startup_seconds": 6.31555052800104,
+      "code": true,
+      "prefill": true,
+      "mixed": true
+    },
+    {
+      "label": "after-b1",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-local-graph-after-b1",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=info,ds41rt::graph_capture=debug",
+        "-v",
+        "/tmp/ds41-rtx-local-graph/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "auto",
+        "--dspark-adaptive"
+      ],
+      "startup_seconds": 7.357321140007116,
+      "code": true,
+      "prefill": true,
+      "mixed": true
+    },
+    {
+      "label": "after-b2",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-local-graph-after-b2",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=info,ds41rt::graph_capture=debug",
+        "-v",
+        "/tmp/ds41-rtx-local-graph/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "auto",
+        "--dspark-adaptive"
+      ],
+      "startup_seconds": 7.334186811931431,
+      "code": true,
+      "prefill": true,
+      "mixed": true
+    },
+    {
+      "label": "before-a2",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-local-graph-before-a2",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=info,ds41rt::graph_capture=debug",
+        "-v",
+        "/tmp/ds41-rtx-local-c1-profile/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "auto",
+        "--dspark-adaptive"
+      ],
+      "startup_seconds": 8.356186773977242,
+      "code": true,
+      "prefill": true,
+      "mixed": true
+    }
+  ],
+  "restored": true
+}
