@@ -32,7 +32,11 @@ Remaining synchronization work, based on the current serving source:
 - [Constrained/full-frontier logits downloads](phase1-queued-logits.md) now use
   cooperative transfers with head-owned pinned storage and preserve full retained
   scores for future grammars.
-- Audit token upload and embedding/query handoff, graph capture/rebind/eviction,
+- [Attention/projection/mHC completion](phase1-queued-attention.md) is now cooperative
+  with a retained lane owner and drained cancellation. Numerical/lifecycle checks
+  pass; the complete C2–C16 curve supports retention despite an initial C16
+  scalar dominated by a longer prose completion tail.
+- Finish cache production and index selection, graph capture/rebind/eviction,
   and remaining component waits on the
   shared host thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
 

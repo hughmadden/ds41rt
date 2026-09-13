@@ -247,6 +247,22 @@ impl<'a> SparseAttentionWave<'a> {
         requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
         consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>,
     ) -> Result<T> {
+        unsafe { self.query_then(query, sink, requests, selection, consume, false) }
+    }
+    /// # Safety
+    /// Same inputs as execute_query_then, but the caller must retain all cache,
+    /// selection and consumer storage until completion or a drained abort.
+    pub unsafe fn enqueue_query_then<T>(&mut self, query: &AttentionQueryOutput<'_>,
+        sink: Ds41rtDeviceBuffer, requests: &[AttentionRequest<'_>],
+        selection: Option<&IndexSelectionOutput<'_>>,
+        consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>) -> Result<T> {
+        unsafe { self.query_then(query, sink, requests, selection, consume, true) }
+    }
+    pub async fn wait_chain(&self) -> Result<()> { self.stream.wait().await }
+    pub fn drain_chain(&self) -> Result<()> { self.synchronize() }
+    unsafe fn query_then<T>(&mut self, query: &AttentionQueryOutput<'_>, sink: Ds41rtDeviceBuffer,
+        requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
+        consume: impl FnOnce(QueuedSparseAttention, *mut c_void) -> Result<T>, defer: bool) -> Result<T> {
         let binding = query.binding()?;
         let tokens = query.tokens()?;
         ensure!(query.rows == tokens.len() && query.rows <= self.capacity
@@ -271,6 +287,10 @@ impl<'a> SparseAttentionWave<'a> {
             let queued = self.execute_staged(query.layer, sink, requests, selection)?;
             consume(queued, stream)
         })();
+        if defer && result.is_ok() {
+            drain.2 = true;
+            return result;
+        }
         let drained = unsafe { library.cuda_stream_synchronize(stream) };
         drain.2 = true;
         result.and_then(|v| drained.map(|()| v))

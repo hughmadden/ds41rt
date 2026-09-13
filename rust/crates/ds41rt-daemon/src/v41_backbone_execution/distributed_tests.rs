@@ -162,17 +162,21 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, batch.image_mask()) })?;
             unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
         } else {
-        runtime.block_on(unsafe {
-            execution.execute_layer(
-                requests.cache(),
-                batch.cache()?,
-                &mut lane,
-                &mut index,
-                &mut transport,
-                0,
-                batch.image_mask(),
-            )
-        })?;
+            // Dropping queued attention must drain before the same producer,
+            // cache batch and lane are reused, even without polling completion.
+            let pending = unsafe { execution.prepare_layer_cooperative(requests.cache(),
+                batch.cache()?, &mut lane, &mut index)? };
+            drop(pending);
+            execution.restart();
+            lane.restart()?;
+            index.restart()?;
+            unsafe { requests.begin_input(&batch, &mut embedding, &mut lane)?; }
+            let prepared = unsafe { execution.prepare_layer_cooperative(requests.cache(),
+                batch.cache()?, &mut lane, &mut index)? };
+            let completed = runtime.block_on(unsafe {
+                prepared.execute(&mut transport, 0, batch.image_mask())
+            })?;
+            unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
         }
         let output = lane.output()?;
         assert_eq!(output.layer, 0);

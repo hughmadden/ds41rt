@@ -314,8 +314,16 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 tracing::debug!(target: "ds41rt::timing", layer, rows, advance_us, engram_us, taps_us=tapped_us-advance_us-engram_us, begin_us=prepare_timing.elapsed().as_micros() as u64-tapped_us, "target layer preparation");
             }
             unsafe {
-                let prepared = requests.with_requests(|requests| self.execution.prepare_layer(
-                    requests.cache(), guard.batch.cache()?, &mut self.lane, &mut self.index))?;
+                let cooperative = requests.cooperative_completion();
+                let prepared = requests.with_requests(|requests| {
+                    if cooperative {
+                        self.execution.prepare_layer_cooperative(requests.cache(), guard.batch.cache()?,
+                            &mut self.lane, &mut self.index)
+                    } else {
+                        self.execution.prepare_layer(requests.cache(), guard.batch.cache()?,
+                            &mut self.lane, &mut self.index)
+                    }
+                })?;
                 // No RefCell guard or bank reference survives into this await.
                 let completed = prepared.execute(transport, placement, guard.batch.image_mask()).await?;
                 self.execution.complete_layer(guard.batch.cache()?, &mut self.lane, completed)?;

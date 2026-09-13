@@ -1,6 +1,6 @@
 //! Cache producers and the complete per-layer backbone execution handoff.
 use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage};
-use crate::v41_backbone_lane::{BackboneLane, LaneFfn};
+use crate::v41_backbone_lane::{BackboneLane, LaneFfn, PendingLaneFfn};
 use crate::v41_backbone_router::ExpertRow;
 use crate::v41_compressor::{CompressorWave, CompressorWeights};
 use crate::v41_experts::coordinator::{NativeTp4Wave, NativeFfnOutput};
@@ -13,10 +13,14 @@ use ds41rt_loader::OfficialV41Catalog;
 const SOURCES: [usize; 4] = [2, 8, 14, 20];
 const INDEX: [usize; 8] = [2, 8, 14, 20, 24, 28, 32, 36];
 
-/// Owns a prepared FFN borrow, but no cache-bank or index borrow. A scheduler
-/// may prepare another independent lane while this lane waits for remote work.
+enum PreparedFfn<'l, 'w, 'a> {
+    Ready(LaneFfn<'l, 'w, 'a>),
+    Pending(PendingLaneFfn<'l, 'w, 'a>),
+}
+/// Owns a lane borrow, but no cache-bank or index borrow. The unsafe queued
+/// preparation contract retains external producers through attention completion.
 pub(crate) struct PreparedLayer<'l, 'w, 'a> {
-    ffn: LaneFfn<'l, 'w, 'a>,
+    ffn: PreparedFfn<'l, 'w, 'a>,
     rows: Vec<ExpertRow>,
     batch: u64,
     layer: usize,
@@ -40,12 +44,19 @@ impl PreparedLayer<'_, '_, '_> {
     /// # Safety
     /// The modality mask and placement describe this prepared batch. Poll on
     /// the CUDA owner; no external writes may race the borrowed lane.
-    pub async unsafe fn execute<'t>(mut self, transport: &'t mut NativeTp4Wave<'_>,
+    pub async unsafe fn execute<'t>(self, transport: &'t mut NativeTp4Wave<'_>,
         placement: u64, image_mask: &[u8]) -> Result<CompletedLayer<'t>> {
-        let result = unsafe { self.ffn.execute_tp4(transport, placement, image_mask, &self.rows).await? };
+        let (mut ffn, attended_us) = match self.ffn {
+            PreparedFfn::Ready(ffn) => (ffn, self.attended_us),
+            PreparedFfn::Pending(pending) => {
+                let ffn = pending.complete().await?;
+                (ffn, self.started.elapsed().as_micros() as u64)
+            }
+        };
+        let result = unsafe { ffn.execute_tp4(transport, placement, image_mask, &self.rows).await? };
         Ok(CompletedLayer { result, batch: self.batch, layer: self.layer, rows: self.rows.len(),
             started: self.started, produced_us: self.produced_us, indexed_us: self.indexed_us,
-            attended_us: self.attended_us, experts_us: self.started.elapsed().as_micros() as u64 })
+            attended_us, experts_us: self.started.elapsed().as_micros() as u64 })
     }
 }
 
@@ -314,7 +325,16 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
     pub unsafe fn prepare_layer<'l, 'lw, 'la>(&mut self, bank: &BackboneCache<'_>,
         batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
         index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
-        unsafe { self.prepare_layer_with_cache(LayerCache::Ordinary(bank), batch, lane, index) }
+        unsafe { self.prepare_layer_with_cache(LayerCache::Ordinary(bank), batch, lane, index, false) }
+    }
+    /// # Safety
+    /// Same contract as prepare_layer, extended through returned work completion:
+    /// preserve batch cache slots, this execution's producers and index storage.
+    /// Cancellation must drop the returned work before releasing those owners.
+    pub unsafe fn prepare_layer_cooperative<'l, 'lw, 'la>(&mut self, bank: &BackboneCache<'_>,
+        batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
+        index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
+        unsafe { self.prepare_layer_with_cache(LayerCache::Ordinary(bank), batch, lane, index, true) }
     }
     /// Prepare a reserved encoder layer and publish source/window KV before
     /// returning its FFN owner. Published sources feed all later index consumers.
@@ -325,11 +345,11 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
         ensure!(batch.is_reserved() && batch.stage() == CacheStage::Encoder,
             "published execution requires a reserved encoder batch");
-        unsafe { self.prepare_layer_with_cache(LayerCache::Encoder(bank), batch, lane, index) }
+        unsafe { self.prepare_layer_with_cache(LayerCache::Encoder(bank), batch, lane, index, false) }
     }
     unsafe fn prepare_layer_with_cache<'l, 'lw, 'la>(&mut self, mut bank: LayerCache<'_, '_>,
         batch: &CacheBatch, lane: &'l mut BackboneLane<'lw, 'la>,
-        index: &mut IndexLane<'_, '_>) -> Result<PreparedLayer<'l, 'lw, 'la>> {
+        index: &mut IndexLane<'_, '_>, cooperative: bool) -> Result<PreparedLayer<'l, 'lw, 'la>> {
         let publishing = matches!(&bank, LayerCache::Encoder(_));
         let timing = std::time::Instant::now();
         // Invalidate even if obtaining the completed query or bank check fails.
@@ -375,7 +395,11 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             .sinks
             .get(&format!("layers.{layer}.attn.attn_sink"))?;
         let rows = batch.expert_rows();
-        let ffn = unsafe { lane.attention_indexed_ffn(sink, &cache, index)? };
+        let ffn = if cooperative {
+            PreparedFfn::Pending(unsafe { lane.enqueue_attention_indexed_ffn(sink, &cache, index)? })
+        } else {
+            PreparedFfn::Ready(unsafe { lane.attention_indexed_ffn(sink, &cache, index)? })
+        };
         drop(cache);
         if let LayerCache::Encoder(bank) = &mut bank {
             bank.publish_encoder_window(batch, layer, &mut self.windows[layer])?;

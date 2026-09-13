@@ -93,6 +93,35 @@ enum Phase {
     Invalid,
 }
 
+/// Retains all lane consumers until attention finishes. The unsafe constructor's
+/// caller also retains the batch cache producers and index storage while pending.
+pub(crate) struct PendingLaneFfn<'s, 'w, 'a> {
+    lane: Option<&'s mut BackboneLane<'w, 'a>>,
+    values: Ds41rtDeviceBuffer,
+}
+impl<'s, 'w, 'a> PendingLaneFfn<'s, 'w, 'a> {
+    pub async fn complete(mut self) -> Result<LaneFfn<'s, 'w, 'a>> {
+        self.lane.as_ref().unwrap().sparse.wait_chain().await?;
+        let lane = self.lane.take().unwrap();
+        let input = unsafe { lane.block.complete_queued_ffn(self.values)? };
+        lane.phase = Phase::Ffn;
+        Ok(LaneFfn { input, shared: &mut lane.shared, router: &mut lane.router,
+            library: lane.weights.library, phase: &mut lane.phase,
+            route_capture: if lane.capture_routes { Some(&mut lane.route_capture) } else { None } })
+    }
+}
+impl Drop for PendingLaneFfn<'_, '_, '_> {
+    fn drop(&mut self) {
+        if let Some(lane) = self.lane.as_deref_mut() {
+            if let Err(error) = lane.sparse.drain_chain() {
+                tracing::error!(%error, "draining cancelled attention chain");
+            }
+            lane.block.reset();
+            lane.phase = Phase::Invalid;
+        }
+    }
+}
+
 /// Dispatch routed work from input before executing the shared contribution on
 /// RTX. Both consume the same preserved normalized rows and execution identity.
 pub(crate) struct LaneFfn<'s, 'w, 'a> {
@@ -411,6 +440,29 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             phase: &mut self.phase,
             route_capture: if self.capture_routes { Some(&mut self.route_capture) } else { None },
         })
+    }
+    /// # Safety
+    /// Keep this batch's window/source producers, admitted cache slots and index
+    /// selection storage alive and immutable until the returned owner completes
+    /// or drops. Peer lanes may mutate only disjoint request slots/page claims.
+    pub unsafe fn enqueue_attention_indexed_ffn(&mut self, sink: Ds41rtDeviceBuffer,
+        cache: &crate::v41_backbone_cache::CacheAttention<'_>,
+        index: &crate::v41_index_lane::IndexLane<'_, '_>) -> Result<PendingLaneFfn<'_, 'w, 'a>> {
+        self.enter(Phase::Query)?;
+        let selection = if self.layer >= 2 { Some(index.output(self.layer, cache)?) } else { None };
+        let requests = cache.attention_requests();
+        let query = self.query.output()?;
+        let binding = query.binding()?;
+        let tokens = query.tokens()?;
+        let result = unsafe { self.sparse.enqueue_query_then(&query, sink, &requests, selection.as_ref(),
+            |attention, stream| {
+                let projected = self.projection.enqueue_attention(&attention, tokens, stream)?;
+                self.block.enqueue_ffn(binding, attention.rows, projected, stream)
+            }) };
+        match result {
+            Ok(values) => Ok(PendingLaneFfn { lane: Some(self), values }),
+            Err(error) => { self.block.reset(); self.phase = Phase::Invalid; Err(error) }
+        }
     }
     /// Produce learned index selections from this lane's completed query.
     /// # Safety
