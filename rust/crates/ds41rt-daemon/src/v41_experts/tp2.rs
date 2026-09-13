@@ -2,6 +2,171 @@
 use crate::v41_memory::device::{Allocation, Device, Event, PeerTransfer, Stream};
 use anyhow::{ensure, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, V41Tp2ExpertReducer};
+use super::{ExpertLayer, ExpertWeights};
+use ds41rt_ffi::{V41ExpertKernel, V41ExpertLaunchArgs};
+use std::{ffi::c_void, mem::ManuallyDrop, rc::Rc};
+
+/// All encoder layers for one rank. Legacy weight allocations are created and
+/// destroyed inside their owning device scope, never across an async yield.
+pub(crate) struct RankWeights<'a> {
+    device: Device<'a>,
+    weights: ManuallyDrop<Vec<ExpertWeights<'a>>>,
+}
+impl<'a> RankWeights<'a> {
+    pub fn load(device: Device<'a>, catalog: &ds41rt_loader::OfficialV41Catalog,
+        layers: usize, budget: usize) -> Result<Self> {
+        ensure!((1..=20).contains(&layers) && matches!(device.id, 0 | 1), "invalid TP2 encoder placement");
+        let weights = device.run(|| {
+            let mut loaded = Vec::with_capacity(layers);
+            let mut remaining = budget;
+            for layer in 0..layers {
+                let weight = ExpertWeights::load(device.library, catalog,
+                    ExpertLayer::BackboneTp2 { layer, rank: device.id as usize }, remaining)?;
+                remaining = remaining.checked_sub(weight.budget.resident_bytes)
+                    .ok_or_else(|| anyhow::anyhow!("TP2 weights exceed budget"))?;
+                loaded.push(weight);
+            }
+            Ok(loaded)
+        })?;
+        Ok(Self { device, weights: ManuallyDrop::new(weights) })
+    }
+}
+impl Drop for RankWeights<'_> {
+    fn drop(&mut self) {
+        if let Err(error) = self.device.run(|| {
+            unsafe { ManuallyDrop::drop(&mut self.weights); }
+            Ok(())
+        }) { tracing::error!(%error, "releasing TP2 rank weights"); }
+    }
+}
+
+struct RankState<'a> { kernel: V41ExpertKernel<'a>, slots: [*mut c_void; 44] }
+pub(crate) struct RankInputs<'s, 'a> {
+    pub wire: &'s Allocation<'a>,
+    pub ids: &'s Allocation<'a>,
+    pub routing: &'s Allocation<'a>,
+    pub producer: &'s Stream<'a>,
+}
+pub(crate) struct ExpertWave<'a> {
+    reductions: [PeerReduction<'a>; 2],
+    ranks: [RankWave<'a>; 2],
+}
+impl<'a> ExpertWave<'a> {
+    pub fn new(weights: [Rc<RankWeights<'a>>; 2], capacity: u32) -> Result<Self> {
+        ensure!(weights[0].device.id == 0 && weights[1].device.id == 1
+            && std::ptr::eq(weights[0].device.library, weights[1].device.library)
+            && weights[0].weights.len() == weights[1].weights.len(), "TP2 rank pair mismatch");
+        Ok(Self {
+            reductions: [PeerReduction::new(weights[1].device, weights[0].device, capacity)?,
+                PeerReduction::new(weights[0].device, weights[1].device, capacity)?],
+            ranks: [RankWave::new(weights[0].clone(), capacity)?, RankWave::new(weights[1].clone(), capacity)?],
+        })
+    }
+    /// # Safety
+    /// Input producers own all writes; no conflicting input aliases until return.
+    /// Each request lane must own a separate ExpertWave. The returned output view
+    /// is valid until the next execution or destruction of this owner.
+    pub async unsafe fn execute(&mut self, layer: usize, rows: u32, destination: usize,
+        input: [RankInputs<'_, 'a>; 2]) -> Result<Ds41rtDeviceBuffer> {
+        ensure!(destination < 2, "invalid TP2 output device");
+        // Errors between rank launches must drain the already enqueued rank too.
+        struct Drain<'s, 'a> { ranks: &'s mut [RankWave<'a>; 2], complete: bool }
+        impl Drop for Drain<'_, '_> {
+            fn drop(&mut self) {
+                if !self.complete {
+                    for rank in self.ranks.iter() {
+                        if let Err(error) = rank.stream.drain() {
+                            tracing::error!(%error, "draining cancelled TP2 rank");
+                        }
+                    }
+                }
+            }
+        }
+        let mut guard = Drain { ranks: &mut self.ranks, complete: false };
+        let mut layouts = [false; 2];
+        for rank in 0..2 {
+            layouts[rank] = unsafe { guard.ranks[rank].enqueue(layer, rows, input[rank].wire.buffer,
+                input[rank].ids.buffer, input[rank].routing.buffer, input[rank].producer)? };
+        }
+        ensure!(layouts[0] == layouts[1], "TP2 rank output layout mismatch");
+        let local = &guard.ranks[destination];
+        let remote = &guard.ranks[1-destination];
+        let output = unsafe { self.reductions[destination].reduce(&local.output, &remote.output,
+            &local.stream, &remote.stream, rows, layouts[0]).await? };
+        guard.complete = true;
+        Ok(output)
+    }
+}
+
+pub(crate) struct RankWave<'a> {
+    pub stream: Stream<'a>,
+    ready: Event<'a>,
+    states: Vec<RankState<'a>>,
+    _scratch: Allocation<'a>,
+    weights: Rc<RankWeights<'a>>,
+    pub output: Allocation<'a>,
+    capacity: u32,
+}
+impl<'a> RankWave<'a> {
+    pub fn new(weights: Rc<RankWeights<'a>>, capacity: u32) -> Result<Self> {
+        ensure!(matches!(capacity, 1 | 16 | 80 | 256 | 1024 | 4096), "invalid TP2 rank capacity");
+        let device = weights.device;
+        let capacities: Vec<u32> = [1, 16, 80, 256, 1024, 4096].into_iter().filter(|&c| c <= capacity).collect();
+        let kernels = device.run(|| capacities.iter().map(|&c| device.library.v41_tp2_expert_kernel(c))
+            .collect::<Result<Vec<_>>>())?;
+        let bytes = kernels.iter().map(|k| k.info().scratch_bytes as usize).max().unwrap();
+        let stream = Stream::new(device)?;
+        let scratch = Allocation::new(device, bytes)?;
+        let mut states = Vec::with_capacity(kernels.len());
+        for kernel in kernels {
+            let mut slots = [std::ptr::null_mut(); 44];
+            let initialized = device.run(|| unsafe {
+                kernel.bind_scratch(scratch.buffer.ptr, bytes as u64, &mut slots)?;
+                kernel.initialize_scratch(scratch.buffer.ptr, bytes as u64, stream.raw)
+            });
+            let drained = stream.drain();
+            initialized.and(drained)?;
+            states.push(RankState { kernel, slots });
+        }
+        Ok(Self { stream, ready: Event::new(device)?, states, _scratch: scratch, weights,
+            output: Allocation::new(device, capacity as usize * 5120 * 6 * 4)?, capacity })
+    }
+    /// # Safety
+    /// Previous wave use is complete. All inputs are ordered on `producer` and
+    /// retained without mutation until this stream completes. Callers must drain
+    /// both rank streams on partial enqueue failure before releasing inputs.
+    pub unsafe fn enqueue(&mut self, layer: usize, rows: u32, wire: Ds41rtDeviceBuffer,
+        ids: Ds41rtDeviceBuffer, routing: Ds41rtDeviceBuffer, producer: &Stream<'a>) -> Result<bool> {
+        ensure!(rows > 0 && rows <= self.capacity && layer < self.weights.weights.len(), "TP2 layer/rows not resident");
+        let device = self.weights.device;
+        for (buffer, width) in [(wire, 5280), (ids, 24), (routing, 24)] {
+            ensure!(buffer.device_id == device.id && buffer.bytes >= rows as usize * width,
+                "TP2 rank input device or extent differs");
+        }
+        self.ready.record(producer)?;
+        let state = self.states.iter_mut().find(|s| s.kernel.info().capacity_rows >= rows).unwrap();
+        self.weights.weights[layer].bind(&state.kernel, &mut state.slots)?;
+        state.slots[0] = wire.ptr;
+        state.slots[1] = ids.ptr;
+        state.slots[2] = routing.ptr;
+        let token_sums = state.kernel.accumulates_tokens();
+        let info = state.kernel.info();
+        let args = V41ExpertLaunchArgs { tensors: state.slots, num_tokens: rows as i32,
+            max_rows: info.max_rows, scatter_rows: rows as i32 * 6, rows_padded: info.rows_padded,
+            max_tasks: info.max_tasks, max_phys_tiles: info.max_phys_tiles,
+            max_active_clusters: info.max_active_clusters, stream: self.stream.raw };
+        let queued = device.run(|| unsafe {
+            device.library.cuda_stream_wait_event(self.stream.raw, self.ready.raw)?;
+            state.kernel.launch(&args)?;
+            let mut source = self.output.buffer;
+            source.ptr = state.slots[41];
+            source.bytes = rows as usize * 5120 * if token_sums { 4 } else { 24 };
+            device.library.copy_d2d_async(self.output.buffer, source, source.bytes, self.stream.raw)
+        });
+        if let Err(error) = queued { self.stream.drain()?; return Err(error); }
+        Ok(token_sums)
+    }
+}
 
 pub(crate) struct PeerReduction<'a> {
     // Transfer drains before any referenced staging or output can be freed.
@@ -60,6 +225,58 @@ impl<'a> PeerReduction<'a> {
 mod tests {
     use super::*;
     use ds41rt_ffi::NativeLibrary;
+    #[test]
+    #[ignore = "requires official DS41RT_SNAPSHOT, TP2 DS41RT_NATIVE_LIB and two GPUs"]
+    fn real_encoder_rank_waves_share_weights_across_independent_lanes() -> Result<()> {
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let catalog = ds41rt_loader::read_official_v41_catalog(ds41rt_loader::OFFICIAL_V41_MODEL_ID,
+            std::path::Path::new(&std::env::var("DS41RT_SNAPSHOT")?))?;
+        lib.cuda_set_device(0)?;
+        let devices = [Device { library: &lib, id: 0 }, Device { library: &lib, id: 1 }];
+        let weights = [Rc::new(RankWeights::load(devices[0], &catalog, 1, 4_000_000_000)?),
+            Rc::new(RankWeights::load(devices[1], &catalog, 1, 4_000_000_000)?)];
+        let mut first = ExpertWave::new(weights.clone(), 16)?;
+        let mut second = ExpertWave::new(weights, 16)?;
+        let mut inputs = Vec::new();
+        for device in devices {
+            inputs.push((Allocation::new(device, 16*5280)?, Allocation::new(device, 16*24)?,
+                Allocation::new(device, 16*24)?, Stream::new(device)?));
+        }
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        for nonzero in [false, true] {
+            let mut wire = vec![0u8; 16*5280];
+            for row in wire.chunks_exact_mut(5280) {
+                row[..5120].fill(if nonzero { 0x38 } else { 0 });
+                row[5120..].fill(127);
+            }
+            let ids: Vec<u8> = (0..96i32).flat_map(|i| (i%6).to_ne_bytes()).collect();
+            let routing: Vec<u8> = (0..96).flat_map(|_| (1f32/6.).to_ne_bytes()).collect();
+            for (rank, (w, i, r, _)) in inputs.iter().enumerate() {
+                devices[rank].run(|| {
+                    lib.copy_h2d(w.buffer, &wire)?;
+                    lib.copy_h2d(i.buffer, &ids)?;
+                    lib.copy_h2d(r.buffer, &routing)
+                })?;
+            }
+            let make_inputs = || std::array::from_fn(|rank| RankInputs {
+                wire: &inputs[rank].0, ids: &inputs[rank].1, routing: &inputs[rank].2, producer: &inputs[rank].3 });
+            let (x, y) = runtime.block_on(async { tokio::join!(
+                unsafe { first.execute(0, 16, 0, make_inputs()) },
+                unsafe { second.execute(0, 16, 1, make_inputs()) }) });
+            let mut results = Vec::new();
+            for (device, output) in [(devices[0], x?), (devices[1], y?)] {
+                let mut host = vec![0; output.bytes];
+                device.run(|| lib.copy_d2h(&mut host, output))?;
+                assert!(host.chunks_exact(2).all(|v| (u16::from_ne_bytes([v[0],v[1]]) & 0x7f80) != 0x7f80));
+                assert_eq!(host.chunks_exact(2).any(|v| u16::from_ne_bytes([v[0],v[1]]) & 0x7fff != 0), nonzero);
+                results.push(host);
+            }
+            assert_eq!(results[0], results[1]);
+            assert_eq!(lib.cuda_get_device()?, 0);
+        }
+        Ok(())
+    }
+
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB and two CUDA devices"]
     fn opposite_lane_peer_reductions_preserve_results_and_device() -> Result<()> {

@@ -261,3 +261,28 @@ cooperatively on one host thread. It checks changed values, C1/C16, both route
 and token-sum layouts, correct BF16 results on both devices, and restoration of
 the caller's device. It does not deliberately stall either producer. The daemon
 offline check also passes.
+
+## Rust TP2 expert execution owner
+
+`RankWeights` loads encoder TP2 layers inside explicit device scopes and frees
+them on the same devices. Immutable rank weights can be shared by both lanes.
+`RankWave` owns independent streams, capacity variants, scratch, and FP32 output
+storage. `ExpertWave` enqueues both ranks, then chains peer transfer/reduction
+onto either requested output GPU. Error/cancellation guards drain partially
+enqueued ranks before input borrows can be released. Its execute path performs
+no allocation. This backend is not yet selected by the serving layer loop.
+
+The real-checkpoint Rust fixture passes with layer 0 loaded as two TP2 halves,
+two concurrent lane owners sharing those weights, and opposite output devices.
+C16 zero input produces zero; changed nonzero input produces finite nonzero
+outputs identical on either destination GPU. This verifies loading, execution,
+ownership and reduction plumbing; it is not a full-model quality or throughput
+qualification. Current rank workspaces copy FP32 kernel scratch output into a
+stable preallocated buffer before peer reduction; account for those copies and
+buffers when measuring and planning memory.
+
+A deliberate stalled-producer CUDA test also passes: the peer chain returns
+Pending, another stream remains ready, and dropping the future drains both copy
+and its queued follow-up before returning. The test releases the producer after
+50 ms and checks final data and device restoration. Cancellation can block for
+cleanup; normal progress still polls cooperatively with no cross-lane join.

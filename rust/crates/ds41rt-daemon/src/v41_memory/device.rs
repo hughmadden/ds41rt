@@ -62,7 +62,7 @@ impl<'a> Stream<'a> {
     fn ready(&self) -> Result<bool> {
         self.device.run(|| unsafe { self.device.library.cuda_stream_query(self.raw) })
     }
-    fn drain(&self) -> Result<()> {
+    pub(crate) fn drain(&self) -> Result<()> {
         self.device.run(|| unsafe { self.device.library.cuda_stream_synchronize(self.raw) })
     }
 }
@@ -160,6 +160,72 @@ impl<'a> PeerTransfer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB, libcudart.so.13 and two CUDA devices"]
+    fn cancelled_peer_chain_drains_before_releasing_borrows() -> Result<()> {
+        use std::future::Future;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::task::{Context, Poll, Waker};
+        struct RuntimeLibrary(*mut c_void);
+        impl Drop for RuntimeLibrary {
+            fn drop(&mut self) { unsafe { libc::dlclose(self.0); } }
+        }
+        unsafe extern "C" fn hold(data: *mut c_void) {
+            let release = unsafe { &*data.cast::<AtomicBool>() };
+            while !release.load(Ordering::Acquire) { std::thread::yield_now(); }
+        }
+        let cuda = RuntimeLibrary(unsafe { libc::dlopen(c"libcudart.so.13".as_ptr(), libc::RTLD_NOW) });
+        ensure!(!cuda.0.is_null(), "CUDA runtime library unavailable");
+        let symbol = unsafe { libc::dlsym(cuda.0, c"cudaLaunchHostFunc".as_ptr()) };
+        ensure!(!symbol.is_null(), "CUDA callback API unavailable");
+        let launch: unsafe extern "C" fn(*mut c_void, unsafe extern "C" fn(*mut c_void), *mut c_void) -> i32 =
+            unsafe { std::mem::transmute(symbol) };
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        lib.cuda_set_device(0)?;
+        let d0 = Device { library: &lib, id: 0 };
+        let d1 = Device { library: &lib, id: 1 };
+        let source = Allocation::new(d0, 4096)?;
+        let mut destination = Allocation::new(d1, 4096)?;
+        let output = Allocation::new(d1, 4096)?;
+        let producer = Stream::new(d0)?;
+        let independent = Stream::new(d1)?;
+        let mut transfer = PeerTransfer::new(d0, d1)?;
+        lib.copy_h2d(source.buffer, &[73u8; 4096])?;
+        let release = AtomicBool::new(false);
+        // Always release during unwinding, before any stream owner drains.
+        struct Release<'a>(&'a AtomicBool);
+        impl Drop for Release<'_> { fn drop(&mut self) { self.0.store(true, Ordering::Release); } }
+        let _release = Release(&release);
+        ensure!(unsafe { launch(producer.raw, hold, (&release as *const AtomicBool).cast_mut().cast()) } == 0,
+            "could not stall producer");
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        let _entered = runtime.enter();
+        let mut future = Box::pin(unsafe { transfer.copy_then(&source, &mut destination, &producer, 4096,
+            |copied, stream| lib.copy_d2d_async(output.buffer, copied, 4096, stream)) });
+        // On assertion failure release before the future's cancellation guard.
+        let _unwind_release = Release(&release);
+        let mut context = Context::from_waker(Waker::noop());
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending));
+        assert_eq!(lib.cuda_get_device()?, 0);
+        assert!(independent.ready()?);
+        assert!(!release.load(Ordering::Acquire));
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                release.store(true, Ordering::Release);
+            });
+            drop(future);
+            // Without cancellation draining, Drop returns while the gate is held.
+            assert!(release.load(Ordering::Acquire));
+        });
+        assert!(producer.ready()?);
+        assert_eq!(lib.cuda_get_device()?, 0);
+        let mut bytes = [0u8; 4096];
+        d1.run(|| lib.copy_d2h(&mut bytes, output.buffer))?;
+        assert_eq!(bytes, [73u8; 4096]);
+        Ok(())
+    }
+
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB and two CUDA devices"]
     fn peer_owners_restore_device_and_copy_independent_lanes() -> Result<()> {
