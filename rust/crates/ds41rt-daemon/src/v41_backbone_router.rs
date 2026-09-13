@@ -328,7 +328,7 @@ impl BackboneRouterWave<'_, '_> {
     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
         self.invalidate();
         ensure!(
-            self.graphs.get(self.layer, self.weights).is_none(),
+            self.graphs.get_shape(self.layer, self.weights, rows).is_none(),
             "backbone router graph already captured"
         );
         unsafe {
@@ -369,7 +369,7 @@ impl BackboneRouterWave<'_, '_> {
         self.validate(rows)?;
         let (graph, count) = self
             .graphs
-            .get(self.layer, self.weights)
+            .get_shape(self.layer, self.weights, rows)
             .context("backbone router graph missing")?;
         ensure!(count == rows, "backbone router captured rows differ");
         let launched = unsafe {
@@ -457,10 +457,9 @@ impl BackboneRouterWave<'_, '_> {
         self.invalidate();
         if self
             .graphs
-            .get(self.layer, self.weights)
-            .is_none_or(|(_, n)| n != rows)
+            .get_shape(self.layer, self.weights, rows)
+            .is_none()
         {
-            self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
             }
@@ -490,6 +489,7 @@ impl BackboneRouterWave<'_, '_> {
         })
     }
     /// Clear only this layer; other layers retain their captured shape.
+    pub fn enable_small_graph_shapes(&mut self) { self.graphs.enable_small_shapes(); }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.invalidate();
         self.synchronize()?;

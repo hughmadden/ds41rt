@@ -261,7 +261,7 @@ impl AttentionOutputWave<'_, '_> {
         self.ready = None;
         self.origin = None;
         ensure!(
-            self.graphs.get(self.weights.layer, self.weights).is_none(),
+            self.graphs.get_shape(self.weights.layer, self.weights, rows).is_none(),
             "attention output graph already captured"
         );
         unsafe {
@@ -304,7 +304,7 @@ impl AttentionOutputWave<'_, '_> {
         self.validate(rows)?;
         let (graph, count) = self
             .graphs
-            .get(self.weights.layer, self.weights)
+            .get_shape(self.weights.layer, self.weights, rows)
             .context("attention output graph missing")?;
         ensure!(count == rows, "attention output capture row count differs");
         let launched = unsafe {
@@ -345,8 +345,7 @@ impl AttentionOutputWave<'_, '_> {
                 )?;
             }
             let rows = attention.rows as u32;
-            if self.graphs.get(self.weights.layer, self.weights).is_none_or(|(_, n)| n != rows) {
-                self.clear_graph()?;
+            if self.graphs.get_shape(self.weights.layer, self.weights, rows).is_none() {
                 unsafe { self.capture(rows)?; }
             }
             unsafe { self.replay(rows)?; }
@@ -381,7 +380,8 @@ impl AttentionOutputWave<'_, '_> {
             _owner: PhantomData,
         })
     }
-    /// Evict only the current layer; other layers retain one captured shape each.
+    pub fn enable_small_graph_shapes(&mut self) { self.graphs.enable_small_shapes(); }
+    /// Evict all shapes for the current layer; other layers remain cached.
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready = None;
         self.origin = None;

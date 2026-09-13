@@ -84,6 +84,7 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         })
     }
     /// Begin a new batch after all consumers finish; also recovers failed work.
+    pub fn enable_small_graph_shapes(&mut self) { self.query.enable_small_graph_shapes(); }
     pub fn restart(&mut self) -> Result<()> {
         self.restart_at(0)
     }

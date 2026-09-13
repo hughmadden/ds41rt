@@ -203,7 +203,7 @@ impl BackboneSharedWave<'_, '_> {
     pub unsafe fn capture(&mut self, rows: u32) -> Result<()> {
         self.invalidate();
         ensure!(
-            self.graphs.get(self.layer, self.weights).is_none(),
+            self.graphs.get_shape(self.layer, self.weights, rows).is_none(),
             "shared FFN graph already captured"
         );
         unsafe {
@@ -244,7 +244,7 @@ impl BackboneSharedWave<'_, '_> {
         self.validate(rows)?;
         let (graph, count) = self
             .graphs
-            .get(self.layer, self.weights)
+            .get_shape(self.layer, self.weights, rows)
             .context("shared FFN graph missing")?;
         ensure!(count == rows, "shared FFN captured rows differ");
         let launched = unsafe {
@@ -276,10 +276,9 @@ impl BackboneSharedWave<'_, '_> {
         let rows = input.tokens.len() as u32;
         if self
             .graphs
-            .get(self.layer, self.weights)
-            .is_none_or(|(_, n)| n != rows)
+            .get_shape(self.layer, self.weights, rows)
+            .is_none()
         {
-            self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
             }
@@ -310,7 +309,8 @@ impl BackboneSharedWave<'_, '_> {
             _owner: PhantomData,
         })
     }
-    /// Evict only the current layer; other layers retain one captured shape each.
+    pub fn enable_small_graph_shapes(&mut self) { self.graphs.enable_small_shapes(); }
+    /// Evict all shapes for the current layer; other layers remain cached.
     pub fn clear_graph(&mut self) -> Result<()> {
         self.invalidate();
         self.synchronize()?;

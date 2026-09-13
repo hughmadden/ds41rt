@@ -423,6 +423,10 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     pub fn set_route_capture(&mut self, enabled: bool) {
         self.capture_routes = enabled;
         if enabled {
+            self.query.enable_small_graph_shapes();
+            self.projection.enable_small_graph_shapes();
+            self.shared.enable_small_graph_shapes();
+            self.router.enable_small_graph_shapes();
             self.route_capture.resize_with(40, Vec::new);
             for rows in &mut self.route_capture { rows.clear(); }
         }

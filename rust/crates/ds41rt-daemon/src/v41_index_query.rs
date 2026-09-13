@@ -274,7 +274,7 @@ impl IndexQueryWave<'_, '_> {
         self.origin = None;
         self.tokens.clear();
         ensure!(
-            self.graphs.get(self.weights.layer, self.weights).is_none(),
+            self.graphs.get_shape(self.weights.layer, self.weights, rows).is_none(),
             "index query graph already captured"
         );
         unsafe {
@@ -318,7 +318,7 @@ impl IndexQueryWave<'_, '_> {
         self.validate(rows)?;
         let (graph, count) = self
             .graphs
-            .get(self.weights.layer, self.weights)
+            .get_shape(self.weights.layer, self.weights, rows)
             .context("index query graph missing")?;
         ensure!(count == rows, "index query capture row count differs");
         let launched = unsafe {
@@ -359,10 +359,9 @@ impl IndexQueryWave<'_, '_> {
         let rows = query.rows as u32;
         if self
             .graphs
-            .get(self.weights.layer, self.weights)
-            .is_none_or(|(_, n)| n != rows)
+            .get_shape(self.weights.layer, self.weights, rows)
+            .is_none()
         {
-            self.clear_graph()?;
             unsafe {
                 self.capture(rows)?;
             }
@@ -390,6 +389,7 @@ impl IndexQueryWave<'_, '_> {
             _owner: PhantomData,
         })
     }
+    pub fn enable_small_graph_shapes(&mut self) { self.graphs.enable_small_shapes(); }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready = None;
         self.origin = None;

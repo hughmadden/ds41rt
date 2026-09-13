@@ -1,0 +1,122 @@
+{
+  "scope": "Instrumented C1 adaptive small-shape graph retention pilot; not release qualification",
+  "repeats": 3,
+  "nonce_seed": 53001,
+  "gpu_power_limit_w": 400,
+  "memory_clock": "standard (max 14001 MHz, load 13365 MHz)",
+  "timing": {
+    "adaptive-min": {
+      "2_changed": {
+        "count": 81,
+        "median_ms": 39.179
+      },
+      "2_same": {
+        "count": 77,
+        "median_ms": 27.589
+      },
+      "3_changed": {
+        "count": 127,
+        "median_ms": 42.352
+      },
+      "3_same": {
+        "count": 80,
+        "median_ms": 30.631
+      },
+      "4_changed": {
+        "count": 73,
+        "median_ms": 45.703
+      },
+      "4_same": {
+        "count": 35,
+        "median_ms": 33.573
+      },
+      "5_changed": {
+        "count": 31,
+        "median_ms": 49.067
+      },
+      "5_same": {
+        "count": 1,
+        "median_ms": 36.311
+      },
+      "6_changed": {
+        "count": 48,
+        "median_ms": 51.796
+      },
+      "6_same": {
+        "count": 138,
+        "median_ms": 39.942499999999995
+      },
+      "layer_captures": 0,
+      "sparse_captures": 15120
+    },
+    "graphs": {
+      "2_changed": {
+        "count": 81,
+        "median_ms": 32.016
+      },
+      "2_same": {
+        "count": 77,
+        "median_ms": 26.912
+      },
+      "3_changed": {
+        "count": 127,
+        "median_ms": 35.013
+      },
+      "3_same": {
+        "count": 80,
+        "median_ms": 30.15
+      },
+      "4_changed": {
+        "count": 73,
+        "median_ms": 38.041
+      },
+      "4_same": {
+        "count": 35,
+        "median_ms": 32.832
+      },
+      "5_changed": {
+        "count": 31,
+        "median_ms": 41.091
+      },
+      "5_same": {
+        "count": 1,
+        "median_ms": 36.172
+      },
+      "6_changed": {
+        "count": 48,
+        "median_ms": 44.1785
+      },
+      "6_same": {
+        "count": 138,
+        "median_ms": 39.581500000000005
+      },
+      "layer_captures": 2016,
+      "sparse_captures": 15120
+    }
+  },
+  "results": {
+    "adaptive-min": {
+      "median_decode_tps": {
+        "code": 115.28492945403984,
+        "fable": 44.05500612427473,
+        "topic": 56.166429526124034
+      },
+      "exact_outputs_vs_fixed_5": 9,
+      "samples": 9
+    },
+    "graphs": {
+      "median_decode_tps": {
+        "code": 118.43012930523118,
+        "fable": 50.15926274077619,
+        "topic": 64.18493912278383
+      },
+      "exact_outputs_vs_fixed_5": 9,
+      "samples": 9
+    }
+  },
+  "memory_mib": {
+    "before_requests": 65510,
+    "after_requests": 65732,
+    "note": "Whole process change; not an isolated graph allocation measurement"
+  }
+}
