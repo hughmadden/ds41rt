@@ -1,0 +1,811 @@
+{
+  "source_commit": "7c0dfcf054a4ee1be4d84397c35e25bbfdd63607",
+  "scope": "Five complete local layers, C16 admission, C1 code only; quiet throughput and separate host traces",
+  "artifacts": {
+    "libds41rt_native.so": "1aed37f945a4291139133b95bdef7fd5040f86164bbfcd6bf89286c98dfc9f94",
+    "ds41rt": "bd2c4e38ce60c0d104b9639a3bdd4baf75c37aefe6e3b60a7124a64a8e94f2a0"
+  },
+  "runs": {
+    "quiet-spec": {
+      "source_sha256": "526b317a50ef4477f7d5aca907ef79a813786b2a86f6e6297ec7c00c439cec1c",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-profile-quiet-spec",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=info",
+        "-v",
+        "/tmp/ds41-rtx-local-c1-profile/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "5",
+        "--dspark-adaptive"
+      ],
+      "passed": true,
+      "tps": [
+        124.0134484890144,
+        123.37771260910517,
+        123.74065094556202
+      ],
+      "median_tps": 123.74065094556202
+    },
+    "quiet-target": {
+      "source_sha256": "16291183afd34d65d70c311ea0ea27457e3dc21841bc33ac7261c44b744bf2e3",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-profile-quiet-target",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=info",
+        "-v",
+        "/tmp/ds41-rtx-local-c1-profile/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--rtx-expert-layers",
+        "5"
+      ],
+      "passed": true,
+      "tps": [
+        40.76592709601181,
+        43.889281997629965,
+        43.69670511301297
+      ],
+      "median_tps": 43.69670511301297
+    },
+    "trace-spec": {
+      "source_sha256": "e7a1e09bf564a12c7f33c2c1bd25a9a765a565b8964f6db903e07359062f38c3",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-profile-trace-spec",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=warn,ds41rt::timing=debug",
+        "-v",
+        "/tmp/ds41-rtx-local-c1-profile/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "5",
+        "--dspark-adaptive"
+      ],
+      "passed": true,
+      "tps": [
+        118.54815945777479,
+        120.46345684962742,
+        120.80484612562364
+      ],
+      "median_tps": 120.46345684962742
+    },
+    "trace-target": {
+      "source_sha256": "3fe92b1ef5ef004cb71c5f0de6a89e56be367ef5febe2685a91f7b6ad58d71f4",
+      "command": [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "ds41rt-profile-trace-target",
+        "--gpus",
+        "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+        "--network",
+        "host",
+        "--ipc",
+        "host",
+        "--ulimit",
+        "memlock=-1:-1",
+        "--device=/dev/infiniband",
+        "-e",
+        "RUST_LOG=warn,ds41rt::timing=debug",
+        "-v",
+        "/tmp/ds41-rtx-local-c1-profile/artifacts:/phase1:ro",
+        "-v",
+        "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+        "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--rtx-expert-layers",
+        "5"
+      ],
+      "passed": true,
+      "tps": [
+        43.01817720580056,
+        43.25400513366249,
+        43.22805222692432
+      ],
+      "median_tps": 43.22805222692432
+    }
+  },
+  "timing": {
+    "spec": {
+      "source_sha256": "2e4b51408d1dc5349b5de75af481085cbcf127f58f7562bfc9f9c56002536429",
+      "rounds": 114,
+      "scheduler_median_ms": {
+        "draft_us": 2.883,
+        "prepare_us": 0.007,
+        "verify_us": 38.3675,
+        "total_us": 41.8695
+      },
+      "stage_median_ms": {
+        "target attention chain": {
+          "total_us": 5.484
+        },
+        "target layer preparation": {
+          "advance_us": 0.404,
+          "engram_us": 0.354,
+          "taps_us": 0.02,
+          "begin_us": 3.226
+        },
+        "target query preparation": {
+          "total_us": 3.239
+        },
+        "target collection": {
+          "shared_copy_us": 0.0,
+          "upload_us": 0.141,
+          "receive_us": 17.8135,
+          "reduce_us": 0.281
+        },
+        "target local experts": {
+          "routed_us": 0.177,
+          "total_us": 2.1335
+        },
+        "target experts": {
+          "routed_us": 1.32,
+          "dispatch_us": 0.196,
+          "shared_us": 1.996,
+          "collect_us": 18.3025
+        },
+        "target layer": {
+          "produced_us": 1.306,
+          "index_us": 1.1035,
+          "attention_us": 5.5635,
+          "experts_us": 24.038,
+          "finish_us": 0.274
+        }
+      },
+      "observed_scheduler_rounds": 125,
+      "ffn_layer_median_ms": {
+        "0": {
+          "routed_us": 0.036,
+          "total_us": 0.478
+        },
+        "1": {
+          "routed_us": 0.035,
+          "total_us": 0.431
+        },
+        "2": {
+          "routed_us": 0.035,
+          "total_us": 0.42
+        },
+        "3": {
+          "routed_us": 0.035,
+          "total_us": 0.3855
+        },
+        "4": {
+          "routed_us": 0.035,
+          "total_us": 0.407
+        },
+        "5": {
+          "routed_us": 0.039,
+          "dispatch_us": 0.007,
+          "shared_us": 0.058,
+          "collect_us": 0.505
+        },
+        "6": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.455
+        },
+        "7": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.4685
+        },
+        "8": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.472
+        },
+        "9": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.4485
+        },
+        "10": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.489
+        },
+        "11": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.472
+        },
+        "12": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.5195
+        },
+        "13": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.5105
+        },
+        "14": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.456
+        },
+        "15": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.5975
+        },
+        "16": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.456
+        },
+        "17": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.005,
+          "shared_us": 0.058,
+          "collect_us": 0.5235
+        },
+        "18": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.0055,
+          "shared_us": 0.057,
+          "collect_us": 0.487
+        },
+        "19": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.569
+        },
+        "20": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.4305
+        },
+        "21": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.45
+        },
+        "22": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.506
+        },
+        "23": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.562
+        },
+        "24": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.468
+        },
+        "25": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.486
+        },
+        "26": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.472
+        },
+        "27": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.058,
+          "collect_us": 0.468
+        },
+        "28": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.006,
+          "shared_us": 0.056,
+          "collect_us": 0.4785
+        },
+        "29": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.523
+        },
+        "30": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.507
+        },
+        "31": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.0055,
+          "shared_us": 0.057,
+          "collect_us": 0.569
+        },
+        "32": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.006,
+          "shared_us": 0.057,
+          "collect_us": 0.532
+        },
+        "33": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.0575,
+          "collect_us": 0.5695
+        },
+        "34": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.5835
+        },
+        "35": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.5905
+        },
+        "36": {
+          "routed_us": 0.037,
+          "dispatch_us": 0.006,
+          "shared_us": 0.056,
+          "collect_us": 0.591
+        },
+        "37": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.582
+        },
+        "38": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.6415
+        },
+        "39": {
+          "routed_us": 0.038,
+          "dispatch_us": 0.005,
+          "shared_us": 0.057,
+          "collect_us": 0.6275
+        }
+      }
+    },
+    "target": {
+      "source_sha256": "289d2a048ed3b37647e0a553e28e9a14c428a0f482846047b46c58fc4145a02e",
+      "rounds": 636,
+      "scheduler_median_ms": {
+        "draft_us": 0.0,
+        "prepare_us": 0.005,
+        "verify_us": 22.615,
+        "total_us": 23.051
+      },
+      "stage_median_ms": {
+        "target attention chain": {
+          "total_us": 5.56
+        },
+        "target layer preparation": {
+          "advance_us": 0.388,
+          "engram_us": 0.334,
+          "taps_us": 0.02,
+          "begin_us": 3.062
+        },
+        "target query preparation": {
+          "total_us": 3.078
+        },
+        "target collection": {
+          "shared_copy_us": 0.0,
+          "upload_us": 0.177,
+          "receive_us": 4.819,
+          "reduce_us": 0.185
+        },
+        "target local experts": {
+          "routed_us": 0.169,
+          "total_us": 1.08
+        },
+        "target experts": {
+          "routed_us": 1.213,
+          "dispatch_us": 0.102,
+          "shared_us": 1.834,
+          "collect_us": 5.255
+        },
+        "target layer": {
+          "produced_us": 1.2,
+          "index_us": 0.898,
+          "attention_us": 5.639,
+          "experts_us": 9.547,
+          "finish_us": 0.26
+        }
+      },
+      "observed_scheduler_rounds": 639,
+      "ffn_layer_median_ms": {
+        "0": {
+          "routed_us": 0.034,
+          "total_us": 0.216
+        },
+        "1": {
+          "routed_us": 0.034,
+          "total_us": 0.216
+        },
+        "2": {
+          "routed_us": 0.033,
+          "total_us": 0.215
+        },
+        "3": {
+          "routed_us": 0.035,
+          "total_us": 0.217
+        },
+        "4": {
+          "routed_us": 0.034,
+          "total_us": 0.216
+        },
+        "5": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.004,
+          "shared_us": 0.053,
+          "collect_us": 0.151
+        },
+        "6": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.149
+        },
+        "7": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.149
+        },
+        "8": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "9": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "10": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.149
+        },
+        "11": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "12": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.149
+        },
+        "13": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "14": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.15
+        },
+        "15": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.151
+        },
+        "16": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "17": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.15
+        },
+        "18": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "19": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.149
+        },
+        "20": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "21": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.149
+        },
+        "22": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.149
+        },
+        "23": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.15
+        },
+        "24": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "25": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "26": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.149
+        },
+        "27": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.149
+        },
+        "28": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.151
+        },
+        "29": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.15
+        },
+        "30": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "31": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "32": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.15
+        },
+        "33": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.151
+        },
+        "34": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "35": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.149
+        },
+        "36": {
+          "routed_us": 0.035,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.151
+        },
+        "37": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.151
+        },
+        "38": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.052,
+          "collect_us": 0.15
+        },
+        "39": {
+          "routed_us": 0.036,
+          "dispatch_us": 0.003,
+          "shared_us": 0.053,
+          "collect_us": 0.15
+        }
+      }
+    },
+    "local_layers": 5,
+    "limitations": [
+      "Host wall timings include synchronization, logging and device execution.",
+      "Nested stages overlap: do not sum the entire table.",
+      "Only consecutive complete 40-layer C1 rounds at one target row or six verifier rows; excludes prefill and partial rounds.",
+      "Three nearby code-generation requests; no long-context or concurrency coverage."
+    ]
+  },
+  "raw_directory": "/tmp/ds41-rtx-local-c1-profile",
+  "limitations": [
+    "No matched remote-only control: these measurements do not prove placement speedup.",
+    "No startup, long-context, prefill, concurrency or broad semantic qualification in this run.",
+    "Host timings include logging and device waits; nested components overlap.",
+    "Only complete 40-layer C1 rounds with six verifier rows or one target row are summarized.",
+    "RTX power cap 400 W, standard memory speed; no builds overlapped measurements."
+  ]
+}
