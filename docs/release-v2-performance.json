@@ -9,8 +9,17 @@
     "xgrammar_revision": "557becfb64c503ae9c04344b0047661f43f44320"
   },
   "images": {
-    "coordinator": "sha256:3ffe75377cb901119b0ead470d4e047ff5b623c8c0eac6b98024e51814a222a8",
-    "spark": "sha256:62ceef2aaf502c03d977f7639ac8fd011aa43fe112ef75f228684bb226dc550b",
+    "coordinator": {
+      "local_image_id": "sha256:3ffe75377cb901119b0ead470d4e047ff5b623c8c0eac6b98024e51814a222a8",
+      "published_digest": "sha256:3ffe75377cb901119b0ead470d4e047ff5b623c8c0eac6b98024e51814a222a8",
+      "platform_manifest_digest": "sha256:5da3ae2053e0c624d2c5cf8a66a10f9f7e58290dd77f222f41280104a9360ee5",
+      "config_digest": "sha256:239529111f876dcc75f1949eb9bda67fca092d75555508d5e288cc1bc45d9477"
+    },
+    "spark": {
+      "local_image_id": "sha256:62ceef2aaf502c03d977f7639ac8fd011aa43fe112ef75f228684bb226dc550b",
+      "published_digest": "sha256:d9b4bc411eb3480a956d3a993597c5b102bbd438adb9c73e57d6ba2e5cf21e39",
+      "config_digest": "sha256:62ceef2aaf502c03d977f7639ac8fd011aa43fe112ef75f228684bb226dc550b"
+    },
     "tags": [
       "v2",
       "latest"

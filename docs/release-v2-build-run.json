@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "release": "v2",
+  "source": {
+    "measured_image_revision": "9477b6e39f4bbe431c4cd6d48c8b303045f9238f",
+    "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+    "sparkinfer_revision": "bae6e5cf08fc7e51e8ea40f287dcfa95440036fc",
+    "xgrammar_revision": "557becfb64c503ae9c04344b0047661f43f44320"
+  },
+  "clean_build_seconds": 304.852430176,
+  "artifacts": {
+    "coordinator": {
+      "architecture": "amd64",
+      "local_image_id": "sha256:3ffe75377cb901119b0ead470d4e047ff5b623c8c0eac6b98024e51814a222a8",
+      "executable_sha256": "448cab6b3ff2267b58e400e382144a3cf3624be1b6e1f9c973f051506ae7c742",
+      "native_library_sha256": "c74da89370e8cc0af183f6bc39c3b65fd4c504edc5decc42a81483843e7fd946"
+    },
+    "spark": {
+      "architecture": "arm64",
+      "local_image_id": "sha256:62ceef2aaf502c03d977f7639ac8fd011aa43fe112ef75f228684bb226dc550b",
+      "executable_sha256": "83f81f5793ae09c81268ab813d96a0fad5a86ac612afa92d6c15cd326b99273a",
+      "native_library_sha256": "4df74a88e5268a6476ffab0b4f4fb534caa57b3b0ac99b87360845f7dbe56825"
+    }
+  },
+  "startup_seconds": {
+    "target_only": 59.498675296,
+    "initial_dspark": 55.116801291,
+    "final_standard_dspark": 57.76107986
+  },
+  "runtime": {
+    "port": 8000,
+    "rtx_layers": [0, 1, 2, 3, 4],
+    "spark_layers_per_worker": 40,
+    "spark_budget_bytes": 107374182400,
+    "global_pool_bytes": 16681077760,
+    "global_pool_logical_tokens": 18710016,
+    "private_tail_tokens": 32768,
+    "prompt_snapshot_entries": 24,
+    "completed_turn_entries": 24,
+    "peak_gpu_memory_used_mib": 96950
+  },
+  "published_images": {
+    "coordinator": {
+      "tags": ["v2", "latest"],
+      "digest": "sha256:3ffe75377cb901119b0ead470d4e047ff5b623c8c0eac6b98024e51814a222a8",
+      "platform_manifest_digest": "sha256:5da3ae2053e0c624d2c5cf8a66a10f9f7e58290dd77f222f41280104a9360ee5",
+      "config_digest": "sha256:239529111f876dcc75f1949eb9bda67fca092d75555508d5e288cc1bc45d9477"
+    },
+    "spark": {
+      "tags": ["v2", "latest"],
+      "digest": "sha256:d9b4bc411eb3480a956d3a993597c5b102bbd438adb9c73e57d6ba2e5cf21e39",
+      "config_digest": "sha256:62ceef2aaf502c03d977f7639ac8fd011aa43fe112ef75f228684bb226dc550b"
+    },
+    "latest_identical": true,
+    "visibility": "public"
+  },
+  "release_assets": [
+    {
+      "name": "ds41rt-v2-coordinator-linux-amd64.tar.gz",
+      "bytes": 17028492,
+      "sha256": "63576c0dd347c675f7f62bb55c6d03c9cc15d0e4f56a23181f283b84317178e5"
+    },
+    {
+      "name": "ds41rt-v2-spark-expert-linux-arm64.tar.gz",
+      "bytes": 15435229,
+      "sha256": "41ccd1a316b623652fa8a631bff5a1a247a1448895a26d72580d1471a14cbbb2"
+    },
+    {
+      "name": "ds41rt-v2-qualification-evidence.tar.gz",
+      "bytes": 13151519,
+      "sha256": "e462a1db3ab8ab9df9a0a5edaa60b89c5172da820d5afe366db3db50cee6a9"
+    }
+  ],
+  "qualification_passed": true,
+  "standard_service_running": true
+}

@@ -79,6 +79,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-dir", type=Path, required=True)
     parser.add_argument("--build-dir", type=Path, required=True)
+    parser.add_argument("--publication-dir", type=Path)
     parser.add_argument("--v1", type=Path, required=True)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, required=True)
@@ -117,6 +118,42 @@ def main() -> None:
     spark_ids = {row["Id"] for row in spark_images}
     assert len(spark_images) == 4
     assert len(spark_ids) == 1
+    images = {
+        "coordinator": {"local_image_id": deployment["image_id"]},
+        "spark": {"local_image_id": next(iter(spark_ids))},
+        "tags": ["v2", "latest"],
+    }
+    if args.publication_dir:
+        published = args.publication_dir.resolve()
+        coordinator_v2 = published / "coordinator-v2-manifest.json"
+        coordinator_latest = published / "coordinator-latest-manifest.json"
+        coordinator_platform = published / "coordinator-v2-platform-manifest.json"
+        spark_v2 = published / "spark-v2-manifest.json"
+        spark_latest = published / "spark-latest-manifest.json"
+        assert coordinator_v2.read_bytes() == coordinator_latest.read_bytes()
+        assert spark_v2.read_bytes() == spark_latest.read_bytes()
+        coordinator_index = read(coordinator_v2)
+        coordinator_manifest = read(coordinator_platform)
+        spark_manifest = read(spark_v2)
+        amd64 = next(
+            row for row in coordinator_index["manifests"]
+            if row.get("platform") == {"architecture": "amd64", "os": "linux"}
+        )
+        assert sha256(coordinator_platform) == amd64["digest"].removeprefix("sha256:")
+        assert spark_manifest["config"]["digest"] == images["spark"]["local_image_id"]
+        images["coordinator"].update(
+            {
+                "published_digest": f"sha256:{sha256(coordinator_v2)}",
+                "platform_manifest_digest": amd64["digest"],
+                "config_digest": coordinator_manifest["config"]["digest"],
+            }
+        )
+        images["spark"].update(
+            {
+                "published_digest": f"sha256:{sha256(spark_v2)}",
+                "config_digest": spark_manifest["config"]["digest"],
+            }
+        )
     log = re.sub(r"\x1b\[[0-9;]*m", "", (raw / "tools-startup-service.log").read_text())
     placement = next(line for line in log.splitlines() if "bottom-up RTX expert placement" in line)
     pool = next(line for line in log.splitlines() if "native KV pool reservation" in line)
@@ -138,11 +175,7 @@ def main() -> None:
             "sparkinfer_revision": deployment["labels"]["io.ds41rt.sparkinfer.revision"],
             "xgrammar_revision": old["source"]["xgrammar_revision"],
         },
-        "images": {
-            "coordinator": deployment["image_id"],
-            "spark": spark_ids.pop(),
-            "tags": ["v2", "latest"],
-        },
+        "images": images,
         "hardware": {
             **old["hardware"],
             "coordinator_gpus": "1 x NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
