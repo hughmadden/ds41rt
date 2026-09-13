@@ -3,6 +3,8 @@ use crate::v41_backbone_cache::BackboneCache;
 use anyhow::{ensure, Context, Result};
 use std::{fmt, str::FromStr};
 
+pub(crate) mod distributed;
+
 // Aggregate source capacity is independent of the retained snapshot count.
 const RETAINED_CONTEXTS: usize = 2;
 // Extra pages cover retained partial tails and active copy-on-write frontiers.

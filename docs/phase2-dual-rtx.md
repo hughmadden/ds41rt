@@ -63,3 +63,26 @@ every prefill operation is local.
 
 Commit and push each completed development increment on `dev`. Keep `main`,
 `release/v2`, and the published v2 images as the qualified rollback baseline.
+
+## First implementation checkpoint
+
+`v41_native_serve/memory/distributed.rs` now computes page-group capacity from
+per-device residual budgets and an explicit source-owner map. It preserves
+whole-group rounding, checks minimum admission and maximum physical capacity,
+and reports unused memory independently for each card. This is startup accounting
+only; it is not wired into allocation or serving yet. Four standalone Rust tests
+pass, covering either GPU as bottleneck, exact-size rounding, limits, invalid
+owners, and arithmetic overflow. The full daemon passes offline `cargo check`.
+
+The host reports a PCIe `NODE` connection between the two RTX cards, with peer
+read and write support in both directions (`nvidia-smi topo -p2p r/w`). This
+establishes advertised capability, not measured transfer bandwidth or asynchronous
+CUDA ownership correctness. Those require a real transfer fixture.
+
+Current cache binding selects the latest source at or before the attention
+layer: source 2 serves layers 2–7, source 8 serves 8–13, source 14 serves 14–19,
+and source 20 serves 20–39. Layers 0–1 use only their sliding windows. Therefore
+the candidate 3/1 split naturally groups encoder attention on one device and
+decoder attention on the other; TP2 FFNs still require transfers within each
+layer. Existing local expert execution only accepts full-width weights, so TP2
+requires new packing/kernel ownership rather than relabeling existing buffers.
