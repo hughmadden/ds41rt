@@ -10,7 +10,7 @@ pub(crate) struct PlacedProducerWaves<'w, 'a> {
 }
 /// Borrows only this lane. The caller retains the query and admitted bank
 /// storage until completion; cancellation drains only this layer's producers.
-pub(crate) struct PendingPlacedProduction<'p, 'w, 'a> {
+pub(crate) struct PendingPlacedProduction<'p, 'w, 'i, 'a> {
     waves: &'p mut PlacedProducerWaves<'w, 'a>,
     batch: u64,
     layer: usize,
@@ -19,8 +19,11 @@ pub(crate) struct PendingPlacedProduction<'p, 'w, 'a> {
     window_ready: bool,
     source_ready: bool,
     complete: bool,
+    index: Option<&'p mut DeviceOwner<'a, IndexLane<'i, 'a>>>,
+    projection_ready: bool,
+    selection_started: bool,
 }
-impl PendingPlacedProduction<'_, '_, '_> {
+impl PendingPlacedProduction<'_, '_, '_, '_> {
     /// # Safety
     /// The original bank, query buffers and admitted slots remain alive and
     /// immutable. No other producer may overwrite this lane's proposals.
@@ -41,14 +44,43 @@ impl PendingPlacedProduction<'_, '_, '_> {
             self.source_ready = self.waves.sources[source]
                 .on_device_mut(|wave| unsafe { wave.poll_query(state) })?;
         }
+        if let Some(index) = self.index.as_deref_mut() {
+            let device = index.device;
+            if !self.projection_ready {
+                self.projection_ready = device.run(|| index.poll_projection())?;
+            }
+            if !(self.window_ready && self.source_ready && self.projection_ready) {
+                return Ok(false);
+            }
+            if !self.selection_started {
+                let source = SOURCES
+                    .iter()
+                    .rposition(|&layer| layer <= self.layer)
+                    .filter(|_| !batch.stage().reuses_sources())
+                    .map(|i| self.waves.sources[i].get());
+                let cache =
+                    bank.attention(batch, self.layer, &self.waves.windows[self.layer], source)?;
+                device.run(|| unsafe { index.enqueue_selection(&cache) })?;
+                self.selection_started = true;
+            }
+            if !device.run(|| index.poll_selection())? {
+                return Ok(false);
+            }
+        }
         self.complete = self.window_ready && self.source_ready;
         Ok(self.complete)
     }
 }
-impl Drop for PendingPlacedProduction<'_, '_, '_> {
+impl Drop for PendingPlacedProduction<'_, '_, '_, '_> {
     fn drop(&mut self) {
         if self.complete {
             return;
+        }
+        if let Some(index) = self.index.as_deref_mut() {
+            let device = index.device;
+            if let Err(error) = device.run(|| index.get_mut().abort_pending()) {
+                tracing::error!(%error, "draining cancelled placed index work");
+            }
         }
         if self.window {
             if let Err(error) =
@@ -71,12 +103,12 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
     /// # Safety
     /// Query writes are complete and correspond to this admitted batch. Retain
     /// the query buffers and bank slots until completion or drained cancellation.
-    pub unsafe fn enqueue_production(
-        &mut self,
+    pub unsafe fn enqueue_production<'p, 'i>(
+        &'p mut self,
         bank: &BackboneCache<'_>,
         batch: &CacheBatch,
         query: &crate::v41_attention_query::AttentionQueryOutput<'_>,
-    ) -> Result<PendingPlacedProduction<'_, 'w, 'a>> {
+    ) -> Result<PendingPlacedProduction<'p, 'w, 'i, 'a>> {
         ensure!(
             self.pending_commit.is_none(),
             "placed cache commit still pending"
@@ -112,6 +144,9 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
             window_ready: !window,
             source_ready: source.is_none(),
             complete: false,
+            index: None,
+            projection_ready: true,
+            selection_started: false,
         };
         if window {
             let state = bank.window(batch, layer)?;
@@ -125,6 +160,34 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
             pending.waves.sources[i]
                 .on_device_mut(|wave| unsafe { wave.enqueue_query(state, &chunks, query) })?;
         }
+        Ok(pending)
+    }
+    /// Project the learned index concurrently with SWA/compression, then select
+    /// when this layer's producers are ready. This owner borrows only one lane.
+    /// # Safety
+    /// Same retained query/cache contract as enqueue_production. Index storage
+    /// remains exclusive until completion or cancellation has drained consumers.
+    pub unsafe fn enqueue_production_and_index<'p, 'i>(
+        &'p mut self,
+        bank: &BackboneCache<'_>,
+        batch: &CacheBatch,
+        query: &crate::v41_attention_query::AttentionQueryOutput<'_>,
+        index: &'p mut DeviceOwner<'a, IndexLane<'i, 'a>>,
+    ) -> Result<PendingPlacedProduction<'p, 'w, 'i, 'a>> {
+        ensure!(
+            batch.stage().windows().contains(&query.layer) && INDEX.contains(&query.layer),
+            "placed index requires an attention index layer"
+        );
+        ensure!(
+            index.device.id == bank.attention_device(query.layer)?.id,
+            "placed index and cache GPUs differ"
+        );
+        let mut pending = unsafe { self.enqueue_production(bank, batch, query)? };
+        pending.projection_ready = false;
+        pending.index = Some(index);
+        let index = pending.index.as_deref_mut().unwrap();
+        let device = index.device;
+        device.run(|| unsafe { index.get_mut().enqueue_projection(query) })?;
         Ok(pending)
     }
     pub fn device_bytes(

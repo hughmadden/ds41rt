@@ -1,6 +1,8 @@
 //! One lane's learned index query and retained source-20 candidates.
 use crate::v41_attention_query::AttentionQueryOutput;
-use crate::v41_backbone_cache::CacheAttention;
+use crate::v41_backbone_cache::{CacheAttention, CachePlacement};
+use crate::v41_memory::device::{Device, DeviceOwner};
+mod placement;
 use crate::v41_index_query::{IndexQueryWave, IndexQueryWeights};
 use crate::v41_index_selection::{IndexSelectionOutput, IndexSelectionWave};
 use anyhow::{ensure, Context, Result};
@@ -10,7 +12,8 @@ use ds41rt_loader::OfficialV41Catalog;
 const LAYERS: [usize; 8] = [2, 8, 14, 20, 24, 28, 32, 36];
 pub(crate) struct IndexLaneWeights<'a> {
     library: &'a NativeLibrary,
-    weights: Vec<IndexQueryWeights<'a>>,
+    weights: Vec<DeviceOwner<'a, IndexQueryWeights<'a>>>,
+    placement: Option<CachePlacement>,
 }
 impl<'a> IndexLaneWeights<'a> {
     pub fn device_bytes(library: &NativeLibrary, catalog: &OfficialV41Catalog) -> Result<usize> {
@@ -30,28 +33,17 @@ impl<'a> IndexLaneWeights<'a> {
             Self::device_bytes(library, catalog)? <= budget,
             "index lane weights exceed budget"
         );
-        let weights = LAYERS
-            .into_iter()
-            .map(|layer| {
-                IndexQueryWeights::load(
-                    library,
-                    catalog,
-                    layer,
-                    IndexQueryWeights::device_bytes(library, catalog, layer)?,
-                    staging,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        Ok(Self { library, weights })
+        Self::load_placed(library, catalog, staging, None)
     }
 }
 
 pub(crate) struct IndexLane<'w, 'a> {
     weights: &'w IndexLaneWeights<'a>,
     source: IndexSelectionWave<'a>,
-    reindex: IndexSelectionWave<'a>,
+    reindex: Option<IndexSelectionWave<'a>>,
     query: IndexQueryWave<'w, 'a>,
     next: usize,
+    device: Option<i32>,
     ready: Option<usize>,
     invalid: bool,
 }
@@ -64,7 +56,15 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         ])
     }
     pub fn new(weights: &'w IndexLaneWeights<'a>, capacity: u32, budget: usize) -> Result<Self> {
-        let bytes = Self::workspace_bytes(weights.library, capacity)?;
+        Self::new_inner(weights, capacity, budget, None)
+    }
+    fn new_inner(weights: &'w IndexLaneWeights<'a>, capacity: u32, budget: usize,
+        device: Option<i32>) -> Result<Self> {
+        let bytes = match device {
+            Some(gpu) => Self::placed_workspace_bytes(weights.library,
+                weights.placement.context("placed index weights absent")?,capacity,gpu as usize)?,
+            None => Self::workspace_bytes(weights.library, capacity)?,
+        };
         let total = bytes.iter().try_fold(0usize, |n, &b| {
             n.checked_add(b).context("index workspace budget overflow")
         })?;
@@ -73,15 +73,27 @@ impl<'w, 'a> IndexLane<'w, 'a> {
             weights.weights.len() == 8,
             "index lane requires all eight weight owners"
         );
+        ensure!(weights.placement.is_some() == device.is_some(), "index workspace placement differs from weights");
+        let first = Self::next_owned(weights, device, 0);
+        ensure!(first < LAYERS.len(), "GPU has no index producers");
         Ok(Self {
             weights,
-            query: weights.weights[0].wave(capacity, bytes[0])?,
+            query: weights.weights[first].wave(capacity, bytes[0])?,
             source: IndexSelectionWave::new(weights.library, capacity as usize, bytes[1])?,
-            reindex: IndexSelectionWave::new(weights.library, capacity as usize, bytes[2])?,
-            next: 0,
+            reindex: if bytes[2] == 0 { None } else { Some(IndexSelectionWave::new(weights.library, capacity as usize, bytes[2])?) },
+            next: first,
+            device,
             ready: None,
             invalid: false,
         })
+    }
+    fn next_owned(weights: &IndexLaneWeights<'_>, device: Option<i32>, start: usize) -> usize {
+        if device.is_none() { return start; }
+        (start..LAYERS.len()).find(|&i| device.is_none_or(|id| weights.weights[i].device.id == id))
+            .unwrap_or(LAYERS.len())
+    }
+    fn advance(&mut self) {
+        self.next = Self::next_owned(self.weights, self.device, self.next + 1);
     }
     /// Begin a new batch after all consumers finish; also recovers failed work.
     pub fn enable_small_graph_shapes(&mut self) { self.query.enable_small_graph_shapes(); }
@@ -96,8 +108,9 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         self.invalid = true;
         self.ready = None;
         self.source.clear_graph()?;
-        self.reindex.clear_graph()?;
-        self.query.rebind(&self.weights.weights[first])?;
+        if let Some(reindex) = &mut self.reindex { reindex.clear_graph()?; }
+        let first = Self::next_owned(self.weights, self.device, first);
+        if first < LAYERS.len() { self.query.rebind(&self.weights.weights[first])?; }
         self.next = first;
         self.invalid = false;
         Ok(())
@@ -114,7 +127,8 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         let valid = !std::mem::replace(&mut self.invalid, true);
         self.ready = None;
         ensure!(
-            valid && LAYERS.get(self.next) == Some(&query.layer),
+            valid && LAYERS.get(self.next) == Some(&query.layer)
+                && self.device.is_none_or(|id| query.hidden.device_id == id),
             "index producer order differs; restart lane"
         );
         self.query.rebind(&self.weights.weights[self.next])?;
@@ -127,12 +141,12 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         } else {
             let candidates = self.source.output()?;
             unsafe {
-                self.reindex
+                self.reindex.as_mut().context("decoder reindex workspace absent")?
                     .execute(&projected, &requests, Some(&candidates))?;
             }
         }
         self.ready = Some(query.layer);
-        self.next += 1;
+        self.advance();
         self.invalid = false;
         Ok(())
     }
@@ -141,7 +155,8 @@ impl<'w, 'a> IndexLane<'w, 'a> {
     pub unsafe fn enqueue_projection(&mut self, query: &AttentionQueryOutput<'_>) -> Result<()> {
         let valid = !std::mem::replace(&mut self.invalid, true);
         self.ready = None;
-        ensure!(valid && LAYERS.get(self.next) == Some(&query.layer), "queued index order differs");
+        ensure!(valid && LAYERS.get(self.next) == Some(&query.layer)
+                && self.device.is_none_or(|id| query.hidden.device_id == id), "queued index order differs");
         self.query.rebind(&self.weights.weights[self.next])?;
         unsafe { self.query.enqueue_attention(query) }
     }
@@ -157,19 +172,20 @@ impl<'w, 'a> IndexLane<'w, 'a> {
             unsafe { self.source.enqueue_selection(&query, &requests, None) }
         } else {
             let shared = self.source.output()?;
-            unsafe { self.reindex.enqueue_selection(&query, &requests, Some(&shared)) }
+            unsafe { self.reindex.as_mut().context("decoder reindex workspace absent")?.enqueue_selection(&query, &requests, Some(&shared)) }
         }
     }
     pub fn poll_selection(&mut self) -> Result<bool> {
         ensure!(self.invalid, "queued index selection absent");
         let layer = *LAYERS.get(self.next).context("queued index order exhausted")?;
-        let ready = if layer <= 20 { self.source.poll_pending()? } else { self.reindex.poll_pending()? };
-        if ready { self.ready = Some(layer); self.next += 1; self.invalid = false; }
+        let ready = if layer <= 20 { self.source.poll_pending()? } else { self.reindex.as_mut().context("decoder reindex workspace absent")?.poll_pending()? };
+        if ready { self.ready = Some(layer); self.advance(); self.invalid = false; }
         Ok(ready)
     }
     pub fn abort_pending(&mut self) -> Result<()> {
         // Drain consumers before their projected inputs can be recycled.
-        let result = self.reindex.abort_pending().and(self.source.abort_pending()).and(self.query.abort_pending());
+        let reindex = self.reindex.as_mut().map_or(Ok(()), |wave| wave.abort_pending());
+        let result = reindex.and(self.source.abort_pending()).and(self.query.abort_pending());
         self.invalid = true; self.ready = None;
         result
     }
@@ -184,7 +200,7 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         let output = if producer <= 20 {
             self.source.output()?
         } else {
-            self.reindex.output()?
+            self.reindex.as_ref().context("decoder reindex workspace absent")?.output()?
         };
         let requests = cache.selection_requests()?;
         let bindings = requests
@@ -230,6 +246,7 @@ mod tests {
         let empty = IndexLaneWeights {
             library: &library,
             weights: Vec::new(),
+            placement: None,
         };
         for capacity in [1, 80, 4096] {
             let groups = IndexLane::workspace_bytes(&library, capacity)?;

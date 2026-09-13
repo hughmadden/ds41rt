@@ -554,3 +554,46 @@ wrong-batch rejection, shared-bank access while pending, and caller-device
 restoration also pass. This is not an end-to-end serving or throughput result.
 The full execution loop still requires attention/index/layer-state placement
 and selection of these placed producers.
+
+## Placed learned index and producer overlap
+
+Index query weights now load beside their attention/cache consumer groups. Each
+request lane owns separate index workspaces on the participating GPUs, and each
+GPU advances only through its assigned index layers. Source 20 and layers
+24/28/32/36 retain their candidates on the same GPU. Decoder restart skips GPUs
+without decoder index work. The ordinary constructor retains all eight layers
+on its original device.
+
+The placed producer owner now also accepts a placed index lane: it enqueues
+index projection alongside SWA/compression, polls the three producers separately,
+and starts selection after their required outputs complete. It retains no bank
+borrow across a wait. Cancellation drains index consumers before cache producers.
+The producer and index weights have independent borrow lifetimes.
+
+The first hardware check exposed a single-device restriction in the native index
+scorer. Its initializer now configures one canonical AOT CUDA library on two
+devices, preserving the generated global launch symbols and already initialized
+devices if a later initialization fails. Normal initialized calls avoid the
+initialization mutex. Direct scorer graph tests initialize both devices, then
+execute on GPU0/GPU1/GPU0 with changed queries; exact expected finite scores and
+masked negative infinities pass.
+
+For the rebalanced boundary at layer 14, component budgets are:
+
+| Index component, bytes | GPU0 | GPU1 |
+| --- | ---: | ---: |
+| Query weights | 11,479,040 | 34,437,120 |
+| Workspace per lane, C16 | 11,259,012 | 17,911,940 |
+| Workspace per lane, 4096-row capacity | 1,809,562,628 | 3,512,712,196 |
+
+GPU0 omits the unused decoder reindex workspace, saving 1,703,149,568 bytes
+(1.59 GiB) per 4096-row lane compared with allocating both selection workspaces
+there. These budgets exclude attention, producers, FFNs, and persistent caches.
+
+The official-weight combined producer/index fixture passes all eight index
+layers across both GPUs, with changed hidden inputs, cancellation/restart,
+source-20 candidate retention through decoder reindex, and exact packed-query,
+head-weight, and selected-ID parity against direct execution. Its short context
+checks binding and placement; the separate scorer graph fixture explicitly runs
+the scoring kernel. Existing index budget checks also pass. Full distributed
+attention/layer-state execution and serving performance qualification remain.
