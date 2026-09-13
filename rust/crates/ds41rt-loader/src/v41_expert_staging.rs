@@ -10,6 +10,11 @@ pub enum V41ExpertSelection {
         expert: usize,
         rank: usize,
     },
+    /// Complete routed expert on one device; no TP slicing during the read.
+    BackboneFull {
+        layer: usize,
+        expert: usize,
+    },
     Dspark {
         stage: usize,
         expert: usize,
@@ -53,6 +58,15 @@ impl OfficialV41Catalog {
                     config.moe_intermediate_size / 4,
                 )
             }
+            V41ExpertSelection::BackboneFull { layer, expert } => {
+                ensure!(layer < config.num_hidden_layers, "backbone layer out of range");
+                ensure!(expert < config.n_routed_experts, "backbone expert out of range");
+                (
+                    format!("layers.{layer}.ffn.experts.{expert}"),
+                    None,
+                    config.moe_intermediate_size,
+                )
+            }
             V41ExpertSelection::Dspark { stage, expert } => {
                 ensure!(
                     stage < config.num_nextn_predict_layers,
@@ -82,7 +96,11 @@ impl OfficialV41Catalog {
         let mut bytes = 0usize;
         let mut scratch_bytes = 0usize;
         for (slot, name) in names.iter().enumerate() {
-            let size = usize::try_from(self.device_tensor_bytes(name, rank)?)?;
+            let size = usize::try_from(if matches!(selection, V41ExpertSelection::BackboneFull { .. }) {
+                self.tensor(name)?.metadata.byte_length
+            } else {
+                self.device_tensor_bytes(name, rank)?
+            })?;
             let expected = intermediate
                 .checked_mul(config.hidden_size)
                 .context("expert staging size overflow")?
@@ -148,7 +166,7 @@ impl V41ExpertStaging<'_> {
             let tensor = self.catalog.tensor(name)?;
             let mut offset = tensor.metadata.byte_offset;
             let bytes = match tensor.placement {
-                crate::V41TensorPlacement::BackboneExpertTp4 { axis: 0, .. } => {
+                crate::V41TensorPlacement::BackboneExpertTp4 { axis: 0, .. } if self.rank.is_some() => {
                     offset = offset
                         .checked_add((range.len() as u64) * self.rank.unwrap() as u64)
                         .context("expert prefetch offset overflow")?;
@@ -190,9 +208,17 @@ impl V41ExpertStaging<'_> {
             self.scratch_bytes
         );
         for (name, range) in self.names.iter().zip(&self.ranges) {
-            self.catalog
-                .read_device_tensor_into(name, self.rank, &mut staging[range.clone()], scratch)
-                .with_context(|| format!("staging official expert tensor {name}"))?;
+            if matches!(self.selection, V41ExpertSelection::BackboneFull { .. }) {
+                use std::os::unix::fs::FileExt;
+                let tensor = self.catalog.tensor(name)?;
+                std::fs::File::open(self.catalog.snapshot().join(&tensor.shard))?
+                    .read_exact_at(&mut staging[range.clone()], tensor.metadata.byte_offset)
+                    .with_context(|| format!("staging full official backbone expert tensor {name}"))?;
+            } else {
+                self.catalog
+                    .read_device_tensor_into(name, self.rank, &mut staging[range.clone()], scratch)
+                    .with_context(|| format!("staging official expert tensor {name}"))?;
+            }
         }
         Ok(())
     }

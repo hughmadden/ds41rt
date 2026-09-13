@@ -3,7 +3,8 @@ use crate::v41_backbone_cache::BackboneCache;
 use anyhow::{ensure, Context, Result};
 use std::{fmt, str::FromStr};
 
-const RETAINED_CONTEXTS: usize = 8;
+// Aggregate source capacity is independent of the retained snapshot count.
+const RETAINED_CONTEXTS: usize = 2;
 // Extra pages cover retained partial tails and active copy-on-write frontiers.
 const MAX_GROUPS: usize = 131_072;
 const GROUP_BYTES: usize = 5 * 256 * (68 + ds41rt_ffi::V41Kv::COMPRESSED_ROW_BYTES);
@@ -227,15 +228,15 @@ mod tests {
         }
     }
     #[test]
-    fn default_pool_covers_twenty_four_contexts_and_private_tails() {
+    fn default_pool_covers_eighteen_contexts_and_twenty_four_snapshot_tails() {
         let p = PoolPlan::new(16, 1_048_576, 24, None, None, 96 << 30, 96 << 30).unwrap();
-        assert_eq!(p.pages, [49_216, 49_216, 49_216, 98_432]);
-        assert_eq!(p.global_bytes, 22_426_746_880);
+        assert_eq!(p.pages, [36_928, 36_928, 36_928, 73_856]);
+        assert_eq!(p.global_bytes, 16_827_351_040);
         assert!(p.cache_bytes > p.global_bytes);
         let small = PoolPlan::new(16, 32768, 24, None, None, 8 << 30, 96 << 30).unwrap();
-        assert_eq!(small.pages, [1600, 1600, 1600, 3200]);
+        assert_eq!(small.pages, [1216, 1216, 1216, 2432]);
         assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 32 << 30, 96 << 30).is_ok());
-        assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 22 << 30, 96 << 30).is_err());
+        assert!(PoolPlan::new(16, 1_048_576, 24, None, None, 16 << 30, 96 << 30).is_err());
     }
     #[test]
     fn exact_and_total_budgets_round_down_without_undercutting_admission() {
@@ -257,7 +258,7 @@ mod tests {
             PoolPlan::new(2, 1_048_576, 24, Some(ByteSize(1 << 30)), None, free, total).unwrap();
         assert!(small.global_bytes <= 1 << 30);
         let c2 = PoolPlan::new(2, 1_048_576, 24, None, None, free, total).unwrap();
-        assert_eq!(c2.pages[0], 2048 * 10 + 50);
+        assert_eq!(c2.pages[0], 2048 * 4 + 50);
         let reservation = Some("80GiB".parse().unwrap());
         let p = PoolPlan::new(16, 1_048_576, 24, None, reservation, free, total).unwrap();
         assert!(p.cache_bytes + p.occupied_before + RUNTIME_HEADROOM <= 80 << 30);

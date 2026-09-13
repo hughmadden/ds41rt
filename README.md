@@ -22,7 +22,7 @@ The corrected standard `v1` build uses architectural FP4 compressed KV, the stan
 | Weighted eight-type dSpark median | **70.43 tok/s** |
 | dSpark gain on weighted mix | 70.04% |
 | C16 aggregate warm decode median | **742.91 tok/s** |
-| Default architectural cache | 20.93 GiB for 25,165,824 tokens total (24 × 1,048,576) |
+| Benchmark architectural cache (prior default) | 20.93 GiB for 25,165,824 tokens total (24 × 1,048,576) |
 | Exact prompt / completed-turn retention | 24 / 24 entries |
 | Warmed C16 coordinator process | 64.23 GiB |
 | Clean standard dSpark launch readiness | 56.77 s |
@@ -150,7 +150,7 @@ Command-line values override [`ds41rt.config`](ds41rt.config) for one launch:
 | `--restart` | off | Replace the running five-host deployment |
 | `--dry-run` | off | Validate configuration, images, hosts, model, and devices without starting services |
 
-With no explicit pool setting, the planner reserves source capacity for sixteen maximum-context active requests plus eight additional maximum-context equivalents. `--kv-pool-size` selects the exact global pool; `--memory-reservation` caps total planned device occupancy; when both are present, the exact pool must fit under the ceiling. Smaller values are useful for side-by-side development servers:
+With no explicit pool setting, the planner reserves source capacity for sixteen maximum-context active requests plus two additional maximum-context equivalents (18 × 1,048,576 tokens at default concurrency). The 24 completed-turn and prompt-snapshot limits remain independent of this aggregate token budget. The performance tables above retain the measured prior 24-context configuration until the new placement is qualified. `--kv-pool-size` selects the exact global pool; `--memory-reservation` caps total planned device occupancy; when both are present, the exact pool must fit under the ceiling. Smaller values are useful for side-by-side development servers:
 
 ```bash
 ./run.sh --listen 0.0.0.0:18000 --concurrency 2 \

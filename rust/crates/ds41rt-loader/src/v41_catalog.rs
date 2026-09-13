@@ -604,7 +604,7 @@ mod expert_staging_tests {
     use std::os::unix::fs::FileExt;
 
     #[test]
-    fn native_expert_staging_covers_all_tp_ranks_and_full_dspark() {
+    fn native_expert_staging_covers_all_tp_ranks_and_full_experts() {
         let dir = tempfile::tempdir().unwrap();
         let file = File::create(dir.path().join("fixture")).unwrap();
         let mut offset = (1u64 << 31) + 128;
@@ -692,6 +692,23 @@ mod expert_staging_tests {
                 .iter()
                 .all(|&byte| byte == 205));
         }
+        // Full backbone reads must preserve every official byte, including W2
+        // columns that the TP4 path normally slices into separate ranks.
+        let full = catalog.expert_staging(V41ExpertSelection::BackboneFull {
+            layer: 39, expert: 383,
+        }).unwrap();
+        assert_eq!(full.staging_bytes(), 18_800_640);
+        assert_eq!(full.intermediate_size(), 2304);
+        assert_eq!(full.minimum_read_scratch_bytes(), 0);
+        let mut full_staging = vec![205; full.staging_bytes() + 32];
+        assert!(full.read_into(&mut full_staging[..full.staging_bytes() - 1], &mut []).is_err());
+        assert!(full_staging.iter().all(|&byte| byte == 205));
+        full.prefetch().unwrap();
+        full.read_into(&mut full_staging, &mut []).unwrap();
+        for (range, expected) in full.tensor_ranges().iter().zip(&payloads) {
+            assert_eq!(&full_staging[range.clone()], expected.as_slice());
+        }
+        assert!(full_staging[full.staging_bytes()..].iter().all(|&byte| byte == 205));
         let plan = catalog
             .expert_staging(V41ExpertSelection::Dspark {
                 stage: 2,
@@ -709,6 +726,8 @@ mod expert_staging_tests {
         }
         for selection in [
             select(4),
+            V41ExpertSelection::BackboneFull { layer: 40, expert: 0 },
+            V41ExpertSelection::BackboneFull { layer: 0, expert: 384 },
             V41ExpertSelection::Backbone {
                 layer: 40,
                 expert: 0,
@@ -732,6 +751,7 @@ mod expert_staging_tests {
         }
         // Catalog metadata alone is insufficient after a file changes: propagate I/O failure.
         file.set_len(0).unwrap();
+        assert!(full.read_into(&mut full_staging, &mut []).is_err());
         assert!(plan.read_into(&mut staging, &mut []).is_err());
     }
 }

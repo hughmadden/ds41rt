@@ -9,6 +9,33 @@ for the metrics already measured, labeling instrumented probes and allowing a
 summary across several commits. Do not run extra tests solely for commit-message
 numbers. Diagnostic-only work should not imply a measured speedup. Phase 2 dual-RTX execution is forward-looking context, not this goal.
 
+## Bottom-up RTX layer placement
+
+Use excess RTX memory for complete routed-expert layers, starting at layer 0.
+Phase 1 runs those layers on the single RTX; leave TP2 weight splitting and the
+other dual-device changes to Phase 2. Select placement at startup after budgeting
+mandatory weights, both execution lanes, vision, dSpark, KV, load staging and
+peak runtime workspace. Preserve explicit user memory and KV overrides.
+
+The default aggregate source pool is now 18 maximum-context equivalents at C16,
+with 24 retained completed-turn and prompt-snapshot entries, plus private tails.
+Use remaining memory aggressively, but determine headroom from measured runtime
+and loading peaks rather than adopting an unverified occupancy percentage.
+Whole-layer granularity can leave space that cannot accommodate another layer.
+
+Keep loading extremely fast. Measure cold and warm startup against the existing
+configuration, preserve bounded parallel reads and packing, and allow Sparks to
+omit locally owned layers once placement and worker compatibility are validated.
+Report the chosen RTX layer range, actual Spark memory budget, and KV bytes with
+the represented token capacity in final configuration headlines. These are
+qualification requirements, not claims about the current deployment.
+
+Qualify numerical behavior, tool/needle checks, retained-context lifecycle,
+C1 target/dSpark, prefill and concurrency before promoting local placement.
+Once placement works, profile longer RTX chains through local experts and across
+layers using A1 ownership rules; do not combine that experiment with the initial
+placement comparison.
+
 ## Required adaptive verification (A4)
 
 - Capture current uninstrumented code, mixed-content, prefill and concurrency
