@@ -39,8 +39,11 @@ Remaining synchronization work, based on the current serving source:
 The [separate cooperative embedding/handoff candidate](phase1-cooperative-embedding.md)
 was rejected after a consistent 2.3% C8 decline across three pairs. Its patch and
 exact-byte checks are archived; serving remains on the prior implementation.
-Next enqueue embedding, handoff and query preparation as a larger unit before
-yielding, then verify C8 performance. Do not re-enable the archived candidate unchanged.
+The subsequent [chained embedding/query candidate](phase1-chained-query.md)
+improved median C8 by 4.1% but declined at C16 in all three pairs (median −4.7%);
+it too is archived with serving source restored. Next address adjacent blocking
+cache/index/attention work identified in the [wait audit](phase1-lane-wait-audit.md).
+Do not re-enable either archived candidate unchanged.
 
 After these changes, first revisit the combined attention graph, which previously
 showed small target/adaptive C1 gains but a C16 decline. Rank other archived
