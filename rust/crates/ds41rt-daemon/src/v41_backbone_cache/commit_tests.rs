@@ -328,10 +328,10 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
             }
         }
         if cycle != 1 {
-            unsafe { bank.enqueue_window_commit(&batch, &mut windows, &sources, &accepted)?; }
+            unsafe { bank.enqueue_cache_commit(&batch, &mut windows, &mut sources, &accepted)?; }
             assert!(bank.release(&[leases[0]]).is_err());
             bank.validate_batch(&batch)?;
-            while !windows.iter().map(|w| w.poll_commit()).collect::<Result<Vec<_>>>()?
+            while !windows.iter().map(|w| w.poll_commit()).chain(sources.iter().map(|s| s.poll_commit())).collect::<Result<Vec<_>>>()?
                 .into_iter().all(|ready| ready) { std::thread::yield_now(); }
         }
         bank.commit(&batch, &mut windows, &mut sources, &accepted)?;

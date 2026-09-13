@@ -130,11 +130,11 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                         draft.begin_queued_commit(lane, pass, &requests.borrow(),
                             batch.as_ref().unwrap(), &decision.accepted)?;
                     }
-                    pass.enqueue_window_commit(&requests.borrow(), batch.as_ref().unwrap(), &decision.accepted)?;
+                    pass.enqueue_cache_commit(&requests.borrow(), batch.as_ref().unwrap(), &decision.accepted)?;
                     loop {
                         let draft_ready = draft.borrow().as_deref().map(|draft| draft.poll_queued_commit(lane))
                             .transpose()?.unwrap_or(true);
-                        if pass.poll_window_commit()? && draft_ready { break; }
+                        if pass.poll_cache_commit()? && draft_ready { break; }
                         tokio::task::yield_now().await;
                     }
                     if let Some(draft) = draft.borrow_mut().as_deref_mut() {
@@ -145,7 +145,7 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                     }
                 }.await;
                 if let Err(error) = committed {
-                    if let Err(cleanup) = pass.abort_window_commit(&mut requests.borrow_mut()) {
+                    if let Err(cleanup) = pass.abort_cache_commit(&mut requests.borrow_mut()) {
                         tracing::error!(%cleanup, "draining failed lane window commit");
                     }
                     if let Some(draft) = draft.borrow_mut().as_deref_mut() {

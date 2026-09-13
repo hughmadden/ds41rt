@@ -1,0 +1,4335 @@
+{
+  "scope": "Queued compressed-source commit versus 5447319 queued SWA/dSpark; both adaptive independent lanes.",
+  "raw_directory": "/home/tj/.cache/ds41rt-experiments/queued-source-commit",
+  "records": {
+    "pilot-results.json": {
+      "scope": "Queued dSpark/SWA baseline versus fully queued cache commit including compressed sources; both adaptive independent lanes; retirement still synchronous",
+      "artifacts": {
+        "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+        "ds41rt": "da666dcbb65552ea5a6719d97de92f8aeafb15952c535ff7e84e3ae26d9dcdad"
+      },
+      "arms": [
+        {
+          "label": "after-b1",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-source-commit-after-b1",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-source-commit/after:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "da666dcbb65552ea5a6719d97de92f8aeafb15952c535ff7e84e3ae26d9dcdad"
+          },
+          "startup_seconds": 5.327156872022897,
+          "code": true,
+          "mixed": true,
+          "constraints": true
+        },
+        {
+          "label": "before-a1",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-source-commit-before-a1",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-source-commit/before:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "f1072c5d382d354e16abf727651536bd0ce2c67b630f1e72e94716d3aa5e6103"
+          },
+          "startup_seconds": 5.309795948094688,
+          "code": true,
+          "mixed": true,
+          "constraints": true
+        }
+      ],
+      "gpu_tests": true,
+      "restored": true
+    },
+    "comparison.json": {
+      "scope": "Compare identical-input fixed/adaptive probes without claiming prose quality.",
+      "source_sha256": {
+        "fixed_decode": "5d0b0c55ae7073c8bb163984f77237298180ae3a7a20290329570a4fd4284428",
+        "fixed_mixed": "17787407e27720962449deb5874c2f6c8c97db834d5a785494059fdf5083b89c",
+        "adaptive_decode": "91e17729615087a28f33dedd494d28993c76d40b2caf415ce79f4c0275faaf7c",
+        "adaptive_mixed": "da1205b8f6ed0ff7c6efaed8737bfc11624bcf464e721bcf3617ffd5c7c0e1b5"
+      },
+      "decode": {
+        "code": {
+          "fixed_tps": 129.30071721331848,
+          "adaptive_tps": 129.90281135247386,
+          "adaptive_over_fixed": 1.0046565413721724
+        }
+      },
+      "mixed": [
+        {
+          "concurrency": 2,
+          "fixed_tps": 92.8202559063325,
+          "adaptive_tps": 92.38469821069455,
+          "adaptive_over_fixed": 0.9953075146002884,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 4,
+          "fixed_tps": 122.36653292855284,
+          "adaptive_tps": 115.51154917159832,
+          "adaptive_over_fixed": 0.9439799135196795,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 8,
+          "fixed_tps": 163.82978215003072,
+          "adaptive_tps": 168.46540112505053,
+          "adaptive_over_fixed": 1.028295337478839,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 4,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 5,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 6,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 7,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 16,
+          "fixed_tps": 199.6358659222868,
+          "adaptive_tps": 198.8632064051759,
+          "adaptive_over_fixed": 0.9961296557933549,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 4,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 5,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 6,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 7,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 8,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 9,
+              "case": "code",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 10,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 11,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 12,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 13,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 14,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 15,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        }
+      ],
+      "lifecycle": {
+        "fixed": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 5.842074327985756,
+          "cold_prompt_tokens_per_ttft_second": 5617.011725236647,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        },
+        "adaptive": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 5.8144613289041445,
+          "cold_prompt_tokens_per_ttft_second": 5643.68703199969,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        }
+      },
+      "decode_pairs": [
+        {
+          "case": "code",
+          "repeat": 1,
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 2,
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 3,
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        }
+      ],
+      "limitations": [
+        "Exploratory sequential arms, not a balanced release comparison.",
+        "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+        "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+        "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+      ]
+    },
+    "after-b1-constraints.json": {
+      "scope": "Focused C4 high-thinking tool/response grammar isolation under independent lanes.",
+      "base_url": "http://127.0.0.1:8000",
+      "cases": [
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 0
+                      },
+                      "marker": {
+                        "const": "lane-0-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 0
+              },
+              "marker": {
+                "const": "lane-0-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 0,
+            "marker": "lane-0-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-6df0616a-f98e-4c4d-932e-898d8f0ed426",
+              "object": "chat.completion",
+              "created": 1789291923,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+                    "tool_calls": [
+                      {
+                        "id": "call_chatcmpl-6df0616a-f98e-4c4d-932e-898d8f0ed426_0",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup",
+                          "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "logprobs": null,
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 323
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+              "tool_calls": [
+                {
+                  "id": "call_chatcmpl-6df0616a-f98e-4c4d-932e-898d8f0ed426_0",
+                  "type": "function",
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 323
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 1
+                      },
+                      "marker": {
+                        "const": "lane-1-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 1
+              },
+              "marker": {
+                "const": "lane-1-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 1,
+            "marker": "lane-1-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "tool_calls",
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 126
+                },
+                "prompt_cache_hit_tokens": 126,
+                "prompt_cache_miss_tokens": 197
+              },
+              "text": ""
+            },
+            "message": {
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot=1 and marker=\"lane-1-台北\".",
+              "tool_calls": [
+                {
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 1, \"marker\": \"lane-1-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 126
+              },
+              "prompt_cache_hit_tokens": 126,
+              "prompt_cache_miss_tokens": 197
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 2, \"marker\": \"lane-2-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 2
+                    },
+                    "marker": {
+                      "const": "lane-2-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 2
+              },
+              "marker": {
+                "const": "lane-2-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 2,
+            "marker": "lane-2-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-b1320a13-0ad1-4770-9afc-f6a1a34bc881",
+              "object": "chat.completion",
+              "created": 1789291924,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+                    "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 3, \"marker\": \"lane-3-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 3
+                    },
+                    "marker": {
+                      "const": "lane-3-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 3
+              },
+              "marker": {
+                "const": "lane-3-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 3,
+            "marker": "lane-3-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "stop",
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              },
+              "text": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}"
+            },
+            "message": {
+              "content": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 3, \"marker\": \"lane-3-台北\"}. Ensure no markdown.",
+              "tool_calls": []
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    "before-a1-constraints.json": {
+      "scope": "Focused C4 high-thinking tool/response grammar isolation under independent lanes.",
+      "base_url": "http://127.0.0.1:8000",
+      "cases": [
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 0
+                      },
+                      "marker": {
+                        "const": "lane-0-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 0
+              },
+              "marker": {
+                "const": "lane-0-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 0,
+            "marker": "lane-0-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-cbdcd4fa-953b-403b-b783-bc024e4c00a6",
+              "object": "chat.completion",
+              "created": 1789291987,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+                    "tool_calls": [
+                      {
+                        "id": "call_chatcmpl-cbdcd4fa-953b-403b-b783-bc024e4c00a6_0",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup",
+                          "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "logprobs": null,
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 126
+                },
+                "prompt_cache_hit_tokens": 126,
+                "prompt_cache_miss_tokens": 197
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+              "tool_calls": [
+                {
+                  "id": "call_chatcmpl-cbdcd4fa-953b-403b-b783-bc024e4c00a6_0",
+                  "type": "function",
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 126
+              },
+              "prompt_cache_hit_tokens": 126,
+              "prompt_cache_miss_tokens": 197
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 1
+                      },
+                      "marker": {
+                        "const": "lane-1-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 1
+              },
+              "marker": {
+                "const": "lane-1-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 1,
+            "marker": "lane-1-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "tool_calls",
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 323
+              },
+              "text": ""
+            },
+            "message": {
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot 1 and marker \"lane-1-台北\".",
+              "tool_calls": [
+                {
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 1, \"marker\": \"lane-1-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 323
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 2, \"marker\": \"lane-2-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 2
+                    },
+                    "marker": {
+                      "const": "lane-2-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 2
+              },
+              "marker": {
+                "const": "lane-2-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 2,
+            "marker": "lane-2-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-fb15a697-d227-4636-b28f-83e5d71bbc1d",
+              "object": "chat.completion",
+              "created": 1789291986,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+                    "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 3, \"marker\": \"lane-3-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 3
+                    },
+                    "marker": {
+                      "const": "lane-3-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 3
+              },
+              "marker": {
+                "const": "lane-3-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 3,
+            "marker": "lane-3-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "stop",
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              },
+              "text": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}"
+            },
+            "message": {
+              "content": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 3, \"marker\": \"lane-3-台北\"}. Ensure no markdown.",
+              "tool_calls": []
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    "c4-repeat-results.json": {
+      "scope": "C4 followup: queued SWA baseline versus queued SWA and compressed sources; both adaptive independent lanes",
+      "artifacts": {
+        "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+        "ds41rt": "da666dcbb65552ea5a6719d97de92f8aeafb15952c535ff7e84e3ae26d9dcdad"
+      },
+      "arms": [
+        {
+          "label": "before-a2",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-source-commit-before-a2",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-source-commit/before:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "f1072c5d382d354e16abf727651536bd0ce2c67b630f1e72e94716d3aa5e6103"
+          },
+          "startup_seconds": 6.325266116997227,
+          "mixed1": true,
+          "mixed2": true
+        },
+        {
+          "label": "after-b3",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-source-commit-after-b3",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-source-commit/after:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "da666dcbb65552ea5a6719d97de92f8aeafb15952c535ff7e84e3ae26d9dcdad"
+          },
+          "startup_seconds": 5.317130427923985,
+          "mixed1": true,
+          "mixed2": true
+        }
+      ],
+      "restored": true
+    },
+    "ordered-results.json": {
+      "scope": "C4 followup: queued SWA baseline versus queued SWA and compressed sources; both adaptive independent lanes",
+      "artifacts": {
+        "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+        "ds41rt": "da666dcbb65552ea5a6719d97de92f8aeafb15952c535ff7e84e3ae26d9dcdad"
+      },
+      "arms": [
+        {
+          "label": "after-ordered",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-source-commit-after-ordered",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-source-commit/after:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "da666dcbb65552ea5a6719d97de92f8aeafb15952c535ff7e84e3ae26d9dcdad"
+          },
+          "startup_seconds": 5.301439694012515,
+          "mixed1": true,
+          "mixed2": true,
+          "mixed3": true
+        },
+        {
+          "label": "before-ordered",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-source-commit-before-ordered",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-source-commit/before:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "f1072c5d382d354e16abf727651536bd0ce2c67b630f1e72e94716d3aa5e6103"
+          },
+          "startup_seconds": 5.311659647966735,
+          "mixed1": true,
+          "mixed2": true,
+          "mixed3": true
+        }
+      ],
+      "restored": true
+    }
+  },
+  "gpu_tests": {
+    "source-gpu-tests.log": "\nrunning 9 tests\nhigh-page memory: free=32687194112 total=101973491712\ntest v41_compressor::prefix::tests::native_compressor_prefix_preserves_pending_odd_row ... ok\ntest v41_compressor::prefix::tests::compressed_prefix_restore_requires_complete_groups_and_bounds_views ... ok\ntest v41_compressor::source_cache::tests::native_source_shared_writers_fit_exact_pool_and_preserve_nonwriters ... ok\ntest v41_compressor::source_cache::tests::retained_source_truncation_preserves_future_rows_after_original_release ... ok\ntest v41_compressor::source_cache::tests::native_source_prefix_exhaustion_and_page_boundary ... ok\ntest v41_compressor::source_cache::reservation::tests::native_disjoint_source_plans_publish_out_of_order_and_rollback ... ok\nPASS highest row=67108863, KV byte offset=17179868928; scatter, both index scorers, attention, four-plane COW\ntest v41_compressor::source_cache::high_pages::highest_physical_page_scatter_score_attention_and_fork ... ok\ntest v41_compressor::source_cache::tests::native_source_prefix_copy_on_write_and_eviction ... ok\ntest v41_compressor::commit::tests::native_independent_source_commits_match_direct_values_carry_and_abort ... ok\n\ntest result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 809 filtered out; finished in 1.23s\n\n",
+    "real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure.log": "\nrunning 1 test\nPASS cache prefix cycle=0 proposed=9 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=1 proposed=129 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=2 proposed=3 all 44 owners, 16 requests, packed bytes and device histories\nPASS retained full backbone prefix: all 44 owners, odd carry, slot reuse, exact next commit\nPASS C16 partial encoder replay: shared complete-group sources, 128 bounded rows, zero acceptance, suffix append, decoder replay, immutable retained future\nPASS exact encoder continuation: populated rings and odd carry match full continuation; decoder stays fresh until final 128 rows\nPASS committed encoder source views: all 16 requests/all 4 sources, causal ratios, odd carry, stable snapshots across append\nPASS 16 CED transactions: encoder 64+65, replay 63+65, untouched global/encoder bytes, full decode readiness\nPASS 16-request encoder reservations: layer-major 64+65, ordered completion, generation survival, capacity and release\nexpected late source exhaustion: compressed KV pool exhausted at work item 1: need 1 pages, 0 available\nPASS late source failure early=false revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nexpected late source exhaustion: compressed KV pool exhausted at work item 1: need 1 pages, 0 available\nPASS late source failure early=true revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nPASS early encoder publication: mixed/all windows, all sources, deferred logical end, stale/duplicate/partial guards\ntest v41_backbone_cache::commit_tests::real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 817 filtered out; finished in 6.08s\n\n"
+  },
+  "followups": {
+    "unordered": [
+      {
+        "repeat": 1,
+        "before_tps": 116.95518600753984,
+        "after_tps": 115.95228457619487,
+        "pairs": [
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "before": {
+          "scope": "Focused deterministic mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56011,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "start": 727987.213927836,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓋 request nonce 56011-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.8313167110318318,
+                    "finish_seconds": 4.879860504064709,
+                    "observed_decode_tokens_per_second": 52.611509443605584,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "start": 727987.21417057,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56011-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a pile of seeds. Ruby cracked them; Jade carried them to the nest. When the flock praised the feast, Ruby said, “I did the hard work.” Jade said, “Without me, the seeds would rot on the ground.” They squawked for days, each claiming the greater share. The seeds went uneaten. A wise old macaw landed beside them. “Who built this nest?” she asked. “We did,” they said together. “Then who owns the sky?” They fell silent. That evening, they split the seeds and shared the praise. The flock cheered, and the nest felt warmer than before. Credit shared is credit doubled; credit hoarded is credit lost.",
+                    "first_content_seconds": 1.2190333269536495,
+                    "finish_seconds": 6.904664349975064,
+                    "observed_decode_tokens_per_second": 26.382295895150815,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 151,
+                      "total_tokens": 200,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "start": 727987.213590379,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56011-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's virtual memory explained for a junior programmer:\n\n- **It's an illusion of a huge, private memory space.** Each process sees its own contiguous address space, but the OS maps those virtual addresses to real physical RAM (or disk) behind the scenes. This gives isolation between processes and lets programs use more memory than physically installed.\n\n- **Memory is split into fixed-size pages.** Virtual memory is divided into *pages* (e.g., 4 KB), and physical RAM into *frames* of the same size. A **page table** maps each virtual page to a physical frame, so allocation is flexible and doesn't require contiguous RAM.\n\n- **A page fault happens when a page isn't in RAM.** If a program accesses a page that's on disk (swapped out) or not yet loaded, the CPU traps into the OS. The OS loads the page from disk into a free frame, updates the page table, and resumes the instruction — the program never notices.\n\n- **The TLB is a cache for page-table lookups.** Translating every address via the page table would be slow, so the CPU keeps a small **Translation Lookaside Buffer** of recent virtual→physical mappings. A TLB hit is fast; a miss falls back to the page table (and may trigger a page walk).\n\n- **The payoff: isolation, flexibility, and oversubscription.** Processes can't stomp on each other's memory, the OS can move pages around freely, and the system can run programs larger than physical RAM — at the cost of page-fault overhead when data isn't resident.",
+                    "first_content_seconds": 1.0833424819866195,
+                    "finish_seconds": 8.526909339940175,
+                    "observed_decode_tokens_per_second": 43.52751929054032,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 325,
+                      "total_tokens": 367,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "start": 727987.212841504,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56011-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.9570312190335244,
+                    "finish_seconds": 4.890617727069184,
+                    "observed_decode_tokens_per_second": 54.1490569903259,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 116.95518600753984,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        },
+        "after": {
+          "scope": "Focused deterministic mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56011,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "start": 728007.971492025,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓋 request nonce 56011-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.945762426010333,
+                    "finish_seconds": 4.881199034978636,
+                    "observed_decode_tokens_per_second": 54.1236008006337,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "start": 728007.972199608,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56011-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a pile of seeds. Ruby cracked them; Jade carried them to the nest. When the flock praised the feast, Ruby said, “I did the hard work.” Jade said, “Without me, the seeds would rot on the ground.” They squawked for days, each claiming the greater share. The seeds went uneaten. A wise old macaw landed beside them. “Who built this nest?” she asked. “We did,” they said together. “Then who owns the sky?” They fell silent. That evening, they split the seeds and shared the praise. The flock cheered, and the nest felt warmer than before. Credit shared is credit doubled; credit hoarded is credit lost.",
+                    "first_content_seconds": 1.2064816070487723,
+                    "finish_seconds": 6.839740075985901,
+                    "observed_decode_tokens_per_second": 26.627572803046206,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 151,
+                      "total_tokens": 200,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "start": 728007.971841349,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56011-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's virtual memory explained for a junior programmer:\n\n- **It's an illusion of a huge, private memory space.** Each process sees its own contiguous address space, but the OS maps those virtual addresses to real physical RAM (or disk) behind the scenes. This gives isolation between processes and lets programs use more memory than physically installed.\n\n- **Memory is split into fixed-size chunks called pages.** Virtual memory is divided into pages (e.g., 4 KB), and physical RAM into frames of the same size. A **page table** maps each virtual page to its physical frame, so the OS can place pages anywhere in RAM without the program caring.\n\n- **A page fault happens when a page isn't in RAM.** If the CPU accesses a virtual page with no valid physical mapping (e.g., it was swapped to disk), the hardware traps to the OS. The OS loads the page from disk into a free frame, updates the page table, and resumes the instruction — the program never notices.\n\n- **The TLB is a cache for page table lookups.** Translating every address via the page table would be slow, so the CPU keeps a small **Translation Lookaside Buffer** of recent virtual→physical mappings. A TLB hit is fast; a miss means walking the page table (and possibly a page fault).\n\n- **The payoff: isolation, flexibility, and overcommitment.** Processes can't stomp on each other's memory, the OS can move pages around freely, and programs can allocate more than physical RAM — at the cost of page-fault overhead when the working set doesn't fit.",
+                    "first_content_seconds": 0.8067145559471101,
+                    "finish_seconds": 8.577152226003818,
+                    "observed_decode_tokens_per_second": 41.82518589041435,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 326,
+                      "total_tokens": 368,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "start": 728007.970950801,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56011-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 1.070420745993033,
+                    "finish_seconds": 4.867768337018788,
+                    "observed_decode_tokens_per_second": 56.09178377649216,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 115.95228457619487,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        }
+      },
+      {
+        "repeat": 2,
+        "before_tps": 147.76784210780818,
+        "after_tps": 135.63737919513193,
+        "pairs": [
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "before": {
+          "scope": "Focused deterministic mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56012,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "start": 727995.917060167,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56012-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.41491221403703094,
+                    "finish_seconds": 3.3922493390273303,
+                    "observed_decode_tokens_per_second": 71.54043732978138,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "start": 727995.917398135,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56012-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a mirror in the jungle. Ruby preened before it, squawking, “I discovered this treasure!” Jade hopped forward. “We found it together,” she said. “I spotted the glint first.” Ruby fluffed her feathers. “But I led us here.” They argued until a passing macaw asked, “Who will carry it home?” Neither could lift the mirror alone. Shamefaced, they gripped opposite edges and flew it to their nest. That night, the moon’s reflection filled their home with light. Ruby whispered, “You were right.” Jade nodded. “And you were brave.” They shared the perch, each seeing themselves in the other. Credit divided is not lost but doubled.",
+                    "first_content_seconds": 0.2764850180828944,
+                    "finish_seconds": 5.515615207026713,
+                    "observed_decode_tokens_per_second": 29.77593500715217,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 157,
+                      "total_tokens": 206,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "start": 727995.917685367,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56012-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's a concise explanation of virtual memory:\n\n- **Virtual memory gives each process its own private address space**, so programs can use more memory than physically installed and don't need to know where data actually lives in RAM. The OS maps virtual addresses to physical ones via **page tables**.\n\n- **Memory is divided into fixed-size blocks called pages** (virtual) and **frames** (physical). Paging lets the OS load only the pages a program is actively using, keeping the rest on disk.\n\n- **A page fault happens when a program accesses a page not currently in RAM.** The CPU traps to the OS, which loads the page from disk into a free frame, updates the page table, and resumes the instruction—transparent to the program.\n\n- **The TLB (Translation Lookaside Buffer) is a small, fast cache of recent virtual-to-physical translations.** It avoids walking the page table on every memory access, which would otherwise be very slow.\n\n- **The trade-off:** virtual memory enables isolation, larger-than-RAM programs, and easy sharing, but excessive page faults (thrashing) cause severe slowdowns since disk access is orders of magnitude slower than RAM.",
+                    "first_content_seconds": 0.5373846100410447,
+                    "finish_seconds": 5.70048041199334,
+                    "observed_decode_tokens_per_second": 46.29005719971885,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 240,
+                      "total_tokens": 282,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "start": 727995.916491894,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓬 request nonce 56012-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.1456612350884825,
+                    "finish_seconds": 3.3927243530051783,
+                    "observed_decode_tokens_per_second": 65.59773933087573,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 147.76784210780818,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        },
+        "after": {
+          "scope": "Focused deterministic mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56012,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "start": 728016.728832761,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56012-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.27165945805609226,
+                    "finish_seconds": 3.6763111810432747,
+                    "observed_decode_tokens_per_second": 62.56146511606112,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "start": 728016.729095816,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56012-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a mirror in the jungle. Ruby preened before it, squawking, “I discovered this treasure!” Jade hopped forward. “We found it together,” she said. “I spotted the glint first.” Ruby fluffed her feathers. “But I led us here.” They argued until a passing monkey asked, “Who carries the mirror to the flock?” Neither could lift it alone. Shamefaced, they gripped opposite edges and flew together, the mirror flashing sunlight across the canopy. The flock cheered, but Ruby and Jade knew the truth: the applause belonged to both, and to neither. Only shared effort made the treasure useful. Credit is a mirror—it reflects best when two hold it steady.",
+                    "first_content_seconds": 0.40179983398411423,
+                    "finish_seconds": 6.000318336999044,
+                    "observed_decode_tokens_per_second": 27.50727713359659,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 155,
+                      "total_tokens": 204,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "start": 728016.729390879,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56012-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's a concise explanation of virtual memory:\n\n- **Virtual memory gives each process its own private address space**, so programs can use more memory than physically installed and don't need to know where data actually lives in RAM. The OS maps virtual addresses to physical ones via **page tables**.\n\n- **Memory is divided into fixed-size blocks called pages** (virtual) and **frames** (physical). Paging lets the OS load only the pages a program is actively using, keeping the rest on disk.\n\n- **A page fault happens when a program accesses a page not currently in RAM.** The CPU traps to the OS, which loads the page from disk into a free frame, updates the page table, and resumes the instruction.\n\n- **The TLB (Translation Lookaside Buffer) is a small, fast cache of recent virtual-to-physical translations.** It avoids walking the page table on every memory access, which would otherwise be very slow.\n\n- **The payoff:** isolation between processes, simpler memory management, and the illusion of a large contiguous memory — at the cost of page-fault overhead and translation latency when the TLB misses.",
+                    "first_content_seconds": 0.5240868609398603,
+                    "finish_seconds": 6.097020062967204,
+                    "observed_decode_tokens_per_second": 40.732589423002786,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 228,
+                      "total_tokens": 270,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "start": 728016.728291578,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓬 request nonce 56012-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.1484320079907775,
+                    "finish_seconds": 3.727765436982736,
+                    "observed_decode_tokens_per_second": 59.50828673147302,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 135.63737919513193,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        }
+      }
+    ],
+    "ordered": [
+      {
+        "repeat": 1,
+        "before_tps": 118.41208542703053,
+        "after_tps": 116.50077075348904,
+        "pairs": [
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "before": {
+          "scope": "Focused fixed-input mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56011,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "admission": "ordered_first_content",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "admission_index": 0,
+                  "start": 728182.571485034,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓋 request nonce 56011-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.8349642109824345,
+                    "finish_seconds": 5.029203822021373,
+                    "observed_decode_tokens_per_second": 50.783936959490646,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "admission_index": 1,
+                  "start": 728183.406597708,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56011-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a pile of seeds. Ruby cracked them; Jade carried them to the nest. When the flock praised the feast, Ruby said, “I did the hard work.” Jade said, “Without me, the seeds would rot on the ground.” They squawked for days, each claiming the greater share. The flock grew tired and left. A hungry rat crept in and took every seed while the parrots argued. Ruby and Jade stared at the empty nest, then at each other. “We lost everything,” Ruby whispered. “Because we fought over who deserved the credit,” Jade replied. They never shared a meal again. Credit shared is a feast; credit hoarded is an empty nest.",
+                    "first_content_seconds": 0.19626670505385846,
+                    "finish_seconds": 6.364262416027486,
+                    "observed_decode_tokens_per_second": 23.99482861777768,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 149,
+                      "total_tokens": 198,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "admission_index": 2,
+                  "start": 728183.602993338,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56011-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's virtual memory explained for a junior programmer:\n\n- **It's an illusion of a huge, private memory space.** Each process sees its own contiguous address space, even though physical RAM is shared and limited. The OS + CPU map virtual addresses to physical ones behind the scenes.\n\n- **Memory is split into fixed-size pages.** Virtual memory is divided into *pages* (e.g., 4 KB), and physical RAM into *frames* of the same size. A **page table** maps each virtual page to a physical frame (or marks it as not present).\n\n- **Not all pages need to be in RAM.** Only the pages a program is actively using live in physical memory; the rest sit on disk (swap). This lets programs use more memory than the machine physically has.\n\n- **A page fault happens when you touch a page that isn't in RAM.** The CPU traps to the OS, which loads the page from disk into a free frame, updates the page table, and resumes your instruction. Frequent page faults (thrashing) tank performance.\n\n- **The TLB is a tiny cache for address translation.** Walking the page table on every memory access would be slow, so the CPU caches recent virtual→physical mappings in the **Translation Lookaside Buffer**. A TLB hit is fast; a miss means a page-table walk (and possibly a page fault).",
+                    "first_content_seconds": 0.6465589179424569,
+                    "finish_seconds": 7.007112500956282,
+                    "observed_decode_tokens_per_second": 43.86410653706045,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 280,
+                      "total_tokens": 322,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "admission_index": 3,
+                  "start": 728184.249651515,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56011-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.21757186600007117,
+                    "finish_seconds": 3.4614352259086445,
+                    "observed_decode_tokens_per_second": 65.66244516723519,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 118.41208542703053,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        },
+        "after": {
+          "scope": "Focused fixed-input mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56011,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "admission": "ordered_first_content",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "admission_index": 0,
+                  "start": 728154.76626172,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓋 request nonce 56011-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.8116016100393608,
+                    "finish_seconds": 4.83523285202682,
+                    "observed_decode_tokens_per_second": 52.93725671907979,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "admission_index": 1,
+                  "start": 728155.578038884,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56011-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a pile of seeds. Ruby cracked them; Jade carried them to the nest. When the flock praised the feast, Ruby said, “I did the hard work.” Jade said, “Without me, the seeds would rot on the ground.” They squawked for days, each claiming the greater share. The seeds went uneaten. A wise old macaw landed beside them. “Who built this nest?” she asked. “We did,” they said together. “Then who owns the sky?” They fell silent. That evening, they split the seeds and shared the praise. The flock cheered, and the nest felt warmer than before. Credit shared is credit doubled; credit hoarded is credit lost.",
+                    "first_content_seconds": 0.1963419490493834,
+                    "finish_seconds": 6.06152833905071,
+                    "observed_decode_tokens_per_second": 25.574634807124358,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 151,
+                      "total_tokens": 200,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "admission_index": 2,
+                  "start": 728155.774467033,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56011-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's virtual memory explained for a junior programmer:\n\n- **It's an illusion of a huge, private memory space.** Each process sees its own contiguous address space, but the OS maps those virtual addresses to real physical RAM (or disk) behind the scenes. This gives isolation between processes and lets programs use more memory than physically installed.\n\n- **Memory is split into fixed-size chunks called pages.** Virtual memory is divided into pages (e.g., 4 KB), and physical RAM into frames of the same size. A **page table** maps each virtual page to its physical frame, so the OS can place pages anywhere in RAM without the program caring.\n\n- **A page fault happens when a page isn't in RAM.** If the CPU accesses a virtual page with no valid physical mapping (e.g., it was swapped to disk), the hardware traps to the OS. The OS loads the page from disk into a free frame, updates the page table, and resumes the instruction — the program never notices.\n\n- **The TLB is a cache for page table lookups.** Translating every address via the page table would be slow, so the CPU keeps a small **Translation Lookaside Buffer** of recent virtual→physical mappings. A TLB hit is fast; a miss means walking the page table (and possibly a page fault).\n\n- **The payoff: isolation, flexibility, and overcommitment.** Processes can't stomp on each other's memory, the OS can move pages around freely, and programs can allocate more than physical RAM — at the cost of page-fault overhead when the working set doesn't fit.",
+                    "first_content_seconds": 0.6388841340085492,
+                    "finish_seconds": 7.537250709952787,
+                    "observed_decode_tokens_per_second": 47.11260215328794,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 326,
+                      "total_tokens": 368,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "admission_index": 3,
+                  "start": 728156.413449595,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56011-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.21829837700352073,
+                    "finish_seconds": 3.31599843793083,
+                    "observed_decode_tokens_per_second": 68.76069206527296,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 116.50077075348904,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        }
+      },
+      {
+        "repeat": 2,
+        "before_tps": 133.6555646642269,
+        "after_tps": 133.8451072799085,
+        "pairs": [
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "before": {
+          "scope": "Focused fixed-input mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56012,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "admission": "ordered_first_content",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "admission_index": 0,
+                  "start": 728190.792940534,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56012-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.14521099906414747,
+                    "finish_seconds": 3.695881033083424,
+                    "observed_decode_tokens_per_second": 59.98867761837304,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "admission_index": 1,
+                  "start": 728190.938257702,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56012-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a mirror in the jungle. Ruby preened before it, squawking, “I discovered this treasure!” Jade hopped forward. “We found it together,” she said. “I spotted the glint first.” Ruby fluffed her feathers. “But I led us here.” They argued until a passing macaw asked, “Who will carry it home?” Neither could lift the mirror alone. Shamefaced, they gripped opposite edges and flew it to their nest. That night, the moon’s reflection filled their home with light. Ruby whispered, “You were right.” Jade nodded. “And you were brave.” They shared the perch, each seeing themselves in the other. Credit divided is not lost but doubled.",
+                    "first_content_seconds": 0.17455377406440675,
+                    "finish_seconds": 5.8145025720587,
+                    "observed_decode_tokens_per_second": 27.659825574210444,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 157,
+                      "total_tokens": 206,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "admission_index": 2,
+                  "start": 728191.112915722,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56012-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's a concise explanation of virtual memory:\n\n- **Virtual memory gives each process its own private address space**, so programs can use more memory than physically installed and don't need to know where data actually lives in RAM. The OS maps virtual addresses to physical ones via **page tables**.\n\n- **Memory is divided into fixed-size blocks called pages** (virtual) and **frames** (physical). Paging lets the OS load only the pages a program is actively using, keeping the rest on disk.\n\n- **A page fault happens when a program accesses a page not currently in RAM.** The CPU traps to the OS, which loads the page from disk into a free frame, updates the page table, and resumes the instruction.\n\n- **The TLB (Translation Lookaside Buffer) is a small, fast cache of recent virtual-to-physical translations.** It avoids walking the page table on every memory access, which would otherwise be very slow.\n\n- **The payoff:** isolation between processes, simpler memory management, and the illusion of a large contiguous memory — at the cost of page-fault overhead and translation latency when the TLB misses.",
+                    "first_content_seconds": 0.17007577698677778,
+                    "finish_seconds": 5.878107624012046,
+                    "observed_decode_tokens_per_second": 39.76852373700415,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 228,
+                      "total_tokens": 270,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "admission_index": 3,
+                  "start": 728191.283090968,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓬 request nonce 56012-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.21535174001473933,
+                    "finish_seconds": 3.393024703953415,
+                    "observed_decode_tokens_per_second": 67.03018290969435,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 133.6555646642269,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        },
+        "after": {
+          "scope": "Focused fixed-input mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56012,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "admission": "ordered_first_content",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "admission_index": 0,
+                  "start": 728163.503824099,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56012-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.14509569597430527,
+                    "finish_seconds": 3.7133180709788576,
+                    "observed_decode_tokens_per_second": 59.69358902406643,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "admission_index": 1,
+                  "start": 728163.648981447,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56012-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Two parrots, Ruby and Jade, found a mirror in the jungle. Ruby preened before it, squawking, “I discovered this treasure!” Jade hopped forward. “We found it together,” she said. “I spotted the glint first.” Ruby fluffed her feathers. “But I led us here.” They argued until a passing macaw asked, “Who will carry it home?” Neither could lift the mirror alone. Shamefaced, they gripped opposite edges and flew it to their nest. That night, the moon’s reflection filled their home with light. Ruby whispered, “You were right.” Jade nodded. “And you were brave.” They shared the perch, each seeing themselves in the other. Credit divided is not lost but doubled.",
+                    "first_content_seconds": 0.17450081498827785,
+                    "finish_seconds": 5.824306791997515,
+                    "observed_decode_tokens_per_second": 27.611567659988857,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 157,
+                      "total_tokens": 206,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "admission_index": 2,
+                  "start": 728163.823545296,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56012-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's a concise explanation of virtual memory:\n\n- **Virtual memory gives each process its own private address space**, so programs can use more memory than physically installed and don't need to know where data actually lives in RAM. The OS maps virtual addresses to physical ones via **page tables**.\n\n- **Memory is divided into fixed-size blocks called pages** (virtual) and **frames** (physical). Paging lets the OS load only the pages a program is actively using, keeping the rest on disk.\n\n- **A page fault happens when a program accesses a page not currently in RAM.** The CPU traps to the OS, which loads the page from disk into a free frame, updates the page table, and resumes the instruction.\n\n- **The TLB (Translation Lookaside Buffer) is a small, fast cache of recent virtual-to-physical translations.** It avoids walking the page table on every memory access, which would otherwise be very slow.\n\n- **The payoff:** isolation between processes, simpler memory management, and the illusion of a large contiguous memory — at the cost of page-fault overhead and translation latency when the TLB misses.",
+                    "first_content_seconds": 0.17010047298390418,
+                    "finish_seconds": 5.869674633955583,
+                    "observed_decode_tokens_per_second": 39.8275368630874,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 228,
+                      "total_tokens": 270,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "admission_index": 3,
+                  "start": 728163.993700301,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓬 request nonce 56012-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.2138589669484645,
+                    "finish_seconds": 3.3885018390137702,
+                    "observed_decode_tokens_per_second": 67.09416100760652,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 133.8451072799085,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        }
+      },
+      {
+        "repeat": 3,
+        "before_tps": 130.32169487356515,
+        "after_tps": 130.20343407209967,
+        "pairs": [
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "before": {
+          "scope": "Focused fixed-input mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56013,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "admission": "ordered_first_content",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "admission_index": 0,
+                  "start": 728197.166014938,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56013-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.13233800802845508,
+                    "finish_seconds": 3.596595845068805,
+                    "observed_decode_tokens_per_second": 61.48503085497071,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "admission_index": 1,
+                  "start": 728197.298434629,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56013-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "In a lush canopy, two parrots, Crimson and Jade, found a cache of golden figs. Crimson scouted the tree; Jade cracked the hard shells. They feasted, but when the flock praised them, Crimson squawked, “I found the tree!” Jade shrieked, “I opened every fig!” Their duet became a duel, and the figs spoiled as they argued. A passing iguana sighed. “You both ate, yet neither will share the bow.” They parted ways, each claiming sole victory. The next day, Crimson found a tree but couldn’t crack a single shell; Jade cracked shells but found no fruit. Alone, they starved. Only when they met again, silent and hungry, did they share a single fig—and finally, a song. Credit shared is credit doubled; credit hoarded is credit lost.",
+                    "first_content_seconds": 0.17755247000604868,
+                    "finish_seconds": 6.278430919977836,
+                    "observed_decode_tokens_per_second": 28.68439380247106,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 176,
+                      "total_tokens": 225,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "admission_index": 2,
+                  "start": 728197.476087519,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56013-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's the explanation:\n\n- **Virtual memory gives each process its own private address space**, so programs can use more memory than physically installed and don't need to know where data actually lives in RAM. The OS maps virtual addresses to physical ones via **page tables**.\n\n- **Memory is divided into fixed-size blocks called pages** (typically 4 KB). The OS loads only the pages a program is actively using, keeping the rest on disk. This is **paging**.\n\n- **A page fault happens when a program accesses a page not currently in RAM.** The CPU traps to the OS, which loads the page from disk into a free frame, updates the page table, and resumes the instruction — the program never notices.\n\n- **The TLB (Translation Lookaside Buffer) is a small, fast cache of recent virtual-to-physical translations.** It avoids walking the page table on every memory access, which would otherwise be very slow.\n\n- **Together they give the illusion of a large, contiguous memory** while the hardware and OS juggle pages between RAM and disk behind the scenes — trading speed for capacity and isolation.",
+                    "first_content_seconds": 0.17133629997260869,
+                    "finish_seconds": 6.1604273179546,
+                    "observed_decode_tokens_per_second": 37.56830532787815,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 226,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "admission_index": 3,
+                  "start": 728197.647494745,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓬 request nonce 56013-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.21188624307978898,
+                    "finish_seconds": 3.3380647810408846,
+                    "observed_decode_tokens_per_second": 68.13430436347353,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 130.32169487356515,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        },
+        "after": {
+          "scope": "Focused fixed-input mixed traffic and cache/lifecycle probe, not release qualification.",
+          "nonce_seed": 56013,
+          "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+          "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+          "admission": "ordered_first_content",
+          "batches": [
+            {
+              "concurrency": 4,
+              "rows": [
+                {
+                  "case": "code",
+                  "admission_index": 0,
+                  "start": 728169.864637471,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓓 request nonce 56013-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.15307427302468568,
+                    "finish_seconds": 3.6732192849740386,
+                    "observed_decode_tokens_per_second": 60.50887087803433,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                },
+                {
+                  "case": "fable",
+                  "admission_index": 1,
+                  "start": 728170.017779876,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓝 request nonce 56013-1.\nWrite a self-contained fable of about 150 words about two parrots who disagree about sharing credit. Output no title or preamble. End with a one-sentence moral."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 256,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "In a lush canopy, two parrots, Crimson and Jade, found a cache of golden figs. Crimson scouted the tree; Jade cracked the hard shells. They ate well, but when the flock praised them, Crimson squawked, “I found the feast!” Jade shrieked, “I opened every fig!” Their squabble grew so loud that a hawk swooped down. The parrots fled, leaving the figs scattered. Hungry and ashamed, they realized neither could have feasted alone. The next day, they shared a single fig, each thanking the other. The flock cheered their teamwork, and the hawk stayed away. Pride divides the feast, but shared credit fills the belly.",
+                    "first_content_seconds": 0.18324136594310403,
+                    "finish_seconds": 5.4070754029089585,
+                    "observed_decode_tokens_per_second": 27.183099423747674,
+                    "usage": {
+                      "prompt_tokens": 49,
+                      "completion_tokens": 143,
+                      "total_tokens": 192,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 49
+                    }
+                  }
+                },
+                {
+                  "case": "topic",
+                  "admission_index": 2,
+                  "start": 728170.201091398,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓦 request nonce 56013-2.\nExplain virtual memory to a junior programmer in five concise bullet points, including paging, page faults, and the role of the TLB."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 384,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "Here's the explanation:\n\n- **Virtual memory gives each process its own private address space**, so programs can use more memory than physically installed and don't need to know where data actually lives in RAM. The OS maps virtual addresses to physical ones via **page tables**.\n\n- **Memory is divided into fixed-size blocks called pages** (typically 4 KB). The OS loads only the pages a program is actively using, keeping the rest on disk. This is **paging**.\n\n- **A page fault happens when a program accesses a page not currently in RAM.** The CPU traps to the OS, which loads the page from disk into a free frame, updates the page table, and resumes the instruction — the program never notices.\n\n- **The TLB (Translation Lookaside Buffer) is a small, fast cache of recent virtual-to-physical translations.** It avoids walking the page table on every memory access, which would otherwise be very slow.\n\n- **Together they give the illusion of a large, contiguous memory** while the hardware and OS juggle pages between RAM and disk behind the scenes — trading speed for capacity and isolation.",
+                    "first_content_seconds": 0.19275456899777055,
+                    "finish_seconds": 5.907089508022182,
+                    "observed_decode_tokens_per_second": 39.37466081370678,
+                    "usage": {
+                      "prompt_tokens": 42,
+                      "completion_tokens": 226,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 42
+                    }
+                  }
+                },
+                {
+                  "case": "code",
+                  "admission_index": 3,
+                  "start": 728170.393901701,
+                  "request": {
+                    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "蓬 request nonce 56013-3.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                      }
+                    ],
+                    "thinking": {
+                      "type": "disabled"
+                    },
+                    "temperature": 0,
+                    "max_tokens": 320,
+                    "stream": true,
+                    "stream_options": {
+                      "include_usage": true
+                    }
+                  },
+                  "result": {
+                    "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+                    "first_content_seconds": 0.22160365304443985,
+                    "finish_seconds": 3.35909670998808,
+                    "observed_decode_tokens_per_second": 67.88859644760201,
+                    "usage": {
+                      "prompt_tokens": 54,
+                      "completion_tokens": 214,
+                      "total_tokens": 268,
+                      "prompt_tokens_details": {
+                        "cached_tokens": 0
+                      },
+                      "prompt_cache_hit_tokens": 0,
+                      "prompt_cache_miss_tokens": 54
+                    }
+                  }
+                }
+              ],
+              "aggregate_tps": 130.20343407209967,
+              "span_definition": "earliest first content through last finish, including admission gaps"
+            }
+          ],
+          "lifecycle": {},
+          "passed": true,
+          "lifecycle_skipped": true
+        }
+      }
+    ]
+  },
+  "memory": {
+    "before-a1": {
+      "peak_gpu_mib": 96998.0
+    },
+    "after-b1": {
+      "peak_gpu_mib": 97092.0
+    }
+  }
+}

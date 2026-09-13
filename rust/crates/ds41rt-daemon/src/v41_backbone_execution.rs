@@ -403,16 +403,17 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
     /// Commit after the same batch completed its full or CED phase. The caller
     /// determines acceptance after target-head/sampling/verification and includes
     /// engram/dSpark history in the enclosing scheduler transaction.
-    pub unsafe fn enqueue_window_commit(&mut self, bank: &BackboneCache<'_>,
+    pub unsafe fn enqueue_cache_commit(&mut self, bank: &BackboneCache<'_>,
         batch: &CacheBatch, accepted: &[u32]) -> Result<()> {
-        unsafe { bank.enqueue_window_commit(batch, &mut self.windows, &self.sources, accepted) }
+        unsafe { bank.enqueue_cache_commit(batch, &mut self.windows, &mut self.sources, accepted) }
     }
-    pub fn poll_window_commit(&self) -> Result<bool> {
+    pub fn poll_cache_commit(&self) -> Result<bool> {
         for window in &self.windows { if !window.poll_commit()? { return Ok(false); } }
+        for source in &self.sources { if !source.poll_commit()? { return Ok(false); } }
         Ok(true)
     }
-    pub fn abort_window_commit(&mut self, bank: &mut BackboneCache<'_>) -> Result<()> {
-        bank.abort_window_commit(&mut self.windows)
+    pub fn abort_cache_commit(&mut self, bank: &mut BackboneCache<'_>) -> Result<()> {
+        bank.abort_cache_commit(&mut self.windows, &mut self.sources)
     }
     pub fn commit(
         &mut self,

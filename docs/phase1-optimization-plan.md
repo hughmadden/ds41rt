@@ -22,11 +22,9 @@ Remaining synchronization work, based on the current serving source:
 - Queued dSpark main-context/cache commit and target SWA publication are implemented
   and have focused numerical/lifecycle evidence. Draft replay also has separate
   lane workspaces. The scoped v2 performance comparison remains pending.
-- Queue compressed-cache publication without blocking the shared scheduler
-  thread. `BackboneCache::commit` still commits compressed sources synchronously.
-  Compressed-source uploads also share pinned staging, so merely
-  replacing stream synchronization with polling is insufficient: reserve pages
-  and keep upload storage owned until completion, with disjoint request access.
+- Compressed-cache publication is now queued with producer-owned upload storage
+  and page/slot reservations. Disjoint plans can publish out of order; partial
+  errors drain before rollback. Numerical, ownership and cache-recovery tests pass.
 - Retire completed/cancelled requests within their owning lane. Preserve exact
   turn snapshots while making snapshot copies cooperative; today retirement
   requests a global drain and prefix retention waits on the host.
@@ -39,6 +37,10 @@ candidates by actual C1 serving evidence; component-only Spark FC2 gains require
 serving integration and are not established end-to-end wins. Local expert graphs
 previously showed no C1 gain and have lower priority. Preserve rejected-candidate
 records and record new measurements separately.
+Use ordered admission for mixed-workload comparisons: simultaneous client threads
+can change initial lane groupings and expert sharing even with identical prompts.
+Record admission mode and timestamps; keep unordered arrivals for lifecycle/race
+coverage rather than treating them as controlled grouping comparisons.
 
 For v2, rerun only the benchmark tables in the main README **excluding the prefill
 matrix**, and update matching performance-report tables with the same data.
@@ -114,9 +116,9 @@ The [two lane-local draft workspaces](phase1-split-draft-workspaces.md) now shar
 weights and use forty-row storage for eight requests each.
 [Queued dSpark commit](phase1-queued-draft-commit.md) prepares and writes accepted
 KV from each lane's producer; [queued SWA commit](phase1-queued-window-commit.md)
-removes the sequential window waits. Next, compressed-source plans must actually
-claim free pages until publication or rollback, preserve shared-tail copy ownership,
-and use producer-owned upload staging. Then remove retirement coupling separately
+removes the sequential window waits. [Queued compressed-source publication](phase1-queued-source-commit.md)
+claims pages until completion/rollback, preserves shared-tail copy ownership and
+uses producer-owned upload staging. Next remove retirement coupling separately
 from admission, including cooperative snapshot copies and release bookkeeping.
 Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must

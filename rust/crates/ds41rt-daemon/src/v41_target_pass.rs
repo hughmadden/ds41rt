@@ -357,16 +357,16 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     }
     /// The scheduler samples/validates logits before publishing accepted input
     /// prefixes. A failed commit consumes this pass; discard before reuse.
-    pub fn enqueue_window_commit(&mut self, requests: &Requests<'a>, batch: &RequestBatch,
+    pub fn enqueue_cache_commit(&mut self, requests: &Requests<'a>, batch: &RequestBatch,
         accepted: &[u32]) -> Result<()> {
         let id = batch.cache()?.identity();
         self.state.ready(id)?;
         requests.validate_acceptance(batch, accepted)?;
-        unsafe { self.execution.enqueue_window_commit(requests.cache(), batch.cache()?, accepted) }
+        unsafe { self.execution.enqueue_cache_commit(requests.cache(), batch.cache()?, accepted) }
     }
-    pub fn poll_window_commit(&self) -> Result<bool> { self.execution.poll_window_commit() }
-    pub fn abort_window_commit(&mut self, requests: &mut Requests<'a>) -> Result<()> {
-        requests.abort_window_commit(&mut self.execution)
+    pub fn poll_cache_commit(&self) -> Result<bool> { self.execution.poll_cache_commit() }
+    pub fn abort_cache_commit(&mut self, requests: &mut Requests<'a>) -> Result<()> {
+        requests.abort_cache_commit(&mut self.execution)
     }
     pub fn commit(
         &mut self,

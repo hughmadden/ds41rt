@@ -569,6 +569,9 @@ impl<'a> BackboneCache<'a> {
         for (state, &window) in self.windows.iter().zip(&request.windows) {
             if state.request_id(window).is_ok() { state.ensure_not_writing(window)?; }
         }
+        for (state, &source) in self.sources.iter().zip(&request.sources) {
+            if state.request_id(source).is_ok() { state.ensure_not_writing(source)?; }
+        }
         Ok(())
     }
     /// Check every component before starting or publishing accepted cache writes.
@@ -618,25 +621,33 @@ impl<'a> BackboneCache<'a> {
     /// # Safety
     /// The enclosing target pass retains bank and producer ownership until all
     /// writes finish. Abort/drain before releasing any participating request.
-    pub unsafe fn enqueue_window_commit(&self, batch: &CacheBatch,
-        windows: &mut [WindowWave<'_, '_>], sources: &[CompressorWave<'_, '_>], accepted: &[u32]) -> Result<()> {
-        let (published, _) = self.validate_commit(batch, windows, sources, accepted)?;
+    pub unsafe fn enqueue_cache_commit(&self, batch: &CacheBatch,
+        windows: &mut [WindowWave<'_, '_>], sources: &mut [CompressorWave<'_, '_>], accepted: &[u32]) -> Result<()> {
+        let (published, published_sources) = self.validate_commit(batch, windows, sources, accepted)?;
         for layer in batch.stage.windows() {
             if published & (1u64 << layer) == 0 {
                 unsafe { windows[layer].enqueue_commit(&self.windows[layer], accepted)?; }
             }
         }
+        for i in 0..batch.stage.source_count() {
+            if published_sources & (1 << i) == 0 {
+                unsafe { sources[i].enqueue_commit(&self.sources[i], accepted)?; }
+            }
+        }
         Ok(())
     }
-    pub fn abort_window_commit(&mut self, windows: &mut [WindowWave<'_, '_>]) -> Result<()> {
+    pub fn abort_cache_commit(&mut self, windows: &mut [WindowWave<'_, '_>], sources: &mut [CompressorWave<'_, '_>]) -> Result<()> {
         let mut result = Ok(());
         for (state, wave) in self.windows.iter_mut().zip(windows) {
+            if let Err(error) = wave.abort_commit(state) { result = Err(error); }
+        }
+        for (state, wave) in self.sources.iter_mut().zip(sources) {
             if let Err(error) = wave.abort_commit(state) { result = Err(error); }
         }
         result
     }
     /// Publish this phase's window/source owners. Queued windows must have
-    /// completed; direct windows and sources retain their synchronous path.
+    /// completed; direct calls retain their synchronous path.
     /// Execution failure revokes all participants after draining queued writes.
     pub fn commit(
         &mut self,
@@ -658,7 +669,7 @@ impl<'a> BackboneCache<'a> {
             Ok(())
         })();
         if let Err(error) = committed {
-            if let Err(cleanup) = self.abort_window_commit(windows) {
+            if let Err(cleanup) = self.abort_cache_commit(windows, sources) {
                 tracing::error!(%cleanup, "draining failed window writes");
             }
             let leases = batch

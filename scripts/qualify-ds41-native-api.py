@@ -18,7 +18,7 @@ def open_request(base, body, api_key=None):
     return urllib.request.urlopen(urllib.request.Request(base + '/v1/chat/completions',
         data=json.dumps(body).encode(), headers={'Content-Type': 'application/json', **({'Authorization': 'Bearer ' + api_key} if api_key else {})}), timeout=180)
 
-def stream_case(base, body, cancel=False, api_key=None):
+def stream_case(base, body, cancel=False, api_key=None, on_first_content=None):
     start = time.perf_counter()
     events, text, first, finish, usage = [], '', None, None, None
     done = False
@@ -42,6 +42,8 @@ def stream_case(base, body, cancel=False, api_key=None):
                 if delta:
                     if first is None:
                         first = elapsed
+                        if on_first_content is not None:
+                            on_first_content()
                     text += delta
                     if cancel:
                         return dict(cancelled_after_content=True, first_content_seconds=first, text=text)

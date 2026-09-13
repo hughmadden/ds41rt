@@ -9,6 +9,8 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 mod source_cache;
+mod commit;
+use commit::PendingCommit;
 mod prefix;
 pub(crate) use prefix::{CompressorPrefix, COMPRESSOR_PREFIX_BYTES};
 use source_cache::SourceCache;
@@ -132,6 +134,11 @@ impl<'a> CompressorState<'a> {
         })
     }
     fn validate(&self, lease: CompressorLease) -> Result<usize> {
+        let slot = self.validate_identity(lease)?;
+        self.index.ensure_idle(slot)?;
+        Ok(slot)
+    }
+    fn validate_identity(&self, lease: CompressorLease) -> Result<usize> {
         ensure!(
             lease.owner == self.owner && lease.slot < self.slot_count,
             "foreign compressor lease"
@@ -144,12 +151,15 @@ impl<'a> CompressorState<'a> {
         Ok(lease.slot)
     }
     pub fn request_id(&self, lease: CompressorLease) -> Result<u64> {
-        self.slots[self.validate(lease)?]
+        self.slots[self.validate_identity(lease)?]
             .request
             .context("compressor request missing")
     }
     pub fn committed_end(&self, lease: CompressorLease) -> Result<u64> {
-        Ok(self.slots[self.validate(lease)?].end)
+        Ok(self.slots[self.validate_identity(lease)?].end)
+    }
+    pub(crate) fn ensure_not_writing(&self, lease: CompressorLease) -> Result<()> {
+        self.validate(lease).map(|_| ())
     }
     pub fn check_append_capacity(&self, work: &[(CompressorLease, u32)]) -> Result<()> {
         let ratio = ratio(self.layer)?;
@@ -314,6 +324,8 @@ impl<'a> CompressorWeights<'a> {
             capacity: rows,
             graph: None,
             ready: None,
+            pending_commit: None,
+            commit_staging: HostAllocation::new(self.library, rows*4+256)?,
         })
     }
 }
@@ -426,6 +438,8 @@ pub(crate) struct CompressorWave<'w, 'a> {
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
     ready: Option<Prepared>,
+    pending_commit: Option<PendingCommit>,
+    commit_staging: HostAllocation<'a>,
 }
 impl CompressorWave<'_, '_> {
     pub fn device_bytes(layer: usize, rows: usize) -> Result<usize> {
@@ -454,6 +468,7 @@ impl CompressorWave<'_, '_> {
         state: &CompressorState<'_>,
         chunks: &[CompressorChunk],
     ) -> Result<Prepared> {
+        ensure!(self.pending_commit.is_none(), "compressor commit pending");
         self.ready = None;
         ensure!(
             state.layer == self.weights.layer,
@@ -853,8 +868,8 @@ impl CompressorWave<'_, '_> {
         state: &CompressorState<'_>,
         chunks: &[CompressorChunk],
     ) -> Result<()> {
-        self.output(state)?;
-        let prepared = self.ready.as_ref().context("compressor output incomplete")?;
+        let prepared = if self.pending_commit.is_some() { self.validate_pending_commit(state)? }
+            else { self.output(state)?; self.ready.as_ref().context("compressor output incomplete")? };
         ensure!(
             prepared.chunks.len() == chunks.len()
                 && prepared.chunks.iter().zip(chunks).all(|(a, b)|
@@ -863,156 +878,8 @@ impl CompressorWave<'_, '_> {
         );
         Ok(())
     }
-    /// Consume this proposal once. Validate all requests before any GPU write;
-    /// zero acceptance also invalidates competing proposals via version advance.
-    /// Reserve paired index/KV pages before writes, drain all source writes before
-    /// publishing history, and return accepted complete latents for KV commit.
-    pub fn commit(
-        &mut self,
-        state: &mut CompressorState<'_>,
-        accepted: &[u32],
-    ) -> Result<Vec<CompressorLatentRow>> {
-        let prepared = self
-            .ready
-            .take()
-            .context("compressor has no proposal to commit")?;
-        ensure!(
-            prepared.owner == state.owner && accepted.len() == prepared.chunks.len(),
-            "compressor commit binding differs"
-        );
-        for (i, chunk) in prepared.chunks.iter().enumerate() {
-            let slot = state.validate(chunk.lease)?;
-            ensure!(
-                state.slots[slot].version == prepared.versions[i]
-                    && state.slots[slot].end == chunk.position,
-                "stale compressor proposal"
-            );
-            ensure!(
-                accepted[i] <= chunk.tokens,
-                "compressor acceptance exceeds proposal"
-            );
-            state.slots[slot]
-                .version
-                .checked_add(1)
-                .context("compressor version exhausted")?;
-        }
-        let ratio = self.weights.ratio;
-        let mut completed = vec![];
-        let mut appends = vec![];
-        for (i, chunk) in prepared.chunks.iter().enumerate() {
-            let end = prepared.offsets[i] + accepted[i] as usize;
-            completed.extend(
-                prepared
-                    .completed
-                    .iter()
-                    .filter(|r| {
-                        r.source_row as usize >= prepared.offsets[i]
-                            && (r.source_row as usize) < end
-                    })
-                    .copied(),
-            );
-            appends.push((
-                chunk.lease.slot,
-                chunk.position as usize / ratio,
-                (chunk.position as usize + accepted[i] as usize) / ratio,
-            ));
-        }
-        let plan = state.index.reserve(&appends)?;
-        let mut destinations = vec![u64::MAX; prepared.rows];
-        for row in &completed {
-            destinations[row.source_row as usize] =
-                state
-                    .index
-                    .destination(&plan, row.lease.slot, row.position as usize / ratio)?;
-        }
-        // Reuse pinned proposal metadata after execution has drained. Commit is
-        // outside the proposal graph because acceptance is only known afterward.
-        for (dst, value) in self.staging.bytes_mut()[..prepared.rows * 8]
-            .chunks_exact_mut(8)
-            .zip(&destinations)
-        {
-            dst.copy_from_slice(&value.to_ne_bytes());
-        }
-        let slice = |b: Ds41rtDeviceBuffer, row: usize| Ds41rtDeviceBuffer {
-            ptr: unsafe { b.ptr.cast::<u8>().add(row * 2048).cast() },
-            bytes: 2048,
-            ..b
-        };
-        let write = (|| -> Result<()> {
-            unsafe { state.index.copy_shared_tails(&plan, self.stream.raw)?; }
-            if !completed.is_empty() {
-                unsafe {
-                    self.stream.library.copy_h2d_async(
-                        self.cache_destinations.buffer,
-                        &self.staging.bytes_mut()[..prepared.rows * 8],
-                        self.stream.raw,
-                    )?;
-                    self.kernel.index_store(
-                        self.index_packed.buffer,
-                        self.index_scales.buffer,
-                        self.cache_destinations.buffer,
-                        state.index.packed.buffer,
-                        state.index.scales.buffer,
-                        prepared.rows,
-                        state.index.capacity,
-                        self.stream.raw,
-                    )?;
-                    self.kv.store(
-                        self.kv_values.buffer,
-                        self.kv_scales.buffer,
-                        self.cache_destinations.buffer,
-                        state.index.kv_values.buffer,
-                        state.index.kv_scales.buffer,
-                        prepared.rows,
-                        state.index.capacity,
-                        self.stream.raw,
-                    )?;
-                }
-            }
-            if let Some(pending) = &state.pending {
-                for (i, chunk) in prepared.chunks.iter().enumerate() {
-                    let count = accepted[i] as usize;
-                    if count > 0 && (chunk.position + count as u64) % 2 == 1 {
-                        let row = prepared.offsets[i] + count - 1;
-                        for (dst, src) in [
-                            (pending[0].buffer, self.projected.buffer),
-                            (pending[1].buffer, self.scores.as_ref().unwrap().buffer),
-                        ] {
-                            unsafe {
-                                self.stream.library.copy_d2d_async(
-                                    slice(dst, chunk.lease.slot),
-                                    slice(src, row),
-                                    2048,
-                                    self.stream.raw,
-                                )?;
-                            }
-                        }
-                    }
-                }
-            }
-            unsafe {
-                state.index.upload(&plan, self.stream.raw)?;
-            }
-            Ok(())
-        })();
-        let drained = self.synchronize();
-        if let Err(error) = write.and(drained) {
-            for chunk in &prepared.chunks {
-                state.slots[chunk.lease.slot].request = None;
-                if let Err(error) = state.index.release(chunk.lease.slot) {
-                    tracing::error!(%error, "clearing failed index transaction metadata");
-                }
-            }
-            return Err(error);
-        }
-        state.index.apply(plan);
-        for (i, chunk) in prepared.chunks.iter().enumerate() {
-            state.slots[chunk.lease.slot].end = chunk.position + u64::from(accepted[i]);
-            state.slots[chunk.lease.slot].version += 1;
-        }
-        Ok(completed)
-    }
     pub fn clear_graph(&mut self) -> Result<()> {
+        ensure!(self.pending_commit.is_none(), "cannot reset a pending source commit");
         self.ready = None;
         self.synchronize()?;
         if let Some((graph, _, _)) = self.graph.take() {
@@ -1025,6 +892,8 @@ impl CompressorWave<'_, '_> {
 }
 impl Drop for CompressorWave<'_, '_> {
     fn drop(&mut self) {
+        if let Err(error) = self.synchronize() { tracing::error!(%error, "draining pending source commit"); }
+        self.pending_commit = None;
         if let Err(error) = self.clear_graph() {
             tracing::error!(%error,"draining compressor graph");
         }

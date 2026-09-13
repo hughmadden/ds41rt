@@ -6,6 +6,8 @@ use std::ffi::c_void;
 use std::{cell::RefCell, rc::Rc};
 mod ownership;
 use ownership::PagePool;
+mod reservation;
+use reservation::PageReservation;
 pub(crate) use ownership::SourcePrefix;
 
 /// Capacity failure for one entry in the caller's ordered append transaction.
@@ -41,6 +43,7 @@ pub(super) struct SourceCache<'a> {
     pages: [Vec<u32>; 16],
     rows: [usize; 16],
     pool: Rc<RefCell<PagePool>>,
+    writing: Rc<std::cell::Cell<u16>>,
 }
 pub(super) struct IndexPlan {
     additions: Vec<(usize, Vec<u32>)>,
@@ -48,6 +51,7 @@ pub(super) struct IndexPlan {
     lengths: Vec<(usize, u64)>,
     // Shared partial pages are copied before accepted rows are appended.
     replacements: Vec<(usize, usize, u32, u32)>,
+    reservation: Option<PageReservation>,
 }
 /// Only rows below `rows` are initialized. Logical row r uses physical page
 /// pages[r / 256], offset r % 256. Drain device consumers before mutating owner.
@@ -97,6 +101,7 @@ impl<'a> SourceCache<'a> {
             pages: std::array::from_fn(|_| vec![]),
             rows: [0; 16],
             pool: Rc::new(RefCell::new(PagePool::new(pages))),
+            writing: Default::default(),
         })
     }
     pub fn view(&self, slot: usize, rows: usize) -> IndexCacheView<'_> {
@@ -124,7 +129,13 @@ impl<'a> SourceCache<'a> {
             device_rows: index.device_rows,
         }
     }
+    pub fn ensure_idle(&self, slot: usize) -> Result<()> {
+        ensure!(slot < self.lengths.buffer.bytes / 8 && self.writing.get() & (1 << slot) == 0,
+            "compressed cache slot has a pending append");
+        Ok(())
+    }
     pub fn release(&mut self, slot: usize) -> Result<()> {
+        self.ensure_idle(slot)?;
         // Caller first revokes the host lease, and has drained all consumers.
         self.pool.borrow_mut().release(&self.pages[slot]);
         self.pages[slot].clear();
@@ -134,6 +145,7 @@ impl<'a> SourceCache<'a> {
             .copy_h2d(slice(self.lengths.buffer, slot * 8, 8), &[0; 8])
     }
     pub fn reset(&self, slot: usize) -> Result<()> {
+        self.ensure_idle(slot)?;
         self.lengths
             .library
             .copy_h2d(slice(self.lengths.buffer, slot * 8, 8), &[0; 8])
@@ -141,6 +153,7 @@ impl<'a> SourceCache<'a> {
     /// Retain initialized source rows without copying GPU data. Callers drain
     /// consumers and supply the authoritative committed row count.
     pub fn retain_prefix(&self, slot: usize, rows: usize) -> Result<SourcePrefix> {
+        self.ensure_idle(slot)?;
         ensure!(
             slot < self.lengths.buffer.bytes / 8 && rows <= self.rows[slot],
             "source prefix exceeds initialized page table"
@@ -156,6 +169,7 @@ impl<'a> SourceCache<'a> {
     /// Attach a retained source to a fresh request. Device metadata is installed
     /// before host publication; a later append privately copies a shared tail.
     pub fn restore_prefix(&mut self, slot: usize, prefix: &SourcePrefix) -> Result<()> {
+        self.ensure_idle(slot)?;
         ensure!(
             slot < self.lengths.buffer.bytes / 8
                 && self.pages[slot].is_empty()
@@ -181,9 +195,11 @@ impl<'a> SourceCache<'a> {
         Ok(())
     }
     /// # Safety
-    /// Serialize with all pool mutations and enqueue before accepted row writes.
-    /// The caller drains the stream before applying or discarding the plan.
+    /// Enqueue before accepted row writes. The plan owns destinations and append
+    /// slots; old shared tails retain their request references through completion.
+    /// Disjoint reservations may coexist. Drain before applying/discarding a plan.
     pub unsafe fn copy_shared_tails(&self, plan: &IndexPlan, stream: *mut c_void) -> Result<()> {
+        self.validate_plan(plan)?;
         for &(_, _, source, destination) in &plan.replacements {
             for (buffer, row_bytes) in [
                 (self.packed.buffer, 64),
@@ -208,69 +224,45 @@ impl<'a> SourceCache<'a> {
     /// Value/scales writes precede this call on stream. Drain the stream before
     /// reusing staging, releasing a slot or publishing the plan on the host.
     pub unsafe fn upload(&mut self, plan: &IndexPlan, stream: *mut c_void) -> Result<()> {
-        let library = self.lengths.library;
-        let mut offset = 0;
-        for &(slot, logical, _, destination) in &plan.replacements {
-            let staging = &mut self.staging.bytes_mut()[offset..offset + 4];
-            staging.copy_from_slice(&destination.to_ne_bytes());
-            unsafe {
-                library.copy_h2d_async(
-                    slice(
-                        self.page_table.buffer,
-                        (slot * self.stride + logical) * 4,
-                        4,
-                    ),
-                    staging,
-                    stream,
-                )?;
-            }
-            offset += 4;
-        }
-        for (slot, pages) in &plan.additions {
-            let bytes = pages.len() * 4;
-            if bytes == 0 {
-                continue;
-            }
-            let staging = &mut self.staging.bytes_mut()[offset..offset + bytes];
-            for (out, page) in staging.chunks_exact_mut(4).zip(pages) {
-                out.copy_from_slice(&page.to_ne_bytes());
-            }
-            let dst = (slot * self.stride + self.pages[*slot].len()) * 4;
-            unsafe {
-                library.copy_h2d_async(
-                    slice(self.page_table.buffer, dst, bytes),
-                    staging,
-                    stream,
-                )?;
-            }
-            offset += bytes;
-        }
-        for &(slot, rows) in &plan.lengths {
-            let staging = &mut self.staging.bytes_mut()[offset..offset + 8];
-            staging.copy_from_slice(&rows.to_ne_bytes());
-            unsafe {
-                library.copy_h2d_async(slice(self.lengths.buffer, slot * 8, 8), staging, stream)?;
-            }
-            offset += 8;
-        }
+        self.validate_plan(plan)?;
+        let starts = std::array::from_fn(|slot| self.pages[slot].len());
+        unsafe { upload_metadata(self.lengths.library, self.page_table.buffer, self.lengths.buffer,
+            self.stride, starts, plan, self.staging.bytes_mut(), stream) }
+    }
+    /// # Safety
+    /// Same publication ordering as upload. Staging belongs to the producer and
+    /// remains pinned and untouched until this stream drains.
+    pub unsafe fn upload_staged(&self, plan: &IndexPlan, staging: &mut [u8], stream: *mut c_void) -> Result<()> {
+        self.validate_plan(plan)?;
+        let starts = std::array::from_fn(|slot| self.pages[slot].len());
+        unsafe { upload_metadata(self.lengths.library, self.page_table.buffer, self.lengths.buffer,
+            self.stride, starts, plan, staging, stream) }
+    }
+    pub fn validate_plan(&self, plan: &IndexPlan) -> Result<()> {
+        let reservation = plan.reservation.as_ref().ok_or_else(|| anyhow::anyhow!("source plan not reserved"))?;
+        ensure!(Rc::ptr_eq(&reservation.pool, &self.pool)
+            && self.writing.get() & reservation.mask == reservation.mask, "foreign or lost source reservation");
         Ok(())
     }
-    /// Reserve all requests together without mutating pool metadata. Caller
-    /// serializes this plan through apply/release and validates unique slots.
+    /// Atomically claim the append slots and free pages after validating every
+    /// participant. Disjoint plans may coexist and apply in either order. After
+    /// queueing GPU writes, drain before applying or dropping the plan.
     pub fn reserve(&self, appends: &[(usize, usize, usize)]) -> Result<IndexPlan> {
         let mut plan = IndexPlan {
             additions: vec![],
             used: 0,
             lengths: vec![],
             replacements: vec![],
+            reservation: None,
         };
-        let pool = self.pool.borrow();
+        let mut pool = self.pool.borrow_mut();
         let mut seen = [false; 16];
         for &(slot, old, new) in appends {
             ensure!(
                 slot < self.lengths.buffer.bytes / 8 && !seen[slot],
                 "duplicate or invalid index slot"
             );
+            self.ensure_idle(slot)?;
             seen[slot] = true;
             ensure!(
                 old == self.rows[slot]
@@ -325,6 +317,13 @@ impl<'a> SourceCache<'a> {
             ));
             plan.used += extra;
         }
+        let remaining = pool.free.len() - plan.used;
+        let pages = pool.free.split_off(remaining);
+        let mask = seen.iter().enumerate().fold(0u16, |mask, (slot, &used)|
+            mask | if used { 1 << slot } else { 0 });
+        self.writing.set(self.writing.get() | mask);
+        plan.reservation = Some(PageReservation { pool: self.pool.clone(), pages,
+            flags: self.writing.clone(), mask });
         Ok(plan)
     }
     pub fn destination(&self, plan: &IndexPlan, slot: usize, row: usize) -> Result<u64> {
@@ -350,10 +349,10 @@ impl<'a> SourceCache<'a> {
         };
         Ok(u64::from(page) * PAGE_ROWS as u64 + (row % PAGE_ROWS) as u64)
     }
-    pub fn apply(&mut self, plan: IndexPlan) {
+    pub fn apply(&mut self, mut plan: IndexPlan) {
+        let mut reservation = plan.reservation.take().expect("source plan is not reserved");
+        assert!(Rc::ptr_eq(&self.pool, &reservation.pool), "foreign source plan");
         let mut pool = self.pool.borrow_mut();
-        let remaining = pool.free.len() - plan.used;
-        pool.free.truncate(remaining);
         for (slot, logical, old, new) in plan.replacements {
             pool.retain(&[new]);
             pool.release(&[old]);
@@ -366,7 +365,63 @@ impl<'a> SourceCache<'a> {
         for (slot, rows) in plan.lengths {
             self.rows[slot] = rows as usize;
         }
+        reservation.pages.clear(); // Page references now belong to request tables.
+        drop(pool); // Reservation drop must not reborrow an active pool borrow.
+        drop(reservation);
     }
+}
+
+unsafe fn upload_metadata(library: &NativeLibrary, page_table: Ds41rtDeviceBuffer,
+    lengths: Ds41rtDeviceBuffer, stride: usize, starts: [usize; 16], plan: &IndexPlan,
+    staging: &mut [u8], stream: *mut c_void) -> Result<()> {
+    let bytes = plan.replacements.len()*4 + plan.additions.iter().map(|(_, p)| p.len()*4).sum::<usize>()
+        + plan.lengths.len()*8;
+    ensure!(staging.len() >= bytes, "source metadata staging too small");
+        let mut offset = 0;
+        for &(slot, logical, _, destination) in &plan.replacements {
+            let staging = &mut staging[offset..offset + 4];
+            staging.copy_from_slice(&destination.to_ne_bytes());
+            unsafe {
+                library.copy_h2d_async(
+                    slice(
+                        page_table,
+                        (slot * stride + logical) * 4,
+                        4,
+                    ),
+                    staging,
+                    stream,
+                )?;
+            }
+            offset += 4;
+        }
+        for (slot, pages) in &plan.additions {
+            let bytes = pages.len() * 4;
+            if bytes == 0 {
+                continue;
+            }
+            let staging = &mut staging[offset..offset + bytes];
+            for (out, page) in staging.chunks_exact_mut(4).zip(pages) {
+                out.copy_from_slice(&page.to_ne_bytes());
+            }
+            let dst = (slot * stride + starts[*slot]) * 4;
+            unsafe {
+                library.copy_h2d_async(
+                    slice(page_table, dst, bytes),
+                    staging,
+                    stream,
+                )?;
+            }
+            offset += bytes;
+        }
+        for &(slot, rows) in &plan.lengths {
+            let staging = &mut staging[offset..offset + 8];
+            staging.copy_from_slice(&rows.to_ne_bytes());
+            unsafe {
+                library.copy_h2d_async(slice(lengths, slot * 8, 8), staging, stream)?;
+            }
+            offset += 8;
+        }
+        Ok(())
 }
 
 fn slice(buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {

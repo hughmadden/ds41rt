@@ -401,8 +401,8 @@ impl<'a> Requests<'a> {
         }
         Ok(())
     }
-    pub fn abort_window_commit(&mut self, execution: &mut BackboneExecution<'_, '_>) -> Result<()> {
-        execution.abort_window_commit(&mut self.cache)
+    pub fn abort_cache_commit(&mut self, execution: &mut BackboneExecution<'_, '_>) -> Result<()> {
+        execution.abort_cache_commit(&mut self.cache)
     }
     /// Invalidate every participant after a partially applied combined commit.
     pub fn revoke_batch(&mut self, batch: &mut RequestBatch) {

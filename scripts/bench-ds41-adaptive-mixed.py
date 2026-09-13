@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused deterministic mixed traffic and cache/lifecycle probe, not release qualification."""
+"""Focused fixed-input mixed traffic and cache/lifecycle probe, not release qualification."""
 import argparse
 import concurrent.futures
 import hashlib
@@ -20,6 +20,8 @@ def main():
     p.add_argument('--concurrency', type=int, nargs='+', choices=range(1,17), default=[4,16],
                    help='Mixed batch concurrency levels, default 4 16')
     p.add_argument('--skip-lifecycle', action='store_true', help='Run only mixed traffic for focused diagnostics')
+    p.add_argument('--ordered-admission', action='store_true',
+                   help='Start each request after its predecessor emits content, controlling admission order while decode overlaps')
     args = p.parse_args()
     if args.output.exists():
         p.error('output must be new')
@@ -33,19 +35,20 @@ def main():
     report = dict(scope=__doc__, nonce_seed=args.nonce_seed,
                   corpus_sha256=hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
                   tokenizer_sha256=hashlib.sha256(args.tokenizer.read_bytes()).hexdigest(),
+                  admission='ordered_first_content' if args.ordered_admission else 'simultaneous_unordered',
                   batches=[], lifecycle={}, passed=False)
 
     def save():
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n')
 
-    def request(body, cancel=False):
+    def request(body, cancel=False, on_first_content=None):
         start = time.perf_counter()
-        result = api['stream_case'](args.base_url, body, cancel=cancel)
+        result = api['stream_case'](args.base_url, body, cancel=cancel, on_first_content=on_first_content)
         result.pop('events', None)
         return dict(start=start, request=body, result=result)
 
-    # All calls begin together. Each prompt has a different first content token;
-    # both serving arms receive identical input order and content.
+    # Inputs match across arms. Simultaneous clients do not guarantee server
+    # arrival order; ordered mode controls that variable without serializing decode.
     for concurrency in args.concurrency:
         bodies = []
         for i in range(concurrency):
@@ -55,14 +58,28 @@ def main():
             body['max_tokens'] = definition['max_tokens']
             bodies.append((case, body))
         barrier = threading.Barrier(concurrency)
+        admitted = [threading.Event() for _ in range(concurrency+1)]
+        admitted[0].set()
+        failed = threading.Event()
 
         def work(item):
-            case, body = item
-            barrier.wait(timeout=30)
-            return dict(case=case, **request(body))
+            index, (case, body) = item
+            try:
+                if args.ordered_admission:
+                    if not admitted[index].wait(timeout=180) or failed.is_set():
+                        raise RuntimeError('ordered admission predecessor failed or timed out')
+                else:
+                    barrier.wait(timeout=30)
+                return dict(case=case, admission_index=index, **request(body,
+                    on_first_content=admitted[index+1].set if args.ordered_admission else None))
+            except BaseException:
+                failed.set()
+                for gate in admitted:
+                    gate.set()
+                raise
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
-            rows = list(pool.map(work, bodies))
+            rows = list(pool.map(work, enumerate(bodies)))
         begin = min(r['start'] + r['result']['first_content_seconds'] for r in rows)
         end = max(r['start'] + r['result']['finish_seconds'] for r in rows)
         tokens = sum(r['result']['usage']['completion_tokens'] - 1 for r in rows)
