@@ -65,6 +65,23 @@ impl<'a> Stream<'a> {
     pub(crate) fn drain(&self) -> Result<()> {
         self.device.run(|| unsafe { self.device.library.cuda_stream_synchronize(self.raw) })
     }
+    /// Retain queued work through cooperative completion or cancellation drain.
+    pub(crate) async fn wait(&self) -> Result<()> {
+        struct Drain<'s, 'a> { stream: &'s Stream<'a>, complete: bool }
+        impl Drop for Drain<'_, '_> {
+            fn drop(&mut self) {
+                if !self.complete {
+                    if let Err(error) = self.stream.drain() {
+                        tracing::error!(%error, "draining interrupted device stream");
+                    }
+                }
+            }
+        }
+        let mut guard = Drain { stream: self, complete: false };
+        while !self.ready()? { tokio::task::yield_now().await; }
+        guard.complete = true;
+        Ok(())
+    }
 }
 impl Drop for Stream<'_> {
     fn drop(&mut self) {

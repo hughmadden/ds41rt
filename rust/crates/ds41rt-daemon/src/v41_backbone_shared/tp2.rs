@@ -18,6 +18,11 @@ pub(crate) struct Wave<'a> {
     capacity: u32,
 }
 impl<'a> Wave<'a> {
+    /// Per GPU, per lane, excluding immutable weights and CUDA state.
+    pub fn device_bytes(library: &ds41rt_ffi::NativeLibrary, capacity: u32) -> Result<usize> {
+        RankWave::device_bytes(library, capacity)?.checked_add(capacity as usize*5120*4)
+            .context("shared TP2 workspace overflow")
+    }
     pub fn new(weights: [Rc<Vec<Weights<'a>>>; 2], capacity: u32) -> Result<Self> {
         ensure!(!weights[0].is_empty() && weights[0].len() == weights[1].len(), "shared TP2 rank layers differ");
         let d0 = weights[0][0].device;
@@ -38,7 +43,7 @@ impl<'a> Wave<'a> {
     /// completion. Each lane owns a separate Wave. Returned output remains valid
     /// only until the next execute or destruction of this owner.
     pub async unsafe fn execute(&mut self, layer: usize, rows: u32, destination: usize,
-        inputs: [&Allocation<'a>; 2], producers: [&Stream<'a>; 2]) -> Result<Ds41rtDeviceBuffer> {
+        inputs: [Ds41rtDeviceBuffer; 2], producers: [&Stream<'a>; 2]) -> Result<Ds41rtDeviceBuffer> {
         ensure!(destination < 2 && rows > 0 && rows <= self.capacity, "invalid shared TP2 destination/rows");
         struct Drain<'s, 'a> { ranks: &'s mut [RankWave<'a>; 2], complete: bool }
         impl Drop for Drain<'_, '_> {
@@ -52,10 +57,11 @@ impl<'a> Wave<'a> {
         }
         let mut drain = Drain { ranks: &mut self.ranks, complete: false };
         for rank in 0..2 {
-            unsafe { drain.ranks[rank].enqueue(layer, rows, inputs[rank].buffer, producers[rank])?; }
+            unsafe { drain.ranks[rank].enqueue(layer, rows, inputs[rank], producers[rank])?; }
         }
         let local = &drain.ranks[destination];
         let remote = &drain.ranks[1-destination];
+        remote.stream.wait().await?;
         self.ready[destination].record(&local.stream)?;
         let ready = &self.ready[destination];
         let output = &mut self.output[destination];
@@ -79,6 +85,7 @@ pub(crate) struct Weights<'a> {
     matrices: [Matrix<'a>; 3],
 }
 impl<'a> Weights<'a> {
+    pub fn device(&self) -> Device<'a> { self.device }
     pub fn device_bytes() -> usize { 3 * (5120 * 1152 + 5120 * 1152 / 32) }
     pub fn load_peak_device_bytes() -> usize { Self::device_bytes() + 5120 * 1152 / 1024 }
     pub fn load(device: Device<'a>, catalog: &OfficialV41Catalog, layer: usize, budget: usize) -> Result<Self> {
@@ -127,6 +134,14 @@ pub(crate) struct RankWave<'a> {
     capacity: u32,
 }
 impl<'a> RankWave<'a> {
+    pub fn device_bytes(library: &ds41rt_ffi::NativeLibrary, capacity: u32) -> Result<usize> {
+        ensure!([1,16,80,256,1024,4096].contains(&capacity), "invalid shared TP2 capacity");
+        let up = library.v41_fp8_matrix_plan(capacity,5120,1152)?;
+        let down = library.v41_fp8_matrix_plan(capacity,1152,5120)?;
+        usize::try_from(up.info().scratch_bytes)?.checked_add(usize::try_from(down.info().scratch_bytes)?)
+            .and_then(|bytes| bytes.checked_add(16 + capacity as usize*(3*1152+5120)*2))
+            .context("shared TP2 rank workspace overflow")
+    }
     pub fn new(weights: Rc<Vec<Weights<'a>>>, capacity: u32) -> Result<Self> {
         ensure!(!weights.is_empty() && weights.len() <= 40, "shared TP2 needs resident layers");
         let device = weights[0].device;
@@ -208,8 +223,8 @@ mod tests {
             for input in &inputs { input.device.run(|| lib.copy_h2d(input.buffer, &host))?; }
             let [left, right] = &mut lanes;
             let (a,b) = runtime.block_on(async { tokio::join!(
-                unsafe { left.execute(0, rows, 0, [&inputs[0], &inputs[1]], [&producers[0], &producers[1]]) },
-                unsafe { right.execute(0, rows, 1, [&inputs[0], &inputs[1]], [&producers[0], &producers[1]]) }
+                unsafe { left.execute(0, rows, 0, [inputs[0].buffer, inputs[1].buffer], [&producers[0], &producers[1]]) },
+                unsafe { right.execute(0, rows, 1, [inputs[0].buffer, inputs[1].buffer], [&producers[0], &producers[1]]) }
             ) });
             let outputs = [a?,b?];
             let mut actual = [vec![0; rows as usize*5120*2], vec![0; rows as usize*5120*2]];

@@ -375,3 +375,53 @@ fixtures also pass against that combined library, rather than only the isolated
 test libraries. This establishes build coexistence and expert workspace reuse;
 complete serving integration, distributed attention/cache placement, vocabulary
 partitioning, automatic launcher selection, and full-model qualification remain.
+
+## Serving FFN connection and copy-engine independence
+
+`v41_experts/tp2_ffn.rs` now combines routed and shared TP2 execution for one
+encoder FFN. It borrows the completed normalized/router buffers on the owning
+GPU, copies only the peer inputs, runs both contributions concurrently, and
+returns their rounded BF16 sum to the input GPU. Each request lane owns its
+streams, peer buffers, expert workspaces, and output. Immutable weights remain
+shared between lanes. Execution performs no allocation.
+
+`NativeTp4Wave::install_tp2` and the serving lane's local FFN branch now select
+this operation when installed, validating query binding, layer, row count and
+token identity. Startup does not install it yet: complete placement, distributed
+attention/cache ownership, decoder shared TP2, and the remaining phase-2 serving
+components must still be integrated before enabling two-GPU mode.
+
+The official layer-0 fixture passes C1/C16 changed inputs with distinct values,
+expert IDs, and routing weights in each lane. Each result exactly matches a
+rounded sum of independently executed routed and shared contributions. It also
+checks cancellation and subsequent reuse of the same workspace.
+
+A deliberately held upload exposed copy-engine head-of-line blocking: queuing
+copies behind the held dependency prevented unrelated peer copies and the other
+lane from finishing until the 500 ms gate released, despite separate streams.
+The TP2 path now polls its own upload/remote producer cooperatively before
+submitting a not-yet-ready copy. The gated test then finishes the other lane in
+about 0.23 ms, with the gate still held; independent peer copies also complete.
+This is an isolation test, not a throughput measurement. No cross-request lane
+join or blocking synchronization was added to normal execution. Cancellation
+still drains queued work before releasing borrowed storage.
+
+Per-GPU, per-lane workspace accounting now includes exported scratch sizes,
+stable routed outputs, peer reductions, shared projections, peer inputs, and the
+final FFN output. It excludes immutable weights, CUDA modules/streams, allocator
+rounding, and runtime headroom:
+
+| Row capacity | Explicit workspace bytes per GPU per lane |
+| --- | ---: |
+| 1 | 1,231,360 |
+| 16 | 19,200,672 |
+| 80 | 95,860,384 |
+| 256 | 153,787,808 |
+| 1024 | 404,235,680 |
+| 4096 | 1,460,135,984 |
+
+The transfer boundary adds 25,808 bytes per row per GPU per lane beyond the
+shared/routed backends. At capacity 4096, two complete FFN lanes require
+2,920,271,968 explicit workspace bytes on each GPU. Full placement must also
+account for attention, cache/snapshots, auxiliary components, loading peaks,
+weights, and CUDA overhead; these FFN numbers alone are not a serving budget.

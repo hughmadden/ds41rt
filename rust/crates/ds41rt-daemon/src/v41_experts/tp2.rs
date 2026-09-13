@@ -13,6 +13,8 @@ pub(crate) struct RankWeights<'a> {
     weights: ManuallyDrop<Vec<ExpertWeights<'a>>>,
 }
 impl<'a> RankWeights<'a> {
+    pub fn device(&self) -> Device<'a> { self.device }
+    pub fn layers(&self) -> usize { self.weights.len() }
     pub fn load(device: Device<'a>, catalog: &ds41rt_loader::OfficialV41Catalog,
         layers: usize, budget: usize) -> Result<Self> {
         ensure!((1..=20).contains(&layers) && matches!(device.id, 0 | 1), "invalid TP2 encoder placement");
@@ -42,9 +44,9 @@ impl Drop for RankWeights<'_> {
 
 struct RankState<'a> { kernel: V41ExpertKernel<'a>, slots: [*mut c_void; 44] }
 pub(crate) struct RankInputs<'s, 'a> {
-    pub wire: &'s Allocation<'a>,
-    pub ids: &'s Allocation<'a>,
-    pub routing: &'s Allocation<'a>,
+    pub wire: Ds41rtDeviceBuffer,
+    pub ids: Ds41rtDeviceBuffer,
+    pub routing: Ds41rtDeviceBuffer,
     pub producer: &'s Stream<'a>,
 }
 pub(crate) struct ExpertWave<'a> {
@@ -52,6 +54,11 @@ pub(crate) struct ExpertWave<'a> {
     ranks: [RankWave<'a>; 2],
 }
 impl<'a> ExpertWave<'a> {
+    /// Per GPU, per lane; immutable expert weights and CUDA state are separate.
+    pub fn device_bytes(library: &ds41rt_ffi::NativeLibrary, capacity: u32) -> Result<usize> {
+        RankWave::device_bytes(library, capacity)?.checked_add(PeerReduction::device_bytes(capacity)?)
+            .ok_or_else(|| anyhow::anyhow!("TP2 expert workspace overflow"))
+    }
     pub fn new(weights: [Rc<RankWeights<'a>>; 2], capacity: u32) -> Result<Self> {
         ensure!(weights[0].device.id == 0 && weights[1].device.id == 1
             && std::ptr::eq(weights[0].device.library, weights[1].device.library)
@@ -85,8 +92,8 @@ impl<'a> ExpertWave<'a> {
         let mut guard = Drain { ranks: &mut self.ranks, complete: false };
         let mut layouts = [false; 2];
         for rank in 0..2 {
-            layouts[rank] = unsafe { guard.ranks[rank].enqueue(layer, rows, input[rank].wire.buffer,
-                input[rank].ids.buffer, input[rank].routing.buffer, input[rank].producer)? };
+            layouts[rank] = unsafe { guard.ranks[rank].enqueue(layer, rows, input[rank].wire,
+                input[rank].ids, input[rank].routing, input[rank].producer)? };
         }
         ensure!(layouts[0] == layouts[1], "TP2 rank output layout mismatch");
         let local = &guard.ranks[destination];
@@ -108,6 +115,14 @@ pub(crate) struct RankWave<'a> {
     capacity: u32,
 }
 impl<'a> RankWave<'a> {
+    pub fn device_bytes(library: &ds41rt_ffi::NativeLibrary, capacity: u32) -> Result<usize> {
+        ensure!([1,16,80,256,1024,4096].contains(&capacity), "invalid TP2 rank capacity");
+        let scratch = [1,16,80,256,1024,4096].into_iter().filter(|&c| c <= capacity)
+            .map(|c| Ok(usize::try_from(library.v41_tp2_expert_info(c)?.scratch_bytes)?))
+            .collect::<Result<Vec<_>>>()?.into_iter().max().unwrap();
+        scratch.checked_add(capacity as usize*5120*6*4)
+            .ok_or_else(|| anyhow::anyhow!("TP2 rank workspace overflow"))
+    }
     pub fn new(weights: Rc<RankWeights<'a>>, capacity: u32) -> Result<Self> {
         ensure!(matches!(capacity, 1 | 16 | 80 | 256 | 1024 | 4096), "invalid TP2 rank capacity");
         let device = weights.device;
@@ -205,6 +220,9 @@ impl<'a> PeerReduction<'a> {
         let bytes = rows as usize * 5120 * if token_sums { 4 } else { 24 };
         ensure!(local.device.id == self.output.device.id && local.buffer.bytes >= bytes
             && std::ptr::eq(local.device.library, self.output.device.library), "local rank owner mismatch");
+        // Keep not-yet-ready transfers off the copy engine. This cooperative
+        // wait belongs only to this operation's producer, never another lane.
+        remote_producer.wait().await?;
         self.local_ready.record(local_producer)?;
         let ready = &self.local_ready;
         let output = &mut self.output;
@@ -261,7 +279,7 @@ mod tests {
                 })?;
             }
             let make_inputs = || std::array::from_fn(|rank| RankInputs {
-                wire: &inputs[rank].0, ids: &inputs[rank].1, routing: &inputs[rank].2, producer: &inputs[rank].3 });
+                wire: inputs[rank].0.buffer, ids: inputs[rank].1.buffer, routing: inputs[rank].2.buffer, producer: &inputs[rank].3 });
             let (x, y) = runtime.block_on(async { tokio::join!(
                 unsafe { first.execute(0, rows, 0, make_inputs()) },
                 unsafe { second.execute(0, rows, 1, make_inputs()) }) });

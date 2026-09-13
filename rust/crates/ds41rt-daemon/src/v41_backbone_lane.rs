@@ -250,10 +250,14 @@ impl LaneFfn<'_, '_, '_> {
                     unsafe { routed.capture_route_ids(library, output)?; }
                 }
                 let routed_us = timing.elapsed().as_micros() as u64;
-                let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
-                    else { shared.execute_ffn(input)? } };
-                let result = unsafe { if cooperative { transport.execute_local_ffn_cooperative(&routed, &contribution).await }
-                    else { transport.execute_local_ffn(&routed, &contribution) } };
+                let result = if transport.has_tp2_layer(input.layer) {
+                    unsafe { transport.execute_tp2_ffn(input, &routed).await }
+                } else {
+                    let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
+                        else { shared.execute_ffn(input)? } };
+                    unsafe { if cooperative { transport.execute_local_ffn_cooperative(&routed, &contribution).await }
+                        else { transport.execute_local_ffn(&routed, &contribution) } }
+                };
                 let ffn_us = timing.elapsed().as_micros() as u64;
                 tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
                     total_us=ffn_us, "target local experts");

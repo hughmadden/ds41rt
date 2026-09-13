@@ -19,15 +19,39 @@ pub(crate) struct NativeTp4Wave<'a> {
     reducer: V41CompactReducer<'a>,
     ready_rows: Option<u32>,
     local: Option<super::local::LocalExpertWave<'a>>,
+    tp2: Option<Box<super::tp2_ffn::Wave<'a>>>,
 }
 impl<'a> NativeTp4Wave<'a> {
     pub fn install_local(&mut self, wave: super::local::LocalExpertWave<'a>) -> Result<()> {
-        ensure!(self.local.is_none(), "local expert lane already installed");
+        ensure!(self.local.is_none() && self.tp2.is_none(), "local expert lane already installed");
         self.local = Some(wave);
         Ok(())
     }
     pub fn has_local_layer(&self, layer: usize) -> bool {
-        self.local.as_ref().is_some_and(|wave| wave.contains(layer))
+        self.local.as_ref().is_some_and(|wave| wave.contains(layer)) || self.has_tp2_layer(layer)
+    }
+    pub fn install_tp2(&mut self, wave: super::tp2_ffn::Wave<'a>) -> Result<()> {
+        ensure!(self.local.is_none() && self.tp2.is_none(), "local expert lane already installed");
+        self.tp2 = Some(Box::new(wave));
+        Ok(())
+    }
+    pub fn has_tp2_layer(&self, layer: usize) -> bool {
+        self.tp2.as_ref().is_some_and(|wave| wave.contains(layer))
+    }
+    /// # Safety
+    /// Input and router producers have completed. Both borrowed outputs remain
+    /// immutable through this operation, including cancellation draining.
+    pub async unsafe fn execute_tp2_ffn(&mut self, input: &crate::v41_block::FfnInput<'_>,
+        routed: &crate::v41_backbone_router::RouterOutput<'_>) -> Result<NativeFfnOutput<'_>> {
+        self.ready_rows = None;
+        let binding = routed.binding()?;
+        ensure!(binding == input.binding() && input.layer == routed.layer
+            && input.tokens.len() == routed.rows as usize && input.tokens == routed.tokens,
+            "TP2 FFN input/router identity mismatch");
+        let values = unsafe { self.tp2.as_mut().context("TP2 expert lane missing")?
+            .execute(input.layer, routed.rows, input.values, routed.expert_input, routed.ids, routed.routing).await? };
+        self.ready_rows = Some(routed.rows);
+        Ok(NativeFfnOutput { values, binding, _owner: std::marker::PhantomData })
     }
     /// # Safety
     /// Completed router/shared buffers stay live and unmodified through drain.
@@ -100,6 +124,7 @@ impl<'a> NativeTp4Wave<'a> {
             reducer,
             ready_rows: None,
             local: None,
+            tp2: None,
         })
     }
     /// RoCE execution with optional host BF16 shared-expert contribution.
