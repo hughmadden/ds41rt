@@ -36,6 +36,7 @@ is fully asynchronous.
 | FFN completion and layer advance | [Queued layer completion](phase1-queued-layer.md) chains final mHC and next-input copies, waits once, and marks copies ready for advance | Implemented with exact output/copy and cancellation/reuse checks; high-concurrency cost remains unresolved |
 | Engram gate at layers 1 and 14 | [Owned gather leases leave the shared request borrow](phase1-queued-layer.md); pinned H2D/dequantization and gate/residual completion now wait cooperatively | Implemented with direct output parity, cold/warm and cancellation/reuse checks |
 | dSpark taps at layers 37–39 | `TargetTapWave::capture_cooperative` retains prepared input and waits cooperatively before the next query | Implemented; batch/order check and full serving checks pass |
+| Spark dispatch and result reduction | [Completed-owner dispatch check and cooperative TP reduction](phase1-queued-tp.md) retain received frames and shared input | GPU parity, pending cancellation and live receive-lifetime checks pass; dynamic capture has no remaining blocking CUDA calls |
 | Weight rebind | Query/projection/shared/router/mHC owners require already-complete streams through nonblocking queries | Fixture cancellation/reuse checks pass; aggregate dynamic wait counts are recorded separately |
 | Cold graph setup and eviction | LayerGraphs retains small shapes per layer; insertion/eviction requires completed launches, and capture remains synchronous | Never suspend between begin/end capture; containing owners must drain before replacing or destroying captured storage |
 
@@ -45,7 +46,7 @@ mHC and sparse-preparation interfaces (`git apply --check` reports conflicts in
 those three files). It remains a later performance experiment. Keep its original
 rejected results intact and record the new independent-lane comparison separately.
 
-## Current candidate evidence
+## Historical chained-query evidence
 
 Raw evidence: `/home/tj/.cache/ds41rt-experiments/chained-query`.
 The first pair reports C1 code 129.83 → 129.84 tok/s, C8 152.14 → 159.20,
@@ -66,18 +67,27 @@ memcpy calls disappear from the four-second trace. Remaining stream-synchronize
 API time is 82 ms across 3,448 calls. A separate stack capture confirms active-lane
 waits in TP dispatch and post-receive TP reduction; teardown stacks are excluded.
 
+[TP dispatch and reduction now complete without blocking the owner thread](phase1-queued-tp.md).
+The next capture contains zero stream/device synchronizations, synchronous memcpy,
+CUDA allocations or CUDA frees throughout 12 seconds of mixed decode. The first
+six seconds retain all 16 requests; later time includes changing shapes and request
+completion. This is evidence for the exercised serving path, not for shutdown,
+error cleanup or excluded admission/prefill. Graph instantiation still consumes
+host CPU/driver time and is a performance concern, not a remaining GPU wait.
+
+RoCE receive polling yields on its first wait and then at a bounded 50-microsecond
+decode polling quantum. It waits for its own four results, without a peer-lane
+round barrier. Those required within-lane data dependencies remain.
+
 ## Remaining completion order
 
-1. Replace TP dispatch's completed-owner synchronization with an explicit
-   completion check, and queue final TP reduction with cooperative completion.
-   Retain received frames, device planes and shared contribution through errors
-   and cancellation. Preserve the direct C1 path for comparison.
-2. Repeat dynamic and stack audits through warm decode and shape changes. Remove
-   or explain remaining host-blocking GPU waits; never suspend inside capture.
-3. Resolve accumulated high-concurrency performance uncertainty, retaining
-   frozen e9c07ae and every earlier curve. The latest intermediate C16 result is
-   −3.1%, versus −18.5% in the preceding checkpoint; neither gets discarded.
-   Then revisit plausible C1 candidates and run the scoped release qualification.
-
-The mHC/layer, Engram and tap work is now implemented. These steps preserve the
-full asynchronous-loop objective rather than narrowing it to explicit round joins.
+1. The fresh accumulated pair against e9c07ae is complete: C1 129.77 → 129.48,
+   median C2–C14 +0.39%, C6 −7.1%, C16 −9.8%. Retain every earlier curve and
+   investigate the repeated C6 loss and high-concurrency uncertainty. CUDA wait
+   removal alone is not release performance qualification.
+2. Adapt and remeasure the combined-attention graph candidate without restoring
+   blocking cold warmup or unsafe captured-owner lifetimes. Rank other archived
+   experiments by their actual C1 serving evidence.
+3. Run the scoped README/report qualification excluding the prefill matrix, plus
+   high-concurrency thinking/high tool calling; prepare and verify the v2 release
+   and matching container with the requested headline and release-note updates.

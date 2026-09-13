@@ -50,9 +50,15 @@ Remaining synchronization work, based on the current serving source:
   now complete cooperatively. Exact/lifecycle checks pass, but the accumulated
   comparison has C1 130.17 → 129.63, C14 −8.8%, C15 −6.9%, C16 178.70 → 145.56.
   This is unresolved development work, not a release-qualified improvement.
-- Finish cold sparse graph setup and audit rebind/eviction and remaining component
-  waits. Investigate accumulated high-concurrency costs against preserved e9c07ae.
-  Retain coordinated fatal-error cleanup and admission/prefill drains.
+- [Cold sparse/projection/head warmup and completed-owner rebinds](phase1-queued-sparse.md)
+  now yield or query completion. [Draft setup and cold-chain warmup](phase1-queued-draft.md)
+  do the same. Stack capture then found TP dispatch/reduction drains;
+  [cooperative TP completion](phase1-queued-tp.md) removes these, leaving zero
+  blocking CUDA calls in the measured 12-second mixed decode capture.
+  The fresh accumulated pair is C1 129.77 → 129.48, median C2–C14 +0.39%,
+  C6 −7.1%, C16 179.17 → 161.54 (−9.8%). Preserve that unresolved performance
+  evidence for the archived experiments. Coordinated fatal-error cleanup and
+  admission/prefill still drain.
 
 The [separate cooperative embedding/handoff candidate](phase1-cooperative-embedding.md)
 was rejected after a consistent 2.3% C8 decline across three pairs. Its patch and

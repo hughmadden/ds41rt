@@ -263,7 +263,8 @@ impl LaneFfn<'_, '_, '_> {
             let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
                     else { shared.execute_ffn(input)? } };
             let shared_us = timing.elapsed().as_micros() as u64;
-            let result = unsafe { pending.finish(&contribution).await }?;
+            let result = unsafe { if cooperative { pending.finish_cooperative(&contribution).await }
+                else { pending.finish(&contribution).await } }?;
             tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us, dispatch_us=dispatched_us-routed_us, shared_us=shared_us-dispatched_us, collect_us=timing.elapsed().as_micros() as u64-shared_us, "target experts");
             if tracing::enabled!(target: "ds41rt::route_policy", tracing::Level::DEBUG) {
                 let ffn_us = timing.elapsed().as_micros() as u64;

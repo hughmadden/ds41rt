@@ -152,7 +152,8 @@ impl<'a> NativeTp4Wave<'a> {
         request: &'r crate::v41_backbone_router::BoundExpertRequest,
     ) -> Result<NativePendingFfn<'w, 'a, 'r>> {
         self.ready_rows = None;
-        self.synchronize()?;
+        // Previous output or cancellation cleanup completed this wave.
+        self.stream.require_complete()?;
         let header = &request.request().header;
         ensure!(
             header.layer_id as usize == request.binding().layer()
@@ -323,25 +324,26 @@ impl Drop for PlaneUploads<'_, '_> {
         self.frames.clear();
     }
 }
-fn reduce_planes(
-    library: &NativeLibrary,
-    reducer: &V41CompactReducer<'_>,
-    stream: &LoadStream<'_>,
-    planes: &[DeviceAllocation<'_>; 4],
-    output: Ds41rtDeviceBuffer,
-    shared: Option<Ds41rtDeviceBuffer>,
-    rows: u32,
-) -> Result<()> {
-    let launched = unsafe {
-        reducer.reduce(
-            std::array::from_fn(|rank| planes[rank].buffer.ptr.cast::<u16>().cast_const()),
-            shared.map_or(std::ptr::null(), |b| b.ptr.cast()),
-            output.ptr.cast(),
-            rows,
-            stream.raw,
-        )
-    };
+unsafe fn enqueue_reduce_planes(reducer: &V41CompactReducer<'_>, stream: &LoadStream<'_>,
+    planes: &[DeviceAllocation<'_>; 4], output: Ds41rtDeviceBuffer,
+    shared: Option<Ds41rtDeviceBuffer>, rows: u32) -> Result<()> {
+    unsafe { reducer.reduce(
+        std::array::from_fn(|rank| planes[rank].buffer.ptr.cast::<u16>().cast_const()),
+        shared.map_or(std::ptr::null(), |b| b.ptr.cast()), output.ptr.cast(), rows, stream.raw) }
+}
+fn reduce_planes(library: &NativeLibrary, reducer: &V41CompactReducer<'_>,
+    stream: &LoadStream<'_>, planes: &[DeviceAllocation<'_>; 4], output: Ds41rtDeviceBuffer,
+    shared: Option<Ds41rtDeviceBuffer>, rows: u32) -> Result<()> {
+    let launched = unsafe { enqueue_reduce_planes(reducer, stream, planes, output, shared, rows) };
     launched.and(unsafe { library.cuda_stream_synchronize(stream.raw) })
+}
+/// Retain planes, upload frames, output and shared input through completion.
+async unsafe fn reduce_planes_cooperative(reducer: &V41CompactReducer<'_>,
+    stream: &LoadStream<'_>, planes: &[DeviceAllocation<'_>; 4], output: Ds41rtDeviceBuffer,
+    shared: Option<Ds41rtDeviceBuffer>, rows: u32) -> Result<()> {
+    let launched = unsafe { enqueue_reduce_planes(reducer, stream, planes, output, shared, rows) };
+    let drained = stream.wait().await;
+    launched.and(drained)
 }
 
 /// Borrows every mutable reduction buffer and owns all unread response sockets.
@@ -367,6 +369,16 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
         self,
         shared: &crate::v41_backbone_shared::SharedOutput<'_>,
     ) -> Result<NativeFfnOutput<'w>> {
+        unsafe { self.finish_inner(shared, false).await }
+    }
+    /// # Safety
+    /// Same input retention as finish; cancellation drains before releasing frames.
+    pub async unsafe fn finish_cooperative(self,
+        shared: &crate::v41_backbone_shared::SharedOutput<'_>) -> Result<NativeFfnOutput<'w>> {
+        unsafe { self.finish_inner(shared, true).await }
+    }
+    async unsafe fn finish_inner(self,
+        shared: &crate::v41_backbone_shared::SharedOutput<'_>, cooperative: bool) -> Result<NativeFfnOutput<'w>> {
         validate_shared(self.request, shared, self.shared, self.capacity)?;
         let timing = std::time::Instant::now();
         // The shared owner remains borrowed until reduction drains, so consume
@@ -391,16 +403,14 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
             .await?;
         let received_us = timing.elapsed().as_micros() as u64;
         let rows = self.request.request().header.row_count;
-        reduce_planes(
-            self.library,
-            self.reducer,
-            self.stream,
-            self.planes,
-            self.output,
-            Some(shared.values),
-            rows,
-        )?;
-        uploads.pending = false; // reduce_planes drained the same stream.
+        if cooperative {
+            unsafe { reduce_planes_cooperative(self.reducer, self.stream, self.planes,
+                self.output, Some(shared.values), rows).await?; }
+        } else {
+            reduce_planes(self.library, self.reducer, self.stream, self.planes,
+                self.output, Some(shared.values), rows)?;
+        }
+        uploads.pending = false; // uploads and reduction completed on the same stream.
         tracing::debug!(target: "ds41rt::timing", layer=self.request.request().header.layer_id, rows, shared_copy_us, upload_us, receive_us=received_us-shared_copy_us-upload_us, reduce_us=timing.elapsed().as_micros() as u64-received_us, "target collection");
         *self.ready_rows = Some(rows);
         let mut values = self.output;
@@ -465,8 +475,21 @@ mod upload_tests {
                             VerbsHostProtocolV2ResponsePayload::from_owned(payloads[rank][first as usize * 10240..end as usize * 10240].to_vec()))?;
                     }
                 }
-                reduce_planes(&library, &reducer, &stream, &planes,
-                    output.buffer, Some(shared.buffer), rows)?;
+                let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+                runtime.block_on(async {
+                    use std::{future::Future, task::Poll};
+                    let cancelled = {
+                        let mut work = std::pin::pin!(unsafe { reduce_planes_cooperative(&reducer, &stream,
+                            &planes, output.buffer, Some(shared.buffer), rows) });
+                        std::future::poll_fn(|cx| Poll::Ready(work.as_mut().poll(cx).is_pending())).await
+                    };
+                    stream.require_complete()?;
+                    unsafe { reduce_planes_cooperative(&reducer, &stream, &planes,
+                        output.buffer, Some(shared.buffer), rows).await?; }
+                    eprintln!("PASS cooperative TP reduction rows={rows} pending_cancel={cancelled} reuse=true");
+                    Ok::<_, anyhow::Error>(())
+                })?;
+                stream.require_complete()?;
                 uploads.pending = false;
             }
             let mut actual = vec![0u8; bytes];
