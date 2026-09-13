@@ -1,0 +1,2202 @@
+{
+  "spec": {
+    "source_sha256": "fe93745ec3db94562b6be4a836c53331ff1b41023c9745eaf633d2fd33b5c208",
+    "rounds": 123,
+    "scheduler_median_ms": {
+      "draft_us": 2.87,
+      "prepare_us": 0.008,
+      "verify_us": 39.334,
+      "total_us": 42.647
+    },
+    "stage_median_ms": {
+      "target layer preparation": {
+        "advance_us": 0.406,
+        "engram_us": 0.354,
+        "taps_us": 0.019,
+        "begin_us": 3.238
+      },
+      "target query preparation": {
+        "total_us": 3.251
+      },
+      "target attention stages": {
+        "sparse_us": 1.801,
+        "projection_us": 2.731,
+        "ffn_prepare_us": 1.284
+      },
+      "target collection": {
+        "shared_copy_us": 0.0,
+        "upload_us": 0.161,
+        "receive_us": 20.319,
+        "reduce_us": 0.343
+      },
+      "target experts": {
+        "routed_us": 1.5,
+        "dispatch_us": 0.2,
+        "shared_us": 2.264,
+        "collect_us": 20.912
+      },
+      "target layer": {
+        "produced_us": 1.287,
+        "index_us": 1.097,
+        "attention_us": 5.901,
+        "experts_us": 24.926,
+        "finish_us": 0.271
+      }
+    }
+  },
+  "target": {
+    "source_sha256": "57f32b82a494dbd8fc4668f3439f704cfe7b6101746e9f8afcc5086e26976e80",
+    "rounds": 636,
+    "scheduler_median_ms": {
+      "draft_us": 0.0,
+      "prepare_us": 0.003,
+      "verify_us": 23.047,
+      "total_us": 23.4825
+    },
+    "stage_median_ms": {
+      "target layer preparation": {
+        "advance_us": 0.385,
+        "engram_us": 0.331,
+        "taps_us": 0.019,
+        "begin_us": 3.063
+      },
+      "target query preparation": {
+        "total_us": 3.079
+      },
+      "target attention stages": {
+        "sparse_us": 1.827,
+        "projection_us": 2.805,
+        "ffn_prepare_us": 1.258
+      },
+      "target collection": {
+        "shared_copy_us": 0.0,
+        "upload_us": 0.203,
+        "receive_us": 5.523,
+        "reduce_us": 0.21
+      },
+      "target experts": {
+        "routed_us": 1.3785,
+        "dispatch_us": 0.121,
+        "shared_us": 2.084,
+        "collect_us": 6.017
+      },
+      "target layer": {
+        "produced_us": 1.194,
+        "index_us": 0.8965,
+        "attention_us": 5.974,
+        "experts_us": 9.664,
+        "finish_us": 0.253
+      }
+    }
+  },
+  "limitations": [
+    "Host wall timings include synchronization, logging and device execution.",
+    "Nested stages overlap: do not sum the entire table.",
+    "Only consecutive complete 40-layer C1 rounds at one target row or six verifier rows; excludes prefill and partial rounds.",
+    "Three nearby code-generation requests; no long-context or concurrency coverage."
+  ],
+  "hardware": {
+    "rtx": "One RTX PRO 6000 Blackwell",
+    "power_limit_w": 400,
+    "memory_speed": "standard, no overclock",
+    "spark_workers": 4
+  },
+  "source_commit": "df60262",
+  "gpu_profiles": {
+    "spec": {
+      "report_sha256": "b3ef0bbb88b6683c59f043acd03753c032a3d5fea9ea1e4dce2e9128faefad2a",
+      "kernels": [
+        {
+          "Time (%)": "11.7",
+          "Total Time (ns)": "73919137",
+          "Instances": "84",
+          "Avg (ns)": "879989.7",
+          "Med (ns)": "880054.5",
+          "Min (ns)": "870006",
+          "Max (ns)": "890391",
+          "StdDev (ns)": "7667.5",
+          "Name": "void gemmSN_TN_kernel<float, (int)128, (int)16, (int)2, (int)4, (int)6, (int)7, (bool)0, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<float>>(cublasGemmSmallNParams<T9, T10, T11, T1>)"
+        },
+        {
+          "Time (%)": "8.7",
+          "Total Time (ns)": "55156678",
+          "Instances": "2142",
+          "Avg (ns)": "25750.1",
+          "Med (ns)": "29567.0",
+          "Min (ns)": "5152",
+          "Max (ns)": "31712",
+          "StdDev (ns)": "8698.4",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o1280111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "8.4",
+          "Total Time (ns)": "53335294",
+          "Instances": "1806",
+          "Avg (ns)": "29532.3",
+          "Med (ns)": "29504.0",
+          "Min (ns)": "28416",
+          "Max (ns)": "31040",
+          "StdDev (ns)": "377.5",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o8192111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "8.3",
+          "Total Time (ns)": "52325828",
+          "Instances": "1596",
+          "Avg (ns)": "32785.6",
+          "Med (ns)": "32832.0",
+          "Min (ns)": "30432",
+          "Max (ns)": "34143",
+          "StdDev (ns)": "549.5",
+          "Name": "void <unnamed>::attend<(bool)1, (int)1, (bool)1, (bool)0>(const __nv_bfloat16 *, const float *, const unsigned long *, const int *, __nv_bfloat16 *, int, ds41rt_v41_sparse_kv, float *, const unsigned long *, const ds41rt_v41_sparse_kv *)"
+        },
+        {
+          "Time (%)": "7.7",
+          "Total Time (ns)": "49029165",
+          "Instances": "3612",
+          "Avg (ns)": "13574.0",
+          "Med (ns)": "13567.0",
+          "Min (ns)": "12896",
+          "Max (ns)": "14559",
+          "StdDev (ns)": "247.9",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "7.3",
+          "Total Time (ns)": "45991086",
+          "Instances": "3738",
+          "Avg (ns)": "12303.7",
+          "Med (ns)": "12159.0",
+          "Min (ns)": "11360",
+          "Max (ns)": "13536",
+          "StdDev (ns)": "464.5",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1819201_TVLayoutDst1819201_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "6.6",
+          "Total Time (ns)": "41489996",
+          "Instances": "1806",
+          "Avg (ns)": "22973.4",
+          "Med (ns)": "22976.0",
+          "Min (ns)": "22304",
+          "Max (ns)": "24672",
+          "StdDev (ns)": "222.7",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor000o40968111012_tensorptrf8E4M3FNgmemalig_0"
+        },
+        {
+          "Time (%)": "4.7",
+          "Total Time (ns)": "29862605",
+          "Instances": "3696",
+          "Avg (ns)": "8079.7",
+          "Med (ns)": "8064.0",
+          "Min (ns)": "7488",
+          "Max (ns)": "9408",
+          "StdDev (ns)": "264.0",
+          "Name": "void <unnamed>::ds41_rmsnorm_cached_bf16_kernel<(int)5120>(const unsigned short *, const unsigned short *, unsigned short *, int, float)"
+        },
+        {
+          "Time (%)": "4.3",
+          "Total Time (ns)": "27423640",
+          "Instances": "126",
+          "Avg (ns)": "217647.9",
+          "Med (ns)": "242446.0",
+          "Min (ns)": "60992",
+          "Max (ns)": "247966",
+          "StdDev (ns)": "43586.5",
+          "Name": "<unnamed>::attend(const __nv_bfloat16 *, const unsigned char *, const __nv_bfloat16 *, const float *, const ds41rt_v41_attention_window *, __nv_bfloat16 *, int)"
+        },
+        {
+          "Time (%)": "3.9",
+          "Total Time (ns)": "24850715",
+          "Instances": "1806",
+          "Avg (ns)": "13760.1",
+          "Med (ns)": "14144.0",
+          "Min (ns)": "7776",
+          "Max (ns)": "14976",
+          "StdDev (ns)": "1535.1",
+          "Name": "<unnamed>::score_kernel(const __nv_bfloat16 *, const __nv_bfloat16 *, float *, int)"
+        },
+        {
+          "Time (%)": "3.4",
+          "Total Time (ns)": "21767035",
+          "Instances": "3612",
+          "Avg (ns)": "6026.3",
+          "Med (ns)": "6016.0",
+          "Min (ns)": "4768",
+          "Max (ns)": "7648",
+          "StdDev (ns)": "619.9",
+          "Name": "kernel_cutlass_kernel_b12xnormmhc_v41_project_V41Project_object_at__ptrbf16gmemalign16_ptrf32gmemalign16_ptrf32gmemalign16_0"
+        },
+        {
+          "Time (%)": "3.1",
+          "Total Time (ns)": "19532646",
+          "Instances": "1806",
+          "Avg (ns)": "10815.4",
+          "Med (ns)": "10816.0",
+          "Min (ns)": "9503",
+          "Max (ns)": "12512",
+          "StdDev (ns)": "369.6",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o2304111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "2.3",
+          "Total Time (ns)": "14454345",
+          "Instances": "126",
+          "Avg (ns)": "114717.0",
+          "Med (ns)": "113087.0",
+          "Min (ns)": "99999",
+          "Max (ns)": "151230",
+          "StdDev (ns)": "10885.2",
+          "Name": "kernel_cutlass_kernel_b12xmoe_sharedkernelsw4a8_v41_sliceV41FusedSliceKernel_object_at__tensorptri32gmemalign16o80128013201_tensorptri8gmemalign16o8016052801_tensorptri32gmemalign16o37748_5"
+        },
+        {
+          "Time (%)": "2.1",
+          "Total Time (ns)": "13199463",
+          "Instances": "3612",
+          "Avg (ns)": "3654.3",
+          "Med (ns)": "3648.0",
+          "Min (ns)": "3328",
+          "Max (ns)": "3968",
+          "StdDev (ns)": "89.3",
+          "Name": "void <unnamed>::finish_mixes_kernel<(int)8>(const float *, const float *, const float *, float *, float *, float *)"
+        },
+        {
+          "Time (%)": "1.8",
+          "Total Time (ns)": "11174189",
+          "Instances": "1806",
+          "Avg (ns)": "6187.3",
+          "Med (ns)": "6368.0",
+          "Min (ns)": "3360",
+          "Max (ns)": "8128",
+          "StdDev (ns)": "749.6",
+          "Name": "void <unnamed>::select_kernel<(bool)0>(float *, const float *, const float *, const unsigned char *, unsigned int *, float *, int, int)"
+        },
+        {
+          "Time (%)": "1.5",
+          "Total Time (ns)": "9747649",
+          "Instances": "84",
+          "Avg (ns)": "116043.4",
+          "Med (ns)": "116398.5",
+          "Min (ns)": "114463",
+          "Max (ns)": "118463",
+          "StdDev (ns)": "1014.1",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o6144111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "1.5",
+          "Total Time (ns)": "9380876",
+          "Instances": "504",
+          "Avg (ns)": "18612.8",
+          "Med (ns)": "25984.0",
+          "Min (ns)": "3424",
+          "Max (ns)": "26624",
+          "StdDev (ns)": "10638.5",
+          "Name": "void cutlass::Kernel2<cutlass_80_wmma_tensorop_bf16_s161616gemm_bf16_16x16_128x2_tn_align8>(T1::Params)"
+        },
+        {
+          "Time (%)": "1.2",
+          "Total Time (ns)": "7801725",
+          "Instances": "9156",
+          "Avg (ns)": "852.1",
+          "Med (ns)": "864.0",
+          "Min (ns)": "767",
+          "Max (ns)": "1216",
+          "StdDev (ns)": "47.2",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o512051201_tensorptri32gmemalign16o1280i641_tensorptri8gmemalign16o160i641_tensorptri_0"
+        },
+        {
+          "Time (%)": "1.0",
+          "Total Time (ns)": "6255994",
+          "Instances": "336",
+          "Avg (ns)": "18619.0",
+          "Med (ns)": "18592.0",
+          "Min (ns)": "18495",
+          "Max (ns)": "18848",
+          "StdDev (ns)": "61.4",
+          "Name": "void <unnamed>::finish<(int)512>(const unsigned long *, unsigned long *, int *, int)"
+        },
+        {
+          "Time (%)": "0.9",
+          "Total Time (ns)": "5460997",
+          "Instances": "5544",
+          "Avg (ns)": "985.0",
+          "Med (ns)": "960.0",
+          "Min (ns)": "735",
+          "Max (ns)": "1344",
+          "StdDev (ns)": "86.8",
+          "Name": "<unnamed>::backbone_frequencies_kernel(const unsigned long *, float *, bool)"
+        },
+        {
+          "Time (%)": "0.7",
+          "Total Time (ns)": "4722909",
+          "Instances": "1680",
+          "Avg (ns)": "2811.3",
+          "Med (ns)": "2848.0",
+          "Min (ns)": "1792",
+          "Max (ns)": "3200",
+          "StdDev (ns)": "204.1",
+          "Name": "<unnamed>::merge(const float *, const float *, __nv_bfloat16 *, int)"
+        },
+        {
+          "Time (%)": "0.7",
+          "Total Time (ns)": "4491539",
+          "Instances": "1806",
+          "Avg (ns)": "2487.0",
+          "Med (ns)": "2464.0",
+          "Min (ns)": "2272",
+          "Max (ns)": "2944",
+          "StdDev (ns)": "99.7",
+          "Name": "void <unnamed>::norm_kernel<(int)1280, (bool)0>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.7",
+          "Total Time (ns)": "4484702",
+          "Instances": "3612",
+          "Avg (ns)": "1241.6",
+          "Med (ns)": "1216.0",
+          "Min (ns)": "896",
+          "Max (ns)": "1760",
+          "StdDev (ns)": "123.8",
+          "Name": "<unnamed>::post_kernel(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, const float *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.6",
+          "Total Time (ns)": "3791253",
+          "Instances": "210",
+          "Avg (ns)": "18053.6",
+          "Med (ns)": "12160.0",
+          "Min (ns)": "11776",
+          "Max (ns)": "42175",
+          "StdDev (ns)": "11944.6",
+          "Name": "nvjet_sm120_tss_mma_384x8x64_2_96x8x64_tmaAB_alignCD4_bz_TNNN"
+        },
+        {
+          "Time (%)": "0.5",
+          "Total Time (ns)": "3288776",
+          "Instances": "336",
+          "Avg (ns)": "9788.0",
+          "Med (ns)": "9792.0",
+          "Min (ns)": "9695",
+          "Max (ns)": "9920",
+          "StdDev (ns)": "43.8",
+          "Name": "void <unnamed>::tiles<(int)512, (unsigned long)1048576>(const float *, const unsigned long *, unsigned long *, int, int)"
+        },
+        {
+          "Time (%)": "0.5",
+          "Total Time (ns)": "3189670",
+          "Instances": "1680",
+          "Avg (ns)": "1898.6",
+          "Med (ns)": "1920.0",
+          "Min (ns)": "1536",
+          "Max (ns)": "2304",
+          "StdDev (ns)": "128.2",
+          "Name": "void <unnamed>::store<(bool)0>(const unsigned char *, const unsigned char *, const unsigned long *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.5",
+          "Total Time (ns)": "3086563",
+          "Instances": "3696",
+          "Avg (ns)": "835.1",
+          "Med (ns)": "832.0",
+          "Min (ns)": "576",
+          "Max (ns)": "1152",
+          "StdDev (ns)": "69.0",
+          "Name": "<unnamed>::pre_kernel(const __nv_bfloat16 *, const float *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.4",
+          "Total Time (ns)": "2649155",
+          "Instances": "84",
+          "Avg (ns)": "31537.6",
+          "Med (ns)": "31520.0",
+          "Min (ns)": "29664",
+          "Max (ns)": "32736",
+          "StdDev (ns)": "507.6",
+          "Name": "void <unnamed>::attend<(bool)1, (int)1, (bool)0, (bool)0>(const __nv_bfloat16 *, const float *, const unsigned long *, const int *, __nv_bfloat16 *, int, ds41rt_v41_sparse_kv, float *, const unsigned long *, const ds41rt_v41_sparse_kv *)"
+        },
+        {
+          "Time (%)": "0.4",
+          "Total Time (ns)": "2427244",
+          "Instances": "1848",
+          "Avg (ns)": "1313.4",
+          "Med (ns)": "1312.0",
+          "Min (ns)": "1216",
+          "Max (ns)": "1632",
+          "StdDev (ns)": "50.6",
+          "Name": "void <unnamed>::norm_kernel<(int)512, (bool)0>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.4",
+          "Total Time (ns)": "2348453",
+          "Instances": "42",
+          "Avg (ns)": "55915.5",
+          "Med (ns)": "55951.0",
+          "Min (ns)": "55071",
+          "Max (ns)": "56639",
+          "StdDev (ns)": "335.1",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o15360111100_tensorptrf8E4M3FNgmemalign_0"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "2178793",
+          "Instances": "336",
+          "Avg (ns)": "6484.5",
+          "Med (ns)": "6368.0",
+          "Min (ns)": "5760",
+          "Max (ns)": "7456",
+          "StdDev (ns)": "333.1",
+          "Name": "kernel_cutlass_kernel_b12xattentiondsa_indexer_v41_overlayV41OverlayScore_object_at__tensorptri8_gmem_o_i641_tensorptri8_gmem_o_i641_tensorptrbf16_gmem_align1_o_i641_tensorptri8_gmem_o_i6_0"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "1768586",
+          "Instances": "2142",
+          "Avg (ns)": "825.7",
+          "Med (ns)": "832.0",
+          "Min (ns)": "799",
+          "Max (ns)": "864",
+          "StdDev (ns)": "14.3",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o128012801_tensorptri32gmemalign16o320i641_tensorptri8gmemalign16o40i641_tensorptri8g_0"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "1696112",
+          "Instances": "1806",
+          "Avg (ns)": "939.2",
+          "Med (ns)": "928.0",
+          "Min (ns)": "832",
+          "Max (ns)": "992",
+          "StdDev (ns)": "23.8",
+          "Name": "kernel_cutlass_kernel_b12xgemmwo_projection_quant_cute_WOQuantCuTeLaunch_object_at__tensorptrbf16gmemalign16o1_tensorptri64gmemo1_tensorptrf32gmemo1_tensorptri32gmemalign16o1_tensorptri8g_0"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "1588555",
+          "Instances": "42",
+          "Avg (ns)": "37822.7",
+          "Med (ns)": "37791.0",
+          "Min (ns)": "37695",
+          "Max (ns)": "37952",
+          "StdDev (ns)": "90.3",
+          "Name": "void <unnamed>::finish<(int)2048>(const unsigned long *, unsigned long *, int *, int)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1574897",
+          "Instances": "1806",
+          "Avg (ns)": "872.0",
+          "Med (ns)": "864.0",
+          "Min (ns)": "736",
+          "Max (ns)": "1216",
+          "StdDev (ns)": "34.4",
+          "Name": "<unnamed>::rope_kernel(const __nv_bfloat16 *, const float *, __nv_bfloat16 *, int, int)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1543086",
+          "Instances": "1680",
+          "Avg (ns)": "918.5",
+          "Med (ns)": "864.0",
+          "Min (ns)": "800",
+          "Max (ns)": "1536",
+          "StdDev (ns)": "92.3",
+          "Name": "<unnamed>::reduce_compact(const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1522804",
+          "Instances": "1806",
+          "Avg (ns)": "843.2",
+          "Med (ns)": "832.0",
+          "Min (ns)": "800",
+          "Max (ns)": "864",
+          "StdDev (ns)": "16.0",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o230423041_tensorptri32gmemalign16o576i641_tensorptri8gmemalign16o72i641_tensorptri8g_0"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1475599",
+          "Instances": "1806",
+          "Avg (ns)": "817.1",
+          "Med (ns)": "832.0",
+          "Min (ns)": "768",
+          "Max (ns)": "864",
+          "StdDev (ns)": "16.2",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o819281921_tensorptri32gmemalign16o2048i641_tensorptri8gmemalign16o256i641_tensorptri_0"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1291897",
+          "Instances": "1680",
+          "Avg (ns)": "769.0",
+          "Med (ns)": "768.0",
+          "Min (ns)": "736",
+          "Max (ns)": "800",
+          "StdDev (ns)": "12.4",
+          "Name": "void <unnamed>::pack<(bool)0>(const __nv_bfloat16 *, const float *, unsigned char *, unsigned char *)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1192725",
+          "Instances": "252",
+          "Avg (ns)": "4733.0",
+          "Med (ns)": "4672.0",
+          "Min (ns)": "4416",
+          "Max (ns)": "5152",
+          "StdDev (ns)": "177.5",
+          "Name": "nvjet_sm120_tss_mma_64x8x128_5_16x8x128_tmaAB_alignCD4_splitK_TNNN"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1136020",
+          "Instances": "1806",
+          "Avg (ns)": "629.0",
+          "Med (ns)": "640.0",
+          "Min (ns)": "607",
+          "Max (ns)": "640",
+          "StdDev (ns)": "15.2",
+          "Name": "<unnamed>::shared_swiglu(const __nv_bfloat16 *, const __nv_bfloat16 *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "983353",
+          "Instances": "1806",
+          "Avg (ns)": "544.5",
+          "Med (ns)": "544.0",
+          "Min (ns)": "512",
+          "Max (ns)": "576",
+          "StdDev (ns)": "11.5",
+          "Name": "<unnamed>::grouped_output_rows(const unsigned short *, unsigned short *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "840312",
+          "Instances": "42",
+          "Avg (ns)": "20007.4",
+          "Med (ns)": "20064.0",
+          "Min (ns)": "19551",
+          "Max (ns)": "20192",
+          "StdDev (ns)": "174.9",
+          "Name": "void <unnamed>::tiles<(int)2048, (unsigned long)131072>(const float *, const unsigned long *, unsigned long *, int, int)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "705561",
+          "Instances": "84",
+          "Avg (ns)": "8399.5",
+          "Med (ns)": "8352.0",
+          "Min (ns)": "8096",
+          "Max (ns)": "8767",
+          "StdDev (ns)": "147.6",
+          "Name": "<unnamed>::engram_gate_kernel(const unsigned short *, const unsigned short *, const unsigned short *, const unsigned short *, const unsigned char *, unsigned short *)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "511772",
+          "Instances": "42",
+          "Avg (ns)": "12185.0",
+          "Med (ns)": "12192.0",
+          "Min (ns)": "12032",
+          "Max (ns)": "12288",
+          "StdDev (ns)": "76.9",
+          "Name": "<unnamed>::dspark_terminal_layout_kernel(const __nv_bfloat16 *, const float *, __nv_bfloat16 *, float *, int)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "466428",
+          "Instances": "126",
+          "Avg (ns)": "3701.8",
+          "Med (ns)": "3680.0",
+          "Min (ns)": "3647",
+          "Max (ns)": "3808",
+          "StdDev (ns)": "44.8",
+          "Name": "kernel_cutlass_prefix_b12xmoe_sharedkernelsv41_route_planV41RoutePlan_object_at__tensorptri32gmemalign16o1281_tensorptri32gmemalign16o128221_3"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "420282",
+          "Instances": "336",
+          "Avg (ns)": "1250.8",
+          "Med (ns)": "1248.0",
+          "Min (ns)": "1215",
+          "Max (ns)": "1280",
+          "StdDev (ns)": "12.8",
+          "Name": "<unnamed>::index_query_prepare_kernel(const __nv_bfloat16 *, const float *, const __nv_bfloat16 *, unsigned char *, unsigned char *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "416540",
+          "Instances": "210",
+          "Avg (ns)": "1983.5",
+          "Med (ns)": "1920.0",
+          "Min (ns)": "1824",
+          "Max (ns)": "2464",
+          "StdDev (ns)": "150.2",
+          "Name": "<unnamed>::draft_step_tiles(const float *, const float *, const unsigned long *, const float *, float *, int)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "369788",
+          "Instances": "42",
+          "Avg (ns)": "8804.5",
+          "Med (ns)": "8800.0",
+          "Min (ns)": "8480",
+          "Max (ns)": "9312",
+          "StdDev (ns)": "186.5",
+          "Name": "void <unnamed>::embed_kernel<(bool)0>(const __nv_bfloat16 *, const int *, __nv_bfloat16 *, float *)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "346141",
+          "Instances": "42",
+          "Avg (ns)": "8241.5",
+          "Med (ns)": "8239.5",
+          "Min (ns)": "7872",
+          "Max (ns)": "8512",
+          "StdDev (ns)": "117.3",
+          "Name": "void <unnamed>::embed_kernel<(bool)1>(const __nv_bfloat16 *, const int *, __nv_bfloat16 *, float *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "308317",
+          "Instances": "42",
+          "Avg (ns)": "7340.9",
+          "Med (ns)": "7296.0",
+          "Min (ns)": "7199",
+          "Max (ns)": "7584",
+          "StdDev (ns)": "99.2",
+          "Name": "void <unnamed>::norm_kernel<(int)5120, (bool)0>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "278014",
+          "Instances": "126",
+          "Avg (ns)": "2206.5",
+          "Med (ns)": "2240.0",
+          "Min (ns)": "2016",
+          "Max (ns)": "2496",
+          "StdDev (ns)": "95.9",
+          "Name": "<unnamed>::pool_kernel(const float *, const float *, const float *, const float *, const unsigned long *, const __nv_bfloat16 *, __nv_bfloat16 *, int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "256511",
+          "Instances": "252",
+          "Avg (ns)": "1017.9",
+          "Med (ns)": "992.0",
+          "Min (ns)": "864",
+          "Max (ns)": "1376",
+          "StdDev (ns)": "125.4",
+          "Name": "void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, float, float, float, float, (bool)0, float, float, float, (bool)1, (bool)0, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "244639",
+          "Instances": "210",
+          "Avg (ns)": "1164.9",
+          "Med (ns)": "1152.0",
+          "Min (ns)": "1120",
+          "Max (ns)": "1216",
+          "StdDev (ns)": "17.2",
+          "Name": "<unnamed>::draft_step_finish(const float *, const float *, float *, unsigned int *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "236378",
+          "Instances": "168",
+          "Avg (ns)": "1407.0",
+          "Med (ns)": "1408.0",
+          "Min (ns)": "1248",
+          "Max (ns)": "1664",
+          "StdDev (ns)": "64.5",
+          "Name": "void <unnamed>::store<(bool)1>(const unsigned char *, const unsigned char *, const unsigned long *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "234238",
+          "Instances": "126",
+          "Avg (ns)": "1859.0",
+          "Med (ns)": "1856.0",
+          "Min (ns)": "1792",
+          "Max (ns)": "1984",
+          "StdDev (ns)": "38.1",
+          "Name": "<unnamed>::write_window(const __nv_bfloat16 *, const ds41rt_v41_kv_write_t *, unsigned char *, unsigned int, unsigned int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "230748",
+          "Instances": "168",
+          "Avg (ns)": "1373.5",
+          "Med (ns)": "1376.0",
+          "Min (ns)": "1248",
+          "Max (ns)": "1600",
+          "StdDev (ns)": "67.6",
+          "Name": "<unnamed>::index_store_kernel(const unsigned char *, const unsigned char *, const unsigned long *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "200607",
+          "Instances": "42",
+          "Avg (ns)": "4776.4",
+          "Med (ns)": "4704.0",
+          "Min (ns)": "4608",
+          "Max (ns)": "5120",
+          "StdDev (ns)": "147.4",
+          "Name": "nvjet_sm120_tst_mma_64x8x128_5_16x8x128_tmaAB_alignCD4_splitK_TNNN"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "199965",
+          "Instances": "210",
+          "Avg (ns)": "952.2",
+          "Med (ns)": "896.0",
+          "Min (ns)": "672",
+          "Max (ns)": "1376",
+          "StdDev (ns)": "118.8",
+          "Name": "<unnamed>::embedding_lookup_bf16_kernel(const unsigned short *, const unsigned int *, unsigned short *, unsigned long, unsigned long, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "199102",
+          "Instances": "126",
+          "Avg (ns)": "1580.2",
+          "Med (ns)": "1600.0",
+          "Min (ns)": "1376",
+          "Max (ns)": "1856",
+          "StdDev (ns)": "85.7",
+          "Name": "kernel_cutlass_kernel_b12xmoe_sharedkernelsv41_route_planV41SliceReduce_object_at__tensorptrf32gmemalign16o122405120122880051201_tensorptrf32gmemalign16o240512051201_tensorptri32gmemalign_6"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "195966",
+          "Instances": "168",
+          "Avg (ns)": "1166.5",
+          "Med (ns)": "1184.0",
+          "Min (ns)": "1088",
+          "Max (ns)": "1216",
+          "StdDev (ns)": "33.2",
+          "Name": "void <unnamed>::pack<(bool)1>(const __nv_bfloat16 *, const float *, unsigned char *, unsigned char *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "189116",
+          "Instances": "168",
+          "Avg (ns)": "1125.7",
+          "Med (ns)": "1120.0",
+          "Min (ns)": "1088",
+          "Max (ns)": "1344",
+          "StdDev (ns)": "37.8",
+          "Name": "void <unnamed>::norm_kernel<(int)128, (bool)0>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "173087",
+          "Instances": "126",
+          "Avg (ns)": "1373.7",
+          "Med (ns)": "1440.0",
+          "Min (ns)": "1184",
+          "Max (ns)": "1568",
+          "StdDev (ns)": "114.0",
+          "Name": "void <unnamed>::norm_kernel<(int)512, (bool)1>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "169279",
+          "Instances": "168",
+          "Avg (ns)": "1007.6",
+          "Med (ns)": "992.0",
+          "Min (ns)": "768",
+          "Max (ns)": "1344",
+          "StdDev (ns)": "146.2",
+          "Name": "<unnamed>::dspark_frequencies_kernel(const unsigned long *, float *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "167680",
+          "Instances": "168",
+          "Avg (ns)": "998.1",
+          "Med (ns)": "992.0",
+          "Min (ns)": "960",
+          "Max (ns)": "1056",
+          "StdDev (ns)": "26.7",
+          "Name": "<unnamed>::index_pack_kernel(const __nv_bfloat16 *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "164384",
+          "Instances": "126",
+          "Avg (ns)": "1304.6",
+          "Med (ns)": "1312.0",
+          "Min (ns)": "1216",
+          "Max (ns)": "1472",
+          "StdDev (ns)": "43.1",
+          "Name": "kernel_cutlass_scatter_b12xmoe_sharedkernelsv41_route_planV41RoutePlan_object_at__tensorptrf32gmemalign16o2401_tensorptri32gmemalign16o307201_tensorptri32gmemalign16o1281_tensorptri32gmem_4"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "145502",
+          "Instances": "126",
+          "Avg (ns)": "1154.8",
+          "Med (ns)": "1152.0",
+          "Min (ns)": "1119",
+          "Max (ns)": "1312",
+          "StdDev (ns)": "43.8",
+          "Name": "kernel_cutlass_pack_b12xmoe_sharedkernelsv41_route_planV41RoutePlan_object_at__tensorptri32gmemalign16o2401_tensorptri32gmemalign16o11_tensorptri32gmemalign16o307201_tensorptri32gmemalign_2"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "145019",
+          "Instances": "336",
+          "Avg (ns)": "431.6",
+          "Med (ns)": "416.0",
+          "Min (ns)": "415",
+          "Max (ns)": "480",
+          "StdDev (ns)": "16.8",
+          "Name": "<unnamed>::tile_positions(unsigned long *, unsigned long *, int, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "111424",
+          "Instances": "126",
+          "Avg (ns)": "884.3",
+          "Med (ns)": "896.0",
+          "Min (ns)": "736",
+          "Max (ns)": "1184",
+          "StdDev (ns)": "92.0",
+          "Name": "void <unnamed>::reduce_routes<(int)1, (int)3>(const float *, const float *, const float *, const float *, const __nv_bfloat16 *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "110495",
+          "Instances": "42",
+          "Avg (ns)": "2630.8",
+          "Med (ns)": "2624.0",
+          "Min (ns)": "2496",
+          "Max (ns)": "2880",
+          "StdDev (ns)": "88.7",
+          "Name": "<unnamed>::confidence(const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, float *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "107933",
+          "Instances": "126",
+          "Avg (ns)": "856.6",
+          "Med (ns)": "864.0",
+          "Min (ns)": "800",
+          "Max (ns)": "1056",
+          "StdDev (ns)": "31.4",
+          "Name": "<unnamed>::dspark_tap_kernel(const __nv_bfloat16 *, __nv_bfloat16 *, unsigned long, int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "71806",
+          "Instances": "84",
+          "Avg (ns)": "854.8",
+          "Med (ns)": "864.0",
+          "Min (ns)": "832",
+          "Max (ns)": "896",
+          "StdDev (ns)": "16.1",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o614461441_tensorptri32gmemalign16o1536i641_tensorptri8gmemalign16o192i641_tensorptri_0"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "62688",
+          "Instances": "84",
+          "Avg (ns)": "746.3",
+          "Med (ns)": "736.0",
+          "Min (ns)": "704",
+          "Max (ns)": "960",
+          "StdDev (ns)": "43.9",
+          "Name": "<unnamed>::engram_dequant_kernel(const unsigned char *, const unsigned char *, unsigned short *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "46975",
+          "Instances": "42",
+          "Avg (ns)": "1118.5",
+          "Med (ns)": "1120.0",
+          "Min (ns)": "1088",
+          "Max (ns)": "1248",
+          "StdDev (ns)": "36.0",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o15360153601_tensorptri32gmemalign16o3840i641_tensorptri8gmemalign16o480i641_tensorpt_0"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "41952",
+          "Instances": "126",
+          "Avg (ns)": "333.0",
+          "Med (ns)": "320.0",
+          "Min (ns)": "320",
+          "Max (ns)": "352",
+          "StdDev (ns)": "15.8",
+          "Name": "kernel_cutlass_publish_b12xmoe_sharedkernelsv41_slice_pipelineV41SlicePipeline_object_at__tensorptri32gmemalign16o11__1"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "41568",
+          "Instances": "42",
+          "Avg (ns)": "989.7",
+          "Med (ns)": "992.0",
+          "Min (ns)": "960",
+          "Max (ns)": "1088",
+          "StdDev (ns)": "30.3",
+          "Name": "<unnamed>::block_max(const float *, const unsigned long *, const unsigned long *, float *, unsigned long *, int, int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "40447",
+          "Instances": "42",
+          "Avg (ns)": "963.0",
+          "Med (ns)": "960.0",
+          "Min (ns)": "928",
+          "Max (ns)": "992",
+          "StdDev (ns)": "11.9",
+          "Name": "void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, float, __nv_bfloat16, float, __nv_bfloat16, (bool)0, float, __nv_bfloat16, __nv_bfloat16, (bool)1, (bool)0, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)"
+        }
+      ],
+      "apis": [
+        {
+          "Time (%)": "73.3",
+          "Total Time (ns)": "712861606",
+          "Num Calls": "36338",
+          "Avg (ns)": "19617.5",
+          "Med (ns)": "3925.0",
+          "Min (ns)": "390",
+          "Max (ns)": "2946857",
+          "StdDev (ns)": "100524.4",
+          "Name": "cudaStreamSynchronize"
+        },
+        {
+          "Time (%)": "9.0",
+          "Total Time (ns)": "87530021",
+          "Num Calls": "32999",
+          "Avg (ns)": "2652.5",
+          "Med (ns)": "2453.0",
+          "Min (ns)": "1832",
+          "Max (ns)": "33230",
+          "StdDev (ns)": "633.3",
+          "Name": "cudaMemcpyAsync"
+        },
+        {
+          "Time (%)": "6.7",
+          "Total Time (ns)": "65185477",
+          "Num Calls": "11256",
+          "Avg (ns)": "5791.2",
+          "Med (ns)": "4787.0",
+          "Min (ns)": "2995",
+          "Max (ns)": "195734",
+          "StdDev (ns)": "3678.6",
+          "Name": "cudaGraphLaunch"
+        },
+        {
+          "Time (%)": "4.9",
+          "Total Time (ns)": "47649134",
+          "Num Calls": "18690",
+          "Avg (ns)": "2549.4",
+          "Med (ns)": "2553.0",
+          "Min (ns)": "781",
+          "Max (ns)": "19840",
+          "StdDev (ns)": "480.1",
+          "Name": "cudaLaunchKernel"
+        },
+        {
+          "Time (%)": "3.0",
+          "Total Time (ns)": "29037444",
+          "Num Calls": "5178",
+          "Avg (ns)": "5607.8",
+          "Med (ns)": "3315.0",
+          "Min (ns)": "2784",
+          "Max (ns)": "704519",
+          "StdDev (ns)": "16854.6",
+          "Name": "cudaMemcpy"
+        },
+        {
+          "Time (%)": "1.4",
+          "Total Time (ns)": "13527510",
+          "Num Calls": "336",
+          "Avg (ns)": "40260.4",
+          "Med (ns)": "37281.0",
+          "Min (ns)": "27982",
+          "Max (ns)": "123596",
+          "StdDev (ns)": "10277.2",
+          "Name": "cudaGraphInstantiate"
+        },
+        {
+          "Time (%)": "1.1",
+          "Total Time (ns)": "10505828",
+          "Num Calls": "4032",
+          "Avg (ns)": "2605.6",
+          "Med (ns)": "2644.0",
+          "Min (ns)": "1041",
+          "Max (ns)": "15653",
+          "StdDev (ns)": "546.6",
+          "Name": "cudaLaunchKernelExC"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "2380282",
+          "Num Calls": "22722",
+          "Avg (ns)": "104.8",
+          "Med (ns)": "90.0",
+          "Min (ns)": "80",
+          "Max (ns)": "5719",
+          "StdDev (ns)": "61.7",
+          "Name": "cuKernelGetName"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "1762973",
+          "Num Calls": "336",
+          "Avg (ns)": "5246.9",
+          "Med (ns)": "4742.5",
+          "Min (ns)": "3235",
+          "Max (ns)": "28142",
+          "StdDev (ns)": "2038.4",
+          "Name": "cudaGraphExecDestroy"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "375336",
+          "Num Calls": "336",
+          "Avg (ns)": "1117.1",
+          "Med (ns)": "1051.5",
+          "Min (ns)": "761",
+          "Max (ns)": "3465",
+          "StdDev (ns)": "254.4",
+          "Name": "cudaGraphDestroy"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "308936",
+          "Num Calls": "1470",
+          "Avg (ns)": "210.2",
+          "Med (ns)": "200.0",
+          "Min (ns)": "120",
+          "Max (ns)": "3846",
+          "StdDev (ns)": "144.8",
+          "Name": "cudaGraphNodeGetType"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "238874",
+          "Num Calls": "336",
+          "Avg (ns)": "710.9",
+          "Med (ns)": "661.0",
+          "Min (ns)": "461",
+          "Max (ns)": "2534",
+          "StdDev (ns)": "199.4",
+          "Name": "cudaStreamBeginCapture"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "181102",
+          "Num Calls": "4",
+          "Avg (ns)": "45275.5",
+          "Med (ns)": "8528.0",
+          "Min (ns)": "2454",
+          "Max (ns)": "161592",
+          "StdDev (ns)": "77615.7",
+          "Name": "cudaFree"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "171958",
+          "Num Calls": "672",
+          "Avg (ns)": "255.9",
+          "Med (ns)": "250.0",
+          "Min (ns)": "140",
+          "Max (ns)": "1743",
+          "StdDev (ns)": "100.6",
+          "Name": "cudaGraphGetNodes"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "171554",
+          "Num Calls": "336",
+          "Avg (ns)": "510.6",
+          "Med (ns)": "480.5",
+          "Min (ns)": "310",
+          "Max (ns)": "2163",
+          "StdDev (ns)": "165.6",
+          "Name": "cudaStreamEndCapture"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "123285",
+          "Num Calls": "4",
+          "Avg (ns)": "30821.3",
+          "Med (ns)": "5298.0",
+          "Min (ns)": "2594",
+          "Max (ns)": "110095",
+          "StdDev (ns)": "52866.2",
+          "Name": "cudaMalloc"
+        }
+      ],
+      "report_path": "/tmp/ds41-phase1-c1-nsys-interactive/spec.nsys-rep",
+      "total_gpu_kernel_ms": 633.042418,
+      "response": {
+        "usage": {
+          "prompt_tokens": 54,
+          "completion_tokens": 214,
+          "total_tokens": 268,
+          "prompt_tokens_details": {
+            "cached_tokens": 54
+          },
+          "prompt_cache_hit_tokens": 54,
+          "prompt_cache_miss_tokens": 0
+        },
+        "serving_completed": true,
+        "objective_checks_passed": true,
+        "passed": false,
+        "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+      },
+      "notes": [
+        "Explicit nsys start after one warmup, stop after complete response, node-level CUDA graph tracing.",
+        "Speculative profile reused warmup prompt (54 cached tokens); benchmark cold-cache gate fails, response and Python structure checks pass.",
+        "Profiler API time includes device waits; kernel durations include instrumentation overhead."
+      ]
+    },
+    "target": {
+      "report_sha256": "c776330ec84243f515f910cd59583a83c63ec564b6182dd4d7f0b95ca7c03d02",
+      "kernels": [
+        {
+          "Time (%)": "14.2",
+          "Total Time (ns)": "351185740",
+          "Instances": "34240",
+          "Avg (ns)": "10256.6",
+          "Med (ns)": "10592.0",
+          "Min (ns)": "7840",
+          "Max (ns)": "12224",
+          "StdDev (ns)": "903.3",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "11.2",
+          "Total Time (ns)": "276491050",
+          "Instances": "8132",
+          "Avg (ns)": "34000.4",
+          "Med (ns)": "34111.0",
+          "Min (ns)": "18944",
+          "Max (ns)": "35455",
+          "StdDev (ns)": "1118.8",
+          "Name": "void <unnamed>::attend<(bool)1, (int)1, (bool)1, (bool)0>(const __nv_bfloat16 *, const float *, const unsigned long *, const int *, __nv_bfloat16 *, int, ds41rt_v41_sparse_kv, float *, const unsigned long *, const ds41rt_v41_sparse_kv *)"
+        },
+        {
+          "Time (%)": "10.2",
+          "Total Time (ns)": "252475779",
+          "Instances": "10272",
+          "Avg (ns)": "24579.0",
+          "Med (ns)": "28416.0",
+          "Min (ns)": "3008",
+          "Max (ns)": "30720",
+          "StdDev (ns)": "8716.6",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o1280111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "10.0",
+          "Total Time (ns)": "246453985",
+          "Instances": "8560",
+          "Avg (ns)": "28791.4",
+          "Med (ns)": "28864.0",
+          "Min (ns)": "11232",
+          "Max (ns)": "30912",
+          "StdDev (ns)": "1217.6",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o8192111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "7.8",
+          "Total Time (ns)": "193416303",
+          "Instances": "8560",
+          "Avg (ns)": "22595.4",
+          "Med (ns)": "22624.0",
+          "Min (ns)": "7200",
+          "Max (ns)": "24959",
+          "StdDev (ns)": "1062.1",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor000o40968111012_tensorptrf8E4M3FNgmemalig_0"
+        },
+        {
+          "Time (%)": "7.6",
+          "Total Time (ns)": "188484310",
+          "Instances": "214",
+          "Avg (ns)": "880767.8",
+          "Med (ns)": "880695.0",
+          "Min (ns)": "875383",
+          "Max (ns)": "886999",
+          "StdDev (ns)": "1796.6",
+          "Name": "std::enable_if<!T7, void>::type internal::gemvx::kernel<int, int, __nv_bfloat16, float, float, float, (bool)0, (bool)1, (bool)1, (bool)0, (int)7, (bool)0, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<float>, float>>(T13)"
+        },
+        {
+          "Time (%)": "5.7",
+          "Total Time (ns)": "140007298",
+          "Instances": "17335",
+          "Avg (ns)": "8076.6",
+          "Med (ns)": "8064.0",
+          "Min (ns)": "3967",
+          "Max (ns)": "9920",
+          "StdDev (ns)": "222.4",
+          "Name": "void <unnamed>::ds41_rmsnorm_cached_bf16_kernel<(int)5120>(const unsigned short *, const unsigned short *, unsigned short *, int, float)"
+        },
+        {
+          "Time (%)": "3.7",
+          "Total Time (ns)": "92528689",
+          "Instances": "17040",
+          "Avg (ns)": "5430.1",
+          "Med (ns)": "5344.0",
+          "Min (ns)": "4896",
+          "Max (ns)": "7488",
+          "StdDev (ns)": "389.0",
+          "Name": "kernel_cutlass_kernel_b12xnormmhc_v41_project_V41Project_object_at__ptrbf16gmemalign16_ptrf32gmemalign16_ptrf32gmemalign16_0"
+        },
+        {
+          "Time (%)": "3.3",
+          "Total Time (ns)": "82492856",
+          "Instances": "8560",
+          "Avg (ns)": "9637.0",
+          "Med (ns)": "9632.0",
+          "Min (ns)": "5024",
+          "Max (ns)": "11072",
+          "StdDev (ns)": "384.0",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o2304111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "2.8",
+          "Total Time (ns)": "69744448",
+          "Instances": "8560",
+          "Avg (ns)": "8147.7",
+          "Med (ns)": "8128.0",
+          "Min (ns)": "4768",
+          "Max (ns)": "9407",
+          "StdDev (ns)": "334.0",
+          "Name": "<unnamed>::score_kernel(const __nv_bfloat16 *, const __nv_bfloat16 *, float *, int)"
+        },
+        {
+          "Time (%)": "2.7",
+          "Total Time (ns)": "66481845",
+          "Instances": "43201",
+          "Avg (ns)": "1538.9",
+          "Med (ns)": "1696.0",
+          "Min (ns)": "800",
+          "Max (ns)": "2208",
+          "StdDev (ns)": "345.8",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o512051201_tensorptri32gmemalign16o1280i641_tensorptri8gmemalign16o160i641_tensorptri_0"
+        },
+        {
+          "Time (%)": "2.5",
+          "Total Time (ns)": "61426360",
+          "Instances": "17040",
+          "Avg (ns)": "3604.8",
+          "Med (ns)": "3584.0",
+          "Min (ns)": "3424",
+          "Max (ns)": "3968",
+          "StdDev (ns)": "66.4",
+          "Name": "void <unnamed>::finish_mixes_kernel<(int)8>(const float *, const float *, const float *, float *, float *, float *)"
+        },
+        {
+          "Time (%)": "2.2",
+          "Total Time (ns)": "53578891",
+          "Instances": "8560",
+          "Avg (ns)": "6259.2",
+          "Med (ns)": "6272.0",
+          "Min (ns)": "5568",
+          "Max (ns)": "8032",
+          "StdDev (ns)": "105.4",
+          "Name": "void <unnamed>::select_kernel<(bool)0>(float *, const float *, const float *, const unsigned char *, unsigned int *, float *, int, int)"
+        },
+        {
+          "Time (%)": "1.9",
+          "Total Time (ns)": "46020651",
+          "Instances": "428",
+          "Avg (ns)": "107524.9",
+          "Med (ns)": "107630.5",
+          "Min (ns)": "105566",
+          "Max (ns)": "110079",
+          "StdDev (ns)": "648.0",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o6144111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "1.3",
+          "Total Time (ns)": "31683097",
+          "Instances": "1712",
+          "Avg (ns)": "18506.5",
+          "Med (ns)": "18496.0",
+          "Min (ns)": "18367",
+          "Max (ns)": "18880",
+          "StdDev (ns)": "49.6",
+          "Name": "void <unnamed>::finish<(int)512>(const unsigned long *, unsigned long *, int *, int)"
+        },
+        {
+          "Time (%)": "1.1",
+          "Total Time (ns)": "26745595",
+          "Instances": "28513",
+          "Avg (ns)": "938.0",
+          "Med (ns)": "896.0",
+          "Min (ns)": "640",
+          "Max (ns)": "1344",
+          "StdDev (ns)": "81.4",
+          "Name": "<unnamed>::backbone_frequencies_kernel(const unsigned long *, float *, bool)"
+        },
+        {
+          "Time (%)": "0.9",
+          "Total Time (ns)": "22224725",
+          "Instances": "8640",
+          "Avg (ns)": "2572.3",
+          "Med (ns)": "2592.0",
+          "Min (ns)": "928",
+          "Max (ns)": "3008",
+          "StdDev (ns)": "161.8",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o819281921_tensorptri32gmemalign16o2048i641_tensorptri8gmemalign16o256i641_tensorptri_0"
+        },
+        {
+          "Time (%)": "0.8",
+          "Total Time (ns)": "20915837",
+          "Instances": "8641",
+          "Avg (ns)": "2420.5",
+          "Med (ns)": "2400.0",
+          "Min (ns)": "1696",
+          "Max (ns)": "2944",
+          "StdDev (ns)": "95.7",
+          "Name": "void <unnamed>::norm_kernel<(int)1280, (bool)0>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.8",
+          "Total Time (ns)": "19762195",
+          "Instances": "8560",
+          "Avg (ns)": "2308.7",
+          "Med (ns)": "2336.0",
+          "Min (ns)": "1280",
+          "Max (ns)": "2720",
+          "StdDev (ns)": "150.0",
+          "Name": "<unnamed>::merge(const float *, const float *, __nv_bfloat16 *, int)"
+        },
+        {
+          "Time (%)": "0.7",
+          "Total Time (ns)": "16954446",
+          "Instances": "17335",
+          "Avg (ns)": "978.0",
+          "Med (ns)": "960.0",
+          "Min (ns)": "704",
+          "Max (ns)": "1952",
+          "StdDev (ns)": "70.0",
+          "Name": "<unnamed>::pre_kernel(const __nv_bfloat16 *, const float *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.7",
+          "Total Time (ns)": "16584690",
+          "Instances": "1712",
+          "Avg (ns)": "9687.3",
+          "Med (ns)": "9696.0",
+          "Min (ns)": "9599",
+          "Max (ns)": "9952",
+          "StdDev (ns)": "41.3",
+          "Name": "void <unnamed>::tiles<(int)512, (unsigned long)1048576>(const float *, const unsigned long *, unsigned long *, int, int)"
+        },
+        {
+          "Time (%)": "0.7",
+          "Total Time (ns)": "16437879",
+          "Instances": "17120",
+          "Avg (ns)": "960.2",
+          "Med (ns)": "896.0",
+          "Min (ns)": "735",
+          "Max (ns)": "6592",
+          "StdDev (ns)": "270.7",
+          "Name": "<unnamed>::post_kernel(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, const float *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.6",
+          "Total Time (ns)": "15987657",
+          "Instances": "8560",
+          "Avg (ns)": "1867.7",
+          "Med (ns)": "1856.0",
+          "Min (ns)": "1376",
+          "Max (ns)": "2240",
+          "StdDev (ns)": "75.1",
+          "Name": "void <unnamed>::store<(bool)0>(const unsigned char *, const unsigned char *, const unsigned long *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.6",
+          "Total Time (ns)": "13805741",
+          "Instances": "428",
+          "Avg (ns)": "32256.4",
+          "Med (ns)": "32448.0",
+          "Min (ns)": "16672",
+          "Max (ns)": "33600",
+          "StdDev (ns)": "1431.8",
+          "Name": "void <unnamed>::attend<(bool)1, (int)1, (bool)0, (bool)0>(const __nv_bfloat16 *, const float *, const unsigned long *, const int *, __nv_bfloat16 *, int, ds41rt_v41_sparse_kv, float *, const unsigned long *, const ds41rt_v41_sparse_kv *)"
+        },
+        {
+          "Time (%)": "0.5",
+          "Total Time (ns)": "11366416",
+          "Instances": "1712",
+          "Avg (ns)": "6639.3",
+          "Med (ns)": "6464.0",
+          "Min (ns)": "5248",
+          "Max (ns)": "8032",
+          "StdDev (ns)": "443.3",
+          "Name": "kernel_cutlass_kernel_b12xattentiondsa_indexer_v41_overlayV41OverlayScore_object_at__tensorptri8_gmem_o_i641_tensorptri8_gmem_o_i641_tensorptrbf16_gmem_align1_o_i641_tensorptri8_gmem_o_i6_0"
+        },
+        {
+          "Time (%)": "0.5",
+          "Total Time (ns)": "11360406",
+          "Instances": "8856",
+          "Avg (ns)": "1282.8",
+          "Med (ns)": "1280.0",
+          "Min (ns)": "960",
+          "Max (ns)": "1856",
+          "StdDev (ns)": "55.5",
+          "Name": "void <unnamed>::norm_kernel<(int)512, (bool)0>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.4",
+          "Total Time (ns)": "9944397",
+          "Instances": "8640",
+          "Avg (ns)": "1151.0",
+          "Med (ns)": "1152.0",
+          "Min (ns)": "768",
+          "Max (ns)": "1504",
+          "StdDev (ns)": "31.6",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o230423041_tensorptri32gmemalign16o576i641_tensorptri8gmemalign16o72i641_tensorptri8g_0"
+        },
+        {
+          "Time (%)": "0.4",
+          "Total Time (ns)": "9812849",
+          "Instances": "10369",
+          "Avg (ns)": "946.4",
+          "Med (ns)": "960.0",
+          "Min (ns)": "768",
+          "Max (ns)": "1248",
+          "StdDev (ns)": "25.6",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o128012801_tensorptri32gmemalign16o320i641_tensorptri8gmemalign16o40i641_tensorptri8g_0"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "7864025",
+          "Instances": "8560",
+          "Avg (ns)": "918.7",
+          "Med (ns)": "928.0",
+          "Min (ns)": "800",
+          "Max (ns)": "1152",
+          "StdDev (ns)": "18.4",
+          "Name": "<unnamed>::reduce_splits(const float *, __nv_bfloat16 *, unsigned long, int)"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "7818898",
+          "Instances": "214",
+          "Avg (ns)": "36536.9",
+          "Med (ns)": "36512.0",
+          "Min (ns)": "36415",
+          "Max (ns)": "37952",
+          "StdDev (ns)": "119.7",
+          "Name": "void <unnamed>::finish<(int)2048>(const unsigned long *, unsigned long *, int *, int)"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "7397173",
+          "Instances": "8640",
+          "Avg (ns)": "856.2",
+          "Med (ns)": "832.0",
+          "Min (ns)": "736",
+          "Max (ns)": "3296",
+          "StdDev (ns)": "208.5",
+          "Name": "kernel_cutlass_kernel_b12xgemmwo_projection_quant_cute_WOQuantCuTeLaunch_object_at__tensorptrbf16gmemalign16o1_tensorptri64gmemo1_tensorptrf32gmemo1_tensorptri32gmemalign16o1_tensorptri8g_0"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "7166697",
+          "Instances": "8560",
+          "Avg (ns)": "837.2",
+          "Med (ns)": "832.0",
+          "Min (ns)": "768",
+          "Max (ns)": "1952",
+          "StdDev (ns)": "63.4",
+          "Name": "<unnamed>::reduce_compact(const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, const __nv_bfloat16 *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "6994820",
+          "Instances": "8641",
+          "Avg (ns)": "809.5",
+          "Med (ns)": "800.0",
+          "Min (ns)": "736",
+          "Max (ns)": "2880",
+          "StdDev (ns)": "183.4",
+          "Name": "<unnamed>::rope_kernel(const __nv_bfloat16 *, const float *, __nv_bfloat16 *, int, int)"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "6963739",
+          "Instances": "81",
+          "Avg (ns)": "85972.1",
+          "Med (ns)": "85407.0",
+          "Min (ns)": "35776",
+          "Max (ns)": "101215",
+          "StdDev (ns)": "7130.3",
+          "Name": "<unnamed>::mixes_kernel(const __nv_bfloat16 *, const float *, const float *, const float *, float *, float *, float *)"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "6363387",
+          "Instances": "8640",
+          "Avg (ns)": "736.5",
+          "Med (ns)": "736.0",
+          "Min (ns)": "672",
+          "Max (ns)": "1056",
+          "StdDev (ns)": "21.8",
+          "Name": "void <unnamed>::pack<(bool)0>(const __nv_bfloat16 *, const float *, unsigned char *, unsigned char *)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "5940547",
+          "Instances": "1284",
+          "Avg (ns)": "4626.6",
+          "Med (ns)": "4576.0",
+          "Min (ns)": "1888",
+          "Max (ns)": "5088",
+          "StdDev (ns)": "242.0",
+          "Name": "nvjet_sm120_tss_mma_64x8x64_10_16x8x64_tmaAB_alignCD4_splitK_TNNN"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "5474032",
+          "Instances": "8640",
+          "Avg (ns)": "633.6",
+          "Med (ns)": "640.0",
+          "Min (ns)": "576",
+          "Max (ns)": "1056",
+          "StdDev (ns)": "32.8",
+          "Name": "<unnamed>::shared_swiglu(const __nv_bfloat16 *, const __nv_bfloat16 *, __nv_bfloat16 *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "4751536",
+          "Instances": "8640",
+          "Avg (ns)": "549.9",
+          "Med (ns)": "544.0",
+          "Min (ns)": "480",
+          "Max (ns)": "1632",
+          "StdDev (ns)": "77.1",
+          "Name": "<unnamed>::grouped_output_rows(const unsigned short *, unsigned short *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.2",
+          "Total Time (ns)": "4159181",
+          "Instances": "214",
+          "Avg (ns)": "19435.4",
+          "Med (ns)": "19456.0",
+          "Min (ns)": "18656",
+          "Max (ns)": "19872",
+          "StdDev (ns)": "253.5",
+          "Name": "void <unnamed>::tiles<(int)2048, (unsigned long)131072>(const float *, const unsigned long *, unsigned long *, int, int)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "3553789",
+          "Instances": "76",
+          "Avg (ns)": "46760.4",
+          "Med (ns)": "47263.5",
+          "Min (ns)": "42111",
+          "Max (ns)": "52320",
+          "StdDev (ns)": "3138.6",
+          "Name": "void <unnamed>::attend<(bool)0, (int)1, (bool)1, (bool)0>(const __nv_bfloat16 *, const float *, const unsigned long *, const int *, __nv_bfloat16 *, int, ds41rt_v41_sparse_kv, float *, const unsigned long *, const ds41rt_v41_sparse_kv *)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "3495422",
+          "Instances": "432",
+          "Avg (ns)": "8091.3",
+          "Med (ns)": "8064.0",
+          "Min (ns)": "7648",
+          "Max (ns)": "9376",
+          "StdDev (ns)": "162.4",
+          "Name": "<unnamed>::engram_gate_kernel(const unsigned short *, const unsigned short *, const unsigned short *, const unsigned short *, const unsigned char *, unsigned short *)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "2845378",
+          "Instances": "1712",
+          "Avg (ns)": "1662.0",
+          "Med (ns)": "1664.0",
+          "Min (ns)": "1408",
+          "Max (ns)": "2048",
+          "StdDev (ns)": "41.2",
+          "Name": "void dot_kernel<float, (int)128, (int)0, cublasDotParams<cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<float>>>(T4)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "2222030",
+          "Instances": "160",
+          "Avg (ns)": "13887.7",
+          "Med (ns)": "13328.0",
+          "Min (ns)": "11584",
+          "Max (ns)": "18656",
+          "StdDev (ns)": "2208.9",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "2159651",
+          "Instances": "1728",
+          "Avg (ns)": "1249.8",
+          "Med (ns)": "1248.0",
+          "Min (ns)": "1215",
+          "Max (ns)": "1824",
+          "StdDev (ns)": "40.6",
+          "Name": "<unnamed>::index_query_prepare_kernel(const __nv_bfloat16 *, const float *, const __nv_bfloat16 *, unsigned char *, unsigned char *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "2067789",
+          "Instances": "97",
+          "Avg (ns)": "21317.4",
+          "Med (ns)": "18687.0",
+          "Min (ns)": "4288",
+          "Max (ns)": "32255",
+          "StdDev (ns)": "9077.9",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o1280111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "2050601",
+          "Instances": "80",
+          "Avg (ns)": "25632.5",
+          "Med (ns)": "25247.5",
+          "Min (ns)": "18943",
+          "Max (ns)": "34143",
+          "StdDev (ns)": "6271.1",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o8192111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "1901958",
+          "Instances": "161",
+          "Avg (ns)": "11813.4",
+          "Med (ns)": "11520.0",
+          "Min (ns)": "11136",
+          "Max (ns)": "12992",
+          "StdDev (ns)": "565.6",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1819201_TVLayoutDst1819201_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "1796977",
+          "Instances": "216",
+          "Avg (ns)": "8319.3",
+          "Med (ns)": "8352.0",
+          "Min (ns)": "3808",
+          "Max (ns)": "8832",
+          "StdDev (ns)": "453.6",
+          "Name": "void <unnamed>::embed_kernel<(bool)0>(const __nv_bfloat16 *, const int *, __nv_bfloat16 *, float *)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "1742831",
+          "Instances": "856",
+          "Avg (ns)": "2036.0",
+          "Med (ns)": "2016.0",
+          "Min (ns)": "1632",
+          "Max (ns)": "2528",
+          "StdDev (ns)": "79.6",
+          "Name": "std::enable_if<T7, void>::type internal::gemvx::kernel<int, int, __nv_bfloat16, __nv_bfloat16, __nv_bfloat16, float, (bool)1, (bool)1, (bool)1, (bool)0, (int)7, (bool)0, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<__nv_bfloat16>, float>>(T13)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "1594031",
+          "Instances": "1712",
+          "Avg (ns)": "931.1",
+          "Med (ns)": "928.0",
+          "Min (ns)": "864",
+          "Max (ns)": "1312",
+          "StdDev (ns)": "21.4",
+          "Name": "void reduce_1Block_kernel<float, (int)128, (int)7, cublasGemvTensorStridedBatched<float>, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<__nv_bfloat16>>(const T1 *, T1, T4, int, const T1 *, T1, T5, T6, cublasPointerMode_t, cublasLtEpilogue_t, cublasGemvTensorStridedBatched<const biasType<T6::value_type, T1>::type>)"
+        },
+        {
+          "Time (%)": "0.1",
+          "Total Time (ns)": "1403759",
+          "Instances": "80",
+          "Avg (ns)": "17547.0",
+          "Med (ns)": "17296.0",
+          "Min (ns)": "10560",
+          "Max (ns)": "24991",
+          "StdDev (ns)": "6892.0",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1819201_TVLayoutDst1819201_Valuetypef8E4M3FN_tensor000o40968111012_tensorptrf8E4M3FNgmemalig_0"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "1212898",
+          "Instances": "1296",
+          "Avg (ns)": "935.9",
+          "Med (ns)": "992.0",
+          "Min (ns)": "767",
+          "Max (ns)": "1472",
+          "StdDev (ns)": "145.4",
+          "Name": "void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, float, float, float, float, (bool)0, float, float, float, (bool)1, (bool)0, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "1174430",
+          "Instances": "648",
+          "Avg (ns)": "1812.4",
+          "Med (ns)": "1280.0",
+          "Min (ns)": "448",
+          "Max (ns)": "3296",
+          "StdDev (ns)": "1130.2",
+          "Name": "<unnamed>::pool_kernel(const float *, const float *, const float *, const float *, const unsigned long *, const __nv_bfloat16 *, __nv_bfloat16 *, int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "1149395",
+          "Instances": "80",
+          "Avg (ns)": "14367.4",
+          "Med (ns)": "14192.0",
+          "Min (ns)": "11039",
+          "Max (ns)": "18080",
+          "StdDev (ns)": "3225.8",
+          "Name": "kernel_cutlass_kernel_b12xmoe_sharedv41_router_V41RouterScores_object_at__tensor00o51201110_tensor00o38451201110_tensorptrf32gmemalign16oi641__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayout_0"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "994136",
+          "Instances": "214",
+          "Avg (ns)": "4645.5",
+          "Med (ns)": "4608.0",
+          "Min (ns)": "1952",
+          "Max (ns)": "5088",
+          "StdDev (ns)": "240.0",
+          "Name": "nvjet_sm120_tst_mma_64x8x64_10_16x8x64_tmaAB_alignCD4_splitK_TNNN"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "951870",
+          "Instances": "864",
+          "Avg (ns)": "1101.7",
+          "Med (ns)": "1088.0",
+          "Min (ns)": "1024",
+          "Max (ns)": "1344",
+          "StdDev (ns)": "43.7",
+          "Name": "void <unnamed>::pack<(bool)1>(const __nv_bfloat16 *, const float *, unsigned char *, unsigned char *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "939319",
+          "Instances": "864",
+          "Avg (ns)": "1087.2",
+          "Med (ns)": "1088.0",
+          "Min (ns)": "832",
+          "Max (ns)": "1504",
+          "StdDev (ns)": "42.7",
+          "Name": "void <unnamed>::norm_kernel<(int)128, (bool)0>(const __nv_bfloat16 *, const __nv_bfloat16 *, const float *, __nv_bfloat16 *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "845466",
+          "Instances": "432",
+          "Avg (ns)": "1957.1",
+          "Med (ns)": "1952.0",
+          "Min (ns)": "928",
+          "Max (ns)": "2208",
+          "StdDev (ns)": "97.2",
+          "Name": "kernel_cutlass_kernel_b12x_libquantmxfp8_rows_MXFP8RowsQuantLaunch_object_at__tensorptrbf16gmemalign16o614461441_tensorptri32gmemalign16o1536i641_tensorptri8gmemalign16o192i641_tensorptri_0"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "827480",
+          "Instances": "864",
+          "Avg (ns)": "957.7",
+          "Med (ns)": "960.0",
+          "Min (ns)": "896",
+          "Max (ns)": "1376",
+          "StdDev (ns)": "40.7",
+          "Name": "<unnamed>::index_pack_kernel(const __nv_bfloat16 *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "810518",
+          "Instances": "535",
+          "Avg (ns)": "1515.0",
+          "Med (ns)": "1504.0",
+          "Min (ns)": "1024",
+          "Max (ns)": "1728",
+          "StdDev (ns)": "63.0",
+          "Name": "<unnamed>::index_store_kernel(const unsigned char *, const unsigned char *, const unsigned long *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "739414",
+          "Instances": "80",
+          "Avg (ns)": "9242.7",
+          "Med (ns)": "9136.0",
+          "Min (ns)": "6656",
+          "Max (ns)": "12704",
+          "StdDev (ns)": "2380.7",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o2304111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "723004",
+          "Instances": "535",
+          "Avg (ns)": "1351.4",
+          "Med (ns)": "1375.0",
+          "Min (ns)": "864",
+          "Max (ns)": "1632",
+          "StdDev (ns)": "72.3",
+          "Name": "void <unnamed>::store<(bool)1>(const unsigned char *, const unsigned char *, const unsigned long *, unsigned char *, unsigned char *, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "676475",
+          "Instances": "1712",
+          "Avg (ns)": "395.1",
+          "Med (ns)": "384.0",
+          "Min (ns)": "352",
+          "Max (ns)": "448",
+          "StdDev (ns)": "16.1",
+          "Name": "<unnamed>::tile_positions(unsigned long *, unsigned long *, int, unsigned long)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "531643",
+          "Instances": "642",
+          "Avg (ns)": "828.1",
+          "Med (ns)": "832.0",
+          "Min (ns)": "768",
+          "Max (ns)": "1312",
+          "StdDev (ns)": "47.1",
+          "Name": "<unnamed>::dspark_tap_kernel(const __nv_bfloat16 *, __nv_bfloat16 *, unsigned long, int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "530196",
+          "Instances": "80",
+          "Avg (ns)": "6627.4",
+          "Med (ns)": "6752.0",
+          "Min (ns)": "6208",
+          "Max (ns)": "7520",
+          "StdDev (ns)": "295.2",
+          "Name": "void <unnamed>::select_kernel<(bool)1>(float *, const float *, const float *, const unsigned char *, unsigned int *, float *, int, int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "471356",
+          "Instances": "4",
+          "Avg (ns)": "117839.0",
+          "Med (ns)": "117679.0",
+          "Min (ns)": "116607",
+          "Max (ns)": "119391",
+          "StdDev (ns)": "1357.3",
+          "Name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o6144111100_tensorptrf8E4M3FNgmemalign1_0"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "327037",
+          "Instances": "428",
+          "Avg (ns)": "764.1",
+          "Med (ns)": "768.0",
+          "Min (ns)": "704",
+          "Max (ns)": "1408",
+          "StdDev (ns)": "53.4",
+          "Name": "<unnamed>::engram_dequant_kernel(const unsigned char *, const unsigned char *, unsigned short *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "217887",
+          "Instances": "232",
+          "Avg (ns)": "939.2",
+          "Med (ns)": "928.0",
+          "Min (ns)": "800",
+          "Max (ns)": "1472",
+          "StdDev (ns)": "96.0",
+          "Name": "void cublasLt::splitKreduce_kernel<(int)32, (int)16, int, float, __nv_bfloat16, float, __nv_bfloat16, (bool)0, float, __nv_bfloat16, __nv_bfloat16, (bool)1, (bool)0, (bool)0, (bool)0>(cublasLt::cublasSplitKParams<T6>, const T4 *, const T10 *, T9 *, T5 *, const T6 *, const T6 *, const T11 *, const T4 *, T11 *, void *, long, T6 *, int *, T6 *, T6 *, const T6 *, const T6 *, const T6 *, const T6 *, const T6 *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "205566",
+          "Instances": "214",
+          "Avg (ns)": "960.6",
+          "Med (ns)": "960.0",
+          "Min (ns)": "927",
+          "Max (ns)": "1088",
+          "StdDev (ns)": "36.0",
+          "Name": "<unnamed>::block_max(const float *, const unsigned long *, const unsigned long *, float *, unsigned long *, int, int)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "111359",
+          "Instances": "4",
+          "Avg (ns)": "27839.8",
+          "Med (ns)": "27839.5",
+          "Min (ns)": "27680",
+          "Max (ns)": "28000",
+          "StdDev (ns)": "167.6",
+          "Name": "void <unnamed>::attend<(bool)0, (int)1, (bool)0, (bool)0>(const __nv_bfloat16 *, const float *, const unsigned long *, const int *, __nv_bfloat16 *, int, ds41rt_v41_sparse_kv, float *, const unsigned long *, const ds41rt_v41_sparse_kv *)"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "52255",
+          "Instances": "12",
+          "Avg (ns)": "4354.6",
+          "Med (ns)": "4320.0",
+          "Min (ns)": "3008",
+          "Max (ns)": "5600",
+          "StdDev (ns)": "1142.5",
+          "Name": "nvjet_sm120_tss_mma_64x56x64_6_16x56x64_tmaAB_alignCD4_splitK_TNNN"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "29471",
+          "Instances": "16",
+          "Avg (ns)": "1841.9",
+          "Med (ns)": "1840.0",
+          "Min (ns)": "1536",
+          "Max (ns)": "2176",
+          "StdDev (ns)": "305.0",
+          "Name": "nvjet_sm120_tst_mma_32x16x128_8_16x8x128_tmaAB_alignCD4_splitK_TNNN"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "16288",
+          "Instances": "8",
+          "Avg (ns)": "2036.0",
+          "Med (ns)": "2000.0",
+          "Min (ns)": "1728",
+          "Max (ns)": "2400",
+          "StdDev (ns)": "332.1",
+          "Name": "nvjet_sm120_tst_mma_16x32x128_8_16x8x128_tmaAB_alignCD4_bz_TNNN"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "8384",
+          "Instances": "2",
+          "Avg (ns)": "4192.0",
+          "Med (ns)": "4192.0",
+          "Min (ns)": "3008",
+          "Max (ns)": "5376",
+          "StdDev (ns)": "1674.4",
+          "Name": "nvjet_sm120_tst_mma_64x56x64_6_16x56x64_tmaAB_alignCD4_splitK_TNNN"
+        }
+      ],
+      "apis": [
+        {
+          "Time (%)": "70.2",
+          "Total Time (ns)": "2843963385",
+          "Num Calls": "183464",
+          "Avg (ns)": "15501.5",
+          "Med (ns)": "3815.0",
+          "Min (ns)": "330",
+          "Max (ns)": "899751",
+          "StdDev (ns)": "36494.1",
+          "Name": "cudaStreamSynchronize"
+        },
+        {
+          "Time (%)": "10.4",
+          "Total Time (ns)": "421685950",
+          "Num Calls": "166881",
+          "Avg (ns)": "2526.9",
+          "Med (ns)": "2494.0",
+          "Min (ns)": "721",
+          "Max (ns)": "42373",
+          "StdDev (ns)": "599.7",
+          "Name": "cudaMemcpyAsync"
+        },
+        {
+          "Time (%)": "7.5",
+          "Total Time (ns)": "302446651",
+          "Num Calls": "56497",
+          "Avg (ns)": "5353.3",
+          "Med (ns)": "4467.0",
+          "Min (ns)": "2794",
+          "Max (ns)": "243035",
+          "StdDev (ns)": "2730.2",
+          "Name": "cudaGraphLaunch"
+        },
+        {
+          "Time (%)": "5.6",
+          "Total Time (ns)": "226643815",
+          "Num Calls": "95717",
+          "Avg (ns)": "2367.9",
+          "Med (ns)": "2413.0",
+          "Min (ns)": "681",
+          "Max (ns)": "43075",
+          "StdDev (ns)": "520.8",
+          "Name": "cudaLaunchKernel"
+        },
+        {
+          "Time (%)": "2.3",
+          "Total Time (ns)": "94034716",
+          "Num Calls": "22168",
+          "Avg (ns)": "4241.9",
+          "Med (ns)": "3095.0",
+          "Min (ns)": "2454",
+          "Max (ns)": "160922",
+          "StdDev (ns)": "5919.8",
+          "Name": "cudaMemcpy"
+        },
+        {
+          "Time (%)": "1.9",
+          "Total Time (ns)": "76983421",
+          "Num Calls": "2222",
+          "Avg (ns)": "34646.0",
+          "Med (ns)": "31792.5",
+          "Min (ns)": "15163",
+          "Max (ns)": "212479",
+          "StdDev (ns)": "11031.9",
+          "Name": "cudaGraphInstantiate"
+        },
+        {
+          "Time (%)": "1.3",
+          "Total Time (ns)": "51600069",
+          "Num Calls": "21676",
+          "Avg (ns)": "2380.5",
+          "Med (ns)": "2484.0",
+          "Min (ns)": "841",
+          "Max (ns)": "9484",
+          "StdDev (ns)": "608.6",
+          "Name": "cudaLaunchKernelExC"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "13205483",
+          "Num Calls": "2222",
+          "Avg (ns)": "5943.1",
+          "Med (ns)": "4496.5",
+          "Min (ns)": "2513",
+          "Max (ns)": "54242",
+          "StdDev (ns)": "3419.9",
+          "Name": "cudaGraphExecDestroy"
+        },
+        {
+          "Time (%)": "0.3",
+          "Total Time (ns)": "11339062",
+          "Num Calls": "117349",
+          "Avg (ns)": "96.6",
+          "Med (ns)": "90.0",
+          "Min (ns)": "60",
+          "Max (ns)": "5097",
+          "StdDev (ns)": "50.1",
+          "Name": "cuKernelGetName"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "1956438",
+          "Num Calls": "10316",
+          "Avg (ns)": "189.7",
+          "Med (ns)": "161.0",
+          "Min (ns)": "100",
+          "Max (ns)": "3716",
+          "StdDev (ns)": "86.3",
+          "Name": "cudaGraphNodeGetType"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "1929596",
+          "Num Calls": "2222",
+          "Avg (ns)": "868.4",
+          "Med (ns)": "841.0",
+          "Min (ns)": "350",
+          "Max (ns)": "3936",
+          "StdDev (ns)": "227.7",
+          "Name": "cudaGraphDestroy"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "1192668",
+          "Num Calls": "2222",
+          "Avg (ns)": "536.8",
+          "Med (ns)": "501.0",
+          "Min (ns)": "281",
+          "Max (ns)": "4336",
+          "StdDev (ns)": "206.6",
+          "Name": "cudaStreamBeginCapture"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "1010065",
+          "Num Calls": "4444",
+          "Avg (ns)": "227.3",
+          "Med (ns)": "211.0",
+          "Min (ns)": "120",
+          "Max (ns)": "1573",
+          "StdDev (ns)": "82.0",
+          "Name": "cudaGraphGetNodes"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "905230",
+          "Num Calls": "2222",
+          "Avg (ns)": "407.4",
+          "Med (ns)": "381.0",
+          "Min (ns)": "260",
+          "Max (ns)": "4166",
+          "StdDev (ns)": "129.9",
+          "Name": "cudaStreamEndCapture"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "558468",
+          "Num Calls": "4",
+          "Avg (ns)": "139617.0",
+          "Med (ns)": "157346.0",
+          "Min (ns)": "16545",
+          "Max (ns)": "227231",
+          "StdDev (ns)": "96238.2",
+          "Name": "cudaMalloc"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "194702",
+          "Num Calls": "2",
+          "Avg (ns)": "97351.0",
+          "Med (ns)": "97351.0",
+          "Min (ns)": "9874",
+          "Max (ns)": "184828",
+          "StdDev (ns)": "123711.2",
+          "Name": "cudaFree"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "115358",
+          "Num Calls": "52",
+          "Avg (ns)": "2218.4",
+          "Med (ns)": "1873.0",
+          "Min (ns)": "831",
+          "Max (ns)": "5859",
+          "StdDev (ns)": "1325.3",
+          "Name": "cuLaunchKernelEx"
+        },
+        {
+          "Time (%)": "0.0",
+          "Total Time (ns)": "18291",
+          "Num Calls": "52",
+          "Avg (ns)": "351.8",
+          "Med (ns)": "255.5",
+          "Min (ns)": "160",
+          "Max (ns)": "951",
+          "StdDev (ns)": "199.5",
+          "Name": "cuKernelSetAttribute"
+        }
+      ],
+      "report_path": "/tmp/ds41-phase1-c1-nsys-target/target.nsys-rep",
+      "total_gpu_kernel_ms": 2475.648233,
+      "response": {
+        "usage": {
+          "prompt_tokens": 54,
+          "completion_tokens": 214,
+          "total_tokens": 268,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 54
+        },
+        "serving_completed": true,
+        "objective_checks_passed": true,
+        "passed": true,
+        "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+      },
+      "notes": [
+        "Explicit nsys start after one warmup, stop after complete response, node-level CUDA graph tracing.",
+        "Target profile uses a different nonce from warmup; cold-cache gate passes.",
+        "Profiler API time includes device waits; kernel durations include instrumentation overhead."
+      ]
+    }
+  }
+}
