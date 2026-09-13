@@ -121,7 +121,35 @@ impl LaneFfn<'_, '_, '_> {
         let route_capture = &mut self.route_capture;
         complete_ffn(self.phase, async {
             let timing = std::time::Instant::now();
+            router.set_local_mode(transport.has_local_layer(input.layer))?;
             let routed = unsafe { router.execute_ffn(input, image_mask)? };
+            if transport.has_local_layer(input.layer) {
+                routed.validate_request_rows(rows)?;
+                let trace = tracing::enabled!(target: "ds41rt::route_policy", tracing::Level::DEBUG);
+                let mut temporary = Vec::new();
+                let mut captured = if let Some(capture) = route_capture.as_deref_mut() {
+                    Some(&mut capture[input.layer])
+                } else if trace { Some(&mut temporary) } else { None };
+                if let Some(output) = captured.as_deref_mut() {
+                    unsafe { routed.capture_route_ids(library, output)?; }
+                }
+                let routed_us = timing.elapsed().as_micros() as u64;
+                let contribution = unsafe { shared.execute_ffn(input)? };
+                let result = unsafe { transport.execute_local_ffn(&routed, &contribution) };
+                let ffn_us = timing.elapsed().as_micros() as u64;
+                tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
+                    total_us=ffn_us, "target local experts");
+                if trace {
+                    let route_ids: Vec<_> = captured.as_ref().expect("trace capture exists").iter().flatten().copied().collect();
+                    let owners: Vec<_> = rows.iter().map(|r| (r.request_id, r.position)).collect();
+                    let unique_experts = route_ids.iter().collect::<std::collections::BTreeSet<_>>().len();
+                    tracing::debug!(target: "ds41rt::route_policy", layer=input.layer, local=true,
+                        rows=rows.len(), unique_experts, ffn_us, routed_us,
+                        remote_and_shared_us=ffn_us-routed_us, owners=?owners, route_ids=?route_ids,
+                        "native route policy observation");
+                }
+                return result;
+            }
             let request = unsafe { routed.expert_request(library, placement, rows)? };
             if let Some(capture) = route_capture.as_deref_mut() {
                 let output = &mut capture[input.layer];
@@ -130,13 +158,6 @@ impl LaneFfn<'_, '_, '_> {
                     .map(|routes| std::array::from_fn(|i| routes[i].expert_id)));
             }
             let routed_us = timing.elapsed().as_micros() as u64;
-            if transport.has_local_layer(input.layer) {
-                let contribution = unsafe { shared.execute_ffn(input)? };
-                let result = unsafe { transport.execute_local_ffn(&routed, &contribution) };
-                tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
-                    total_us=timing.elapsed().as_micros() as u64, "target local experts");
-                return result;
-            }
             let pending = transport.dispatch_ffn(&request).await?;
             let dispatched_us = timing.elapsed().as_micros() as u64;
             let contribution = unsafe { shared.execute_ffn(input)? };

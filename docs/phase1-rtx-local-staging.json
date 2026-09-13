@@ -1,0 +1,186 @@
+{
+  "scope": "Balanced ABBA at five local layers, adaptive enabled; not whole-release qualification",
+  "arms": [
+    {
+      "label": "before-a1",
+      "startup_seconds": 10.379317661980167,
+      "local_load_ms": 6618,
+      "dense_load_seconds": 1.822,
+      "code_tps": [
+        120.22090621682518,
+        120.98515595106606,
+        121.85172101686791
+      ],
+      "code_hashes": [
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+      ],
+      "prefill_tps": [
+        7838.544650212674,
+        7761.122719158733,
+        7316.236147587172
+      ],
+      "mixed": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 118.5946618414364
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 186.39414794583607
+        }
+      ],
+      "lifecycle_passed": true,
+      "memory_peak_mib": 96800.0
+    },
+    {
+      "label": "after-b1",
+      "startup_seconds": 11.678630906972103,
+      "local_load_ms": 4882,
+      "dense_load_seconds": 3.019,
+      "code_tps": [
+        117.06167119771526,
+        121.550000539056,
+        121.694239960154
+      ],
+      "code_hashes": [
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+      ],
+      "prefill_tps": [
+        7789.540633650947,
+        7765.535339440281,
+        7885.413673256681
+      ],
+      "mixed": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 117.8848183587334
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 183.25909206446323
+        }
+      ],
+      "lifecycle_passed": true,
+      "memory_peak_mib": 96936.0
+    },
+    {
+      "label": "after-b2",
+      "startup_seconds": 10.38611869502347,
+      "local_load_ms": 4157,
+      "dense_load_seconds": 3.177,
+      "code_tps": [
+        123.6676852866344,
+        122.43174286009327,
+        123.75134514479421
+      ],
+      "code_hashes": [
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+      ],
+      "prefill_tps": [
+        7719.585115178535,
+        7411.944436966043,
+        7737.373961426687
+      ],
+      "mixed": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 118.67531056427198
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 187.61153683013424
+        }
+      ],
+      "lifecycle_passed": null,
+      "memory_peak_mib": 96796.0
+    },
+    {
+      "label": "before-a2",
+      "startup_seconds": 11.375202456954867,
+      "local_load_ms": 4756,
+      "dense_load_seconds": 3.489,
+      "code_tps": [
+        116.82338068770237,
+        120.66001913916045,
+        120.64947877531765
+      ],
+      "code_hashes": [
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+        "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba"
+      ],
+      "prefill_tps": [
+        7719.85777892711,
+        7797.464484529213,
+        7623.808071169468
+      ],
+      "mixed": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 117.21589919984586
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 181.4811085895876
+        }
+      ],
+      "lifecycle_passed": null,
+      "memory_peak_mib": 96930.0
+    }
+  ],
+  "summary": {
+    "before": {
+      "code_median": 120.65474895723905,
+      "prefill_median": 7740.490249042921,
+      "c4_median": 117.90528052064113,
+      "c16_median": 183.93762826771183,
+      "startup_median": 10.877260059467517,
+      "local_load_median_ms": 5687.0
+    },
+    "after": {
+      "code_median": 122.06299141012363,
+      "prefill_median": 7751.454650433484,
+      "c4_median": 118.28006446150269,
+      "c16_median": 185.43531444729874,
+      "startup_median": 11.032374800997786,
+      "local_load_median_ms": 4519.5
+    }
+  },
+  "restored": true,
+  "matched_prefill_prompt_hashes": [
+    "a6c9882136a010c01323a38d69d78ce296f103e2fb74f8eb6cafbb8c685c9c76",
+    "94ae1dbaf24534b1e34432111cb35ad0121925bb3964f7466f6b533d823c6d24",
+    "58ee145155e7601466444555b50b05a50b673fe7cbb62398253900a168c92041",
+    "3f540602724a1c7a399b0a7b1bfe2f585c207d5623ceb1381b725760ee9c8c70"
+  ],
+  "source_sha256": {
+    "rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs": "794ca9470e0b29621db34941a084e8e90d36f6ab805722bbccf30c67e6dc9bc0",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_router.rs": "dff76d63b25167cf6e417400b87691992ae6e4f2ca5cd695cf3b58c1fd1878e1",
+    "rust/crates/ds41rt-daemon/src/v41_experts.rs": "e62ffd59821baf285a610ecea43330309720d8cd3d69fa3b73948b7751b8684d"
+  },
+  "measured_patch_sha256": "287933627df7df54c7c152966c43aa46139c7f18306f52f369e44e41dad14cb9",
+  "artifacts": {
+    "before": {
+      "libds41rt_native.so": "1aed37f945a4291139133b95bdef7fd5040f86164bbfcd6bf89286c98dfc9f94",
+      "ds41rt": "a3b31060f6ae4aa2e821fcdc0a9935a936cc67feaf40ea7683ce9eb78ee242f6"
+    },
+    "after": {
+      "libds41rt_native.so": "1aed37f945a4291139133b95bdef7fd5040f86164bbfcd6bf89286c98dfc9f94",
+      "ds41rt": "fdfcde678d6d23234c5bf07279d80ec2b5d636406c337c4da02641169ab9cebe"
+    }
+  },
+  "router_check": "32 real-weight mode transitions passed, exact device tensors and captured IDs; poisoned payload tail remained untouched",
+  "limits": [
+    "Final source also restores shared row-metadata validation for local execution and adds payload-tail poison assertions after the timed binary was frozen",
+    "Only two C4/C16 batches per variant, six code and six measured prefill samples",
+    "Startup host page-cache state uncontrolled; local load timing includes workspace setup",
+    "Text hashes vary; objective checks are named Python structure checks, not broad semantic quality",
+    "Target-only, broader tool/needle quality, and final promotion remain outstanding"
+  ]
+}

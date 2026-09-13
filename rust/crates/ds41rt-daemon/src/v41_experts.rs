@@ -206,11 +206,13 @@ impl<'a> ExpertWeights<'a> {
                             .add(expert * (sizes[i] / experts))
                     });
                     packer.pack(sources, destinations, stream.raw)?;
-                    // Reuse device staging only after this expert finishes. Pinned
-                    // staging remains borrowed by this group until all packing drains.
-                    library.cuda_stream_synchronize(stream.raw)?;
+                    // The next copy reuses device staging on this same stream,
+                    // after this pack. Distinct pinned inputs stay alive for the
+                    // entire group. LoadStream::drop drains on partial failure.
                 }
             }
+            // Only CPU reuse of pinned staging requires host completion.
+            unsafe { library.cuda_stream_synchronize(stream.raw)?; }
         }
         Ok(Self {
             buffers,

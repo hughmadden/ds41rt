@@ -76,6 +76,8 @@ impl<'a> BackboneRouterWeights<'a> {
             layer: self.layer,
             capacity,
             graphs: LayerGraphs::new(self.library),
+            other_graphs: LayerGraphs::new(self.library),
+            full_request: true,
             ready: None,
             origin: None,
         })
@@ -92,10 +94,27 @@ pub(crate) struct RouterOutput<'a> {
     pub routing: Ds41rtDeviceBuffer,
     pub tokens: &'a [u64],
     request_staging: ds41rt_ffi::Ds41rtHostBuffer,
+    full_request: bool,
     origin: Option<QueryBinding>,
     _owner: PhantomData<&'a ()>,
 }
 impl RouterOutput<'_> {
+    /// # Safety
+    /// The completed router output stays live and unchanged through this copy.
+    pub unsafe fn capture_route_ids(&self, library: &NativeLibrary, output: &mut Vec<[u32; 6]>) -> Result<()> {
+        ensure!(self.rows > 0 && self.rows <= 4096 && self.ids.bytes == self.rows as usize * 24,
+            "invalid route capture extent");
+        output.resize(self.rows as usize, [0; 6]);
+        // Arrays have contiguous u32 layout; every bit pattern is valid. The
+        // vector is exclusively borrowed and fully initialized before copying.
+        let bytes = unsafe { std::slice::from_raw_parts_mut(output.as_mut_ptr().cast::<u8>(), self.ids.bytes) };
+        let offset = if self.full_request { self.rows as usize * 5280 } else { 0 };
+        ensure!(offset + bytes.len() <= self.request_staging.bytes, "route capture staging extent differs");
+        // This execution already drained the graph's route-ID download.
+        unsafe { std::ptr::copy_nonoverlapping(self.request_staging.ptr.cast::<u8>().add(offset), bytes.as_mut_ptr(), bytes.len()); }
+        let _ = library;
+        Ok(())
+    }
     pub fn binding(&self) -> Result<QueryBinding> {
         self.origin
             .context("backbone router output has no block origin")
@@ -111,6 +130,65 @@ mod reuse_tests {
         library.copy_d2h(&mut result, buffer)?;
         Ok(result)
     }
+    #[test]
+    fn local_router_graphs_preserve_ids_without_remote_payload() -> Result<()> {
+        let Some(path) = std::env::var_os("DS41RT_ROUTER_REUSE_LIBRARY") else {
+            eprintln!("skip local router GPU test: DS41RT_ROUTER_REUSE_LIBRARY unset");
+            return Ok(());
+        };
+        let model = std::env::var_os("DS41RT_ROUTER_REUSE_MODEL").context("DS41RT_ROUTER_REUSE_MODEL required")?;
+        let library = unsafe { NativeLibrary::load(path)? };
+        let catalog = read_official_v41_catalog(OFFICIAL_V41_MODEL_ID, std::path::Path::new(&model))?;
+        let weights = (0..2).map(|layer| BackboneRouterWeights::load(&library, &catalog, layer, 1 << 30, 16 << 20))
+            .collect::<Result<Vec<_>>>()?;
+        for rows in [1, 16, 80, 256] {
+            let mut lane = weights[0].wave(rows, BackboneRouterWave::device_bytes(rows)?)?;
+            let mut handles = std::collections::HashMap::new();
+            for (cycle, local) in [false, true, false, true].into_iter().enumerate() {
+                for layer in 0..2 {
+                    lane.rebind(&weights[layer])?;
+                    lane.set_local_mode(local)?;
+                    let hidden: Vec<u8> = (0..rows as usize * 5120).flat_map(|i| {
+                        let x = ((i + cycle * 3 + layer) % 17) as f32 / 32.;
+                        ((x.to_bits() >> 16) as u16).to_ne_bytes()
+                    }).collect();
+                    let mask: Vec<u8> = (0..rows).map(|i| (i % 2) as u8).collect();
+                    let [input, modality] = lane.inputs();
+                    library.copy_h2d(input, &hidden)?;
+                    library.copy_h2d(modality, &mask)?;
+                    let mut fresh = weights[layer].wave(rows, BackboneRouterWave::device_bytes(rows)?)?;
+                    let [fresh_input, fresh_mask] = fresh.inputs();
+                    library.copy_h2d(fresh_input, &hidden)?;
+                    library.copy_h2d(fresh_mask, &mask)?;
+                    if local {
+                        unsafe { std::ptr::write_bytes(lane.request_staging.buffer.ptr, 0xa5, lane.request_staging.buffer.bytes); }
+                    }
+                    let actual = unsafe { lane.execute_captured(rows)? };
+                    let reference = unsafe { fresh.execute(rows)? };
+                    if local {
+                        let staging = unsafe { std::slice::from_raw_parts(actual.request_staging.ptr.cast::<u8>(), actual.request_staging.bytes) };
+                        assert!(staging[rows as usize * 24..].iter().all(|&b| b == 0xa5));
+                    }
+                    for (a,b) in [(actual.ids,reference.ids),(actual.routing,reference.routing),
+                                  (actual.expert_input,reference.expert_input)] {
+                        assert_eq!(bytes(&library,a)?,bytes(&library,b)?);
+                    }
+                    let mut ids = vec![[u32::MAX;6]; rows as usize + 5];
+                    unsafe { actual.capture_route_ids(&library, &mut ids)?; }
+                    assert_eq!(ids.len(),rows as usize);
+                    let captured: Vec<u8> = ids.iter().flatten().flat_map(|v| v.to_ne_bytes()).collect();
+                    assert_eq!(captured,bytes(&library,reference.ids)?);
+                    assert_eq!(unsafe { actual.download_request(&library) }.is_err(),local);
+                    let handle = lane.graphs.get(layer,&weights[layer]).unwrap().0;
+                    if let Some(previous) = handles.insert((local,layer),handle) { assert_eq!(previous,handle); }
+                    if let Some(other) = handles.get(&(!local,layer)) { assert_ne!(*other,handle); }
+                }
+            }
+        }
+        eprintln!("PASS 32 local/remote router graph transitions with exact IDs, routes and FP8 input");
+        Ok(())
+    }
+
     #[test]
     fn real_router_rebinding_matches_fresh_owners() -> Result<()> {
         let Some(path) = std::env::var_os("DS41RT_ROUTER_REUSE_LIBRARY") else {
@@ -227,6 +305,8 @@ pub(crate) struct BackboneRouterWave<'w, 'a> {
     layer: usize,
     capacity: u32,
     graphs: LayerGraphs<'w, 'a, BackboneRouterWeights<'a>>,
+    other_graphs: LayerGraphs<'w, 'a, BackboneRouterWeights<'a>>,
+    full_request: bool,
     ready: Option<u32>,
     origin: Option<QueryBinding>,
 }
@@ -250,6 +330,14 @@ impl<'w, 'a> BackboneRouterWave<'w, 'a> {
     }
 }
 impl BackboneRouterWave<'_, '_> {
+    pub fn set_local_mode(&mut self, local: bool) -> Result<()> {
+        if self.full_request == !local { return Ok(()); }
+        self.synchronize()?;
+        self.invalidate();
+        std::mem::swap(&mut self.graphs, &mut self.other_graphs);
+        self.full_request = !local;
+        Ok(())
+    }
     pub fn device_bytes(capacity: u32) -> Result<usize> {
         ensure!(
             (1..=4096).contains(&capacity),
@@ -297,8 +385,12 @@ impl BackboneRouterWave<'_, '_> {
             )?;
             self.input_quantizer
                 .launch(self.b(0), self.b(5), rows, self.stream.raw)?;
-            let bytes = rows as usize * 5328;
-            if bytes <= self.request_staging.buffer.bytes {
+            let bytes = rows as usize * if self.full_request { 5328 } else { 24 };
+            if !self.full_request {
+                ensure!(bytes <= self.request_staging.buffer.bytes, "local route staging too small");
+                let ids = std::slice::from_raw_parts_mut(self.request_staging.buffer.ptr.cast::<u8>(), bytes);
+                self.stream.library.copy_d2h_async(ids, self.b(3), self.stream.raw)?;
+            } else if bytes <= self.request_staging.buffer.bytes {
                 let staging = std::slice::from_raw_parts_mut(
                     self.request_staging.buffer.ptr.cast::<u8>(),
                     bytes,
@@ -484,27 +576,33 @@ impl BackboneRouterWave<'_, '_> {
             routing: b(4, 24),
             tokens: &self.tokens,
             request_staging: self.request_staging.buffer,
+            full_request: self.full_request,
             origin: self.origin,
             _owner: PhantomData,
         })
     }
     /// Clear only this layer; other layers retain their captured shape.
-    pub fn enable_small_graph_shapes(&mut self) { self.graphs.enable_small_shapes(); }
+    pub fn enable_small_graph_shapes(&mut self) {
+        self.graphs.enable_small_shapes();
+        self.other_graphs.enable_small_shapes();
+    }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.invalidate();
         self.synchronize()?;
         unsafe {
-            self.graphs.remove(self.layer)?;
+            let current = self.graphs.remove(self.layer);
+            let other = self.other_graphs.remove(self.layer);
+            current.and(other)?;
         }
         Ok(())
     }
 }
 impl Drop for BackboneRouterWave<'_, '_> {
     fn drop(&mut self) {
-        if let Err(e) = self
-            .synchronize()
-            .and_then(|()| unsafe { self.graphs.clear() })
-        {
+        let drained = self.synchronize();
+        let current = unsafe { self.graphs.clear() };
+        let other = unsafe { self.other_graphs.clear() };
+        if let Err(e) = drained.and(current).and(other) {
             tracing::error!(%e,"draining backbone router");
         }
     }
@@ -531,6 +629,17 @@ impl BoundExpertRequest {
     }
 }
 impl RouterOutput<'_> {
+    pub fn validate_request_rows(&self, rows: &[ExpertRow]) -> Result<QueryBinding> {
+        let binding = self.binding()?;
+        ensure!(
+            binding.layer() == self.layer
+                && rows.len() == self.rows as usize
+                && self.tokens.len() == rows.len()
+                && rows.iter().zip(self.tokens).all(|(r, &p)| r.position == p),
+            "router request rows differ from block"
+        );
+        Ok(binding)
+    }
     /// # Safety
     /// The completed output and its owning stream remain exclusively borrowed
     /// until all transfers drain, including after a partial enqueue failure.
@@ -538,6 +647,7 @@ impl RouterOutput<'_> {
         &self,
         library: &NativeLibrary,
     ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+        ensure!(self.full_request, "local router output has no remote request payload");
         let bytes = self.rows as usize * 5328;
         if bytes > self.request_staging.bytes {
             let mut hidden = vec![0; self.rows as usize * 5280];
@@ -573,14 +683,7 @@ impl RouterOutput<'_> {
         };
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT: AtomicU64 = AtomicU64::new(1);
-        let binding = self.binding()?;
-        ensure!(
-            binding.layer() == self.layer
-                && rows.len() == self.rows as usize
-                && self.tokens.len() == rows.len()
-                && rows.iter().zip(self.tokens).all(|(r, &p)| r.position == p),
-            "router request rows differ from block"
-        );
+        let binding = self.validate_request_rows(rows)?;
         let request_id = NEXT
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .ok()
