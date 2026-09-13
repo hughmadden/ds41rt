@@ -264,7 +264,8 @@ impl LaneFfn<'_, '_, '_> {
                 }
                 return result;
             }
-            ensure!(shared.is_some(), "decoder shared TP2 execution required");
+            let tp2_shared = transport.has_tp2_shared_layer(input.layer);
+            ensure!(shared.is_some() || tp2_shared, "decoder shared TP2 execution required");
             let request = unsafe { routed.expert_request(library, placement, rows)? };
             if let Some(capture) = route_capture.as_deref_mut() {
                 let output = &mut capture[input.layer];
@@ -275,6 +276,13 @@ impl LaneFfn<'_, '_, '_> {
             let routed_us = timing.elapsed().as_micros() as u64;
             let pending = transport.dispatch_ffn(&request).await?;
             let dispatched_us = timing.elapsed().as_micros() as u64;
+            if tp2_shared {
+                let result = unsafe { pending.finish_tp2(input).await };
+                tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
+                    dispatch_us=dispatched_us-routed_us, shared_and_collect_us=timing.elapsed().as_micros() as u64-dispatched_us,
+                    "target experts with TP2 shared");
+                return result;
+            }
             let shared = shared.as_mut().context("decoder shared TP2 execution required")?;
             let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
                     else { shared.execute_ffn(input)? } };

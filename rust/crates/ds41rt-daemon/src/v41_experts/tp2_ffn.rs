@@ -104,6 +104,74 @@ impl<'a> Wave<'a> {
         layer < self.layers
     }
 
+    pub fn contains_shared(&self, layer: usize) -> bool {
+        self.shared.contains(layer)
+    }
+
+    /// Execute only the shared TP2 contribution while decoder routed experts
+    /// run on Sparks. Reuses the encoder FFN's lane-local input/shared storage.
+    /// # Safety
+    /// Completed normalized input remains immutable through completion or drain.
+    pub async unsafe fn execute_shared(
+        &mut self,
+        layer: usize,
+        rows: u32,
+        values: Ds41rtDeviceBuffer,
+    ) -> Result<Ds41rtDeviceBuffer> {
+        ensure!(
+            self.contains_shared(layer)
+                && rows > 0
+                && rows <= self.capacity
+                && matches!(values.device_id, 0 | 1)
+                && !values.ptr.is_null()
+                && values.bytes >= rows as usize * 10240,
+            "TP2 shared input layer/device/extent differs"
+        );
+        let local = values.device_id as usize;
+        let remote = 1 - local;
+        let upload = &self.streams[remote];
+        struct Drain<'s, 'a> {
+            stream: &'s Stream<'a>,
+            complete: bool,
+        }
+        impl Drop for Drain<'_, '_> {
+            fn drop(&mut self) {
+                if !self.complete {
+                    if let Err(error) = self.stream.drain() {
+                        tracing::error!(%error,"draining TP2 shared input upload");
+                    }
+                }
+            }
+        }
+        let mut guard = Drain {
+            stream: upload,
+            complete: false,
+        };
+        upload.wait().await?;
+        let peer = self.peers[remote].values.buffer;
+        upload.device.run(|| unsafe {
+            upload
+                .device
+                .library
+                .copy_peer_async(peer, values, rows as usize * 10240, upload.raw)
+        })?;
+        let mut inputs = [values; 2];
+        inputs[remote] = peer;
+        let output = unsafe {
+            self.shared
+                .execute(
+                    layer,
+                    rows,
+                    local,
+                    inputs,
+                    [&self.streams[0], &self.streams[1]],
+                )
+                .await?
+        };
+        guard.complete = true;
+        Ok(output)
+    }
+
     /// # Safety
     /// Local inputs are complete, immutable, and retained through return or
     /// cancellation. They all represent the same normalized FFN rows. Each lane
@@ -241,20 +309,25 @@ mod tests {
             Rc::new(RankWeights::load(devices[0], &catalog, 1, 4_000_000_000)?),
             Rc::new(RankWeights::load(devices[1], &catalog, 1, 4_000_000_000)?),
         ];
-        let shared = [
-            Rc::new(vec![SharedWeights::load(
-                devices[0],
-                &catalog,
-                0,
-                SharedWeights::load_peak_device_bytes(),
-            )?]),
-            Rc::new(vec![SharedWeights::load(
-                devices[1],
-                &catalog,
-                0,
-                SharedWeights::load_peak_device_bytes(),
-            )?]),
-        ];
+        let shared: [Rc<Vec<SharedWeights<'_>>>; 2] = [0, 1]
+            .map(|rank| {
+                (0..40)
+                    .map(|layer| {
+                        SharedWeights::load(
+                            devices[rank],
+                            &catalog,
+                            layer,
+                            SharedWeights::load_peak_device_bytes(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>>>()
+                    .map(Rc::new)
+            })
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?
+            .try_into()
+            .ok()
+            .expect("two shared ranks");
         let mut lanes = [
             Wave::new(routed.clone(), shared.clone(), 1, 16)?,
             Wave::new(routed.clone(), shared.clone(), 1, 16)?,
@@ -271,6 +344,60 @@ mod tests {
         ];
         let producers = [Stream::new(devices[0])?, Stream::new(devices[1])?];
         let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        assert!(lanes[0].contains_shared(39));
+        assert!(!lanes[0].contains_shared(40));
+        assert!(!lanes[0].contains(20));
+        for layer in [20, 39] {
+            for rows in [1u32, 16, 1] {
+                for local in 0..2 {
+                    let host: Vec<u8> = (0..rows as usize * 5120)
+                        .flat_map(|i| {
+                            let value = ((i + layer + local) % 17) as f32 / 32.0 - 0.25;
+                            ((value.to_bits() >> 16) as u16).to_ne_bytes()
+                        })
+                        .collect();
+                    for rank in 0..2 {
+                        devices[rank].run(|| {
+                            devices[rank]
+                                .library
+                                .copy_h2d(reference_inputs[rank].values.buffer, &host)
+                        })?;
+                    }
+                    devices[local].run(|| {
+                        devices[local]
+                            .library
+                            .copy_h2d(inputs[local].values.buffer, &host)
+                    })?;
+                    let actual = runtime.block_on(unsafe {
+                        lanes[local].execute_shared(layer, rows, inputs[local].values.buffer)
+                    })?;
+                    let expected = runtime.block_on(unsafe {
+                        reference_shared.execute(
+                            layer,
+                            rows,
+                            local,
+                            [
+                                reference_inputs[0].values.buffer,
+                                reference_inputs[1].values.buffer,
+                            ],
+                            [&producers[0], &producers[1]],
+                        )
+                    })?;
+                    devices[local].run(|| {
+                        let mut left = vec![0; actual.bytes];
+                        let mut right = vec![0; expected.bytes];
+                        devices[local].library.copy_d2h(&mut left, actual)?;
+                        devices[local].library.copy_d2h(&mut right, expected)?;
+                        assert_eq!(
+                            left, right,
+                            "decoder shared TP2 broadcast/reduction differs"
+                        );
+                        Ok(())
+                    })?;
+                    assert_eq!(lib.cuda_get_device()?, 0);
+                }
+            }
+        }
         for (rows, bf16, fp8) in [
             (1, 0u16, 0u8),
             (16, 0x3f80, 0x38),
@@ -502,6 +629,40 @@ mod tests {
         })?;
         // Reuse the cancelled lane's same streams, events, and scratch.
         runtime.block_on(unsafe { left.execute(0, 16, a[0], a[1], a[2], a[3]) })?;
+        release.store(false, Ordering::Release);
+        devices[1].run(|| {
+            ensure!(
+                unsafe {
+                    launch(
+                        left.streams[1].raw,
+                        hold,
+                        (&release as *const AtomicBool).cast_mut().cast(),
+                    )
+                } == 0,
+                "stalling shared upload failed"
+            );
+            Ok(())
+        })?;
+        let mut blocked_shared = Box::pin(unsafe { left.execute_shared(20, 16, a[0]) });
+        let shared_unwind_release = Release(&release);
+        assert!(matches!(
+            blocked_shared.as_mut().poll(&mut context),
+            Poll::Pending
+        ));
+        std::thread::scope(|scope| -> Result<()> {
+            scope.spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                release.store(true, Ordering::Release);
+            });
+            let result = runtime.block_on(unsafe { right.execute_shared(39, 1, b[0]) });
+            let independent = !release.load(Ordering::Acquire);
+            drop(blocked_shared);
+            result?;
+            assert!(independent, "decoder shared work joined the other lane");
+            Ok(())
+        })?;
+        drop(shared_unwind_release);
+        runtime.block_on(unsafe { left.execute_shared(20, 16, a[0]) })?;
         assert_eq!(lib.cuda_get_device()?, 0);
         Ok(())
     }

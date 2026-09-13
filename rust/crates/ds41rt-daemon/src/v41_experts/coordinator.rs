@@ -38,6 +38,9 @@ impl<'a> NativeTp4Wave<'a> {
     pub fn has_tp2_layer(&self, layer: usize) -> bool {
         self.tp2.as_ref().is_some_and(|wave| wave.contains(layer))
     }
+    pub fn has_tp2_shared_layer(&self, layer: usize) -> bool {
+        self.tp2.as_ref().is_some_and(|wave| wave.contains_shared(layer))
+    }
     /// # Safety
     /// Input and router producers have completed. Both borrowed outputs remain
     /// immutable through this operation, including cancellation draining.
@@ -200,6 +203,7 @@ impl<'a> NativeTp4Wave<'a> {
             output: self.output.buffer,
             reducer: &self.reducer,
             ready_rows: &mut self.ready_rows,
+            tp2: self.tp2.as_deref_mut(),
         })
     }
 
@@ -385,6 +389,7 @@ pub(crate) struct NativePendingFfn<'w, 'a, 'r> {
     output: Ds41rtDeviceBuffer,
     reducer: &'w V41CompactReducer<'a>,
     ready_rows: &'w mut Option<u32>,
+    tp2: Option<&'w mut super::tp2_ffn::Wave<'a>>,
 }
 impl<'w> NativePendingFfn<'w, '_, '_> {
     /// # Safety
@@ -402,9 +407,30 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
         shared: &crate::v41_backbone_shared::SharedOutput<'_>) -> Result<NativeFfnOutput<'w>> {
         unsafe { self.finish_inner(shared, true).await }
     }
+    /// Run decoder shared TP2 after Spark dispatch, then reduce both results on
+    /// this coordinator's GPU. The pending owner retains all lane workspaces.
+    /// # Safety
+    /// Input is the completed normalized FFN input for the dispatched request;
+    /// its storage remains immutable through completion or cancellation drain.
+    pub async unsafe fn finish_tp2(mut self, input: &crate::v41_block::FfnInput<'_>) -> Result<NativeFfnOutput<'w>> {
+        let header = &self.request.request().header;
+        ensure!(self.request.binding() == input.binding() && header.layer_id as usize == input.layer
+            && header.row_count as usize == input.tokens.len()
+            && input.values.device_id == self.output.device_id,
+            "decoder TP2 shared input/request/device differs");
+        let values = unsafe { self.tp2.as_mut().context("decoder TP2 shared workspace missing")?
+            .execute_shared(input.layer,header.row_count,input.values).await? };
+        unsafe { self.finish_values(values,true).await }
+    }
     async unsafe fn finish_inner(self,
         shared: &crate::v41_backbone_shared::SharedOutput<'_>, cooperative: bool) -> Result<NativeFfnOutput<'w>> {
         validate_shared(self.request, shared, self.shared, self.capacity)?;
+        unsafe { self.finish_values(shared.values,cooperative).await }
+    }
+    async unsafe fn finish_values(self, values: Ds41rtDeviceBuffer, cooperative: bool) -> Result<NativeFfnOutput<'w>> {
+        ensure!(values.device_id == self.output.device_id
+            && values.bytes == self.request.request().header.row_count as usize * 10240,
+            "shared reduction device/extent differs");
         let timing = std::time::Instant::now();
         // The shared owner remains borrowed until reduction drains, so consume
         // its completed device output directly instead of copying it first.
@@ -430,10 +456,10 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
         let rows = self.request.request().header.row_count;
         if cooperative {
             unsafe { reduce_planes_cooperative(self.reducer, self.stream, self.planes,
-                self.output, Some(shared.values), rows).await?; }
+                self.output, Some(values), rows).await?; }
         } else {
             reduce_planes(self.library, self.reducer, self.stream, self.planes,
-                self.output, Some(shared.values), rows)?;
+                self.output, Some(values), rows)?;
         }
         uploads.pending = false; // uploads and reduction completed on the same stream.
         tracing::debug!(target: "ds41rt::timing", layer=self.request.request().header.layer_id, rows, shared_copy_us, upload_us, receive_us=received_us-shared_copy_us-upload_us, reduce_us=timing.elapsed().as_micros() as u64-received_us, "target collection");

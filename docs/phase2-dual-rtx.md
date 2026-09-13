@@ -647,3 +647,36 @@ TP2 before distributed decoder FFNs can execute. The existing FFN finish path
 also still copies next-layer inputs locally; a boundary-specific finish can
 omit that redundant local copy when integrating the handoff. End-to-end serving,
 loading speed, and one-/two-GPU throughput remain unqualified.
+
+## Decoder shared TP2 with dispatched Spark work
+
+The existing TP2 FFN lane now exposes a shared-only operation for decoder layers.
+It reuses its shared rank workspaces and normalized-input peer buffer, so this
+adds no GPU scratch allocation. Only normalized BF16 rows cross to the other
+rank; router IDs, routing weights, and expert-wire inputs stay out of this copy.
+Both shared ranks reduce onto the input GPU. The upload waits cooperatively for
+its own stream before submitting peer DMA, preserving the independent-lane rule.
+
+`NativePendingFfn` now retains access to the lane's TP2 workspace after Spark
+routed-work dispatch. Its TP2 completion path validates the block/request/device,
+executes the shared contribution, then uses the existing ordered Spark-plane
+reduction with that completed shared buffer. The placed backbone lane selects
+this path when shared TP2 weights cover the decoder layer. The ordinary full
+shared-expert path remains available. The coordinator must be allocated on the
+same GPU as the decoder input/output; startup selection still needs to enforce
+that placement.
+
+The real-weight fixture now loads all forty shared rank weights and checks
+layers 20 and 39 with changed 1/16/1-row inputs from either GPU. Shared-only peer
+broadcast and reduction match the independently invoked shared TP2 operation
+byte-for-byte. A held upload in one lane leaves the other lane's decoder shared
+work free to complete; pending cancellation drains and subsequent reuse passes.
+The existing encoder FFN parity and independent-lane checks pass in the same
+fixture. These tests establish the local computation and ownership behavior;
+the new coordinator completion branch still needs a live Spark-backed decoder
+run after the distributed serving loop and startup are connected. No end-to-end
+throughput or tool-quality claim follows from this checkpoint.
+
+The existing rank-upload/reduction regression also passes through 4096 rows,
+including interleaved chunks, bounds rejection, cooperative cancellation, and
+reuse. The daemon compile check passes.

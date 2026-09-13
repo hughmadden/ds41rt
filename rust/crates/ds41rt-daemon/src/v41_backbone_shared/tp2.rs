@@ -23,6 +23,9 @@ impl<'a> Wave<'a> {
         RankWave::device_bytes(library, capacity)?.checked_add(capacity as usize*5120*4)
             .context("shared TP2 workspace overflow")
     }
+    pub fn contains(&self, layer: usize) -> bool {
+        self.ranks.iter().all(|rank| rank.weights.get(layer).is_some_and(|w| w.layer == layer))
+    }
     pub fn new(weights: [Rc<Vec<Weights<'a>>>; 2], capacity: u32) -> Result<Self> {
         ensure!(!weights[0].is_empty() && weights[0].len() == weights[1].len(), "shared TP2 rank layers differ");
         let d0 = weights[0][0].device;
