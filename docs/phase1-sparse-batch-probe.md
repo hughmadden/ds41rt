@@ -82,7 +82,11 @@ compute-sanitizer --tool memcheck --error-exitcode 1 \
 Select only the Phase 1 RTX with Docker `--gpus device=GPU-...`. Output files must
 be new. The original audit directory was `/tmp/ds41-phase1-sparse-batch`.
 
-## Integration work remaining
+## Integration follow-up
+
+The subsequent implementation and serving measurements are tracked in
+[batched sparse attention in serving](phase1-sparse-batch-serving.md). The following
+requirements were identified by this isolated probe:
 
 Validate and upload current per-row descriptors into wave-owned storage before
 graph replay; retain all borrowed allocations until stream completion. Make the

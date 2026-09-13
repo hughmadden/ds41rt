@@ -25,6 +25,7 @@ def main():
     parser.add_argument('--baseline', required=True)
     parser.add_argument('--candidate', required=True)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--serving-native', action='store_true', help='Exercise public batch validation and launch ABI')
     parser.add_argument('--skip-timing', action='store_true', help='Numerical and replay checks only, for sanitizer runs')
     args = parser.parse_args()
     assert not args.output.exists()
@@ -33,13 +34,16 @@ def main():
     torch.manual_seed(7183)
     baseline, candidate = (C.CDLL(p) for p in (args.baseline, args.candidate))
     assert baseline.ds41rt_v41_sparse_attention_initialize() == 0
-    assert candidate.ds41rt_probe_sparse_batch_initialize() == 0
+    assert (candidate.ds41rt_v41_sparse_attention_initialize() if args.serving_native else candidate.ds41rt_probe_sparse_batch_initialize()) == 0
     old = baseline.ds41rt_v41_sparse_attention_bounded
     old.argtypes = [C.c_void_p]*5 + [C.c_int32, C.c_int32, C.POINTER(View), C.c_void_p,
         C.c_void_p, C.c_void_p, C.c_uint64, C.c_int32]
-    new = candidate.ds41rt_probe_sparse_batch
+    new = candidate.ds41rt_v41_sparse_attention_batch if args.serving_native else candidate.ds41rt_probe_sparse_batch
     new.argtypes = [C.c_void_p]*5 + [C.c_int32] + [C.c_void_p]*4 + [C.c_int32]*2
-    results, timings = [], []
+    validator = candidate.ds41rt_v41_sparse_attention_batch_validate if args.serving_native else None
+    if validator is not None:
+        validator.argtypes = [C.c_void_p]*5 + [C.c_int32, C.POINTER(View)] + [C.c_void_p]*3 + [C.c_uint64, C.c_int32, C.c_int32]
+    results, timings, rejections, capacity_checks = [], [], [], []
     for compressed in (0, 1, 2):
         parts = 10 if compressed else 2
         # Distinct allocations for each request, including private compressor rows.
@@ -55,7 +59,7 @@ def main():
                     scales[slot] = torch.full((capacities[slot], 32), 56, device='cuda', dtype=torch.uint8)
             end = torch.zeros(1, device='cuda', dtype=torch.uint64)
             source_end = torch.tensor([512], device='cuda', dtype=torch.uint64)
-            pages = torch.tensor([1, 0], device='cuda', dtype=torch.int32)
+            pages = torch.tensor([2, 0], device='cuda', dtype=torch.int32)
             view = View((C.c_void_p*4)(*[v.data_ptr() for v in values]),
                 (C.c_void_p*4)(*[s.data_ptr() for s in scales]), end.data_ptr(), pages.data_ptr(),
                 source_end.data_ptr(), 6, 768, 3, 2, compressed)
@@ -88,7 +92,7 @@ def main():
                 stream = torch.cuda.current_stream().cuda_stream
                 status = new(query.data_ptr(), sink.data_ptr(), metadata.data_ptr(), selected.data_ptr(),
                     output.data_ptr(), rows, descriptors.data_ptr(), stream, bounds.data_ptr(),
-                    scratch.data_ptr(), parts, int(compressed == 2))
+                    scratch.data_ptr(), parts, compressed if args.serving_native else int(compressed == 2))
                 assert status == 0, status
             for iteration, start in enumerate((49, 60, 63, 124, 127, 128, 2048, 4096, 32768, 131072, 4096)):
                 shift = iteration % len(base_layout)
@@ -107,6 +111,23 @@ def main():
                 metadata.copy_(torch.tensor(meta, device='cuda', dtype=torch.uint64))
                 bounds.copy_(torch.tensor(lower, device='cuda', dtype=torch.uint64))
                 descriptors.copy_(torch.tensor(list(packed), device='cuda', dtype=torch.uint8))
+                if validator is not None:
+                    host_views = (View*rows).from_buffer_copy(packed)
+                    validation_args = [query.data_ptr(), sink.data_ptr(), metadata.data_ptr(), selected.data_ptr(),
+                        output.data_ptr(), rows, host_views, descriptors.data_ptr(), bounds.data_ptr(),
+                        scratch.data_ptr(), scratch.numel()*4, parts, compressed]
+                    assert validator(*validation_args) == 0
+                    if iteration == 0:
+                        for name, index, value in [('descriptor-query-alias', 7, query.data_ptr()),
+                            ('descriptor-cache-alias', 7, views[0].values[0]),
+                            ('bounds-output-alias', 8, output.data_ptr()),
+                            ('scratch-output-alias', 9, output.data_ptr()),
+                            ('scratch-undersized', 10, 4), ('wrong-parts', 11, 1),
+                            ('too-many-rows', 5, 49), ('wrong-format', 12, 1 if compressed != 1 else 2)]:
+                            bad = list(validation_args)
+                            bad[index] = value
+                            assert validator(*bad) != 0, name
+                            rejections.append(dict(compressed=compressed, rows=rows, case=name))
                 if graph is None:
                     launch_new()
                     torch.cuda.synchronize()
@@ -122,6 +143,20 @@ def main():
                 assert torch.equal(reference, output), (compressed, layout, start,
                     (reference.float()-output.float()).abs().max().item())
                 results.append(dict(compressed=compressed, layout=layout, start=start, bit_exact=True))
+            if compressed == 2:
+                # Reproduce the stale FP8 byte-divisor bug: upper physical pages
+                # disappear if capacity is inferred as values.bytes / 512.
+                for view in views:
+                    view.source_capacity = 384
+                launch_old()
+                torch.cuda.synchronize()
+                assert not torch.equal(reference, output), 'upper-pool fixture must detect halved FP4 capacity'
+                for view in views:
+                    view.source_capacity = 768
+                launch_old()
+                torch.cuda.synchronize()
+                assert torch.equal(reference, output)
+                capacity_checks.append(dict(rows=rows, upper_pool_page=2, detects_halved_capacity=True))
             if args.skip_timing:
                 continue
             # Last state has valid bounds; interleave both arms in alternating order.
@@ -146,7 +181,7 @@ def main():
                 scratch_bytes=scratch.numel()*4, baseline_us=statistics.median(samples[0]),
                 candidate_us=statistics.median(samples[1]), samples_us=samples))
             print(timings[-1] | {'samples_us': 'omitted'}, flush=True)
-    args.output.write_text(json.dumps(dict(scope=__doc__, cases=results, timings=timings), indent=2)+'\n')
+    args.output.write_text(json.dumps(dict(scope=__doc__, cases=results, timings=timings, validation_rejections=rejections, capacity_checks=capacity_checks), indent=2)+'\n')
     print(f'PASS {len(results)} byte-exact cases with changed descriptor graph replay', flush=True)
 
 if __name__ == '__main__':

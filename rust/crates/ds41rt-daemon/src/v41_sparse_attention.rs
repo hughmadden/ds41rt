@@ -7,7 +7,7 @@ use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_window::WindowProposal;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
-    Ds41rtDeviceBuffer, NativeLibrary, V41SparseAttention, V41SparseSource, V41SparseWindow,
+    Ds41rtDeviceBuffer, NativeLibrary, V41SparseAttention, V41SparseBatch, V41SparseSource, V41SparseWindow, V41Kv,
 };
 use std::{collections::VecDeque, ffi::c_void, marker::PhantomData};
 
@@ -42,18 +42,22 @@ pub(crate) struct SparseAttentionWave<'a> {
     query: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     split_scratch: DeviceAllocation<'a>,
+    descriptors: DeviceAllocation<'a>,
+    descriptor_staging: HostAllocation<'a>,
     replay_begins: DeviceAllocation<'a>,
     metadata: DeviceAllocation<'a>,
     staging: HostAllocation<'a>,
     replay_staging: HostAllocation<'a>,
     capacity: usize,
-    // Complete external-pointer and launch-geometry fingerprints are checked
+    // Batched keys retain row count and stable wave/selection/sink storage;
+    // current descriptors are validated and uploaded before EVERY replay.
+    // For other paths, complete external-pointer and launch-geometry fingerprints are checked
     // against live proposals before every replay. Inactive graphs never launch.
     // Adaptive mode keeps at most 48 variants per layer, including prefill;
     // request layouts can have many more combinations than total row counts.
     graphs: [VecDeque<(*mut c_void, Vec<usize>)>; 40],
     graph_limit: usize,
-    warmed_kernels: u8,
+    warmed_kernels: u16,
 }
 struct RequestLaunch {
     window: V41SparseWindow,
@@ -73,7 +77,8 @@ impl<'a> SparseAttentionWave<'a> {
             (1..=4096).contains(&capacity),
             "invalid sparse attention capacity"
         );
-        Ok(capacity * 131160 + V41SparseAttention::split_scratch_bytes(capacity.min(16), 10)?)
+        Ok(capacity * 131160 + V41SparseAttention::split_scratch_bytes(capacity.min(48), 10)?
+            + V41SparseAttention::batch_descriptor_bytes(capacity.min(48))?)
     }
     pub fn new(library: &'a NativeLibrary, capacity: usize, budget: usize) -> Result<Self> {
         ensure!(
@@ -90,8 +95,10 @@ impl<'a> SparseAttentionWave<'a> {
             output: DeviceAllocation::new(library, capacity * 65536)?,
             split_scratch: DeviceAllocation::new(
                 library,
-                V41SparseAttention::split_scratch_bytes(capacity.min(16), 10)?,
+                V41SparseAttention::split_scratch_bytes(capacity.min(48), 10)?,
             )?,
+            descriptors: DeviceAllocation::new(library, V41SparseAttention::batch_descriptor_bytes(capacity.min(48))?)?,
+            descriptor_staging: HostAllocation::new(library, V41SparseAttention::batch_descriptor_bytes(capacity.min(48))?)?,
             replay_begins: DeviceAllocation::new(library, capacity * 8)?,
             metadata: DeviceAllocation::new(library, capacity * 80)?,
             staging: HostAllocation::new(library, capacity * 80)?,
@@ -130,7 +137,13 @@ impl<'a> SparseAttentionWave<'a> {
         sink: Ds41rtDeviceBuffer,
         launches: &[RequestLaunch],
         selected: Option<Ds41rtDeviceBuffer>,
+        batch: Option<&V41SparseBatch>,
     ) -> Result<()> {
+        if let Some(batch) = batch {
+            return unsafe { self.kernel.launch_batch(batch, self.query.buffer, sink,
+                self.metadata.buffer, selected, self.output.buffer, self.descriptors.buffer,
+                self.replay_begins.buffer, self.split_scratch.buffer, self.stream.raw) };
+        }
         let mut offset = 0;
         for l in launches {
             unsafe {
@@ -318,7 +331,7 @@ impl<'a> SparseAttentionWave<'a> {
                 proposal_scales: s.kv_scales,
                 pages: s.kv_cache.device_pages,
                 end: s.kv_cache.device_rows,
-                capacity: s.kv_cache.values.bytes / 512,
+                capacity: s.kv_cache.values.bytes / V41Kv::COMPRESSED_VALUE_BYTES,
                 proposal_capacity: s.capacity,
                 page_stride: s.kv_cache.device_pages.bytes / 4,
             });
@@ -369,6 +382,25 @@ impl<'a> SparseAttentionWave<'a> {
         } else {
             None
         };
+        // Only small multi-request split launches use descriptor batching. C1
+        // and large prefill retain their existing arithmetic and dispatch.
+        let batch = if self.kernel.supports_batch() && launches.len() > 1 && rows <= 48
+            && launches.iter().all(|launch| launch.rows <= 16) {
+            let bindings: Vec<_> = launches.iter()
+                .map(|launch| (&launch.window, launch.source.as_ref(), launch.rows)).collect();
+            let batch = self.kernel.prepare_batch(self.query.buffer, sink, self.metadata.buffer,
+                selected, &bindings, self.output.buffer, self.descriptors.buffer,
+                self.replay_begins.buffer, self.split_scratch.buffer)?;
+            self.descriptor_staging.bytes_mut()[..batch.bytes().len()].copy_from_slice(batch.bytes());
+            unsafe { self.stream.library.copy_host_buffer_h2d_async(self.descriptors.buffer,
+                self.descriptor_staging.buffer, batch.bytes().len(), self.stream.raw)?; }
+            // The kernel reads current descriptors rather than capturing external
+            // cache pointers or request row counts. Selection is lane-owned and
+            // stable; still include its address to guard any future owner change.
+            fingerprint = vec![usize::MAX, layer, rows, sink.ptr as usize,
+                selected.map_or(0, |buffer| buffer.ptr as usize)];
+            Some(batch)
+        } else { None };
         for (i, m) in metadata.into_iter().enumerate() {
             self.staging.bytes_mut()[i * 8..i * 8 + 8].copy_from_slice(&m.to_ne_bytes());
         }
@@ -377,7 +409,7 @@ impl<'a> SparseAttentionWave<'a> {
                 self.metadata.buffer, self.staging.buffer, rows * 80, self.stream.raw,
             )?;
         }
-        if requests.iter().any(|r| r.window.cache.begin != 0) {
+        if batch.is_some() || requests.iter().any(|r| r.window.cache.begin != 0) {
             let mut row = 0;
             for request in requests {
                 for _ in request.positions {
@@ -400,9 +432,10 @@ impl<'a> SparseAttentionWave<'a> {
             self.graphs[layer].push_back(entry);
             graph
         } else {
-            tracing::debug!(target: "ds41rt::timing", layer, rows, "sparse graph capture");
+            tracing::debug!(target: "ds41rt::timing", layer, rows, batched = batch.is_some(), "sparse graph capture");
             self.synchronize()?;
-            if self.graphs[layer].len() >= self.graph_limit {
+            let limit = if batch.is_some() { 48 } else { self.graph_limit };
+            if self.graphs[layer].len() >= limit {
                 let (old, _) = self.graphs[layer].pop_front().unwrap();
                 unsafe { self.stream.library.cuda_graph_exec_destroy(old)?; }
             }
@@ -410,13 +443,13 @@ impl<'a> SparseAttentionWave<'a> {
             // unsplit single-group, two-group and four-group. Changing pointers
             // or launch dimensions does not require executing a warmed recipe
             // again before capture. Keep the fixed-policy path unchanged.
-            let needed = launches.iter().fold(0u8, |mask, launch| {
+            let needed = if batch.is_some() { 1u16 << (8 + usize::from(selected.is_some())) } else { launches.iter().fold(0u16, |mask, launch| {
                 let recipe = if launch.rows <= 16 { 0 } else if launch.rows < 128 { 1 }
                     else if launch.rows < 256 { 2 } else { 3 };
                 mask | (1 << (recipe + 4 * usize::from(launch.source.is_some())))
-            });
-            if self.graph_limit == 1 || self.warmed_kernels & needed != needed {
-                let launched = unsafe { self.enqueue(sink, &launches, selected) };
+            }) };
+            if (batch.is_none() && self.graph_limit == 1) || self.warmed_kernels & needed != needed {
+                let launched = unsafe { self.enqueue(sink, &launches, selected, batch.as_ref()) };
                 launched.and(self.synchronize())?;
                 self.warmed_kernels |= needed;
             }
@@ -425,7 +458,7 @@ impl<'a> SparseAttentionWave<'a> {
                     .library
                     .cuda_graph_begin_capture(self.stream.raw)?;
             }
-            let launched = unsafe { self.enqueue(sink, &launches, selected) };
+            let launched = unsafe { self.enqueue(sink, &launches, selected, batch.as_ref()) };
             let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
             match (launched, captured) {
                 (Ok(()), Ok(g)) => {

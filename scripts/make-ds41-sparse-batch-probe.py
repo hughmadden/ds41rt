@@ -8,10 +8,11 @@ args = parser.parse_args()
 assert not args.output.exists()
 p = Path(__file__).resolve().parents[1] / 'native/cuda/kernels/v41_sparse_attention.cu'
 s = p.read_text()
-assert s.count('template<bool Split,int Groups=1,bool SourceFP4=false>') == 1
-assert s.count('ds41rt_v41_sparse_kv_t v,float* partial,\n    const uint64_t* window_begins) {') == 1
-s = s.replace('template<bool Split,int Groups=1,bool SourceFP4=false>', 'template<bool Split,int Groups=1,bool SourceFP4=false,bool Batched=false>')
-s=s.replace('ds41rt_v41_sparse_kv_t v,float* partial,\n    const uint64_t* window_begins) {', 'ds41rt_v41_sparse_kv_t uniform_view,float* partial,\n    const uint64_t* window_begins,const ds41rt_v41_sparse_kv_t* row_views=nullptr) {\n  const auto& v=Batched?row_views[blockIdx.x]:uniform_view;')
+if 'bool SourceFP4=false,bool Batched=false>' not in s:
+    assert s.count('template<bool Split,int Groups=1,bool SourceFP4=false>') == 1
+    assert s.count('ds41rt_v41_sparse_kv_t v,float* partial,\n    const uint64_t* window_begins) {') == 1
+    s = s.replace('template<bool Split,int Groups=1,bool SourceFP4=false>', 'template<bool Split,int Groups=1,bool SourceFP4=false,bool Batched=false>')
+    s=s.replace('ds41rt_v41_sparse_kv_t v,float* partial,\n    const uint64_t* window_begins) {', 'ds41rt_v41_sparse_kv_t uniform_view,float* partial,\n    const uint64_t* window_begins,const ds41rt_v41_sparse_kv_t* row_views=nullptr) {\n  const auto& v=Batched?row_views[blockIdx.x]:uniform_view;')
 assert 'const auto& v=Batched' in s
 s+='''
 // Isolated probe ABI: caller supplies validated device descriptors and disjoint

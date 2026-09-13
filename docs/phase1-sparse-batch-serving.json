@@ -1,0 +1,3520 @@
+{
+  "scope": "Small multi-request sparse batching: sequential exploratory serving comparison; no release qualification claim.",
+  "hardware": {
+    "rtx": "one RTX PRO 6000 Blackwell, GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+    "power_limit_w": 400,
+    "memory": "standard speed, max 14001 MHz; no memory overclock",
+    "sparks": "four resident workers, unchanged"
+  },
+  "settings": {
+    "port": 8000,
+    "concurrency": 16,
+    "prompt_snapshots": 24,
+    "retained_turns": 24,
+    "draft_limit": 5,
+    "thinking": "disabled for these performance prompts",
+    "c1_repeats": 3,
+    "decode_nonce_seed": 55001,
+    "mixed_nonce_seed": 56001,
+    "runtime_log": "warn"
+  },
+  "fixed_before_after": {
+    "scope": "Both arms use fixed policy; before is per-request sparse, after is batched sparse.",
+    "source_sha256": {
+      "before_decode": "51a15ee28cae611751dff60d3905e5aa03660104d4d27dad51116d0f6591e349",
+      "before_mixed": "c2392f1c8c4af6ec47c80374c5db4ce7204177ee041f42393c35bebb378a9fe9",
+      "after_decode": "0bc3cd237544cd2b9869dbd82f158ec982c1bc3517a6106321c0131698da88c4",
+      "after_mixed": "af8029c68f19734c1830b126c77fc34331cc34172a8025877f03ae20a5c2e822"
+    },
+    "decode": {
+      "code": {
+        "before_tps": 119.11487734445895,
+        "after_tps": 120.81711617432126,
+        "after_over_before": 1.014290732340174
+      },
+      "fable": {
+        "before_tps": 46.00016181033998,
+        "after_tps": 46.30625198801282,
+        "after_over_before": 1.006654110890628
+      },
+      "topic": {
+        "before_tps": 63.00269222607452,
+        "after_tps": 63.58567512683798,
+        "after_over_before": 1.0092533014092717
+      }
+    },
+    "mixed": [
+      {
+        "concurrency": 4,
+        "before_tps": 101.62683482788354,
+        "after_tps": 109.2053606960115,
+        "after_over_before": 1.074572093886059,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      },
+      {
+        "concurrency": 16,
+        "before_tps": 164.47433861037368,
+        "after_tps": 167.72564061347057,
+        "after_over_before": 1.0197678375275243,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 4,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 5,
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 6,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 7,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 8,
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 9,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 10,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 11,
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 12,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 13,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 14,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 15,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      }
+    ],
+    "lifecycle": {
+      "before": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 5.893495190888643,
+        "cold_prompt_tokens_per_ttft_second": 5568.003186077434,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      },
+      "after": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 5.900025796028785,
+        "cold_prompt_tokens_per_ttft_second": 5561.840089256433,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      }
+    },
+    "decode_pairs": [
+      {
+        "case": "code",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      }
+    ],
+    "limitations": [
+      "Exploratory sequential arms, not a balanced release comparison.",
+      "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+      "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+      "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+    ]
+  },
+  "adaptive_before_after": {
+    "scope": "Both arms use adaptive policy; before is per-request sparse, after is batched sparse.",
+    "source_sha256": {
+      "before_decode": "998793af43c74ff37742431f85b590e8c1819c5d02b4cf661ccaf97946eecd50",
+      "before_mixed": "e4512b3296891ef4db5fc8b4ffd8018ae4bd18172ad29ae077c008b58c3ee093",
+      "after_decode": "a59d7e54827b7a3dcb035bd8d2e8182e4e321472ad1776badc28f52acbfe4058",
+      "after_mixed": "a91e4b6a25e45af439ef2ce26618735cf927849f29385104968bbf60aac3304f"
+    },
+    "decode": {
+      "code": {
+        "before_tps": 122.22469148899422,
+        "after_tps": 122.06311825892233,
+        "after_over_before": 0.9986780639156987
+      },
+      "fable": {
+        "before_tps": 52.99578027174623,
+        "after_tps": 52.61298880401765,
+        "after_over_before": 0.9927769443950869
+      },
+      "topic": {
+        "before_tps": 66.40977177006789,
+        "after_tps": 65.83222055966304,
+        "after_over_before": 0.9913032194658865
+      }
+    },
+    "mixed": [
+      {
+        "concurrency": 4,
+        "before_tps": 101.89744471309116,
+        "after_tps": 102.19069249578435,
+        "after_over_before": 1.0028778718006017,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      },
+      {
+        "concurrency": 16,
+        "before_tps": 151.3739677451425,
+        "after_tps": 182.80487616394464,
+        "after_over_before": 1.2076374748379466,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 4,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 5,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 6,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 7,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 8,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 9,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 10,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 11,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 12,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 13,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 14,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 15,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "after_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      }
+    ],
+    "lifecycle": {
+      "before": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 5.961261086980812,
+        "cold_prompt_tokens_per_ttft_second": 5504.707732339861,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      },
+      "after": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 5.886706523015164,
+        "cold_prompt_tokens_per_ttft_second": 5574.424318879107,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      }
+    },
+    "decode_pairs": [
+      {
+        "case": "code",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "after_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      }
+    ],
+    "limitations": [
+      "Exploratory sequential arms, not a balanced release comparison.",
+      "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+      "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+      "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput.",
+      "Before data is the earlier warmup milestone, not a fresh rerun."
+    ]
+  },
+  "same_binary_policy_comparison": {
+    "scope": "Compare identical-input fixed/adaptive probes without claiming prose quality.",
+    "source_sha256": {
+      "fixed_decode": "0bc3cd237544cd2b9869dbd82f158ec982c1bc3517a6106321c0131698da88c4",
+      "fixed_mixed": "af8029c68f19734c1830b126c77fc34331cc34172a8025877f03ae20a5c2e822",
+      "adaptive_decode": "a59d7e54827b7a3dcb035bd8d2e8182e4e321472ad1776badc28f52acbfe4058",
+      "adaptive_mixed": "a91e4b6a25e45af439ef2ce26618735cf927849f29385104968bbf60aac3304f"
+    },
+    "decode": {
+      "code": {
+        "fixed_tps": 120.81711617432126,
+        "adaptive_tps": 122.06311825892233,
+        "adaptive_over_fixed": 1.010313125524394
+      },
+      "fable": {
+        "fixed_tps": 46.30625198801282,
+        "adaptive_tps": 52.61298880401765,
+        "adaptive_over_fixed": 1.136196227188446
+      },
+      "topic": {
+        "fixed_tps": 63.58567512683798,
+        "adaptive_tps": 65.83222055966304,
+        "adaptive_over_fixed": 1.0353309991337476
+      }
+    },
+    "mixed": [
+      {
+        "concurrency": 4,
+        "fixed_tps": 109.2053606960115,
+        "adaptive_tps": 102.19069249578435,
+        "adaptive_over_fixed": 0.9357662649935888,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      },
+      {
+        "concurrency": 16,
+        "fixed_tps": 167.72564061347057,
+        "adaptive_tps": 182.80487616394464,
+        "adaptive_over_fixed": 1.0899041762208836,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 4,
+            "case": "fable",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 5,
+            "case": "topic",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 6,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 7,
+            "case": "fable",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 8,
+            "case": "topic",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 9,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 10,
+            "case": "fable",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 11,
+            "case": "topic",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 12,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 13,
+            "case": "fable",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 14,
+            "case": "topic",
+            "exact": false,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 15,
+            "case": "code",
+            "exact": true,
+            "fixed_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "adaptive_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      }
+    ],
+    "lifecycle": {
+      "fixed": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 5.900025796028785,
+        "cold_prompt_tokens_per_ttft_second": 5561.840089256433,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      },
+      "adaptive": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 5.886706523015164,
+        "cold_prompt_tokens_per_ttft_second": 5574.424318879107,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      }
+    },
+    "decode_pairs": [
+      {
+        "case": "code",
+        "repeat": 1,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 1,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 1,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 2,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 2,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 2,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 3,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 3,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 3,
+        "exact": true,
+        "fixed_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "adaptive_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      }
+    ],
+    "limitations": [
+      "Exploratory sequential arms, not a balanced release comparison.",
+      "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+      "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+      "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+    ]
+  },
+  "instrumented_timing": {
+    "before": {
+      "source_sha256": "8167273abbf67033c7bd2de771fced57672f4d7e41f6e91387159e017f7a0ae7",
+      "requests": 16,
+      "rounds": 42,
+      "median_sparse_ms": 27.6225,
+      "median_verify_ms": 160.729,
+      "median_total_ms": 176.693,
+      "median_proposed": 43.0,
+      "median_emitted": 50.0,
+      "rounds_with_captures": 36,
+      "median_sparse_ms_with_captures": 28.087,
+      "raw_rounds": [
+        {
+          "sparse_us": 75788,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 46,
+          "emitted": 62,
+          "draft_us": 17672,
+          "prepare_us": 79,
+          "verify_us": 186058,
+          "total_us": 207485,
+          "capture_count": 720,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 23367,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 11507,
+          "prepare_us": 60,
+          "verify_us": 176796,
+          "total_us": 191358,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 23408,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 39,
+          "emitted": 55,
+          "draft_us": 11580,
+          "prepare_us": 66,
+          "verify_us": 178968,
+          "total_us": 193602,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 23556,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 47,
+          "emitted": 63,
+          "draft_us": 11628,
+          "prepare_us": 66,
+          "verify_us": 179235,
+          "total_us": 194061,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 29810,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 40,
+          "emitted": 56,
+          "draft_us": 11925,
+          "prepare_us": 61,
+          "verify_us": 160342,
+          "total_us": 175820,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 27603,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 25,
+          "accepted": 15,
+          "emitted": 31,
+          "draft_us": 11566,
+          "prepare_us": 48,
+          "verify_us": 148628,
+          "total_us": 163775,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25827,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 23,
+          "accepted": 14,
+          "emitted": 30,
+          "draft_us": 11572,
+          "prepare_us": 50,
+          "verify_us": 130678,
+          "total_us": 145799,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 26925,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 24,
+          "accepted": 17,
+          "emitted": 33,
+          "draft_us": 11604,
+          "prepare_us": 50,
+          "verify_us": 135814,
+          "total_us": 150957,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 26404,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 29,
+          "accepted": 21,
+          "emitted": 37,
+          "draft_us": 11973,
+          "prepare_us": 47,
+          "verify_us": 151023,
+          "total_us": 166520,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25331,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 35,
+          "accepted": 29,
+          "emitted": 45,
+          "draft_us": 12083,
+          "prepare_us": 52,
+          "verify_us": 147923,
+          "total_us": 163490,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 28904,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 39,
+          "accepted": 33,
+          "emitted": 49,
+          "draft_us": 12335,
+          "prepare_us": 54,
+          "verify_us": 155003,
+          "total_us": 170817,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25815,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 39,
+          "accepted": 31,
+          "emitted": 47,
+          "draft_us": 12165,
+          "prepare_us": 52,
+          "verify_us": 145083,
+          "total_us": 160671,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 28625,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 35,
+          "emitted": 51,
+          "draft_us": 12342,
+          "prepare_us": 50,
+          "verify_us": 163258,
+          "total_us": 179061,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25790,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 44,
+          "accepted": 39,
+          "emitted": 55,
+          "draft_us": 12170,
+          "prepare_us": 53,
+          "verify_us": 156490,
+          "total_us": 172058,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 26525,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 36,
+          "emitted": 52,
+          "draft_us": 12452,
+          "prepare_us": 51,
+          "verify_us": 158913,
+          "total_us": 174783,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 27642,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 12614,
+          "prepare_us": 50,
+          "verify_us": 177210,
+          "total_us": 193343,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 28458,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 30,
+          "emitted": 46,
+          "draft_us": 12603,
+          "prepare_us": 57,
+          "verify_us": 162453,
+          "total_us": 178517,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 29894,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 12495,
+          "prepare_us": 54,
+          "verify_us": 157245,
+          "total_us": 173203,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 29107,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 36,
+          "emitted": 52,
+          "draft_us": 12388,
+          "prepare_us": 55,
+          "verify_us": 153090,
+          "total_us": 168993,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 28070,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 12329,
+          "prepare_us": 50,
+          "verify_us": 150662,
+          "total_us": 166428,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 28104,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 40,
+          "emitted": 56,
+          "draft_us": 12373,
+          "prepare_us": 49,
+          "verify_us": 163256,
+          "total_us": 179103,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 30019,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 44,
+          "accepted": 41,
+          "emitted": 57,
+          "draft_us": 12715,
+          "prepare_us": 57,
+          "verify_us": 170290,
+          "total_us": 186514,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 26452,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 46,
+          "accepted": 42,
+          "emitted": 58,
+          "draft_us": 12570,
+          "prepare_us": 53,
+          "verify_us": 175268,
+          "total_us": 191261,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25909,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 49,
+          "accepted": 44,
+          "emitted": 60,
+          "draft_us": 12585,
+          "prepare_us": 58,
+          "verify_us": 177909,
+          "total_us": 193957,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 26240,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 44,
+          "accepted": 38,
+          "emitted": 54,
+          "draft_us": 12684,
+          "prepare_us": 52,
+          "verify_us": 165940,
+          "total_us": 182152,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 28450,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 33,
+          "emitted": 49,
+          "draft_us": 12843,
+          "prepare_us": 54,
+          "verify_us": 158848,
+          "total_us": 175201,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25536,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 30,
+          "emitted": 46,
+          "draft_us": 12682,
+          "prepare_us": 54,
+          "verify_us": 145618,
+          "total_us": 161810,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25929,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 28,
+          "emitted": 44,
+          "draft_us": 12380,
+          "prepare_us": 56,
+          "verify_us": 152110,
+          "total_us": 168020,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 28040,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 25,
+          "emitted": 41,
+          "draft_us": 12434,
+          "prepare_us": 58,
+          "verify_us": 152310,
+          "total_us": 168216,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 27064,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 30,
+          "emitted": 46,
+          "draft_us": 12701,
+          "prepare_us": 60,
+          "verify_us": 166933,
+          "total_us": 183135,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 30886,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 31,
+          "emitted": 47,
+          "draft_us": 12692,
+          "prepare_us": 60,
+          "verify_us": 154538,
+          "total_us": 170780,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 25886,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 41,
+          "emitted": 57,
+          "draft_us": 12718,
+          "prepare_us": 58,
+          "verify_us": 158148,
+          "total_us": 174412,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 31143,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 38,
+          "emitted": 54,
+          "draft_us": 12564,
+          "prepare_us": 55,
+          "verify_us": 161116,
+          "total_us": 177146,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 30794,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 44,
+          "accepted": 37,
+          "emitted": 53,
+          "draft_us": 12569,
+          "prepare_us": 53,
+          "verify_us": 162350,
+          "total_us": 178508,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 30194,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 38,
+          "emitted": 54,
+          "draft_us": 12793,
+          "prepare_us": 56,
+          "verify_us": 168960,
+          "total_us": 185308,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 24137,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 26,
+          "emitted": 42,
+          "draft_us": 12748,
+          "prepare_us": 54,
+          "verify_us": 159106,
+          "total_us": 175384,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 36810,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 40,
+          "accepted": 28,
+          "emitted": 44,
+          "draft_us": 12769,
+          "prepare_us": 63,
+          "verify_us": 162118,
+          "total_us": 178410,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 39639,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 46,
+          "accepted": 28,
+          "emitted": 44,
+          "draft_us": 12679,
+          "prepare_us": 66,
+          "verify_us": 208285,
+          "total_us": 224656,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 42119,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 40,
+          "accepted": 27,
+          "emitted": 43,
+          "draft_us": 12607,
+          "prepare_us": 59,
+          "verify_us": 159939,
+          "total_us": 176240,
+          "capture_count": 80,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 24226,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 35,
+          "emitted": 51,
+          "draft_us": 12862,
+          "prepare_us": 57,
+          "verify_us": 161646,
+          "total_us": 178057,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 24173,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 12864,
+          "prepare_us": 63,
+          "verify_us": 165273,
+          "total_us": 181630,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 42817,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 27,
+          "emitted": 40,
+          "draft_us": 12945,
+          "prepare_us": 62,
+          "verify_us": 180900,
+          "total_us": 197564,
+          "capture_count": 40,
+          "batched_capture_count": 0
+        }
+      ],
+      "batched_layer_row_shapes": 0,
+      "max_batched_captures_per_layer_row_across_two_lanes": 0
+    },
+    "after": {
+      "source_sha256": "67e55bd23d3483e6189a1fc89525e618d4f40dd123268c07a69e71b0be9af2b9",
+      "requests": 16,
+      "rounds": 42,
+      "median_sparse_ms": 8.3225,
+      "median_verify_ms": 151.394,
+      "median_total_ms": 167.3415,
+      "median_proposed": 42.0,
+      "median_emitted": 50.5,
+      "rounds_with_captures": 18,
+      "median_sparse_ms_with_captures": 8.933,
+      "raw_rounds": [
+        {
+          "sparse_us": 59191,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 46,
+          "emitted": 62,
+          "draft_us": 17808,
+          "prepare_us": 65,
+          "verify_us": 194820,
+          "total_us": 216310,
+          "capture_count": 680,
+          "batched_capture_count": 80
+        },
+        {
+          "sparse_us": 8083,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 11672,
+          "prepare_us": 68,
+          "verify_us": 186699,
+          "total_us": 201377,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8265,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 39,
+          "emitted": 55,
+          "draft_us": 11804,
+          "prepare_us": 71,
+          "verify_us": 190027,
+          "total_us": 204862,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8470,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 80,
+          "accepted": 47,
+          "emitted": 63,
+          "draft_us": 11715,
+          "prepare_us": 73,
+          "verify_us": 192398,
+          "total_us": 207328,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8330,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 40,
+          "emitted": 56,
+          "draft_us": 12009,
+          "prepare_us": 66,
+          "verify_us": 155471,
+          "total_us": 171252,
+          "capture_count": 80,
+          "batched_capture_count": 80
+        },
+        {
+          "sparse_us": 8036,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 25,
+          "accepted": 15,
+          "emitted": 31,
+          "draft_us": 11820,
+          "prepare_us": 50,
+          "verify_us": 133976,
+          "total_us": 149341,
+          "capture_count": 80,
+          "batched_capture_count": 80
+        },
+        {
+          "sparse_us": 5552,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 23,
+          "accepted": 15,
+          "emitted": 31,
+          "draft_us": 11584,
+          "prepare_us": 44,
+          "verify_us": 117790,
+          "total_us": 132843,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 7257,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 24,
+          "accepted": 16,
+          "emitted": 32,
+          "draft_us": 11854,
+          "prepare_us": 47,
+          "verify_us": 131942,
+          "total_us": 147272,
+          "capture_count": 80,
+          "batched_capture_count": 80
+        },
+        {
+          "sparse_us": 6022,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 27,
+          "accepted": 20,
+          "emitted": 36,
+          "draft_us": 12025,
+          "prepare_us": 49,
+          "verify_us": 124488,
+          "total_us": 139870,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 8039,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 37,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 12045,
+          "prepare_us": 54,
+          "verify_us": 150895,
+          "total_us": 166336,
+          "capture_count": 80,
+          "batched_capture_count": 80
+        },
+        {
+          "sparse_us": 8315,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 40,
+          "accepted": 35,
+          "emitted": 51,
+          "draft_us": 12360,
+          "prepare_us": 60,
+          "verify_us": 156137,
+          "total_us": 171943,
+          "capture_count": 80,
+          "batched_capture_count": 80
+        },
+        {
+          "sparse_us": 6810,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 40,
+          "accepted": 31,
+          "emitted": 47,
+          "draft_us": 12058,
+          "prepare_us": 57,
+          "verify_us": 141608,
+          "total_us": 157108,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8010,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 33,
+          "emitted": 49,
+          "draft_us": 12348,
+          "prepare_us": 55,
+          "verify_us": 150839,
+          "total_us": 166615,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 7089,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 36,
+          "emitted": 52,
+          "draft_us": 12139,
+          "prepare_us": 58,
+          "verify_us": 140258,
+          "total_us": 155794,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 9482,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 39,
+          "emitted": 55,
+          "draft_us": 12406,
+          "prepare_us": 57,
+          "verify_us": 150181,
+          "total_us": 166033,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 9535,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 32,
+          "emitted": 48,
+          "draft_us": 12518,
+          "prepare_us": 52,
+          "verify_us": 159045,
+          "total_us": 175021,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 7533,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 40,
+          "accepted": 28,
+          "emitted": 44,
+          "draft_us": 12642,
+          "prepare_us": 52,
+          "verify_us": 146513,
+          "total_us": 162583,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 7691,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 37,
+          "emitted": 53,
+          "draft_us": 12426,
+          "prepare_us": 53,
+          "verify_us": 143323,
+          "total_us": 159214,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 7693,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 35,
+          "emitted": 51,
+          "draft_us": 12322,
+          "prepare_us": 54,
+          "verify_us": 140511,
+          "total_us": 156310,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 7784,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 35,
+          "emitted": 51,
+          "draft_us": 12415,
+          "prepare_us": 55,
+          "verify_us": 146260,
+          "total_us": 162081,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8832,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 44,
+          "accepted": 37,
+          "emitted": 53,
+          "draft_us": 12233,
+          "prepare_us": 59,
+          "verify_us": 154657,
+          "total_us": 170267,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 7996,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 40,
+          "emitted": 56,
+          "draft_us": 12672,
+          "prepare_us": 52,
+          "verify_us": 154219,
+          "total_us": 170210,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 7998,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 38,
+          "emitted": 54,
+          "draft_us": 12575,
+          "prepare_us": 48,
+          "verify_us": 152524,
+          "total_us": 168411,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8154,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 44,
+          "accepted": 39,
+          "emitted": 55,
+          "draft_us": 12641,
+          "prepare_us": 51,
+          "verify_us": 156724,
+          "total_us": 172710,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8248,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 38,
+          "emitted": 54,
+          "draft_us": 12816,
+          "prepare_us": 49,
+          "verify_us": 156864,
+          "total_us": 173010,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 9375,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 46,
+          "accepted": 37,
+          "emitted": 53,
+          "draft_us": 12926,
+          "prepare_us": 54,
+          "verify_us": 162454,
+          "total_us": 178856,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 7995,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 39,
+          "accepted": 28,
+          "emitted": 44,
+          "draft_us": 12514,
+          "prepare_us": 57,
+          "verify_us": 133681,
+          "total_us": 149652,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8313,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 40,
+          "accepted": 28,
+          "emitted": 44,
+          "draft_us": 12433,
+          "prepare_us": 58,
+          "verify_us": 123770,
+          "total_us": 139516,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8457,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 44,
+          "accepted": 23,
+          "emitted": 39,
+          "draft_us": 12477,
+          "prepare_us": 54,
+          "verify_us": 145910,
+          "total_us": 161689,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 9034,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 28,
+          "emitted": 44,
+          "draft_us": 12703,
+          "prepare_us": 56,
+          "verify_us": 146463,
+          "total_us": 162591,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 8334,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 34,
+          "emitted": 50,
+          "draft_us": 12690,
+          "prepare_us": 67,
+          "verify_us": 144279,
+          "total_us": 160500,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8739,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 39,
+          "emitted": 55,
+          "draft_us": 12538,
+          "prepare_us": 58,
+          "verify_us": 156607,
+          "total_us": 172692,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 11448,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 46,
+          "accepted": 41,
+          "emitted": 57,
+          "draft_us": 12395,
+          "prepare_us": 56,
+          "verify_us": 164840,
+          "total_us": 180730,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 9589,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 42,
+          "emitted": 58,
+          "draft_us": 12613,
+          "prepare_us": 57,
+          "verify_us": 154789,
+          "total_us": 170882,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 8618,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 40,
+          "accepted": 35,
+          "emitted": 51,
+          "draft_us": 12746,
+          "prepare_us": 56,
+          "verify_us": 153362,
+          "total_us": 169543,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8985,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 45,
+          "accepted": 30,
+          "emitted": 46,
+          "draft_us": 12703,
+          "prepare_us": 54,
+          "verify_us": 153458,
+          "total_us": 169655,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 8489,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 38,
+          "accepted": 31,
+          "emitted": 47,
+          "draft_us": 12668,
+          "prepare_us": 61,
+          "verify_us": 140678,
+          "total_us": 156685,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 9587,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 39,
+          "accepted": 23,
+          "emitted": 39,
+          "draft_us": 12555,
+          "prepare_us": 47,
+          "verify_us": 132922,
+          "total_us": 148918,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 8995,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 41,
+          "accepted": 32,
+          "emitted": 48,
+          "draft_us": 12389,
+          "prepare_us": 48,
+          "verify_us": 145877,
+          "total_us": 161612,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 9064,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 42,
+          "accepted": 38,
+          "emitted": 54,
+          "draft_us": 12789,
+          "prepare_us": 50,
+          "verify_us": 151893,
+          "total_us": 168068,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        },
+        {
+          "sparse_us": 10477,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 43,
+          "accepted": 33,
+          "emitted": 49,
+          "draft_us": 12666,
+          "prepare_us": 53,
+          "verify_us": 170523,
+          "total_us": 186610,
+          "capture_count": 40,
+          "batched_capture_count": 40
+        },
+        {
+          "sparse_us": 9073,
+          "requests": 16,
+          "lane0": 8,
+          "lane1": 8,
+          "proposed": 39,
+          "accepted": 17,
+          "emitted": 29,
+          "draft_us": 12752,
+          "prepare_us": 56,
+          "verify_us": 156741,
+          "total_us": 173033,
+          "capture_count": 0,
+          "batched_capture_count": 0
+        }
+      ],
+      "batched_layer_row_shapes": 1400,
+      "max_batched_captures_per_layer_row_across_two_lanes": 2
+    },
+    "limitations": [
+      "Instrumented sequential runs; row counts, routing and emitted token counts may differ.",
+      "Capture counts group layer/rows across both lanes; the trace does not identify individual wave ownership.",
+      "Work is attributed to the following completed speculative scheduler round; initial rounds may include prefill."
+    ]
+  },
+  "native": {
+    "byte_exact_cases": 132,
+    "validation_rejections": 96,
+    "upper_pool_capacity_checks": [
+      {
+        "rows": 1,
+        "upper_pool_page": 2,
+        "detects_halved_capacity": true
+      },
+      {
+        "rows": 6,
+        "upper_pool_page": 2,
+        "detects_halved_capacity": true
+      },
+      {
+        "rows": 24,
+        "upper_pool_page": 2,
+        "detects_halved_capacity": true
+      },
+      {
+        "rows": 48,
+        "upper_pool_page": 2,
+        "detects_halved_capacity": true
+      }
+    ],
+    "memcheck_errors": 0,
+    "ctest_passed": 5,
+    "results_sha256": "d7134ad536b9f6aa30cc4164f455e84827b9c5a83482a53e22988519156a3eaf"
+  },
+  "memory_mib": {
+    "baseline-fixed": {
+      "before": "3172408, 65510\n",
+      "after": "3172408, 65770\n"
+    },
+    "batch-fixed": {
+      "before": "3173194, 65590\n",
+      "after": "3173194, 65918\n"
+    },
+    "batch-adaptive": {
+      "before": "3174089, 65590\n",
+      "after": "3174089, 67442\n"
+    }
+  },
+  "artifact_sha256": {
+    "ds41rt": "c90ecc82d064674c3f930a33c6b3f75a12a73c1f4d9b41ba48f8a879c4d62ea9",
+    "libds41rt_native.so": "afa775ee82c3f850b0415bac9d4b07c4955371700a3136c5949a6e7526595e97"
+  },
+  "implementation_source_sha256": {
+    "native/cuda/kernels/v41_sparse_attention.cu": "98b9084e53809819434aaf56659c34a0eb6225adb9626f54f4b596addfc14093",
+    "native/include/ds41rt_v41_sparse_attention.h": "e51b9a4bf2a3f354c3d9f60df1a49e0c225431f447e8fb1e901ca1eec8fb5243",
+    "rust/crates/ds41rt-daemon/src/v41_sparse_attention.rs": "134268ab7da9da30cd246292d1e62c0bf71fa919889a13417915adb37affaba3",
+    "rust/crates/ds41rt-ffi/src/v41_sparse_attention.rs": "1d91a356772895192973873c6f22f1613dec6658f9999a239a70da39eba271e9"
+  },
+  "audit_directory": "/tmp/ds41-phase1-batch-serving"
+}

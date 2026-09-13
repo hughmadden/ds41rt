@@ -82,11 +82,12 @@ __device__ __forceinline__ uint64_t locate(const ds41rt_v41_sparse_kv_t& v,const
   return physical<v.source_capacity?((2ull<<62)|physical):UINT64_MAX;
 }
 // Grid-constant descriptor avoids a per-thread copy for dynamic source indexing.
-template<bool Split,int Groups=1,bool SourceFP4=false>
+template<bool Split,int Groups=1,bool SourceFP4=false,bool Batched=false>
 __global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,__nv_bfloat16* output,
-    int width,const __grid_constant__ ds41rt_v41_sparse_kv_t v,float* partial,
-    const uint64_t* window_begins) {
+    int width,const __grid_constant__ ds41rt_v41_sparse_kv_t uniform_view,float* partial,
+    const uint64_t* window_begins,const ds41rt_v41_sparse_kv_t* row_views=nullptr) {
+  const auto& v=Batched?row_views[blockIdx.x]:uniform_view;
   // Keep each query's softmax tile boundaries independent of other proposal
   // rows. A batch-wide maximum moves compressed keys between BF16 probability
   // tiles when draft length changes, perturbing already-causal output rows.
@@ -330,6 +331,8 @@ template<bool FP4> static int32_t initialize_format() {
   if(status!=cudaSuccess)return status;
   const auto split=cudaFuncSetAttribute(attend<true,1,FP4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
   if(split!=cudaSuccess)return split;
+  const auto batch=cudaFuncSetAttribute(attend<true,1,FP4,true>,cudaFuncAttributeMaxDynamicSharedMemorySize,kSharedBytes);
+  if(batch!=cudaSuccess)return batch;
   const auto pair=cudaFuncSetAttribute(attend<false,2,FP4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kGroupedSharedBytes);
   if(pair!=cudaSuccess)return pair;
   return cudaFuncSetAttribute(attend<false,4,FP4>,cudaFuncAttributeMaxDynamicSharedMemorySize,kFourSharedBytes);
@@ -365,7 +368,7 @@ template<bool FP4> static int32_t dispatch_attention(const uint16_t* query,const
   }
   return cudaGetLastError();
 }
-static int32_t launch_attention(const uint16_t* query,const float* sink,
+static int32_t validate_attention(const uint16_t* query,const float* sink,
     const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
     int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,float* partial,uint64_t scratch_bytes,int parts,const uint64_t* window_begins=nullptr) {
   if(!view || rows<1 || rows>4096 || window_width<0 || window_width>128)return cudaErrorInvalidValue;
@@ -398,6 +401,16 @@ static int32_t launch_attention(const uint16_t* query,const float* sink,
       (partial && (!disjoint(v.values[i],values,partial,required) ||
                    !disjoint(v.scales[i],scales,partial,required))))return cudaErrorInvalidValue;
   }
+  return cudaSuccess;
+}
+static int32_t launch_attention(const uint16_t* query,const float* sink,
+    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
+    int32_t window_width,const ds41rt_v41_sparse_kv_t* view,void* stream,float* partial,
+    uint64_t scratch_bytes,int parts,const uint64_t* window_begins=nullptr) {
+  const auto status=validate_attention(query,sink,metadata,selected,output,rows,
+      window_width,view,stream,partial,scratch_bytes,parts,window_begins);
+  if(status!=cudaSuccess)return status;
+  const auto& v=*view;
   return v.compressed==2?
       dispatch_attention<true>(query,sink,metadata,selected,output,rows,window_width,v,stream,partial,parts,window_begins):
       dispatch_attention<false>(query,sink,metadata,selected,output,rows,window_width,v,stream,partial,parts,window_begins);
@@ -423,4 +436,63 @@ extern "C" int32_t ds41rt_v41_sparse_attention_bounded(const uint16_t* query,con
   if(!window_begins || (!partial && (parts!=1 || scratch_bytes!=0)))return cudaErrorInvalidValue;
   return launch_attention(query,sink,metadata,selected,output,rows,window_width,view,stream,
       partial,scratch_bytes,parts,window_begins);
+}
+
+extern "C" int32_t ds41rt_v41_sparse_attention_batch_validate(
+    const uint16_t* query,const float* sink,const uint64_t* metadata,
+    const int32_t* selected,uint16_t* output,int32_t rows,
+    const ds41rt_v41_sparse_kv_t* host_views,const ds41rt_v41_sparse_kv_t* device_views,
+    const uint64_t* begins,float* partial,uint64_t scratch_bytes,int32_t parts,int32_t compressed) {
+  if(rows<1 || rows>48 || !host_views || !begins || !partial || compressed<0 || compressed>2 ||
+      parts!=(compressed?10:2))return cudaErrorInvalidValue;
+  const uint64_t descriptor_bytes=uint64_t(rows)*sizeof(*device_views);
+  if(!span(device_views,descriptor_bytes,8))return cudaErrorInvalidValue;
+  // Descriptor upload is a write: reject overlap with every input and output,
+  // including views belonging to a different request in this batch.
+  for(int row=0;row<rows;++row) {
+    const auto& v=host_views[row];
+    if(v.compressed!=compressed)return cudaErrorInvalidValue;
+    const auto status=validate_attention(query,sink,metadata,selected,output,rows,0,
+        &v,nullptr,partial,scratch_bytes,parts,begins);
+    if(status!=cudaSuccess)return status;
+    const void* common[]={query,sink,metadata,selected,output,begins,partial,v.window_end,v.pages,v.source_end};
+    const uint64_t bytes[]={uint64_t(rows)*65536,256,uint64_t(rows)*80,uint64_t(rows)*2048,
+        uint64_t(rows)*65536,uint64_t(rows)*8,uint64_t(rows)*parts*64*514*4,8,uint64_t(v.page_stride)*4,8};
+    for(int i=0;i<10;++i) {
+      if((i==3 || i>=8) && !compressed)continue;
+      if(!disjoint(device_views,descriptor_bytes,common[i],bytes[i]))return cudaErrorInvalidValue;
+    }
+    const uint64_t capacity[]={128,v.window_proposal_capacity,v.source_capacity,v.source_proposal_capacity};
+    for(int i=0;i<(compressed?4:2);++i) {
+      if(!disjoint(device_views,descriptor_bytes,v.values[i],capacity[i]*((compressed==2 && i>=2)?256:512)) ||
+         !disjoint(device_views,descriptor_bytes,v.scales[i],capacity[i]*((compressed==2 && i>=2)?32:16)))
+        return cudaErrorInvalidValue;
+    }
+  }
+  return cudaSuccess;
+}
+template<bool FP4> static int32_t dispatch_batch(const uint16_t* query,const float* sink,
+    const uint64_t* metadata,const int32_t* selected,uint16_t* output,int32_t rows,
+    const ds41rt_v41_sparse_kv_t* views,void* stream,const uint64_t* begins,
+    float* partial,int32_t parts) {
+  ds41rt_v41_sparse_kv_t unused{};
+  attend<true,1,FP4,true><<<dim3(rows,4,parts),128,kSharedBytes,reinterpret_cast<cudaStream_t>(stream)>>>(
+    reinterpret_cast<const __nv_bfloat16*>(query),sink,metadata,selected,
+    reinterpret_cast<__nv_bfloat16*>(output),0,unused,partial,begins,views);
+  const auto status=cudaGetLastError();
+  if(status!=cudaSuccess)return status;
+  merge<<<dim3(rows,64),256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+    partial,sink,reinterpret_cast<__nv_bfloat16*>(output),parts);
+  return cudaGetLastError();
+}
+extern "C" int32_t ds41rt_v41_sparse_attention_batch(
+    const uint16_t* query,const float* sink,const uint64_t* metadata,
+    const int32_t* selected,uint16_t* output,int32_t rows,
+    const ds41rt_v41_sparse_kv_t* device_views,void* stream,const uint64_t* begins,
+    float* partial,int32_t parts,int32_t compressed) {
+  // Contents were host-validated before upload/replay; never download metadata.
+  if(rows<1 || rows>48 || compressed<0 || compressed>2 || parts!=(compressed?10:2) ||
+      !device_views || !begins || !partial)return cudaErrorInvalidValue;
+  return compressed==2?dispatch_batch<true>(query,sink,metadata,selected,output,rows,device_views,stream,begins,partial,parts):
+      dispatch_batch<false>(query,sink,metadata,selected,output,rows,device_views,stream,begins,partial,parts);
 }
