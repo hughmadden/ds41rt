@@ -1,0 +1,173 @@
+{
+  "scope": "Instrumented adaptive graph pilots; experimental, not release qualification",
+  "repeats": 3,
+  "nonce_seed": 53001,
+  "power_limit_w": 400,
+  "memory_speed": "standard; max 14001 MHz, load 13365 MHz",
+  "kept": "sparse-graphs",
+  "rejected": "index-graphs",
+  "sparse_timing": {
+    "graphs": {
+      "sparse_captures_first_nine_requests": 15120,
+      "layer_captures_first_nine_requests": 2016,
+      "verify_ms": {
+        "(2, 'changed')": 32.016,
+        "(2, 'same')": 26.912,
+        "(3, 'changed')": 35.013,
+        "(3, 'same')": 30.15,
+        "(4, 'changed')": 38.041,
+        "(4, 'same')": 32.832,
+        "(5, 'changed')": 41.091,
+        "(5, 'same')": 36.172,
+        "(6, 'changed')": 44.178,
+        "(6, 'same')": 39.582
+      }
+    },
+    "sparse-graphs": {
+      "sparse_captures_first_nine_requests": 320,
+      "layer_captures_first_nine_requests": 2016,
+      "verify_ms": {
+        "(2, 'changed')": 30.294,
+        "(2, 'same')": 26.939,
+        "(3, 'changed')": 33.304,
+        "(3, 'same')": 30.162,
+        "(4, 'changed')": 36.324,
+        "(4, 'same')": 32.926,
+        "(5, 'changed')": 39.617,
+        "(5, 'same')": 37.085,
+        "(6, 'changed')": 42.394,
+        "(6, 'same')": 39.514
+      }
+    }
+  },
+  "index_timing": {
+    "sparse-graphs": {
+      "verify_ms": {
+        "(2, 'changed')": 30.294,
+        "(2, 'same')": 26.939,
+        "(3, 'changed')": 33.304,
+        "(3, 'same')": 30.162,
+        "(4, 'changed')": 36.324,
+        "(4, 'same')": 32.926,
+        "(5, 'changed')": 39.617,
+        "(5, 'same')": 37.085,
+        "(6, 'changed')": 42.394,
+        "(6, 'same')": 39.514
+      },
+      "index_graph_captures": 0,
+      "index_total_ms": 784.053
+    },
+    "index-graphs": {
+      "verify_ms": {
+        "(2, 'changed')": 31.031,
+        "(2, 'same')": 26.799,
+        "(3, 'changed')": 34.1,
+        "(3, 'same')": 30.102,
+        "(4, 'changed')": 37.276,
+        "(4, 'same')": 33.052,
+        "(5, 'changed')": 40.516,
+        "(5, 'same')": 36.077,
+        "(6, 'changed')": 43.44,
+        "(6, 'same')": 39.564
+      },
+      "index_graph_captures": 2471,
+      "index_total_ms": 797.537
+    }
+  },
+  "runs": {
+    "graphs": {
+      "median_decode_tps": {
+        "code": 118.43012930523118,
+        "fable": 50.15926274077619,
+        "topic": 64.18493912278383
+      },
+      "exact_outputs_vs_fixed_5": 9,
+      "binary_sha256": "56208588af0eb90091a6a39ec8859676dce7f07ec5d826c31625f7d146970e59",
+      "memory": {
+        "before": "3140633, 65510\n",
+        "after": "3140633, 65732\n"
+      }
+    },
+    "sparse-graphs": {
+      "median_decode_tps": {
+        "code": 119.1532997412221,
+        "fable": 51.3944823743336,
+        "topic": 66.55171803510805
+      },
+      "exact_outputs_vs_fixed_5": 9,
+      "binary_sha256": "1364cd54de1f37e0812212b727ce5d27bd53dffe4c8ed3e9fc0267a8b3317925",
+      "counting": {
+        "passed": true,
+        "summaries": [
+          {
+            "concurrency": 1,
+            "samples": 1,
+            "median_aggregate_tps": 143.9852077980857,
+            "min_aggregate_tps": 143.9852077980857,
+            "max_aggregate_tps": 143.9852077980857
+          },
+          {
+            "concurrency": 4,
+            "samples": 1,
+            "median_aggregate_tps": 292.5462819448379,
+            "min_aggregate_tps": 292.5462819448379,
+            "max_aggregate_tps": 292.5462819448379
+          },
+          {
+            "concurrency": 16,
+            "samples": 1,
+            "median_aggregate_tps": 692.2558132382139,
+            "min_aggregate_tps": 692.2558132382139,
+            "max_aggregate_tps": 692.2558132382139
+          }
+        ],
+        "note": "One run each; distinct UUID prompts, not a controlled throughput comparison"
+      },
+      "memory": {
+        "before": "3143354, 65510\n",
+        "after": "3143354, 65882\n"
+      }
+    },
+    "index-graphs": {
+      "median_decode_tps": {
+        "code": 118.46976778397313,
+        "fable": 51.2186383662849,
+        "topic": 65.37920778165694
+      },
+      "exact_outputs_vs_fixed_5": 9,
+      "binary_sha256": "ab7302aec131d482759499ed20f2a8e6952ceb17818cc69c2bd99c3dadd6ee7c",
+      "counting": {
+        "passed": true,
+        "summaries": [
+          {
+            "concurrency": 1,
+            "samples": 1,
+            "median_aggregate_tps": 144.25537011440127,
+            "min_aggregate_tps": 144.25537011440127,
+            "max_aggregate_tps": 144.25537011440127
+          },
+          {
+            "concurrency": 4,
+            "samples": 1,
+            "median_aggregate_tps": 288.04082510798327,
+            "min_aggregate_tps": 288.04082510798327,
+            "max_aggregate_tps": 288.04082510798327
+          },
+          {
+            "concurrency": 16,
+            "samples": 1,
+            "median_aggregate_tps": 676.341588557435,
+            "min_aggregate_tps": 676.341588557435,
+            "max_aggregate_tps": 676.341588557435
+          }
+        ],
+        "note": "One run each; distinct UUID prompts, not a controlled throughput comparison"
+      },
+      "memory": {
+        "before": "3145310, 65510\n",
+        "after": "3145310, 66020\n"
+      }
+    }
+  },
+  "counter_note": "Zero index capture count in old trace means that counter was unavailable; it does not mean no captures."
+}

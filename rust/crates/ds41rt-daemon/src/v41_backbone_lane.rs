@@ -424,6 +424,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.capture_routes = enabled;
         if enabled {
             self.query.enable_small_graph_shapes();
+            self.sparse.enable_small_graph_shapes();
             self.projection.enable_small_graph_shapes();
             self.shared.enable_small_graph_shapes();
             self.router.enable_small_graph_shapes();

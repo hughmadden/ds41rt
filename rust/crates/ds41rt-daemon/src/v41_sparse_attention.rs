@@ -9,7 +9,7 @@ use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
     Ds41rtDeviceBuffer, NativeLibrary, V41SparseAttention, V41SparseSource, V41SparseWindow,
 };
-use std::{ffi::c_void, marker::PhantomData};
+use std::{collections::VecDeque, ffi::c_void, marker::PhantomData};
 
 pub(crate) struct AttentionRequest<'a> {
     pub window: &'a WindowProposal<'a>,
@@ -47,9 +47,12 @@ pub(crate) struct SparseAttentionWave<'a> {
     staging: HostAllocation<'a>,
     replay_staging: HostAllocation<'a>,
     capacity: usize,
-    // Keep one live-shape graph per backbone layer; fingerprints still bind
-    // every external pointer and launch geometry before replay.
-    graphs: [Option<(*mut c_void, Vec<usize>)>; 40],
+    // Complete external-pointer and launch-geometry fingerprints are checked
+    // against live proposals before every replay. Inactive graphs never launch.
+    // Adaptive mode keeps at most 48 variants per layer, including prefill;
+    // request layouts can have many more combinations than total row counts.
+    graphs: [VecDeque<(*mut c_void, Vec<usize>)>; 40],
+    graph_limit: usize,
 }
 struct RequestLaunch {
     window: V41SparseWindow,
@@ -93,9 +96,11 @@ impl<'a> SparseAttentionWave<'a> {
             staging: HostAllocation::new(library, capacity * 80)?,
             replay_staging: HostAllocation::new(library, capacity * 8)?,
             capacity,
-            graphs: std::array::from_fn(|_| None),
+            graphs: std::array::from_fn(|_| VecDeque::new()),
+            graph_limit: 1,
         })
     }
+    pub fn enable_small_graph_shapes(&mut self) { self.graph_limit = 48; }
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.query.buffer
     }
@@ -107,7 +112,7 @@ impl<'a> SparseAttentionWave<'a> {
         // Attempt every destruction even if one CUDA call reports an error.
         let mut failure = None;
         for graph in &mut self.graphs {
-            if let Some((g, _)) = graph.take() {
+            for (g, _) in graph.drain(..) {
                 if let Err(error) = unsafe { self.stream.library.cuda_graph_exec_destroy(g) } {
                     failure.get_or_insert(error);
                 }
@@ -117,15 +122,6 @@ impl<'a> SparseAttentionWave<'a> {
             Some(error) => Err(error),
             None => Ok(()),
         }
-    }
-    fn clear_layer_graph(&mut self, layer: usize) -> Result<()> {
-        self.synchronize()?;
-        if let Some((g, _)) = self.graphs[layer].take() {
-            unsafe {
-                self.stream.library.cuda_graph_exec_destroy(g)?;
-            }
-        }
-        Ok(())
     }
     unsafe fn enqueue(
         &self,
@@ -394,12 +390,20 @@ impl<'a> SparseAttentionWave<'a> {
                 )?;
             }
         }
-        if self.graphs[layer]
-            .as_ref()
-            .is_none_or(|(_, f)| f != &fingerprint)
-        {
+        let cached = self.graphs[layer].iter().position(|(_, f)| f == &fingerprint);
+        let graph = if let Some(index) = cached {
+            // Move a used binding to the newest end of the bounded LRU.
+            let entry = self.graphs[layer].remove(index).unwrap();
+            let graph = entry.0;
+            self.graphs[layer].push_back(entry);
+            graph
+        } else {
             tracing::debug!(target: "ds41rt::timing", layer, rows, "sparse graph capture");
-            self.clear_layer_graph(layer)?;
+            self.synchronize()?;
+            if self.graphs[layer].len() >= self.graph_limit {
+                let (old, _) = self.graphs[layer].pop_front().unwrap();
+                unsafe { self.stream.library.cuda_graph_exec_destroy(old)?; }
+            }
             let launched = unsafe { self.enqueue(sink, &launches, selected) };
             launched.and(self.synchronize())?;
             unsafe {
@@ -410,7 +414,10 @@ impl<'a> SparseAttentionWave<'a> {
             let launched = unsafe { self.enqueue(sink, &launches, selected) };
             let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
             match (launched, captured) {
-                (Ok(()), Ok(g)) => self.graphs[layer] = Some((g, fingerprint)),
+                (Ok(()), Ok(g)) => {
+                    self.graphs[layer].push_back((g, fingerprint));
+                    g
+                },
                 (Err(e), Ok(g)) => {
                     unsafe {
                         self.stream.library.cuda_graph_exec_destroy(g)?;
@@ -419,11 +426,11 @@ impl<'a> SparseAttentionWave<'a> {
                 }
                 (Err(e), Err(_)) | (Ok(()), Err(e)) => return Err(e),
             }
-        }
+        };
         let launched = unsafe {
             self.stream
                 .library
-                .cuda_graph_launch(self.graphs[layer].as_ref().unwrap().0, self.stream.raw)
+                .cuda_graph_launch(graph, self.stream.raw)
         };
         launched.and(self.synchronize())?;
         Ok(SparseAttentionOutput {
