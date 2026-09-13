@@ -6,44 +6,48 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 import numpy as np
 
 
 def observations(path):
     hist={};pending=[];decisions=[];records=[];conf=[]
-    for raw in path.open():
-     if not any(s in raw for s in ['native route policy observation','native draft policy observation','native scheduler round']):continue
-     line=re.sub(r'\x1b\[[0-9;]*m','',raw)
-     f=dict(re.findall(r'(\w+)=(.*?)(?= \w+=|$)',line.strip()))
-     if 'native route policy observation' in line:
-      pending.append((int(f['layer']),ast.literal_eval(f['owners']),json.loads(f['route_ids'])))
-     elif 'native draft policy observation' in line:
-      decisions.append({k:int(f[k]) for k in ['request_id','lane','context_tokens','verifier_rows','accepted_inputs','matched_prefix','generated']}|{'confidence':json.loads(f['raw_confidence']),'terminal':f['eos']=='true' or f['length_limit']=='true','constrained':f['constrained']=='true'})
-     else:
-      if not decisions:pending=[];continue
-      ds={d['request_id']:d for d in decisions}
-      routes=[r for r in pending if all(i in ds and ds[i]['context_tokens']<=p<ds[i]['context_tokens']+ds[i]['verifier_rows'] for i,p in r[1])]
-      actual=defaultdict(set);predicted=defaultdict(set);missing=0
-      for d in decisions:
-       if d['generated']>1 and not d['terminal'] and not d['constrained']:
-        for j in range(min(5,d['verifier_rows']-1,d['matched_prefix']+1)):
-         conf.append([d['request_id'],j,d['confidence'][j],int(d['matched_prefix']>j)])
-       for l in range(40):
-        h=hist.get((d['request_id'],l),[])
-        if h:
-         for ids in list(h)[-d['verifier_rows']:]:predicted[d['lane'],l].update(ids)
-        else:missing+=1
-      for l,owners,ids in routes:
-       lane=ds[owners[0][0]]['lane']
-       actual[lane,l].update(ids)
-      if len(actual)==40*len({d['lane'] for d in decisions}):
-       records.append({'rows':sum(d['verifier_rows'] for d in decisions),'lanes':len({d['lane'] for d in decisions}),'requests':len(ds),'unique':sum(len(s) for s in actual.values())/40,'history_unique':sum(len(s) for s in predicted.values())/40,'missing':missing,'verify_us':int(f['verify_us']),'draft_us':int(f['draft_us']),'ids':list(ds),'warm':all(d['generated']>6 for d in decisions),'terminal':any(d['terminal'] for d in decisions)})
-      for l,owners,ids in routes:
-       for row,(i,p) in enumerate(owners):
-        if p<ds[i]['context_tokens']+ds[i]['accepted_inputs']:
-         h=hist.setdefault((i,l),deque(maxlen=6));h.append(ids[row*6:row*6+6])
-      pending=[];decisions=[]
+    with path.open() as stream:
+     for raw in stream:
+      if not any(s in raw for s in ['native route policy observation','native draft policy observation','native scheduler round']):continue
+      line=re.sub(r'\x1b\[[0-9;]*m','',raw)
+      f=dict(re.findall(r'(\w+)=(.*?)(?= \w+=|$)',line.strip()))
+      if 'native route policy observation' in line:
+       pending.append((int(f['layer']),ast.literal_eval(f['owners']),json.loads(f['route_ids'])))
+      elif 'native draft policy observation' in line:
+       decisions.append({k:int(f[k]) for k in ['request_id','lane','context_tokens','verifier_rows','accepted_inputs','matched_prefix','generated']}|{'confidence':json.loads(f['raw_confidence']),'terminal':f['eos']=='true' or f['length_limit']=='true','constrained':f['constrained']=='true'})
+      else:
+       if not decisions:pending=[];continue
+       ds={d['request_id']:d for d in decisions}
+       routes=[r for r in pending if all(i in ds and ds[i]['context_tokens']<=p<ds[i]['context_tokens']+ds[i]['verifier_rows'] for i,p in r[1])]
+       actual=defaultdict(Counter);predicted=defaultdict(Counter);missing=0;seen=set()
+       for d in decisions:
+        if d['generated']>1 and not d['terminal'] and not d['constrained']:
+         for j in range(min(5,d['verifier_rows']-1,d['matched_prefix']+1)):
+          conf.append([d['request_id'],j,d['confidence'][j],int(d['matched_prefix']>j)])
+        for l in range(40):
+         h=hist.get((d['request_id'],l),[])
+         if len(h)<d['verifier_rows']:missing+=1
+         if h:
+          for ids in list(h)[-d['verifier_rows']:]:predicted[d['lane'],l].update(ids)
+       for l,owners,ids in routes:
+        lane=ds[owners[0][0]]['lane']
+        if (lane,l) in seen or len(ids)!=6*len(owners) or any(ds[i]['lane']!=lane for i,_ in owners):
+         raise ValueError('duplicate or malformed layer route observation')
+        seen.add((lane,l))
+        actual[lane,l].update(ids)
+       if len(actual)==40*len({d['lane'] for d in decisions}):
+        records.append({'rows':sum(d['verifier_rows'] for d in decisions),'lanes':len({d['lane'] for d in decisions}),'requests':len(ds),'unique':sum(len(s) for s in actual.values())/40,'history_unique':sum(len(s) for s in predicted.values())/40,'groups':sum((n+15)//16 for s in actual.values() for n in s.values())/40,'history_groups':sum((n+15)//16 for s in predicted.values() for n in s.values())/40,'missing':missing,'verify_us':int(f['verify_us']),'draft_us':int(f['draft_us']),'ids':list(ds),'warm':all(d['generated']>6 for d in decisions),'terminal':any(d['terminal'] for d in decisions)})
+       for l,owners,ids in routes:
+        for row,(i,p) in enumerate(owners):
+         if p<ds[i]['context_tokens']+ds[i]['accepted_inputs']:
+          h=hist.setdefault((i,l),deque(maxlen=6));h.append(ids[row*6:row*6+6])
+       pending=[];decisions=[]
     return records, conf
 
 def fit(X,y):

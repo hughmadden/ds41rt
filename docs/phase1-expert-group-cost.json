@@ -1,0 +1,241 @@
+{
+  "scope": "Compare row/unique and expert-group cost features on complete accepted-history traces.",
+  "sources": [
+    {
+      "path": "/tmp/ds41-phase1-sparse-graphs-5-trace.log",
+      "sha256": "83fae47e3bcefc5dcf180cf62362a84c6f780c4a8f3de2df178bbc6c117ad6cc"
+    },
+    {
+      "path": "/tmp/ds41-phase1-mixed-diagnostic-1-trace.log",
+      "sha256": "46c0cf8e0b2ba011d5242b0f64e4bc26c6627c9ea9fedee244047a6c85389206"
+    }
+  ],
+  "models": {
+    "rows_unique": {
+      "features": [
+        "intercept",
+        "rows",
+        "unique",
+        "extra_lane"
+      ],
+      "coefficients": [
+        20142.277997830035,
+        660.3440939362449,
+        716.7934833357014,
+        6187.5238335894
+      ],
+      "training_samples": 1040,
+      "block_heldout": [
+        {
+          "samples": 210,
+          "actual_routes": {
+            "median_absolute_relative_error": 0.04664558774548212,
+            "p90_absolute_relative_error": 0.06429826388811877,
+            "median_signed_relative_error": -0.023874241203626443
+          },
+          "accepted_history": {
+            "median_absolute_relative_error": 0.04727912309935217,
+            "p90_absolute_relative_error": 0.0914409323068345,
+            "median_signed_relative_error": -0.0158598702371262
+          }
+        },
+        {
+          "samples": 40,
+          "actual_routes": {
+            "median_absolute_relative_error": 0.1445682903108743,
+            "p90_absolute_relative_error": 0.36238727462163606,
+            "median_signed_relative_error": -0.1445682903108743
+          },
+          "accepted_history": {
+            "median_absolute_relative_error": 0.14248793820656452,
+            "p90_absolute_relative_error": 0.37044267769859096,
+            "median_signed_relative_error": -0.14248793820656452
+          }
+        }
+      ],
+      "leave_trace_out": [
+        {
+          "source": 0,
+          "coefficients": [
+            21282.325033130295,
+            0.0,
+            917.0996403602853,
+            18511.81747822457
+          ],
+          "validation": {
+            "samples": 1062,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.0764251998104272,
+              "p90_absolute_relative_error": 0.19765507173501648,
+              "median_signed_relative_error": 0.05838174773593634
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.06714263378319232,
+              "p90_absolute_relative_error": 0.20953373531109235,
+              "median_signed_relative_error": 0.03874645140493112
+            }
+          }
+        },
+        {
+          "source": 1,
+          "coefficients": [
+            22131.455438093497,
+            729.7505125111591,
+            590.1462724275975,
+            3865.9390562966173
+          ],
+          "validation": {
+            "samples": 228,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.13017253537074472,
+              "p90_absolute_relative_error": 0.44441342385673777,
+              "median_signed_relative_error": -0.13000160107962822
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.1443058012833306,
+              "p90_absolute_relative_error": 0.44850249660984015,
+              "median_signed_relative_error": -0.13986448528187728
+            }
+          }
+        }
+      ]
+    },
+    "rows_unique_extra_groups": {
+      "features": [
+        "intercept",
+        "rows",
+        "unique",
+        "extra_groups",
+        "extra_lane"
+      ],
+      "coefficients": [
+        19978.838996099326,
+        255.46660070104966,
+        829.2536560282031,
+        4083.159861118671,
+        9285.917878035914
+      ],
+      "training_samples": 1040,
+      "block_heldout": [
+        {
+          "samples": 210,
+          "actual_routes": {
+            "median_absolute_relative_error": 0.04367392744425626,
+            "p90_absolute_relative_error": 0.06441343829675417,
+            "median_signed_relative_error": -0.027868713545784775
+          },
+          "accepted_history": {
+            "median_absolute_relative_error": 0.04642200557392857,
+            "p90_absolute_relative_error": 0.09226646049652648,
+            "median_signed_relative_error": -0.01943124306838573
+          }
+        },
+        {
+          "samples": 40,
+          "actual_routes": {
+            "median_absolute_relative_error": 0.09161025747738895,
+            "p90_absolute_relative_error": 0.33558977761717756,
+            "median_signed_relative_error": -0.09161025747738895
+          },
+          "accepted_history": {
+            "median_absolute_relative_error": 0.11019175067958073,
+            "p90_absolute_relative_error": 0.3454924367485198,
+            "median_signed_relative_error": -0.10051536991970189
+          }
+        }
+      ],
+      "leave_trace_out": [
+        {
+          "source": 0,
+          "coefficients": [
+            21282.325033130295,
+            0.0,
+            917.0996403602853,
+            0.0,
+            18511.817478224577
+          ],
+          "validation": {
+            "samples": 1062,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.0764251998104272,
+              "p90_absolute_relative_error": 0.1976550717350165,
+              "median_signed_relative_error": 0.05838174773593634
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.06714263378319232,
+              "p90_absolute_relative_error": 0.20953373531109235,
+              "median_signed_relative_error": 0.03874645140493112
+            }
+          }
+        },
+        {
+          "source": 1,
+          "coefficients": [
+            22131.45543809352,
+            729.7505125111591,
+            590.1462724275965,
+            0.0,
+            3865.9390562966432
+          ],
+          "validation": {
+            "samples": 228,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.13017253537074486,
+              "p90_absolute_relative_error": 0.4444134238567377,
+              "median_signed_relative_error": -0.13000160107962874
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.14430580128333076,
+              "p90_absolute_relative_error": 0.4485024966098401,
+              "median_signed_relative_error": -0.13986448528187756
+            }
+          }
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Diagnostic model comparison, not a serving policy or counterfactual evaluation.",
+    "Block holdout shares workload and request history; leave-trace-out is stricter but still limited to supplied traces.",
+    "Changing row shapes, contexts and graph warmup remain confounders. No claim that expert groups fully explain C16 loss."
+  ],
+  "recapture_observation": {
+    "mixed": {
+      "True": {
+        "rounds": 34,
+        "median_captures": 40.0,
+        "median_sparse_ms": 36.6145,
+        "median_verify_ms": 164.768
+      },
+      "False": {
+        "rounds": 7,
+        "median_captures": 0,
+        "median_sparse_ms": 23.8,
+        "median_verify_ms": 168.015
+      }
+    },
+    "counting": {
+      "True": {
+        "rounds": 1,
+        "median_captures": 80,
+        "median_sparse_ms": 41.378,
+        "median_verify_ms": 180.057
+      },
+      "False": {
+        "rounds": 99,
+        "median_captures": 0,
+        "median_sparse_ms": 24.381,
+        "median_verify_ms": 120.803
+      }
+    }
+  },
+  "host_cost_probe": {
+    "scope": "Optimized-build synthetic C16 forecast plus bounded joint search; not serving throughput",
+    "iterations": 25,
+    "cost_evaluations": 905,
+    "initial_rebuild_median_us": 10657,
+    "incremental_median_us": 1020,
+    "incremental_max_us": 1654,
+    "production_policy_changed": false
+  }
+}

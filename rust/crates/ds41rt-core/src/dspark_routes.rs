@@ -10,7 +10,113 @@ pub struct DsparkRouteForecast {
     lanes: Vec<usize>,
     prefixes: Vec<Vec<LayerSets>>,
 }
+// Seven independent 9-bit counters per word. Each lane has at most eight
+// requests, each with six history rows and six routes: even duplicate route IDs
+// cannot exceed 288, so addition has no carry between fields. The +15 group
+// rounding below also remains below 512.
+const COUNT_WORDS: usize = 384usize.div_ceil(7);
+type LayerCounts = [[u64; COUNT_WORDS]; 40];
+#[cfg(test)]
+const COUNT_LOW: u64 = (1 << 0) | (1 << 9) | (1 << 18) | (1 << 27)
+    | (1 << 36) | (1 << 45) | (1 << 54);
+
+pub struct DsparkWorkForecast {
+    lanes: Vec<usize>,
+    rows: Vec<Vec<[[u32; 6]; 40]>>,
+}
+
+#[cfg(test)]
+fn packed_work(counts: u64) -> (u32, u32) {
+    // ceil(count/16) fits five bits (maximum 18 groups). The guard bit
+    // isolates zero detection; multiplication sums the seven 9-bit fields.
+    let groups = ((counts + COUNT_LOW * 15) >> 4) & (COUNT_LOW * 31);
+    let unique = (((groups | (COUNT_LOW << 8)) - COUNT_LOW) & (COUNT_LOW << 8)).count_ones();
+    let total = (groups.wrapping_mul(COUNT_LOW) >> 54) & 511;
+    (unique, total as u32)
+}
+
+pub struct DsparkWorkEvaluator<'a> {
+    forecast: &'a DsparkWorkForecast,
+    counts: [LayerCounts; 2],
+    lengths: Vec<usize>,
+    unique: u32,
+    groups: u32,
+}
+impl DsparkWorkForecast {
+    /// Start with mandatory anchors. Subsequent calls incrementally apply only
+    /// changed suffix rows; every candidate still sees the complete joint cost.
+    pub fn evaluator(&self) -> DsparkWorkEvaluator<'_> {
+        let mut value = DsparkWorkEvaluator {
+            forecast: self, counts: [[[0u64; COUNT_WORDS]; 40]; 2],
+            lengths: vec![0; self.rows.len()], unique: 0, groups: 0,
+        };
+        for request in 0..self.rows.len() { value.adjust::<true>(request, 0); }
+        value
+    }
+    pub fn mean_expert_work(&self, lengths: &[usize]) -> (f64, f64) {
+        self.evaluator().mean_expert_work(lengths)
+    }
+}
+impl DsparkWorkEvaluator<'_> {
+    fn adjust<const ADD: bool>(&mut self, request: usize, row: usize) {
+        let lane = self.forecast.lanes[request];
+        for (layer, routes) in self.forecast.rows[request][row].iter().enumerate() {
+            for &expert in routes {
+                let word = &mut self.counts[lane][layer][expert as usize / 7];
+                let shift = (expert as usize % 7) * 9;
+                let count = (*word >> shift) & 511;
+                let delta = 1u64 << shift;
+                if ADD {
+                    self.unique += u32::from(count == 0);
+                    self.groups += u32::from(count % 16 == 0);
+                    *word += delta;
+                } else {
+                    debug_assert!(count > 0);
+                    self.unique -= u32::from(count == 1);
+                    self.groups -= u32::from((count - 1) % 16 == 0);
+                    *word -= delta;
+                }
+            }
+        }
+    }
+    /// Sum lane means for unique experts and 16-route work groups. Requests may
+    /// change in any order, including restoring a previous or full candidate.
+    pub fn mean_expert_work(&mut self, lengths: &[usize]) -> (f64, f64) {
+        assert_eq!(lengths.len(), self.lengths.len());
+        for (request, &length) in lengths.iter().enumerate() {
+            assert!(length < self.forecast.rows[request].len());
+            while self.lengths[request] > length {
+                self.adjust::<false>(request, self.lengths[request]);
+                self.lengths[request] -= 1;
+            }
+            while self.lengths[request] < length {
+                self.lengths[request] += 1;
+                self.adjust::<true>(request, self.lengths[request]);
+            }
+        }
+        (self.unique as f64 / 40., self.groups as f64 / 40.)
+    }
+}
+
 impl DsparkRouteHistory {
+    /// Optional richer forecast; the current unique-only serving policy does
+    /// not allocate or evaluate these counters. Preserve the scheduler's eight
+    /// requests per lane bound so packed additions cannot overflow a field.
+    pub fn forecast_work(&self, requests: &[(u64, usize, usize)]) -> Option<DsparkWorkForecast> {
+        if requests.is_empty() || requests.len() > 16 { return None; }
+        let mut lanes = [0usize; 2];
+        let mut rows = Vec::with_capacity(requests.len());
+        for (i, &(id, lane, maximum)) in requests.iter().enumerate() {
+            if lane > 1 || maximum > 5 || requests[..i].iter().any(|r| r.0 == id) { return None; }
+            lanes[lane] += 1;
+            if lanes[lane] > 8 { return None; }
+            let history = self.requests.get(&id)?;
+            if history.iter().any(|h| h.len() < maximum + 1) { return None; }
+            rows.push((0..=maximum).map(|n| std::array::from_fn(|layer|
+                history[layer][history[layer].len() - 1 - n])).collect());
+        }
+        Some(DsparkWorkForecast { lanes: requests.iter().map(|r| r.1).collect(), rows })
+    }
     pub fn release(&mut self, request: u64) { self.requests.remove(&request); }
     pub fn observe_accepted(&mut self, request: u64, layer: usize, routes: &[[u32; 6]]) -> Result<(), &'static str> {
         if layer >= 40 || routes.len() > 6 || routes.iter().flatten().any(|&e| e >= 384) {
@@ -68,6 +174,128 @@ impl DsparkRouteForecast {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "explicit optimized-build host cost probe"]
+    fn work_forecast_joint_search_cost_probe() {
+        use std::{hint::black_box, time::Instant};
+        let mut history = DsparkRouteHistory::default();
+        for id in 0..16u64 {
+            for layer in 0..40 {
+                let rows: Vec<_> = (0..6).map(|row| std::array::from_fn(|route|
+                    ((id * 17 + layer as u64 * 11 + row * 3 + route as u64) % 384) as u32)).collect();
+                history.observe_accepted(id, layer, &rows).unwrap();
+            }
+        }
+        let requests: Vec<_> = (0..16).map(|id| (id, id as usize / 8, 5)).collect();
+        let probabilities = [&[0.9, 0.8, 0.7, 0.6, 0.5][..]; 16];
+        let mut timings = Vec::new();
+        let mut calls = 0;
+        for _ in 0..25 {
+            let start = Instant::now();
+            let forecast = history.forecast_work(black_box(&requests)).unwrap();
+            let mut evaluator = forecast.evaluator();
+            let result = crate::select_dspark_prefixes_bounded(&probabilities, &[1; 16], |lengths| {
+                let (unique, groups) = evaluator.mean_expert_work(black_box(lengths));
+                20_000. + 250. * (16 + lengths.iter().sum::<usize>()) as f64
+                    + 800. * unique + 4000. * (groups - unique)
+            }).unwrap();
+            calls = result.evaluated_shapes;
+            black_box(result);
+            timings.push(start.elapsed().as_micros());
+        }
+        timings.sort_unstable();
+        eprintln!("C16 forecast+joint search: median_us={} max_us={} cost_calls={}", timings[12], timings[24], calls);
+    }
+
+    #[test]
+    fn packed_group_counts_match_scalar_boundaries_and_mixed_fields() {
+        for slot in 0..7 {
+            for count in 0u64..=288 {
+                assert_eq!(packed_work(count << (slot * 9)),
+                    (u32::from(count != 0), count.div_ceil(16) as u32));
+            }
+        }
+        let mut seed = 4197u64;
+        for _ in 0..4096 {
+            let (mut packed, mut unique, mut groups) = (0u64, 0u32, 0u32);
+            for slot in 0..7 {
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let count = (seed >> 32) % 289;
+                packed |= count << (slot * 9);
+                unique += u32::from(count != 0);
+                groups += count.div_ceil(16) as u32;
+            }
+            assert_eq!(packed_work(packed), (unique, groups));
+        }
+    }
+
+    #[test]
+    fn work_forecast_preserves_lane_groups_bounds_and_accepted_history() {
+        let mut h = DsparkRouteHistory::default();
+        for id in 0..16 {
+            for layer in 0..40 {
+                h.observe_accepted(id, layer, &[[383; 6]; 6]).unwrap();
+                h.observe_accepted(id, layer, &[[0, 1, 2, 3, 4, 5]; 6]).unwrap();
+            }
+        }
+        let requests: Vec<_> = (0..16).map(|id| (id, id as usize / 8, 5)).collect();
+        let forecast = h.forecast_work(&requests).unwrap();
+        assert_eq!(forecast.mean_expert_work(&[1; 16]), (12., 12.));
+        assert_eq!(forecast.mean_expert_work(&[2; 16]), (12., 24.));
+        assert_eq!(forecast.mean_expert_work(&[5; 16]), (12., 36.));
+        for id in 0..16 {
+            for layer in 0..40 { h.observe_accepted(id, layer, &[[383; 6]; 6]).unwrap(); }
+        }
+        assert_eq!(h.forecast_work(&requests).unwrap().mean_expert_work(&[5; 16]), (2., 36.));
+        // Forecasts are immutable snapshots even as accepted history changes.
+        assert_eq!(forecast.mean_expert_work(&[5; 16]), (12., 36.));
+        let crowded: Vec<_> = (0..9).map(|id| (id, 0, 5)).collect();
+        assert!(h.forecast_work(&crowded).is_none());
+        assert!(h.forecast_work(&[(0, 0, 5), (0, 1, 5)]).is_none());
+        h.release(0);
+        assert!(h.forecast_work(&requests).is_none());
+    }
+
+    #[test]
+    fn work_forecast_matches_scalar_route_multiplicities() {
+        let mut h = DsparkRouteHistory::default();
+        let mut histories = Vec::new();
+        for id in 0..16u64 {
+            let mut history = [[[0u32; 6]; 6]; 40];
+            for layer in 0..40 {
+                for row in 0..6 {
+                    for route in 0..6 {
+                        history[layer][row][route] = if route == 0 { 383 }
+                            else { ((id as usize * 37 + layer * 13 + row * 5 + route) % 384) as u32 };
+                    }
+                }
+                h.observe_accepted(id, layer, &history[layer]).unwrap();
+            }
+            histories.push(history);
+        }
+        let requests: Vec<_> = (0..16).map(|id| (id, id as usize % 2, 5)).collect();
+        let forecast = h.forecast_work(&requests).unwrap();
+        let mut evaluator = forecast.evaluator();
+        for cycle in 0..12 {
+            let lengths: Vec<_> = (0..16).map(|i| (i + cycle) % 6).collect();
+            let (mut unique, mut groups) = (0usize, 0usize);
+            for lane in 0..2 {
+                for layer in 0..40 {
+                    let mut counts = [0usize; 384];
+                    for id in (lane..16).step_by(2) {
+                        for row in &histories[id][layer][5-lengths[id]..] {
+                            for &expert in row { counts[expert as usize] += 1; }
+                        }
+                    }
+                    unique += counts.iter().filter(|&&n| n != 0).count();
+                    groups += counts.iter().map(|n| n.div_ceil(16)).sum::<usize>();
+                }
+            }
+            assert_eq!(forecast.mean_expert_work(&lengths), (unique as f64 / 40., groups as f64 / 40.));
+            assert_eq!(evaluator.mean_expert_work(&lengths), (unique as f64 / 40., groups as f64 / 40.));
+        }
+    }
+
     #[test]
     fn accepted_history_is_bounded_and_shared_routes_deduplicate_per_lane() {
         let mut h = DsparkRouteHistory::default();
