@@ -140,9 +140,9 @@ impl<'a> SourceCache<'a> {
         self.pool.borrow_mut().release(&self.pages[slot]);
         self.pages[slot].clear();
         self.rows[slot] = 0;
-        self.lengths
-            .library
-            .copy_h2d(slice(self.lengths.buffer, slot * 8, 8), &[0; 8])
+        // The lease is revoked and consumers drained. reset/restore installs
+        // replacement device metadata before a new owner becomes usable.
+        Ok(())
     }
     pub fn reset(&self, slot: usize) -> Result<()> {
         self.ensure_idle(slot)?;

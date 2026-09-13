@@ -210,7 +210,16 @@ mod tests {
         waves[0].abort_commit(&mut state)?;
         assert!(state.request_id(first).is_err());
         assert_eq!(state.end(second)?, 3);
-        state.view(second)?;
+        let device_end = state.view(second)?.device_end;
+        state.release(second)?;
+        assert!(state.view(second).is_err());
+        let mut end_bytes = [0; 8];
+        lib.copy_d2h(&mut end_bytes, device_end)?;
+        assert_eq!(u64::from_ne_bytes(end_bytes), 3); // Release needs no GPU clear.
+        let replacement = state.begin_request(1, 33)?;
+        lib.copy_d2h(&mut end_bytes, state.view(replacement)?.device_end)?;
+        assert_eq!(u64::from_ne_bytes(end_bytes), 0);
+        assert_eq!(state.end(replacement)?, 0);
         Ok(())
     }
 }

@@ -195,9 +195,9 @@ impl<'a> WindowState<'a> {
     pub fn release(&mut self, lease: WindowLease) -> Result<()> {
         let slot = self.validate(lease)?;
         self.slots[slot].request = None;
-        self.ends
-            .library
-            .copy_h2d(slice(self.ends.buffer, slot * 8, 8), &[0; 8])
+        // No consumer may use a revoked lease. Admission resets device_end before
+        // publishing its replacement, so clearing it here only adds a host wait.
+        Ok(())
     }
     pub fn invalidate(&mut self, leases: &[WindowLease]) -> Result<()> {
         let slots = leases

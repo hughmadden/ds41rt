@@ -80,6 +80,12 @@ mod tests {
         assert!(super::super::tests::read(&cache, 1, 512)?.iter().all(|&b| b == 0x22));
         cache.release(0)?; cache.release(1)?;
         assert_eq!(cache.pool.borrow().free.len(), 8);
+        let mut length = [0; 8];
+        lib.copy_d2h(&mut length, slice(cache.lengths.buffer, 0, 8))?;
+        assert_eq!(u64::from_ne_bytes(length), 257); // Revoked metadata need not be cleared.
+        cache.reset(0)?;
+        lib.copy_d2h(&mut length, slice(cache.lengths.buffer, 0, 8))?;
+        assert_eq!(u64::from_ne_bytes(length), 0);
         let free = cache.pool.borrow().free.clone();
         let cancelled = cache.reserve(&[(0, 0, 257)])?;
         drop(cancelled);

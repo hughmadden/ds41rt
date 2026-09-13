@@ -31,12 +31,23 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
         let mut round_id = 0u64;
         loop {
             if drain.get() { return Ok(()); }
-            // Prefill uses both execution lanes. Retire/admit/migrate only after
-            // draining the current stacks, never merely to align decode rounds.
+            // This lane has completed all of its own GPU/transport work. Retire
+            // only its requests; the peer need not stop or migrate survivors.
+            let retired: Vec<_> = active.borrow().iter().enumerate().filter_map(|(slot, entry)|
+                entry.as_ref().filter(|r| r.lane == lane && (r.finished || r.job.events.is_closed()))
+                    .map(|_| slot)).collect();
+            for slot in retired {
+                let request = active.borrow_mut()[slot].take().unwrap();
+                let request_id = request.id;
+                retire_request(request, &mut requests.borrow_mut(), &mut prefixes.borrow_mut(),
+                    draft.borrow_mut().as_deref_mut())?;
+                tracing::debug!(target: "ds41rt::lane_schedule", lane, request_id, round_id,
+                    "independent lane request retired");
+            }
+            // Admission/prefill still uses both execution lanes.
             let members: Vec<_> = {
                 let active = active.borrow();
-                if active.iter().flatten().any(|r| r.finished || r.job.events.is_closed())
-                    || (active.iter().any(Option::is_none) && !receive.is_empty()) {
+                if active.iter().any(Option::is_none) && !receive.is_empty() {
                     drain.set(true); return Ok(());
                 }
                 active.iter().enumerate().filter_map(|(slot, r)|

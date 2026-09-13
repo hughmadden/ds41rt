@@ -118,8 +118,10 @@ weights and use forty-row storage for eight requests each.
 KV from each lane's producer; [queued SWA commit](phase1-queued-window-commit.md)
 removes the sequential window waits. [Queued compressed-source publication](phase1-queued-source-commit.md)
 claims pages until completion/rollback, preserves shared-tail copy ownership and
-uses producer-owned upload staging. Next remove retirement coupling separately
-from admission, including cooperative snapshot copies and release bookkeeping.
+uses producer-owned upload staging. [Lane-local retirement](phase1-lane-retirement.md)
+now releases completed requests without draining the peer, and avoids redundant
+device length clears. Next make snapshot retention cooperative and finish the
+remaining blocking transfer audit.
 Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and

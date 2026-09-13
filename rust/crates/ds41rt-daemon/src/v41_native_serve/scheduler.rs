@@ -63,6 +63,20 @@ impl Active<'_> {
     }
 }
 
+fn retire_request<'a>(request: Active<'a>, requests: &mut Requests<'a>,
+    prefixes: &mut PrefixCache<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<()> {
+    if request.cacheable && requests.cache().request_id(request.lease).is_ok() {
+        let retained = request.next_after_commit.as_ref().context("finished request has no retained logits")
+            .and_then(|next| prefixes.retain(SnapshotKind::Turn, &request.tokens, &request.image_keys,
+                next, request.id, request.lease, requests, draft.as_deref_mut()));
+        if let Err(error) = retained { tracing::warn!(%error, "completed request prefix was not retained"); }
+    }
+    // Release both owners even if one cleanup reports an error.
+    let target = requests.release_if_present(request.lease);
+    let speculative = draft.map(|draft| draft.release(request.id)).transpose();
+    target.and(speculative.map(|_| ()))
+}
+
 pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeServeArgs,
     runtime: &tokio::runtime::Runtime, receive: &mut mpsc::Receiver<NativeRequest>,
     first: &mut TargetPass<'w, 'a>, second: &mut TargetPass<'w, 'a>,
@@ -81,15 +95,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
         // committed. No cache owner is migrated or retired inside a layer stack.
         for entry in &mut active {
             if entry.as_ref().is_some_and(|r| r.finished || r.job.events.is_closed()) {
-                let request = entry.take().unwrap();
-                if request.cacheable && requests.cache().request_id(request.lease).is_ok() {
-                    if let Err(error) = prefixes.retain(SnapshotKind::Turn, &request.tokens, &request.image_keys, request.next_after_commit.as_ref().context("finished request has no retained logits")?,
-                        request.id, request.lease, requests, draft.as_deref_mut()) {
-                        tracing::warn!(%error, "completed request prefix was not retained");
-                    }
-                }
-                requests.release_if_present(request.lease)?;
-                if let Some(draft) = draft.as_deref_mut() { draft.release(request.id)?; }
+                retire_request(entry.take().unwrap(), requests, &mut prefixes, draft.as_deref_mut())?;
             }
         }
         let mut loads = [0usize; 2];
