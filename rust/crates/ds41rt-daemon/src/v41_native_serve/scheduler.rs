@@ -337,14 +337,21 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     let [a, b] = &mut batches;
     // Drain both futures even if one fails, before discarding private device state.
     let results = runtime.block_on(async { tokio::join!(
-        execute_logits(lib, first, requests, a, first_transport, capture_routes),
-        execute_logits(lib, second, requests, b, second_transport, capture_routes),
+        async {
+            let result = execute_logits(lib, first, requests, a, first_transport, capture_routes).await;
+            (result, started.elapsed().as_micros() as u64)
+        },
+        async {
+            let result = execute_logits(lib, second, requests, b, second_transport, capture_routes).await;
+            (result, started.elapsed().as_micros() as u64)
+        },
     ) });
     let executed_us = started.elapsed().as_micros() as u64;
+    let lane_done_us = [results.0.1, results.1.1];
     let result = (|| -> Result<()> {
         let mut accepted_drafts = 0u32;
         let mut emitted = 0usize;
-        let next = [results.0?, results.1?];
+        let next = [results.0.0?, results.1.0?];
         for (lane, pass) in [&mut *first, &mut *second].into_iter().enumerate() {
             let Some(batch) = &mut batches[lane] else { continue; };
             let mut offset = 0;
@@ -421,6 +428,9 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         tracing::debug!(target: "ds41rt::timing", speculative,
             requests=members[0].len()+members[1].len(), lane0=members[0].len(), lane1=members[1].len(),
             proposed, accepted=accepted_drafts, emitted, draft_us, prepare_us,
+            lane0_verify_done_us=lane_done_us[0], lane1_verify_done_us=lane_done_us[1],
+            lane0_join_wait_us=if members[0].is_empty() { 0 } else { executed_us-lane_done_us[0] },
+            lane1_join_wait_us=if members[1].is_empty() { 0 } else { executed_us-lane_done_us[1] },
             verify_us=executed_us-prepared_us, total_us=started.elapsed().as_micros() as u64,
             "native scheduler round");
         Ok(())
