@@ -45,3 +45,20 @@ The preserved 1719167 FFN checkpoint gives C4 samples 364.45, 387.07 and
 380.40 tok/s (median 380.40), with exact output. This sits between the control
 and latest candidate; attribution requires component timing and acceptance
 evidence, not simply reverting the last commit.
+
+Placement was checked against the actual startup logs and memory monitors for
+every counting and graph-revisit arm: all load five RTX expert layers. Counting
+peaks at 95,290–95,338 MiB and graph runs at 96,688–96,986 MiB. The approximately
+65,520 MiB visible between experiments belongs to the restored v1 standard server.
+
+Focused timing logs show identical concurrent speculative work: 200 rounds,
+2,000 proposed tokens, 1,996 accepted and 2,392 emitted. Summed preparation time
+falls 898 → 739 ms while verification rises 11,805 → 13,000 ms. These are summed
+overlapping lane times with debug logging, not uninstrumented throughput.
+The 50 µs receive-polling interval is a hypothesis to test: it may delay short
+GPU completions on the peer lane now that more operations yield.
+
+Release decisions prioritize the weighted eight-type score and individual real
+workloads. Counting remains a headline and diagnostic workload; its loss alone
+is not a release veto. Continue investigating the cause for potential broader
+benefit, and check any proposed fix on real workloads too.

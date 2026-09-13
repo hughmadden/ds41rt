@@ -1,0 +1,248 @@
+{
+  "scope": "Weighted eight-type development comparison, three repeats per case; e9c07ae versus 2957772",
+  "raw_directory": "/home/tj/.cache/ds41rt-experiments/async-weighted",
+  "runner": {
+    "scope": "Weighted eight-type release workloads: frozen e9c07ae versus asynchronous 2957772",
+    "artifacts": {
+      "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+      "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+    },
+    "arms": [
+      {
+        "label": "before-a1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-async-weighted-before-a1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/async-weighted/before:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "f171b2b5533389c1c576c6527e35da3ae1e7d6031c16422a150b553702460e4e"
+        },
+        "startup_seconds": 5.278247475042008,
+        "weighted": true
+      },
+      {
+        "label": "after-b1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-async-weighted-after-b1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/async-weighted/after:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+        },
+        "startup_seconds": 5.301683190045878,
+        "weighted": true
+      }
+    ],
+    "restored": true
+  },
+  "before_weighted_tps": 77.91290566762686,
+  "after_weighted_tps": 80.77498337159673,
+  "cases": [
+    {
+      "case": "code",
+      "before_samples": [
+        119.96126913510567,
+        128.6960696282107,
+        129.54177964091215
+      ],
+      "after_samples": [
+        119.98291659409335,
+        128.66189115899488,
+        130.7300427100366
+      ],
+      "before_median": 128.6960696282107,
+      "after_median": 128.66189115899488
+    },
+    {
+      "case": "math",
+      "before_samples": [
+        125.23406545237317,
+        135.2585153845087,
+        134.6098912535168
+      ],
+      "after_samples": [
+        132.72437529346047,
+        135.0877675357593,
+        135.1992555464497
+      ],
+      "before_median": 134.6098912535168,
+      "after_median": 135.0877675357593
+    },
+    {
+      "case": "fable",
+      "before_samples": [
+        52.679589790196665,
+        53.64468600970163,
+        59.50256621723329
+      ],
+      "after_samples": [
+        54.51870405522723,
+        55.28784127539998,
+        61.29078186573387
+      ],
+      "before_median": 53.64468600970163,
+      "after_median": 55.28784127539998
+    },
+    {
+      "case": "hello",
+      "before_samples": [
+        89.61859029749647,
+        72.41758438457938,
+        77.90038499579651
+      ],
+      "after_samples": [
+        94.37272028114003,
+        74.91533171005962,
+        82.22900443895487
+      ],
+      "before_median": 77.90038499579651,
+      "after_median": 82.22900443895487
+    },
+    {
+      "case": "topic",
+      "before_samples": [
+        74.07692298783249,
+        69.85794456487999,
+        66.21619854866456
+      ],
+      "after_samples": [
+        76.13817346570123,
+        71.20737302586703,
+        68.79900594164855
+      ],
+      "before_median": 69.85794456487999,
+      "after_median": 71.20737302586703
+    },
+    {
+      "case": "structured-json",
+      "before_samples": [
+        104.44414672194489,
+        85.6021871935942,
+        89.33698831623796
+      ],
+      "after_samples": [
+        110.5524877461823,
+        91.0970010538683,
+        91.72747994306249
+      ],
+      "before_median": 89.33698831623796,
+      "after_median": 91.72747994306249
+    },
+    {
+      "case": "structured-json-schema",
+      "before_samples": [
+        101.00758363683343,
+        77.50488133395649,
+        90.68452901846317
+      ],
+      "after_samples": [
+        107.40330223965672,
+        82.50191547327418,
+        94.88561012412823
+      ],
+      "before_median": 90.68452901846317,
+      "after_median": 94.88561012412823
+    },
+    {
+      "case": "multilingual",
+      "before_samples": [
+        66.36591723784879,
+        72.46402957949046,
+        61.87571087394556
+      ],
+      "after_samples": [
+        71.28045225255941,
+        76.45916970413728,
+        64.4776432612451
+      ],
+      "before_median": 66.36591723784879,
+      "after_median": 71.28045225255941
+    }
+  ]
+}

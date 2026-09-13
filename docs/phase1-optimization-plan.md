@@ -225,3 +225,9 @@ The [combined attention graph revisit](phase1-attention-graph-revisit.md) is com
 Three order-controlled pairs show a small C1 gain and uncertain concurrent impact;
 omit the optional fusion. Keep the asynchronous 2957772 implementation and check
 matched fixed-output counting before scoped v2 qualification.
+
+The [weighted eight-type comparison](phase1-async-weighted.md) passes and improves
+77.91 → 80.77 tok/s in one three-repeat pair. Prioritize weighted and individual
+real workloads for release decisions. The [exact counting loss](phase1-async-counting.md)
+is reproducible and worth explaining, but is not alone a release veto. Test the
+remaining receive-polling interval against the now-cooperative GPU completion path.

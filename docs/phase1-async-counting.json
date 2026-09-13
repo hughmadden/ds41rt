@@ -464,5 +464,145 @@
       "min_aggregate_tps": 364.4537362517784,
       "max_aggregate_tps": 387.0710468258129
     }
+  ],
+  "timing_diagnostic": {
+    "before-timing": {
+      "rounds": 200,
+      "sums": {
+        "proposed": 2000,
+        "accepted": 1996,
+        "emitted": 2392,
+        "prepared_us": 897723,
+        "verify_us": 11805162,
+        "total_us": 12785640
+      },
+      "layers": {
+        "produced_us": 34.47317275747508,
+        "index_us": 29.26220930232558,
+        "attention_us": 223.71021594684385,
+        "experts_us": 842.7997508305648,
+        "finish_us": 8.150747508305647
+      },
+      "row_counts": {
+        "32": 40,
+        "6": 4000,
+        "12": 8000
+      }
+    },
+    "after-timing": {
+      "rounds": 200,
+      "sums": {
+        "proposed": 2000,
+        "accepted": 1996,
+        "emitted": 2392,
+        "prepared_us": 739036,
+        "verify_us": 13000336,
+        "total_us": 13824864
+      },
+      "layers": {
+        "produced_us": 62.466279069767445,
+        "index_us": 29.671345514950165,
+        "attention_us": 213.0921926910299,
+        "experts_us": 932.5828903654485,
+        "finish_us": 38.17400332225914
+      },
+      "row_counts": {
+        "32": 40,
+        "6": 4000,
+        "12": 8000
+      }
+    }
+  },
+  "placement_evidence": [
+    {
+      "experiment": "async-counting",
+      "arm": "before-a1",
+      "peak_mib": 95338.0,
+      "logs": [
+        "2026-09-13T14:17:29.348072Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:17:31.032188Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1684"
+      ]
+    },
+    {
+      "experiment": "async-counting",
+      "arm": "after-b1",
+      "peak_mib": 95338.0,
+      "logs": [
+        "2026-09-13T14:19:21.956507Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:19:23.654833Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1698"
+      ]
+    },
+    {
+      "experiment": "async-counting",
+      "arm": "before-a2",
+      "peak_mib": 95290.0,
+      "logs": [
+        "2026-09-13T14:23:12.340796Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:23:14.023362Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1682"
+      ]
+    },
+    {
+      "experiment": "async-counting",
+      "arm": "after-b2",
+      "peak_mib": 95290.0,
+      "logs": [
+        "2026-09-13T14:21:41.749552Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:21:43.437894Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1688"
+      ]
+    },
+    {
+      "experiment": "attention-graph-revisit",
+      "arm": "before-a1",
+      "peak_mib": 96986.0,
+      "logs": [
+        "2026-09-13T14:03:20.697743Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:03:22.372205Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1674"
+      ]
+    },
+    {
+      "experiment": "attention-graph-revisit",
+      "arm": "after-b1",
+      "peak_mib": 96758.0,
+      "logs": [
+        "2026-09-13T14:04:37.012315Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:04:38.692421Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1680"
+      ]
+    },
+    {
+      "experiment": "attention-graph-revisit",
+      "arm": "before-a2",
+      "peak_mib": 96892.0,
+      "logs": [
+        "2026-09-13T14:08:53.905327Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:08:55.594449Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1689"
+      ]
+    },
+    {
+      "experiment": "attention-graph-revisit",
+      "arm": "after-b2",
+      "peak_mib": 96698.0,
+      "logs": [
+        "2026-09-13T14:07:58.374993Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:08:00.068531Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1693"
+      ]
+    },
+    {
+      "experiment": "attention-graph-revisit",
+      "arm": "before-a3",
+      "peak_mib": 96832.0,
+      "logs": [
+        "2026-09-13T14:09:47.398645Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:09:49.093476Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1695"
+      ]
+    },
+    {
+      "experiment": "attention-graph-revisit",
+      "arm": "after-b3",
+      "peak_mib": 96688.0,
+      "logs": [
+        "2026-09-13T14:10:45.918970Z  INFO ds41rt::v41_native_serve: bottom-up RTX expert placement layers=5 resident_bytes=36097228800 workspace_bytes=341047072 peak_bytes=36457076512",
+        "2026-09-13T14:10:47.600768Z  INFO ds41rt::v41_native_serve: local RTX experts ready layers=5 elapsed_ms=1682"
+      ]
+    }
   ]
 }
