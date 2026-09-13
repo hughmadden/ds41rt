@@ -52,8 +52,22 @@ OpenAI-compatible serving surface from v1.
   five complete routed-expert layers on the RTX, and retains an 18,710,016-token
   global FP4 pool plus 32,768 private-tail tokens.
 
-Final release throughput, retained-context, concurrency, memory, startup, and
-three-run high-thinking tool-eval results are recorded in the
-[v2 performance report](release-v2-performance.md). The v1 prefill matrix and
-official API reference are retained as prior measurements because those tests
-were intentionally excluded from the scoped v2 rerun.
+Measurements use a 400 W RTX power limit and standard 14,001 MHz maximum memory
+speed with no memory overclock. Read the
+[README](https://github.com/tpurtell/ds41rt/blob/v2/README.md),
+[performance report](https://github.com/tpurtell/ds41rt/blob/v2/docs/release-v2-performance.md),
+[tool report](https://github.com/tpurtell/ds41rt/blob/v2/docs/release-v2-tool-eval.md),
+[build and registry report](https://github.com/tpurtell/ds41rt/blob/v2/docs/release-v2-build-run.md),
+and [completed checklist](https://github.com/tpurtell/ds41rt/blob/v2/docs/release-v2-checklist.md).
+The v1 prefill matrix and official API reference are retained as prior
+measurements because those tests were intentionally excluded from the scoped v2
+rerun.
+
+Container images:
+
+- `ghcr.io/tpurtell/ds41rt-coordinator:v2` (`linux/amd64`), digest
+  `sha256:3ffe75377cb901119b0ead470d4e047ff5b623c8c0eac6b98024e51814a222a8`
+- `ghcr.io/tpurtell/ds41rt-spark-expert:v2` (`linux/arm64`), digest
+  `sha256:d9b4bc411eb3480a956d3a993597c5b102bbd438adb9c73e57d6ba2e5cf21e39`
+
+The `v2` and `latest` tags are identical for each role.
