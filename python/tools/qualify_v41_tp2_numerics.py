@@ -19,7 +19,10 @@ def wire_input(x, wire):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-lib", required=True)
+    parser.add_argument("--rows", default="1,16", help="Comma-separated exported capacities")
     args = parser.parse_args()
+    capacities = [int(value) for value in args.rows.split(",")]
+    assert capacities and all(value in (1, 16, 80, 256, 1024, 4096) for value in capacities)
     assert torch.cuda.device_count() >= 2
     lib = library(args.native_lib, tp2=True)
     reduce = lib.ds41rt_v41_reduce_tp2_experts_async
@@ -51,7 +54,7 @@ def main():
             torch.cuda.synchronize()
             states.append(packed)
     results = []
-    for rows in (1, 16):
+    for rows in capacities:
         x = torch.randn(rows, hidden).mul_(0.5).bfloat16()
         ids = torch.rand(rows, experts).topk(6, -1).indices.int()
         routing = torch.rand(rows, 6)
@@ -85,19 +88,25 @@ def main():
                     assert torch.cuda.memory_allocated() == before
                     rank_outputs.append(native.output.clone())
             with torch.cuda.device(0):
+                token_sums = owners[0][0].token_accumulation
+                assert owners[1][0].token_accumulation == token_sums
                 peer = rank_outputs[1].to(device="cuda:0")
                 result = torch.empty((rows, hidden), dtype=torch.bfloat16, device="cuda:0")
                 check(reduce(rank_outputs[0].data_ptr(), peer.data_ptr(), result.data_ptr(),
-                             rows, 0, torch.cuda.current_stream().cuda_stream))
+                             rows, int(token_sums), torch.cuda.current_stream().cuda_stream))
                 actual = result.float().cpu()
                 expected = reference(x.cuda(), ids.cuda(), routing.cuda(),
                     {k: v.cuda() for k, v in weights.items()},
                     {k: v.cuda() for k, v in scales.items()}).cpu()
             assert torch.isfinite(actual).all() and actual.norm() > 0
-            relative = ((actual-expected).norm()/expected.norm()).item()
-            cosine = torch.nn.functional.cosine_similarity(actual.flatten(), expected.flatten(), dim=0).item()
+            # Large prefill vectors need FP64 metric accumulation: FP32 CPU
+            # reductions can otherwise report an impossible cosine above one.
+            measured, oracle = actual.double(), expected.double()
+            relative = ((measured-oracle).norm()/oracle.norm()).item()
+            cosine = torch.nn.functional.cosine_similarity(measured.flatten(), oracle.flatten(), dim=0).item()
             assert relative < 0.01 and cosine > 0.9999, (rows, changed, relative, cosine)
-            results.append(dict(rows=rows, changed=changed, relative_l2=relative, cosine=cosine))
+            results.append(dict(rows=rows, changed=changed, token_sums=token_sums,
+                                relative_l2=relative, cosine=cosine))
     print(json.dumps(results, indent=2))
 
 

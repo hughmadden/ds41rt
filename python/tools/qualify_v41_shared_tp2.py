@@ -23,7 +23,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-lib", required=True)
     parser.add_argument("--snapshot", type=Path, required=True)
+    parser.add_argument("--rows", default="1,16", help="Comma-separated exported capacities")
     args = parser.parse_args()
+    capacities = [int(value) for value in args.rows.split(",")]
+    assert capacities and all(value in (1, 16, 80, 256, 1024, 4096) for value in capacities)
     assert torch.cuda.device_count() >= 2
     torch.manual_seed(41152)
     torch.backends.cuda.matmul.allow_tf32 = False
@@ -50,7 +53,7 @@ def main():
             with safe_open(args.snapshot / index[key], framework="pt", device="cpu") as file:
                 raw[name, suffix] = file.get_tensor(key)
     results = []
-    for rows in (1, 16):
+    for rows in capacities:
         x = torch.randn(rows, 5120).mul_(0.5).bfloat16()
         rank_results, handles = [], []
         for rank in (0, 1):
@@ -103,8 +106,9 @@ def main():
                 mid = (torch.nn.functional.silu(gate) * up).bfloat16()
                 expected = (quantize(mid) @ full["w2"].T).bfloat16().float().cpu()
                 actual = rank_results[0][changed] + rank_results[1][changed]
-                relative = ((actual-expected).norm()/expected.norm()).item()
-                cosine = torch.nn.functional.cosine_similarity(actual.flatten(), expected.flatten(), dim=0).item()
+                measured, oracle = actual.double(), expected.double()
+                relative = ((measured-oracle).norm()/oracle.norm()).item()
+                cosine = torch.nn.functional.cosine_similarity(measured.flatten(), oracle.flatten(), dim=0).item()
                 assert torch.isfinite(actual).all() and relative < 0.01 and cosine > 0.9999, (rows, changed, relative, cosine)
                 results.append(dict(rows=rows, changed=changed, relative_l2=relative, cosine=cosine))
     print(json.dumps(results, indent=2))

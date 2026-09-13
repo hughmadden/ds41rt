@@ -228,6 +228,8 @@ mod tests {
     #[test]
     #[ignore = "requires official DS41RT_SNAPSHOT, TP2 DS41RT_NATIVE_LIB and two GPUs"]
     fn real_encoder_rank_waves_share_weights_across_independent_lanes() -> Result<()> {
+        let capacity: u32 = std::env::var("DS41RT_TP2_TEST_CAPACITY").unwrap_or_else(|_| "16".into()).parse()?;
+        ensure!([1,16,80,256,1024,4096].contains(&capacity), "invalid fixture capacity");
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let catalog = ds41rt_loader::read_official_v41_catalog(ds41rt_loader::OFFICIAL_V41_MODEL_ID,
             std::path::Path::new(&std::env::var("DS41RT_SNAPSHOT")?))?;
@@ -235,22 +237,22 @@ mod tests {
         let devices = [Device { library: &lib, id: 0 }, Device { library: &lib, id: 1 }];
         let weights = [Rc::new(RankWeights::load(devices[0], &catalog, 1, 4_000_000_000)?),
             Rc::new(RankWeights::load(devices[1], &catalog, 1, 4_000_000_000)?)];
-        let mut first = ExpertWave::new(weights.clone(), 16)?;
-        let mut second = ExpertWave::new(weights, 16)?;
+        let mut first = ExpertWave::new(weights.clone(), capacity)?;
+        let mut second = ExpertWave::new(weights, capacity)?;
         let mut inputs = Vec::new();
         for device in devices {
-            inputs.push((Allocation::new(device, 16*5280)?, Allocation::new(device, 16*24)?,
-                Allocation::new(device, 16*24)?, Stream::new(device)?));
+            inputs.push((Allocation::new(device, capacity as usize*5280)?, Allocation::new(device, capacity as usize*24)?,
+                Allocation::new(device, capacity as usize*24)?, Stream::new(device)?));
         }
         let runtime = tokio::runtime::Builder::new_current_thread().build()?;
-        for nonzero in [false, true] {
-            let mut wire = vec![0u8; 16*5280];
+        for (rows, nonzero) in [(1, false), (capacity, true), (1, true), (capacity, false)] {
+            let mut wire = vec![0u8; capacity as usize*5280];
             for row in wire.chunks_exact_mut(5280) {
                 row[..5120].fill(if nonzero { 0x38 } else { 0 });
                 row[5120..].fill(127);
             }
-            let ids: Vec<u8> = (0..96i32).flat_map(|i| (i%6).to_ne_bytes()).collect();
-            let routing: Vec<u8> = (0..96).flat_map(|_| (1f32/6.).to_ne_bytes()).collect();
+            let ids: Vec<u8> = (0..capacity as i32*6).flat_map(|i| (i%6).to_ne_bytes()).collect();
+            let routing: Vec<u8> = (0..capacity*6).flat_map(|_| (1f32/6.).to_ne_bytes()).collect();
             for (rank, (w, i, r, _)) in inputs.iter().enumerate() {
                 devices[rank].run(|| {
                     lib.copy_h2d(w.buffer, &wire)?;
@@ -261,8 +263,8 @@ mod tests {
             let make_inputs = || std::array::from_fn(|rank| RankInputs {
                 wire: &inputs[rank].0, ids: &inputs[rank].1, routing: &inputs[rank].2, producer: &inputs[rank].3 });
             let (x, y) = runtime.block_on(async { tokio::join!(
-                unsafe { first.execute(0, 16, 0, make_inputs()) },
-                unsafe { second.execute(0, 16, 1, make_inputs()) }) });
+                unsafe { first.execute(0, rows, 0, make_inputs()) },
+                unsafe { second.execute(0, rows, 1, make_inputs()) }) });
             let mut results = Vec::new();
             for (device, output) in [(devices[0], x?), (devices[1], y?)] {
                 let mut host = vec![0; output.bytes];
@@ -271,7 +273,31 @@ mod tests {
                 assert_eq!(host.chunks_exact(2).any(|v| u16::from_ne_bytes([v[0],v[1]]) & 0x7fff != 0), nonzero);
                 results.push(host);
             }
-            assert_eq!(results[0], results[1]);
+            let atomic = first.ranks[0].states.iter().find(|state| state.kernel.info().capacity_rows >= rows)
+                .unwrap().kernel.info().abi_version == 3;
+            if atomic {
+                // Independent atomic executions can straddle a BF16 rounding
+                // boundary. Bound both each value and aggregate error; do not
+                // dump multi-megabyte buffers when this fixture fails.
+                let mut squared_error = 0f64;
+                let mut squared_signal = 0f64;
+                let mut changed = 0usize;
+                for (a,b) in results[0].chunks_exact(2).zip(results[1].chunks_exact(2)) {
+                    let a = u16::from_ne_bytes([a[0],a[1]]);
+                    let b = u16::from_ne_bytes([b[0],b[1]]);
+                    assert!(a.abs_diff(b) <= 1, "atomic output differs by more than one BF16 step: {a} vs {b}");
+                    changed += usize::from(a != b);
+                    let x = f32::from_bits((a as u32) << 16) as f64;
+                    let y = f32::from_bits((b as u32) << 16) as f64;
+                    squared_error += (x-y)*(x-y);
+                    squared_signal += x*x;
+                }
+                let relative = (squared_error / squared_signal.max(f64::MIN_POSITIVE)).sqrt();
+                assert!(relative < 1e-6, "atomic lane relative L2: {relative}");
+                eprintln!("TP2 atomic rows={rows} changed={changed} relative_l2={relative}");
+            } else {
+                assert!(results[0] == results[1], "deterministic TP2 lane outputs differ at rows={rows}");
+            }
             assert_eq!(lib.cuda_get_device()?, 0);
         }
         Ok(())

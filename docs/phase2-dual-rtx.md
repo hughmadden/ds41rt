@@ -349,3 +349,29 @@ addition truncates BF16; a dedicated TP2 addition entry now rounds to nearest,
 without changing that existing single-device kernel. Native build and the Rust
 fixture pass. These checks do not establish full-model quality, serving lane
 overlap, or throughput; integration and larger prefill capacities remain pending.
+
+## Prefill capacities and combined native build
+
+TP2 routed and shared exports now have numerical evidence for capacities
+1, 16, 80, 256, 1024, and 4096. The qualification tools accept `--rows` to select
+exported capacities; routed reduction follows the export's route/token output
+layout, including atomic token accumulation at 256 rows and above. Changed-input
+graph replay passes at every capacity. Against the unsplit references, maximum
+relative L2 is 0.239% for routed experts and 0.234% for shared experts, with
+minimum cosine above 0.999997. Metrics accumulate in FP64 to avoid inaccurate
+FP32 reductions over large prefill vectors.
+
+The real-checkpoint Rust lane fixtures accept `DS41RT_TP2_TEST_CAPACITY` (default
+16). At capacity 4096 they alternate one-row and full-capacity executions with
+zero/nonzero inputs and opposite output destinations. Shared results match
+exactly. Routed deterministic variants match exactly; independent atomic
+executions show about 8e-9 relative L2 variation, bounded to one BF16 encoding
+step per element and less than 1e-6 relative L2 by the fixture. Zero input still
+produces exact zero after a nonzero execution.
+
+A fresh CMake build with CUDA, coordinator expert AOT, full-width RTX expert
+AOT, TP2 expert AOT, and FP8 AOT enabled succeeds. Both 4096-capacity Rust lane
+fixtures also pass against that combined library, rather than only the isolated
+test libraries. This establishes build coexistence and expert workspace reuse;
+complete serving integration, distributed attention/cache placement, vocabulary
+partitioning, automatic launcher selection, and full-model qualification remain.

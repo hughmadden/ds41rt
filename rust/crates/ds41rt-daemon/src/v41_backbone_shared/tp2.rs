@@ -185,6 +185,8 @@ mod tests {
     #[test]
     #[ignore = "requires shared TP2 DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, two GPUs"]
     fn real_shared_tp2_complete_independent_lanes() -> Result<()> {
+        let capacity: u32 = std::env::var("DS41RT_TP2_TEST_CAPACITY").unwrap_or_else(|_| "16".into()).parse()?;
+        ensure!([1,16,80,256,1024,4096].contains(&capacity), "invalid fixture capacity");
         let lib = unsafe { ds41rt_ffi::NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let catalog = ds41rt_loader::read_official_v41_catalog(ds41rt_loader::OFFICIAL_V41_MODEL_ID,
             std::path::Path::new(&std::env::var("DS41RT_SNAPSHOT")?))?;
@@ -194,12 +196,12 @@ mod tests {
             Rc::new(vec![Weights::load(devices[0], &catalog, 0, Weights::load_peak_device_bytes())?]),
             Rc::new(vec![Weights::load(devices[1], &catalog, 0, Weights::load_peak_device_bytes())?]),
         ];
-        let mut lanes = [Wave::new(weights.clone(), 16)?, Wave::new(weights, 16)?];
-        let inputs = [Allocation::new(devices[0], 16*5120*2)?, Allocation::new(devices[1], 16*5120*2)?];
+        let mut lanes = [Wave::new(weights.clone(), capacity)?, Wave::new(weights, capacity)?];
+        let inputs = [Allocation::new(devices[0], capacity as usize*5120*2)?, Allocation::new(devices[1], capacity as usize*5120*2)?];
         let producers = [Stream::new(devices[0])?, Stream::new(devices[1])?];
         let runtime = tokio::runtime::Builder::new_current_thread().build()?;
-        for (rows, nonzero) in [(1, false), (16, true), (1, true), (16, false)] {
-            let host: Vec<u8> = (0..16*5120).flat_map(|i| {
+        for (rows, nonzero) in [(1, false), (capacity, true), (1, true), (capacity, false)] {
+            let host: Vec<u8> = (0..capacity as usize*5120).flat_map(|i| {
                 let value = if nonzero { (i % 31) as f32 / 32.0 - 0.5 } else { 0.0 };
                 ((value.to_bits() >> 16) as u16).to_ne_bytes()
             }).collect();
