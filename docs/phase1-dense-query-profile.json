@@ -1,0 +1,1149 @@
+{
+  "source_commit": "39f7274",
+  "decision": "No query-B tile integrated: warm benefit does not survive cache-pressure proxy",
+  "profile": {
+    "target": {
+      "sqlite_sha256": "7e16f1128ad178820be51b2e92025474357726bae9f3ac36c1911407657de218",
+      "kernels": {
+        "shared_up_N2304_K5120": {
+          "calls": 17120,
+          "median_us": 11.072,
+          "mean_us": 11.0646,
+          "total_ms": 189.425952,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                36
+              ]
+            },
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                36
+              ]
+            }
+          ]
+        },
+        "query_a_N1280_K5120": {
+          "calls": 8522,
+          "median_us": 9.92,
+          "mean_us": 9.88772541656888,
+          "total_ms": 84.263196,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                20
+              ]
+            },
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1819201_TVLayoutDst1819201_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                20
+              ]
+            }
+          ]
+        },
+        "query_b_N32768_K1280": {
+          "calls": 8522,
+          "median_us": 28.512,
+          "mean_us": 28.43334522412579,
+          "total_ms": 242.308968,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o1280111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                188
+              ]
+            },
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o1280111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                188
+              ]
+            }
+          ]
+        },
+        "kv_N512_K5120": {
+          "calls": 8520,
+          "median_us": 9.024,
+          "mean_us": 9.01387147887324,
+          "total_ms": 76.798185,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                8
+              ]
+            }
+          ]
+        },
+        "output_a_groups8_N1024_K4096": {
+          "calls": 8520,
+          "median_us": 22.624,
+          "mean_us": 22.583770070422535,
+          "total_ms": 192.41372099999998,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor000o40968111012_tensorptrf8E4M3FNgmemalig_0",
+              "grid": [
+                1,
+                1,
+                128
+              ]
+            }
+          ]
+        },
+        "output_b_N5120_K8192": {
+          "calls": 8520,
+          "median_us": 28.895,
+          "mean_us": 28.859561971830985,
+          "total_ms": 245.883468,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1204801_TVLayoutDst1204801_Valuetypef8E4M3FN_tensor00o8192111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                2,
+                80
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "spec": {
+      "sqlite_sha256": "fb5f38def1121f7536d2267ba9048db478e2a70921a613ed24c97fa133c87732",
+      "kernels": {
+        "shared_up_N2304_K5120": {
+          "calls": 3778,
+          "median_us": 13.568,
+          "mean_us": 13.559711752249868,
+          "total_ms": 51.228591,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                18
+              ]
+            },
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                36
+              ]
+            }
+          ]
+        },
+        "query_a_N1280_K5120": {
+          "calls": 1851,
+          "median_us": 12.704,
+          "mean_us": 12.662887628309022,
+          "total_ms": 23.439005,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1819201_TVLayoutDst1819201_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                20
+              ]
+            }
+          ]
+        },
+        "query_b_N32768_K1280": {
+          "calls": 1851,
+          "median_us": 29.567,
+          "mean_us": 29.33137547271745,
+          "total_ms": 54.292376000000004,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o1280111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                188
+              ]
+            }
+          ]
+        },
+        "kv_N512_K5120": {
+          "calls": 1849,
+          "median_us": 11.872,
+          "mean_us": 11.847515954570039,
+          "total_ms": 21.906057,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1819201_TVLayoutDst1819201_Valuetypef8E4M3FN_tensor00o5120111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                8
+              ]
+            }
+          ]
+        },
+        "output_a_groups8_N1024_K4096": {
+          "calls": 1849,
+          "median_us": 22.976,
+          "mean_us": 22.996421308815577,
+          "total_ms": 42.520383,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor000o40968111012_tensorptrf8E4M3FNgmemalig_0",
+              "grid": [
+                1,
+                1,
+                128
+              ]
+            }
+          ]
+        },
+        "output_b_N5120_K8192": {
+          "calls": 1849,
+          "median_us": 29.536,
+          "mean_us": 29.642103299080585,
+          "total_ms": 54.808249,
+          "identities": [
+            {
+              "name": "kernel_cutlass_kernel_b12x_libdense_gemmDenseGemmKernel_object_at__CopyAtom_ThrID10_TVLayoutSrc1409601_TVLayoutDst1409601_Valuetypef8E4M3FN_tensor00o8192111100_tensorptrf8E4M3FNgmemalign1_0",
+              "grid": [
+                1,
+                1,
+                40
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "limitations": [
+      "Instrumented CUDA kernel intervals, not untraced serving latency.",
+      "Only recurrent captured dense node signatures with explicitly matched layouts/grids; quantization, reduction and other kernels excluded.",
+      "Speculative samples combine backbone verification and draft calls of the same geometry; not an exact six-row-only attribution.",
+      "This signature map is specific to the recorded native artifact and requires review for changed exports."
+    ]
+  },
+  "query_b_probe": {
+    "scope": "Probe query-B AOT tile choices against native quantization/GEMM on official weights.",
+    "native_sha256": "1aed37f945a4291139133b95bdef7fd5040f86164bbfcd6bf89286c98dfc9f94",
+    "source_sha256": "4c48be217b0b181236d0df2a4e2795ce7005ebe540e315adbca6b7d7d85d8554",
+    "sparkinfer_lock": {
+      "schema": 1,
+      "repository": "https://github.com/tpurtell/sparkinfer-glmrt.git",
+      "revision": "7299b3b92e70d539b2c0a63aaadce36932ceef4d",
+      "source_tree_sha256": "2678ac188756a16a3645256cf3ac40dc07648d8608eef25cf038a5f3c96d3af1"
+    },
+    "shape": [
+      32768,
+      1280
+    ],
+    "sms": 188,
+    "eviction_bytes": 268435456,
+    "cases": [
+      {
+        "capacity": 1,
+        "rows": 1,
+        "errors": [
+          {
+            "mutation": 0,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          }
+        ],
+        "samples_us": {
+          "warm": {
+            "native": [
+              19.72533343359828,
+              18.962666702767212,
+              19.14400017509858,
+              18.97866666937868,
+              18.98133335635066,
+              19.162666828682024
+            ],
+            "16x64": [
+              18.045333214104176,
+              17.93066660563151,
+              18.079999989519518,
+              17.965333225826424,
+              17.93066660563151,
+              17.866666583965223
+            ],
+            "16x128": [
+              13.685333309695125,
+              13.632000035916766,
+              13.712000024194518,
+              13.72000016272068,
+              13.773333436499039,
+              13.776000201081237
+            ],
+            "32x64": [
+              24.117333348840475,
+              24.08800010258953,
+              24.130666783700388,
+              24.11200013011694,
+              24.13600015764435,
+              24.074666822950046
+            ],
+            "32x128": [
+              17.882666550576687,
+              17.954666477938492,
+              17.837333182493847,
+              17.9946666272978,
+              17.952000101407368,
+              17.87733317663272
+            ]
+          },
+          "evicted": {
+            "native": [
+              33.450666815042496,
+              33.624000226457916,
+              34.818667297561966,
+              33.78933357695738,
+              34.304000437259674,
+              34.128000338872276
+            ],
+            "16x64": [
+              34.47466716170311,
+              33.96000030140082,
+              33.78933357695738,
+              33.44533344109853,
+              34.64266719917456,
+              33.44800012807051
+            ],
+            "16x128": [
+              33.9626669883728,
+              34.13333371281624,
+              34.472000474731125,
+              34.130667025844254,
+              34.30666712423166,
+              33.79466695090135
+            ],
+            "32x64": [
+              33.9626669883728,
+              34.472000474731125,
+              34.818667297561966,
+              34.128000338872276,
+              34.472000474731125,
+              34.130667025844254
+            ],
+            "32x128": [
+              33.624000226457916,
+              34.47466716170311,
+              33.96000030140082,
+              33.62133353948593,
+              33.9626669883728,
+              33.79466695090135
+            ]
+          }
+        },
+        "median_us": {
+          "warm": {
+            "native": 19.06266676572462,
+            "16x64": 17.947999915728968,
+            "16x128": 13.716000093457598,
+            "32x64": 24.114666739478707,
+            "32x128": 17.917333325992026
+          },
+          "evicted": {
+            "native": 33.95866695791483,
+            "16x64": 33.8746669391791,
+            "16x128": 34.13200036933024,
+            "32x64": 34.30133375028769,
+            "32x128": 33.877333626151085
+          }
+        }
+      },
+      {
+        "capacity": 16,
+        "rows": 1,
+        "errors": [
+          {
+            "mutation": 0,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          }
+        ],
+        "samples_us": {
+          "warm": {
+            "native": [
+              18.887999933212996,
+              18.408000003546476,
+              18.271999899297953,
+              18.05866664896409,
+              18.208000032852095,
+              18.175999944408733
+            ],
+            "16x64": [
+              18.693333336462576,
+              18.786666604379814,
+              18.623999785631895,
+              18.471999869992334,
+              18.56266676137845,
+              18.623999940852325
+            ],
+            "16x128": [
+              14.530666715775927,
+              14.583999989554286,
+              14.52266665485998,
+              14.378666644915938,
+              14.551999823500713,
+              14.565333491191268
+            ],
+            "32x64": [
+              27.130666964997847,
+              27.855999767780304,
+              27.650666267921526,
+              27.21866701419155,
+              27.08800012866656,
+              27.301333534220856
+            ],
+            "32x128": [
+              17.909333265076082,
+              17.91999985774358,
+              17.909333265076082,
+              18.01866665482521,
+              18.031999934464693,
+              17.93866651132703
+            ]
+          },
+          "evicted": {
+            "native": [
+              33.877333626151085,
+              34.1386670867602,
+              33.626666913429894,
+              33.45333350201448,
+              33.96533367534479,
+              33.95733361442884
+            ],
+            "16x64": [
+              34.472000474731125,
+              33.62133353948593,
+              33.78933357695738,
+              34.12533365190029,
+              33.624000226457916,
+              33.450666815042496
+            ],
+            "16x128": [
+              33.786666889985405,
+              34.30666712423166,
+              33.79466695090135,
+              34.13600039978822,
+              33.28000009059906,
+              33.450666815042496
+            ],
+            "32x64": [
+              33.9626669883728,
+              34.477333848675094,
+              33.968000362316765,
+              34.1386670867602,
+              34.30133375028769,
+              33.79466695090135
+            ],
+            "32x128": [
+              34.12533365190029,
+              33.626666913429894,
+              33.79466695090135,
+              33.61866685251395,
+              34.13600039978822,
+              33.96533367534479
+            ]
+          }
+        },
+        "median_us": {
+          "warm": {
+            "native": 18.239999966075025,
+            "16x64": 18.623999863242112,
+            "16x128": 14.54133326963832,
+            "32x64": 27.260000274206202,
+            "32x128": 17.929333184535302
+          },
+          "evicted": {
+            "native": 33.917333620289966,
+            "16x64": 33.70666690170765,
+            "16x128": 33.79066692044338,
+            "32x64": 34.05333372453848,
+            "32x128": 33.88000031312307
+          }
+        }
+      },
+      {
+        "capacity": 16,
+        "rows": 5,
+        "errors": [
+          {
+            "mutation": 0,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          }
+        ],
+        "samples_us": {
+          "warm": {
+            "native": [
+              18.965333234518766,
+              18.3680000094076,
+              18.693333491683006,
+              18.479999775687855,
+              18.229333218187094,
+              18.4560000586013
+            ],
+            "16x64": [
+              17.981333347658317,
+              17.943999885270994,
+              18.221333312491577,
+              18.031999779244263,
+              17.89599983021617,
+              18.114666764934857
+            ],
+            "16x128": [
+              14.394666689137617,
+              14.242666773498058,
+              13.984000077471137,
+              15.677333498994509,
+              14.309333249305686,
+              14.781333273276687
+            ],
+            "32x64": [
+              27.10933346922199,
+              27.448000386357307,
+              27.901333135863144,
+              27.25066679219405,
+              27.86133298650384,
+              28.986666196336348
+            ],
+            "32x128": [
+              17.904000046352547,
+              17.8853333927691,
+              20.33866678054134,
+              17.917333481212456,
+              17.901333359380562,
+              18.933333456516266
+            ]
+          },
+          "evicted": {
+            "native": [
+              34.04800035059452,
+              34.472000474731125,
+              34.64000051220258,
+              34.304000437259674,
+              34.98666733503342,
+              34.81600061058998
+            ],
+            "16x64": [
+              34.634667138258614,
+              34.304000437259674,
+              34.47466716170311,
+              34.47466716170311,
+              34.64800057311853,
+              34.29866706331571
+            ],
+            "16x128": [
+              34.46933347731829,
+              34.128000338872276,
+              33.96000030140082,
+              34.10400046656529,
+              35.15733405947685,
+              34.813333923617996
+            ],
+            "32x64": [
+              34.818667297561966,
+              35.32533378650745,
+              34.97333390017351,
+              34.81600061058998,
+              34.98666733503342,
+              34.994667395949364
+            ],
+            "32x128": [
+              34.813333923617996,
+              34.645333886146545,
+              34.98666733503342,
+              34.29866706331571,
+              34.477333848675094,
+              34.30666712423166
+            ]
+          }
+        },
+        "median_us": {
+          "warm": {
+            "native": 18.467999917144578,
+            "16x64": 18.00666656345129,
+            "16x128": 14.351999969221652,
+            "32x64": 27.654666686430573,
+            "32x128": 17.9106667637825
+          },
+          "evicted": {
+            "native": 34.556000493466854,
+            "16x64": 34.47466716170311,
+            "16x128": 34.298666908095285,
+            "32x64": 34.980000617603466,
+            "32x128": 34.56133386741082
+          }
+        }
+      },
+      {
+        "capacity": 16,
+        "rows": 6,
+        "errors": [
+          {
+            "mutation": 0,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          }
+        ],
+        "samples_us": {
+          "warm": {
+            "native": [
+              18.80533341318369,
+              18.445333155492943,
+              18.370666696379583,
+              18.35733310629924,
+              18.122666515409946,
+              18.341333294908207
+            ],
+            "16x64": [
+              19.114666618406773,
+              19.322666494796675,
+              18.616000035156805,
+              19.346666677544516,
+              19.346666677544516,
+              18.92533339560032
+            ],
+            "16x128": [
+              15.256000061829885,
+              15.136000079413256,
+              14.370666661610207,
+              14.184000125775734,
+              14.22933341624836,
+              14.751999949415525
+            ],
+            "32x64": [
+              27.282667035857838,
+              27.216000171999138,
+              28.157333222528298,
+              27.090666815638542,
+              27.98399965589245,
+              27.413333610941965
+            ],
+            "32x128": [
+              18.917333489904802,
+              18.461333277324837,
+              17.957333475351334,
+              18.32266664132476,
+              18.27999980499347,
+              18.285333178937435
+            ]
+          },
+          "evicted": {
+            "native": [
+              35.41866752008597,
+              34.81066723664602,
+              34.46933378775915,
+              34.818667297561966,
+              34.1386670867602,
+              34.645333886146545
+            ],
+            "16x64": [
+              35.16000074644884,
+              34.81600061058998,
+              34.813333923617996,
+              34.98666733503342,
+              34.98400064806143,
+              34.813333923617996
+            ],
+            "16x128": [
+              34.477333848675094,
+              34.47466716170311,
+              33.95733361442884,
+              34.98400064806143,
+              33.9626669883728,
+              34.30666712423166
+            ],
+            "32x64": [
+              34.9893340220054,
+              34.813333923617996,
+              34.818667297561966,
+              34.98400064806143,
+              35.336000534395374,
+              34.994667395949364
+            ],
+            "32x128": [
+              34.13600039978822,
+              34.9893340220054,
+              34.98400064806143,
+              35.162667433420815,
+              34.98666733503342,
+              34.81600061058998
+            ]
+          }
+        },
+        "median_us": {
+          "warm": {
+            "native": 18.36399990133941,
+            "16x64": 19.218666556601725,
+            "16x128": 14.561333305512866,
+            "32x64": 27.3480003233999,
+            "32x128": 18.303999910131097
+          },
+          "evicted": {
+            "native": 34.728000561396286,
+            "16x64": 34.9000006293257,
+            "16x128": 34.39066714296739,
+            "32x64": 34.98666733503342,
+            "32x128": 34.98533399154742
+          }
+        }
+      },
+      {
+        "capacity": 16,
+        "rows": 16,
+        "errors": [
+          {
+            "mutation": 0,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 0,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "16x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x64",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          },
+          {
+            "mutation": 1,
+            "tile": "32x128",
+            "relative_l2": 0.0,
+            "max_abs": 0.0
+          }
+        ],
+        "samples_us": {
+          "warm": {
+            "native": [
+              16.114666514719527,
+              15.704000213493904,
+              15.72533332121869,
+              15.874666317055622,
+              15.762666628385583,
+              15.90133310916523
+            ],
+            "16x64": [
+              13.277333385000626,
+              13.314666614557305,
+              13.22666664297382,
+              13.10666666055719,
+              13.050666622196635,
+              13.175999900947014
+            ],
+            "16x128": [
+              11.874666747947535,
+              13.088000006973743,
+              11.621333425864577,
+              11.514666800697645,
+              11.493333382532,
+              11.610666677976647
+            ],
+            "32x64": [
+              19.98933358117938,
+              20.54666681215167,
+              19.893333471069734,
+              19.906667061150074,
+              20.090666754792135,
+              20.040000167985756
+            ],
+            "32x128": [
+              15.890666516497731,
+              15.898666655023893,
+              16.080000049745042,
+              15.94399979027609,
+              15.877333004027605,
+              15.895999890441695
+            ]
+          },
+          "evicted": {
+            "native": [
+              34.98666733503342,
+              34.94400065392256,
+              35.83733395983776,
+              35.64533405005932,
+              35.312000662088394,
+              35.47733370214701
+            ],
+            "16x64": [
+              35.138667250672974,
+              35.816000464061894,
+              35.47466732561588,
+              35.317334036032356,
+              35.66933423280716,
+              34.81600061058998
+            ],
+            "16x128": [
+              34.962667462726436,
+              35.13333387672901,
+              35.496000510950886,
+              35.83733395983776,
+              35.32800078392029,
+              35.15200068553289
+            ],
+            "32x64": [
+              35.47466732561588,
+              35.162667433420815,
+              35.11466737836599,
+              35.6480007370313,
+              35.1653341203928,
+              35.33066747089227
+            ],
+            "32x128": [
+              35.49600082139174,
+              35.30133391420046,
+              34.77333392947912,
+              35.1653341203928,
+              34.78133399039507,
+              35.15466737250487
+            ]
+          }
+        },
+        "median_us": {
+          "warm": {
+            "native": 15.818666472720603,
+            "16x64": 13.201333271960417,
+            "16x128": 11.616000051920611,
+            "32x64": 20.014666874582566,
+            "32x128": 15.897333272732794
+          },
+          "evicted": {
+            "native": 35.3946671821177,
+            "16x64": 35.396000680824116,
+            "16x128": 35.24000073472659,
+            "32x64": 35.24800079564254,
+            "32x128": 35.16000074644883
+          }
+        }
+      }
+    ],
+    "hardware": [
+      "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 400.00 W, 107.39 W, 2797 MHz, 13365 MHz, 0x0000000000000000",
+      "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 400.00 W, 124.69 W, 2707 MHz, 13365 MHz, 0x0000000000000000",
+      "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 400.00 W, 156.23 W, 2707 MHz, 13365 MHz, 0x0000000000000000",
+      "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 400.00 W, 178.03 W, 2782 MHz, 13365 MHz, 0x0000000000000000",
+      "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 400.00 W, 194.92 W, 2805 MHz, 13365 MHz, 0x0000000000000000",
+      "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0, P1, 400.00 W, 284.59 W, 2805 MHz, 13365 MHz, 0x0000000000000000"
+    ],
+    "limitations": [
+      "Official weights with synthetic finite activations; bounded numerical comparison to native output, not full-model quality.",
+      "Component graph timing includes quantization and GEMM; eviction work is outside events.",
+      "256 MiB read/write eviction is a cache-pressure proxy, not proof of full cache invalidation.",
+      "No serving performance or fixed-clock qualification claim."
+    ]
+  },
+  "profile_runs": {
+    "spec": {
+      "launch": [
+        "docker",
+        "exec",
+        "ds41rt-dense-profile-spec",
+        "/nsys/target-linux-x64/nsys",
+        "launch",
+        "--session-new=c1",
+        "--trace=cuda,nvtx",
+        "--cuda-graph-trace=node",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--dspark",
+        "--rtx-expert-layers",
+        "5",
+        "--dspark-adaptive"
+      ],
+      "report_sha256": "004d57e6a4f3b6904517063341a3ae3c4bdeb8ed92cb2bba503296db35a0070e",
+      "request_sha256": "a47508b66b13cd32a0add1f555c68064bcab3113c564507481f9f2b5dd732395",
+      "response_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+      "structure_check_passed": true
+    },
+    "target": {
+      "launch": [
+        "docker",
+        "exec",
+        "ds41rt-dense-profile-target",
+        "/nsys/target-linux-x64/nsys",
+        "launch",
+        "--session-new=c1",
+        "--trace=cuda,nvtx",
+        "--cuda-graph-trace=node",
+        "/phase1/ds41rt",
+        "serve-native",
+        "--snapshot",
+        "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+        "--native-lib",
+        "/phase1/libds41rt_native.so",
+        "--peers",
+        "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+        "--listen",
+        "0.0.0.0:8000",
+        "--prefill-batch-tokens",
+        "2048",
+        "--concurrency",
+        "16",
+        "--prefix-cache-entries",
+        "24",
+        "--max-context-tokens",
+        "1048576",
+        "--max-output-tokens",
+        "393216",
+        "--rtx-expert-layers",
+        "5"
+      ],
+      "report_sha256": "48a883528fc87c17b7025338c9dc963d0a0f2c84ffc772e813e0fcbdcf560613",
+      "request_sha256": "cec9902870aa824178ce6a6b3bcacd5676311412f3015522e520634cac100130",
+      "response_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+      "structure_check_passed": true
+    }
+  },
+  "raw_directories": [
+    "/tmp/ds41-phase1-dense-profile",
+    "/tmp/ds41-query-b-tiles"
+  ],
+  "toolchain": {
+    "python": "3.12.3 (main, Apr 15 2024, 18:25:56) [Clang 17.0.6 ]",
+    "torch": "2.13.0+cu130",
+    "cuda": "13.0",
+    "cutlass": "4.6.2"
+  }
+}
