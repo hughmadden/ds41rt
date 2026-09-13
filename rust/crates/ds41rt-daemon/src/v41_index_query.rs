@@ -113,6 +113,7 @@ impl<'a> IndexQueryWeights<'a> {
             capacity,
             graphs: LayerGraphs::new(self.library),
             ready: None,
+            pending: None,
             origin: None,
             tokens: Vec::new(),
         };
@@ -164,12 +165,14 @@ pub(crate) struct IndexQueryWave<'w, 'a> {
     capacity: u32,
     graphs: LayerGraphs<'w, 'a, IndexQueryWeights<'a>>,
     ready: Option<u32>,
+    pending: Option<(u32, QueryBinding, bool)>,
     origin: Option<QueryBinding>,
     tokens: Vec<u64>,
 }
 impl<'w, 'a> IndexQueryWave<'w, 'a> {
     /// Retain captured weight owners while reusing this lane's fixed buffers.
     pub fn rebind(&mut self, weights: &'w IndexQueryWeights<'a>) -> Result<()> {
+        ensure!(self.pending.is_none(), "index query pending");
         self.ready = None;
         self.origin = None;
         self.tokens.clear();
@@ -208,6 +211,7 @@ impl IndexQueryWave<'_, '_> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
     fn validate(&mut self, rows: u32) -> Result<()> {
+        ensure!(self.pending.is_none(), "index query pending");
         self.ready = None;
         self.origin = None;
         self.tokens.clear();
@@ -283,6 +287,9 @@ impl IndexQueryWave<'_, '_> {
         self.ready = None;
         self.origin = None;
         self.tokens.clear();
+        unsafe { self.capture_ready(rows) }
+    }
+    unsafe fn capture_ready(&mut self, rows: u32) -> Result<()> {
         unsafe {
             self.stream
                 .library
@@ -372,6 +379,55 @@ impl IndexQueryWave<'_, '_> {
         self.origin = Some(binding);
         self.tokens.extend_from_slice(tokens);
         self.output()
+    }
+    /// # Safety
+    /// Retain the main query and this wave until polling completes or abort drains.
+    pub unsafe fn enqueue_attention(&mut self, query: &AttentionQueryOutput<'_>) -> Result<()> {
+        self.validate(query.rows as u32)?;
+        let binding = query.binding()?;
+        let tokens = query.tokens()?;
+        ensure!(query.rows <= self.capacity as usize && query.rows == tokens.len()
+            && binding.layer() == self.weights.layer && query.layer == self.weights.layer
+            && query.hidden.device_id == self.hidden.buffer.device_id, "queued index origin differs");
+        self.tokens.extend_from_slice(tokens);
+        let rows = query.rows as u32;
+        let graph = self.graphs.get_shape(self.weights.layer, self.weights, rows);
+        self.pending = Some((rows, binding, graph.is_none()));
+        let result = (|| -> Result<()> { unsafe {
+            for (dst, src) in [(self.qr.buffer, query.normalized_rank),
+                (self.hidden.buffer, query.hidden), (self.positions.buffer, query.positions)] {
+                self.stream.library.copy_d2d_async(dst, src, src.bytes, self.stream.raw)?;
+            }
+            if let Some((graph, _)) = graph { self.stream.library.cuda_graph_launch(graph, self.stream.raw) }
+            else { self.enqueue(rows) }
+        }})();
+        if result.is_err() { self.abort_pending()?; }
+        result
+    }
+    pub fn poll_pending(&mut self) -> Result<bool> {
+        let result = (|| -> Result<bool> {
+            let (rows, binding, capture) = self.pending.context("no pending index query")?;
+            if !unsafe { self.stream.library.cuda_stream_query(self.stream.raw)? } { return Ok(false); }
+            if capture {
+                unsafe { self.capture_ready(rows)?; }
+                let graph = self.graphs.get_shape(self.weights.layer, self.weights, rows)
+                    .context("queued index graph missing")?.0;
+                self.pending.as_mut().unwrap().2 = false;
+                unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw)?; }
+                return Ok(false);
+            }
+            self.pending = None;
+            self.ready = Some(rows);
+            self.origin = Some(binding);
+            Ok(true)
+        })();
+        if result.is_err() { self.abort_pending()?; }
+        result
+    }
+    pub fn abort_pending(&mut self) -> Result<()> {
+        if self.pending.is_some() { self.synchronize()?; }
+        self.pending = None; self.ready = None; self.origin = None; self.tokens.clear();
+        Ok(())
     }
     pub fn output(&self) -> Result<IndexQueryOutput<'_>> {
         let rows = self.ready.context("index query output unpublished")? as usize;

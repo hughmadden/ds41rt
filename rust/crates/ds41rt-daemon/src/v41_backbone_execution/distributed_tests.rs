@@ -1,4 +1,5 @@
 use super::*;
+use ds41rt_ffi::Ds41rtDeviceBuffer;
 use crate::v41_backbone_lane::BackboneLaneWeights;
 use crate::v41_engram::{
     layer::{EngramGate, EngramLayerWeights},
@@ -37,9 +38,10 @@ fn production_bytes(lib: &NativeLibrary, bank: &BackboneCache<'_>, batch: &Cache
         let mut bytes = vec![0; buffer.bytes]; lib.copy_d2h(&mut bytes, buffer)?; Ok(bytes)
     }).collect()
 }
-fn check_queued_production(lib: &NativeLibrary, runtime: &tokio::runtime::Runtime,
-    bank: &BackboneCache<'_>, batch: &CacheBatch, lane: &BackboneLane<'_, '_>,
-    execution: &mut BackboneExecution<'_, '_>) -> Result<()> {
+fn check_queued_production<'w, 'a>(lib: &NativeLibrary, runtime: &tokio::runtime::Runtime,
+    bank: &BackboneCache<'a>, batch: &CacheBatch, lane: &BackboneLane<'w, 'a>,
+    execution: &mut BackboneExecution<'w, 'a>, index: &mut IndexLane<'w, 'a>,
+    reference_index: &mut IndexLane<'w, 'a>) -> Result<()> {
     let query = lane.query_output()?;
     let layer = query.layer;
     unsafe { bank.produce_window(batch, &query, &mut execution.windows[layer])?; }
@@ -51,15 +53,35 @@ fn check_queued_production(lib: &NativeLibrary, runtime: &tokio::runtime::Runtim
     if let Some(i) = SOURCES.iter().position(|&l| l == layer) { execution.sources[i].clear_graph()?; }
     // Unpolled cancellation must drain before staging and scratch are reused.
     drop(unsafe { execution.enqueue_production(bank, batch, lane)? });
+    if layer == 2 {
+        drop(unsafe { execution.enqueue_production_and_index(bank, batch, lane, index)? });
+        index.restart()?;
+    }
     for warm in [false, true] {
         runtime.block_on(async {
-            let mut pending = unsafe { execution.enqueue_production(bank, batch, lane)? };
+            let mut pending = unsafe {
+                if warm { execution.enqueue_production_and_index(bank, batch, lane, index)? }
+                else { execution.enqueue_production(bank, batch, lane)? }
+            };
             while !unsafe { pending.poll(bank, batch)? } { tokio::task::yield_now().await; }
             Ok::<_, anyhow::Error>(())
         })?;
         assert_eq!(production_bytes(lib, bank, batch, execution, layer)?, reference,
             "queued producer differs at layer {layer}, warm={warm}");
         if !warm { execution.queued_production = None; }
+    }
+    if INDEX.contains(&layer) {
+        let source = SOURCES.iter().rposition(|&l| l <= layer).map(|i| &execution.sources[i]);
+        let cache = bank.attention(batch, layer, &execution.windows[layer], source)?;
+        unsafe { reference_index.select(&query, &cache)?; }
+        let expected = reference_index.output(layer, &cache)?;
+        let actual = index.output(layer, &cache)?;
+        let read = |buffer: Ds41rtDeviceBuffer| -> Result<Vec<u8>> {
+            let mut bytes = vec![0; buffer.bytes]; lib.copy_d2h(&mut bytes, buffer)?; Ok(bytes)
+        };
+        assert_eq!(read(expected.selected)?, read(actual.selected)?, "queued selections differ at layer {layer}");
+        assert_eq!(expected.candidate_blocks().map(read).transpose()?, actual.candidate_blocks().map(read).transpose()?,
+            "queued retained candidates differ at layer {layer}");
     }
     Ok(())
 }
@@ -125,6 +147,8 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         80,
         IndexLane::workspace_bytes(&lib, 80)?.into_iter().sum(),
     )?;
+    let mut reference_index = IndexLane::new(&index_weights, 80,
+        IndexLane::workspace_bytes(&lib, 80)?.into_iter().sum())?;
     let mut execution = BackboneExecution::new(
         &producers,
         80,
@@ -211,7 +235,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             lane.restart()?;
             index.restart()?;
             unsafe { requests.begin_input(&batch, &mut embedding, &mut lane)?; }
-            check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution)?;
+            check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution, &mut index, &mut reference_index)?;
             let prepared = unsafe { execution.prepare_layer_cooperative(requests.cache(),
                 batch.cache()?, &mut lane, &mut index)? };
             let completed = runtime.block_on(unsafe {
@@ -277,7 +301,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             std::fs::write(dir.join(format!("layer1-c{cycle}-query.bin")), &rotated)?;
         }
         if cycle == 0 {
-            for layer in 1..21 {
+            for layer in 1..37 {
                 if layer != 1 {
                     lane.advance()?;
                     if layer == 14 {
@@ -289,13 +313,13 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                     }
                     unsafe { lane.begin_prepared()?; }
                 }
-                check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution)?;
+                check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution, &mut index, &mut reference_index)?;
                 let prepared = unsafe { execution.prepare_layer_cooperative(requests.cache(),
                     batch.cache()?, &mut lane, &mut index)? };
                 let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, batch.image_mask()) })?;
                 unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
             }
-            eprintln!("PASS queued production: 21 windows, all four compressed sources, cold/warm graphs, cancelled producers, exact direct-output parity");
+            eprintln!("PASS queued production/index: 37 windows, four compressed sources, eight index layers and retained source-20 candidates; cold/warm graphs, cancellation/reuse, exact direct-output parity");
         }
         if cycle == 1 {
             for layer in 1..20 {

@@ -33,6 +33,8 @@ struct Ready {
     bindings: Vec<(IndexBinding, u64)>,
 }
 impl IndexSelectionOutput<'_> {
+    #[cfg(test)]
+    pub(crate) fn candidate_blocks(&self) -> Option<Ds41rtDeviceBuffer> { self.blocks }
     pub fn validate_query(&self, query: QueryBinding) -> Result<()> {
         let origin = self.origin.context("selection has no query origin")?;
         ensure!(
@@ -69,6 +71,8 @@ pub(crate) struct IndexSelectionWave<'a> {
     candidates: V41CandidateBlocks<'a>,
     graph: Option<(*mut c_void, Vec<usize>)>,
     ready: Option<Ready>,
+    pending: Option<Ready>,
+    in_flight: bool,
 }
 fn slice(mut b: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtDeviceBuffer {
     debug_assert!(offset + bytes <= b.bytes);
@@ -123,6 +127,8 @@ impl<'a> IndexSelectionWave<'a> {
             candidates: library.v41_candidate_blocks()?,
             graph: None,
             ready: None,
+            pending: None,
+            in_flight: false,
         })
     }
     fn b(&self, i: usize) -> Ds41rtDeviceBuffer {
@@ -132,6 +138,7 @@ impl<'a> IndexSelectionWave<'a> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
     pub fn clear_graph(&mut self) -> Result<()> {
+        ensure!(!self.in_flight, "index selection pending");
         self.ready = None;
         self.synchronize()?;
         if let Some((g, _)) = self.graph.take() {
@@ -254,6 +261,37 @@ impl<'a> IndexSelectionWave<'a> {
         requests: &[SelectionRequest<'_>],
         shared: Option<&IndexSelectionOutput<'_>>,
     ) -> Result<IndexSelectionOutput<'s>> {
+        unsafe { self.execute_inner(query, requests, shared, false)?; }
+        self.output()
+    }
+    /// # Safety
+    /// Retain query, proposals and optional source candidates through polling or abort.
+    pub unsafe fn enqueue_selection(&mut self, query: &IndexQueryOutput<'_>,
+        requests: &[SelectionRequest<'_>], shared: Option<&IndexSelectionOutput<'_>>) -> Result<()> {
+        let result = unsafe { self.execute_inner(query, requests, shared, true) };
+        if result.is_err() { self.abort_pending()?; }
+        result
+    }
+    pub fn poll_pending(&mut self) -> Result<bool> {
+        ensure!(self.in_flight && self.pending.is_some(), "no pending index selection");
+        let ready = unsafe { self.stream.library.cuda_stream_query(self.stream.raw) };
+        match ready {
+            Ok(false) => Ok(false),
+            Ok(true) => { self.ready = self.pending.take(); self.in_flight = false; Ok(true) }
+            Err(error) => { self.abort_pending()?; Err(error) }
+        }
+    }
+    pub fn abort_pending(&mut self) -> Result<()> {
+        if self.in_flight {
+            self.synchronize()?;
+            self.in_flight = false; self.pending = None; self.ready = None;
+        }
+        Ok(())
+    }
+    unsafe fn execute_inner(&mut self, query: &IndexQueryOutput<'_>,
+        requests: &[SelectionRequest<'_>], shared: Option<&IndexSelectionOutput<'_>>,
+        defer: bool) -> Result<()> {
+        ensure!(!self.in_flight, "index selection pending");
         self.ready = None;
         ensure!(
             [2, 8, 14, 20, 24, 28, 32, 36].contains(&query.layer),
@@ -365,14 +403,21 @@ impl<'a> IndexSelectionWave<'a> {
             }
             staging[rows * 48 + i * 8..rows * 48 + i * 8 + 8].copy_from_slice(&m[1].to_ne_bytes());
         }
-        self.stream
-            .library
-            .copy_h2d(self.b(0), &self.staging.bytes_mut()[..rows * 48])?;
-        self.stream
-            .library
-            .copy_h2d(self.b(1), &self.staging.bytes_mut()[rows * 48..rows * 56])?;
-        if self.graph.as_ref().map(|(_, f)| f) != Some(&fingerprint) {
-            self.clear_graph()?;
+        if self.graph.as_ref().map(|(_, f)| f) != Some(&fingerprint) { self.clear_graph()?; }
+        if defer {
+            self.in_flight = true;
+            let host = self.staging.buffer;
+            unsafe {
+                self.stream.library.copy_host_buffer_h2d_async(self.b(0), host, rows * 48, self.stream.raw)?;
+                let mut lengths = host;
+                lengths.ptr = host.ptr.cast::<u8>().add(rows * 48).cast(); lengths.bytes = rows * 8;
+                self.stream.library.copy_host_buffer_h2d_async(self.b(1), lengths, rows * 8, self.stream.raw)?;
+            }
+        } else {
+            self.stream.library.copy_h2d(self.b(0), &self.staging.bytes_mut()[..rows * 48])?;
+            self.stream.library.copy_h2d(self.b(1), &self.staging.bytes_mut()[rows * 48..rows * 56])?;
+        }
+        if self.graph.is_none() {
             unsafe {
                 self.stream
                     .library
@@ -395,14 +440,15 @@ impl<'a> IndexSelectionWave<'a> {
         }
         let g = self.graph.as_ref().context("selection graph missing")?.0;
         let launched = unsafe { self.stream.library.cuda_graph_launch(g, self.stream.raw) };
-        launched.and(self.synchronize())?;
-        self.ready = Some(Ready {
-            origin: query.origin(),
-            layer: query.layer,
-            rows,
-            bindings,
-        });
-        self.output()
+        let ready = Ready { origin: query.origin(), layer: query.layer, rows, bindings };
+        if defer {
+            launched?;
+            self.pending = Some(ready);
+        } else {
+            launched.and(self.synchronize())?;
+            self.ready = Some(ready);
+        }
+        Ok(())
     }
     /// Borrow completed selection storage. Consumers validate its retained source
     /// bindings against live cache proposals before using these logical row IDs.
@@ -422,6 +468,7 @@ impl<'a> IndexSelectionWave<'a> {
 }
 impl Drop for IndexSelectionWave<'_> {
     fn drop(&mut self) {
+        if let Err(error) = self.abort_pending() { tracing::error!(%error, "draining pending index selection"); }
         if let Err(error) = self.clear_graph() {
             tracing::error!(%error,"draining index selection graph");
         }

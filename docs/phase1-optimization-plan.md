@@ -199,3 +199,9 @@ Phase 2 may split encoder/decoder ownership across two RTX GPUs with TP2 shared
 and encoder routed experts, partitioned KV sources and vocabulary head. Avoid
 unnecessary single-device assumptions in new interfaces, but do not implement it
 as part of Phase 1.
+
+The [combined cache/index checkpoint](phase1-queued-index.md) now overlaps index
+projection with cache production and polls selection with guarded ownership.
+Against preserved e9c07ae: C1 130.18 → 128.43 tok/s, median C2–C14 −0.34%,
+C16 150.25 → 131.40. Functional checks pass; performance remains unresolved.
+Keep that control for remaining FFN/layer-completion work and final qualification.

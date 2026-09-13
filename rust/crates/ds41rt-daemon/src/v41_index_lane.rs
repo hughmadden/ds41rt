@@ -48,9 +48,9 @@ impl<'a> IndexLaneWeights<'a> {
 
 pub(crate) struct IndexLane<'w, 'a> {
     weights: &'w IndexLaneWeights<'a>,
-    query: IndexQueryWave<'w, 'a>,
     source: IndexSelectionWave<'a>,
     reindex: IndexSelectionWave<'a>,
+    query: IndexQueryWave<'w, 'a>,
     next: usize,
     ready: Option<usize>,
     invalid: bool,
@@ -136,6 +136,43 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         self.invalid = false;
         Ok(())
     }
+    /// # Safety
+    /// Retain main query/cache inputs until selection completes or abort drains.
+    pub unsafe fn enqueue_projection(&mut self, query: &AttentionQueryOutput<'_>) -> Result<()> {
+        let valid = !std::mem::replace(&mut self.invalid, true);
+        self.ready = None;
+        ensure!(valid && LAYERS.get(self.next) == Some(&query.layer), "queued index order differs");
+        self.query.rebind(&self.weights.weights[self.next])?;
+        unsafe { self.query.enqueue_attention(query) }
+    }
+    pub fn poll_projection(&mut self) -> Result<bool> { self.query.poll_pending() }
+    /// # Safety
+    /// Preserve completed projection and cache proposal storage through selection.
+    pub unsafe fn enqueue_selection(&mut self, cache: &CacheAttention<'_>) -> Result<()> {
+        ensure!(self.invalid, "queued index projection absent");
+        let query = self.query.output()?;
+        ensure!(LAYERS.get(self.next) == Some(&query.layer), "queued selection layer differs");
+        let requests = cache.selection_requests()?;
+        if query.layer <= 20 {
+            unsafe { self.source.enqueue_selection(&query, &requests, None) }
+        } else {
+            let shared = self.source.output()?;
+            unsafe { self.reindex.enqueue_selection(&query, &requests, Some(&shared)) }
+        }
+    }
+    pub fn poll_selection(&mut self) -> Result<bool> {
+        ensure!(self.invalid, "queued index selection absent");
+        let layer = *LAYERS.get(self.next).context("queued index order exhausted")?;
+        let ready = if layer <= 20 { self.source.poll_pending()? } else { self.reindex.poll_pending()? };
+        if ready { self.ready = Some(layer); self.next += 1; self.invalid = false; }
+        Ok(ready)
+    }
+    pub fn abort_pending(&mut self) -> Result<()> {
+        // Drain consumers before their projected inputs can be recycled.
+        let result = self.reindex.abort_pending().and(self.source.abort_pending()).and(self.query.abort_pending());
+        self.invalid = true; self.ready = None;
+        result
+    }
     /// Revalidate exact proposal snapshots and row order for the attention layer.
     pub fn output(
         &self,
@@ -156,6 +193,12 @@ impl<'w, 'a> IndexLane<'w, 'a> {
             .collect::<Vec<_>>();
         output.validate_attention(layer, &bindings)?;
         Ok(output)
+    }
+}
+
+impl Drop for IndexLane<'_, '_> {
+    fn drop(&mut self) {
+        if let Err(error) = self.abort_pending() { tracing::error!(%error, "draining index lane"); }
     }
 }
 

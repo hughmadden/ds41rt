@@ -316,8 +316,8 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             unsafe {
                 let cooperative = requests.cooperative_completion();
                 if cooperative {
-                    let mut production = requests.with_requests(|requests| self.execution.enqueue_production(
-                        requests.cache(), guard.batch.cache()?, &self.lane))?;
+                    let mut production = requests.with_requests(|requests| self.execution.enqueue_production_and_index(
+                        requests.cache(), guard.batch.cache()?, &self.lane, &mut self.index))?;
                     while !requests.with_requests(|requests| production.poll(requests.cache(), guard.batch.cache()?))? {
                         tokio::task::yield_now().await;
                     }

@@ -196,12 +196,20 @@ impl PassProgress {
 
 /// Every layer retains its private proposal until accepted-prefix commit. Two
 /// alternating passes need independent producer storage and progress owners.
+#[derive(Clone, Copy)]
+struct Produced {
+    batch: u64,
+    layer: usize,
+    started: std::time::Instant,
+    producer_us: u64,
+    indexed: bool,
+}
 pub(crate) struct BackboneExecution<'w, 'a> {
     weights: &'w CacheProducerWeights<'a>,
     windows: Vec<WindowWave<'w, 'a>>,
     sources: Vec<CompressorWave<'w, 'a>>,
     progress: PassProgress,
-    queued_production: Option<(u64, usize, std::time::Instant)>,
+    queued_production: Option<Produced>,
 }
 /// Scratch producers retain their wave owner; the caller retains the matching
 /// query and admitted cache slots through completion or drained cancellation.
@@ -212,6 +220,10 @@ pub(crate) struct PendingProduction<'p, 'w, 'a> {
     source: Option<usize>,
     window_ready: bool,
     source_ready: bool,
+    index: Option<&'p mut IndexLane<'w, 'a>>,
+    projection_ready: bool,
+    selection_started: bool,
+    producer_us: Option<u64>,
     complete: bool,
     started: std::time::Instant,
 }
@@ -226,8 +238,24 @@ impl PendingProduction<'_, '_, '_> {
             let source = self.source.unwrap();
             self.source_ready = unsafe { self.execution.sources[source].poll_query(bank.source(batch, self.layer)?)? };
         }
+        if let Some(index) = self.index.as_deref_mut() {
+            if !self.projection_ready { self.projection_ready = index.poll_projection()?; }
+        }
         if self.window_ready && self.source_ready {
-            self.execution.queued_production = Some((self.batch, self.layer, self.started));
+            let producer_us = *self.producer_us.get_or_insert_with(|| self.started.elapsed().as_micros() as u64);
+            if !self.projection_ready { return Ok(false); }
+            if let Some(index) = self.index.as_deref_mut() {
+                if !self.selection_started {
+                    let source = SOURCES.iter().rposition(|&l| l <= self.layer)
+                        .filter(|_| !batch.stage().reuses_sources()).map(|i| &self.execution.sources[i]);
+                    let cache = bank.attention(batch, self.layer, &self.execution.windows[self.layer], source)?;
+                    unsafe { index.enqueue_selection(&cache)?; }
+                    self.selection_started = true;
+                }
+                if !index.poll_selection()? { return Ok(false); }
+            }
+            self.execution.queued_production = Some(Produced { batch: self.batch, layer: self.layer,
+                started: self.started, producer_us, indexed: self.index.is_some() });
             self.complete = true;
         }
         Ok(self.complete)
@@ -236,6 +264,9 @@ impl PendingProduction<'_, '_, '_> {
 impl Drop for PendingProduction<'_, '_, '_> {
     fn drop(&mut self) {
         if !self.complete {
+            if let Some(index) = self.index.as_deref_mut() {
+                if let Err(error) = index.abort_pending() { tracing::error!(%error, "draining cancelled index work"); }
+            }
             if let Err(error) = self.execution.windows[self.layer].abort_query() {
                 tracing::error!(%error, "draining cancelled window production");
             }
@@ -360,6 +391,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         let source = SOURCES.iter().position(|&l| l == layer).filter(|_| !batch.stage().reuses_sources());
         let pending = PendingProduction { execution: self, batch: batch.identity(), layer, source,
             window_ready: false, source_ready: source.is_none(), complete: false,
+            index: None, projection_ready: true, selection_started: false, producer_us: None,
             started: std::time::Instant::now() };
         unsafe {
             pending.execution.windows[layer].enqueue_query(bank.window(batch, layer)?,
@@ -368,6 +400,20 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
                 pending.execution.sources[i].enqueue_query(bank.source(batch, layer)?,
                     &batch.source_chunks(layer)?, &query)?;
             }
+        }
+        Ok(pending)
+    }
+    /// # Safety
+    /// Same retained query/cache contract as enqueue_production, with index
+    /// storage retained by the returned owner until all producers/selection drain.
+    pub unsafe fn enqueue_production_and_index<'p>(&'p mut self, bank: &BackboneCache<'_>,
+        batch: &CacheBatch, lane: &BackboneLane<'_, '_>, index: &'p mut IndexLane<'w, 'a>)
+        -> Result<PendingProduction<'p, 'w, 'a>> {
+        let mut pending = unsafe { self.enqueue_production(bank, batch, lane)? };
+        if INDEX.contains(&pending.layer) {
+            pending.index = Some(index);
+            pending.projection_ready = false;
+            unsafe { pending.index.as_deref_mut().unwrap().enqueue_projection(&lane.query_output()?)?; }
         }
         Ok(pending)
     }
@@ -426,7 +472,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         index: &mut IndexLane<'_, '_>, cooperative: bool) -> Result<PreparedLayer<'l, 'lw, 'la>> {
         let publishing = matches!(&bank, LayerCache::Encoder(_));
         let queued_production = self.queued_production.take();
-        let timing = queued_production.map_or_else(std::time::Instant::now, |p| p.2);
+        let timing = queued_production.map_or_else(std::time::Instant::now, |p| p.started);
         // Invalidate even if obtaining the completed query or bank check fails.
         let layer = self.progress.next;
         self.progress.begin(batch.identity(), layer)?;
@@ -437,8 +483,8 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             query.layer == layer,
             "backbone query layer differs from pass"
         );
-        if let Some((id, produced_layer, _)) = queued_production {
-            ensure!(id == batch.identity() && produced_layer == layer && !publishing,
+        if let Some(produced) = queued_production {
+            ensure!(produced.batch == batch.identity() && produced.layer == layer && !publishing,
                 "queued cache production identity differs");
         } else {
             unsafe { bank.bank().produce_window(batch, &query, &mut self.windows[layer])?; }
@@ -455,14 +501,14 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
                 bank.publish_encoder_source(batch, layer, &mut self.sources[i])?;
             }
         }
-        let produced_us = timing.elapsed().as_micros() as u64;
+        let produced_us = queued_production.map_or_else(|| timing.elapsed().as_micros() as u64, |p| p.producer_us);
         let source = SOURCES
             .iter()
             .rposition(|&l| l <= layer)
             .filter(|_| !batch.stage().reuses_sources() && !publishing)
             .map(|i| &self.sources[i]);
         let cache = bank.bank().attention(batch, layer, &self.windows[layer], source)?;
-        if INDEX.contains(&layer) {
+        if INDEX.contains(&layer) && !queued_production.is_some_and(|p| p.indexed) {
             unsafe {
                 lane.select_index(index, &cache)?;
             }
