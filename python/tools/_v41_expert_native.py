@@ -88,7 +88,7 @@ def check(code):
 
 
 class Native:
-    def __init__(self, lib, capacity, weights, wire, ids, routing, *, coordinator=False, full_backbone=False):
+    def __init__(self, lib, capacity, weights, wire, ids, routing, *, coordinator=False, full_backbone=False, storage=None):
         assert not (coordinator and full_backbone)
         self.lib = lib
         self.info = info = Info()
@@ -118,7 +118,11 @@ class Native:
             check(query(capacity, C.byref(kind)))
             assert kind.value == 1
         check(lib.ds41rt_v41_expert_initialize(capacity, C.byref(self.handle)))
-        self.storage = torch.empty(info.scratch_bytes, device="cuda", dtype=torch.uint8)
+        if storage is not None:
+            assert storage.dtype == torch.uint8 and storage.is_cuda and storage.is_contiguous()
+            assert storage.numel() >= info.scratch_bytes
+        self.storage = (torch.empty(info.scratch_bytes, device="cuda", dtype=torch.uint8)
+                        if storage is None else storage)
         self.args = Launch()
         slots = self.args.tensors
         check(

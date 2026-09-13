@@ -7,13 +7,15 @@ use std::{ffi::c_void, rc::Rc};
 
 struct State<'a> {
     kernel: V41ExpertKernel<'a>,
-    scratch: DeviceAllocation<'a>,
     slots: [*mut c_void; 44],
 }
 pub(crate) struct LocalExpertWave<'a> {
     // Drain before scratch, weights or output can be released on any exit.
     stream: LoadStream<'a>,
     states: Vec<State<'a>>,
+    // Capacity variants are mutually exclusive. Every execute drains before
+    // another variant may reuse these bytes; kernels overwrite live scratch.
+    _scratch: DeviceAllocation<'a>,
     weights: Rc<Vec<ExpertWeights<'a>>>,
     output: DeviceAllocation<'a>,
     reducer: V41LocalExpertReducer<'a>,
@@ -27,10 +29,10 @@ impl<'a> LocalExpertWave<'a> {
         Ok(capacities)
     }
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
-        Self::capacities(capacity)?.into_iter().try_fold(capacity as usize * 10240, |sum, c| {
-            sum.checked_add(usize::try_from(library.v41_local_expert_info(c)?.scratch_bytes)?)
-                .context("local expert workspace size overflow")
-        })
+        let arena = Self::capacities(capacity)?.into_iter().try_fold(0usize, |largest, c| {
+            Ok::<_, anyhow::Error>(largest.max(usize::try_from(library.v41_local_expert_info(c)?.scratch_bytes)?))
+        })?;
+        arena.checked_add(capacity as usize * 10240).context("local expert workspace size overflow")
     }
     pub fn new(library: &'a NativeLibrary, weights: Rc<Vec<ExpertWeights<'a>>>,
         capacity: u32, budget: usize) -> Result<Self> {
@@ -41,18 +43,18 @@ impl<'a> LocalExpertWave<'a> {
         }
         ensure!(Self::device_bytes(library, capacity)? <= budget, "local expert workspace exceeds budget");
         let stream = LoadStream { library, raw: library.cuda_stream_create()? };
+        let scratch = DeviceAllocation::new(library, Self::device_bytes(library, capacity)? - capacity as usize * 10240)?;
         let mut states = Vec::new();
         for c in Self::capacities(capacity)? {
             let kernel = library.v41_local_expert_kernel(c)?;
-            let scratch = DeviceAllocation::new(library, kernel.info().scratch_bytes as usize)?;
             let mut slots = [std::ptr::null_mut(); 44];
             unsafe { kernel.bind_scratch(scratch.buffer.ptr, scratch.buffer.bytes as u64, &mut slots)?; }
             let initialized = unsafe { kernel.initialize_scratch(scratch.buffer.ptr, scratch.buffer.bytes as u64, stream.raw) };
             let drained = unsafe { library.cuda_stream_synchronize(stream.raw) };
             initialized.and(drained)?;
-            states.push(State { kernel, scratch, slots });
+            states.push(State { kernel, slots });
         }
-        Ok(Self { stream, states, weights, output: DeviceAllocation::new(library, capacity as usize * 10240)?,
+        Ok(Self { stream, states, _scratch: scratch, weights, output: DeviceAllocation::new(library, capacity as usize * 10240)?,
             reducer: library.v41_local_expert_reducer()?, capacity })
     }
     pub fn contains(&self, layer: usize) -> bool { layer < self.weights.len() }
@@ -83,8 +85,7 @@ impl<'a> LocalExpertWave<'a> {
             max_rows: info.max_rows, scatter_rows: rows as i32 * 6, rows_padded: info.rows_padded,
             max_tasks: info.max_tasks, max_phys_tiles: info.max_phys_tiles,
             max_active_clusters: info.max_active_clusters, stream: self.stream.raw };
-        // Own scratch through the drain, even if a pipeline fails after enqueue.
-        let _scratch = &state.scratch;
+        // Shared arena remains exclusive through this drain, including failure.
         let launched = (|| -> Result<()> {
             unsafe { state.kernel.launch(&args)?; }
             unsafe { self.reducer.finish(state.slots[41].cast(), shared.values.ptr.cast(),
