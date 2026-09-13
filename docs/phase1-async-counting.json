@@ -1,0 +1,218 @@
+{
+  "cross_arm_exact": true,
+  "rows": [
+    {
+      "concurrency": 1,
+      "before": {
+        "concurrency": 1,
+        "samples": 3,
+        "median_aggregate_tps": 150.93964775578866,
+        "min_aggregate_tps": 150.78271610821264,
+        "max_aggregate_tps": 150.9441972137249
+      },
+      "after": {
+        "concurrency": 1,
+        "samples": 3,
+        "median_aggregate_tps": 150.58980835147685,
+        "min_aggregate_tps": 150.4236581581808,
+        "max_aggregate_tps": 150.66959917004584
+      },
+      "change_percent": -0.2317743611524925
+    },
+    {
+      "concurrency": 2,
+      "before": {
+        "concurrency": 2,
+        "samples": 3,
+        "median_aggregate_tps": 225.273514298217,
+        "min_aggregate_tps": 208.03670864053257,
+        "max_aggregate_tps": 226.043568381098
+      },
+      "after": {
+        "concurrency": 2,
+        "samples": 3,
+        "median_aggregate_tps": 223.6201950877085,
+        "min_aggregate_tps": 207.9935371535368,
+        "max_aggregate_tps": 224.35300736325107
+      },
+      "change_percent": -0.7339163752378974
+    },
+    {
+      "concurrency": 4,
+      "before": {
+        "concurrency": 4,
+        "samples": 3,
+        "median_aggregate_tps": 407.0672114871207,
+        "min_aggregate_tps": 404.7932139205066,
+        "max_aggregate_tps": 407.30251500167685
+      },
+      "after": {
+        "concurrency": 4,
+        "samples": 3,
+        "median_aggregate_tps": 369.1545780248879,
+        "min_aggregate_tps": 369.0519657695981,
+        "max_aggregate_tps": 369.7050988585483
+      },
+      "change_percent": -9.313605319310359
+    },
+    {
+      "concurrency": 8,
+      "before": {
+        "concurrency": 8,
+        "samples": 3,
+        "median_aggregate_tps": 572.1598837449304,
+        "min_aggregate_tps": 555.0261806396118,
+        "max_aggregate_tps": 585.6328896965066
+      },
+      "after": {
+        "concurrency": 8,
+        "samples": 3,
+        "median_aggregate_tps": 538.4892318721008,
+        "min_aggregate_tps": 514.4588653878744,
+        "max_aggregate_tps": 539.488180046988
+      },
+      "change_percent": -5.884832689150921
+    },
+    {
+      "concurrency": 16,
+      "before": {
+        "concurrency": 16,
+        "samples": 3,
+        "median_aggregate_tps": 932.34524151473,
+        "min_aggregate_tps": 921.9096941773771,
+        "max_aggregate_tps": 963.7793853735704
+      },
+      "after": {
+        "concurrency": 16,
+        "samples": 3,
+        "median_aggregate_tps": 880.4232084016547,
+        "min_aggregate_tps": 878.6857700499777,
+        "max_aggregate_tps": 881.2959142922826
+      },
+      "change_percent": -5.568970677505725
+    }
+  ],
+  "runner": {
+    "scope": "Fixed-output warm counting: frozen e9c07ae versus asynchronous 2957772",
+    "artifacts": {
+      "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+      "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+    },
+    "arms": [
+      {
+        "label": "before-a1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-async-counting-before-a1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/async-counting/before:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "f171b2b5533389c1c576c6527e35da3ae1e7d6031c16422a150b553702460e4e"
+        },
+        "startup_seconds": 5.3062114510685205,
+        "counting": true
+      },
+      {
+        "label": "after-b1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-async-counting-after-b1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/async-counting/after:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+        },
+        "startup_seconds": 5.303127027000301,
+        "counting": true
+      }
+    ],
+    "restored": true
+  },
+  "scope": "Exact-output warm counting; e9c07ae versus 2957772; reversed-order follow-up pending",
+  "prompt": "release-concurrency async-release-comparison-01. Count from 1 to 200, separated by commas. Output only the sequence.",
+  "raw_directory": "/home/tj/.cache/ds41rt-experiments/async-counting"
+}

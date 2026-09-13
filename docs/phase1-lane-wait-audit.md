@@ -40,11 +40,10 @@ is fully asynchronous.
 | Weight rebind | Query/projection/shared/router/mHC owners require already-complete streams through nonblocking queries | Fixture cancellation/reuse checks pass; aggregate dynamic wait counts are recorded separately |
 | Cold graph setup and eviction | LayerGraphs retains small shapes per layer; insertion/eviction requires completed launches, and capture remains synchronous | Never suspend between begin/end capture; containing owners must drain before replacing or destroying captured storage |
 
-The combined attention graph archived in
-`phase1-attention-graph-candidate.patch` now needs adaptation to the changed block,
-mHC and sparse-preparation interfaces (`git apply --check` reports conflicts in
-those three files). It remains a later performance experiment. Keep its original
-rejected results intact and record the new independent-lane comparison separately.
+The [combined attention graph revisit](phase1-attention-graph-revisit.md) is complete.
+The adapted candidate passes correctness and cancellation checks, but three pairs
+show only a small C1 benefit and uncertain concurrent impact. Keep it out of the
+release; both the original and adapted patches and measurements remain archived.
 
 ## Historical chained-query evidence
 
@@ -85,9 +84,9 @@ round barrier. Those required within-lane data dependencies remain.
    median C2–C14 +0.39%, C6 −7.1%, C16 −9.8%. Retain every earlier curve and
    investigate the repeated C6 loss and high-concurrency uncertainty. CUDA wait
    removal alone is not release performance qualification.
-2. Adapt and remeasure the combined-attention graph candidate without restoring
-   blocking cold warmup or unsafe captured-owner lifetimes. Rank other archived
-   experiments by their actual C1 serving evidence.
+2. The combined-attention revisit is complete and omitted. Run matched fixed-output
+   counting against e9c07ae to assess accumulated asynchronous changes without
+   varying prose output lengths.
 3. Run the scoped README/report qualification excluding the prefill matrix, plus
    high-concurrency thinking/high tool calling; prepare and verify the v2 release
    and matching container with the requested headline and release-note updates.
