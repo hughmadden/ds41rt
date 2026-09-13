@@ -685,6 +685,7 @@ type FreeDeviceBufferFn = unsafe extern "C" fn(buf: *mut Ds41rtDeviceBuffer) -> 
 type CudaStreamCreateFn = unsafe extern "C" fn(out: *mut *mut c_void) -> Ds41rtStatus;
 type CudaStreamDestroyFn = unsafe extern "C" fn(cuda_stream: *mut c_void) -> Ds41rtStatus;
 type CudaStreamSynchronizeFn = unsafe extern "C" fn(cuda_stream: *mut c_void) -> Ds41rtStatus;
+type CudaStreamQueryFn = unsafe extern "C" fn(cuda_stream: *mut c_void, ready: *mut i32) -> Ds41rtStatus;
 type CudaStreamWaitEventFn =
     unsafe extern "C" fn(cuda_stream: *mut c_void, cuda_event: *mut c_void) -> Ds41rtStatus;
 type CudaEventCreateFn = unsafe extern "C" fn(out: *mut *mut c_void) -> Ds41rtStatus;
@@ -3868,6 +3869,18 @@ impl NativeLibrary {
             unsafe { self.lib.get(b"ds41rt_cuda_stream_synchronize")? };
         let status = unsafe { synchronize_fn(cuda_stream) };
         self.status_to_result("ds41rt_cuda_stream_synchronize", status)
+    }
+
+    /// Poll completion without blocking the CUDA owner thread.
+    /// The stream must remain live on the current CUDA device.
+    pub unsafe fn cuda_stream_query(&self, cuda_stream: *mut c_void) -> Result<bool> {
+        let query_fn: Symbol<CudaStreamQueryFn> =
+            unsafe { self.lib.get(b"ds41rt_cuda_stream_query")? };
+        let mut ready = 0;
+        let status = unsafe { query_fn(cuda_stream, &mut ready) };
+        self.status_to_result("ds41rt_cuda_stream_query", status)?;
+        anyhow::ensure!(ready == 0 || ready == 1, "invalid CUDA stream query result");
+        Ok(ready == 1)
     }
 
     pub unsafe fn cuda_stream_wait_event(

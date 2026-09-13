@@ -1048,6 +1048,25 @@ extern "C" ds41rt_status_t ds41rt_cuda_stream_synchronize(void* cuda_stream) {
   return ok();
 }
 
+extern "C" ds41rt_status_t ds41rt_cuda_stream_query(void* cuda_stream, int32_t* ready) {
+  if (ready == nullptr) {
+    return fail(DS41RT_STATUS_INVALID_ARGUMENT, "CUDA stream query output is null");
+  }
+  *ready = 0;
+#if DS41RT_NATIVE_ENABLE_CUDA
+  const cudaError_t err = cudaStreamQuery(reinterpret_cast<cudaStream_t>(cuda_stream));
+  if (err == cudaErrorNotReady) return ok();
+  if (err != cudaSuccess) {
+    return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "cudaStreamQuery failed", err);
+  }
+  *ready = 1;
+  return ok();
+#else
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE,
+              "CUDA stream query is unavailable in this build");
+#endif
+}
+
 extern "C" ds41rt_status_t ds41rt_cuda_stream_wait_event(void* cuda_stream, void* cuda_event) {
   if (cuda_stream == nullptr || cuda_event == nullptr) {
     return fail(DS41RT_STATUS_INVALID_ARGUMENT,

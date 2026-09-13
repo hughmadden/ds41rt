@@ -483,6 +483,8 @@ ds41rt_status_t ds41rt_free_device_buffer(ds41rt_device_buffer_t* buf);
 ds41rt_status_t ds41rt_cuda_stream_create(void** out_cuda_stream);
 ds41rt_status_t ds41rt_cuda_stream_destroy(void* cuda_stream);
 ds41rt_status_t ds41rt_cuda_stream_synchronize(void* cuda_stream);
+// Returns immediately: ready=0 means pending; asynchronous errors remain errors.
+ds41rt_status_t ds41rt_cuda_stream_query(void* cuda_stream, int32_t* ready);
 ds41rt_status_t ds41rt_cuda_stream_wait_event(void* cuda_stream, void* cuda_event);
 ds41rt_status_t ds41rt_cuda_event_create(void** out_cuda_event);
 ds41rt_status_t ds41rt_cuda_event_destroy(void* cuda_event);
