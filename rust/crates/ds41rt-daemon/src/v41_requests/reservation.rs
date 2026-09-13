@@ -2,6 +2,20 @@
 use super::*;
 impl Requests<'_> {
     /// # Safety
+    /// Retain query, cache and producer owners; abort queued writes on cancellation.
+    pub unsafe fn poll_distributed_encoder_production(&mut self, batch: &RequestBatch,
+        pending: &mut crate::v41_backbone_execution::PendingDistributedProduction<'_, '_, '_, '_>) -> Result<bool> {
+        self.validate(batch)?;
+        unsafe { pending.poll_encoder(&mut self.cache, batch.cache()?) }
+    }
+
+    pub fn finish_distributed_encoder_publication(&mut self, batch: &RequestBatch,
+        execution: &mut crate::v41_backbone_execution::DistributedExecution<'_, '_>) -> Result<()> {
+        self.validate(batch)?;
+        execution.finish_encoder_publication(&mut self.cache, batch.cache()?)
+    }
+
+    /// # Safety
     /// The prepared layer-20 boundary and execution owner belong to this batch.
     pub unsafe fn publish_encoder_boundary(&mut self, batch: &RequestBatch,
         execution: &mut BackboneExecution<'_, '_>, lane: &BackboneLane<'_, '_>) -> Result<()> {

@@ -7,6 +7,7 @@ pub(crate) struct DistributedExecution<'w, 'a> {
     pub producers: PlacedProducerWaves<'w, 'a>,
     progress: PassProgress,
     produced: Option<Produced>,
+    publication: Option<(u64, usize)>,
 }
 pub(crate) struct PendingDistributedProduction<'p, 'w, 'i, 'a> {
     pending: PendingPlacedProduction<'p, 'w, 'i, 'a>,
@@ -23,6 +24,23 @@ impl PendingDistributedProduction<'_, '_, '_, '_> {
         if !unsafe { self.pending.poll(bank, batch)? } {
             return Ok(false);
         }
+        self.finish();
+        Ok(true)
+    }
+    /// # Safety
+    /// As for poll; additionally abort queued publication before request release.
+    pub unsafe fn poll_encoder(
+        &mut self,
+        bank: &mut BackboneCache<'_>,
+        batch: &CacheBatch,
+    ) -> Result<bool> {
+        if !unsafe { self.pending.poll_encoder(bank, batch)? } {
+            return Ok(false);
+        }
+        self.finish();
+        Ok(true)
+    }
+    fn finish(&mut self) {
         *self.produced = Some(Produced {
             batch: self.batch,
             layer: self.layer,
@@ -30,7 +48,6 @@ impl PendingDistributedProduction<'_, '_, '_, '_> {
             producer_us: self.started.elapsed().as_micros() as u64,
             indexed: self.indexed,
         });
-        Ok(true)
     }
 }
 /// Scope every poll and cancellation of attention/FFN work to this layer's GPU.
@@ -81,6 +98,7 @@ impl<'w, 'a> DistributedExecution<'w, 'a> {
             producers: PlacedProducerWaves::new(weights, capacity, budgets)?,
             progress: PassProgress::default(),
             produced: None,
+            publication: None,
         })
     }
     /// All external readers/writers have completed or drained before restarting.
@@ -102,11 +120,9 @@ impl<'w, 'a> DistributedExecution<'w, 'a> {
             self.produced.is_none() && batch.stage() == self.progress.stage,
             "distributed production phase or pending result differs"
         );
-        // Reserved encoder chunks publish their cache during the pass and need
-        // a separate early-publication integration; never silently defer them.
         ensure!(
-            !batch.is_reserved(),
-            "reserved encoder publication not connected to distributed execution"
+            self.publication.is_none(),
+            "encoder publication still pending"
         );
         let query = lane.query_output()?;
         let layer = query.layer;
@@ -170,7 +186,7 @@ impl<'w, 'a> DistributedExecution<'w, 'a> {
         let source = SOURCES
             .iter()
             .rposition(|&l| l <= layer)
-            .filter(|_| !batch.stage().reuses_sources())
+            .filter(|&i| !batch.stage().reuses_sources() && !batch.is_reserved())
             .map(|i| self.producers.sources[i].get());
         let cache = bank.attention(batch, layer, &self.producers.windows[layer], source)?;
         let indexed_us = produced.started.elapsed().as_micros() as u64;
@@ -254,6 +270,57 @@ impl<'w, 'a> DistributedExecution<'w, 'a> {
         self.progress.finish_decoder_source();
         Ok(())
     }
+    /// Queue publication only after this layer's attention/FFN consumers drain.
+    /// # Safety
+    /// Retain bank and producer owners until publication or explicit abort.
+    pub unsafe fn enqueue_encoder_publication(
+        &mut self,
+        bank: &BackboneCache<'_>,
+        batch: &CacheBatch,
+        layer: usize,
+    ) -> Result<()> {
+        ensure!(
+            batch.is_reserved()
+                && batch.stage() == CacheStage::Encoder
+                && self.publication.is_none()
+                && !self.progress.invalid
+                && self.progress.batch == Some(batch.identity())
+                && layer < 20
+                && self.progress.next == layer + 1,
+            "encoder publication requires this completed layer"
+        );
+        self.publication = Some((batch.identity(), layer));
+        if layer < 20 {
+            unsafe {
+                bank.enqueue_encoder_window(batch, layer, &mut self.producers.windows[layer])?;
+            }
+        }
+        Ok(())
+    }
+    pub fn poll_encoder_publication(&self) -> Result<bool> {
+        use crate::v41_backbone_cache::CacheWave;
+        let (_, layer) = self.publication.context("encoder publication absent")?;
+        if layer < 20 && !self.producers.windows[layer].on_device(|wave| wave.poll_commit())? {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+    pub fn finish_encoder_publication(
+        &mut self,
+        bank: &mut BackboneCache<'_>,
+        batch: &CacheBatch,
+    ) -> Result<()> {
+        let (identity, layer) = self.publication.context("encoder publication absent")?;
+        ensure!(
+            identity == batch.identity() && self.poll_encoder_publication()?,
+            "encoder publication identity differs or writes pending"
+        );
+        if layer < 20 {
+            bank.publish_encoder_window(batch, layer, &mut self.producers.windows[layer])?;
+        }
+        self.publication = None;
+        Ok(())
+    }
     /// # Safety
     /// Retain cache bank and lane owners until publication or explicit abort.
     pub unsafe fn enqueue_cache_commit(
@@ -262,6 +329,10 @@ impl<'w, 'a> DistributedExecution<'w, 'a> {
         batch: &CacheBatch,
         accepted: &[u32],
     ) -> Result<()> {
+        ensure!(
+            self.publication.is_none(),
+            "encoder publication still pending"
+        );
         self.progress.commit(batch.identity())?;
         unsafe { self.producers.enqueue_cache_commit(bank, batch, accepted) }
     }
@@ -281,7 +352,9 @@ impl<'w, 'a> DistributedExecution<'w, 'a> {
     pub fn abort_cache_commit(&mut self, bank: &mut BackboneCache<'_>) -> Result<()> {
         self.progress.invalid = true;
         self.produced = None;
-        self.producers.abort_cache_commit(bank)
+        let result = self.producers.abort_cache_commit(bank);
+        self.publication = None;
+        result
     }
 }
 

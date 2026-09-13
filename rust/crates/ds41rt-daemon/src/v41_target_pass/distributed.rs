@@ -19,6 +19,29 @@ pub(crate) struct DistributedTargetPass<'w, 'a> {
     timeout: Duration,
     state: State,
 }
+/// Execution futures drain their borrowed GPU work before this guard revokes
+/// reserved chunks, including cancellation during queued early publication.
+struct ReservedPassGuard<'p, 'r, 'q, 'w, 'a> {
+    pass: &'p mut DistributedTargetPass<'w, 'a>,
+    requests: &'r std::cell::RefCell<&'q mut Requests<'a>>,
+    batch: &'p mut RequestBatch,
+    complete: bool,
+}
+impl Drop for ReservedPassGuard<'_, '_, '_, '_, '_> {
+    fn drop(&mut self) {
+        if self.complete {
+            return;
+        }
+        let mut requests = self.requests.borrow_mut();
+        if let Err(error) = self.pass.abort_cache_commit(&mut requests) {
+            tracing::error!(%error, "draining cancelled distributed encoder publication");
+        }
+        requests.revoke_batch(self.batch);
+        if let Err(error) = self.pass.discard(self.batch) {
+            tracing::error!(%error, "discarding cancelled distributed encoder pass");
+        }
+    }
+}
 impl<'w, 'a> DistributedTargetPass<'w, 'a> {
     pub fn new(
         map: CachePlacement,
@@ -103,6 +126,52 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         transport: &mut DeviceOwner<'a, NativeTp4Wave<'a>>,
         placement: u64,
         selected: &[usize],
+        suffix: Option<&mut DeviceOwner<'a, EncoderSuffix<'a>>>,
+        encoder: Option<&BlockOutput<'_>>,
+        greedy: bool,
+    ) -> Result<()> {
+        requests.with_requests(|r| r.validate(batch))?;
+        ensure!(self.state == State::Idle, "distributed pass still in use");
+        if batch.cache()?.is_reserved() {
+            let mut guard = ReservedPassGuard {
+                pass: self,
+                requests,
+                batch,
+                complete: false,
+            };
+            unsafe {
+                guard
+                    .pass
+                    .execute_inner(
+                        requests,
+                        guard.batch,
+                        transport,
+                        placement,
+                        selected,
+                        suffix,
+                        encoder,
+                        greedy,
+                    )
+                    .await?;
+            }
+            guard.complete = true;
+            Ok(())
+        } else {
+            unsafe {
+                self.execute_inner(
+                    requests, batch, transport, placement, selected, suffix, encoder, greedy,
+                )
+                .await
+            }
+        }
+    }
+    async unsafe fn execute_inner(
+        &mut self,
+        requests: &std::cell::RefCell<&mut Requests<'a>>,
+        batch: &mut RequestBatch,
+        transport: &mut DeviceOwner<'a, NativeTp4Wave<'a>>,
+        placement: u64,
+        selected: &[usize],
         mut suffix: Option<&mut DeviceOwner<'a, EncoderSuffix<'a>>>,
         encoder: Option<&BlockOutput<'_>>,
         greedy: bool,
@@ -111,9 +180,10 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         let stage = batch.cache()?.stage();
         let id = batch.cache()?.identity();
         let rows = batch.cache()?.positions().len();
+        let reserved = batch.cache()?.is_reserved();
         ensure!(
-            !batch.cache()?.is_reserved(),
-            "distributed reserved encoder publication remains unsupported"
+            !reserved || stage == CacheStage::Encoder,
+            "reserved stage differs"
         );
         ensure!(
             transport.device.id == self.map.attention(20)? as i32,
@@ -262,7 +332,13 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                 })?
             };
             while !unsafe {
-                requests.with_requests(|r| production.poll(r.cache(), guard.batch.cache()?))?
+                if reserved {
+                    requests
+                        .borrow_mut()
+                        .poll_distributed_encoder_production(guard.batch, &mut production)?
+                } else {
+                    requests.with_requests(|r| production.poll(r.cache(), guard.batch.cache()?))?
+                }
             } {
                 tokio::task::yield_now().await;
             }
@@ -286,6 +362,12 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                 self.execution
                     .complete_layer(guard.batch.cache()?, &mut self.lanes[gpu], completed)
                     .await?;
+            }
+            if reserved {
+                unsafe {
+                    self.publish_encoder_layer(requests, guard.batch, layer)
+                        .await?;
+                }
             }
         }
         if stage.is_encoder() {
@@ -316,7 +398,14 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                     })?
                 };
                 while !unsafe {
-                    requests.with_requests(|r| production.poll(r.cache(), guard.batch.cache()?))?
+                    if reserved {
+                        requests
+                            .borrow_mut()
+                            .poll_distributed_encoder_production(guard.batch, &mut production)?
+                    } else {
+                        requests
+                            .with_requests(|r| production.poll(r.cache(), guard.batch.cache()?))?
+                    }
                 } {
                     tokio::task::yield_now().await;
                 }
@@ -351,6 +440,25 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         }
         guard.completed = true;
         Ok(())
+    }
+    async unsafe fn publish_encoder_layer(
+        &mut self,
+        requests: &std::cell::RefCell<&mut Requests<'a>>,
+        batch: &RequestBatch,
+        layer: usize,
+    ) -> Result<()> {
+        unsafe {
+            requests.with_requests(|r| {
+                self.execution
+                    .enqueue_encoder_publication(r.cache(), batch.cache()?, layer)
+            })?;
+        }
+        while !self.execution.poll_encoder_publication()? {
+            tokio::task::yield_now().await;
+        }
+        requests
+            .borrow_mut()
+            .finish_distributed_encoder_publication(batch, &mut self.execution)
     }
     pub fn output(&self, batch: &RequestBatch) -> Result<TargetLogits<'_>> {
         self.state.ready(batch.cache()?.identity())?;
@@ -408,7 +516,10 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         self.state = State::Running;
         for lane in &mut self.lanes {
             let device = lane.device;
-            device.run(|| { lane.invalidate(); Ok(()) })?;
+            device.run(|| {
+                lane.invalidate();
+                Ok(())
+            })?;
         }
         for index in self.indices.iter_mut().flatten() {
             let device = index.device;
@@ -686,6 +797,174 @@ mod tests {
             assert_eq!(lib.cuda_get_device()?, 0);
         }
         requests.release(lease)?;
+        let prompt = [100u32, 200, 300, 400, 500, 600, 700];
+        let baseline = requests.admit(1, 92000)?;
+        let mut baseline_batch = requests.prepare(&[crate::v41_requests::RequestTokens {
+            lease: baseline,
+            tokens: &prompt,
+            image_mask: None,
+            kind: ExpertV2SourceKind::Prefill,
+        }])?;
+        runtime.block_on(unsafe {
+            pass.execute(
+                &std::cell::RefCell::new(&mut requests),
+                &mut baseline_batch,
+                &mut transport,
+                0,
+                &[6],
+                None,
+                None,
+                true,
+            )
+        })?;
+        let expected = devices[1].run(|| pass.head.greedy_output())?;
+        pass.discard(&mut baseline_batch)?;
+        requests.release(baseline)?;
+        let lease = requests.admit(0, 92001)?;
+        requests.begin_encoder(lease, prompt.len() as u64)?;
+        let mut suffix = devices[map.attention(19)?].own(|| {
+            EncoderSuffix::new(
+                &lib,
+                prompt.len() as u64,
+                EncoderSuffix::device_bytes(prompt.len() as u64)?,
+            )
+        })?;
+        for chunk in [&prompt[..3], &prompt[3..]] {
+            let mut batch = requests.reserve_encoder(&[crate::v41_requests::RequestTokens {
+                lease,
+                tokens: chunk,
+                image_mask: None,
+                kind: ExpertV2SourceKind::Prefill,
+            }])?;
+            runtime.block_on(unsafe {
+                pass.execute(
+                    &std::cell::RefCell::new(&mut requests),
+                    &mut batch,
+                    &mut transport,
+                    0,
+                    &[],
+                    Some(&mut suffix),
+                    None,
+                    false,
+                )
+            })?;
+            pass.enqueue_cache_commit(&requests, &batch, &[chunk.len() as u32])?;
+            assert!(pass.poll_cache_commit()?);
+            pass.commit(&mut requests, &mut batch, &[chunk.len() as u32])?;
+            assert_eq!(lib.cuda_get_device()?, 0);
+        }
+        assert_eq!(requests.cache().committed_end(lease)?, 7);
+        assert_eq!(requests.begin_decoder_replay(lease)?, 0);
+        let mut batch = requests.prepare_replay(&[crate::v41_backbone_cache::CacheWork {
+            lease,
+            tokens: 7,
+            kind: ExpertV2SourceKind::Prefill,
+        }])?;
+        let encoded = suffix.output()?;
+        runtime.block_on(unsafe {
+            pass.execute(
+                &std::cell::RefCell::new(&mut requests),
+                &mut batch,
+                &mut transport,
+                0,
+                &[6],
+                None,
+                Some(&encoded),
+                true,
+            )
+        })?;
+        let next = devices[1].run(|| pass.head.greedy_output())?;
+        assert!(next[0].0 < 129280 && next[0].1.is_finite());
+        assert_eq!(
+            next[0].0, expected[0].0,
+            "reserved encoder/replay greedy token differs from full prefill"
+        );
+        ensure!(
+            (next[0].1 - expected[0].1).abs() < 0.25,
+            "reserved encoder/replay greedy score differs: {} vs {}",
+            next[0].1,
+            expected[0].1
+        );
+
+        pass.enqueue_cache_commit(&requests, &batch, &[7])?;
+        runtime.block_on(async {
+            while !pass.poll_cache_commit()? {
+                tokio::task::yield_now().await;
+            }
+            Ok::<_, anyhow::Error>(())
+        })?;
+        pass.commit(&mut requests, &mut batch, &[7])?;
+        requests.release(lease)?;
+        eprintln!(
+            "PASS distributed reserved encoder 3+4 tokens, source publication and decoder replay token={}",
+            next[0].0
+        );
+        // Cancel a reserved pass at a cooperative suspension. The guard revokes
+        // its admission and resets both GPU-local lanes for subsequent reuse.
+        let cancelled = requests.admit(0, 92002)?;
+        requests.begin_encoder(cancelled, 7)?;
+        let mut batch = requests.reserve_encoder(&[crate::v41_requests::RequestTokens {
+            lease: cancelled,
+            tokens: &prompt[..3],
+            image_mask: None,
+            kind: ExpertV2SourceKind::Prefill,
+        }])?;
+        {
+            use std::future::Future;
+            let bank = std::cell::RefCell::new(&mut requests);
+            let mut pending = Box::pin(unsafe {
+                pass.execute(
+                    &bank,
+                    &mut batch,
+                    &mut transport,
+                    0,
+                    &[],
+                    Some(&mut suffix),
+                    None,
+                    false,
+                )
+            });
+            runtime.block_on(std::future::poll_fn(|cx| {
+                assert!(pending.as_mut().poll(cx).is_pending());
+                std::task::Poll::Ready(())
+            }));
+        }
+        assert!(requests.cache().request_id(cancelled).is_err());
+        assert!(requests.validate(&batch).is_err());
+        assert_eq!(pass.state, State::Idle);
+        assert_eq!(lib.cuda_get_device()?, 0);
+        let recovered = requests.admit(0, 92003)?;
+        let mut batch = requests.prepare(&[crate::v41_requests::RequestTokens {
+            lease: recovered,
+            tokens: &prompt[..1],
+            image_mask: None,
+            kind: ExpertV2SourceKind::Prefill,
+        }])?;
+        runtime.block_on(unsafe {
+            pass.execute(
+                &std::cell::RefCell::new(&mut requests),
+                &mut batch,
+                &mut transport,
+                0,
+                &[0],
+                None,
+                None,
+                true,
+            )
+        })?;
+        pass.enqueue_cache_commit(&requests, &batch, &[1])?;
+        runtime.block_on(async {
+            while !pass.poll_cache_commit()? {
+                tokio::task::yield_now().await;
+            }
+            Ok::<_, anyhow::Error>(())
+        })?;
+        pass.commit(&mut requests, &mut batch, &[1])?;
+        assert_eq!(requests.cache().committed_end(recovered)?, 1);
+        requests.release(recovered)?;
+        eprintln!(
+            "PASS cancelled distributed reserved pass revoked admission and restored both GPU owners"
+        );
         Ok(())
     }
 }

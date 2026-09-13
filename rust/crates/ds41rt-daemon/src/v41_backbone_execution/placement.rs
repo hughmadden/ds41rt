@@ -22,12 +22,63 @@ pub(crate) struct PendingPlacedProduction<'p, 'w, 'i, 'a> {
     index: Option<&'p mut DeviceOwner<'a, IndexLane<'i, 'a>>>,
     projection_ready: bool,
     selection_started: bool,
+    publication_started: bool,
+    source_published: bool,
 }
 impl PendingPlacedProduction<'_, '_, '_, '_> {
     /// # Safety
     /// The original bank, query buffers and admitted slots remain alive and
     /// immutable. No other producer may overwrite this lane's proposals.
     pub unsafe fn poll(&mut self, bank: &BackboneCache<'_>, batch: &CacheBatch) -> Result<bool> {
+        ensure!(
+            !batch.is_reserved(),
+            "reserved production requires publication polling"
+        );
+        unsafe {
+            self.poll_producers(bank, batch)?;
+            self.poll_selection(bank, batch)
+        }
+    }
+    /// # Safety
+    /// Retain the bank and wave through completion; cancellation must abort
+    /// queued commits before releasing the reserved request.
+    pub unsafe fn poll_encoder(
+        &mut self,
+        bank: &mut BackboneCache<'_>,
+        batch: &CacheBatch,
+    ) -> Result<bool> {
+        ensure!(
+            batch.is_reserved() && batch.stage() == CacheStage::Encoder,
+            "encoder publication polling requires a reserved batch"
+        );
+        unsafe {
+            self.poll_producers(bank, batch)?;
+        }
+        if !self.source_ready {
+            return Ok(false);
+        }
+        if let Some(i) = self.source {
+            if !self.source_published {
+                if !self.publication_started {
+                    self.publication_started = true;
+                    unsafe {
+                        bank.enqueue_encoder_source(batch, self.layer, &mut self.waves.sources[i])?;
+                    }
+                }
+                if !self.waves.sources[i].on_device(|wave| wave.poll_commit())? {
+                    return Ok(false);
+                }
+                bank.publish_encoder_source(batch, self.layer, &mut self.waves.sources[i])?;
+                self.source_published = true;
+            }
+        }
+        unsafe { self.poll_selection(bank, batch) }
+    }
+    unsafe fn poll_producers(
+        &mut self,
+        bank: &BackboneCache<'_>,
+        batch: &CacheBatch,
+    ) -> Result<()> {
         ensure!(
             !self.complete && batch.identity() == self.batch,
             "placed production batch differs or already complete"
@@ -44,6 +95,13 @@ impl PendingPlacedProduction<'_, '_, '_, '_> {
             self.source_ready = self.waves.sources[source]
                 .on_device_mut(|wave| unsafe { wave.poll_query(state) })?;
         }
+        Ok(())
+    }
+    unsafe fn poll_selection(
+        &mut self,
+        bank: &BackboneCache<'_>,
+        batch: &CacheBatch,
+    ) -> Result<bool> {
         if let Some(index) = self.index.as_deref_mut() {
             let device = index.device;
             if !self.projection_ready {
@@ -56,7 +114,7 @@ impl PendingPlacedProduction<'_, '_, '_, '_> {
                 let source = SOURCES
                     .iter()
                     .rposition(|&layer| layer <= self.layer)
-                    .filter(|_| !batch.stage().reuses_sources())
+                    .filter(|_| !batch.stage().reuses_sources() && !batch.is_reserved())
                     .map(|i| self.waves.sources[i].get());
                 let cache =
                     bank.attention(batch, self.layer, &self.waves.windows[self.layer], source)?;
@@ -147,6 +205,8 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
             index: None,
             projection_ready: true,
             selection_started: false,
+            publication_started: false,
+            source_published: false,
         };
         if window {
             let state = bank.window(batch, layer)?;

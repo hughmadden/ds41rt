@@ -788,3 +788,23 @@ unchanged until the enclosing commit. Duplicate publication is rejected, and
 aborting queued GPU1 window/source writes preserves a disjoint peer request.
 The distributed target loop still rejects reserved chunks until this primitive
 is connected to its chunk scheduling and cancellation guards.
+
+## Reserved chunks through the distributed target loop
+
+The distributed loop now accepts reserved encoder chunks. Compressed sources
+publish cooperatively before index selection, so selection and subsequent
+attention consumers share the committed causal snapshot. Window publication
+follows the completed layer. Each poll releases the request-bank borrow; the
+reserved-pass cancellation guard drains pending writes before revoking admission
+and invalidating both GPU-local lanes. Source 20 publishes at the encoder
+boundary, and final chunk commit advances cache and Engram history together.
+
+The full real-model fixture passes reserved chunks of three and four tokens,
+then replays the seven retained encoder rows through the live Spark decoder.
+Its greedy token matches a full seven-token prefill, with the winning score
+within 0.25 logits. Cancelling at a cooperative suspension revokes the reserved
+request; the same GPU owners then successfully execute and commit a fresh full
+pass. Ordinary full prefill/decode, commit, and discard/reuse checks also pass.
+These are short integration checks, not release quality or throughput results.
+Interleaving encoder chunks across two request lanes and connecting the normal
+serving scheduler remain pending.
