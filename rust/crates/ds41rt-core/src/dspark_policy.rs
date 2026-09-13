@@ -124,3 +124,43 @@ mod tests {
         assert!(select_dspark_prefixes_bounded(&[&[0.]], &[2], |_| 1.).is_err());
     }
 }
+
+/// Independent prefix cutoff using the product of conditional acceptance probabilities.
+/// Minimum preserves the caller's qualified verifier shapes; no device work or route history.
+pub fn select_dspark_confidence_prefix(
+    probabilities: &[f64], threshold: f64, minimum: usize,
+) -> Result<usize, &'static str> {
+    if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold)
+        || minimum > probabilities.len() || probabilities.len() > 5
+        || probabilities.iter().any(|p| !p.is_finite() || !(0.0..=1.0).contains(p)) {
+        return Err("invalid confidence prefix parameters");
+    }
+    let mut product = 1.0;
+    let mut length = 0;
+    for &probability in probabilities {
+        product *= probability;
+        if product < threshold { break; }
+        length += 1;
+    }
+    Ok(length.max(minimum))
+}
+
+#[cfg(test)]
+mod confidence_cutoff_tests {
+    use super::select_dspark_confidence_prefix as select;
+    #[test]
+    fn cumulative_cutoff_cannot_resume_after_an_unlikely_token() {
+        assert_eq!(select(&[0.9, 0.9, 0.9, 0.9], 0.8, 1), Ok(2));
+        assert_eq!(select(&[0.9, 0.1, 1.0, 1.0], 0.8, 1), Ok(1));
+        assert_eq!(select(&[0.1, 1.0], 0.8, 1), Ok(1));
+    }
+    #[test]
+    fn limits_and_invalid_inputs() {
+        assert_eq!(select(&[], 0.8, 0), Ok(0));
+        assert_eq!(select(&[0.5, 0.5], 0.25, 0), Ok(2));
+        assert_eq!(select(&[0.0; 5], 0.0, 1), Ok(5));
+        assert!(select(&[f64::NAN], 0.8, 0).is_err());
+        assert!(select(&[0.5], f64::INFINITY, 0).is_err());
+        assert!(select(&[0.5], 0.8, 2).is_err());
+    }
+}

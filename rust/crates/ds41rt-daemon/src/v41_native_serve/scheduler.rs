@@ -283,6 +283,11 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         for (&slot, input) in members[lane].iter().zip(&mut inputs[lane]) {
             if let Some(constraint) = &active[slot].as_ref().unwrap().constraint {
                 constraint.truncate_proposal(input)?;
+            } else if let Some(draft) = draft.as_deref() {
+                // Select immediately for this request, before preparing this lane's
+                // Engram reads; no other lane's proposals or history are needed.
+                let length = draft.confidence_prefix(active[slot].as_ref().unwrap().id, input.len() - 1)?;
+                input.truncate(length + 1);
             }
         }
         draft_us += draft_start.elapsed().as_micros() as u64;

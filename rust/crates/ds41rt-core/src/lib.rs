@@ -1,7 +1,7 @@
 mod dspark_routes;
 pub use dspark_routes::{DsparkRouteForecast, DsparkRouteHistory, DsparkWorkForecast, DsparkWorkEvaluator};
 mod dspark_policy;
-pub use dspark_policy::{select_dspark_prefixes, select_dspark_prefixes_bounded, DsparkPrefixSelection};
+pub use dspark_policy::{select_dspark_confidence_prefix, select_dspark_prefixes, select_dspark_prefixes_bounded, DsparkPrefixSelection};
 mod dspark_rng;
 pub use dspark_rng::{DsparkRng, DsparkRngReservation};
 mod dspark_verify;

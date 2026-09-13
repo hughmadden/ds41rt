@@ -15,6 +15,7 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     // Downloaded only for the experimental adaptive policy or explicit diagnostics.
     confidence_trace: std::collections::BTreeMap<u64, Vec<f32>>,
     adaptive: Option<ds41rt_core::DsparkRouteHistory>,
+    confidence_cutoff: Option<f64>,
 }
 struct DraftRequest {
     leases: [WindowLease; 3],
@@ -52,6 +53,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             draft_limit: 5,
             confidence_trace: Default::default(),
             adaptive: None,
+            confidence_cutoff: None,
         })
     }
     pub fn admit(&mut self, id: u64) -> Result<()> {
@@ -84,6 +86,23 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
     }
     pub fn set_adaptive(&mut self, enabled: bool) {
         self.adaptive = enabled.then(ds41rt_core::DsparkRouteHistory::default);
+    }
+    pub fn set_confidence_cutoff(&mut self, threshold: Option<f64>) {
+        self.confidence_cutoff = threshold;
+    }
+    pub fn confidence_prefix(&self, id: u64, maximum: usize) -> Result<usize> {
+        let Some(threshold) = self.confidence_cutoff else { return Ok(maximum); };
+        if maximum == 0 { return Ok(0); }
+        let logits = self.confidence_trace(id).context("missing draft confidence")?;
+        ensure!(maximum <= logits.len(), "draft confidence prefix exceeds output");
+        let probabilities: Vec<_> = logits[..maximum].iter().map(|&x| {
+            let x = f64::from(x);
+            if x >= 0. { 1. / (1. + (-x).exp()) } else { x.exp() / (1. + x.exp()) }
+        }).collect();
+        // Preserve the existing minimum of one draft: anchor-only numerical
+        // specialization needs its own qualification before voluntary selection.
+        ds41rt_core::select_dspark_confidence_prefix(&probabilities, threshold, 1)
+            .map_err(anyhow::Error::msg)
     }
     pub fn adaptive_enabled(&self) -> bool { self.adaptive.is_some() }
     pub fn observe_accepted_routes(&mut self, id: u64, offset: usize, accepted: usize,
@@ -267,7 +286,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
         let packed: Vec<_> = bytes.chunks_exact(4)
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
-        if self.adaptive.is_some() || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
+        if self.adaptive.is_some() || self.confidence_cutoff.is_some() || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
             let confidence = self.chain.draft_output()?[2];
             ensure!(confidence.bytes == 5 * count * 4, "draft confidence extent differs");
             let mut bytes = vec![0; confidence.bytes];

@@ -508,9 +508,20 @@ pub(crate) struct NativeServeArgs {
     /// Experimental history-based joint draft-prefix selection.
     #[arg(long, requires = "dspark")]
     pub dspark_adaptive: bool,
+    /// Experimental independent cumulative confidence cutoff, between zero and one.
+    #[arg(long, requires = "dspark", conflicts_with = "dspark_adaptive", value_parser = parse_dspark_confidence)]
+    pub dspark_confidence_cutoff: Option<f64>,
 
     #[arg(long)] pub snapshot: PathBuf,
     #[arg(long)] pub native_lib: PathBuf,
     #[arg(long,value_delimiter=',',num_args=1..)] pub peers: Vec<std::net::SocketAddr>,
     #[arg(long,default_value="127.0.0.1:8000")] pub listen: String,
+}
+
+fn parse_dspark_confidence(value: &str) -> Result<f64, String> {
+    let value: f64 = value.parse().map_err(|_| "expected a probability".to_string())?;
+    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+        return Err("confidence cutoff must be finite and between zero and one".into());
+    }
+    Ok(value)
 }
