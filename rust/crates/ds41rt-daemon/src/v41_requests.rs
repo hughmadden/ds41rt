@@ -127,6 +127,7 @@ impl<'a> Requests<'a> {
         }).collect::<Result<Vec<_>>>().map(Some)
     }
     pub fn release(&mut self, lease: CacheLease) -> Result<()> {
+        if self.cache.request_id(lease).is_ok() { self.cache.ensure_releasable(lease)?; }
         let slot = self
             .slots
             .iter()
@@ -399,6 +400,9 @@ impl<'a> Requests<'a> {
                 "decoder acceptance exceeds proposal");
         }
         Ok(())
+    }
+    pub fn abort_window_commit(&mut self, execution: &mut BackboneExecution<'_, '_>) -> Result<()> {
+        execution.abort_window_commit(&mut self.cache)
     }
     /// Invalidate every participant after a partially applied combined commit.
     pub fn revoke_batch(&mut self, batch: &mut RequestBatch) {

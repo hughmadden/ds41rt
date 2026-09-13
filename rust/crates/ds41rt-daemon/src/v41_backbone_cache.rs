@@ -533,7 +533,7 @@ impl<'a> BackboneCache<'a> {
     /// proposal/attention consumers must have drained before this mutable call.
     pub fn release(&mut self, leases: &[CacheLease]) -> Result<()> {
         for (i, &lease) in leases.iter().enumerate() {
-            self.request(lease)?;
+            self.ensure_releasable(lease)?;
             ensure!(!leases[..i].contains(&lease), "duplicate cache release");
         }
         let removed = leases
@@ -564,17 +564,16 @@ impl<'a> BackboneCache<'a> {
         }
         Ok(())
     }
-    /// Commit the accepted prefix to this phase’s window/source owners. Any
-    /// execution failure revokes all participating requests; partial device
-    /// changes are never published as a usable bank history. Engram/dSpark
-    /// acceptance remains the enclosing scheduler transaction's responsibility.
-    pub fn commit(
-        &mut self,
-        batch: &CacheBatch,
-        windows: &mut [WindowWave<'_, '_>],
-        sources: &mut [CompressorWave<'_, '_>],
-        accepted: &[u32],
-    ) -> Result<()> {
+    pub fn ensure_releasable(&self, lease: CacheLease) -> Result<()> {
+        let request = self.request(lease)?;
+        for (state, &window) in self.windows.iter().zip(&request.windows) {
+            if state.request_id(window).is_ok() { state.ensure_not_writing(window)?; }
+        }
+        Ok(())
+    }
+    /// Check every component before starting or publishing accepted cache writes.
+    fn validate_commit(&self, batch: &CacheBatch, windows: &[WindowWave<'_, '_>],
+        sources: &[CompressorWave<'_, '_>], accepted: &[u32]) -> Result<(u64, u8)> {
         self.validate_batch(batch)?;
         ensure!(
             windows.len() == 40 && sources.len() == 4 && accepted.len() == batch.requests.len(),
@@ -614,6 +613,39 @@ impl<'a> BackboneCache<'a> {
             let wave = &sources[i];
             wave.validate_batch(&self.sources[i], &batch.source_chunks(SOURCES[i])?)?;
         }
+        Ok((published_windows, published_sources))
+    }
+    /// # Safety
+    /// The enclosing target pass retains bank and producer ownership until all
+    /// writes finish. Abort/drain before releasing any participating request.
+    pub unsafe fn enqueue_window_commit(&self, batch: &CacheBatch,
+        windows: &mut [WindowWave<'_, '_>], sources: &[CompressorWave<'_, '_>], accepted: &[u32]) -> Result<()> {
+        let (published, _) = self.validate_commit(batch, windows, sources, accepted)?;
+        for layer in batch.stage.windows() {
+            if published & (1u64 << layer) == 0 {
+                unsafe { windows[layer].enqueue_commit(&self.windows[layer], accepted)?; }
+            }
+        }
+        Ok(())
+    }
+    pub fn abort_window_commit(&mut self, windows: &mut [WindowWave<'_, '_>]) -> Result<()> {
+        let mut result = Ok(());
+        for (state, wave) in self.windows.iter_mut().zip(windows) {
+            if let Err(error) = wave.abort_commit(state) { result = Err(error); }
+        }
+        result
+    }
+    /// Publish this phase's window/source owners. Queued windows must have
+    /// completed; direct windows and sources retain their synchronous path.
+    /// Execution failure revokes all participants after draining queued writes.
+    pub fn commit(
+        &mut self,
+        batch: &CacheBatch,
+        windows: &mut [WindowWave<'_, '_>],
+        sources: &mut [CompressorWave<'_, '_>],
+        accepted: &[u32],
+    ) -> Result<()> {
+        let (published_windows, published_sources) = self.validate_commit(batch, windows, sources, accepted)?;
         let committed = (|| -> Result<()> {
             for layer in batch.stage.windows() {
                 if published_windows & (1u64 << layer) != 0 { continue; }
@@ -626,6 +658,9 @@ impl<'a> BackboneCache<'a> {
             Ok(())
         })();
         if let Err(error) = committed {
+            if let Err(cleanup) = self.abort_window_commit(windows) {
+                tracing::error!(%cleanup, "draining failed window writes");
+            }
             let leases = batch
                 .requests
                 .iter()

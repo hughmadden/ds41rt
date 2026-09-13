@@ -1,0 +1,1898 @@
+{
+  "scope": "Queued SWA plus dSpark commit versus 45883d1 queued dSpark baseline; both adaptive independent lanes.",
+  "raw_directory": "/home/tj/.cache/ds41rt-experiments/queued-window-commit",
+  "records": {
+    "pilot-results.json": {
+      "scope": "Queued dSpark baseline versus queued dSpark plus SWA commit; both adaptive independent lanes; compressed-source commit remains synchronous",
+      "artifacts": {
+        "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+        "ds41rt": "f1072c5d382d354e16abf727651536bd0ce2c67b630f1e72e94716d3aa5e6103"
+      },
+      "arms": [
+        {
+          "label": "after-b1",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-window-commit-after-b1",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-window-commit/after:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "f1072c5d382d354e16abf727651536bd0ce2c67b630f1e72e94716d3aa5e6103"
+          },
+          "startup_seconds": 5.306975250947289,
+          "code": true,
+          "mixed": true,
+          "constraints": true
+        },
+        {
+          "label": "before-a1",
+          "command": [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "ds41rt-queued-window-commit-before-a1",
+            "--gpus",
+            "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+            "--network",
+            "host",
+            "--ipc",
+            "host",
+            "--ulimit",
+            "memlock=-1:-1",
+            "--device=/dev/infiniband",
+            "-e",
+            "RUST_LOG=info",
+            "-v",
+            "/home/tj/.cache/ds41rt-experiments/queued-window-commit/before:/phase1:ro",
+            "-v",
+            "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+            "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+            "/phase1/ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+            "--native-lib",
+            "/phase1/libds41rt_native.so",
+            "--peers",
+            "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+            "--listen",
+            "0.0.0.0:8000",
+            "--prefill-batch-tokens",
+            "2048",
+            "--concurrency",
+            "16",
+            "--prefix-cache-entries",
+            "24",
+            "--max-context-tokens",
+            "1048576",
+            "--max-output-tokens",
+            "393216",
+            "--dspark",
+            "--rtx-expert-layers",
+            "5"
+          ],
+          "artifacts": {
+            "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+            "ds41rt": "17e7dd7974c66981244aeebf1f809cd386b2113bc55a299f4642f3b4376945fa"
+          },
+          "startup_seconds": 5.32198599295225,
+          "code": true,
+          "mixed": true,
+          "constraints": true
+        }
+      ],
+      "gpu_tests": true,
+      "restored": true
+    },
+    "comparison.json": {
+      "scope": "Compare identical-input fixed/adaptive probes without claiming prose quality.",
+      "source_sha256": {
+        "fixed_decode": "f02226aa56901ca378865cc3e53feea60e1cb84a6ea6d8dbc0fe912d7ef9b9f7",
+        "fixed_mixed": "425a7cd3ee3ac567a75b9c5a84f44def59901d12bfceeaa63d7490afbe7dd843",
+        "adaptive_decode": "aad0392371df72986f6a5c0edb38b9ba4d82413ffd979b246b384ff07a443fe3",
+        "adaptive_mixed": "e454d194d991ed7efd5b82682704023665bae0f079c7f78b086d3f1ec12acba3"
+      },
+      "decode": {
+        "code": {
+          "fixed_tps": 129.6114721199915,
+          "adaptive_tps": 130.48033430029477,
+          "adaptive_over_fixed": 1.0067035900919241
+        }
+      },
+      "mixed": [
+        {
+          "concurrency": 2,
+          "fixed_tps": 92.31390925775041,
+          "adaptive_tps": 93.46337920274156,
+          "adaptive_over_fixed": 1.012451752441571,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 4,
+          "fixed_tps": 119.06733225756379,
+          "adaptive_tps": 115.54295483135071,
+          "adaptive_over_fixed": 0.9704001310906234,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 8,
+          "fixed_tps": 163.08378046743948,
+          "adaptive_tps": 167.12663255502693,
+          "adaptive_over_fixed": 1.0247900317002685,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 4,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 5,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 6,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 7,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        },
+        {
+          "concurrency": 16,
+          "fixed_tps": 177.61877287302062,
+          "adaptive_tps": 202.18722224912784,
+          "adaptive_over_fixed": 1.1383212426181504,
+          "pairs": [
+            {
+              "index": 0,
+              "case": "code",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 1,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 2,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 3,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 4,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 5,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 6,
+              "case": "code",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 7,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 8,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 9,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 10,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 11,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 12,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 13,
+              "case": "fable",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 14,
+              "case": "topic",
+              "exact": false,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {},
+                "objective_checks_passed": null,
+                "prose_quality_assessed": false
+              }
+            },
+            {
+              "index": 15,
+              "case": "code",
+              "exact": true,
+              "fixed_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              },
+              "adaptive_checks": {
+                "response_nonempty": true,
+                "objective_checks": {
+                  "python_structure": {
+                    "passed": true,
+                    "issues": []
+                  }
+                },
+                "objective_checks_passed": true,
+                "prose_quality_assessed": false
+              }
+            }
+          ],
+          "scope": "one cold mixed batch per arm, includes admission gaps"
+        }
+      ],
+      "lifecycle": {
+        "fixed": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 5.745180372032337,
+          "cold_prompt_tokens_per_ttft_second": 5711.744083744374,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        },
+        "adaptive": {
+          "passed": true,
+          "cold_prompt_tokens": 32815,
+          "cold_ttft_seconds": 5.914322147960775,
+          "cold_prompt_tokens_per_ttft_second": 5548.395772001434,
+          "warm_usage": {
+            "prompt_tokens": 32815,
+            "completion_tokens": 6,
+            "total_tokens": 32821,
+            "prompt_tokens_details": {
+              "cached_tokens": 32815
+            },
+            "prompt_cache_hit_tokens": 32815,
+            "prompt_cache_miss_tokens": 0
+          },
+          "retained_usage": {
+            "prompt_tokens": 32835,
+            "completion_tokens": 2,
+            "total_tokens": 32837,
+            "prompt_tokens_details": {
+              "cached_tokens": 32821
+            },
+            "prompt_cache_hit_tokens": 32821,
+            "prompt_cache_miss_tokens": 14
+          },
+          "cancellation_count": 8,
+          "survivor_count": 8
+        }
+      },
+      "decode_pairs": [
+        {
+          "case": "code",
+          "repeat": 1,
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 2,
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        },
+        {
+          "case": "code",
+          "repeat": 3,
+          "exact": true,
+          "fixed_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          },
+          "adaptive_checks": {
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false
+          }
+        }
+      ],
+      "limitations": [
+        "Exploratory sequential arms, not a balanced release comparison.",
+        "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+        "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+        "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+      ]
+    },
+    "after-b1-constraints.json": {
+      "scope": "Focused C4 high-thinking tool/response grammar isolation under independent lanes.",
+      "base_url": "http://127.0.0.1:8000",
+      "cases": [
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 0
+                      },
+                      "marker": {
+                        "const": "lane-0-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 0
+              },
+              "marker": {
+                "const": "lane-0-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 0,
+            "marker": "lane-0-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-e88a9893-03b2-4f0d-8a0a-985b73af5f87",
+              "object": "chat.completion",
+              "created": 1789290970,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+                    "tool_calls": [
+                      {
+                        "id": "call_chatcmpl-e88a9893-03b2-4f0d-8a0a-985b73af5f87_0",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup",
+                          "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "logprobs": null,
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 323
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+              "tool_calls": [
+                {
+                  "id": "call_chatcmpl-e88a9893-03b2-4f0d-8a0a-985b73af5f87_0",
+                  "type": "function",
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 323
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 1
+                      },
+                      "marker": {
+                        "const": "lane-1-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 1
+              },
+              "marker": {
+                "const": "lane-1-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 1,
+            "marker": "lane-1-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "tool_calls",
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 126
+                },
+                "prompt_cache_hit_tokens": 126,
+                "prompt_cache_miss_tokens": 197
+              },
+              "text": ""
+            },
+            "message": {
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot=1 and marker=\"lane-1-台北\".",
+              "tool_calls": [
+                {
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 1, \"marker\": \"lane-1-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 126
+              },
+              "prompt_cache_hit_tokens": 126,
+              "prompt_cache_miss_tokens": 197
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 2, \"marker\": \"lane-2-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 2
+                    },
+                    "marker": {
+                      "const": "lane-2-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 2
+              },
+              "marker": {
+                "const": "lane-2-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 2,
+            "marker": "lane-2-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-0ca1ad4c-7496-4a21-a2f1-d9a3dae905c7",
+              "object": "chat.completion",
+              "created": 1789290971,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+                    "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 3, \"marker\": \"lane-3-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 3
+                    },
+                    "marker": {
+                      "const": "lane-3-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 3
+              },
+              "marker": {
+                "const": "lane-3-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 3,
+            "marker": "lane-3-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "stop",
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              },
+              "text": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}"
+            },
+            "message": {
+              "content": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 3, \"marker\": \"lane-3-台北\"}. Ensure no markdown.",
+              "tool_calls": []
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    "before-a1-constraints.json": {
+      "scope": "Focused C4 high-thinking tool/response grammar isolation under independent lanes.",
+      "base_url": "http://127.0.0.1:8000",
+      "cases": [
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 0
+                      },
+                      "marker": {
+                        "const": "lane-0-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 0
+              },
+              "marker": {
+                "const": "lane-0-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 0,
+            "marker": "lane-0-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-47812fdf-a2ab-498d-8690-df0ff210266f",
+              "object": "chat.completion",
+              "created": 1789291035,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+                    "tool_calls": [
+                      {
+                        "id": "call_chatcmpl-47812fdf-a2ab-498d-8690-df0ff210266f_0",
+                        "type": "function",
+                        "function": {
+                          "name": "lookup",
+                          "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "logprobs": null,
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 126
+                },
+                "prompt_cache_hit_tokens": 126,
+                "prompt_cache_miss_tokens": 197
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot 0 and marker \"lane-0-台北\".",
+              "tool_calls": [
+                {
+                  "id": "call_chatcmpl-47812fdf-a2ab-498d-8690-df0ff210266f_0",
+                  "type": "function",
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 0, \"marker\": \"lane-0-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 126
+              },
+              "prompt_cache_hit_tokens": 126,
+              "prompt_cache_miss_tokens": 197
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Call lookup exactly once with the required slot and marker from its schema."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "description": "Record the requested object.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "const": 1
+                      },
+                      "marker": {
+                        "const": "lane-1-台北"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "marker"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              }
+            ],
+            "tool_choice": "required",
+            "parallel_tool_calls": false
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 1
+              },
+              "marker": {
+                "const": "lane-1-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 1,
+            "marker": "lane-1-台北"
+          },
+          "tool": true,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "tool_calls",
+              "usage": {
+                "prompt_tokens": 323,
+                "completion_tokens": 81,
+                "total_tokens": 404,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 323
+              },
+              "text": ""
+            },
+            "message": {
+              "content": "",
+              "reasoning_content": "The user wants me to call lookup exactly once with slot=1 and marker=\"lane-1-台北\".",
+              "tool_calls": [
+                {
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"slot\": 1, \"marker\": \"lane-1-台北\"}"
+                  }
+                }
+              ]
+            },
+            "finish": "tool_calls",
+            "usage": {
+              "prompt_tokens": 323,
+              "completion_tokens": 81,
+              "total_tokens": 404,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 323
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 2, \"marker\": \"lane-2-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": false,
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 2
+                    },
+                    "marker": {
+                      "const": "lane-2-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 2
+              },
+              "marker": {
+                "const": "lane-2-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 2,
+            "marker": "lane-2-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "id": "chatcmpl-a78f6bc1-1474-4fba-8c97-879ea4090e24",
+              "object": "chat.completion",
+              "created": 1789291035,
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+                    "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              }
+            },
+            "message": {
+              "role": "assistant",
+              "content": "{\"slot\": 2, \"marker\": \"lane-2-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 2, \"marker\": \"lane-2-台北\"}. Ensure no markdown."
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        },
+        {
+          "request": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Return exactly this JSON object: {\"slot\": 3, \"marker\": \"lane-3-台北\"}. The response schema enforces this same object."
+              }
+            ],
+            "thinking": {
+              "type": "enabled"
+            },
+            "reasoning_effort": "high",
+            "temperature": 0,
+            "max_tokens": 2048,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "lane",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "const": 3
+                    },
+                    "marker": {
+                      "const": "lane-3-台北"
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "marker"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "const": 3
+              },
+              "marker": {
+                "const": "lane-3-台北"
+              }
+            },
+            "required": [
+              "slot",
+              "marker"
+            ],
+            "additionalProperties": false
+          },
+          "expected": {
+            "slot": 3,
+            "marker": "lane-3-台北"
+          },
+          "tool": false,
+          "result": {
+            "raw": {
+              "done": true,
+              "finish_reason": "stop",
+              "usage": {
+                "prompt_tokens": 63,
+                "completion_tokens": 55,
+                "total_tokens": 118,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 63
+              },
+              "text": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}"
+            },
+            "message": {
+              "content": "{\"slot\": 3, \"marker\": \"lane-3-台北\"}",
+              "reasoning_content": "We need answer exactly JSON object. Need comply. Must return exactly {\"slot\": 3, \"marker\": \"lane-3-台北\"}. Ensure no markdown.",
+              "tool_calls": []
+            },
+            "finish": "stop",
+            "usage": {
+              "prompt_tokens": 63,
+              "completion_tokens": 55,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 63
+            }
+          },
+          "passed": true
+        }
+      ],
+      "passed": true
+    }
+  },
+  "gpu_tests": {
+    "real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure.log": "\nrunning 1 test\nPASS cache prefix cycle=0 proposed=9 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=1 proposed=129 all 44 owners, 16 requests, packed bytes and device histories\nPASS cache prefix cycle=2 proposed=3 all 44 owners, 16 requests, packed bytes and device histories\nPASS retained full backbone prefix: all 44 owners, odd carry, slot reuse, exact next commit\nPASS C16 partial encoder replay: shared complete-group sources, 128 bounded rows, zero acceptance, suffix append, decoder replay, immutable retained future\nPASS exact encoder continuation: populated rings and odd carry match full continuation; decoder stays fresh until final 128 rows\nPASS committed encoder source views: all 16 requests/all 4 sources, causal ratios, odd carry, stable snapshots across append\nPASS 16 CED transactions: encoder 64+65, replay 63+65, untouched global/encoder bytes, full decode readiness\nPASS 16-request encoder reservations: layer-major 64+65, ordered completion, generation survival, capacity and release\nexpected late source exhaustion: compressed KV pool exhausted at work item 1: need 1 pages, 0 available\nPASS late source failure early=false revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nexpected late source exhaustion: compressed KV pool exhausted at work item 1: need 1 pages, 0 available\nPASS late source failure early=true revoked all 16 requests and all 44 component leases; admission and reclaimed-page commit recovered\nPASS early encoder publication: mixed/all windows, all sources, deferred logical end, stale/duplicate/partial guards\ntest v41_backbone_cache::commit_tests::real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 814 filtered out; finished in 5.74s\n\n",
+    "v41_window::commit.log": "\nrunning 1 test\ntest v41_window::commit::tests::native_queued_windows_match_direct_and_keep_peer_slots_independent ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 814 filtered out; finished in 1.22s\n\n"
+  },
+  "memory": {
+    "before-a1": {
+      "peak_gpu_mib": 97004.0
+    },
+    "after-b1": {
+      "peak_gpu_mib": 97028.0
+    }
+  }
+}

@@ -125,25 +125,36 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                 let decision = prepare_commit_lane(lib, lane, pass, &requests.borrow(),
                     &active.borrow(), &members, &inputs, batch.as_ref().unwrap(), &next,
                     draft.borrow().as_deref(), verify_us)?;
-                if draft.borrow().is_some() {
-                    let committed: Result<()> = async {
-                        draft.borrow_mut().as_deref_mut().unwrap().begin_queued_commit(lane,
-                            pass, &requests.borrow(), batch.as_ref().unwrap(), &decision.accepted)?;
-                        loop {
-                            if draft.borrow().as_deref().unwrap().poll_queued_commit(lane)? { break; }
-                            tokio::task::yield_now().await;
-                        }
-                        draft.borrow_mut().as_deref_mut().unwrap().finish_queued_commit(lane,
-                            pass, &mut requests.borrow_mut(), batch.as_mut().unwrap(), &decision.accepted)
-                    }.await;
-                    if let Err(error) = committed {
-                        if let Err(cleanup) = draft.borrow_mut().as_deref_mut().unwrap()
-                            .abort_queued_commit(lane, &mut requests.borrow_mut(), batch.as_mut().unwrap()) {
-                            tracing::error!(%cleanup, "draining failed lane commit");
-                        }
-                        return Err(error);
+                let committed: Result<()> = async {
+                    if let Some(draft) = draft.borrow_mut().as_deref_mut() {
+                        draft.begin_queued_commit(lane, pass, &requests.borrow(),
+                            batch.as_ref().unwrap(), &decision.accepted)?;
                     }
-                } else { pass.commit(&mut requests.borrow_mut(), batch.as_mut().unwrap(), &decision.accepted)?; }
+                    pass.enqueue_window_commit(&requests.borrow(), batch.as_ref().unwrap(), &decision.accepted)?;
+                    loop {
+                        let draft_ready = draft.borrow().as_deref().map(|draft| draft.poll_queued_commit(lane))
+                            .transpose()?.unwrap_or(true);
+                        if pass.poll_window_commit()? && draft_ready { break; }
+                        tokio::task::yield_now().await;
+                    }
+                    if let Some(draft) = draft.borrow_mut().as_deref_mut() {
+                        draft.finish_queued_commit(lane, pass, &mut requests.borrow_mut(),
+                            batch.as_mut().unwrap(), &decision.accepted)
+                    } else {
+                        pass.commit(&mut requests.borrow_mut(), batch.as_mut().unwrap(), &decision.accepted)
+                    }
+                }.await;
+                if let Err(error) = committed {
+                    if let Err(cleanup) = pass.abort_window_commit(&mut requests.borrow_mut()) {
+                        tracing::error!(%cleanup, "draining failed lane window commit");
+                    }
+                    if let Some(draft) = draft.borrow_mut().as_deref_mut() {
+                        if let Err(cleanup) = draft.abort_queued_commit(lane, &mut requests.borrow_mut(), batch.as_mut().unwrap()) {
+                            tracing::error!(%cleanup, "draining failed lane draft commit");
+                        }
+                    } else { requests.borrow_mut().revoke_batch(batch.as_mut().unwrap()); }
+                    return Err(error);
+                }
                 let (accepted, emitted, emissions) = publish_commit_lane(pass, &mut active.borrow_mut(),
                     &members, &inputs, &mut batch, draft.borrow_mut().as_deref_mut(), capture_routes, decision)?;
                 tracing::debug!(target: "ds41rt::lane_schedule", lane, round_id,

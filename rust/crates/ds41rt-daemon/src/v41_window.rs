@@ -11,6 +11,8 @@ use std::{
 };
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 mod prefix;
+mod commit;
+use commit::PendingCommit;
 pub(crate) use prefix::{WindowPrefix, WINDOW_PREFIX_BYTES};
 static NEXT_SNAPSHOT: AtomicU64 = AtomicU64::new(1);
 fn next(counter: &AtomicU64) -> Result<u64> {
@@ -58,6 +60,7 @@ pub(crate) struct WindowState<'a> {
     scales: DeviceAllocation<'a>,
     ends: DeviceAllocation<'a>,
     slots: [Slot; 16],
+    writing: std::rc::Rc<std::cell::Cell<u16>>,
     slot_count: usize,
     layer: usize,
     owner: u64,
@@ -85,6 +88,7 @@ impl<'a> WindowState<'a> {
             scales: DeviceAllocation::new(library, slots * 128 * 16)?,
             ends: DeviceAllocation::new(library, slots * 8)?,
             slots: [Slot::default(); 16],
+            writing: Default::default(),
             slot_count: slots,
             layer,
             owner: next(&NEXT_OWNER)?,
@@ -94,7 +98,8 @@ impl<'a> WindowState<'a> {
     }
     pub fn begin_request(&mut self, slot: usize, request: u64) -> Result<WindowLease> {
         ensure!(
-            slot < self.slot_count && self.slots[slot].request.is_none(),
+            slot < self.slot_count && self.slots[slot].request.is_none()
+                && self.writing.get() & (1 << slot) == 0,
             "window slot unavailable"
         );
         ensure!(
@@ -148,6 +153,11 @@ impl<'a> WindowState<'a> {
         Ok(())
     }
     fn validate(&self, lease: WindowLease) -> Result<usize> {
+        let slot = self.validate_identity(lease)?;
+        ensure!(self.writing.get() & (1 << slot) == 0, "window write is unpublished");
+        Ok(slot)
+    }
+    fn validate_identity(&self, lease: WindowLease) -> Result<usize> {
         ensure!(
             lease.owner == self.owner && lease.slot < self.slot_count,
             "foreign window lease"
@@ -160,10 +170,10 @@ impl<'a> WindowState<'a> {
         Ok(lease.slot)
     }
     pub fn end(&self, lease: WindowLease) -> Result<u64> {
-        Ok(self.slots[self.validate(lease)?].end)
+        Ok(self.slots[self.validate_identity(lease)?].end)
     }
     pub fn request_id(&self, lease: WindowLease) -> Result<u64> {
-        self.slots[self.validate(lease)?]
+        self.slots[self.validate_identity(lease)?]
             .request
             .context("window request missing")
     }
@@ -177,6 +187,9 @@ impl<'a> WindowState<'a> {
             begin: self.slots[slot].begin,
             _owner: PhantomData,
         })
+    }
+    pub(crate) fn ensure_not_writing(&self, lease: WindowLease) -> Result<()> {
+        self.validate(lease).map(|_| ())
     }
     /// Consumers must drain before release; generation checks revoke old views.
     pub fn release(&mut self, lease: WindowLease) -> Result<()> {
@@ -293,6 +306,7 @@ impl<'a> WindowWeights<'a> {
             capacity: rows,
             graph: None,
             ready: None,
+            pending_commit: None,
         };
         ensure!(
             value.input.buffer.device_id == self.tensors.get(&self.names[0])?.device_id,
@@ -377,6 +391,7 @@ pub(crate) struct WindowWave<'w, 'a> {
     capacity: usize,
     graph: Option<(*mut c_void, usize, u64)>,
     ready: Option<Prepared>,
+    pending_commit: Option<PendingCommit>,
 }
 impl WindowWave<'_, '_> {
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -393,6 +408,7 @@ impl WindowWave<'_, '_> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
     fn prepare(&mut self, state: &WindowState<'_>, chunks: &[WindowChunk]) -> Result<Prepared> {
+        ensure!(self.pending_commit.is_none(), "window commit pending");
         self.ready = None;
         ensure!(
             state.layer == self.weights.layer
@@ -650,7 +666,8 @@ impl WindowWave<'_, '_> {
         state: &WindowState<'_>,
         chunks: &[WindowChunk],
     ) -> Result<()> {
-        let prepared = self.validate_ready(state)?;
+        let prepared = if self.pending_commit.is_some() { self.validate_pending_commit(state)? }
+            else { self.validate_ready(state)? };
         ensure!(
             prepared.chunks.len() == chunks.len()
                 && prepared.chunks.iter().zip(chunks).all(|(a, b)|
@@ -659,82 +676,8 @@ impl WindowWave<'_, '_> {
         );
         Ok(())
     }
-    /// Consume a proposal once. Only the last 128 accepted rows per request are
-    /// written, ensuring unique ring destinations even for large prefill chunks.
-    pub fn commit(&mut self, state: &mut WindowState<'_>, accepted: &[u32]) -> Result<()> {
-        let checked = self.validate_ready(state).map(|_| ());
-        let p = self.ready.take().context("window output unpublished")?;
-        checked?;
-        ensure!(
-            accepted.len() == p.chunks.len(),
-            "window acceptance count differs"
-        );
-        let mut destinations = vec![u64::MAX; p.rows];
-        let mut ends = vec![];
-        for (i, c) in p.chunks.iter().enumerate() {
-            ensure!(
-                accepted[i] <= c.tokens,
-                "window accepted prefix exceeds proposal"
-            );
-            state.slots[c.lease.slot]
-                .version
-                .checked_add(1)
-                .context("window version exhausted")?;
-            let n = accepted[i] as usize;
-            for j in n.saturating_sub(128)..n {
-                destinations[p.offsets[i] + j] =
-                    (c.lease.slot * 128) as u64 + (c.position + j as u64) % 128;
-            }
-            ends.push(c.position + n as u64);
-        }
-        let staging = self.staging.bytes_mut();
-        for (i, d) in destinations.iter().enumerate() {
-            staging[i * 8..i * 8 + 8].copy_from_slice(&d.to_ne_bytes());
-        }
-        for (i, end) in ends.iter().enumerate() {
-            staging[p.rows * 8 + i * 8..p.rows * 8 + i * 8 + 8].copy_from_slice(&end.to_ne_bytes());
-        }
-        let launched = (|| -> Result<()> {
-            unsafe {
-                self.stream.library.copy_h2d_async(
-                    self.destinations.buffer,
-                    &self.staging.bytes_mut()[..p.rows * 8],
-                    self.stream.raw,
-                )?;
-                self.kv.store(
-                    self.values.buffer,
-                    self.scales.buffer,
-                    self.destinations.buffer,
-                    state.values.buffer,
-                    state.scales.buffer,
-                    p.rows,
-                    state.slot_count * 128,
-                    self.stream.raw,
-                )?;
-                for (i, c) in p.chunks.iter().enumerate() {
-                    self.stream.library.copy_h2d_async(
-                        slice(state.ends.buffer, c.lease.slot * 8, 8),
-                        &self.staging.bytes_mut()[p.rows * 8 + i * 8..p.rows * 8 + i * 8 + 8],
-                        self.stream.raw,
-                    )?;
-                }
-            }
-            Ok(())
-        })();
-        if let Err(error) = launched.and(self.synchronize()) {
-            let leases = p.chunks.iter().map(|c| c.lease).collect::<Vec<_>>();
-            if let Err(e) = state.invalidate(&leases) {
-                tracing::error!(%e,"invalidating failed window transaction");
-            }
-            return Err(error);
-        }
-        for (i, c) in p.chunks.iter().enumerate() {
-            state.slots[c.lease.slot].end = ends[i];
-            state.slots[c.lease.slot].version += 1;
-        }
-        Ok(())
-    }
     pub fn clear_graph(&mut self) -> Result<()> {
+        ensure!(self.pending_commit.is_none(), "cannot reset a pending window commit");
         self.ready = None;
         self.synchronize()?;
         if let Some((g, _, _)) = self.graph.take() {
@@ -747,6 +690,10 @@ impl WindowWave<'_, '_> {
 }
 impl Drop for WindowWave<'_, '_> {
     fn drop(&mut self) {
+        if let Err(error) = self.synchronize() {
+            tracing::error!(%error, "draining pending window writes");
+        }
+        self.pending_commit = None;
         if let Err(error) = self.clear_graph() {
             tracing::error!(%error,"draining window graph");
         }

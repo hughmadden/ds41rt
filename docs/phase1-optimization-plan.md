@@ -19,11 +19,12 @@ above remain performance targets, not evidence that they have been achieved.
 
 Remaining synchronization work, based on the current serving source:
 
-- Finish and qualify queued dSpark main-context/cache commit. Draft replay already
-  has separate lane workspaces; accepted-KV production needs the same independence.
-- Queue target SWA and compressed-cache publication without blocking the shared
-  scheduler thread. `BackboneCache::commit` currently commits each window/source
-  synchronously. Compressed-source uploads also share pinned staging, so merely
+- Queued dSpark main-context/cache commit and target SWA publication are implemented
+  and have focused numerical/lifecycle evidence. Draft replay also has separate
+  lane workspaces. The scoped v2 performance comparison remains pending.
+- Queue compressed-cache publication without blocking the shared scheduler
+  thread. `BackboneCache::commit` still commits compressed sources synchronously.
+  Compressed-source uploads also share pinned staging, so merely
   replacing stream synchronization with polling is insufficient: reserve pages
   and keep upload storage owned until completion, with disjoint request access.
 - Retire completed/cancelled requests within their owning lane. Preserve exact
@@ -110,10 +111,13 @@ cooperative per-lane head completion. Continue through remaining blocking
 completion boundaries: constrained logits download and target/draft-cache commit.
 [Shared draft replay now completes cooperatively](phase1-async-draft-completion.md).
 The [two lane-local draft workspaces](phase1-split-draft-workspaces.md) now share
-weights and use forty-row storage for eight requests each. Continue with queued
-main-context preparation and direct cache writes from lane-owned producer outputs;
-avoid copying through shared intermediate staging. Remove retirement coupling
-separately from admission.
+weights and use forty-row storage for eight requests each.
+[Queued dSpark commit](phase1-queued-draft-commit.md) prepares and writes accepted
+KV from each lane's producer; [queued SWA commit](phase1-queued-window-commit.md)
+removes the sequential window waits. Next, compressed-source plans must actually
+claim free pages until publication or rollback, preserve shared-tail copy ownership,
+and use producer-owned upload staging. Then remove retirement coupling separately
+from admission, including cooperative snapshot copies and release bookkeeping.
 Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and
