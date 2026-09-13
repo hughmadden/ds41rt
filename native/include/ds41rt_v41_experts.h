@@ -108,6 +108,11 @@ int32_t ds41rt_v41_reduce_compact_bf16_async(const uint16_t* const planes[4],
 int32_t ds41rt_v41_finish_local_experts_async(const float* routed,
     const uint16_t* shared, uint16_t* output, uint32_t rows,
     uint32_t token_sums, void* stream);
+
+// Both FP32 rank contributions must be resident on the current device and ready
+// on this stream. Sum without intermediate rank rounding; emit BF16 once.
+int32_t ds41rt_v41_reduce_tp2_experts_async(const float* rank0, const float* rank1,
+    uint16_t* output, uint32_t rows, uint32_t token_sums, void* stream);
 #ifdef __cplusplus
 }
 #endif

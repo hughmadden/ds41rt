@@ -33,7 +33,7 @@ pub use v41_fp8_plan::{V41Fp8Plan, V41Fp8PlanInfo};
 mod v41_experts;
 pub use v41_experts::{
     V41ExpertInfo, V41ExpertInputQuantizer, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPacker, V41ExpertPointer,
-    V41CompactReducer, V41LocalExpertReducer, V41RouteReducer, V41_EXPERT_POINTER_COUNT,
+    V41CompactReducer, V41LocalExpertReducer, V41Tp2ExpertReducer, V41RouteReducer, V41_EXPERT_POINTER_COUNT,
 };
 
 use anyhow::{Context, Result};

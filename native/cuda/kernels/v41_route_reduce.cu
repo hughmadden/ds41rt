@@ -168,6 +168,22 @@ extern "C" int32_t ds41rt_v41_reduce_routes_async(const float* const planes[4],
 
 namespace {
 template<int Routes>
+__global__ void reduce_tp2(const float* rank0, const float* rank1,
+    __nv_bfloat16* output, uint64_t count) {
+  for (uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+       i < count; i += uint64_t(gridDim.x) * blockDim.x) {
+    const uint64_t base = (i / hidden) * Routes * hidden + i % hidden;
+    float value = __fadd_rn(rank0[base], rank1[base]);
+#pragma unroll
+    for (int route = 1; route < Routes; ++route) {
+      const auto index = base + route * hidden;
+      value = __fadd_rn(value, __fadd_rn(rank0[index], rank1[index]));
+    }
+    output[i] = __float2bfloat16_rn(value);
+  }
+}
+
+template<int Routes>
 __global__ void finish_local(const float* routed, const __nv_bfloat16* shared,
     __nv_bfloat16* output, uint64_t count) {
   for (uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -184,6 +200,30 @@ __global__ void finish_local(const float* routed, const __nv_bfloat16* shared,
   }
 }
 }
+extern "C" int32_t ds41rt_v41_reduce_tp2_experts_async(const float* rank0,
+    const float* rank1, uint16_t* output, uint32_t rows, uint32_t token_sums,
+    void* stream) {
+  if (!rows || rows > 4096 || token_sums > 1 || !rank0 || !rank1 || !output ||
+      reinterpret_cast<uintptr_t>(rank0) % 4 || reinterpret_cast<uintptr_t>(rank1) % 4 ||
+      reinterpret_cast<uintptr_t>(output) % 2) return cudaErrorInvalidValue;
+  const uint64_t count = uint64_t(rows) * hidden;
+  const uint64_t input_bytes = count * (token_sums ? 1 : 6) * 4;
+  const uint64_t output_bytes = count * 2;
+  if (reinterpret_cast<uintptr_t>(rank0) > UINTPTR_MAX - input_bytes ||
+      reinterpret_cast<uintptr_t>(rank1) > UINTPTR_MAX - input_bytes ||
+      reinterpret_cast<uintptr_t>(output) > UINTPTR_MAX - output_bytes ||
+      overlaps(rank0, input_bytes, output, output_bytes) ||
+      overlaps(rank1, input_bytes, output, output_bytes)) return cudaErrorInvalidValue;
+  const unsigned blocks = static_cast<unsigned>(count / 256 < 4096 ? count / 256 : 4096);
+  if (token_sums)
+    reduce_tp2<1><<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(rank0, rank1,
+        reinterpret_cast<__nv_bfloat16*>(output), count);
+  else
+    reduce_tp2<6><<<blocks, 256, 0, static_cast<cudaStream_t>(stream)>>>(rank0, rank1,
+        reinterpret_cast<__nv_bfloat16*>(output), count);
+  return cudaGetLastError();
+}
+
 extern "C" int32_t ds41rt_v41_finish_local_experts_async(const float* routed,
     const uint16_t* shared, uint16_t* output, uint32_t rows,
     uint32_t token_sums, void* stream) {

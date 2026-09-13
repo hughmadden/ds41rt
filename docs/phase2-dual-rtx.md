@@ -222,3 +222,21 @@ This validates C1/C16 synthetic expert numerics, not real checkpoint quality,
 parallel lane progress, device-side final reduction, prefill capacities, shared
 experts, or throughput. The fixture sums rank outputs on the host for comparison;
 serving must use an asynchronous device reduction.
+
+## Device-side TP2 reduction
+
+`ds41rt_v41_reduce_tp2_experts_async` and its Rust owner now reduce two FP32
+rank contributions on the destination GPU, supporting six route planes or one
+pre-accumulated token plane. Rank pairs and routes accumulate in FP32 before
+one BF16 output conversion. Both inputs must already be resident and ordered
+on the destination stream; serving still needs to connect the peer-copy events.
+The existing single-GPU local-expert reduction is unchanged.
+
+The reduction fixture passes 12 combinations across both GPUs, rows 1/16/4096,
+and both layouts. It checks exact BF16 results, changed-data graph replay,
+trailing canaries, input/output overlap rejection, and invalid row counts.
+The C1/C16 expert fixture now invokes native GPU reduction rather than host
+summation and still passes all four comparisons against the unsplit oracle:
+relative L2 is about 0.23% after final BF16 rounding. Its cross-device staging
+currently uses PyTorch for the fixture; it does not qualify the serving transfer
+loop or asynchronous lane progress. Native build and daemon offline check pass.

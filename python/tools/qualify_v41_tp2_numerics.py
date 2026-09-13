@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compare two native RTX expert halves with the unsplit numerical oracle."""
 import argparse
+import ctypes as C
 import json
 import torch
 import _pinned_sparkinfer
@@ -21,6 +22,8 @@ def main():
     args = parser.parse_args()
     assert torch.cuda.device_count() >= 2
     lib = library(args.native_lib, tp2=True)
+    reduce = lib.ds41rt_v41_reduce_tp2_experts_async
+    reduce.argtypes = [P, P, P, C.c_uint32, C.c_uint32, P]
     torch.manual_seed(41152)
     experts, hidden, width = 8, 5120, 2304
     weights, scales = {}, {}
@@ -71,7 +74,7 @@ def main():
                 x = x.mul(-0.5)
                 ids = (ids + 1) % experts
                 routing = routing.flip(-1).contiguous()
-            actual = torch.zeros(rows, hidden)
+            rank_outputs = []
             for rank, (native, graph, wire, live_ids, live_routing, _) in enumerate(owners):
                 with torch.cuda.device(rank):
                     wire_input(x.cuda(), wire)
@@ -80,8 +83,13 @@ def main():
                     before = torch.cuda.memory_allocated()
                     graph.replay()
                     assert torch.cuda.memory_allocated() == before
-                    actual += native.output.reshape(rows, 6, hidden).sum(1).cpu()
+                    rank_outputs.append(native.output.clone())
             with torch.cuda.device(0):
+                peer = rank_outputs[1].to(device="cuda:0")
+                result = torch.empty((rows, hidden), dtype=torch.bfloat16, device="cuda:0")
+                check(reduce(rank_outputs[0].data_ptr(), peer.data_ptr(), result.data_ptr(),
+                             rows, 0, torch.cuda.current_stream().cuda_stream))
+                actual = result.float().cpu()
                 expected = reference(x.cuda(), ids.cuda(), routing.cuda(),
                     {k: v.cuda() for k, v in weights.items()},
                     {k: v.cuda() for k, v in scales.items()}).cpu()

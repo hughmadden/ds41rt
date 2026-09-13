@@ -1,5 +1,5 @@
 //! Native V4.1 expert AOT launch handles; weight/scratch ownership stays with the caller.
-use crate::NativeLibrary;
+use crate::{Ds41rtDeviceBuffer, NativeLibrary};
 use anyhow::{ensure, Context, Result};
 use std::ffi::c_void;
 use std::ptr::NonNull;
@@ -661,6 +661,37 @@ impl V41ExpertInputQuantizer<'_> {
 
 
 type FinishLocalFn = unsafe extern "C" fn(*const f32, *const u16, *mut u16, u32, u32, *mut c_void) -> i32;
+type ReduceTp2Fn = unsafe extern "C" fn(*const f32, *const f32, *mut u16, u32, u32, *mut c_void) -> i32;
+pub struct V41Tp2ExpertReducer<'a> {
+    _library: &'a NativeLibrary,
+    reduce: ReduceTp2Fn,
+}
+impl NativeLibrary {
+    pub fn v41_tp2_expert_reducer(&self) -> Result<V41Tp2ExpertReducer<'_>> {
+        Ok(V41Tp2ExpertReducer { _library: self,
+            reduce: unsafe { *self.lib.get::<ReduceTp2Fn>(b"ds41rt_v41_reduce_tp2_experts_async")? } })
+    }
+}
+impl V41Tp2ExpertReducer<'_> {
+    /// # Safety
+    /// Both FP32 rank buffers and the BF16 destination must remain live on the
+    /// current device through stream completion. Producers (including peer copy)
+    /// must be ordered before this launch. No conflicting aliases are permitted.
+    pub unsafe fn reduce(&self, rank0: Ds41rtDeviceBuffer, rank1: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer, rows: u32, token_sums: bool, stream: *mut c_void) -> Result<()> {
+        ensure!((1..=4096).contains(&rows), "invalid TP2 reduction rows");
+        let count = rows as usize * 5120;
+        let bytes = count * if token_sums { 4 } else { 24 };
+        ensure!(rank0.device_id == output.device_id && rank1.device_id == output.device_id
+            && rank0.bytes >= bytes && rank1.bytes >= bytes && output.bytes >= count * 2,
+            "TP2 reduction buffers have incompatible device or extent");
+        let status = unsafe { (self.reduce)(rank0.ptr.cast(), rank1.ptr.cast(), output.ptr.cast(),
+            rows, u32::from(token_sums), stream) };
+        ensure!(status == 0, "TP2 expert reduction failed with CUDA status {status}");
+        Ok(())
+    }
+}
+
 pub struct V41LocalExpertReducer<'a> {
     _library: &'a NativeLibrary,
     finish: FinishLocalFn,
