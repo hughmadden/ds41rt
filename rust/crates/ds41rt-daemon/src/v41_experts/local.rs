@@ -64,6 +64,24 @@ impl<'a> LocalExpertWave<'a> {
     /// method drains, including on partial launch failure. No external mutation.
     pub unsafe fn execute(&mut self, routed: &RouterOutput<'_>, shared: &SharedOutput<'_>) -> Result<Ds41rtDeviceBuffer> {
         let rows = routed.rows;
+        unsafe { self.enqueue(routed, shared)?; }
+        unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw)?; }
+        Ok(self.output_rows(rows))
+    }
+    /// # Safety
+    /// Same retained input contract as execute; cancellation drains this stream.
+    pub async unsafe fn execute_cooperative(&mut self, routed: &RouterOutput<'_>, shared: &SharedOutput<'_>) -> Result<Ds41rtDeviceBuffer> {
+        unsafe { self.enqueue(routed, shared)?; }
+        self.stream.wait().await?;
+        Ok(self.output_rows(routed.rows))
+    }
+    fn output_rows(&self, rows: u32) -> Ds41rtDeviceBuffer {
+        let mut output = self.output.buffer;
+        output.bytes = rows as usize * 10240;
+        output
+    }
+    unsafe fn enqueue(&mut self, routed: &RouterOutput<'_>, shared: &SharedOutput<'_>) -> Result<()> {
+        let rows = routed.rows;
         ensure!(self.contains(routed.layer) && rows > 0 && rows <= self.capacity,
             "local expert layer/rows are not resident or exceed capacity");
         ensure!(routed.binding()? == shared.binding()? && routed.layer == shared.layer && rows == shared.rows,
@@ -91,10 +109,10 @@ impl<'a> LocalExpertWave<'a> {
             unsafe { self.reducer.finish(state.slots[41].cast(), shared.values.ptr.cast(),
                 self.output.buffer.ptr.cast(), rows, state.kernel.accumulates_tokens(), self.stream.raw) }
         })();
-        let drained = unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) };
-        launched.and(drained)?;
-        let mut output = self.output.buffer;
-        output.bytes = rows as usize * 10240;
-        Ok(output)
+        if let Err(error) = launched {
+            unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw)?; }
+            return Err(error);
+        }
+        Ok(())
     }
 }

@@ -41,6 +41,17 @@ pub(crate) struct CompletedLayer<'t> {
     experts_us: u64,
 }
 impl PreparedLayer<'_, '_, '_> {
+    #[cfg(test)]
+    async unsafe fn check_queued_ffn(mut self, image_mask: &[u8],
+        local: Option<&mut crate::v41_experts::local::LocalExpertWave<'_>>) -> Result<Self> {
+        let mut ffn = match self.ffn {
+            PreparedFfn::Ready(ffn) => ffn,
+            PreparedFfn::Pending(pending) => pending.complete().await?,
+        };
+        unsafe { ffn.check_queued_components(image_mask, local).await?; }
+        self.ffn = PreparedFfn::Ready(ffn);
+        Ok(self)
+    }
     /// # Safety
     /// The modality mask and placement describe this prepared batch. Poll on
     /// the CUDA owner; no external writes may race the borrowed lane.

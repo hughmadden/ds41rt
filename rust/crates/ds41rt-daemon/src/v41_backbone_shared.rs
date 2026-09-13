@@ -209,6 +209,10 @@ impl BackboneSharedWave<'_, '_> {
         unsafe {
             self.execute(rows)?;
         }
+        unsafe { self.capture_ready(rows) }
+    }
+    // Warmup has completed. Capture never yields with the stream in capture mode.
+    unsafe fn capture_ready(&mut self, rows: u32) -> Result<()> {
         self.invalidate();
         unsafe {
             self.stream
@@ -286,6 +290,42 @@ impl BackboneSharedWave<'_, '_> {
         unsafe {
             self.replay(rows)?;
         }
+        self.origin = Some(input.binding());
+        self.output()
+    }
+    /// # Safety
+    /// Same input contract as execute_ffn; the future retains this wave and input
+    /// until completion. Cancellation drains before their storage can be reused.
+    pub async unsafe fn execute_ffn_cooperative(&mut self, input: &FfnInput<'_>) -> Result<SharedOutput<'_>> {
+        self.invalidate();
+        ensure!(
+            input.layer == self.layer
+                && input.binding().layer() == self.layer
+                && !input.tokens.is_empty()
+                && input.tokens.len() <= self.capacity as usize
+                && input.values.bytes == input.tokens.len() * 10240
+                && input.values.device_id == self.input.buffer.device_id,
+            "shared FFN block input differs"
+        );
+        let rows = input.tokens.len() as u32;
+        let cold = self.graphs.get_shape(self.layer, self.weights, rows).is_none();
+        let launched = (|| unsafe {
+            self.stream.library.copy_d2d_async(self.input.buffer, input.values, input.values.bytes, self.stream.raw)?;
+            if cold { self.enqueue(rows) } else {
+                let (graph, _) = self.graphs.get_shape(self.layer, self.weights, rows).unwrap();
+                self.stream.library.cuda_graph_launch(graph, self.stream.raw)
+            }
+        })();
+        if let Err(error) = launched { self.synchronize()?; return Err(error); }
+        self.stream.wait().await?;
+        if cold {
+            unsafe { self.capture_ready(rows)?; }
+            let (graph, _) = self.graphs.get_shape(self.layer, self.weights, rows).unwrap();
+            let launched = unsafe { self.stream.library.cuda_graph_launch(graph, self.stream.raw) };
+            if let Err(error) = launched { self.synchronize()?; return Err(error); }
+            self.stream.wait().await?;
+        }
+        self.ready = Some(rows);
         self.origin = Some(input.binding());
         self.output()
     }

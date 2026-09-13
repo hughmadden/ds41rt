@@ -32,8 +32,10 @@ is fully asynchronous.
 | Token upload, embedding and mHC/query | Candidate writes embeddings directly into block inputs and waits cooperatively after the query chain; subsequent queries also wait cooperatively | Accepted after broader sweep; finish adjacent blocking work |
 | Cache production and index selection | [Production and index now poll together](phase1-queued-index.md), with projection overlapping production and guarded selection completion | Combined checkpoint versus e9c07ae: C1 −1.3%, median C2–C14 −0.34%, C16 −12.5%; costs remain unresolved |
 | Attention through FFN input preparation | [Queued completion](phase1-queued-attention.md) retains lane consumers and drains before cancellation/reuse, with no shared bank borrow across the wait | Implemented; cold attention graph setup still blocks |
-| Router, shared FFN and local experts | `LaneFfn::execute_tp4` still calls synchronous router/shared execution and `NativeTp4Wave::execute_local_ffn`; route downloads are already queued into owned staging | Make completion cooperative while retaining routed/shared inputs; remote dispatch/collection already awaits |
+| Router, shared FFN and local experts | [Cooperative router/shared/local completion](phase1-queued-ffn.md) retains inputs and drains cancellation; route exports keep their existing owned staging | Implemented, including cold router/shared warmup; remaining final mHC and advance follow below |
 | FFN completion and layer advance | `complete_layer` finishes mHC; `BackboneBlockWave::advance` copies residual/pre values and synchronizes before taps/Engram/query consume them | Preserve those producer dependencies when moving completion to a cooperative wait |
+| Engram gate at layers 1 and 14 | Upload polling is cooperative, but its ready branch calls `lane.apply_engram`: gate staging, graph warmup/replay and the residual handoff drain synchronously | Split upload readiness from gate execution; release shared request borrows before waiting while retaining upload/residual storage |
+| dSpark taps at layers 37–39 | `TargetTapWave::capture` launches each tap and synchronizes before the next query | Retain the prepared block input through cooperative tap completion; preserve tap order and batch identity |
 | Weight rebind | Query/projection/shared/router owners synchronize their own streams before rebinding | Establish already-complete ownership before removing redundant waits; a source search alone cannot establish their measured cost |
 | Cold graph setup and eviction | LayerGraphs retains small shapes per layer; insertion/eviction requires completed launches, and capture remains synchronous | Never suspend between begin/end capture; containing owners must drain before replacing or destroying captured storage |
 
@@ -50,3 +52,23 @@ The first pair reports C1 code 129.83 → 129.84 tok/s, C8 152.14 → 159.20,
 and C16 181.77 → 162.87. The two follow-up C16 pairs also decline: 167.66 → 158.38 and
 165.10 → 159.84 tok/s. See [the accepted change and both sets of evidence](phase1-chained-query.md). Exact embedding/image and 56 real-weight query cases,
 cache reuse, cancellation/recovery and high-thinking constrained checks pass.
+
+## Completion order after the FFN component checkpoint
+
+1. Queue final mHC and residual/pre transfer with one retained block owner. Keep
+   the transport result borrowed until mHC finishes. Publish `Ready` only after
+   mHC, and `Prepared` only after copies and binding installation. Cancellation
+   must invalidate the block after draining; layer 39 has no next-layer copy.
+2. Split Engram upload readiness from gate execution so no shared request borrow
+   spans the GPU wait. Retain the upload view, gate and block until projection,
+   gate and residual copy finish. At layers 37–39, retain prepared input while
+   tapping, before the query can overwrite it.
+3. Convert cold sparse graph staging/warmup to owned pending work, with completed
+   launches before graph eviction. Capture must remain a synchronous region with
+   no await between begin/end; replay completion is already cooperative.
+4. Recheck warm decode and shape changes, including rebind and cancellation.
+   An own-stream synchronization on already-completed work is distinguishable
+   from waiting for unfinished GPU work, but both should be audited explicitly.
+
+These steps preserve the full asynchronous-loop objective. They do not replace
+it with the narrower absence of explicit round joins.

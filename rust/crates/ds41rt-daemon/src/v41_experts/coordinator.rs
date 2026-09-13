@@ -39,6 +39,18 @@ impl<'a> NativeTp4Wave<'a> {
         self.ready_rows = Some(routed.rows);
         Ok(NativeFfnOutput { values, binding: routed.binding()?, _owner: std::marker::PhantomData })
     }
+    /// # Safety
+    /// Completed router/shared inputs remain immutable until completion or drain.
+    pub async unsafe fn execute_local_ffn_cooperative(&mut self,
+        routed: &crate::v41_backbone_router::RouterOutput<'_>,
+        shared: &crate::v41_backbone_shared::SharedOutput<'_>) -> Result<NativeFfnOutput<'_>> {
+        self.ready_rows = None;
+        let binding = routed.binding()?;
+        let values = unsafe { self.local.as_mut().context("local expert lane missing")?
+            .execute_cooperative(routed, shared).await? };
+        self.ready_rows = Some(routed.rows);
+        Ok(NativeFfnOutput { values, binding, _owner: std::marker::PhantomData })
+    }
     /// Admission invalidates prior output; completed RoCE sessions remain reusable.
     pub fn begin_request(&mut self) {
         self.ready_rows = None;

@@ -41,9 +41,14 @@ Remaining synchronization work, based on the current serving source:
   lower. It is not release-qualified. Preserve frozen e9c07ae for the combined
   producer/index comparison; investigate a common GPU submission/completion
   boundary rather than accumulating more host waits.
-- Finish index selection, graph capture/rebind/eviction,
-  and remaining component waits on the
-  shared host thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
+- [Combined cache/index completion](phase1-queued-index.md) and
+  [router/shared/local FFN completion](phase1-queued-ffn.md) are now cooperative.
+  Against preserved e9c07ae, the latest combined pair has C1 130.18 → 129.98,
+  median C2–C14 −0.14%, C16 166.16 → 168.58, with C15 −8.0%. Functional checks
+  pass; this remains exploratory progress, not final release qualification.
+- Finish final mHC/layer advance, Engram gates, dSpark taps and cold sparse graph
+  setup. Audit rebind/eviction and remaining component waits on the shared host
+  thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
 
 The [separate cooperative embedding/handoff candidate](phase1-cooperative-embedding.md)
 was rejected after a consistent 2.3% C8 decline across three pairs. Its patch and

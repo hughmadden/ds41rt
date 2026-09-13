@@ -105,7 +105,7 @@ impl<'s, 'w, 'a> PendingLaneFfn<'s, 'w, 'a> {
         let lane = self.lane.take().unwrap();
         let input = unsafe { lane.block.complete_queued_ffn(self.values)? };
         lane.phase = Phase::Ffn;
-        Ok(LaneFfn { input, shared: &mut lane.shared, router: &mut lane.router,
+        Ok(LaneFfn { input, cooperative: true, shared: &mut lane.shared, router: &mut lane.router,
             library: lane.weights.library, phase: &mut lane.phase,
             route_capture: if lane.capture_routes { Some(&mut lane.route_capture) } else { None } })
     }
@@ -126,6 +126,7 @@ impl Drop for PendingLaneFfn<'_, '_, '_> {
 /// RTX. Both consume the same preserved normalized rows and execution identity.
 pub(crate) struct LaneFfn<'s, 'w, 'a> {
     pub input: FfnInput<'s>,
+    cooperative: bool,
     shared: &'s mut BackboneSharedWave<'w, 'a>,
     router: &'s mut BackboneRouterWave<'w, 'a>,
     library: &'a NativeLibrary,
@@ -133,6 +134,54 @@ pub(crate) struct LaneFfn<'s, 'w, 'a> {
     route_capture: Option<&'s mut Vec<Vec<[u32; 6]>>>,
 }
 impl LaneFfn<'_, '_, '_> {
+    #[cfg(test)]
+    pub async unsafe fn check_queued_components(&mut self, image_mask: &[u8],
+        mut local: Option<&mut crate::v41_experts::local::LocalExpertWave<'_>>) -> Result<()> {
+        use std::{future::Future, task::Poll};
+        async fn cancel_once<F: Future>(future: F) -> bool {
+            let mut future = std::pin::pin!(future);
+            std::future::poll_fn(|cx| Poll::Ready(future.as_mut().poll(cx).is_pending())).await
+        }
+        let lib = self.library;
+        let read = |buffers: &[Ds41rtDeviceBuffer]| -> Result<Vec<Vec<u8>>> {
+            buffers.iter().map(|&buffer| { let mut out = vec![0; buffer.bytes];
+                lib.copy_d2h(&mut out, buffer)?; Ok(out) }).collect()
+        };
+        let mut cancelled = 0;
+        for local_mode in [false, true] {
+            self.router.set_local_mode(local_mode)?;
+            let routed = unsafe { self.router.execute_ffn(&self.input, image_mask)? };
+            let reference = read(&[routed.ids, routed.routing, routed.expert_input])?;
+            self.router.clear_graph()?;
+            cancelled += cancel_once(unsafe { self.router.execute_ffn_cooperative(&self.input, image_mask) }).await as usize;
+            for _ in 0..2 {
+                let routed = unsafe { self.router.execute_ffn_cooperative(&self.input, image_mask).await? };
+                assert_eq!(read(&[routed.ids, routed.routing, routed.expert_input])?, reference);
+                let mut ids = Vec::new();
+                unsafe { routed.capture_route_ids(lib, &mut ids)?; }
+                assert_eq!(ids.iter().flatten().flat_map(|v| v.to_ne_bytes()).collect::<Vec<_>>(), reference[0]);
+            }
+        }
+        let shared = unsafe { self.shared.execute_ffn(&self.input)? };
+        let reference = read(&[shared.values])?;
+        self.shared.clear_graph()?;
+        cancelled += cancel_once(unsafe { self.shared.execute_ffn_cooperative(&self.input) }).await as usize;
+        for _ in 0..2 {
+            let shared = unsafe { self.shared.execute_ffn_cooperative(&self.input).await? };
+            assert_eq!(read(&[shared.values])?, reference);
+        }
+        if let Some(local) = local.as_deref_mut() {
+            let routed = self.router.output()?;
+            let shared = self.shared.output()?;
+            let reference = read(&[unsafe { local.execute(&routed, &shared)? }])?;
+            cancelled += cancel_once(unsafe { local.execute_cooperative(&routed, &shared) }).await as usize;
+            for _ in 0..2 {
+                assert_eq!(read(&[unsafe { local.execute_cooperative(&routed, &shared).await? }])?, reference);
+            }
+        }
+        eprintln!("PASS queued FFN components layer {}: direct parity, cold/warm, {cancelled} pending cancellations/reuse", self.input.layer);
+        Ok(())
+    }
     /// # Safety
     /// Metadata and mask identify the actual requests/modality in input order.
     /// All external producers are complete and no writes race this lane.
@@ -143,6 +192,7 @@ impl LaneFfn<'_, '_, '_> {
         image_mask: &[u8],
         rows: &[ExpertRow],
     ) -> Result<NativeFfnOutput<'t>> {
+        let cooperative = self.cooperative;
         let input = &self.input;
         let router = &mut self.router;
         let shared = &mut self.shared;
@@ -151,7 +201,8 @@ impl LaneFfn<'_, '_, '_> {
         complete_ffn(self.phase, async {
             let timing = std::time::Instant::now();
             router.set_local_mode(transport.has_local_layer(input.layer))?;
-            let routed = unsafe { router.execute_ffn(input, image_mask)? };
+            let routed = unsafe { if cooperative { router.execute_ffn_cooperative(input, image_mask).await? }
+                else { router.execute_ffn(input, image_mask)? } };
             if transport.has_local_layer(input.layer) {
                 routed.validate_request_rows(rows)?;
                 let trace = tracing::enabled!(target: "ds41rt::route_policy", tracing::Level::DEBUG);
@@ -163,8 +214,10 @@ impl LaneFfn<'_, '_, '_> {
                     unsafe { routed.capture_route_ids(library, output)?; }
                 }
                 let routed_us = timing.elapsed().as_micros() as u64;
-                let contribution = unsafe { shared.execute_ffn(input)? };
-                let result = unsafe { transport.execute_local_ffn(&routed, &contribution) };
+                let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
+                    else { shared.execute_ffn(input)? } };
+                let result = unsafe { if cooperative { transport.execute_local_ffn_cooperative(&routed, &contribution).await }
+                    else { transport.execute_local_ffn(&routed, &contribution) } };
                 let ffn_us = timing.elapsed().as_micros() as u64;
                 tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
                     total_us=ffn_us, "target local experts");
@@ -189,7 +242,8 @@ impl LaneFfn<'_, '_, '_> {
             let routed_us = timing.elapsed().as_micros() as u64;
             let pending = transport.dispatch_ffn(&request).await?;
             let dispatched_us = timing.elapsed().as_micros() as u64;
-            let contribution = unsafe { shared.execute_ffn(input)? };
+            let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
+                    else { shared.execute_ffn(input)? } };
             let shared_us = timing.elapsed().as_micros() as u64;
             let result = unsafe { pending.finish(&contribution).await }?;
             tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us, dispatch_us=dispatched_us-routed_us, shared_us=shared_us-dispatched_us, collect_us=timing.elapsed().as_micros() as u64-shared_us, "target experts");
@@ -434,6 +488,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.phase = Phase::Ffn;
         Ok(LaneFfn {
             input,
+            cooperative: false,
             shared: &mut self.shared,
             router: &mut self.router,
             library: self.weights.library,

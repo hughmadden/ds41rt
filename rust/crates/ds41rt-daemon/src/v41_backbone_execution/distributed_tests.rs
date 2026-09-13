@@ -182,6 +182,11 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         },
     )?;
     let mut transport = NativeTp4Wave::new(&lib, roce, NativeTp4Wave::device_bytes(80)?)?;
+    use crate::v41_experts::{ExpertLayer, ExpertWeights, local::LocalExpertWave};
+    let local_budget = ExpertWeights::plan(&lib, &catalog, ExpertLayer::BackboneFull { layer: 0 })?;
+    let local_weights = std::rc::Rc::new(vec![ExpertWeights::load(&lib, &catalog,
+        ExpertLayer::BackboneFull { layer: 0 }, local_budget.peak_device_bytes()?)?]);
+    let mut local_fixture = LocalExpertWave::new(&lib, local_weights, 80, LocalExpertWave::device_bytes(&lib, 80)?)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
@@ -238,6 +243,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution, &mut index, &mut reference_index)?;
             let prepared = unsafe { execution.prepare_layer_cooperative(requests.cache(),
                 batch.cache()?, &mut lane, &mut index)? };
+            let prepared = runtime.block_on(unsafe { prepared.check_queued_ffn(batch.image_mask(), Some(&mut local_fixture)) })?;
             let completed = runtime.block_on(unsafe {
                 prepared.execute(&mut transport, 0, batch.image_mask())
             })?;
@@ -316,6 +322,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 check_queued_production(&lib, &runtime, requests.cache(), batch.cache()?, &lane, &mut execution, &mut index, &mut reference_index)?;
                 let prepared = unsafe { execution.prepare_layer_cooperative(requests.cache(),
                     batch.cache()?, &mut lane, &mut index)? };
+                let prepared = runtime.block_on(unsafe { prepared.check_queued_ffn(batch.image_mask(), None) })?;
                 let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, batch.image_mask()) })?;
                 unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
             }
