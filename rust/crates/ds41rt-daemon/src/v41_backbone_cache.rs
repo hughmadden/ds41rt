@@ -155,6 +155,7 @@ impl CacheAttention<'_> {
 }
 
 pub(crate) struct BackboneCache<'a> {
+    prefix_copies: [crate::v41_memory::SnapshotCopies<'a, (CacheLease, BackbonePrefix<'a>)>; 2],
     prefix_pool: Option<crate::v41_memory::SnapshotPool<'a>>,
     prefix_stream: crate::v41_memory::LoadStream<'a>,
     windows: Vec<WindowState<'a>>,
@@ -219,6 +220,8 @@ impl<'a> BackboneCache<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .map_err(|_| anyhow::anyhow!("backbone cache IDs exhausted"))?;
         Ok(Self {
+            prefix_copies: [crate::v41_memory::SnapshotCopies::new(library)?,
+                crate::v41_memory::SnapshotCopies::new(library)?],
             prefix_pool: None,
             prefix_stream: crate::v41_memory::LoadStream { library, raw: library.cuda_stream_create()? },
             windows,
@@ -236,7 +239,7 @@ impl<'a> BackboneCache<'a> {
         );
         Ok(())
     }
-    fn request(&self, lease: CacheLease) -> Result<&Request> {
+    fn request_identity(&self, lease: CacheLease) -> Result<&Request> {
         self.healthy()?;
         ensure!(
             lease.owner == self.owner
@@ -247,6 +250,12 @@ impl<'a> BackboneCache<'a> {
         self.requests[lease.slot]
             .as_ref()
             .context("backbone cache request released")
+    }
+    fn request(&self, lease: CacheLease) -> Result<&Request> {
+        let request = self.request_identity(lease)?;
+        ensure!(!self.prefix_copies.iter().any(|p| p.pending.as_ref().is_some_and(|(l, _)| *l == lease)),
+            "backbone request has pending snapshot copies");
+        Ok(request)
     }
     pub fn begin_request(&mut self, slot: usize, id: u64) -> Result<CacheLease> {
         self.healthy()?;
@@ -301,7 +310,7 @@ impl<'a> BackboneCache<'a> {
         })
     }
     pub fn request_id(&self, lease: CacheLease) -> Result<u64> {
-        Ok(self.request(lease)?.id)
+        Ok(self.request_identity(lease)?.id)
     }
     pub fn committed_end(&self, lease: CacheLease) -> Result<u64> {
         let r = self.request(lease)?;

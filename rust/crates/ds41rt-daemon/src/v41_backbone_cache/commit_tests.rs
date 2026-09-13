@@ -87,7 +87,9 @@ fn qualify_encoder_prefix_replay(
     produce(lib, bank, &batch, windows, sources, 81)?;
     bank.commit(&batch, windows, sources, &[385])?;
     let expected = committed_bytes(lib, bank, original)?;
-    let saved = bank.retain_prefix(original, BackbonePrefix::device_bytes())?;
+    bank.queue_prefix(0, original, BackbonePrefix::device_bytes())?;
+    while !bank.prefix_ready(0, original)? { std::thread::yield_now(); }
+    let saved = bank.finish_prefix(0, original)?;
     bank.release(&[original])?;
     let resumed = (0..16)
         .map(|slot| bank.begin_request(slot, 9200 + slot as u64))
@@ -404,8 +406,26 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
     }
     // Slot 1 ends at 129 tokens: an odd compressor group and a wrapped SWA.
     // Restore into a recycled slot, then compare the next real-weight commit.
-    let saved = bank.retain_prefix(leases[1], BackbonePrefix::device_bytes())?;
     let expected = committed_bytes(&lib, &bank, leases[1])?;
+    bank.queue_prefix(0, leases[1], BackbonePrefix::device_bytes())?;
+    assert!(bank.release(&[leases[1]]).is_err());
+    assert!(bank.retain_prefix(leases[1], BackbonePrefix::device_bytes()).is_err());
+    assert!(bank.plan(&[CacheWork { lease: leases[1], tokens: 1, kind: ExpertV2SourceKind::Decode }]).is_err());
+    assert!(bank.request_id(leases[1]).is_ok());
+    bank.queue_prefix(1, leases[2], BackbonePrefix::device_bytes())?;
+    assert!(bank.queue_prefix(1, leases[3], BackbonePrefix::device_bytes()).is_err());
+    assert!(bank.prefix_ready(1, leases[1]).is_err());
+    while !bank.prefix_ready(1, leases[2])? { std::thread::yield_now(); }
+    drop(bank.finish_prefix(1, leases[2])?);
+    // Aborting a second copy returns only its storage; lane zero remains reserved.
+    bank.queue_prefix(1, leases[2], BackbonePrefix::device_bytes())?;
+    bank.abort_prefix(1)?;
+    assert!(bank.release(&[leases[1]]).is_err());
+    let peer = bank.plan(&[CacheWork { lease: leases[2], tokens: 1, kind: ExpertV2SourceKind::Decode }])?;
+    produce(&lib, &bank, &peer, &mut windows, &mut sources, 76)?;
+    bank.commit(&peer, &mut windows, &mut sources, &[1])?;
+    while !bank.prefix_ready(0, leases[1])? { std::thread::yield_now(); }
+    let saved = bank.finish_prefix(0, leases[1])?;
     assert_eq!(saved.end(), 129);
     assert!(bank.retain_prefix(leases[1], BackbonePrefix::device_bytes() - 1).is_err());
     bank.release(&leases[..1])?;

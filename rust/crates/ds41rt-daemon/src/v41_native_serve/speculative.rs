@@ -7,6 +7,7 @@ use crate::v41_requests::RequestBatch;
 pub(crate) struct DraftRuntime<'w, 'a> {
     mains: Vec<DsparkMainContext<'w, 'a>>,
     pending_commit_ids: Vec<Vec<u64>>,
+    pending_prefix_ids: [Option<u64>; 2],
     chains: Vec<DsparkChain<'w, 'a>>,
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
@@ -61,6 +62,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         Ok(Self {
             mains,
             pending_commit_ids: vec![Vec::new(); lane_count],
+            pending_prefix_ids: [None, None],
             chains,
             windows: [window()?, window()?, window()?],
             requests: Default::default(),
@@ -206,6 +208,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         Ok(enabled.then_some(result.lengths))
     }
     pub fn release(&mut self, id: u64) -> Result<()> {
+        ensure!(!self.pending_prefix_ids.contains(&Some(id)), "cannot release a request with pending snapshot copies");
         ensure!(!self.pending.iter().flatten().any(|(seeds, _)| seeds.iter().any(|seed| seed.0 == id)),
             "cannot release a request with a pending draft");
         ensure!(!self.pending_commit_ids.iter().any(|ids| ids.contains(&id)),
@@ -237,6 +240,51 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let windows = self.windows.iter_mut().zip(request.leases)
             .map(|(window, lease)| window.retain_prefix(lease)).collect::<Result<Vec<_>>>()?;
         Ok(DraftPrefix { windows })
+    }
+    pub fn queue_prefix(&mut self, lane: usize, id: u64, end: u64) -> Result<()> {
+        ensure!(self.pending_prefix_ids.get(lane).context("invalid draft snapshot lane")?.is_none(),
+            "draft snapshot lane is occupied");
+        ensure!(!self.pending_prefix_ids.contains(&Some(id)), "draft snapshot already pending");
+        let request = self.requests.get(&id).context("draft request not admitted")?;
+        for (window, lease) in self.windows.iter().zip(request.leases) {
+            ensure!(window.committed_end(lease)? == Some(end), "draft and target prefix frontiers differ");
+        }
+        let leases = request.leases;
+        self.pending_prefix_ids[lane] = Some(id);
+        let queued = self.windows.iter_mut().zip(leases)
+            .try_for_each(|(window, lease)| window.queue_prefix(lane, lease));
+        if let Err(error) = queued {
+            if let Err(cleanup) = self.abort_prefix(lane) {
+                tracing::error!(%cleanup, "draining failed draft snapshot enqueue");
+            }
+            return Err(error);
+        }
+        Ok(())
+    }
+    pub fn prefix_ready(&self, lane: usize, id: u64) -> Result<bool> {
+        ensure!(self.pending_prefix_ids.get(lane) == Some(&Some(id)), "draft snapshot owner differs");
+        let request = self.requests.get(&id).context("draft snapshot request missing")?;
+        for (window, lease) in self.windows.iter().zip(request.leases) {
+            if !window.prefix_ready(lane, lease)? { return Ok(false); }
+        }
+        Ok(true)
+    }
+    pub fn finish_prefix(&mut self, lane: usize, id: u64) -> Result<DraftPrefix<'a>> {
+        ensure!(self.prefix_ready(lane, id)?, "draft snapshot copies are incomplete");
+        let leases = self.requests[&id].leases;
+        let windows = self.windows.iter_mut().zip(leases)
+            .map(|(window, lease)| window.finish_prefix(lane, lease)).collect::<Result<Vec<_>>>()?;
+        self.pending_prefix_ids[lane] = None;
+        Ok(DraftPrefix { windows })
+    }
+    pub fn abort_prefix(&mut self, lane: usize) -> Result<()> {
+        ensure!(lane < self.pending_prefix_ids.len(), "invalid draft snapshot lane");
+        let mut failure = None;
+        for window in &mut self.windows {
+            if let Err(error) = window.abort_prefix(lane) { failure.get_or_insert(error); }
+        }
+        self.pending_prefix_ids[lane] = None;
+        failure.map_or(Ok(()), Err)
     }
     pub fn restore_prefix(&mut self, id: u64, end: u64, prefix: &DraftPrefix<'a>) -> Result<()> {
         let request = self.requests.get(&id).context("draft request not admitted")?;

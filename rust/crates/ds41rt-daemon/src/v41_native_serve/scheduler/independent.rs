@@ -39,8 +39,7 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             for slot in retired {
                 let request = active.borrow_mut()[slot].take().unwrap();
                 let request_id = request.id;
-                retire_request(request, &mut requests.borrow_mut(), &mut prefixes.borrow_mut(),
-                    draft.borrow_mut().as_deref_mut())?;
+                retire(lane, request, requests, prefixes, draft).await?;
                 tracing::debug!(target: "ds41rt::lane_schedule", lane, request_id, round_id,
                     "independent lane request retired");
             }
@@ -209,4 +208,40 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
     }.await;
     if result.is_err() { drain.set(true); }
     result
+}
+
+async fn retire<'a>(lane: usize, request: Active<'a>, requests: &RefCell<&mut Requests<'a>>,
+    prefixes: &RefCell<&mut PrefixCache<'a>>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a>>>) -> Result<()> {
+    let cacheable = request.cacheable && requests.borrow().cache().request_id(request.lease).is_ok();
+    if cacheable {
+        let retained: Result<()> = async {
+            let next = request.next_after_commit.as_ref().context("finished request has no retained logits")?;
+            let queued = prefixes.borrow_mut().queue_retain(lane, SnapshotKind::Turn, &request.tokens,
+                &request.image_keys, next, request.id, request.lease, &mut requests.borrow_mut(),
+                draft.borrow_mut().as_deref_mut())?;
+            if queued {
+                tracing::debug!(target: "ds41rt::lane_schedule", lane, request_id=request.id,
+                    "independent snapshot queued");
+                loop {
+                    let ready = prefixes.borrow_mut().poll_retain(lane, &mut requests.borrow_mut(),
+                        draft.borrow_mut().as_deref_mut())?;
+                    if ready { break; }
+                    tokio::task::yield_now().await;
+                }
+                tracing::debug!(target: "ds41rt::lane_schedule", lane, request_id=request.id,
+                    "independent snapshot published");
+            }
+            Ok(())
+        }.await;
+        if let Err(error) = retained {
+            if let Err(cleanup) = prefixes.borrow_mut().abort_retain(lane, &mut requests.borrow_mut(),
+                draft.borrow_mut().as_deref_mut()) {
+                tracing::error!(%cleanup, "draining failed independent snapshot");
+            }
+            tracing::warn!(%error, "completed request prefix was not retained");
+        }
+    }
+    let target = requests.borrow_mut().release_if_present(request.lease);
+    let speculative = draft.borrow_mut().as_deref_mut().map(|d| d.release(request.id)).transpose();
+    target.and(speculative.map(|_| ()))
 }

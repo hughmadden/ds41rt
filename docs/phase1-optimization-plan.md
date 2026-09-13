@@ -27,9 +27,11 @@ Remaining synchronization work, based on the current serving source:
   errors drain before rollback. Numerical, ownership and cache-recovery tests pass.
 - Completed/cancelled requests now retire within their owning lane, without a
   peer drain. Snapshot arenas remove allocation/free calls from retention;
-  snapshot copies still need cooperative completion instead of host waits.
-- Audit constrained-logit downloads, graph capture/eviction, and remaining shared
-  host waits. Retain coordinated fatal-error cleanup and admission/prefill drains.
+  [snapshot copies now complete cooperatively](phase1-queued-snapshots.md), with
+  source-slot ownership retained until completion or drained abort.
+- Audit constrained/full-frontier logits downloads, token upload and embedding
+  handoff, graph capture/rebind/eviction, and remaining component waits on the
+  shared host thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
 
 After these changes, first revisit the combined attention graph, which previously
 showed small target/adaptive C1 gains but a C16 decline. Rank other archived
@@ -124,8 +126,9 @@ uses producer-owned upload staging. [Lane-local retirement](phase1-lane-retireme
 now releases completed requests without draining the peer, and avoids redundant
 device length clears. [Snapshot arenas](phase1-snapshot-arenas.md) now remove CUDA
 allocation/free calls from retention, trading their bounded storage for default
-global KV pages. Next make snapshot copies cooperative and finish the remaining
-blocking transfer audit.
+global KV pages. [Queued snapshot copies](phase1-queued-snapshots.md) now retain
+source ownership while polling per-lane streams and publish only after both cache
+owners complete. Next finish the remaining blocking transfer and component-wait audit.
 Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and

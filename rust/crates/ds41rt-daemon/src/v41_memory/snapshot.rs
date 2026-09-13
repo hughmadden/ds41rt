@@ -3,6 +3,27 @@ use super::*;
 use anyhow::{ensure, Context};
 use std::{cell::RefCell, rc::Rc};
 
+/// Stream destruction drains before the queued source/storage owners are dropped.
+pub(crate) struct SnapshotCopies<'a, T> {
+    pub stream: LoadStream<'a>,
+    pub pending: Option<T>,
+}
+impl<'a, T> SnapshotCopies<'a, T> {
+    pub fn new(library: &'a NativeLibrary) -> Result<Self> {
+        Ok(Self { stream: LoadStream { library, raw: library.cuda_stream_create()? }, pending: None })
+    }
+    pub fn ready(&self) -> Result<bool> {
+        ensure!(self.pending.is_some(), "snapshot copy is not pending");
+        unsafe { self.stream.library.cuda_stream_query(self.stream.raw) }
+    }
+    pub fn abort(&mut self) -> Result<()> {
+        if self.pending.is_none() { return Ok(()); }
+        let drained = unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) };
+        self.pending = None;
+        drained
+    }
+}
+
 struct Arena<'a> {
     allocation: DeviceAllocation<'a>,
     stride: usize,

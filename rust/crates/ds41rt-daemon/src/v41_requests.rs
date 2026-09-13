@@ -62,6 +62,7 @@ impl Drop for RequestBatch {
 }
 pub(crate) struct Requests<'a> {
     cache: BackboneCache<'a>,
+    prefix_histories: [Option<(CacheLease, EngramHistory)>; 2],
     pipeline: EngramPipeline,
     slots: Vec<Option<Request>>,
     image_requests: usize,
@@ -76,6 +77,7 @@ impl<'a> Requests<'a> {
     ) -> Result<Self> {
         Ok(Self {
             cache: BackboneCache::new(library, slots, pages, cache_budget)?,
+            prefix_histories: [None, None],
             pipeline,
             slots: (0..slots).map(|_| None).collect(),
             image_requests: 0,
@@ -156,6 +158,33 @@ impl<'a> Requests<'a> {
         let history = request.history.fork()?;
         let cache = self.cache.retain_prefix(lease, budget)?;
         Ok(RequestPrefix { cache, history })
+    }
+    pub fn queue_prefix(&mut self, lane: usize, lease: CacheLease) -> Result<()> {
+        ensure!(self.prefix_histories.get(lane).context("invalid snapshot lane")?.is_none(),
+            "request snapshot lane is occupied");
+        let request = self.request(lease)?;
+        ensure!(request.prefill.is_none() && request.history.position() == self.cache.committed_end(lease)?,
+            "request prefix has pending or inconsistent history");
+        let history = request.history.fork()?;
+        self.cache.queue_prefix(lane, lease, crate::v41_backbone_cache::BackbonePrefix::device_bytes())?;
+        self.prefix_histories[lane] = Some((lease, history));
+        Ok(())
+    }
+    pub fn prefix_ready(&self, lane: usize, lease: CacheLease) -> Result<bool> {
+        ensure!(self.prefix_histories.get(lane).and_then(Option::as_ref).is_some_and(|(l, _)| *l == lease),
+            "request snapshot owner differs");
+        self.cache.prefix_ready(lane, lease)
+    }
+    pub fn finish_prefix(&mut self, lane: usize, lease: CacheLease) -> Result<RequestPrefix<'a>> {
+        ensure!(self.prefix_ready(lane, lease)?, "request snapshot copies are incomplete");
+        let cache = self.cache.finish_prefix(lane, lease)?;
+        let history = self.prefix_histories[lane].take().unwrap().1;
+        Ok(RequestPrefix { cache, history })
+    }
+    pub fn abort_prefix(&mut self, lane: usize) -> Result<()> {
+        let drained = self.cache.abort_prefix(lane);
+        if let Some(history) = self.prefix_histories.get_mut(lane) { *history = None; }
+        drained
     }
     pub fn restore_prefix(&mut self, lease: CacheLease, prefix: &RequestPrefix<'a>) -> Result<()> {
         self.restore_retained(lease, prefix, None)

@@ -15,7 +15,7 @@ mod prefix;
 mod queued;
 pub(crate) use queued::WindowWrite;
 pub(crate) use prefix::DsparkPrefix;
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct WindowLease {
     owner: u64,
     slot: usize,
@@ -102,6 +102,7 @@ impl Drop for WriteReservation {
     }
 }
 pub(crate) struct DsparkWindow<'a> {
+    prefix_copies: [crate::v41_memory::SnapshotCopies<'a, (WindowLease, DsparkPrefix<'a>, ReadReservation)>; 2],
     prefix_pool: Option<crate::v41_memory::SnapshotPool<'a>>,
     stream: LoadStream<'a>,
     kernel: V41DsparkCache<'a>,
@@ -138,6 +139,8 @@ impl<'a> DsparkWindow<'a> {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| anyhow::anyhow!("dSpark cache owner IDs exhausted"))?;
         let mut value = Self {
+            prefix_copies: [crate::v41_memory::SnapshotCopies::new(library)?,
+                crate::v41_memory::SnapshotCopies::new(library)?],
             prefix_pool: None,
             stream: LoadStream {
                 library,

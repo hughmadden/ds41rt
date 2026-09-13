@@ -93,10 +93,37 @@ impl<'a> BackboneCache<'a> {
     /// Snapshot only a fully committed request, after all producer/consumer
     /// streams have drained. Global KV/index pages remain shared; only bounded
     /// SWA and pending compressor state is copied into the retained GPU arena.
-    pub fn retain_prefix(
+    pub fn retain_prefix(&mut self, lease: CacheLease, budget: usize) -> Result<BackbonePrefix<'a>> {
+        let prefix = self.copy_prefix(lease, budget, self.prefix_stream.raw)?;
+        unsafe { self.prefix_stream.library.cuda_stream_synchronize(self.prefix_stream.raw)?; }
+        Ok(prefix)
+    }
+    pub fn queue_prefix(&mut self, lane: usize, lease: CacheLease, budget: usize) -> Result<()> {
+        let copies = self.prefix_copies.get(lane).context("invalid snapshot lane")?;
+        ensure!(copies.pending.is_none(), "backbone snapshot lane is occupied");
+        let stream = copies.stream.raw;
+        let prefix = self.copy_prefix(lease, budget, stream)?;
+        self.prefix_copies[lane].pending = Some((lease, prefix));
+        Ok(())
+    }
+    pub fn prefix_ready(&self, lane: usize, lease: CacheLease) -> Result<bool> {
+        let copies = self.prefix_copies.get(lane).context("invalid snapshot lane")?;
+        ensure!(copies.pending.as_ref().is_some_and(|(l, _)| *l == lease), "backbone snapshot owner differs");
+        self.request_identity(lease)?;
+        copies.ready()
+    }
+    pub fn finish_prefix(&mut self, lane: usize, lease: CacheLease) -> Result<BackbonePrefix<'a>> {
+        ensure!(self.prefix_ready(lane, lease)?, "backbone snapshot copies are incomplete");
+        Ok(self.prefix_copies[lane].pending.take().unwrap().1)
+    }
+    pub fn abort_prefix(&mut self, lane: usize) -> Result<()> {
+        self.prefix_copies.get_mut(lane).context("invalid snapshot lane")?.abort()
+    }
+    fn copy_prefix(
         &mut self,
         lease: CacheLease,
         budget: usize,
+        stream: *mut std::ffi::c_void,
     ) -> Result<BackbonePrefix<'a>> {
         let end = self.committed_end(lease)?;
         let request = self.request(lease)?;
@@ -120,7 +147,7 @@ impl<'a> BackboneCache<'a> {
                     state.retain_prefix(
                         lease,
                         slice(tail.buffer, i * WINDOW_PREFIX_BYTES, WINDOW_PREFIX_BYTES),
-                        self.prefix_stream.raw,
+                        stream,
                     )
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -137,22 +164,21 @@ impl<'a> BackboneCache<'a> {
                             40 * WINDOW_PREFIX_BYTES + i * COMPRESSOR_PREFIX_BYTES,
                             COMPRESSOR_PREFIX_BYTES,
                         ),
-                        self.prefix_stream.raw,
+                        stream,
                     )
                 })
                 .collect::<Result<Vec<_>>>()?;
             Ok((windows, sources))
         })();
-        // Always drain before tail is dropped, including an enqueue failure.
-        let drained = unsafe {
-            self.prefix_stream
-                .library
-                .cuda_stream_synchronize(self.prefix_stream.raw)
+        // No await occurs here. On a partial enqueue failure, drain before any
+        // copied storage is returned to its arena. Success transfers ownership.
+        let (windows, sources) = match result {
+            Ok(saved) => saved,
+            Err(error) => {
+                unsafe { self.prefix_stream.library.cuda_stream_synchronize(stream)?; }
+                return Err(error);
+            }
         };
-        let (windows, sources) = result.and_then(|saved| {
-            drained?;
-            Ok(saved)
-        })?;
         Ok(BackbonePrefix {
             owner: self.owner,
             end,

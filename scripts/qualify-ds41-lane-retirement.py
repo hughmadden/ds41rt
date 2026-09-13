@@ -15,6 +15,7 @@ def main():
     parser.add_argument('--base-url', default='http://127.0.0.1:8000')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--trace-log', type=Path, help='Verify saved lane_schedule debug logs after the request phase')
+    parser.add_argument('--require-queued-snapshot', action='store_true', help='Require queued snapshot publication before retirement')
     args = parser.parse_args()
     if args.trace_log:
         report = json.loads(args.output.read_text())
@@ -39,6 +40,18 @@ def main():
         report['trace'] = dict(path=str(args.trace_log), short_request_id=2, retired_lane=1,
             peer_lane=0, peer_round_before=before[-1][1], peer_round_after=after[0][1],
             peer_round_uncommitted_at_retirement=not committed or committed[-1] < before[-1][1])
+        if args.require_queued_snapshot:
+            markers = {}
+            for name in ['queued', 'published']:
+                found = [i for i, line in enumerate(lines) if f'independent snapshot {name}' in line
+                         and field(line, 'request_id') == 2 and field(line, 'lane') == 1]
+                assert len(found) == 1, f'short request must have exactly one snapshot {name} marker'
+                markers[name] = found[0]
+            assert markers['queued'] < markers['published'] < boundary
+            report['trace']['snapshot_published_before_retirement'] = True
+            report['trace']['peer_round_events_during_snapshot'] = sum(
+                field(line, 'lane') == 0 and ('independent verifier issued' in line or 'independent verifier committed' in line)
+                for line in lines[markers['queued'] + 1:markers['published']])
         report['passed'] = True
     else:
         assert not args.output.exists(), 'refusing to overwrite request evidence'

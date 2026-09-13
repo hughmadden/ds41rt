@@ -5,7 +5,7 @@ use std::ffi::c_void;
 
 #[path = "v41_memory/snapshot.rs"]
 mod snapshot;
-pub(crate) use snapshot::{SnapshotPool, SnapshotStorage};
+pub(crate) use snapshot::{SnapshotCopies, SnapshotPool, SnapshotStorage};
 
 pub(crate) struct DeviceAllocation<'a> {
     pub(crate) library: &'a NativeLibrary,
