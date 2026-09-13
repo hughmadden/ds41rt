@@ -1,0 +1,1038 @@
+{
+  "decision": "Omit combined attention graph from release; retain asynchronous 2957772 implementation",
+  "raw_directory": "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit",
+  "pairs": [
+    {
+      "order": "AB",
+      "concurrency": [
+        {
+          "concurrency": 2,
+          "before_tps": 88.88506399961565,
+          "after_tps": 91.9251537940207,
+          "change_percent": 3.420248192000175
+        },
+        {
+          "concurrency": 6,
+          "before_tps": 136.91826113052537,
+          "after_tps": 134.0192796144915,
+          "change_percent": -2.1173081604288324
+        },
+        {
+          "concurrency": 8,
+          "before_tps": 153.64579716710418,
+          "after_tps": 147.51393973109944,
+          "change_percent": -3.9909047621626614
+        },
+        {
+          "concurrency": 16,
+          "before_tps": 175.60447760457112,
+          "after_tps": 159.30575647754668,
+          "change_percent": -9.2814951813052
+        }
+      ],
+      "before-a_c1_median_tps": 129.6827960699559,
+      "after-b_c1_median_tps": 130.8255043984994
+    },
+    {
+      "order": "BA",
+      "concurrency": [
+        {
+          "concurrency": 2,
+          "before_tps": 95.56575799342451,
+          "after_tps": 87.63094236219567,
+          "change_percent": -8.302990315605307
+        },
+        {
+          "concurrency": 6,
+          "before_tps": 135.98858037737358,
+          "after_tps": 135.69818445477068,
+          "change_percent": -0.21354434453028093
+        },
+        {
+          "concurrency": 8,
+          "before_tps": 153.88260349509062,
+          "after_tps": 158.2586185315101,
+          "change_percent": 2.843736028003385
+        },
+        {
+          "concurrency": 16,
+          "before_tps": 189.78037913939633,
+          "after_tps": 164.89828436688546,
+          "change_percent": -13.110994342694738
+        }
+      ],
+      "before-a_c1_median_tps": 129.7302629896265,
+      "after-b_c1_median_tps": 130.38450322095852
+    },
+    {
+      "order": "AB",
+      "concurrency": [
+        {
+          "concurrency": 2,
+          "before_tps": 96.07738315677358,
+          "after_tps": 90.67041301564302,
+          "change_percent": -5.6277241984284405
+        },
+        {
+          "concurrency": 6,
+          "before_tps": 133.36964557565898,
+          "after_tps": 139.86090179552892,
+          "change_percent": 4.867116645509517
+        },
+        {
+          "concurrency": 8,
+          "before_tps": 153.27405232617113,
+          "after_tps": 153.5988049215405,
+          "change_percent": 0.211877085808565
+        },
+        {
+          "concurrency": 16,
+          "before_tps": 148.7298708081638,
+          "after_tps": 157.66562563428852,
+          "change_percent": 6.008043157416787
+        }
+      ],
+      "before-a_c1_median_tps": 129.22018205843213,
+      "after-b_c1_median_tps": 130.8374938468512
+    }
+  ],
+  "pilot-results": {
+    "scope": "Combined attention graph revisit versus asynchronous 2957772; same math, KV policy and native library",
+    "artifacts": {
+      "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+      "ds41rt": "a297a6e9d386722d766f996b647f7ba2cb7818bc2116623b994738692a8ae4ea"
+    },
+    "arms": [
+      {
+        "label": "before-a1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-before-a1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/before:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+        },
+        "startup_seconds": 5.279197130934335,
+        "code": true,
+        "mixed": true,
+        "constraints": true,
+        "indexed-context": true
+      },
+      {
+        "label": "after-b1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-after-b1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/after:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a297a6e9d386722d766f996b647f7ba2cb7818bc2116623b994738692a8ae4ea"
+        },
+        "startup_seconds": 5.287054053042084,
+        "code": true,
+        "mixed": true,
+        "constraints": true,
+        "indexed-context": true
+      },
+      {
+        "label": "target-before-a1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-target-before-a1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/before:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+        },
+        "startup_seconds": 5.278094083070755,
+        "code": true
+      },
+      {
+        "label": "target-after-b1",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-target-after-b1",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/after:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a297a6e9d386722d766f996b647f7ba2cb7818bc2116623b994738692a8ae4ea"
+        },
+        "startup_seconds": 5.279192117974162,
+        "code": true
+      }
+    ],
+    "restored": true
+  },
+  "repeat-results": {
+    "scope": "Two focused repeat pairs, B-A then A-B, same C1 and ordered C2/C6/C8/C16 workloads; lifecycle checks already passed",
+    "artifacts": {
+      "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+      "ds41rt": "a297a6e9d386722d766f996b647f7ba2cb7818bc2116623b994738692a8ae4ea"
+    },
+    "arms": [
+      {
+        "label": "after-b2",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-after-b2",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/after:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a297a6e9d386722d766f996b647f7ba2cb7818bc2116623b994738692a8ae4ea"
+        },
+        "startup_seconds": 5.294088019058108,
+        "code": true,
+        "mixed": true
+      },
+      {
+        "label": "before-a2",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-before-a2",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/before:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+        },
+        "startup_seconds": 5.276241622981615,
+        "code": true,
+        "mixed": true
+      },
+      {
+        "label": "before-a3",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-before-a3",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/before:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a350bff19f8d32ebc9ec1e305f14cbe26f3cb62ee2dba6155039ca8b1676ac1a"
+        },
+        "startup_seconds": 5.294839052017778,
+        "code": true,
+        "mixed": true
+      },
+      {
+        "label": "after-b3",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-attention-graph-revisit-after-b3",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/home/tj/.cache/ds41rt-experiments/attention-graph-revisit/after:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5"
+        ],
+        "artifacts": {
+          "libds41rt_native.so": "e76fb447e366e37e87a000101acf392357903500e4be70c92ec0a62b7b510e45",
+          "ds41rt": "a297a6e9d386722d766f996b647f7ba2cb7818bc2116623b994738692a8ae4ea"
+        },
+        "startup_seconds": 5.2766132020624354,
+        "code": true,
+        "mixed": true
+      }
+    ],
+    "restored": true
+  },
+  "sync-summary": {
+    "scope": "Instrumented graph revisit, 14GiB KV and five RTX layers; not throughput qualification",
+    "binary_sha256": "a297a6e9d386722d766f996b647f7ba2cb7818bc2116623b994738692a8ae4ea",
+    "first_finish_seconds_after_capture_request": 7.462669929,
+    "windows": {
+      "4": [
+        {
+          "name": "cudaGraphInstantiate_v12000",
+          "count": 5977,
+          "total_ms": 290.800351,
+          "max_us": 5669.407
+        },
+        {
+          "name": "cudaMemcpyAsync_v3020",
+          "count": 66133,
+          "total_ms": 183.942926,
+          "max_us": 50.606
+        },
+        {
+          "name": "cudaLaunchKernel_v7000",
+          "count": 49118,
+          "total_ms": 108.304178,
+          "max_us": 5404.088
+        },
+        {
+          "name": "cudaGraphLaunch_v10000",
+          "count": 10592,
+          "total_ms": 108.222146,
+          "max_us": 1331.13
+        },
+        {
+          "name": "cudaLaunchKernelExC_v11060",
+          "count": 42206,
+          "total_ms": 81.154489,
+          "max_us": 32.659
+        },
+        {
+          "name": "cudaGraphExecDestroy_v10000",
+          "count": 2132,
+          "total_ms": 34.443329,
+          "max_us": 78.367
+        },
+        {
+          "name": "cudaGraphDestroy_v10000",
+          "count": 5978,
+          "total_ms": 9.560943,
+          "max_us": 24.246
+        },
+        {
+          "name": "cuKernelGetName",
+          "count": 90452,
+          "total_ms": 9.527212,
+          "max_us": 39.209
+        },
+        {
+          "name": "cudaGraphNodeGetType_v10000",
+          "count": 46602,
+          "total_ms": 8.450518,
+          "max_us": 10.756
+        },
+        {
+          "name": "cudaStreamBeginCapture_v10000",
+          "count": 5977,
+          "total_ms": 6.036841,
+          "max_us": 66.64
+        },
+        {
+          "name": "cudaGraphGetNodes_v10000",
+          "count": 11956,
+          "total_ms": 2.999814,
+          "max_us": 6.821
+        },
+        {
+          "name": "cudaStreamEndCapture_v10000",
+          "count": 5977,
+          "total_ms": 2.602066,
+          "max_us": 6.931
+        },
+        {
+          "name": "cuLaunchKernelEx",
+          "count": 1159,
+          "total_ms": 2.424954,
+          "max_us": 8.192
+        },
+        {
+          "name": "cuKernelSetAttribute",
+          "count": 1160,
+          "total_ms": 0.578934,
+          "max_us": 59.98
+        },
+        {
+          "name": "cudaStreamQuery_v3020",
+          "count": 1537,
+          "total_ms": 0.512459,
+          "max_us": 2.904
+        },
+        {
+          "name": "cuStreamGetGreenCtx",
+          "count": 3702,
+          "total_ms": 0.484123,
+          "max_us": 0.581
+        },
+        {
+          "name": "cuLibraryLoadData",
+          "count": 5,
+          "total_ms": 0.419921,
+          "max_us": 219.5
+        },
+        {
+          "name": "cudaGetLastError_v3020",
+          "count": 497,
+          "total_ms": 0.047146,
+          "max_us": 0.371
+        },
+        {
+          "name": "cudaGetDevice_v3020",
+          "count": 244,
+          "total_ms": 0.042847,
+          "max_us": 0.351
+        },
+        {
+          "name": "cuDeviceGet",
+          "count": 12,
+          "total_ms": 0.006908,
+          "max_us": 5.198
+        },
+        {
+          "name": "cuLibraryGetKernel",
+          "count": 5,
+          "total_ms": 0.001353,
+          "max_us": 0.37
+        }
+      ],
+      "6": [
+        {
+          "name": "cudaGraphInstantiate_v12000",
+          "count": 7530,
+          "total_ms": 356.322692,
+          "max_us": 5669.407
+        },
+        {
+          "name": "cudaMemcpyAsync_v3020",
+          "count": 95206,
+          "total_ms": 267.584835,
+          "max_us": 50.606
+        },
+        {
+          "name": "cudaGraphLaunch_v10000",
+          "count": 16003,
+          "total_ms": 171.430828,
+          "max_us": 1586.784
+        },
+        {
+          "name": "cudaLaunchKernel_v7000",
+          "count": 64566,
+          "total_ms": 143.710032,
+          "max_us": 5404.088
+        },
+        {
+          "name": "cudaLaunchKernelExC_v11060",
+          "count": 51270,
+          "total_ms": 98.856162,
+          "max_us": 63.655
+        },
+        {
+          "name": "cudaGraphExecDestroy_v10000",
+          "count": 3355,
+          "total_ms": 55.006412,
+          "max_us": 78.367
+        },
+        {
+          "name": "cuKernelGetName",
+          "count": 114626,
+          "total_ms": 12.186443,
+          "max_us": 39.209
+        },
+        {
+          "name": "cudaGraphDestroy_v10000",
+          "count": 7531,
+          "total_ms": 11.860774,
+          "max_us": 24.246
+        },
+        {
+          "name": "cudaGraphNodeGetType_v10000",
+          "count": 57031,
+          "total_ms": 10.385885,
+          "max_us": 10.756
+        },
+        {
+          "name": "cudaStreamBeginCapture_v10000",
+          "count": 7530,
+          "total_ms": 7.779273,
+          "max_us": 66.64
+        },
+        {
+          "name": "cudaGraphGetNodes_v10000",
+          "count": 15062,
+          "total_ms": 3.81231,
+          "max_us": 6.821
+        },
+        {
+          "name": "cuLaunchKernelEx",
+          "count": 1672,
+          "total_ms": 3.47999,
+          "max_us": 8.192
+        },
+        {
+          "name": "cudaStreamEndCapture_v10000",
+          "count": 7530,
+          "total_ms": 3.304661,
+          "max_us": 6.931
+        },
+        {
+          "name": "cuKernelSetAttribute",
+          "count": 1672,
+          "total_ms": 0.730261,
+          "max_us": 59.98
+        },
+        {
+          "name": "cuStreamGetGreenCtx",
+          "count": 5370,
+          "total_ms": 0.697311,
+          "max_us": 0.581
+        },
+        {
+          "name": "cudaStreamQuery_v3020",
+          "count": 1537,
+          "total_ms": 0.512459,
+          "max_us": 2.904
+        },
+        {
+          "name": "cuLibraryLoadData",
+          "count": 5,
+          "total_ms": 0.419921,
+          "max_us": 219.5
+        },
+        {
+          "name": "cudaGetLastError_v3020",
+          "count": 497,
+          "total_ms": 0.047146,
+          "max_us": 0.371
+        },
+        {
+          "name": "cudaGetDevice_v3020",
+          "count": 244,
+          "total_ms": 0.042847,
+          "max_us": 0.351
+        },
+        {
+          "name": "cuDeviceGet",
+          "count": 12,
+          "total_ms": 0.006908,
+          "max_us": 5.198
+        },
+        {
+          "name": "cuLibraryGetKernel",
+          "count": 5,
+          "total_ms": 0.001353,
+          "max_us": 0.37
+        }
+      ],
+      "12": [
+        {
+          "name": "cudaGraphInstantiate_v12000",
+          "count": 16562,
+          "total_ms": 822.204466,
+          "max_us": 6713.825
+        },
+        {
+          "name": "cudaMemcpyAsync_v3020",
+          "count": 208252,
+          "total_ms": 576.072354,
+          "max_us": 50.606
+        },
+        {
+          "name": "cudaGraphLaunch_v10000",
+          "count": 37608,
+          "total_ms": 403.295913,
+          "max_us": 2870.762
+        },
+        {
+          "name": "cudaLaunchKernel_v7000",
+          "count": 152865,
+          "total_ms": 324.194771,
+          "max_us": 5404.088
+        },
+        {
+          "name": "cudaLaunchKernelExC_v11060",
+          "count": 111856,
+          "total_ms": 215.932787,
+          "max_us": 63.655
+        },
+        {
+          "name": "cudaGraphExecDestroy_v10000",
+          "count": 8011,
+          "total_ms": 127.228126,
+          "max_us": 128.944
+        },
+        {
+          "name": "cuKernelGetName",
+          "count": 262125,
+          "total_ms": 27.162585,
+          "max_us": 39.209
+        },
+        {
+          "name": "cudaGraphDestroy_v10000",
+          "count": 16563,
+          "total_ms": 26.929356,
+          "max_us": 77.136
+        },
+        {
+          "name": "cudaGraphNodeGetType_v10000",
+          "count": 126201,
+          "total_ms": 22.593143,
+          "max_us": 24.787
+        },
+        {
+          "name": "cudaStreamBeginCapture_v10000",
+          "count": 16562,
+          "total_ms": 16.764473,
+          "max_us": 164.527
+        },
+        {
+          "name": "cudaGraphGetNodes_v10000",
+          "count": 33126,
+          "total_ms": 8.222977,
+          "max_us": 6.821
+        },
+        {
+          "name": "cudaStreamEndCapture_v10000",
+          "count": 16562,
+          "total_ms": 7.133426,
+          "max_us": 6.931
+        },
+        {
+          "name": "cuLaunchKernelEx",
+          "count": 3296,
+          "total_ms": 6.817491,
+          "max_us": 13.49
+        },
+        {
+          "name": "cuStreamGetGreenCtx",
+          "count": 12840,
+          "total_ms": 1.637079,
+          "max_us": 17.095
+        },
+        {
+          "name": "cuKernelSetAttribute",
+          "count": 3296,
+          "total_ms": 1.487356,
+          "max_us": 59.98
+        },
+        {
+          "name": "cuLaunchKernel",
+          "count": 688,
+          "total_ms": 1.147122,
+          "max_us": 8.052
+        },
+        {
+          "name": "cuKernelGetFunction",
+          "count": 688,
+          "total_ms": 0.925773,
+          "max_us": 595.555
+        },
+        {
+          "name": "cuLibraryLoadData",
+          "count": 10,
+          "total_ms": 0.662054,
+          "max_us": 219.5
+        },
+        {
+          "name": "cudaStreamQuery_v3020",
+          "count": 1537,
+          "total_ms": 0.512459,
+          "max_us": 2.904
+        },
+        {
+          "name": "cudaGetLastError_v3020",
+          "count": 497,
+          "total_ms": 0.047146,
+          "max_us": 0.371
+        },
+        {
+          "name": "cudaGetDevice_v3020",
+          "count": 244,
+          "total_ms": 0.042847,
+          "max_us": 0.351
+        },
+        {
+          "name": "cuLibraryGetKernel",
+          "count": 15,
+          "total_ms": 0.00756,
+          "max_us": 1.472
+        },
+        {
+          "name": "cuDeviceGet",
+          "count": 12,
+          "total_ms": 0.006908,
+          "max_us": 5.198
+        }
+      ]
+    }
+  },
+  "rows32-parity": [
+    {
+      "file": "layer1-c1-query.bin",
+      "sha256": "af17163e3c71d58096038ff872a32a8abfdf79d8737ed20c5eeb10be9558fb57"
+    },
+    {
+      "file": "layer0-c1-pre.bin",
+      "sha256": "a687c66b848961d2781be2b840d59f4c83a14b0e36bf00a641ae9b58c35e199d"
+    },
+    {
+      "file": "layer1-c1-gated.bin",
+      "sha256": "603743435256a5e5d374ff9a596fcf872d8f098ea4ba1e15fad4e86fcfd2910c"
+    },
+    {
+      "file": "layer0-c0-pre.bin",
+      "sha256": "42a042eeed1b88c6213de152faabf936149c857730e153e6063d64f365d0dc62"
+    },
+    {
+      "file": "layer1-c0-query.bin",
+      "sha256": "974f33a5ae65baa9b7b2405cfeff18764f588b98832bc782211d1874bf57fe9a"
+    },
+    {
+      "file": "layer0-c1-residual.bin",
+      "sha256": "5a082668d110a4acb4087bdc1cc353c0312c261a0c456a1bfb76c0e368364a9d"
+    },
+    {
+      "file": "layer1-c0-gated.bin",
+      "sha256": "9140619db182c3c98766c7fc04f137fe0fa083088a4924c7d15479add101900d"
+    },
+    {
+      "file": "layer0-c0-residual.bin",
+      "sha256": "7dd8b1dc022762494e8e46d1e828e91c28530932f42e78d23409eae512bdc47b"
+    }
+  ],
+  "rows80-parity": [
+    {
+      "file": "layer1-c1-query.bin",
+      "sha256": "af17163e3c71d58096038ff872a32a8abfdf79d8737ed20c5eeb10be9558fb57"
+    },
+    {
+      "file": "layer0-c1-pre.bin",
+      "sha256": "a687c66b848961d2781be2b840d59f4c83a14b0e36bf00a641ae9b58c35e199d"
+    },
+    {
+      "file": "layer1-c1-gated.bin",
+      "sha256": "603743435256a5e5d374ff9a596fcf872d8f098ea4ba1e15fad4e86fcfd2910c"
+    },
+    {
+      "file": "layer0-c0-pre.bin",
+      "sha256": "6786336b404c916b010af70a4a4a622e994026c01118d52193f1054679f11d9e"
+    },
+    {
+      "file": "layer1-c0-query.bin",
+      "sha256": "beb7e75c6ecea90ef0661c679a56cf36aefc2c4cecfe85b11702ce55d62c3c38"
+    },
+    {
+      "file": "layer0-c1-residual.bin",
+      "sha256": "5a082668d110a4acb4087bdc1cc353c0312c261a0c456a1bfb76c0e368364a9d"
+    },
+    {
+      "file": "layer1-c0-gated.bin",
+      "sha256": "b6cfbed4ad236e6a7bc8bdb6bb45dcdb03ea45bd315ec7dd11e435037a57d83b"
+    },
+    {
+      "file": "layer0-c0-residual.bin",
+      "sha256": "09d7ce6821d531f3df17bb4c01ab631fd83350b18491b0496f72f8bad13b4c24"
+    }
+  ]
+}

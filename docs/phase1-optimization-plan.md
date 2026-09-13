@@ -220,3 +220,8 @@ projection with cache production and polls selection with guarded ownership.
 Against preserved e9c07ae: C1 130.18 → 128.43 tok/s, median C2–C14 −0.34%,
 C16 150.25 → 131.40. Functional checks pass; performance remains unresolved.
 Keep that control for remaining FFN/layer-completion work and final qualification.
+
+The [combined attention graph revisit](phase1-attention-graph-revisit.md) is complete.
+Three order-controlled pairs show a small C1 gain and uncertain concurrent impact;
+omit the optional fusion. Keep the asynchronous 2957772 implementation and check
+matched fixed-output counting before scoped v2 qualification.

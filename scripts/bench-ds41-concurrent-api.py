@@ -8,13 +8,14 @@ parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--concurrency', type=int, nargs='+', default=[1,2,4,8,16])
 parser.add_argument('--repeats', type=int, default=3)
 parser.add_argument('--label', default='release-concurrency')
+parser.add_argument('--nonce', help='Use the same prompt nonce for controlled comparisons; defaults to a fresh UUID')
 args=parser.parse_args()
 if args.repeats < 1 or any(c < 1 or c > 16 for c in args.concurrency):
  parser.error('repeats must be positive and concurrency must be 1..16')
 if args.output.exists() or len(set(args.concurrency)) != len(args.concurrency):
  parser.error('output must be new and concurrency values unique')
 api=runpy.run_path(str(Path(__file__).with_name('qualify-ds41-native-api.py')));records=[]
-prompt=f'{args.label} {uuid.uuid4().hex}. Count from 1 to 200, separated by commas. Output only the sequence.'
+prompt=f'{args.label} {args.nonce if args.nonce is not None else uuid.uuid4().hex}. Count from 1 to 200, separated by commas. Output only the sequence.'
 def run(i):
  b=api['payload'](prompt,True);b['max_tokens']=640
  start=time.perf_counter();r=api['stream_case'](args.base_url,b)
