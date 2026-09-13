@@ -1,0 +1,25 @@
+diff --git a/rust/crates/ds41rt-daemon/src/v41_native_serve/speculative.rs b/rust/crates/ds41rt-daemon/src/v41_native_serve/speculative.rs
+index 336aa51..d5a157b 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_native_serve/speculative.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_native_serve/speculative.rs
+@@ -110,13 +110,14 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
+                 if x >= 0. { 1. / (1. + (-x).exp()) } else { x.exp() / (1. + x.exp()) }
+             }).collect::<Vec<_>>());
+         }
+-        // Preliminary corrected-path fit in microseconds. Both lanes' expert
+-        // unions are counted separately. These coefficients are experimental;
++        // Batched-sparse fixed/adaptive trace fit in microseconds. Both lanes'
++        // expert unions are counted separately; second-lane overhead remains
++        // material at small row counts. These coefficients are experimental;
+         // missing routing history keeps the full fixed-length policy.
+-        let cost = |lengths: &[usize]| draft_us as f64 + 1000. + 19864.
+-            + 803. * (requests.len() + lengths.iter().sum::<usize>()) as f64
+-            + 636. * forecast.mean_unique_experts(lengths)
+-            + 3168. * (forecast.lane_count() - 1) as f64;
++        let cost = |lengths: &[usize]| draft_us as f64 + 1000. + 25152.
++            + 969. * (requests.len() + lengths.iter().sum::<usize>()) as f64
++            + 382. * forecast.mean_unique_experts(lengths)
++            + 12273. * (forecast.lane_count() - 1) as f64;
+         let full: Vec<_> = requests.iter().map(|r| r.2).collect();
+         let expected_full: f64 = probabilities.iter().map(|p| {
+             let mut product = 1.;

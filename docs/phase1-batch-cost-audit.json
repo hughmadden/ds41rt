@@ -1,0 +1,1247 @@
+{
+  "confidence": {
+    "scope": "Cross-check raw conditional confidence on two explicitly identified request cohorts.\n\nUse a fixed full-draft trace to avoid the adaptive policy censoring low-confidence\nsuffixes. A conditional label is observed only while all earlier tokens match.\nCohorts are initial request IDs versus subsequent IDs, not inferred workloads.\n",
+    "trace_sha256": "d0c3c831f21858802d5532492254adfb40667d522c68c0c635daa4fdb7469139",
+    "initial_requests": 4,
+    "conditional_labels": 3721,
+    "cohorts": [
+      {
+        "initial": true,
+        "labels": 760,
+        "decisions": 247,
+        "observed_acceptance": 0.7526315789473684,
+        "raw_mean_probability": 0.7534123310548149,
+        "transform_trained_on_other_cohort": [
+          -0.004755656967617039,
+          0.9790669375525256
+        ],
+        "raw_brier": 0.11301941058560458,
+        "crossfit_brier": 0.11292480379314088,
+        "mean_emitted_raw": 3.3153988533523835,
+        "mean_emitted_crossfit": 3.3063818961230784,
+        "mean_emitted_observed": 3.3157894736842106,
+        "positions": [
+          {
+            "position": 1,
+            "samples": 247,
+            "observed_acceptance": 0.7854251012145749,
+            "raw_mean_probability": 0.7839769989500394
+          },
+          {
+            "position": 2,
+            "samples": 194,
+            "observed_acceptance": 0.7061855670103093,
+            "raw_mean_probability": 0.7062242424715143
+          },
+          {
+            "position": 3,
+            "samples": 137,
+            "observed_acceptance": 0.7737226277372263,
+            "raw_mean_probability": 0.7211183142562915
+          },
+          {
+            "position": 4,
+            "samples": 106,
+            "observed_acceptance": 0.7169811320754716,
+            "raw_mean_probability": 0.7640094255360129
+          },
+          {
+            "position": 5,
+            "samples": 76,
+            "observed_acceptance": 0.7763157894736842,
+            "raw_mean_probability": 0.8179650218631126
+          }
+        ]
+      },
+      {
+        "initial": false,
+        "labels": 2961,
+        "decisions": 1062,
+        "observed_acceptance": 0.707193515704154,
+        "raw_mean_probability": 0.708296791496058,
+        "transform_trained_on_other_cohort": [
+          0.008000031922543782,
+          0.9521216343996894
+        ],
+        "raw_brier": 0.12456440889687939,
+        "crossfit_brier": 0.12448971548272016,
+        "mean_emitted_raw": 2.988054957198415,
+        "mean_emitted_crossfit": 2.9814846465105336,
+        "mean_emitted_observed": 2.9717514124293785,
+        "positions": [
+          {
+            "position": 1,
+            "samples": 1062,
+            "observed_acceptance": 0.7156308851224106,
+            "raw_mean_probability": 0.7251617964731631
+          },
+          {
+            "position": 2,
+            "samples": 760,
+            "observed_acceptance": 0.6697368421052632,
+            "raw_mean_probability": 0.6705173267662299
+          },
+          {
+            "position": 3,
+            "samples": 509,
+            "observed_acceptance": 0.7190569744597249,
+            "raw_mean_probability": 0.6933621427090244
+          },
+          {
+            "position": 4,
+            "samples": 366,
+            "observed_acceptance": 0.7213114754098361,
+            "raw_mean_probability": 0.7217089051457107
+          },
+          {
+            "position": 5,
+            "samples": 264,
+            "observed_acceptance": 0.7386363636363636,
+            "raw_mean_probability": 0.7594129299271579
+          }
+        ]
+      }
+    ],
+    "limitations": [
+      "Same prompt corpus across cohorts; not independent-workload validation.",
+      "Cohorts include each request through its drain, not only rounds at initial concurrency.",
+      "Mean calibration does not establish per-decision counterfactual accuracy or justify coefficient promotion."
+    ]
+  },
+  "cost_fit": {
+    "scope": "Compare row/unique and expert-group cost features on complete accepted-history traces.",
+    "sources": [
+      {
+        "path": "/tmp/ds41-phase1-batch-fixed-trace-0-trace.log",
+        "sha256": "d0c3c831f21858802d5532492254adfb40667d522c68c0c635daa4fdb7469139"
+      },
+      {
+        "path": "/tmp/ds41-phase1-batch-trace-1-trace.log",
+        "sha256": "67e55bd23d3483e6189a1fc89525e618d4f40dd123268c07a69e71b0be9af2b9"
+      }
+    ],
+    "models": {
+      "rows_unique": {
+        "features": [
+          "intercept",
+          "rows",
+          "unique",
+          "extra_lane"
+        ],
+        "coefficients": [
+          25152.400030097728,
+          969.1773482360252,
+          382.0803266078872,
+          12272.650160303323
+        ],
+        "training_samples": 354,
+        "block_heldout": [
+          {
+            "samples": 38,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.02524268283192247,
+              "p90_absolute_relative_error": 0.09531098045055854,
+              "median_signed_relative_error": 0.019862580424152607
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.02651284702591477,
+              "p90_absolute_relative_error": 0.10115383629310565,
+              "median_signed_relative_error": 0.020246349832594816
+            }
+          },
+          {
+            "samples": 40,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.0645810419842339,
+              "p90_absolute_relative_error": 0.12250877377641721,
+              "median_signed_relative_error": -0.008974678372506869
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.061494813900922,
+              "p90_absolute_relative_error": 0.13668568978769807,
+              "median_signed_relative_error": -0.023127378025472718
+            }
+          }
+        ],
+        "leave_trace_out": [
+          {
+            "source": 0,
+            "coefficients": [
+              25825.2248761839,
+              1068.804879119451,
+              327.84285106824973,
+              16499.161338778318
+            ],
+            "validation": {
+              "samples": 198,
+              "actual_routes": {
+                "median_absolute_relative_error": 0.03623855732978028,
+                "p90_absolute_relative_error": 0.1562955410840443,
+                "median_signed_relative_error": 0.031659395892157466
+              },
+              "accepted_history": {
+                "median_absolute_relative_error": 0.04427378905860445,
+                "p90_absolute_relative_error": 0.1522396738299885,
+                "median_signed_relative_error": 0.03309500628388912
+              }
+            }
+          },
+          {
+            "source": 1,
+            "coefficients": [
+              22774.85108075007,
+              834.8098836324048,
+              505.5823681645471,
+              2810.2989660943745
+            ],
+            "validation": {
+              "samples": 234,
+              "actual_routes": {
+                "median_absolute_relative_error": 0.06605328459076801,
+                "p90_absolute_relative_error": 0.25198174719916483,
+                "median_signed_relative_error": -0.056673854321046435
+              },
+              "accepted_history": {
+                "median_absolute_relative_error": 0.07589627375945729,
+                "p90_absolute_relative_error": 0.25132302862514017,
+                "median_signed_relative_error": -0.06708573086798394
+              }
+            }
+          }
+        ]
+      },
+      "rows_unique_extra_groups": {
+        "features": [
+          "intercept",
+          "rows",
+          "unique",
+          "extra_groups",
+          "extra_lane"
+        ],
+        "coefficients": [
+          25152.40003694219,
+          969.1773497017612,
+          382.0803258653248,
+          0.0,
+          12272.65016805105
+        ],
+        "training_samples": 354,
+        "block_heldout": [
+          {
+            "samples": 38,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.02524268280811976,
+              "p90_absolute_relative_error": 0.09531098045428844,
+              "median_signed_relative_error": 0.019862580400540692
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.026512847026371186,
+              "p90_absolute_relative_error": 0.10115383628553405,
+              "median_signed_relative_error": 0.02024634980001986
+            }
+          },
+          {
+            "samples": 40,
+            "actual_routes": {
+              "median_absolute_relative_error": 0.06458104195462949,
+              "p90_absolute_relative_error": 0.1225087738371145,
+              "median_signed_relative_error": -0.00897467839512557
+            },
+            "accepted_history": {
+              "median_absolute_relative_error": 0.06149481384097061,
+              "p90_absolute_relative_error": 0.13668568974692455,
+              "median_signed_relative_error": -0.023127378002995035
+            }
+          }
+        ],
+        "leave_trace_out": [
+          {
+            "source": 0,
+            "coefficients": [
+              25825.224898079457,
+              1068.8048864534694,
+              327.8428477878239,
+              0.0,
+              16499.16136300608
+            ],
+            "validation": {
+              "samples": 198,
+              "actual_routes": {
+                "median_absolute_relative_error": 0.03623855718953557,
+                "p90_absolute_relative_error": 0.15629554101351198,
+                "median_signed_relative_error": 0.03165939615745998
+              },
+              "accepted_history": {
+                "median_absolute_relative_error": 0.04427378887804813,
+                "p90_absolute_relative_error": 0.15223967354309897,
+                "median_signed_relative_error": 0.03309500658905715
+              }
+            }
+          },
+          {
+            "source": 1,
+            "coefficients": [
+              22774.851227805328,
+              834.8099062331428,
+              505.5823552737678,
+              0.0,
+              2810.2993041060154
+            ],
+            "validation": {
+              "samples": 234,
+              "actual_routes": {
+                "median_absolute_relative_error": 0.0660532852056343,
+                "p90_absolute_relative_error": 0.25198174188901146,
+                "median_signed_relative_error": -0.056673853564318664
+              },
+              "accepted_history": {
+                "median_absolute_relative_error": 0.07589627348571876,
+                "p90_absolute_relative_error": 0.25132302392199435,
+                "median_signed_relative_error": -0.06708572982764888
+              }
+            }
+          }
+        ]
+      }
+    },
+    "limitations": [
+      "Diagnostic model comparison, not a serving policy or counterfactual evaluation.",
+      "Block holdout shares workload and request history; leave-trace-out is stricter but still limited to supplied traces.",
+      "Changing row shapes, contexts and graph warmup remain confounders. No claim that expert groups fully explain C16 loss."
+    ]
+  },
+  "cost_errors": {
+    "fixed": {
+      "1": {
+        "samples": 56,
+        "median_rows": 6.0,
+        "median_actual_us": 38867.5,
+        "old": {
+          "median_predicted_us": 38411.65,
+          "median_signed_relative_error": -0.009874943614269688,
+          "median_absolute_relative_error": 0.02927411217186353
+        },
+        "candidate": {
+          "median_predicted_us": 39212.425,
+          "median_signed_relative_error": 0.01113209768612088,
+          "median_absolute_relative_error": 0.024292124247816804
+        }
+      },
+      "2": {
+        "samples": 24,
+        "median_rows": 12.0,
+        "median_actual_us": 59815.5,
+        "old": {
+          "median_predicted_us": 59960.35,
+          "median_signed_relative_error": 0.0021309684497801324,
+          "median_absolute_relative_error": 0.019536908462701726
+        },
+        "candidate": {
+          "median_predicted_us": 65445.575,
+          "median_signed_relative_error": 0.09428317927182286,
+          "median_absolute_relative_error": 0.1005799170178362
+        }
+      },
+      "4": {
+        "samples": 41,
+        "median_rows": 24.0,
+        "median_actual_us": 87734.0,
+        "old": {
+          "median_predicted_us": 97874.5,
+          "median_signed_relative_error": 0.10532478554062107,
+          "median_absolute_relative_error": 0.10532478554062107
+        },
+        "candidate": {
+          "median_predicted_us": 94058.25,
+          "median_signed_relative_error": 0.06840394054773158,
+          "median_absolute_relative_error": 0.0700181704550716
+        }
+      },
+      "16": {
+        "samples": 36,
+        "median_rows": 96.0,
+        "median_actual_us": 204260.5,
+        "old": {
+          "median_predicted_us": 220737.4,
+          "median_signed_relative_error": 0.07901543880784581,
+          "median_absolute_relative_error": 0.07901543880784581
+        },
+        "candidate": {
+          "median_predicted_us": 202895.3,
+          "median_signed_relative_error": -0.008922316329723358,
+          "median_absolute_relative_error": 0.01749017171115093
+        }
+      }
+    },
+    "adaptive": {
+      "1": {
+        "samples": 72,
+        "median_rows": 3.0,
+        "median_actual_us": 34057.0,
+        "old": {
+          "median_predicted_us": 31177.0,
+          "median_signed_relative_error": -0.07859264781706118,
+          "median_absolute_relative_error": 0.08108991083914872
+        },
+        "candidate": {
+          "median_predicted_us": 33407.0,
+          "median_signed_relative_error": -0.009584276903863712,
+          "median_absolute_relative_error": 0.039188859166064544
+        }
+      },
+      "2": {
+        "samples": 33,
+        "median_rows": 6.0,
+        "median_actual_us": 57868.0,
+        "old": {
+          "median_predicted_us": 44147.5,
+          "median_signed_relative_error": -0.25324359132689966,
+          "median_absolute_relative_error": 0.25324359132689966
+        },
+        "candidate": {
+          "median_predicted_us": 53027.75,
+          "median_signed_relative_error": -0.08599566284925718,
+          "median_absolute_relative_error": 0.08599566284925718
+        }
+      },
+      "4": {
+        "samples": 42,
+        "median_rows": 16.0,
+        "median_actual_us": 71370.0,
+        "old": {
+          "median_predicted_us": 77490.3,
+          "median_signed_relative_error": 0.06262715035625317,
+          "median_absolute_relative_error": 0.10344130346454825
+        },
+        "candidate": {
+          "median_predicted_us": 78183.65,
+          "median_signed_relative_error": 0.06536329628543035,
+          "median_absolute_relative_error": 0.09899607752496253
+        }
+      },
+      "16": {
+        "samples": 37,
+        "median_rows": 57.0,
+        "median_actual_us": 150181.0,
+        "old": {
+          "median_predicted_us": 155640.8,
+          "median_signed_relative_error": 0.04435424937291368,
+          "median_absolute_relative_error": 0.04906853241170017
+        },
+        "candidate": {
+          "median_predicted_us": 144624.65,
+          "median_signed_relative_error": -0.030730000842957055,
+          "median_absolute_relative_error": 0.037360792254274224
+        }
+      }
+    }
+  },
+  "drain": {
+    "before": {
+      "trace_sha256": "d0c3c831f21858802d5532492254adfb40667d522c68c0c635daa4fdb7469139",
+      "phases": [
+        {
+          "active_requests": 4,
+          "rounds": 41,
+          "total_us": 3956675,
+          "verify_us": 3610678,
+          "emitted": 591,
+          "proposed": 820,
+          "emitted_per_scheduler_second": 149.3678404215661
+        },
+        {
+          "active_requests": 2,
+          "rounds": 23,
+          "total_us": 1573585,
+          "verify_us": 1407325,
+          "emitted": 108,
+          "proposed": 230,
+          "emitted_per_scheduler_second": 68.63308941048625
+        },
+        {
+          "active_requests": 1,
+          "rounds": 45,
+          "total_us": 1907650,
+          "verify_us": 1748937,
+          "emitted": 134,
+          "proposed": 225,
+          "emitted_per_scheduler_second": 70.24349330327891
+        }
+      ]
+    },
+    "after": {
+      "trace_sha256": "67e55bd23d3483e6189a1fc89525e618d4f40dd123268c07a69e71b0be9af2b9",
+      "phases": [
+        {
+          "active_requests": 4,
+          "rounds": 41,
+          "total_us": 3470978,
+          "verify_us": 3123664,
+          "emitted": 566,
+          "proposed": 508,
+          "emitted_per_scheduler_second": 163.06643257318254
+        },
+        {
+          "active_requests": 3,
+          "rounds": 1,
+          "total_us": 90678,
+          "verify_us": 79224,
+          "emitted": 8,
+          "proposed": 9,
+          "emitted_per_scheduler_second": 88.22426608438651
+        },
+        {
+          "active_requests": 2,
+          "rounds": 27,
+          "total_us": 1821868,
+          "verify_us": 1630161,
+          "emitted": 113,
+          "proposed": 111,
+          "emitted_per_scheduler_second": 62.02425203143147
+        },
+        {
+          "active_requests": 1,
+          "rounds": 54,
+          "total_us": 2071572,
+          "verify_us": 1880558,
+          "emitted": 146,
+          "proposed": 152,
+          "emitted_per_scheduler_second": 70.47787863516209
+        }
+      ]
+    },
+    "initial_requests": 4,
+    "limitations": [
+      "Instrumented scheduler time, not HTTP aggregate throughput.",
+      "Different schedules redistribute tokens and content across phases; phase TPS is not a paired counterfactual.",
+      "Initial prefill round is excluded. Caller must supply matching workloads and explicit cohort size."
+    ]
+  },
+  "candidate_serving": {
+    "scope": "Same batched native implementation; before uses existing adaptive coefficients, candidate uses global refit.",
+    "source_sha256": {
+      "before_decode": "a59d7e54827b7a3dcb035bd8d2e8182e4e321472ad1776badc28f52acbfe4058",
+      "before_mixed": "a91e4b6a25e45af439ef2ce26618735cf927849f29385104968bbf60aac3304f",
+      "candidate_decode": "075bbda44fd84481241a150aa205e064418a62ba6bde30ac4ff346b79b9bae18",
+      "candidate_mixed": "44af601e952cfb111f85180a1dc74d773fe39c6d2648e9ea82bacd318f1bf192"
+    },
+    "decode": {
+      "code": {
+        "before_tps": 122.06311825892233,
+        "candidate_tps": 120.91120256154798,
+        "candidate_over_before": 0.9905629504324894
+      },
+      "fable": {
+        "before_tps": 52.61298880401765,
+        "candidate_tps": 51.709832308597164,
+        "candidate_over_before": 0.9828339633244422
+      },
+      "topic": {
+        "before_tps": 65.83222055966304,
+        "candidate_tps": 64.39918390974624,
+        "candidate_over_before": 0.9782319867424485
+      }
+    },
+    "mixed": [
+      {
+        "concurrency": 4,
+        "before_tps": 102.19069249578435,
+        "candidate_tps": 101.45407821201763,
+        "candidate_over_before": 0.992791767373559,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      },
+      {
+        "concurrency": 16,
+        "before_tps": 182.80487616394464,
+        "candidate_tps": 188.6106771707524,
+        "candidate_over_before": 1.0317595521992584,
+        "pairs": [
+          {
+            "index": 0,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 1,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 2,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 3,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 4,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 5,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 6,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 7,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 8,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 9,
+            "case": "code",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 10,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 11,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 12,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 13,
+            "case": "fable",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 14,
+            "case": "topic",
+            "exact": false,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {},
+              "objective_checks_passed": null,
+              "prose_quality_assessed": false
+            }
+          },
+          {
+            "index": 15,
+            "case": "code",
+            "exact": true,
+            "before_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            },
+            "candidate_checks": {
+              "response_nonempty": true,
+              "objective_checks": {
+                "python_structure": {
+                  "passed": true,
+                  "issues": []
+                }
+              },
+              "objective_checks_passed": true,
+              "prose_quality_assessed": false
+            }
+          }
+        ],
+        "scope": "one cold mixed batch per arm, includes admission gaps"
+      }
+    ],
+    "lifecycle": {
+      "before": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 5.886706523015164,
+        "cold_prompt_tokens_per_ttft_second": 5574.424318879107,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      },
+      "candidate": {
+        "passed": true,
+        "cold_prompt_tokens": 32815,
+        "cold_ttft_seconds": 6.169735808041878,
+        "cold_prompt_tokens_per_ttft_second": 5318.704239690073,
+        "warm_usage": {
+          "prompt_tokens": 32815,
+          "completion_tokens": 6,
+          "total_tokens": 32821,
+          "prompt_tokens_details": {
+            "cached_tokens": 32815
+          },
+          "prompt_cache_hit_tokens": 32815,
+          "prompt_cache_miss_tokens": 0
+        },
+        "retained_usage": {
+          "prompt_tokens": 32835,
+          "completion_tokens": 2,
+          "total_tokens": 32837,
+          "prompt_tokens_details": {
+            "cached_tokens": 32821
+          },
+          "prompt_cache_hit_tokens": 32821,
+          "prompt_cache_miss_tokens": 14
+        },
+        "cancellation_count": 8,
+        "survivor_count": 8
+      }
+    },
+    "decode_pairs": [
+      {
+        "case": "code",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 1,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 2,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "code",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "objective_checks_passed": true,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "fable",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      },
+      {
+        "case": "topic",
+        "repeat": 3,
+        "exact": true,
+        "before_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        },
+        "candidate_checks": {
+          "response_nonempty": true,
+          "objective_checks": {},
+          "objective_checks_passed": null,
+          "prose_quality_assessed": false
+        }
+      }
+    ],
+    "limitations": [
+      "Exploratory sequential arms, not a balanced release comparison.",
+      "Decode has three samples per case; mixed traffic and long prompt have one sample per arm.",
+      "Exact text equality is reported separately from named output checks; prose quality is not assessed.",
+      "Cold prompt/TTFT is an HTTP proxy including overhead, not isolated prefill throughput."
+    ]
+  },
+  "decision": "Rejected global coefficient replacement; restored prior serving source and kept confidence unchanged.",
+  "candidate_sha256": {
+    "ds41rt": "564ac152ce80f15bbb4966f7af5d6c7dc3cdc57e50af03e81bc58778df31418a",
+    "libds41rt_native.so": "afa775ee82c3f850b0415bac9d4b07c4955371700a3136c5949a6e7526595e97"
+  },
+  "patch_sha256": "b7002c1f02d6f44855f0287cdd3498cac59da375ded66864da70ae9d4a1e840f",
+  "hardware": {
+    "rtx_count": 1,
+    "rtx_power_limit_w": 400,
+    "memory_speed": "standard, configured max 14001 MHz, no memory overclock",
+    "spark_count": 4
+  }
+}
