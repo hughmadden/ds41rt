@@ -28,7 +28,7 @@ pub(crate) struct DistributedTargetPass<'w, 'a> {
     #[cfg(test)]
     observed_layer: Option<std::rc::Rc<std::cell::Cell<usize>>>,
     #[cfg(test)]
-    trace_buffers: [DeviceOwner<'a, crate::v41_memory::HostAllocation<'a>>; 2],
+    trace_buffers: [DeviceOwner<'a, crate::v41_memory::DeviceAllocation<'a>>; 2],
 }
 /// Execution futures drain their borrowed GPU work before this guard revokes
 /// reserved chunks, including cancellation during queued early publication.
@@ -97,8 +97,8 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         })?;
         #[cfg(test)]
         let trace_buffers = [
-            lanes[0].device.own(|| crate::v41_memory::HostAllocation::new(device.library, 20 * 16 * 40960))?,
-            lanes[1].device.own(|| crate::v41_memory::HostAllocation::new(device.library, 20 * 16 * 40960))?,
+            lanes[0].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 40 * 16 * 40976))?,
+            lanes[1].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 40 * 16 * 40976))?,
         ];
         Ok(Self {
             map,
@@ -383,6 +383,8 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                 tokio::task::yield_now().await;
             }
             drop(production);
+            #[cfg(test)]
+            let trace_stream = self.lanes[gpu].trace_stream();
             let prepared = unsafe {
                 requests.with_requests(|r| {
                     self.execution.prepare_layer(
@@ -393,6 +395,16 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                     )
                 })?
             };
+            #[cfg(test)]
+            let prepared = if self.trace && std::env::var_os("DS41RT_TRACE_FFN").is_some()
+                && std::env::var("DS41RT_TRACE_LAYER").ok().map_or(true,
+                    |value| value.split(',').any(|v| v.parse::<usize>().ok() == Some(layer))) {
+                let (prepared, record) = unsafe {
+                    prepared.trace_ffn_input(self.trace_buffers[gpu].buffer, trace_stream).await?
+                };
+                self.trace_records.push(record);
+                prepared
+            } else { prepared };
             let completed = unsafe {
                 prepared
                     .execute(transport.get_mut(), placement, guard.batch.image_mask())
@@ -413,14 +425,30 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                     output.pre
                 } else { output.residual };
                 let position = output.tokens[0];
-                let offset = (layer * 16 + position as usize) * 40960;
+                let paired = std::env::var_os("DS41RT_TRACE_FFN").is_some();
+                let offset = ((layer + if paired { 20 } else { 0 }) * 16 + position as usize) * 40976;
                 ensure!(position as usize + output.tokens.len() <= 16, "trace extent exceeded");
-                let bytes = &mut self.trace_buffers[gpu].bytes_mut()[offset..offset + captured.bytes];
+                let buffer = self.trace_buffers[gpu].buffer;
+                ensure!(offset + captured.bytes <= buffer.bytes, "trace buffer exceeded");
+                let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+                    ptr: unsafe { buffer.ptr.cast::<u8>().add(offset).cast() },
+                    bytes: captured.bytes, ..buffer
+                };
                 // Queue behind this producer and before its next overwrite. No
                 // host wait is added between layers; read back after the run.
-                device.run(|| unsafe { device.library.copy_d2h_async(bytes, captured,
+                device.run(|| unsafe { device.library.copy_d2d_async(destination, captured, captured.bytes,
                     self.lanes[gpu].trace_stream()) })?;
-                self.trace_records.push((position, layer, captured.bytes));
+                let mut captured_bytes = captured.bytes;
+                if std::env::var_os("DS41RT_TRACE_PRE").is_none() {
+                    let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+                        ptr: unsafe { buffer.ptr.cast::<u8>().add(offset + captured_bytes).cast() },
+                        bytes: output.pre.bytes, ..buffer
+                    };
+                    device.run(|| unsafe { device.library.copy_d2d_async(destination, output.pre,
+                        output.pre.bytes, self.lanes[gpu].trace_stream()) })?;
+                    captured_bytes += output.pre.bytes;
+                }
+                self.trace_records.push((position, layer + if paired { 40 } else { 0 }, captured_bytes));
             }
             if reserved {
                 unsafe {
@@ -1168,10 +1196,16 @@ mod tests {
                             })?;
                         }
                         for (position, layer, bytes) in lane.trace_records.drain(..) {
-                            let gpu = map.attention(layer)?;
-                            let offset = (layer * 16 + position as usize) * 40960;
-                            trace.push((position, layer,
-                                lane.trace_buffers[gpu].bytes_mut()[offset..offset+bytes].to_vec()));
+                            let gpu = map.attention(layer % 40)?;
+                            let stored_layer = if layer >= 40 { layer - 20 } else { layer };
+                            let offset = (stored_layer * 16 + position as usize) * 40976;
+                            let buffer = lane.trace_buffers[gpu].buffer;
+                            let source = ds41rt_ffi::Ds41rtDeviceBuffer {
+                                ptr: unsafe { buffer.ptr.cast::<u8>().add(offset).cast() }, bytes, ..buffer
+                            };
+                            let mut data = vec![0; bytes];
+                            devices[gpu].run(|| lib.copy_d2h(&mut data, source))?;
+                            trace.push((position, layer, data));
                         }
                     }
                 }
@@ -1180,11 +1214,20 @@ mod tests {
                     for (position, layer, bytes) in &trace {
                         let (_, _, expected) = expected_trace.iter().find(|(p,l,_)| p == position && l == layer).unwrap();
                         if bytes != expected {
-                            let peak = bytes.chunks_exact(2).zip(expected.chunks_exact(2)).map(|(a,b)|
+                            let paired = std::env::var_os("DS41RT_TRACE_FFN").is_some();
+                            let is_output = !paired || *layer >= 40;
+                            let pre_start = if !is_output { bytes.len() }
+                                else if std::env::var_os("DS41RT_TRACE_PRE").is_some() { 0 }
+                                else { bytes.len() / 40976 * 40960 };
+                            let peak = bytes[..pre_start].chunks_exact(2).zip(expected[..pre_start].chunks_exact(2)).map(|(a,b)|
                                 (f32::from_bits((u16::from_ne_bytes([a[0],a[1]]) as u32)<<16) -
                                  f32::from_bits((u16::from_ne_bytes([b[0],b[1]]) as u32)<<16)).abs()
                             ).fold(0f32,f32::max);
-                            eprintln!("TRACE case={case} position={position} layer={layer} peak={peak}");
+                            let pre_peak = bytes[pre_start..].chunks_exact(4).zip(expected[pre_start..].chunks_exact(4))
+                                .map(|(a,b)| (f32::from_ne_bytes(a.try_into().unwrap()) -
+                                    f32::from_ne_bytes(b.try_into().unwrap())).abs()).fold(0f32, f32::max);
+                            eprintln!("TRACE case={case} position={position} layer={} stage={} bf16_peak={peak} pre_peak={pre_peak}",
+                                layer % 40, if is_output { "output" } else { "ffn_input" });
                         }
                     }
                 }

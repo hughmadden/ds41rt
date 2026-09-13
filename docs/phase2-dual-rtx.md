@@ -921,3 +921,15 @@ publication lifecycle. Capturing mHC pre output at layers 1 and 4 also matched
 in runs that later failed (`interleave-pre1.log`, `interleave-pre4.log`). The
 next useful boundary is attention/projection versus FFN within an affected
 encoder layer; a residual-only end-of-layer trace cannot distinguish them.
+
+Paired tracing now retains captures in GPU memory and downloads after the run,
+avoiding diagnostic PCIe reads between layers. `DS41RT_TRACE_FFN=1` captures
+normalized FFN input plus each layer's residual/pre output. This reproduced the
+failure with complete traces: `interleave-vram-paired.log` first differs at
+layer 7's FFN input; `interleave-vram-full-state.log` first differs at layer 8's
+FFN input, with layer 7 residual and FP32 pre bytes both matching exactly.
+The latter localizes that run's first difference before expert execution,
+within attention/query/projection or its input preparation. It does not prove
+a fixed offending layer or establish the root cause. Earlier trace logs
+represented paired output stages as layer+40; the current formatter labels
+stages and reports BF16 and FP32 differences separately.

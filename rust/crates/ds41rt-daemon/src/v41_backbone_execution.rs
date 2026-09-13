@@ -47,6 +47,29 @@ pub(crate) struct CompletedLayer<'t> {
 }
 impl PreparedLayer<'_, '_, '_> {
     #[cfg(test)]
+    pub async unsafe fn trace_ffn_input(mut self, library: &ds41rt_ffi::NativeLibrary,
+        destination: ds41rt_ffi::Ds41rtDeviceBuffer, stream: *mut std::ffi::c_void)
+        -> Result<(Self, (u64, usize, usize))> {
+        let ffn = match self.ffn {
+            PreparedFfn::Ready(ffn) => ffn,
+            PreparedFfn::Pending(pending) => pending.complete().await?,
+        };
+        let position = ffn.input.tokens[0];
+        let bytes = ffn.input.tokens.len() * 10240;
+        ensure!(position as usize + ffn.input.tokens.len() <= 16, "FFN trace extent exceeded");
+        let offset = (self.layer * 16 + position as usize) * 40976;
+        let mut input = ffn.input.values;
+        input.bytes = bytes;
+        ensure!(offset + bytes <= destination.bytes, "FFN trace buffer exceeded");
+        let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+            ptr: unsafe { destination.ptr.cast::<u8>().add(offset).cast() }, bytes, ..destination
+        };
+        unsafe { library.copy_d2d_async(destination, input, bytes, stream)?; }
+        self.ffn = PreparedFfn::Ready(ffn);
+        let record = (position, self.layer, bytes);
+        Ok((self, record))
+    }
+    #[cfg(test)]
     async unsafe fn check_queued_ffn(mut self, image_mask: &[u8],
         local: Option<&mut crate::v41_experts::local::LocalExpertWave<'_>>) -> Result<Self> {
         let mut ffn = match self.ffn {

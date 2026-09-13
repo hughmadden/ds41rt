@@ -56,6 +56,16 @@ pub(crate) struct PlacedPreparedLayer<'l, 'w, 'a> {
     prepared: Option<PreparedLayer<'l, 'w, 'a>>,
 }
 impl PlacedPreparedLayer<'_, '_, '_> {
+    #[cfg(test)]
+    pub async unsafe fn trace_ffn_input(mut self, destination: ds41rt_ffi::Ds41rtDeviceBuffer, stream: *mut std::ffi::c_void)
+        -> Result<(Self, (u64, usize, usize))> {
+        let prepared = self.prepared.take().context("trace owner absent")?;
+        let (prepared, record) = self.device.future(unsafe {
+            prepared.trace_ffn_input(self.device.library, destination, stream)
+        }).await?;
+        self.prepared = Some(prepared);
+        Ok((self, record))
+    }
     /// # Safety
     /// Retain this batch's producers/index, lane, transport and modality mask
     /// through completion or drained cancellation, as for PreparedLayer::execute.
