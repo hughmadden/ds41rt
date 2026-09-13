@@ -1,4 +1,5 @@
 use super::*;
+mod independent;
 use super::scores::BatchScores;
 use crate::v41_backbone_cache::CacheLease;
 use crate::v41_requests::RequestBatch;
@@ -21,43 +22,42 @@ struct Active<'a> {
     next_after_commit: Option<TokenScores>,
 }
 impl Active<'_> {
+    fn emit_one(&mut self, token: u32) -> Result<[Option<InferenceChunk>; 3]> {
+        ensure!(!self.job.events.is_closed(), "client disconnected");
+        if let Some(constraint) = &mut self.constraint { constraint.accept(token)?; }
+        self.anchor = token;
+        self.tokens.push(token);
+        self.generated += 1;
+        self.buffered += 1;
+        let mut chunks = [None, None, None];
+        let mut count = 0;
+        let mut push = |chunk| { chunks[count] = Some(chunk); count += 1; };
+        if token != 1 {
+            if let Some(content) = self.decoder.step(token)? {
+                push(InferenceChunk::Text { content, content_tokens: self.buffered });
+                self.buffered = 0;
+            }
+        }
+        if token == 1 || self.generated == self.job.max_tokens {
+            if let Some(content) = self.decoder.finish()? {
+                push(InferenceChunk::Text { content, content_tokens: self.buffered });
+                self.buffered = 0;
+            }
+            if self.buffered > 0 {
+                push(InferenceChunk::Text { content: String::new(), content_tokens: self.buffered });
+                self.buffered = 0;
+            }
+            push(InferenceChunk::Finish { finish_reason: if token == 1 { InferenceFinishReason::Stop }
+                else { InferenceFinishReason::Length } });
+            self.finished = true;
+            self.cacheable = true;
+        }
+        Ok(chunks)
+    }
     fn emit(&mut self, tokens: &[u32]) -> Result<()> {
         for &token in tokens {
-            ensure!(!self.job.events.is_closed(), "client disconnected");
-            if let Some(constraint) = &mut self.constraint { constraint.accept(token)?; }
-            self.anchor = token;
-            self.tokens.push(token);
-            self.generated += 1;
-            self.buffered += 1;
-            if token != 1 {
-                if let Some(content) = self.decoder.step(token)? {
-                    self.job.events.blocking_send(Ok(InferenceChunk::Text {
-                        content, content_tokens: self.buffered,
-                    }))?;
-                    self.buffered = 0;
-                }
-            }
-            if token == 1 || self.generated == self.job.max_tokens {
-                if let Some(content) = self.decoder.finish()? {
-                    self.job.events.blocking_send(Ok(InferenceChunk::Text {
-                        content, content_tokens: self.buffered,
-                    }))?;
-                    self.buffered = 0;
-                }
-                if self.buffered > 0 {
-                    self.job.events.blocking_send(Ok(InferenceChunk::Text {
-                        content: String::new(), content_tokens: self.buffered,
-                    }))?;
-                    self.buffered = 0;
-                }
-                self.job.events.blocking_send(Ok(InferenceChunk::Finish {
-                    finish_reason: if token == 1 { InferenceFinishReason::Stop }
-                        else { InferenceFinishReason::Length },
-                }))?;
-                self.finished = true;
-                self.cacheable = true;
-                break;
-            }
+            for chunk in self.emit_one(token)?.into_iter().flatten() { self.job.events.blocking_send(Ok(chunk))?; }
+            if self.finished { break; }
         }
         Ok(())
     }
@@ -218,8 +218,13 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 continue;
             }
         }
-        let result = room.and_then(|_| round(lib, runtime,
-            first, second, requests, first_transport, second_transport, &mut active, &members, draft.as_deref_mut()));
+        let result = room.and_then(|_| if args.independent_decode_lanes {
+            independent::run(lib, runtime, first, second, requests, first_transport,
+                second_transport, &mut active, draft.as_deref_mut(), &mut prefixes, receive)
+        } else {
+            round(lib, runtime, first, second, requests, first_transport, second_transport,
+                &mut active, &members, draft.as_deref_mut())
+        });
         if let Err(error) = result {
             first_transport.reset_connections(); second_transport.reset_connections();
             for request in active.iter_mut().flatten() {
@@ -353,72 +358,12 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         let mut emitted = 0usize;
         let next = [results.0.0?, results.1.0?];
         for (lane, pass) in [&mut *first, &mut *second].into_iter().enumerate() {
-            let Some(batch) = &mut batches[lane] else { continue; };
-            let mut offset = 0;
-            let mut accepted = Vec::new();
-            let mut emissions = Vec::new();
-            let mut next_after_commit = Vec::new();
-            for (&slot, input) in members[lane].iter().zip(&inputs[lane]) {
-                let request = active[slot].as_ref().unwrap();
-                let constrained = request.constraint.as_ref().map(|state|
-                    state.select_verification(&next[lane], offset, input)).transpose()?;
-                let selected = constrained.as_deref().unwrap_or(&next[lane].best[offset..offset + input.len()]);
-                let decision = ds41rt_core::verify_dspark_greedy(input,
-                    selected, 1, request.job.max_tokens - request.generated)
-                    .map_err(anyhow::Error::msg)?;
-                if tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG) {
-                    let top_two = (offset..offset + input.len())
-                        .map(|row| next[lane].top_two(row)).collect::<Result<Vec<_>>>()?;
-                    tracing::debug!(target: "ds41rt::logit_trace",
-                        request_id=request.id, lane, generated=request.generated,
-                        context_tokens=requests.cache().committed_end(request.lease)?,
-                        input=?input, selected=?selected, top_two=?top_two,
-                        accepted_inputs=decision.accepted_inputs,
-                        emitted=?decision.emitted,
-                        constrained=request.constraint.is_some(),
-                        "native verification logits");
-                }
-                if let Some(confidence) = draft.as_deref()
-                    .and_then(|draft| draft.confidence_trace(request.id)) {
-                    // Agreement after the first mismatch is conditional on a
-                    // rejected history and must not be treated as acceptance.
-                    let matched = input.iter().skip(1).zip(selected.iter())
-                        .take_while(|(proposal, target)| proposal == target).count();
-                    tracing::debug!(target: "ds41rt::draft_policy",
-                        request_id=request.id, lane, generated=request.generated,
-                        context_tokens=requests.cache().committed_end(request.lease)?,
-                        verifier_rows=input.len(), lane_rows=inputs[lane].iter().map(Vec::len).sum::<usize>(),
-                        constrained=request.constraint.is_some(), raw_confidence=?confidence,
-                        matched_prefix=matched, accepted_inputs=decision.accepted_inputs,
-                        eos=decision.eos, length_limit=decision.length_limit,
-                        verify_us=executed_us-prepared_us,
-                        "native draft policy observation");
-                }
-                accepted_drafts += decision.accepted_inputs - 1;
-                emitted += decision.emitted.len();
-                let finishing = decision.emitted.contains(&1)
-                    || request.generated + decision.emitted.len() >= request.job.max_tokens;
-                next_after_commit.push(if finishing {
-                    Some(next[lane].retain(offset + decision.accepted_inputs as usize - 1)?)
-                } else { None });
-                offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
-            }
-            if let Some(draft) = draft.as_deref_mut() {
-                draft.commit_batch(pass, requests, batch, &accepted)?;
-                if capture_routes {
-                    let mut offset = 0;
-                    for ((&slot, input), &count) in members[lane].iter().zip(&inputs[lane]).zip(&accepted) {
-                        draft.observe_accepted_routes(active[slot].as_ref().unwrap().id, offset,
-                            count as usize, pass.captured_routes())?;
-                        offset += input.len();
-                    }
-                }
-            }
-            else { pass.commit(requests, batch, &accepted)?; }
-            batches[lane] = None; // Only successful commits relinquish cleanup ownership.
-            for ((&slot, tokens), next_token) in members[lane].iter().zip(emissions).zip(next_after_commit) {
+            let (accepted, count, emissions) = commit_lane(lane, pass, requests, active, &members[lane],
+                &inputs[lane], &mut batches[lane], &next[lane], draft.as_deref_mut(),
+                capture_routes, executed_us-prepared_us)?;
+            accepted_drafts += accepted; emitted += count;
+            for (&slot, tokens) in members[lane].iter().zip(emissions) {
                 let request = active[slot].as_mut().unwrap();
-                request.next_after_commit = next_token;
                 if let Err(error) = request.emit(&tokens) {
                     let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
                     request.finished = true;
@@ -443,4 +388,80 @@ fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
         }
     }
     result
+}
+
+fn commit_lane<'w, 'a>(lane: usize, pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
+    active: &mut [Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
+    owned_batch: &mut Option<RequestBatch>, next: &BatchScores,
+    mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, verify_us: u64,
+) -> Result<(u32, usize, Vec<Vec<u32>>)> {
+    let mut accepted_drafts = 0u32;
+    let mut emitted = 0usize;
+    let Some(batch) = owned_batch else { return Ok((0, 0, Vec::new())); };
+    let mut offset = 0;
+    let mut accepted = Vec::new();
+    let mut emissions = Vec::new();
+    let mut next_after_commit = Vec::new();
+    for (&slot, input) in members.iter().zip(inputs) {
+        let request = active[slot].as_ref().unwrap();
+        let constrained = request.constraint.as_ref().map(|state|
+            state.select_verification(next, offset, input)).transpose()?;
+        let selected = constrained.as_deref().unwrap_or(&next.best[offset..offset + input.len()]);
+        let decision = ds41rt_core::verify_dspark_greedy(input,
+            selected, 1, request.job.max_tokens - request.generated)
+            .map_err(anyhow::Error::msg)?;
+        if tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG) {
+            let top_two = (offset..offset + input.len())
+                .map(|row| next.top_two(row)).collect::<Result<Vec<_>>>()?;
+            tracing::debug!(target: "ds41rt::logit_trace",
+                request_id=request.id, lane, generated=request.generated,
+                context_tokens=requests.cache().committed_end(request.lease)?,
+                input=?input, selected=?selected, top_two=?top_two,
+                accepted_inputs=decision.accepted_inputs,
+                emitted=?decision.emitted,
+                constrained=request.constraint.is_some(),
+                "native verification logits");
+        }
+        if let Some(confidence) = draft.as_deref()
+            .and_then(|draft| draft.confidence_trace(request.id)) {
+            // Agreement after the first mismatch is conditional on a
+            // rejected history and must not be treated as acceptance.
+            let matched = input.iter().skip(1).zip(selected.iter())
+                .take_while(|(proposal, target)| proposal == target).count();
+            tracing::debug!(target: "ds41rt::draft_policy",
+                request_id=request.id, lane, generated=request.generated,
+                context_tokens=requests.cache().committed_end(request.lease)?,
+                verifier_rows=input.len(), lane_rows=inputs.iter().map(Vec::len).sum::<usize>(),
+                constrained=request.constraint.is_some(), raw_confidence=?confidence,
+                matched_prefix=matched, accepted_inputs=decision.accepted_inputs,
+                eos=decision.eos, length_limit=decision.length_limit,
+                verify_us,
+                "native draft policy observation");
+        }
+        accepted_drafts += decision.accepted_inputs - 1;
+        emitted += decision.emitted.len();
+        let finishing = decision.emitted.contains(&1)
+            || request.generated + decision.emitted.len() >= request.job.max_tokens;
+        next_after_commit.push(if finishing {
+            Some(next.retain(offset + decision.accepted_inputs as usize - 1)?)
+        } else { None });
+        offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
+    }
+    if let Some(draft) = draft.as_deref_mut() {
+        draft.commit_batch(pass, requests, batch, &accepted)?;
+        if capture_routes {
+            let mut offset = 0;
+            for ((&slot, input), &count) in members.iter().zip(inputs).zip(&accepted) {
+                draft.observe_accepted_routes(active[slot].as_ref().unwrap().id, offset,
+                    count as usize, pass.captured_routes())?;
+                offset += input.len();
+            }
+        }
+    }
+    else { pass.commit(requests, batch, &accepted)?; }
+    *owned_batch = None; // Only successful commits relinquish cleanup ownership.
+    for (&slot, next_token) in members.iter().zip(next_after_commit) {
+        active[slot].as_mut().unwrap().next_after_commit = next_token;
+    }
+    Ok((accepted_drafts, emitted, emissions))
 }

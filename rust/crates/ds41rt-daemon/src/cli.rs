@@ -514,6 +514,9 @@ pub(crate) struct NativeServeArgs {
     /// With a confidence cutoff, lower it toward this positive floor for predicted expert reuse.
     #[arg(long, requires = "dspark_confidence_cutoff", value_parser = parse_dspark_confidence)]
     pub dspark_reuse_floor: Option<f64>,
+    /// Experimental independent decode lanes; drain together only for admission or retirement.
+    #[arg(long, conflicts_with = "dspark_adaptive")]
+    pub independent_decode_lanes: bool,
 
     #[arg(long)] pub snapshot: PathBuf,
     #[arg(long)] pub native_lib: PathBuf,

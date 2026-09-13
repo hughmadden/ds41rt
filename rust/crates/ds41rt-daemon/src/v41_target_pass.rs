@@ -16,6 +16,21 @@ mod encoder_pair;
 mod encoder_stream;
 pub(crate) use taps::{TargetTapWave, TargetTaps};
 
+// A remote FFN wait owns its prepared lane state, never a request-bank borrow.
+// Both ordinary serving and independent lane scheduling use the same execution
+// body, so cache production and numerical operation order remain identical.
+trait RequestAccess<'a> {
+    fn with_requests<T>(&self, operation: impl FnOnce(&Requests<'a>) -> T) -> T;
+}
+impl<'a> RequestAccess<'a> for Requests<'a> {
+    fn with_requests<T>(&self, operation: impl FnOnce(&Requests<'a>) -> T) -> T { operation(self) }
+}
+impl<'a> RequestAccess<'a> for std::cell::RefCell<&mut Requests<'a>> {
+    fn with_requests<T>(&self, operation: impl FnOnce(&Requests<'a>) -> T) -> T {
+        operation(&self.borrow())
+    }
+}
+
 #[derive(Default, Debug, PartialEq, Eq)]
 enum State {
     #[default]
@@ -121,6 +136,17 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None).await?; }
         self.head.output()
     }
+    /// Execute one full verification while allowing unrelated request commits
+    /// during remote waits. The caller owns disjoint leases and drains queued
+    /// lane work before releasing any request or device storage.
+    pub async unsafe fn execute_shared(&mut self,
+        requests: &std::cell::RefCell<&mut Requests<'a>>, batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize],
+    ) -> Result<TargetLogits<'_>> {
+        ensure!(batch.cache()?.stage() == CacheStage::Full, "shared target execute requires full phase");
+        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None).await?; }
+        self.head.output()
+    }
     pub async unsafe fn execute_encoder(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
         transport: &mut NativeTp4Wave<'a>, placement: u64, suffix: &mut EncoderSuffix<'a>) -> Result<()> {
         ensure!(batch.cache()?.stage() == CacheStage::Encoder, "encoder execute phase differs");
@@ -178,10 +204,10 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         }
         self.head.output()
     }
-    async unsafe fn execute_phase(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
+    async unsafe fn execute_phase(&mut self, requests: &impl RequestAccess<'a>, batch: &mut RequestBatch,
         transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize],
         mut suffix: Option<&mut EncoderSuffix<'a>>, encoder: Option<&BlockOutput<'_>>) -> Result<()> {
-        requests.validate(batch)?;
+        requests.with_requests(|requests| requests.validate(batch))?;
         let id = batch.cache()?.identity();
         let rows = batch.cache()?.positions().len();
         let stage = batch.cache()?.stage();
@@ -224,7 +250,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         } else {
             self.lane.restart()?;
             self.index.restart()?;
-            unsafe { requests.begin_input(guard.batch, &mut self.embedding, &mut self.lane)?; }
+            unsafe { requests.with_requests(|requests| requests.begin_input(guard.batch, &mut self.embedding, &mut self.lane))?; }
         }
         for layer in stage.windows() {
             if layer != stage.windows().start {
@@ -234,12 +260,12 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 if let Some(gate) = [1, 14].iter().position(|&l| l == layer) {
                     let start = Instant::now();
                     while !unsafe {
-                        requests.poll_engram(
+                        requests.with_requests(|requests| requests.poll_engram(
                             guard.batch,
                             &mut self.upload,
                             &mut self.gates[gate],
                             &mut self.lane,
-                        )?
+                        ))?
                     } {
                         ensure!(
                             start.elapsed() < self.engram_timeout,
@@ -262,17 +288,11 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 tracing::debug!(target: "ds41rt::timing", layer, rows, advance_us, engram_us, taps_us=tapped_us-advance_us-engram_us, begin_us=prepare_timing.elapsed().as_micros() as u64-tapped_us, "target layer preparation");
             }
             unsafe {
-                self.execution
-                    .execute_layer(
-                        requests.cache(),
-                        guard.batch.cache()?,
-                        &mut self.lane,
-                        &mut self.index,
-                        transport,
-                        placement,
-                        guard.batch.image_mask(),
-                    )
-                    .await?;
+                let prepared = requests.with_requests(|requests| self.execution.prepare_layer(
+                    requests.cache(), guard.batch.cache()?, &mut self.lane, &mut self.index))?;
+                // No RefCell guard or bank reference survives into this await.
+                let completed = prepared.execute(transport, placement, guard.batch.image_mask()).await?;
+                self.execution.complete_layer(guard.batch.cache()?, &mut self.lane, completed)?;
             }
             if let Some(directory) = &activation_trace {
                 self.lane.trace_output(directory)?;
@@ -287,11 +307,11 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 self.lane.advance()?;
                 unsafe {
                     self.lane.begin_prepared()?;
-                    self.execution.produce_decoder_source(
+                    requests.with_requests(|requests| self.execution.produce_decoder_source(
                         requests.cache(),
                         guard.batch.cache()?,
                         &self.lane,
-                    )?;
+                    ))?;
                 }
             }
             self.state = State::Encoded(id);
