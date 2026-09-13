@@ -260,7 +260,7 @@ fn worker(
         .transpose()?;
     if let Some(draft) = &mut draft {
         draft.set_draft_limit(args.dspark_draft_limit)?;
-        draft.set_adaptive(args.dspark_adaptive);
+        draft.set_adaptive(args.adaptive_dspark());
         draft.set_confidence_cutoff(args.dspark_confidence_cutoff);
         draft.set_reuse_floor(args.dspark_reuse_floor)?;
     }

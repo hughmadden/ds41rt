@@ -163,13 +163,12 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
                 if x >= 0. { 1. / (1. + (-x).exp()) } else { x.exp() / (1. + x.exp()) }
             }).collect::<Vec<_>>());
         }
-        // Preliminary corrected-path fit in microseconds. Both lanes' expert
-        // unions are counted separately. These coefficients are experimental;
-        // missing routing history keeps the full fixed-length policy.
+        ensure!(forecast.lane_count() == 1, "adaptive selection must be lane-local");
+        // Preliminary corrected-path fit in microseconds, evaluated only for
+        // this lane. Missing history retains full fixed-length prefixes.
         let cost = |lengths: &[usize]| draft_us as f64 + 1000. + 19864.
             + 803. * (requests.len() + lengths.iter().sum::<usize>()) as f64
-            + 636. * forecast.mean_unique_experts(lengths)
-            + 3168. * (forecast.lane_count() - 1) as f64;
+            + 636. * forecast.mean_unique_experts(lengths);
         let full: Vec<_> = requests.iter().map(|r| r.2).collect();
         let expected_full: f64 = probabilities.iter().map(|p| {
             let mut product = 1.;

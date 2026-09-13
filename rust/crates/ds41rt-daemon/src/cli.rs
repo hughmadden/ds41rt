@@ -389,7 +389,22 @@ mod tests {
         assert_eq!(args.concurrency, 16);
         assert_eq!(args.prefix_cache_entries, 24);
         assert_eq!(args.dspark_draft_limit, 5);
-        assert!(!args.dspark_adaptive);
+        assert!(!args.adaptive_dspark()); // Target-only remains target-only.
+        for (flags, adaptive) in [
+            (vec!["--dspark"], true),
+            (vec!["--dspark", "--dspark-adaptive", "--independent-decode-lanes"], true),
+            (vec!["--dspark", "--dspark-fixed"], false),
+            (vec!["--dspark", "--dspark-confidence-cutoff", "0.5"], false),
+        ] {
+            let super::Commands::ServeNative(args) = super::Cli::try_parse_from(
+                base.into_iter().chain(flags)).unwrap().command else { panic!("expected native serving"); };
+            assert_eq!(args.adaptive_dspark(), adaptive);
+        }
+        assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-fixed"])).is_err());
+        assert!(super::Cli::try_parse_from(base.into_iter().chain(
+            ["--dspark", "--dspark-fixed", "--dspark-adaptive"])).is_err());
+        assert!(super::Cli::try_parse_from(base.into_iter().chain(
+            ["--dspark", "--dspark-fixed", "--dspark-confidence-cutoff", "0.5"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-adaptive"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark", "--dspark-adaptive"])).is_ok());
         for limit in ["1", "2", "3", "4", "5"] {
@@ -505,17 +520,20 @@ pub(crate) struct NativeServeArgs {
     /// Maximum verified draft tokens per request; fixed-length policy control.
     #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=5))]
     pub dspark_draft_limit: u8,
-    /// Experimental history-based draft-prefix selection; lane-local with independent decode.
-    #[arg(long, requires = "dspark")]
+    /// Compatibility spelling: dSpark uses lane-local adaptive selection by default.
+    #[arg(long, requires = "dspark", hide = true)]
     pub dspark_adaptive: bool,
+    /// Disable adaptive prefix selection and verify the configured fixed draft limit.
+    #[arg(long, requires = "dspark", conflicts_with_all = ["dspark_adaptive", "dspark_confidence_cutoff"])]
+    pub dspark_fixed: bool,
     /// Experimental independent cumulative confidence cutoff, between zero and one.
     #[arg(long, requires = "dspark", conflicts_with = "dspark_adaptive", value_parser = parse_dspark_confidence)]
     pub dspark_confidence_cutoff: Option<f64>,
     /// With a confidence cutoff, lower it toward this positive floor for predicted expert reuse.
     #[arg(long, requires = "dspark_confidence_cutoff", value_parser = parse_dspark_confidence)]
     pub dspark_reuse_floor: Option<f64>,
-    /// Experimental independent decode lanes; drain together only for admission or retirement.
-    #[arg(long)]
+    /// Compatibility spelling: decode lanes always advance independently.
+    #[arg(long, hide = true)]
     pub independent_decode_lanes: bool,
 
     #[arg(long)] pub snapshot: PathBuf,
@@ -530,4 +548,10 @@ fn parse_dspark_confidence(value: &str) -> Result<f64, String> {
         return Err("confidence cutoff must be finite and between zero and one".into());
     }
     Ok(value)
+}
+
+impl NativeServeArgs {
+    pub fn adaptive_dspark(&self) -> bool {
+        self.dspark && !self.dspark_fixed && self.dspark_confidence_cutoff.is_none()
+    }
 }

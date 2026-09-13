@@ -1,5 +1,10 @@
 # Independent decode lane candidate
 
+Current source now defaults to independent decode and lane-local adaptive dSpark;
+the paired decode implementation is removed. See the [default transition and
+adaptive comparison](phase1-independent-adaptive.md). The screens below record
+the earlier opt-in implementation and its confidence/reuse policy.
+
 `--independent-decode-lanes` is an experimental opt-in scheduler. It supports
 fixed drafts, the independent confidence cutoff and lane-local incremental reuse,
 and also target-only execution. It now also accepts `--dspark-adaptive`: each

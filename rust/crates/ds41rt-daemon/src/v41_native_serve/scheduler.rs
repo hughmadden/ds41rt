@@ -220,13 +220,15 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
         }
         // With one active lane there is no peer to overlap. Retain the
         // ordinary C1 path and avoid shared-bank/async-delivery overhead.
-        let result = room.and_then(|_| if args.independent_decode_lanes
-            && members.iter().all(|lane| !lane.is_empty()) {
+        let result = room.and_then(|_| if members.iter().all(|lane| !lane.is_empty()) {
             independent::run(lib, runtime, first, second, requests, first_transport,
                 second_transport, &mut active, draft.as_deref_mut(), &mut prefixes, receive)
         } else {
-            round(lib, runtime, first, second, requests, first_transport, second_transport,
-                &mut active, &members, draft.as_deref_mut())
+            let lane = usize::from(members[0].is_empty());
+            let (pass, transport) = if lane == 0 { (&mut *first, &mut *first_transport) }
+                else { (&mut *second, &mut *second_transport) };
+            single_lane_round(lib, runtime, lane, pass, requests, transport,
+                &mut active, &members[lane], draft.as_deref_mut())
         });
         if let Err(error) = result {
             first_transport.reset_connections(); second_transport.reset_connections();
@@ -266,129 +268,70 @@ fn prepare_decode_lane<'a>(requests: &mut Requests<'a>, active: &[Option<Active<
     requests.prepare(&work)
 }
 
-fn round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
-    first: &mut TargetPass<'w, 'a>, second: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
-    first_transport: &mut NativeTp4Wave<'a>, second_transport: &mut NativeTp4Wave<'a>,
-    active: &mut [Option<Active<'a>>], members: &[Vec<usize>; 2], mut draft: Option<&mut DraftRuntime<'_, 'a>>,
+fn single_lane_round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    lane: usize, pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
+    transport: &mut NativeTp4Wave<'a>, active: &mut [Option<Active<'a>>],
+    members: &[usize], mut draft: Option<&mut DraftRuntime<'_, 'a>>,
 ) -> Result<()> {
     let started = Instant::now();
+    ensure!(!members.is_empty() && members.len() <= 8, "invalid single decode lane");
     let speculative = draft.is_some();
-    let adaptive = draft.as_deref().is_some_and(DraftRuntime::adaptive_enabled);
     let capture_routes = draft.as_deref().is_some_and(DraftRuntime::capture_routes);
-    let mut inputs = [Vec::new(), Vec::new()];
-    let mut batches = [None, None];
-    let mut draft_us = 0u64;
-    let mut prepare_us = 0u64;
-    for lane in 0..2 {
-        ensure!(members[lane].len() <= 8, "decode lane exceeds eight requests");
-        let seeds = members[lane].iter().map(|&slot| {
-            let r = active[slot].as_ref().unwrap();
-            Ok((r.id, r.anchor, requests.cache().committed_end(r.lease)?, r.job.max_tokens - r.generated))
-        }).collect::<Result<Vec<_>>>()?;
-        let draft_start = Instant::now();
-        inputs[lane] = if seeds.is_empty() { Vec::new() }
-            else if let Some(draft) = draft.as_deref_mut() { draft.propose(lib, &seeds)? }
-            else { seeds.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect() };
-        for (&slot, input) in members[lane].iter().zip(&mut inputs[lane]) {
-            if let Some(constraint) = &active[slot].as_ref().unwrap().constraint {
-                constraint.truncate_proposal(input)?;
-            } else if let Some(draft) = draft.as_deref() {
-                // Select immediately for this request, before preparing this lane's
-                // Engram reads; no other lane's proposals or history are needed.
-                let length = draft.confidence_prefix(active[slot].as_ref().unwrap().id, input.len() - 1)?;
-                input.truncate(length + 1);
-            }
-        }
-        if draft.as_deref().is_some_and(DraftRuntime::reuse_enabled)
-            && !members[lane].is_empty() && members[lane].iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none()) {
-            if let Some(draft) = draft.as_deref() {
-                let candidates: Vec<_> = members[lane].iter().zip(&inputs[lane])
-                    .map(|(&slot, input)| (active[slot].as_ref().unwrap().id, lane, input.len() - 1)).collect();
-                if let Some(lengths) = draft.select_reuse_prefixes(&candidates)? {
-                    for (input, length) in inputs[lane].iter_mut().zip(lengths) { input.truncate(length + 1); }
-                }
-            }
-        }
-        draft_us += draft_start.elapsed().as_micros() as u64;
-        if !members[lane].is_empty() && !adaptive {
-            // Token IDs are now known: start this lane's mapped Engram reads
-            // while the other lane generates its draft proposals. RequestBatch
-            // cancels its I/O on drop if subsequent preparation fails.
-            let prepare_start = Instant::now();
-            batches[lane] = Some(prepare_decode_lane(requests, active, &members[lane], &inputs[lane], speculative)?);
-            prepare_us += prepare_start.elapsed().as_micros() as u64;
+    let seeds = members.iter().map(|&slot| {
+        let r = active[slot].as_ref().unwrap();
+        Ok((r.id, r.anchor, requests.cache().committed_end(r.lease)?, r.job.max_tokens-r.generated))
+    }).collect::<Result<Vec<_>>>()?;
+    let draft_start = Instant::now();
+    let mut inputs = if let Some(draft) = draft.as_deref_mut() { draft.propose(lib, &seeds)? }
+        else { seeds.iter().map(|r| vec![r.1]).collect() };
+    for (&slot, input) in members.iter().zip(&mut inputs) {
+        let r = active[slot].as_ref().unwrap();
+        if let Some(constraint) = &r.constraint { constraint.truncate_proposal(input)?; }
+        else if let Some(draft) = draft.as_deref() {
+            input.truncate(draft.confidence_prefix(r.id, input.len()-1)? + 1);
         }
     }
-    if adaptive {
-        // Both proposals must be available to price their joint row/expert cost.
-        // Keep the existing early Engram preparation unchanged for fixed mode.
-        let identities: Vec<_> = (0..2).flat_map(|lane| members[lane].iter().zip(&inputs[lane])
-            .map(move |(&slot, input)| (slot, lane, input.len() - 1))).collect();
-        let candidates: Vec<_> = identities.iter().map(|&(slot, lane, length)|
-            (active[slot].as_ref().unwrap().id, lane, length)).collect();
-        // Grammar-conditioned acceptance has not been calibrated yet.
-        if identities.iter().all(|&(slot, _, _)| active[slot].as_ref().unwrap().constraint.is_none()) {
-            if let Some(lengths) = draft.as_deref().unwrap().select_prefixes(&candidates, draft_us)? {
-                for (input, length) in inputs.iter_mut().flatten().zip(lengths) { input.truncate(length + 1); }
-            }
-        }
-        for lane in 0..2 {
-            if !members[lane].is_empty() {
-                let start = Instant::now();
-                batches[lane] = Some(prepare_decode_lane(requests, active, &members[lane], &inputs[lane], speculative)?);
-                prepare_us += start.elapsed().as_micros() as u64;
+    if members.iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none()) {
+        if let Some(draft) = draft.as_deref().filter(|d| d.reuse_enabled() || d.adaptive_enabled()) {
+            let candidates: Vec<_> = members.iter().zip(&inputs).map(|(&slot, input)|
+                (active[slot].as_ref().unwrap().id, lane, input.len()-1)).collect();
+            let lengths = if draft.adaptive_enabled() {
+                draft.select_prefixes(&candidates, draft_start.elapsed().as_micros() as u64)?
+            } else { draft.select_reuse_prefixes(&candidates)? };
+            if let Some(lengths) = lengths {
+                for (input, length) in inputs.iter_mut().zip(lengths) { input.truncate(length+1); }
             }
         }
     }
+    let draft_us = draft_start.elapsed().as_micros() as u64;
+    let prepare_start = Instant::now();
+    let mut batch = Some(prepare_decode_lane(requests, active, members, &inputs, speculative)?);
+    let prepare_us = prepare_start.elapsed().as_micros() as u64;
     let prepared_us = started.elapsed().as_micros() as u64;
-    let proposed: usize = inputs.iter().flatten().map(|tokens| tokens.len() - 1).sum();
-    let [a, b] = &mut batches;
-    // Drain both futures even if one fails, before discarding private device state.
-    let results = runtime.block_on(async { tokio::join!(
-        async {
-            let result = execute_logits(lib, first, requests, a, first_transport, capture_routes).await;
-            (result, started.elapsed().as_micros() as u64)
-        },
-        async {
-            let result = execute_logits(lib, second, requests, b, second_transport, capture_routes).await;
-            (result, started.elapsed().as_micros() as u64)
-        },
-    ) });
+    let next = runtime.block_on(execute_logits(lib, pass, requests, &mut batch, transport, capture_routes));
     let executed_us = started.elapsed().as_micros() as u64;
-    let lane_done_us = [results.0.1, results.1.1];
     let result = (|| -> Result<()> {
-        let mut accepted_drafts = 0u32;
-        let mut emitted = 0usize;
-        let next = [results.0.0?, results.1.0?];
-        for (lane, pass) in [&mut *first, &mut *second].into_iter().enumerate() {
-            let (accepted, count, emissions) = commit_lane(lane, pass, requests, active, &members[lane],
-                &inputs[lane], &mut batches[lane], &next[lane], draft.as_deref_mut(),
-                capture_routes, executed_us-prepared_us)?;
-            accepted_drafts += accepted; emitted += count;
-            for (&slot, tokens) in members[lane].iter().zip(emissions) {
-                let request = active[slot].as_mut().unwrap();
-                if let Err(error) = request.emit(&tokens) {
-                    let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
-                    request.finished = true;
-                }
+        let next = next?;
+        let (accepted, emitted, emissions) = commit_lane(lane, pass, requests, active, members,
+            &inputs, &mut batch, &next, draft.as_deref_mut(), capture_routes, executed_us-prepared_us)?;
+        for (&slot, tokens) in members.iter().zip(emissions) {
+            let request = active[slot].as_mut().unwrap();
+            if let Err(error) = request.emit(&tokens) {
+                let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
+                request.finished = true;
             }
         }
         tracing::debug!(target: "ds41rt::timing", speculative,
-            requests=members[0].len()+members[1].len(), lane0=members[0].len(), lane1=members[1].len(),
-            proposed, accepted=accepted_drafts, emitted, draft_us, prepare_us,
-            lane0_verify_done_us=lane_done_us[0], lane1_verify_done_us=lane_done_us[1],
-            lane0_join_wait_us=if members[0].is_empty() { 0 } else { executed_us-lane_done_us[0] },
-            lane1_join_wait_us=if members[1].is_empty() { 0 } else { executed_us-lane_done_us[1] },
-            verify_us=executed_us-prepared_us, total_us=started.elapsed().as_micros() as u64,
-            "native scheduler round");
+            requests=members.len(), lane0=if lane == 0 { members.len() } else { 0 },
+            lane1=if lane == 1 { members.len() } else { 0 },
+            proposed=inputs.iter().map(|r| r.len()-1).sum::<usize>(), accepted, emitted,
+            draft_us, prepare_us, verify_us=executed_us-prepared_us,
+            total_us=started.elapsed().as_micros() as u64, "native scheduler round");
         Ok(())
     })();
     if result.is_err() {
-        // Cleanup is performed by the caller after both full execution futures
-        // have returned. Successful commits no longer have a live batch.
-        for (pass, batch) in [first, second].into_iter().zip(&mut batches) {
-            if let Some(batch) = batch { pass.discard(batch)?; }
-        }
+        // The sole execution future has returned before discarding private state.
+        if let Some(batch) = &mut batch { pass.discard(batch)?; }
     }
     result
 }

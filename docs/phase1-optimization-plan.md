@@ -49,8 +49,9 @@ placement comparison.
   routes are unavailable before verification; measure prediction error for any
   expert-count estimate instead of assuming future routes are known.
 - Select request prefix lengths jointly across each batch. Reconsider removable
-  suffixes against updated total rows, expected accepted output and cost. Keep
-  the emitted anchor and account for bucket transitions and both execution lanes.
+  suffixes against updated total rows, expected accepted output and cost within
+  each lane. Keep the emitted anchor and account for bucket transitions. Lanes
+  must advance independently; no joint cross-lane selection or decode-round join.
 - Use bounded host work or a compact GPU operation, avoiding per-token launches
   and new serial completion barriers. Retain a fixed-length comparison mode.
 - Verify greedy output equivalence, constraints, output limits, cancellation,
