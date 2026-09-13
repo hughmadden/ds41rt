@@ -1,0 +1,595 @@
+{
+  "scope": "Independent scheduling functional/lifecycle screen; diagnostics enabled, one code sample per mode",
+  "pilot": {
+    "scope": "Independent lane functional and lifecycle screen, paired versus independent with identical reuse policy; scheduling diagnostics enabled",
+    "artifacts": {
+      "libds41rt_native.so": "9d6b8efc1836b397d714ef3546fd0a489d6507a78f8a1f26cc449357b81c325b",
+      "ds41rt": "48818caa8fc3cca759a101a90d1011434bb9312147b3fa31a92304883e89013e"
+    },
+    "arms": [
+      {
+        "label": "paired",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-independent-paired",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=warn,ds41rt::lane_schedule=debug",
+          "-v",
+          "/tmp/ds41-independent-lanes/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-confidence-cutoff",
+          "0.5",
+          "--dspark-reuse-floor",
+          "0.05"
+        ],
+        "startup_seconds": 8.34942340303678,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "independent",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-independent-independent",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=warn,ds41rt::lane_schedule=debug",
+          "-v",
+          "/tmp/ds41-independent-lanes/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-confidence-cutoff",
+          "0.5",
+          "--dspark-reuse-floor",
+          "0.05",
+          "--independent-decode-lanes"
+        ],
+        "startup_seconds": 11.380715641891584,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      }
+    ],
+    "restored": true
+  },
+  "schedule": {
+    "scope": "Verify lane issue/commit order and evidence of independent next-round issue.",
+    "trace": "/tmp/ds41-independent-lanes/independent-service.log",
+    "sha256": "0de288839f3f538e5b751b0856f174b65f3e0d3d3fa2b2eb152c562a29015ff0",
+    "issues": 442,
+    "commits": 442,
+    "lane_cohort_entries": [
+      21,
+      15
+    ],
+    "next_issues_before_peer_commit": 298,
+    "examples": [
+      {
+        "peer_issue": {
+          "line": 89,
+          "text": "2026-09-13T06:49:53.175746Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=1 requests=2",
+          "round_id": 1
+        },
+        "own_commit": {
+          "line": 90,
+          "text": "2026-09-13T06:49:53.252131Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=0 round_id=1",
+          "round_id": 1
+        },
+        "own_next_issue": {
+          "line": 91,
+          "text": "2026-09-13T06:49:53.255133Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=2 requests=2",
+          "round_id": 2
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 91,
+          "text": "2026-09-13T06:49:53.255133Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=2 requests=2",
+          "round_id": 2
+        },
+        "own_commit": {
+          "line": 92,
+          "text": "2026-09-13T06:49:53.269176Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=1 round_id=1",
+          "round_id": 1
+        },
+        "own_next_issue": {
+          "line": 93,
+          "text": "2026-09-13T06:49:53.272136Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=2 requests=2",
+          "round_id": 2
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 93,
+          "text": "2026-09-13T06:49:53.272136Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=2 requests=2",
+          "round_id": 2
+        },
+        "own_commit": {
+          "line": 94,
+          "text": "2026-09-13T06:49:53.336449Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=0 round_id=2",
+          "round_id": 2
+        },
+        "own_next_issue": {
+          "line": 95,
+          "text": "2026-09-13T06:49:53.339488Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=3 requests=2",
+          "round_id": 3
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 95,
+          "text": "2026-09-13T06:49:53.339488Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=3 requests=2",
+          "round_id": 3
+        },
+        "own_commit": {
+          "line": 96,
+          "text": "2026-09-13T06:49:53.352638Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=1 round_id=2",
+          "round_id": 2
+        },
+        "own_next_issue": {
+          "line": 97,
+          "text": "2026-09-13T06:49:53.355532Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=3 requests=2",
+          "round_id": 3
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 97,
+          "text": "2026-09-13T06:49:53.355532Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=3 requests=2",
+          "round_id": 3
+        },
+        "own_commit": {
+          "line": 98,
+          "text": "2026-09-13T06:49:53.415703Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=0 round_id=3",
+          "round_id": 3
+        },
+        "own_next_issue": {
+          "line": 99,
+          "text": "2026-09-13T06:49:53.418717Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=4 requests=2",
+          "round_id": 4
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 99,
+          "text": "2026-09-13T06:49:53.418717Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=4 requests=2",
+          "round_id": 4
+        },
+        "own_commit": {
+          "line": 100,
+          "text": "2026-09-13T06:49:53.435924Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=1 round_id=3",
+          "round_id": 3
+        },
+        "own_next_issue": {
+          "line": 101,
+          "text": "2026-09-13T06:49:53.438883Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=4 requests=2",
+          "round_id": 4
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 101,
+          "text": "2026-09-13T06:49:53.438883Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=4 requests=2",
+          "round_id": 4
+        },
+        "own_commit": {
+          "line": 102,
+          "text": "2026-09-13T06:49:53.496478Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=0 round_id=4",
+          "round_id": 4
+        },
+        "own_next_issue": {
+          "line": 103,
+          "text": "2026-09-13T06:49:53.499665Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=5 requests=2",
+          "round_id": 5
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 103,
+          "text": "2026-09-13T06:49:53.499665Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=5 requests=2",
+          "round_id": 5
+        },
+        "own_commit": {
+          "line": 104,
+          "text": "2026-09-13T06:49:53.515907Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=1 round_id=4",
+          "round_id": 4
+        },
+        "own_next_issue": {
+          "line": 105,
+          "text": "2026-09-13T06:49:53.518861Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=5 requests=2",
+          "round_id": 5
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 105,
+          "text": "2026-09-13T06:49:53.518861Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=5 requests=2",
+          "round_id": 5
+        },
+        "own_commit": {
+          "line": 106,
+          "text": "2026-09-13T06:49:53.571939Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=0 round_id=5",
+          "round_id": 5
+        },
+        "own_next_issue": {
+          "line": 107,
+          "text": "2026-09-13T06:49:53.575203Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=6 requests=2",
+          "round_id": 6
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 107,
+          "text": "2026-09-13T06:49:53.575203Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=6 requests=2",
+          "round_id": 6
+        },
+        "own_commit": {
+          "line": 108,
+          "text": "2026-09-13T06:49:53.600380Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=1 round_id=5",
+          "round_id": 5
+        },
+        "own_next_issue": {
+          "line": 109,
+          "text": "2026-09-13T06:49:53.603397Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=6 requests=2",
+          "round_id": 6
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 109,
+          "text": "2026-09-13T06:49:53.603397Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=6 requests=2",
+          "round_id": 6
+        },
+        "own_commit": {
+          "line": 110,
+          "text": "2026-09-13T06:49:53.668013Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=0 round_id=6",
+          "round_id": 6
+        },
+        "own_next_issue": {
+          "line": 111,
+          "text": "2026-09-13T06:49:53.671180Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=7 requests=2",
+          "round_id": 7
+        }
+      },
+      {
+        "peer_issue": {
+          "line": 111,
+          "text": "2026-09-13T06:49:53.671180Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=0 round_id=7 requests=2",
+          "round_id": 7
+        },
+        "own_commit": {
+          "line": 112,
+          "text": "2026-09-13T06:49:53.690307Z DEBUG ds41rt::lane_schedule: independent verifier committed lane=1 round_id=6",
+          "round_id": 6
+        },
+        "own_next_issue": {
+          "line": 113,
+          "text": "2026-09-13T06:49:53.693347Z DEBUG ds41rt::lane_schedule: independent verifier issued lane=1 round_id=7 requests=2",
+          "round_id": 7
+        }
+      }
+    ],
+    "limitations": "Host verifier issue/commit order; does not prove concurrent GPU execution or a throughput gain."
+  },
+  "arms": {
+    "paired": {
+      "code": {
+        "scope": "Run the preserved eight-type and counting release decode workloads.",
+        "label": "paired",
+        "base_url": "http://127.0.0.1:8000",
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+        "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+        "repeats": 1,
+        "nonce_seed": 55001,
+        "selected_cases": [
+          "code"
+        ],
+        "include_orchid": false,
+        "include_counting": false,
+        "remote_reference": false,
+        "controls": {
+          "temperature": 0,
+          "thinking": "disabled"
+        },
+        "samples": [
+          {
+            "repeat": 1,
+            "case": "code",
+            "category": "code",
+            "weight": 1.0,
+            "nonce": {
+              "prefix": "\u80da request nonce 55001-0.\n",
+              "marker": "\u80da",
+              "first_content_token_id": 37925
+            },
+            "request": {
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "\u80da request nonce 55001-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                }
+              ],
+              "thinking": {
+                "type": "disabled"
+              },
+              "temperature": 0,
+              "max_tokens": 320,
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              }
+            },
+            "started_ns": 1789282103820134907,
+            "first_content_seconds": 0.8469914779998362,
+            "finish_seconds": 2.653777268016711,
+            "observed_decode_tokens_per_second": 117.88890591065068,
+            "usage": {
+              "prompt_tokens": 54,
+              "completion_tokens": 214,
+              "total_tokens": 268,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 54
+            },
+            "content": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+            "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "finish_reason": "stop",
+            "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+            "cached_tokens": 0,
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false,
+            "bounded_static_prefix_hit": true,
+            "serving_completed": true,
+            "passed": true
+          }
+        ],
+        "repeat_summaries": [
+          {
+            "repeat": 1,
+            "weighted_cases": 1,
+            "serving_completed": 1,
+            "objective_checks_passed": 1,
+            "objective_checks_assessed": 1,
+            "weighted_observed_decode_tokens_per_second": 117.88890591065068,
+            "partial_weighted_observed_decode_tokens_per_second": 117.88890591065068,
+            "complete_weighted_corpus": true,
+            "all_samples_passed": true
+          }
+        ],
+        "passed": true,
+        "median_weighted_observed_decode_tokens_per_second": 117.88890591065068
+      },
+      "prefill_passed": true,
+      "mixed_passed": true,
+      "batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 126.2505758304137
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 192.5753687664598
+        }
+      ]
+    },
+    "independent": {
+      "code": {
+        "scope": "Run the preserved eight-type and counting release decode workloads.",
+        "label": "independent",
+        "base_url": "http://127.0.0.1:8000",
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "corpus_sha256": "e14ff2894de9290827a07aef2ff55e2bb5c792abe91dcdc029fa9d6ed97990bc",
+        "tokenizer_sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+        "repeats": 1,
+        "nonce_seed": 55001,
+        "selected_cases": [
+          "code"
+        ],
+        "include_orchid": false,
+        "include_counting": false,
+        "remote_reference": false,
+        "controls": {
+          "temperature": 0,
+          "thinking": "disabled"
+        },
+        "samples": [
+          {
+            "repeat": 1,
+            "case": "code",
+            "category": "code",
+            "weight": 1.0,
+            "nonce": {
+              "prefix": "\u80da request nonce 55001-0.\n",
+              "marker": "\u80da",
+              "first_content_token_id": 37925
+            },
+            "request": {
+              "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "\u80da request nonce 55001-0.\nWrite a Python function merge_intervals(intervals) that merges overlapping integer intervals. Include type hints, a short docstring, and three assert-based examples. Return only one Python code block."
+                }
+              ],
+              "thinking": {
+                "type": "disabled"
+              },
+              "temperature": 0,
+              "max_tokens": 320,
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              }
+            },
+            "started_ns": 1789282169923937228,
+            "first_content_seconds": 0.8618246500845999,
+            "finish_seconds": 2.7957900140900165,
+            "observed_decode_tokens_per_second": 110.1364088335366,
+            "usage": {
+              "prompt_tokens": 54,
+              "completion_tokens": 214,
+              "total_tokens": 268,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 54
+            },
+            "content": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:]:\n        last_start, last_end = merged[-1]\n        if start <= last_end:\n            merged[-1] = (last_start, max(last_end, end))\n        else:\n            merged.append((start, end))\n    return merged\n\n\nassert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]\nassert merge_intervals([(1, 4), (4, 5)]) == [(1, 5)]\nassert merge_intervals([]) == []\n```",
+            "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+            "finish_reason": "stop",
+            "system_fingerprint": "ds41rt-native-fp4-kv-dspark",
+            "cached_tokens": 0,
+            "response_nonempty": true,
+            "objective_checks": {
+              "python_structure": {
+                "passed": true,
+                "issues": []
+              }
+            },
+            "objective_checks_passed": true,
+            "prose_quality_assessed": false,
+            "bounded_static_prefix_hit": true,
+            "serving_completed": true,
+            "passed": true
+          }
+        ],
+        "repeat_summaries": [
+          {
+            "repeat": 1,
+            "weighted_cases": 1,
+            "serving_completed": 1,
+            "objective_checks_passed": 1,
+            "objective_checks_assessed": 1,
+            "weighted_observed_decode_tokens_per_second": 110.1364088335366,
+            "partial_weighted_observed_decode_tokens_per_second": 110.1364088335366,
+            "complete_weighted_corpus": true,
+            "all_samples_passed": true
+          }
+        ],
+        "passed": true,
+        "median_weighted_observed_decode_tokens_per_second": 110.1364088335366
+      },
+      "prefill_passed": true,
+      "mixed_passed": true,
+      "batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 136.55741546369717
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 188.3833655839977
+        }
+      ]
+    }
+  },
+  "raw_artifacts": {
+    "/tmp/ds41-independent-lanes/paired-prefill.json": "c6c8f985f15e82c1b5ce8fecaf9618f1d8bdcf21c2b4bfcb6d5decb08db99153",
+    "/tmp/ds41-independent-lanes/independent-mixed.json": "8f53565ea4378cf69ab39b0464eb47df372ab4937fa90889e6858e11cd135c61",
+    "/tmp/ds41-independent-lanes/pilot-results.json": "082d0af3638cf176d715c2ec1b9af50b8cdb2ded2282967450091f94e2c0a00d",
+    "/tmp/ds41-independent-lanes/independent-service.log": "0de288839f3f538e5b751b0856f174b65f3e0d3d3fa2b2eb152c562a29015ff0",
+    "/tmp/ds41-independent-lanes/independent-prefill.json": "a05304e8abcdcd4f55131aa408649fc636814258c415ec8e8eaaff7b51291fd3",
+    "/tmp/ds41-independent-lanes/paired-code.log": "3f201dd050560e7de53f0aa497495e39182f524f4c9bd3dd74e91d39853932a5",
+    "/tmp/ds41-independent-lanes/schedule-proof.json": "b644f899f4f0891a67849a0ba0597288e2ed16f7ca854927b33257debdf98fdb",
+    "/tmp/ds41-independent-lanes/paired-mixed.json": "73ceb3b25089bf35087463e598dfcb0e7361afc4475ff6ce6b78825cad88c1c1",
+    "/tmp/ds41-independent-lanes/check.log": "eb5cc86fac51a152971ce877c4a894dfca70a6899cc435d18af97a5eb10482cc",
+    "/tmp/ds41-independent-lanes/independent-prefill.log": "1231b06b2c3df6043897ded855a9a1174186f6660110e01578de218f144aca25",
+    "/tmp/ds41-independent-lanes/pilot.log": "5a5ffe97e5ab2e52b25c0a37b0e791bd93b4fea72dd2a4d5bdbcf88c0690a35e",
+    "/tmp/ds41-independent-lanes/paired-code.json": "dc02185ec200ff9ec09217ee30caf766a3f794f660bd7beb4c6c3c6faf57b4db",
+    "/tmp/ds41-independent-lanes/paired-mixed.log": "8d4683b1a50027b24fad1b10fd6aabb60686d218dde2e3c8e4ae9842dc8af000",
+    "/tmp/ds41-independent-lanes/paired-prefill.log": "47a6c2ccc087566a65f9a7eba2175c1cf5093b2fdeeade2280d997ea4239ade8",
+    "/tmp/ds41-independent-lanes/pilot.py": "2a7dd6565166cb10107ccef4d55acc1dd6407a52830c8b56ae6d0a7b9f27df6e",
+    "/tmp/ds41-independent-lanes/independent-memory.csv": "26d50276c1889c918ff7936a6b6de4d3269faf0dd777dd73c9ce67ea33e1f431",
+    "/tmp/ds41-independent-lanes/independent-code.log": "cdb28a19402e3dce715a30fdfc1909194cc82f0a3bf8f51573e361b06f6d2ce3",
+    "/tmp/ds41-independent-lanes/build.log": "63bfb9b04d3da91688197d30b7c6b7aa4f97a92ca0219b1a7a967c84667c60a1",
+    "/tmp/ds41-independent-lanes/paired-memory.csv": "7855417776af1a121b9b58d49363f7d133e8de7caddc3fb0d9fde1c5256465bc",
+    "/tmp/ds41-independent-lanes/paired-service.log": "97858f6eb16f09b946acfc0a3db5916ab5a0c157656ed3a0bdfdcfab8fef07ca",
+    "/tmp/ds41-independent-lanes/independent-mixed.log": "787971ea48d75728bc1862cac148f6861fa6da1d075b92c3cf068c9cd59b8b67",
+    "/tmp/ds41-independent-lanes/independent-code.json": "652a249ac67d11cdfd16e6ae4c51742cc3aeb7722b2b6eea02c9673c463aec98"
+  }
+}

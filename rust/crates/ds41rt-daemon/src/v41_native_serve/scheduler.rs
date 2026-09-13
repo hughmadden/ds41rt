@@ -218,7 +218,10 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 continue;
             }
         }
-        let result = room.and_then(|_| if args.independent_decode_lanes {
+        // With one active lane there is no peer to overlap. Retain the
+        // ordinary C1 path and avoid shared-bank/async-delivery overhead.
+        let result = room.and_then(|_| if args.independent_decode_lanes
+            && members.iter().all(|lane| !lane.is_empty()) {
             independent::run(lib, runtime, first, second, requests, first_transport,
                 second_transport, &mut active, draft.as_deref_mut(), &mut prefixes, receive)
         } else {

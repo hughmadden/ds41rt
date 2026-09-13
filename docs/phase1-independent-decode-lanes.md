@@ -3,7 +3,7 @@
 `--independent-decode-lanes` is an experimental opt-in scheduler. It supports
 fixed drafts, the independent confidence cutoff and lane-local incremental reuse,
 and also target-only execution. The cross-lane `--dspark-adaptive` cost policy is
-incompatible. Defaults are unchanged; runtime qualification is pending.
+incompatible. Defaults are unchanged; the initial functional screen passed, while performance qualification is pending.
 
 Each lane owns its target pass and transport and loops through preparation,
 verification, commit, token delivery and its next round independently. Request,
@@ -50,3 +50,37 @@ The experiment and old `ds41-attention-output-rtx1` fixture were moved to
 runner now writes its initial manifest before stopping the service and covers
 the stop with its restoration guard. Both comparison arms run after this host
 memory change; prior loading timings are not directly comparable controls.
+
+## Functional screen
+
+Both modes passed code structure, fresh prefill answer, mixed C4/C16 completion,
+retained needle, prompt reuse, retained-turn, cancellation and recovery checks.
+Code responses had identical hashes and 214 output tokens. The independent
+trace contains 442 matched issues/commits and 298 instances where a lane committed
+and issued another round while its peer's existing verifier remained live.
+The verifier checks matching round identities and per-lane sequencing and retains
+example triples. This proves scheduler progress, not concurrent GPU execution.
+Standard serving was restored after the completed run.
+
+Diagnostic one-sample rates were C1 117.89/110.14, C4 126.25/136.56 and C16
+192.58/188.38 tok/s, paired/independent. This mixed result does not establish a
+speedup. Scheduling debug logs and first-use effects are present. The next
+candidate retains the ordinary path when only one lane is active, since no peer
+can overlap, and will undergo an uninstrumented ABBA comparison. The shared
+bank and delivery changes are exercised when both lanes have work.
+
+[Evidence](phase1-independent-decode-lanes.json) retains commands, artifact
+identities, code responses, mixed rates and scheduling proof. Raw lifecycle
+responses and service logs remain under the experiment path above. Reproduce
+the ordering proof with `scripts/verify-ds41-independent-lane-trace.py TRACE
+--output JSON`. These focused checks do not constitute a full quality suite.
+
+The user subsequently cleared the temporary experiment directories. The
+functional screen survived under `~/.cache/ds41rt-experiments/independent-lanes`,
+and its frozen artifact hashes still match its manifest. The relocated old
+7.3 GiB fixture was also removed; only active experiment directories remain.
+The uninstrumented ABBA uses persistent paths under
+`~/.cache/ds41rt-experiments/independent-performance`. Because the former prefill
+text was deleted, both arms use the scheduler source at commit `49f1fb2` as a
+new frozen context corpus. Compare its prefill results within this ABBA, not
+against the earlier corpus. The benchmark records its actual context hash.
