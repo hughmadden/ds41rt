@@ -303,3 +303,30 @@ cosine above 0.999992. The daemon offline check passes. This fixture stages
 weights and sums halves in Python; Rust shared-weight slicing, shared execution
 ownership, peer reduction, other capacities, and serving integration remain
 pending. No single-GPU throughput claim follows from these numerical checks.
+
+## Rust shared-expert ownership and AOT library fix
+
+The catalog supports bounded row/column TP2 reads for coordinator matrices,
+with tests covering both ranks and axes, offsets above 2 GiB, trailing canaries,
+and invalid extents/placement. Existing TP4 and full expert tests continue to pass.
+The shared rank loader keeps native FP8 weights and expanded packed scales,
+discarding temporary source scales after packing. Resident weights require
+18,247,680 bytes per layer per rank, or 729,907,200 bytes for all forty layers
+per GPU. Peak loading additionally reserves 5,760 device bytes for source scales;
+pinned staging, CPU read scratch, execution workspaces and CUDA state are separate.
+
+The Rust shared `RankWave` now preallocates FP8 capacity plans, activation buffers,
+scratch and producer events. Two waves can share immutable weights on each GPU.
+The official layer-0 C16 fixture passes with both cards loaded before execution,
+zero/nonzero inputs, two independent waves per card, finite outputs, same-rank
+lane agreement, and caller-device restoration. Shared cross-rank reduction and
+serving selection remain pending.
+
+This fixture exposed a limitation missed by the earlier Python ordering:
+generated AOT launch symbols are process-global. Initializing a second CUDA
+library overwrote the first GPU's kernel symbols and made its FP8 GEMM reject
+launches. The final implementation uses **one CUDA library per exported variant,
+configured on each GPU**, with separate device-bound handles. FP8, mHC and TP2
+routed expert initialization now follow that model. Separate module libraries
+per GPU described in earlier checkpoints are superseded. Both real shared and
+routed Rust layer fixtures pass after this fix, as does the daemon offline check.

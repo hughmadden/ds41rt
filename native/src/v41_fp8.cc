@@ -25,7 +25,7 @@ struct Variant {
 };
 Variant variants[] = {DS41RT_V41_FP8_VARIANTS};
 Variant peer_variants[] = {DS41RT_V41_FP8_VARIANTS};
-Module hc_project[] = {DS41RT_V41_HC_PROJECT_MODULE, DS41RT_V41_HC_PROJECT_MODULE};
+Module hc_project = DS41RT_V41_HC_PROJECT_MODULE;
 int hc_device[] = {-1, -1};
 int owner_device[] = {-1, -1};
 std::mutex mutex;
@@ -51,9 +51,14 @@ Variant* handle(void* p) {
 int load(Module& m, int device) {
   auto* ptr = &m.library;
   int status = 0;
-  void* init[] = {&ptr, &status}; m.initialize(init);
+  // Exported launch symbols are process-global. Initialize one CUDA library,
+  // then configure that same library on each owning device. Initializing a
+  // second library overwrites the generated kernel symbols used by the first.
+  void* init[] = {&ptr, &status};
+  const bool existing = m.library != nullptr;
+  if (!existing) m.initialize(init);
   if (!status) { void* args[] = {&ptr, &device, &status}; m.load(args); }
-  if (status) m.reset();
+  if (status && !existing) m.reset();
   return status;
 }
 bool span(const void* p, uint64_t bytes, uintptr_t& start, uintptr_t& end) {
@@ -90,10 +95,15 @@ extern "C" int32_t ds41rt_v41_fp8_matrix_initialize(int32_t rows, int32_t k, int
   if (v->device >= 0) {
     if (v->device != device) return cudaErrorInvalidDevice;
   } else {
-    int result = load(v->quant, device);
-    if (!result) result = load(v->gemm, device);
-    if (!result && v->groups > 1) result = load(v->quant_rope, device);
-    if (result) { v->quant.reset(); v->gemm.reset(); v->quant_rope.reset(); return result; }
+    auto* modules = capacity(rows,k,n);
+    const bool existing = modules->gemm.library != nullptr;
+    int result = load(modules->quant, device);
+    if (!result) result = load(modules->gemm, device);
+    if (!result && v->groups > 1) result = load(modules->quant_rope, device);
+    if (result) {
+      if (!existing) { modules->quant.reset(); modules->gemm.reset(); modules->quant_rope.reset(); }
+      return result;
+    }
     v->device = device;
   }
   *out = v; return 0;
@@ -172,7 +182,7 @@ extern "C" int32_t ds41rt_v41_hc_project_initialize() {
   const int slot=device_slot(device);
   if(slot<0) return cudaErrorInvalidDevice;
   if(hc_device[slot]>=0) return hc_device[slot]==device ? 0 : int(cudaErrorInvalidDevice);
-  int result=load(hc_project[slot],device);
+  int result=load(hc_project,device);
   if(!result) hc_device[slot]=device;
   return result;
 }
@@ -187,6 +197,6 @@ extern "C" int32_t ds41rt_v41_hc_project_launch(const uint16_t* residual,
   void* w=const_cast<float*>(weight);
   void* p=partials;
   void* args[]={&r,&w,&p,&rows,&stream,&status};
-  hc_project[slot].launch(args,6);
+  hc_project.launch(args,6);
   return status;
 }

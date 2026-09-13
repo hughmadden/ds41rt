@@ -135,19 +135,31 @@ extern "C" int32_t ds41rt_v41_expert_initialize(int32_t capacity, void** out) {
     *out = variant;
     return cudaSuccess;
   }
-  auto* library_ptr = &variant->library;
+  auto* module_owner = variant;
+#ifdef DS41RT_V41_TP2_EXPERTS
+  // Generated launch symbols are shared process-wide. Keep one library per
+  // exported variant and configure it on both devices; handles remain distinct.
+  for (auto& entry : variants)
+    if (entry.info.capacity_rows == variant->info.capacity_rows) { module_owner = &entry; break; }
+#endif
+  auto* library_ptr = &module_owner->library;
+  const bool existing = module_owner->library != nullptr;
   void* init_args[] = {&library_ptr, &status};
-  variant->initialize(init_args);
+  if (!existing) variant->initialize(init_args);
   if (status != cudaSuccess) {
-    if (variant->library) cudaLibraryUnload(variant->library);
-    variant->library = nullptr;
+    if (!existing) {
+      if (module_owner->library) cudaLibraryUnload(module_owner->library);
+      module_owner->library = nullptr;
+    }
     return status;
   }
   void* load_args[] = {&library_ptr, &device, &status};
   variant->load(load_args);
   if (status != cudaSuccess) {
-    cudaLibraryUnload(variant->library);
-    variant->library = nullptr;
+    if (!existing) {
+      cudaLibraryUnload(module_owner->library);
+      module_owner->library = nullptr;
+    }
     return status;
   }
   variant->device = device;
