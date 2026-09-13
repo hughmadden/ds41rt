@@ -42,6 +42,11 @@ and SWA (0–19), and sources 2/8/14 to RTX0. RTX1 owns decoder attention and SW
 (20–39), source 20, and dSpark. Both cards hold half the vocabulary rows, TP2
 encoder routed experts, and TP2 shared experts for all layers. CPU Engram stays
 unchanged; Sparks retain decoder routed experts only in two-GPU mode.
+The user subsequently authorized rebalancing non-expert attention/dense and
+auxiliary placement instead of requiring the 19/20 boundary. Preserve expert
+TP2 and vocabulary partitioning, keep cache consumers colocated where practical,
+and account for extra transfer costs when moving layers. A reduced KV pool is
+acceptable for initial integration before selecting the final balanced budget.
 Consumer placement must follow the actual CED/index dependency map, including
 bounded decoder replay, rather than treating encoder residency as proof that
 every prefill operation is local.
@@ -109,3 +114,40 @@ not graph replay, cancellation ownership, bandwidth, or full serving performance
 The first fixture launch could not create a CUDA context beside the v2 server
 (only 305 MiB free on RTX0). The v2 coordinator container was stopped to free
 the pair for phase-2 development; its image and container remain available.
+
+## Device ownership and weight accounting
+
+`v41_memory/device.rs` provides explicit allocation/stream/event owners and a
+preallocated peer-transfer direction per lane. Device selection is scoped to
+synchronous enqueue/query calls and restored before cooperative yields. The
+transfer future borrows source, destination, and producer; its drain guard runs
+on errors or cancellation. Legacy single-device owners are unchanged.
+
+The ignored CUDA owner test passes on both cards: simultaneous opposite-direction
+copies preserve three changed input patterns; device selection restores after an
+error, concurrent completion, and destruction. The test needs the local Python
+3.12 library directory in `LD_LIBRARY_PATH`. Cancellation drain behavior still
+needs an explicit pending-transfer test; model integration remains pending.
+
+Initial exact checkpoint-header sums (decimal bytes, **not runtime occupancy**):
+
+| Tensor group | Bytes |
+|---|---:|
+| Encoder routed experts, all 20 layers | 144,388,915,200 |
+| Encoder routed experts per TP2 half | 72,194,457,600 |
+| Shared experts, all 40 layers | 1,416,960,000 |
+| Encoder non-expert, excluding Engram namespace and shared experts | 2,741,203,936 |
+| Decoder non-expert, excluding shared experts | 2,725,876,192 |
+| dSpark (`mtp`) | 7,932,874,632 |
+| Embeddings | 1,323,827,200 |
+| Vocabulary head | 1,323,827,200 |
+| Vision, aligner, image marker vectors | 970,536,960 |
+
+Ordinary non-expert layers contribute 134,631,128 checkpoint bytes each.
+These sums come from all 48 safetensors headers in official snapshot
+`dba1be0a40aa45a94ad051997016db3960a90277`. Runtime planning must additionally
+account for transformed packing/scales, GPU Engram projections (separate from
+the host table), duplicate/aliased tensors, all lane and prefill workspaces,
+SWA/index/KV pools, snapshots, transfer buffers, and CUDA headroom. In particular,
+moving a few ordinary attention layers saves far less than the dSpark allocation;
+the final split must be chosen using the complete ledger.
