@@ -19,6 +19,7 @@ fn slice(mut buffer: Ds41rtDeviceBuffer, offset: usize, bytes: usize) -> Ds41rtD
 impl<'a> DsparkWindow<'a> {
     pub fn retain_prefix(&mut self, lease: WindowLease) -> Result<DsparkPrefix<'a>> {
         let slot = self.validate(lease)?;
+        self.access.readable(slot)?;
         let end = self.slots[slot]
             .end
             .context("cannot retain an unseeded draft window")?;
@@ -43,7 +44,7 @@ impl<'a> DsparkWindow<'a> {
     }
     pub fn restore_prefix(&mut self, lease: WindowLease, prefix: &DsparkPrefix<'a>) -> Result<()> {
         let slot = self.validate(lease)?;
-        self.readers.writable(slot)?;
+        self.access.writable(slot)?;
         ensure!(
             prefix.owner == self.owner && self.slots[slot].end.is_none(),
             "foreign draft prefix or nonfresh window"

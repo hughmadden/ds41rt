@@ -62,7 +62,8 @@ def main():
             required=list(expected), additionalProperties=False)
         tool = i < 2
         prompt = ('Call lookup exactly once with the required slot and marker from its schema.' if tool
-            else 'Return the object required by the response schema.')
+            else 'Return exactly this JSON object: ' + json.dumps(expected, ensure_ascii=False)
+                + '. The response schema enforces this same object.')
         request = dict(model=API['MODEL'], messages=[dict(role='user', content=prompt)],
             thinking=dict(type='enabled'), reasoning_effort='high', temperature=0,
             max_tokens=2048, stream=bool(i % 2))
@@ -89,19 +90,22 @@ def main():
     save()
     for case in cases:
         result = case['result']; message = result['message']
-        assert message.get('reasoning_content'), case
+        failure = dict(expected=case['expected'], finish=result['finish'],
+            content=message.get('content'), tool_calls=message.get('tool_calls'),
+            reasoning_tail=message.get('reasoning_content', '')[-500:])
+        assert message.get('reasoning_content'), failure
         if case['tool']:
-            assert result['finish'] == 'tool_calls', case
-            calls = message['tool_calls']; assert len(calls) == 1, case
-            assert calls[0]['function']['name'] == 'lookup', case
+            assert result['finish'] == 'tool_calls', failure
+            calls = message['tool_calls']; assert len(calls) == 1, failure
+            assert calls[0]['function']['name'] == 'lookup', failure
             value = json.loads(calls[0]['function']['arguments'])
         else:
-            assert result['finish'] == 'stop', case
-            assert not message.get('tool_calls'), case
+            assert result['finish'] == 'stop', failure
+            assert not message.get('tool_calls'), failure
             value = json.loads(message['content'])
-        assert isinstance(value, dict) and set(value) == {'slot', 'marker'}, case
-        assert type(value['slot']) is int and type(value['marker']) is str, case
-        assert value == case['expected'], case
+        assert isinstance(value, dict) and set(value) == {'slot', 'marker'}, failure
+        assert type(value['slot']) is int and type(value['marker']) is str, failure
+        assert value == case['expected'], failure
         case['passed'] = True
     report['passed'] = True; save()
     print('PASS four concurrent high-thinking tool/response constraints, JSON and SSE', flush=True)

@@ -127,14 +127,23 @@ impl MainProposal<'_, '_, '_> {
             .main
             .ready
             .ok_or_else(|| anyhow::anyhow!("main proposal consumed"))?;
-        validate_acceptance(&self.groups, accepted)?;
+        commit_chunks(&self.groups, rows, windows.each_ref().map(|w| &**w), leases, accepted)
+    }
+}
+pub(crate) fn prepare_commit_rows(rows: &[ExpertRow], windows: [&DsparkWindow<'_>; 3],
+    leases: [&[WindowLease]; 3], accepted: &[u32]) -> Result<[Vec<WindowChunk>; 3]> {
+    commit_chunks(&groups(rows)?, rows.len() as u32, windows, leases, accepted)
+}
+fn commit_chunks(groups: &[Group], rows: u32, windows: [&DsparkWindow<'_>; 3],
+    leases: [&[WindowLease]; 3], accepted: &[u32]) -> Result<[Vec<WindowChunk>; 3]> {
+        validate_acceptance(groups, accepted)?;
         ensure!(
-            leases.iter().all(|l| l.len() == self.groups.len()),
+            leases.iter().all(|l| l.len() == groups.len()),
             "main proposal lease count differs"
         );
         let mut chunks: [Vec<WindowChunk>; 3] = std::array::from_fn(|_| Vec::new());
         for stage in 0..3 {
-            for (i, group) in self.groups.iter().enumerate() {
+            for (i, group) in groups.iter().enumerate() {
                 let lease = leases[stage][i];
                 ensure!(
                     windows[stage].request_id(lease)? == group.request,
@@ -163,7 +172,6 @@ impl MainProposal<'_, '_, '_> {
             }
         }
         Ok(chunks)
-    }
 }
 impl Drop for MainProposal<'_, '_, '_> {
     fn drop(&mut self) {

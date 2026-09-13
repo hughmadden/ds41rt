@@ -9,6 +9,46 @@ for the metrics already measured, labeling instrumented probes and allowing a
 summary across several commits. Do not run extra tests solely for commit-message
 numbers. Diagnostic-only work should not imply a measured speedup. Phase 2 dual-RTX execution is forward-looking context, not this goal.
 
+## V2 completion sequence
+
+The current release objective is to finish removing cross-lane dependencies,
+except new-request admission and prefill, then revisit plausible C1 improvements
+whose concurrent results were mixed or unfavorable. Use adaptive dSpark with
+independent decisions for all new comparisons. The historical throughput targets
+above remain performance targets, not evidence that they have been achieved.
+
+Remaining synchronization work, based on the current serving source:
+
+- Finish and qualify queued dSpark main-context/cache commit. Draft replay already
+  has separate lane workspaces; accepted-KV production needs the same independence.
+- Queue target SWA and compressed-cache publication without blocking the shared
+  scheduler thread. `BackboneCache::commit` currently commits each window/source
+  synchronously. Compressed-source uploads also share pinned staging, so merely
+  replacing stream synchronization with polling is insufficient: reserve pages
+  and keep upload storage owned until completion, with disjoint request access.
+- Retire completed/cancelled requests within their owning lane. Preserve exact
+  turn snapshots while making snapshot copies cooperative; today retirement
+  requests a global drain and prefix retention waits on the host.
+- Audit constrained-logit downloads, graph capture/eviction, and remaining shared
+  host waits. Retain coordinated fatal-error cleanup and admission/prefill drains.
+
+After these changes, first revisit the combined attention graph, which previously
+showed small target/adaptive C1 gains but a C16 decline. Rank other archived
+candidates by actual C1 serving evidence; component-only Spark FC2 gains require
+serving integration and are not established end-to-end wins. Local expert graphs
+previously showed no C1 gain and have lower priority. Preserve rejected-candidate
+records and record new measurements separately.
+
+For v2, rerun only the benchmark tables in the main README **excluding the prefill
+matrix**, and update matching performance-report tables with the same data.
+Rerun tool calling at high concurrency with thinking enabled/high; do not rerun
+the full qualification suite. Add RTX resident layer count to the headline
+table, retaining power limit, standard memory speed, and KV bytes/token capacity.
+Publish the v2 GitHub release and matching serving container with concise release
+notes listing optimizations that demonstrated an impact. Verify the clean build
+and standard run path. A measured memory requirement may reduce the KV pool by
+the necessary amount; it need not remain a multiple of one million tokens.
+
 ## Bottom-up RTX layer placement
 
 Use excess RTX memory for complete routed-expert layers, starting at layer 0.

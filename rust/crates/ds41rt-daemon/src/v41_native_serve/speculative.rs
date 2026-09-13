@@ -5,7 +5,8 @@ use crate::v41_requests::RequestBatch;
 
 /// Execution workspaces share a request-indexed bank of persistent draft state.
 pub(crate) struct DraftRuntime<'w, 'a> {
-    main: DsparkMainContext<'w, 'a>,
+    mains: Vec<DsparkMainContext<'w, 'a>>,
+    pending_commit_ids: Vec<Vec<u64>>,
     chains: Vec<DsparkChain<'w, 'a>>,
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
@@ -49,7 +50,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let lane_requests = requests.div_ceil(lane_count as u32);
         let shared_bytes = weights.draft_bytes(requests)?;
         let lane_bytes = weights.draft_bytes(lane_requests)?;
-        let main = weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?;
+        let mut mains = vec![weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?];
+        if lane_count > 1 { mains.push(weights.main_context(80, DsparkMainContext::device_bytes(lib, 80)?)?); }
         let chains = (0..lane_count).map(|_| weights.draft(table, head, lane_requests, lane_bytes))
             .collect::<Result<Vec<_>>>()?;
         tracing::info!(lanes=lane_count, lane_requests, shared_workspace_bytes=shared_bytes,
@@ -57,7 +59,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             additional_workspace_bytes=(lane_bytes*lane_count).saturating_sub(shared_bytes),
             "lane-local dSpark draft workspaces (weights shared)");
         Ok(Self {
-            main,
+            mains,
+            pending_commit_ids: vec![Vec::new(); lane_count],
             chains,
             windows: [window()?, window()?, window()?],
             requests: Default::default(),
@@ -205,6 +208,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
     pub fn release(&mut self, id: u64) -> Result<()> {
         ensure!(!self.pending.iter().flatten().any(|(seeds, _)| seeds.iter().any(|seed| seed.0 == id)),
             "cannot release a request with a pending draft");
+        ensure!(!self.pending_commit_ids.iter().any(|ids| ids.contains(&id)),
+            "cannot release a request with a pending commit");
         if let Some(history) = &mut self.adaptive { history.release(id); }
         self.confidence_trace.remove(&id);
         let mut failure = None;
@@ -277,7 +282,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             leases.iter().map(|request| request[stage]).collect());
         let taps = pass.taps(batch)?;
         let mut proposal = unsafe {
-            self.main
+            self.mains[0]
                 .execute_rows(taps.values(), taps.batch_identity(), taps.rows())?
         };
         let [a, b, c] = &mut self.windows;
@@ -292,6 +297,51 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             )
         }
     }
+    /// Begin a completed decode batch's accepted-cache transaction on its own lane.
+    pub fn begin_queued_commit(&mut self, lane: usize, pass: &TargetPass<'_, 'a>,
+        requests: &Requests<'a>, batch: &RequestBatch, accepted: &[u32]) -> Result<()> {
+        ensure!(lane < self.mains.len() && self.pending_commit_ids[lane].is_empty(), "commit lane busy or invalid");
+        requests.validate_acceptance(batch, accepted)?;
+        ensure!(accepted.iter().any(|&n| n > 0), "queued decode commit has no accepted rows");
+        let ids = batch.cache()?.request_ids();
+        let leases = ids.iter().map(|id| self.requests.get(id)
+            .map(|request| request.leases).context("draft commit request not admitted"))
+            .collect::<Result<Vec<_>>>()?;
+        let stage_leases: [Vec<WindowLease>; 3] = std::array::from_fn(|stage|
+            leases.iter().map(|request| request[stage]).collect());
+        let taps = pass.taps(batch)?;
+        let chunks = crate::v41_experts::dspark::prepare_commit_rows(taps.rows(), self.windows.each_ref(),
+            stage_leases.each_ref().map(|leases| leases.as_slice()), accepted)?;
+        let writes = [self.windows[0].prepare_async_write(&chunks[0], taps.rows().len() as u32)?,
+            self.windows[1].prepare_async_write(&chunks[1], taps.rows().len() as u32)?,
+            self.windows[2].prepare_async_write(&chunks[2], taps.rows().len() as u32)?];
+        self.pending_commit_ids[lane] = ids.to_vec();
+        unsafe { self.mains[lane].enqueue_commit(taps.values(), &batch.cache()?.positions(),
+            self.windows.each_ref(), writes) }
+    }
+    pub fn poll_queued_commit(&self, lane: usize) -> Result<bool> { self.mains[lane].poll_commit() }
+    pub fn finish_queued_commit(&mut self, lane: usize, pass: &mut TargetPass<'_, 'a>,
+        requests: &mut Requests<'a>, batch: &mut RequestBatch, accepted: &[u32]) -> Result<()> {
+        self.mains[lane].publish_commit(&mut self.windows)?;
+        pass.commit(requests, batch, accepted)?;
+        self.pending_commit_ids[lane].clear();
+        Ok(())
+    }
+    /// Drain before revoking any target/cache storage, including partial enqueue.
+    pub fn abort_queued_commit(&mut self, lane: usize, requests: &mut Requests<'a>,
+        batch: &mut RequestBatch) -> Result<()> {
+        // Target publication may have cancelled the batch before returning an
+        // error. Keep cleanup independent of its now-unavailable cache view.
+        let ids = if self.pending_commit_ids[lane].is_empty() {
+            batch.cache().map(|cache| cache.request_ids().to_vec()).unwrap_or_default()
+        } else { self.pending_commit_ids[lane].clone() };
+        let mut result = self.mains[lane].abort_commit(&mut self.windows);
+        self.pending_commit_ids[lane].clear();
+        requests.revoke_batch(batch);
+        for id in ids { if let Err(error) = self.release(id) { result = Err(error); } }
+        result
+    }
+
     /// Inputs are (request identity, anchor, committed end, remaining output budget).
     /// Returned rows retain input order; short histories/budgets use the anchor only.
     pub fn propose(&mut self, lib: &'a NativeLibrary,

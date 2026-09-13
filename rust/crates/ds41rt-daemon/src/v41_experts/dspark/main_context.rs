@@ -1,11 +1,13 @@
 //! Shared main-hidden projection and three independent committed-KV producers.
 use super::{DsparkProjection, DsparkWeights, ProjectionKind};
-use crate::v41_dspark_cache::{DsparkWindow, WindowChunk};
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_dspark_cache::{DsparkWindow, WindowChunk, WindowWrite};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps};
 use std::ffi::c_void;
 mod proposal;
+mod queued;
+pub(crate) use proposal::prepare_commit_rows;
 pub(crate) use proposal::MainProposal;
 
 pub(crate) struct DsparkMainContext<'weights, 'library> {
@@ -22,6 +24,9 @@ pub(crate) struct DsparkMainContext<'weights, 'library> {
     capacity: u32,
     graph: Option<(*mut c_void, u32)>,
     ready: Option<u32>,
+    pending_writes: Option<[WindowWrite; 3]>,
+    commit_descriptors: [DeviceAllocation<'library>; 3],
+    commit_staging: HostAllocation<'library>,
 }
 impl<'library> DsparkWeights<'library> {
     pub fn main_context(
@@ -67,6 +72,9 @@ impl<'library> DsparkWeights<'library> {
             capacity,
             graph: None,
             ready: None,
+            pending_writes: None,
+            commit_descriptors: [DeviceAllocation::new(library, 384)?, DeviceAllocation::new(library, 384)?, DeviceAllocation::new(library, 384)?],
+            commit_staging: HostAllocation::new(library, capacity as usize*8 + 1152)?,
         })
     }
 }
@@ -78,7 +86,7 @@ impl DsparkMainContext<'_, '_> {
             [1, 16, 80, 256, 1024, 4096].contains(&capacity),
             "invalid main context capacity"
         );
-        Ok(capacity as usize * (10240 + 256 + 8 + 3 * 1024)
+        Ok(1152 + capacity as usize * (10240 + 256 + 8 + 3 * 1024)
             + 3 * DsparkProjection::external_input_bytes(library, ProjectionKind::Kv(0), capacity)?)
     }
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
@@ -132,6 +140,7 @@ impl DsparkMainContext<'_, '_> {
         rows: u32,
         stream: *mut c_void,
     ) -> Result<()> {
+        ensure!(self.pending_writes.is_none(), "main-context commit still pending");
         self.ready = None;
         ensure!(
             rows > 0 && rows <= self.capacity,
@@ -144,6 +153,7 @@ impl DsparkMainContext<'_, '_> {
         self.positions.buffer
     }
     fn prepare(&mut self, rows: u32) -> Result<()> {
+        ensure!(self.pending_writes.is_none(), "main-context commit still pending");
         self.ready = None;
         ensure!(
             rows > 0 && rows <= self.capacity,
@@ -356,6 +366,7 @@ impl Drop for DsparkMainContext<'_, '_> {
         if let Err(error) = self.synchronize() {
             tracing::error!(%error,"draining dSpark main context");
         }
+        self.pending_writes = None; // Stream drained before slot reservations release.
         if let Some((graph, _)) = self.graph.take() {
             if let Err(error) = unsafe { self.stream.library.cuda_graph_exec_destroy(graph) } {
                 tracing::error!(%error,"destroying dSpark main context graph");

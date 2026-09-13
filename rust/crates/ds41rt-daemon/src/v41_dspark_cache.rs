@@ -12,6 +12,8 @@ use std::{
 };
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
 mod prefix;
+mod queued;
+pub(crate) use queued::WindowWrite;
 pub(crate) use prefix::DsparkPrefix;
 #[derive(Clone, Copy)]
 pub(crate) struct WindowLease {
@@ -48,17 +50,34 @@ pub(crate) struct WindowRead {
 // Other request slots may be committed, but a live read slot cannot be rewritten
 // or recycled until the chain has drained its GPU work.
 #[derive(Clone, Default)]
-struct ReadSlots(Rc<Cell<[u32; 16]>>);
-struct ReadReservation { slots: ReadSlots, used: [bool; 16] }
-impl ReadSlots {
+struct SlotAccess(Rc<Cell<[u32; 16]>>);
+struct ReadReservation { slots: SlotAccess, used: [bool; 16] }
+const WRITE_RESERVED: u32 = u32::MAX;
+struct WriteReservation { slots: SlotAccess, used: [bool; 16] }
+impl SlotAccess {
     fn writable(&self, slot: usize) -> Result<()> {
-        ensure!(self.0.get()[slot] == 0, "dSpark cache slot has an outstanding reader");
+        ensure!(self.0.get()[slot] == 0, "dSpark cache slot has outstanding access");
         Ok(())
+    }
+    fn readable(&self, slot: usize) -> Result<()> {
+        ensure!(self.0.get()[slot] != WRITE_RESERVED, "dSpark cache write is unpublished");
+        Ok(())
+    }
+    fn reserve_write(&self, used: [bool; 16]) -> Result<WriteReservation> {
+        let mut counts = self.0.get();
+        for (i, active) in used.iter().enumerate() {
+            if *active { self.writable(i)?; counts[i] = WRITE_RESERVED; }
+        }
+        self.0.set(counts);
+        Ok(WriteReservation { slots: self.clone(), used })
     }
     fn reserve(&self, used: [bool; 16]) -> Result<ReadReservation> {
         let mut counts = self.0.get();
         for (i, active) in used.iter().enumerate() {
-            if *active { counts[i] = counts[i].checked_add(1).context("dSpark reader overflow")?; }
+            if *active {
+                ensure!(counts[i] < WRITE_RESERVED-1, "dSpark slot is reserved or reader count exhausted");
+                counts[i] += 1;
+            }
         }
         self.0.set(counts);
         Ok(ReadReservation { slots: self.clone(), used })
@@ -73,6 +92,15 @@ impl Drop for ReadReservation {
         self.slots.0.set(counts);
     }
 }
+impl Drop for WriteReservation {
+    fn drop(&mut self) {
+        let mut counts = self.slots.0.get();
+        for (i, active) in self.used.iter().enumerate() {
+            if *active { debug_assert_eq!(counts[i], WRITE_RESERVED); counts[i] = 0; }
+        }
+        self.slots.0.set(counts);
+    }
+}
 pub(crate) struct DsparkWindow<'a> {
     stream: LoadStream<'a>,
     kernel: V41DsparkCache<'a>,
@@ -82,7 +110,7 @@ pub(crate) struct DsparkWindow<'a> {
     staging: HostAllocation<'a>,
     graph: Option<*mut c_void>,
     slots: [Slot; 16],
-    readers: ReadSlots,
+    access: SlotAccess,
     slot_count: usize,
     source_rows: u32,
     owner: u64,
@@ -120,7 +148,7 @@ impl<'a> DsparkWindow<'a> {
             staging: HostAllocation::new(library, 384)?,
             graph: None,
             slots: [Slot::default(); 16],
-            readers: ReadSlots::default(),
+            access: SlotAccess::default(),
             slot_count: slots,
             source_rows,
             owner,
@@ -172,7 +200,7 @@ impl<'a> DsparkWindow<'a> {
             self.slots[slot].request.is_none(),
             "dSpark window slot is occupied"
         );
-        self.readers.writable(slot)?;
+        self.access.writable(slot)?;
         let generation = self.slots[slot]
             .generation
             .checked_add(1)
@@ -211,7 +239,7 @@ impl<'a> DsparkWindow<'a> {
     }
     pub fn release(&mut self, lease: WindowLease) -> Result<()> {
         let slot = self.validate(lease)?;
-        self.readers.writable(slot)?;
+        self.access.writable(slot)?;
         self.slots[slot].request = None;
         self.slots[slot].end = None;
         Ok(())
@@ -235,7 +263,7 @@ impl<'a> DsparkWindow<'a> {
         let mut ends = [None; 16];
         for (i, chunk) in chunks.iter().enumerate() {
             let slot = self.validate(chunk.lease)?;
-            self.readers.writable(slot)?;
+            self.access.writable(slot)?;
             ensure!(!seen[slot], "duplicate cache slot in batch");
             seen[slot] = true;
             ensure!(
@@ -341,7 +369,7 @@ impl<'a> DsparkWindow<'a> {
             ring: self.ring.buffer,
             slots: self.slot_count as u32,
             descriptors,
-            _reservation: self.readers.reserve(seen)?,
+            _reservation: self.access.reserve(seen)?,
         })
     }
     /// Packed [128,528] bytes: E4M3 values and E8M0 K32 scales per row.
@@ -349,6 +377,7 @@ impl<'a> DsparkWindow<'a> {
     /// draft positions. No chronological reordering of this buffer is necessary.
     pub fn view(&self, lease: WindowLease) -> Result<WindowView> {
         let slot = self.validate(lease)?;
+        self.access.readable(slot)?;
         let end = self.slots[slot]
             .end
             .context("dSpark window has not been seeded")?;
@@ -380,7 +409,7 @@ mod reservation_tests {
     use super::*;
     #[test]
     fn readers_block_only_their_slots_until_last_consumer_finishes() -> Result<()> {
-        let slots = ReadSlots::default();
+        let slots = SlotAccess::default();
         let mut used = [false; 16]; used[3] = true; used[9] = true;
         let first = slots.reserve(used)?;
         let second = slots.reserve(used)?;
@@ -391,6 +420,83 @@ mod reservation_tests {
         assert!(slots.writable(3).is_err());
         drop(second);
         slots.writable(3)?; slots.writable(9)?;
+        Ok(())
+    }
+    #[test]
+    fn writers_exclude_readers_and_recycle_without_blocking_peer_slots() -> Result<()> {
+        let slots = SlotAccess::default();
+        let mask = |slot| std::array::from_fn(|i| i == slot);
+        let first = slots.reserve_write(mask(3))?;
+        assert!(slots.readable(3).is_err());
+        assert!(slots.reserve(mask(3)).is_err());
+        assert!(slots.reserve_write(mask(3)).is_err());
+        assert!(slots.writable(3).is_err());
+        let peer = slots.reserve_write(mask(9))?;
+        let reader = slots.reserve(mask(4))?;
+        assert!(slots.reserve_write(mask(4)).is_err());
+        // Failed multi-slot reservations must not reserve the earlier free slot.
+        let overlapping = std::array::from_fn(|i| i == 1 || i == 3);
+        assert!(slots.reserve_write(overlapping).is_err());
+        assert!(slots.reserve(overlapping).is_err());
+        slots.writable(1)?;
+        drop(first);
+        slots.readable(3)?;
+        slots.writable(3)?;
+        assert!(slots.readable(9).is_err());
+        drop(peer);
+        drop(reader);
+        assert_eq!(slots.0.get(), [0; 16]);
+        Ok(())
+    }
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB and CUDA"]
+    fn native_queued_writes_publish_independently_and_revoke_partial_transactions() -> Result<()> {
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let mut window = DsparkWindow::new(&lib, 2, 2, usize::MAX)?;
+        let first = window.begin_request(0, 11)?;
+        let second = window.begin_request(1, 22)?;
+        lib.copy_h2d(window.source(), &vec![0; 2048])?;
+        let chunk = |lease, position| WindowChunk { lease, position, source_row: 0, tokens: 2 };
+        unsafe { window.write(&[chunk(first, 0), chunk(second, 0)])?; }
+        let first_write = window.prepare_async_write(&[chunk(first, 2)], 2)?;
+        let second_write = window.prepare_async_write(&[chunk(second, 2)], 2)?;
+        assert!(window.attention_read(&[(first, 2)]).is_err());
+        assert!(window.retain_prefix(first).is_err());
+        assert!(window.release(first).is_err());
+        assert_eq!(window.committed_end(first)?, Some(2));
+        let descriptors = [DeviceAllocation::new(&lib, 384)?, DeviceAllocation::new(&lib, 384)?];
+        lib.copy_h2d(descriptors[0].buffer, first_write.descriptor_bytes())?;
+        lib.copy_h2d(descriptors[1].buffer, second_write.descriptor_bytes())?;
+        // Declare streams last: error unwinding drains them before tickets/buffers.
+        let streams = [LoadStream { library: &lib, raw: lib.cuda_stream_create()? },
+            LoadStream { library: &lib, raw: lib.cuda_stream_create()? }];
+        unsafe {
+            window.enqueue_write(&first_write, window.source(), descriptors[0].buffer, streams[0].raw)?;
+            window.enqueue_write(&second_write, window.source(), descriptors[1].buffer, streams[1].raw)?;
+            lib.cuda_stream_synchronize(streams[0].raw)?;
+            window.publish_write(first_write)?;
+        }
+        assert_eq!(window.committed_end(first)?, Some(4));
+        assert_eq!(window.committed_end(second)?, Some(2));
+        drop(window.attention_read(&[(first, 4)])?);
+        assert!(window.attention_read(&[(second, 2)]).is_err());
+        unsafe {
+            lib.cuda_stream_synchronize(streams[1].raw)?;
+            window.publish_write(second_write)?;
+        }
+        assert_eq!(window.committed_end(second)?, Some(4));
+        drop(streams);
+        let failed = window.prepare_async_write(&[chunk(first, 4)], 2)?;
+        lib.copy_h2d(descriptors[0].buffer, failed.descriptor_bytes())?;
+        let stream = LoadStream { library: &lib, raw: lib.cuda_stream_create()? };
+        unsafe {
+            window.enqueue_write(&failed, window.source(), descriptors[0].buffer, stream.raw)?;
+            lib.cuda_stream_synchronize(stream.raw)?;
+            window.revoke_write(failed)?;
+        }
+        assert!(window.request_id(first).is_err());
+        assert_eq!(window.committed_end(second)?, Some(4));
+        drop(window.attention_read(&[(second, 4)])?);
         Ok(())
     }
     #[test]

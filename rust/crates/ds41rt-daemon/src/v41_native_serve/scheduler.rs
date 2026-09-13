@@ -341,14 +341,19 @@ fn single_lane_round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::R
     result
 }
 
-fn commit_lane<'w, 'a>(lib: &'a NativeLibrary, lane: usize, pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
-    active: &mut [Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
-    owned_batch: &mut Option<RequestBatch>, next: &BatchScores,
-    mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, verify_us: u64,
-) -> Result<(u32, usize, Vec<Vec<u32>>)> {
+struct CommitDecision {
+    accepted_drafts: u32,
+    emitted: usize,
+    accepted: Vec<u32>,
+    emissions: Vec<Vec<u32>>,
+    next_after_commit: Vec<Option<TokenScores>>,
+}
+fn prepare_commit_lane<'a>(lib: &'a NativeLibrary, lane: usize, pass: &TargetPass<'_, 'a>,
+    requests: &Requests<'a>, active: &[Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
+    batch: &RequestBatch, next: &BatchScores, draft: Option<&DraftRuntime<'_, 'a>>, verify_us: u64,
+) -> Result<CommitDecision> {
     let mut accepted_drafts = 0u32;
     let mut emitted = 0usize;
-    let Some(batch) = owned_batch else { return Ok((0, 0, Vec::new())); };
     let mut offset = 0;
     let mut accepted = Vec::new();
     let mut emissions = Vec::new();
@@ -373,7 +378,7 @@ fn commit_lane<'w, 'a>(lib: &'a NativeLibrary, lane: usize, pass: &mut TargetPas
                 constrained=request.constraint.is_some(),
                 "native verification logits");
         }
-        if let Some(confidence) = draft.as_deref()
+        if let Some(confidence) = draft
             .and_then(|draft| draft.confidence_trace(request.id)) {
             // Agreement after the first mismatch is conditional on a
             // rejected history and must not be treated as acceptance.
@@ -398,8 +403,14 @@ fn commit_lane<'w, 'a>(lib: &'a NativeLibrary, lane: usize, pass: &mut TargetPas
         } else { None });
         offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
     }
+    Ok(CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit })
+}
+fn publish_commit_lane<'a>(pass: &TargetPass<'_, 'a>, active: &mut [Option<Active<'a>>],
+    members: &[usize], inputs: &[Vec<u32>], owned_batch: &mut Option<RequestBatch>,
+    mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, decision: CommitDecision,
+) -> Result<(u32, usize, Vec<Vec<u32>>)> {
+    let CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit } = decision;
     if let Some(draft) = draft.as_deref_mut() {
-        draft.commit_batch(pass, requests, batch, &accepted)?;
         if capture_routes {
             let mut offset = 0;
             for ((&slot, input), &count) in members.iter().zip(inputs).zip(&accepted) {
@@ -409,10 +420,21 @@ fn commit_lane<'w, 'a>(lib: &'a NativeLibrary, lane: usize, pass: &mut TargetPas
             }
         }
     }
-    else { pass.commit(requests, batch, &accepted)?; }
-    *owned_batch = None; // Only successful commits relinquish cleanup ownership.
+    *owned_batch = None;
     for (&slot, next_token) in members.iter().zip(next_after_commit) {
         active[slot].as_mut().unwrap().next_after_commit = next_token;
     }
     Ok((accepted_drafts, emitted, emissions))
+}
+fn commit_lane<'w, 'a>(lib: &'a NativeLibrary, lane: usize, pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
+    active: &mut [Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
+    owned_batch: &mut Option<RequestBatch>, next: &BatchScores,
+    mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, verify_us: u64,
+) -> Result<(u32, usize, Vec<Vec<u32>>)> {
+    let Some(batch) = owned_batch else { return Ok((0, 0, Vec::new())); };
+    let decision = prepare_commit_lane(lib, lane, pass, requests, active, members, inputs,
+        batch, next, draft.as_deref(), verify_us)?;
+    if let Some(draft) = draft.as_deref_mut() { draft.commit_batch(pass, requests, batch, &decision.accepted)?; }
+    else { pass.commit(requests, batch, &decision.accepted)?; }
+    publish_commit_lane(pass, active, members, inputs, owned_batch, draft, capture_routes, decision)
 }
