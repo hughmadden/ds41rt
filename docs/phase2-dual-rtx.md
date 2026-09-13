@@ -770,3 +770,21 @@ than attempting to restart GPU1 at GPU0's layer zero. The fixture uses a small
 cache and synthetic token IDs: it establishes execution and lifecycle behavior,
 not semantic quality, throughput, or concurrent-lane performance. Its native
 build requires `DS41RT_ENABLE_RDMA=ON` for the live decoder path.
+
+## Queued encoder cache publication
+
+Early encoder publication now accepts device-owned window and compressor waves.
+It can enqueue writes on their assigned GPU, return the request-bank borrow,
+and publish after cooperative polling. Publication rejects unfinished writes
+before changing publication masks or request completion. Direct single-GPU
+callers retain their synchronous path; accepted prompt counts use a fixed
+sixteen-request array.
+
+The placed cache transaction fixture verifies two reserved chunks of three and
+four tokens against direct publication, including ratio-two carry across the odd
+boundary. All twenty encoder windows and four compressed sources match exactly
+with source 14 and source 20 on GPU1. Publication leaves request completion
+unchanged until the enclosing commit. Duplicate publication is rejected, and
+aborting queued GPU1 window/source writes preserves a disjoint peer request.
+The distributed target loop still rejects reserved chunks until this primitive
+is connected to its chunk scheduling and cancellation guards.

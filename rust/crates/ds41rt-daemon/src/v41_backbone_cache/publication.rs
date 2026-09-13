@@ -74,29 +74,83 @@ impl BackboneCache<'_> {
         }
         Ok(())
     }
-    /// Publish completed prompt KV after all consumers of the private window
-    /// have drained. This invalidates that window proposal; it does not accept
-    /// the chunk's FFN output or advance Engram/request completion.
-    pub fn publish_encoder_window(&mut self, batch: &CacheBatch, layer: usize,
-        wave: &mut WindowWave<'_, '_>) -> Result<()> {
+    fn publication_counts(&self, batch: &CacheBatch) -> Result<([u32; 16], usize)> {
+        ensure!(batch.requests.len() <= 16, "too many publication requests");
+        let mut counts = [0; 16];
+        for (count, request) in counts.iter_mut().zip(&batch.requests) {
+            *count = request.work.tokens;
+        }
+        Ok((counts, batch.requests.len()))
+    }
+    fn validate_window_publication<'w, 'a: 'w, W: CacheWave<WindowWave<'w, 'a>>>(
+        &self, batch: &CacheBatch, layer: usize, wave: &W,
+    ) -> Result<()> {
         let (windows, _) = self.validate_publication(batch)?;
         ensure!(layer < 20 && windows & (1u64 << layer) == 0,
             "invalid or already published encoder window");
-        wave.validate_batch(&self.windows[layer], &batch.window_chunks(layer)?)?;
-        let counts = batch.requests.iter().map(|r| r.work.tokens).collect::<Vec<_>>();
-        let result = wave.commit(&mut self.windows[layer], &counts);
+        ensure!(wave.wave_ref().input().device_id == self.windows[layer].device.id,
+            "encoder window publication GPU differs");
+        wave.on_device(|wave| wave.validate_batch(&self.windows[layer], &batch.window_chunks(layer)?))
+    }
+    fn validate_source_publication<'w, 'a: 'w, W: CacheWave<CompressorWave<'w, 'a>>>(
+        &self, batch: &CacheBatch, layer: usize, wave: &W,
+    ) -> Result<usize> {
+        let (_, sources) = self.validate_publication(batch)?;
+        let i = SOURCES.iter().position(|&l| l == layer).context("invalid source layer")?;
+        ensure!(sources & (1 << i) == 0, "encoder source already published");
+        ensure!(wave.wave_ref().input().device_id == self.sources[i].device.id,
+            "encoder source publication GPU differs");
+        wave.on_device(|wave| wave.validate_batch(&self.sources[i], &batch.source_chunks(layer)?))?;
+        Ok(i)
+    }
+    /// Queue prompt window writes without publishing history or waiting for CUDA.
+    /// # Safety
+    /// All proposal readers have drained. Retain this bank and wave, poll the
+    /// owning wave's commit, then publish; abort writes before releasing requests.
+    pub unsafe fn enqueue_encoder_window<'w, 'a: 'w, W: CacheWave<WindowWave<'w, 'a>>>(
+        &self, batch: &CacheBatch, layer: usize, wave: &mut W,
+    ) -> Result<()> {
+        self.validate_window_publication(batch, layer, wave)?;
+        let (counts, len) = self.publication_counts(batch)?;
+        wave.on_device_mut(|wave| unsafe { wave.enqueue_commit(&self.windows[layer], &counts[..len]) })
+    }
+    /// Queue compressed prompt writes, including ratio-two carry, on their GPU.
+    /// # Safety
+    /// Same retained-owner and drained-reader contract as enqueue_encoder_window.
+    pub unsafe fn enqueue_encoder_source<'w, 'a: 'w, W: CacheWave<CompressorWave<'w, 'a>>>(
+        &self, batch: &CacheBatch, layer: usize, wave: &mut W,
+    ) -> Result<()> {
+        let i = self.validate_source_publication(batch, layer, wave)?;
+        let (counts, len) = self.publication_counts(batch)?;
+        wave.on_device_mut(|wave| unsafe { wave.enqueue_commit(&self.sources[i], &counts[..len]) })
+    }
+    /// Publish completed prompt KV after all consumers of the private window
+    /// have drained. Queued writes must be ready; direct callers keep their
+    /// synchronous path. Neither advances Engram/request completion.
+    pub fn publish_encoder_window<'w, 'a: 'w, W: CacheWave<WindowWave<'w, 'a>>>(
+        &mut self, batch: &CacheBatch, layer: usize, wave: &mut W,
+    ) -> Result<()> {
+        self.validate_window_publication(batch, layer, wave)?;
+        ensure!(wave.on_device(|wave| wave.poll_commit())?, "encoder window writes pending");
+        let (counts, len) = self.publication_counts(batch)?;
+        let result = wave.on_device_mut(|wave| wave.commit(&mut self.windows[layer], &counts[..len]));
+        if result.is_err() {
+            wave.on_device_mut(|wave| wave.abort_commit(&mut self.windows[layer]))?;
+        }
         self.finish_publication(batch, 1u64 << layer, 0, result)
     }
     /// Publish the full prompt source proposal, including its ratio-two carry.
     /// Later consumers must use a committed view with a retained causal snapshot.
-    pub fn publish_encoder_source(&mut self, batch: &CacheBatch, layer: usize,
-        wave: &mut CompressorWave<'_, '_>) -> Result<()> {
-        let (_, sources) = self.validate_publication(batch)?;
-        let i = SOURCES.iter().position(|&l| l == layer).context("invalid source layer")?;
-        ensure!(sources & (1 << i) == 0, "encoder source already published");
-        wave.validate_batch(&self.sources[i], &batch.source_chunks(layer)?)?;
-        let counts = batch.requests.iter().map(|r| r.work.tokens).collect::<Vec<_>>();
-        let result = wave.commit(&mut self.sources[i], &counts).map(|_| ());
+    pub fn publish_encoder_source<'w, 'a: 'w, W: CacheWave<CompressorWave<'w, 'a>>>(
+        &mut self, batch: &CacheBatch, layer: usize, wave: &mut W,
+    ) -> Result<()> {
+        let i = self.validate_source_publication(batch, layer, wave)?;
+        ensure!(wave.on_device(|wave| wave.poll_commit())?, "encoder source writes pending");
+        let (counts, len) = self.publication_counts(batch)?;
+        let result = wave.on_device_mut(|wave| wave.commit(&mut self.sources[i], &counts[..len]).map(|_| ()));
+        if result.is_err() {
+            wave.on_device_mut(|wave| wave.abort_commit(&mut self.sources[i]))?;
+        }
         self.finish_publication(batch, 0, 1 << i, result)
     }
 }

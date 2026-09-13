@@ -97,6 +97,75 @@ fn placed_cache_commits_match_direct_and_preserve_peer_requests() -> Result<()> 
     assert_eq!(bank.committed_end(replacement)?,6);
     assert!(committed_bytes(&lib,&bank,replacement)? == committed_bytes(&lib,&reference,refs[0])?,
         "restored odd carry changed the next accepted row");
+    bank.release(&[replacement])?;
+    reference.release(&[refs[0]])?;
+    let encoder = bank.begin_request(0, 44)?;
+    let reference_encoder = reference.begin_request(0, 44)?;
+    bank.begin_encoder(encoder, 10)?;
+    reference.begin_encoder(reference_encoder, 10)?;
+    let mut end = 0;
+    for (chunk, tokens) in [3, 4].into_iter().enumerate() {
+        let batch = bank.reserve_encoder(&[CacheWork {
+            lease: encoder, tokens, kind: ExpertV2SourceKind::Prefill,
+        }])?;
+        let rb = reference.reserve_encoder(&[CacheWork {
+            lease: reference_encoder, tokens, kind: ExpertV2SourceKind::Prefill,
+        }])?;
+        produce(&lib, &bank, &batch, &mut lanes[0].windows, &mut lanes[0].sources, 120 + chunk)?;
+        produce(&lib, &reference, &rb, &mut rw, &mut rs, 120 + chunk)?;
+        for layer in 0..20 {
+            unsafe { bank.enqueue_encoder_window(&batch, layer, &mut lanes[0].windows[layer])?; }
+        }
+        for (i, layer) in SOURCES.into_iter().enumerate() {
+            unsafe { bank.enqueue_encoder_source(&batch, layer, &mut lanes[0].sources[i])?; }
+        }
+        assert_eq!(bank.committed_end(encoder)?, end);
+        assert_eq!(bank.publication_masks(&batch)?, (0, 0));
+        runtime.block_on(async {
+            for wave in &lanes[0].windows[..20] {
+                while !wave.on_device(|wave| wave.poll_commit())? { tokio::task::yield_now().await; }
+            }
+            for wave in &lanes[0].sources {
+                while !wave.on_device(|wave| wave.poll_commit())? { tokio::task::yield_now().await; }
+            }
+            Ok::<_, anyhow::Error>(())
+        })?;
+        for layer in 0..20 {
+            bank.publish_encoder_window(&batch, layer, &mut lanes[0].windows[layer])?;
+            reference.publish_encoder_window(&rb, layer, &mut rw[layer])?;
+            assert!(bank.publish_encoder_window(&batch, layer, &mut lanes[0].windows[layer]).is_err());
+        }
+        for (i, layer) in SOURCES.into_iter().enumerate() {
+            bank.publish_encoder_source(&batch, layer, &mut lanes[0].sources[i])?;
+            reference.publish_encoder_source(&rb, layer, &mut rs[i])?;
+            assert!(bank.publish_encoder_source(&batch, layer, &mut lanes[0].sources[i]).is_err());
+        }
+        assert_eq!(bank.publication_masks(&batch)?, ((1 << 20) - 1, 15));
+        assert_eq!(bank.committed_end(encoder)?, end);
+        unsafe { lanes[0].enqueue_cache_commit(&bank, &batch, &[tokens])?; }
+        assert!(lanes[0].poll_cache_commit()?);
+        lanes[0].finish_cache_commit(&mut bank, &batch, &[tokens])?;
+        reference.commit(&rb, &mut rw, &mut rs, &[tokens])?;
+        end += u64::from(tokens);
+        assert_eq!(bank.committed_end(encoder)?, end);
+        assert!(committed_bytes(&lib, &bank, encoder)? == committed_bytes(&lib, &reference, reference_encoder)?,
+            "placed early publication differs from direct encoder cache");
+        assert_eq!(lib.cuda_get_device()?, 0);
+    }
+    let batch = bank.reserve_encoder(&[CacheWork {
+        lease: encoder, tokens: 3, kind: ExpertV2SourceKind::Prefill,
+    }])?;
+    produce(&lib, &bank, &batch, &mut lanes[0].windows, &mut lanes[0].sources, 130)?;
+    unsafe {
+        bank.enqueue_encoder_window(&batch, 14, &mut lanes[0].windows[14])?;
+        bank.enqueue_encoder_source(&batch, 14, &mut lanes[0].sources[2])?;
+    }
+    lanes[0].abort_cache_commit(&mut bank)?;
+    assert!(bank.validate_batch(&batch).is_err());
+    assert_eq!(bank.committed_end(leases[1])?, 2);
+    assert!(committed_bytes(&lib, &bank, leases[1])? == expected[1]);
+    bank.release(&[encoder])?;
+    eprintln!("PASS queued placed encoder publication: two odd-boundary chunks, all 24 owners, exact direct bytes, abort preserves peer request");
     assert_eq!(lib.cuda_get_device()?,0);
     Ok(())
 }
