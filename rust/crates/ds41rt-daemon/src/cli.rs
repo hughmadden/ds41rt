@@ -502,8 +502,8 @@ pub(crate) struct NativeServeArgs {
     #[arg(long)]
     pub memory_reservation: Option<crate::v41_native_serve::memory::Reservation>,
 
-    /// Complete bottom-up RTX routed layers: auto or 0..40. Opt-in during qualification.
-    #[arg(long, default_value = "0")]
+    /// Complete bottom-up RTX routed layers: auto fills available memory, or 0..40.
+    #[arg(long, default_value = "auto")]
     pub rtx_expert_layers: crate::v41_native_serve::memory::LocalLayers,
 
 
