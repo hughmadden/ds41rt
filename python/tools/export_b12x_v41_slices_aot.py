@@ -30,10 +30,18 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark", *,
     props = torch.cuda.get_device_properties(0)
     if (props.major, props.minor) not in ((12, 0), (12, 1)):
         raise ValueError("native Blackwell device required")
+    if role not in ("spark", "coordinator", "rtx_backbone"):
+        raise ValueError("unsupported expert placement role")
     coordinator = role == "coordinator"
+    local_backbone = role == "rtx_backbone"
+    if local_backbone and (props.major, props.minor) != (12, 0):
+        raise ValueError("full backbone slices require SM120")
     if coordinator and ((props.major, props.minor) != (12, 0) or atomic_min_capacity is not None):
         raise ValueError("coordinator slices require SM120 and ordered route output")
-    experts, intermediate, kernel_intermediate, topk = ((128, 2304, 2304, 3) if coordinator else (384, 576, 640, 6))
+    experts, intermediate, kernel_intermediate, topk = (
+        (128, 2304, 2304, 3) if coordinator else
+        (384, 2304, 2304, 6) if local_backbone else (384, 576, 640, 6)
+    )
     output.mkdir(parents=True, exist_ok=True)
     manifest = dict(
         schema=1,
@@ -44,6 +52,8 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark", *,
         capability=[props.major, props.minor],
         physical_sms=props.multi_processor_count,
         width=width,
+        geometry=dict(experts=experts, hidden=5120, intermediate=intermediate,
+                      kernel_intermediate=kernel_intermediate, topk=topk),
         variants=[],
     )
     includes, entries = [], []
@@ -80,7 +90,8 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark", *,
         label = (f"v41_{role}_m{capacity}" if standard_names
                  else f"v41_slices_m{capacity}_w{selected_width}")
         pipeline = (V41DraftSlicePipeline(capacity, selected_width, props.multi_processor_count)
-                    if coordinator else V41SlicePipeline(capacity, selected_width, atomic_tokens=atomic))
+                    if coordinator else V41SlicePipeline(capacity, selected_width, atomic_tokens=atomic,
+                                               experts=experts, topk=topk, intermediate=intermediate))
         if coordinator:
             args.insert(0, make_fake_tensor(cutlass.BFloat16, (capacity, 5120), (5120, 1), assumed_align=16))
         compiled = cute.compile(
@@ -191,7 +202,7 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark", *,
         )
         info = [
             3 if atomic else 2,
-            0 if coordinator else 1,
+            0 if coordinator else 2 if local_backbone else 1,
             experts,
             5120,
             intermediate,
@@ -259,7 +270,7 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark", *,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--role", choices=("spark", "coordinator"), default="spark")
+    parser.add_argument("--role", choices=("spark", "coordinator", "rtx_backbone"), default="spark")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--rows", default="1,16,80")
     parser.add_argument(

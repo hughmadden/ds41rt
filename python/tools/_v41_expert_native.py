@@ -83,13 +83,15 @@ def check(code):
 
 
 class Native:
-    def __init__(self, lib, capacity, weights, wire, ids, routing, *, coordinator=False):
+    def __init__(self, lib, capacity, weights, wire, ids, routing, *, coordinator=False, full_backbone=False):
+        assert not (coordinator and full_backbone)
         self.lib = lib
         self.info = info = Info()
         self.handle = P()
         check(lib.ds41rt_v41_expert_info(capacity, C.byref(info)))
         expected = ((0, 128, 5120, 2304, 2304, 3, capacity, 1)
-                    if coordinator else (1, 384, 5120, 576, 640, 6, capacity, 7))
+                    if coordinator else (2, 384, 5120, 2304, 2304, 6, capacity, 7)
+                    if full_backbone else (1, 384, 5120, 576, 640, 6, capacity, 7))
         assert (
             info.abi_version,
             info.role,

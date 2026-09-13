@@ -372,12 +372,13 @@ impl NativeLibrary {
             "unsupported V4.1 native expert ABI"
         );
         ensure!(
-            info.input_dtype == 1 || (info.role == 1 && info.input_dtype == 7),
+            info.input_dtype == 1 || (matches!(info.role, 1 | 2) && info.input_dtype == 7),
             "unsupported native expert input representation"
         );
         let expected = match info.role {
             0 => (128, 2304, 2304, 3),
             1 => (384, 576, 640, 6),
+            2 => (384, 2304, 2304, 6),
             _ => anyhow::bail!("unknown V4.1 expert role {}", info.role),
         };
         ensure!(
@@ -425,7 +426,7 @@ impl NativeLibrary {
             let query = unsafe { self.lib.get::<OutputKindFn>(b"ds41rt_v41_expert_output_kind")? };
             let mut kind = u32::MAX;
             let status = unsafe { query(i32::try_from(capacity)?, &mut kind) };
-            ensure!(status == 0 && kind == 1 && info.role == 1, "unsupported V4.1 ABI 3 output layout");
+            ensure!(status == 0 && kind == 1 && matches!(info.role, 1 | 2), "unsupported V4.1 ABI 3 output layout");
             // Reject incomplete libraries at plan time, before any graph or request.
             unsafe { self.lib.get::<CompactFn>(b"ds41rt_v41_compact_tokens_bf16_async")?; }
             true

@@ -1,0 +1,87 @@
+{
+  "scope": "Isolated full-width RTX expert AOT qualification; not serving or performance qualification",
+  "gpu": "GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+  "power_limit_w": 400,
+  "geometry": {
+    "role": 2,
+    "experts": 384,
+    "hidden": 5120,
+    "intermediate": 2304,
+    "topk": 6,
+    "input": "FP8 K32",
+    "output": "FP32 routes"
+  },
+  "capacities": [
+    1,
+    16
+  ],
+  "width": 192,
+  "native_checks": [
+    {
+      "case": "one",
+      "rows": 1,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 1614880
+    },
+    {
+      "case": "shared2",
+      "rows": 2,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "mixed6",
+      "rows": 6,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "shared16",
+      "rows": 16,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "return_one",
+      "rows": 1,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 1614880
+    },
+    {
+      "case": "draft5",
+      "rows": 5,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    },
+    {
+      "case": "draft15",
+      "rows": 15,
+      "width": 192,
+      "exact": true,
+      "scratch_bytes": 25722256
+    }
+  ],
+  "oracle": "Pinned grouped full-width slice kernel with independent CPU route metadata; exact ordered route outputs. That reference also checks against a PyTorch numerical oracle.",
+  "expert_id_coverage": "128-expert reference bytes relocated into slots 256..383 of a 384-expert arena; includes expert 383.",
+  "limitations": [
+    "Synthetic weights; official checkpoint end-to-end quality not checked",
+    "No timing, startup or complete layer residency measurements",
+    "Native capacity 80 and prefill not checked",
+    "No serving dispatch integration yet"
+  ],
+  "sha256": {
+    "python/tools/export_b12x_v41_slices_aot.py": "2a9932012be0e4614e55947ebae773552e4e0422f37da2ede09b41ecafead4a4",
+    "python/tools/qualify_v41_slice_native.py": "886aa569c215e693b1a7d43438ccb08c15d9e5f8cb1569451c9db35acbbd8461",
+    "python/tools/_v41_expert_native.py": "7ee54254d9838158963a76d594ab0078675da3e0238f3a5e9f7fbc0d0a80684f",
+    "native/src/v41_experts.cc": "87c5d6e1c55c373b0413aaae6accf2d5021c59766c5f37bb00af42c3d8ac253f",
+    "native/cuda/kernels/v41_expert_pack.cu": "777a41c5cc15ee46cde3697aa61d46484c1ca98769b061ee0a95b0e5241cd456",
+    "/tmp/ds41-rtx-full-experts/libds41rt_full_experts.so": "46093408fc5aadc0fdbf0e0f681defbd3cb530498d9d20f81b3404e9bf3b7942",
+    "/tmp/ds41-rtx-full-experts/aot/v41_experts.json": "ab8f154ad3fb7fa21767a394604904bc8e4eb69654fd48b77a3ab64f783d7b94"
+  }
+}

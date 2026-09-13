@@ -30,7 +30,7 @@ typedef struct ds41rt_v41_expert_launch_t {
 
 typedef struct ds41rt_v41_expert_info_t {
   uint32_t abi_version;
-  uint32_t role; /* 0: coordinator dSpark; 1: Spark backbone shard */
+  uint32_t role; /* 0: coordinator dSpark; 1: Spark TP4 shard; 2: full RTX backbone */
   uint32_t experts;
   uint32_t hidden_size;
   uint32_t logical_intermediate;
