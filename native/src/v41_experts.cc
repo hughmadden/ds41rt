@@ -203,7 +203,7 @@ struct InputQuantModule {
   cudaLibrary_t library = nullptr;
   int device = -1;
   ~InputQuantModule() { if (library) cudaLibraryUnload(library); }
-} input_quant;
+} input_quant, peer_input_quant;
 }
 extern "C" int32_t ds41rt_v41_expert_input_quant_initialize(void** out) {
   if (!out) return cudaErrorInvalidValue;
@@ -216,30 +216,32 @@ extern "C" int32_t ds41rt_v41_expert_input_quant_initialize(void** out) {
   if (major != 12 || minor != DS41RT_V41_CC_MINOR || sms != DS41RT_V41_SMS)
     return cudaErrorInvalidDevice;
   std::lock_guard<std::mutex> lock(initialization_mutex);
-  if (input_quant.device >= 0) {
-    if (input_quant.device != device) return cudaErrorInvalidDevice;
-    *out = &input_quant;
-    return cudaSuccess;
-  }
+  auto* owner = input_quant.device == device ? &input_quant :
+      (peer_input_quant.device == device ? &peer_input_quant :
+       (input_quant.device < 0 ? &input_quant : (peer_input_quant.device < 0 ? &peer_input_quant : nullptr)));
+  if (!owner) return cudaErrorInvalidDevice;
+  if (owner->device == device) { *out=owner;return cudaSuccess; }
+  // One canonical library owns process-global generated launch symbols.
+  const bool existing = input_quant.library != nullptr;
   auto* library = &input_quant.library;
   void* init[] = {&library, &status};
-  _mlir_ds41rt_v41_expert_input_quant_cuda_init(init);
+  if (!existing) _mlir_ds41rt_v41_expert_input_quant_cuda_init(init);
   if (!status) {
     void* load[] = {&library, &device, &status};
     _mlir_ds41rt_v41_expert_input_quant_cuda_load_to_device(load);
   }
   if (status) {
-    if (input_quant.library) cudaLibraryUnload(input_quant.library);
-    input_quant.library = nullptr;
+    if (!existing) { if (input_quant.library) cudaLibraryUnload(input_quant.library); input_quant.library = nullptr; }
     return status;
   }
-  input_quant.device = device;
-  *out = &input_quant;
+  owner->device = device;
+  *out = owner;
   return cudaSuccess;
 }
 extern "C" int32_t ds41rt_v41_expert_input_quantize_async(void* kernel,
     const uint16_t* input, uint8_t* output, uint32_t rows, void* stream) {
-  if (kernel != &input_quant || input_quant.device < 0 || !input || !output ||
+  auto* owner = kernel == &input_quant ? &input_quant : (kernel == &peer_input_quant ? &peer_input_quant : nullptr);
+  if (!owner || owner->device < 0 || !input || !output ||
       rows == 0 || rows > 4096) return cudaErrorInvalidValue;
   const auto a = reinterpret_cast<uintptr_t>(input), b = reinterpret_cast<uintptr_t>(output);
   const uint64_t an = uint64_t(rows) * 10240, bn = uint64_t(rows) * 5280;
@@ -247,7 +249,7 @@ extern "C" int32_t ds41rt_v41_expert_input_quantize_async(void* kernel,
       (a <= b ? b-a < an : a-b < bn)) return cudaErrorInvalidValue;
   int device;
   auto status = cudaGetDevice(&device); if (status) return status;
-  if (device != input_quant.device) return cudaErrorInvalidDevice;
+  if (device != owner->device) return cudaErrorInvalidDevice;
   void* source = const_cast<uint16_t*>(input);
   void* values = output;
   void* scales = output + 5120;

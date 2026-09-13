@@ -6,6 +6,8 @@ use crate::v41_hc::HcSublayer;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 mod encoder_suffix;
+mod transfer;
+pub(crate) use transfer::BlockTransfer;
 pub(crate) use encoder_suffix::EncoderSuffix;
 #[derive(Clone, Copy)]
 enum Phase {
@@ -149,7 +151,7 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
             attention,
             ffn,
             capacity,
-            tokens: Vec::new(),
+            tokens: Vec::with_capacity(capacity),
             phase: Phase::Idle,
         }
     }

@@ -597,3 +597,53 @@ head-weight, and selected-ID parity against direct execution. Its short context
 checks binding and placement; the separate scorer graph fixture explicitly runs
 the scoring kernel. Existing index budget checks also pass. Full distributed
 attention/layer-state execution and serving performance qualification remain.
+
+## Placed backbone state and adjacent-layer handoff
+
+Backbone mHC, attention query/output, and router weights now load on the GPU
+assigned to each attention layer. A placed lane allocates its reusable block,
+query, projection, sparse-attention, and router workspaces on that GPU. Full
+shared-expert weights and their workspace are absent from placed lanes: the TP2
+rank owners provide them separately. Ordinary loading still includes all forty
+full shared experts and their existing workspace.
+
+For the rebalanced layer-14 boundary, backbone weight budgets excluding shared
+experts are 1,902,329,296 bytes on GPU0 and 3,532,897,264 bytes on GPU1. Omitting
+the duplicate full shared weights avoids 1,461,196,800 additional bytes across
+the two GPUs; this does not remove the separately required TP2 shared weights.
+Placed backbone workspace at C16 is 32,742,680 bytes per GPU per request lane.
+This remains component accounting, not a complete startup memory ledger.
+
+Each directed layer handoff uses its own lane's transfer stream and copies
+completed residual/pre state directly into the destination block's existing
+input buffers. There is no intermediate device allocation or host staging.
+Stream polling scopes the destination CUDA device and restores it before yield;
+cancellation drains before borrowed buffers can be reused. Destination state is
+published only after both copies finish. Token storage is reserved with the
+block capacity at construction. Layer-14 inputs remain gated on Engram work.
+The reusable backbone lane now exposes this handoff and rebinds its attention
+query/output and router to the imported layer. Ordinary `advance` rejects a
+cross-device successor so it cannot accidentally execute the wrong placement.
+
+The official-weight handoff fixture checks 16/1/16 changed rows against direct
+same-device initialization, through both the block and placed backbone lane.
+Normalized/projected/rotated attention-query bytes match exactly. A deliberately
+held stream proves pending cancellation drains, leaves no published prepared
+state, and permits immediate reuse with unchanged buffer addresses and token
+capacity. The Engram gate at the rebalanced boundary is also preserved.
+
+Router execution exposed additional single-device native ownership in the
+router-score and expert-input quantizer exports. They now configure canonical
+CUDA libraries on both devices; quantizer handles retain their device identity.
+Router graph fixtures for layers 0, 14, and 20 compare scores, expert IDs, routing
+weights, and quantized inputs byte-for-byte against direct execution, including
+changed 16/1/16 rows. Both-GPU checks and ordinary loader/lane initialization and
+restart pass. The lane allocation guard test now uses the linked AOT library's
+scratch extents instead of stale totals from an older export build.
+
+The complete serving layer loop still needs to select these placed lanes and
+producers, use the peer handoff at placement boundaries, and wire decoder shared
+TP2 before distributed decoder FFNs can execute. The existing FFN finish path
+also still copies next-layer inputs locally; a boundary-specific finish can
+omit that redundant local copy when integrating the handoff. End-to-end serving,
+loading speed, and one-/two-GPU throughput remain unqualified.
