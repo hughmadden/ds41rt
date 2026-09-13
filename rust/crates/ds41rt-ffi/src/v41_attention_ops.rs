@@ -313,7 +313,7 @@ impl V41AttentionOps<'_> {
     }
     /// # Safety
     /// Finite initialized BF16 vectors and per-row complex FP32 frequencies are
-    /// on the stream device; output is disjoint and all buffers live through
+    /// on the stream device; output is disjoint or exactly aliases input. All buffers live through
     /// completion/replay, with serialized producers and consumers.
     pub unsafe fn rope(
         &self,

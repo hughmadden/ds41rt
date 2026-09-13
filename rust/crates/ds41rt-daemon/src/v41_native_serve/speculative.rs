@@ -6,11 +6,11 @@ use crate::v41_requests::RequestBatch;
 /// Execution workspaces share a request-indexed bank of persistent draft state.
 pub(crate) struct DraftRuntime<'w, 'a> {
     main: DsparkMainContext<'w, 'a>,
-    chain: DsparkChain<'w, 'a>,
+    chains: Vec<DsparkChain<'w, 'a>>,
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
-    captured: std::collections::BTreeSet<usize>,
-    pending: Option<(usize, Vec<(u64, u32, u64, usize)>, Instant)>,
+    captured: Vec<std::collections::BTreeSet<usize>>,
+    pending: Vec<Option<(Vec<(u64, u32, u64, usize)>, Instant)>>,
     request_limit: usize,
     draft_limit: usize,
     // Downloaded only for the experimental adaptive policy or explicit diagnostics.
@@ -45,13 +45,24 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         ensure!((1..=16).contains(&requests), "invalid draft request limit");
         let window = || DsparkWindow::new(lib, requests as usize, capacity,
             DsparkWindow::device_bytes(requests as usize, capacity)?);
+        let lane_count = if requests == 1 { 1 } else { 2 };
+        let lane_requests = requests.div_ceil(lane_count as u32);
+        let shared_bytes = weights.draft_bytes(requests)?;
+        let lane_bytes = weights.draft_bytes(lane_requests)?;
+        let main = weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?;
+        let chains = (0..lane_count).map(|_| weights.draft(table, head, lane_requests, lane_bytes))
+            .collect::<Result<Vec<_>>>()?;
+        tracing::info!(lanes=lane_count, lane_requests, shared_workspace_bytes=shared_bytes,
+            lane_workspace_bytes=lane_bytes, total_workspace_bytes=lane_bytes*lane_count,
+            additional_workspace_bytes=(lane_bytes*lane_count).saturating_sub(shared_bytes),
+            "lane-local dSpark draft workspaces (weights shared)");
         Ok(Self {
-            main: weights.main_context(capacity, DsparkMainContext::device_bytes(lib, capacity)?)?,
-            chain: weights.draft(table, head, requests, weights.draft_bytes(requests)?)?,
+            main,
+            chains,
             windows: [window()?, window()?, window()?],
             requests: Default::default(),
-            captured: Default::default(),
-            pending: None,
+            captured: vec![Default::default(); lane_count],
+            pending: vec![None; lane_count],
             request_limit: requests as usize,
             draft_limit: 5,
             confidence_trace: Default::default(),
@@ -192,6 +203,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         Ok(enabled.then_some(result.lengths))
     }
     pub fn release(&mut self, id: u64) -> Result<()> {
+        ensure!(!self.pending.iter().flatten().any(|(seeds, _)| seeds.iter().any(|seed| seed.0 == id)),
+            "cannot release a request with a pending draft");
         if let Some(history) = &mut self.adaptive { history.release(id); }
         self.confidence_trace.remove(&id);
         let mut failure = None;
@@ -284,7 +297,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
     pub fn propose(&mut self, lib: &'a NativeLibrary,
         inputs: &[(u64, u32, u64, usize)],
     ) -> Result<Vec<Vec<u32>>> {
-        ensure!(self.pending.is_none(), "shared draft proposal still pending");
+        ensure!(self.pending.iter().all(Option::is_none), "shared draft proposal still pending");
         ensure!(!inputs.is_empty() && inputs.len() <= 16, "invalid draft batch size");
         let mut seen = std::collections::BTreeSet::new();
         for &(id, anchor, _, remaining) in inputs {
@@ -302,28 +315,28 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let tokens: Vec<_> = active.iter().map(|(_, (_, anchor, _, _))| *anchor as i32).collect();
         let bindings: [Vec<_>; 3] = std::array::from_fn(|stage| active.iter()
             .map(|(_, (id, _, end, _))| (self.requests[id].leases[stage], *end)).collect());
-        self.chain.set_tokens(&tokens)?;
+        self.chains[0].set_tokens(&tokens)?;
         let mut rngs: Vec<_> = self.requests.iter_mut().filter_map(|(id, request)|
             active.iter().position(|(_, (active_id, _, _, _))| active_id == id)
                 .map(|index| (index, &mut request.rng))).collect();
         rngs.sort_by_key(|(index, _)| *index);
-        self.chain.prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
+        self.chains[0].prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
             &vec![0.0; count])?;
         let windows = self.windows.each_ref();
         let bindings = bindings.each_ref().map(|rows| rows.as_slice());
-        if !self.captured.contains(&count) {
-            unsafe { self.chain.capture(windows, bindings)?; }
-            self.captured.insert(count);
+        if !self.captured[0].contains(&count) {
+            unsafe { self.chains[0].capture(windows, bindings)?; }
+            self.captured[0].insert(count);
         }
-        unsafe { self.chain.replay(windows, bindings)?; }
-        let buffer = self.chain.draft_output()?[0];
+        unsafe { self.chains[0].replay(windows, bindings)?; }
+        let buffer = self.chains[0].draft_output()?[0];
         let mut bytes = vec![0; buffer.bytes];
         lib.copy_d2h(&mut bytes, buffer)?;
         ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
         let packed: Vec<_> = bytes.chunks_exact(4)
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
         if self.adaptive.is_some() || self.confidence_cutoff.is_some() || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
-            let confidence = self.chain.draft_output()?[2];
+            let confidence = self.chains[0].draft_output()?[2];
             ensure!(confidence.bytes == 5 * count * 4, "draft confidence extent differs");
             let mut bytes = vec![0; confidence.bytes];
             lib.copy_d2h(&mut bytes, confidence)?;
@@ -342,21 +355,21 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         Ok(outputs)
     }
 
-    /// One shared draft workspace; another lane can use its target pass while
-    /// the owner waits. Short RefCell borrows never survive a scheduler yield.
+    /// Each lane owns its draft scratch and stream; both can replay concurrently.
+    /// Short RefCell borrows never survive a scheduler yield.
     pub fn poll_propose(&mut self, lane: usize,
         inputs: &[(u64, u32, u64, usize)],
     ) -> Result<Option<(Vec<Vec<u32>>, u64)>> {
-        if let Some((owner, seeds, started)) = &self.pending {
+        ensure!(lane < self.chains.len(), "invalid draft lane");
+        if let Some((seeds, started)) = &self.pending[lane] {
             let started = *started;
-            if *owner != lane { return Ok(None); }
             ensure!(seeds == inputs, "pending draft request inputs changed");
-            let completed = match self.chain.poll_replay() {
+            let completed = match self.chains[lane].poll_replay() {
                 Ok(None) => return Ok(None),
                 Ok(Some(value)) => value,
-                Err(error) => { self.pending = None; return Err(error); },
+                Err(error) => { self.pending[lane] = None; return Err(error); },
             };
-            self.pending = None;
+            self.pending[lane] = None;
             let (packed, values) = completed;
             let active: Vec<_> = inputs.iter().enumerate()
                 .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
@@ -375,7 +388,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             return Ok(Some((outputs, started.elapsed().as_micros() as u64)));
         }
         let started = Instant::now();
-        ensure!(self.pending.is_none(), "shared draft proposal still pending");
+        ensure!(self.pending[lane].is_none(), "shared draft proposal still pending");
         ensure!(!inputs.is_empty() && inputs.len() <= 16, "invalid draft batch size");
         let mut seen = std::collections::BTreeSet::new();
         for &(id, anchor, _, remaining) in inputs {
@@ -393,21 +406,21 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let tokens: Vec<_> = active.iter().map(|(_, (_, anchor, _, _))| *anchor as i32).collect();
         let bindings: [Vec<_>; 3] = std::array::from_fn(|stage| active.iter()
             .map(|(_, (id, _, end, _))| (self.requests[id].leases[stage], *end)).collect());
-        self.chain.set_tokens(&tokens)?;
+        self.chains[lane].set_tokens(&tokens)?;
         let mut rngs: Vec<_> = self.requests.iter_mut().filter_map(|(id, request)|
             active.iter().position(|(_, (active_id, _, _, _))| active_id == id)
                 .map(|index| (index, &mut request.rng))).collect();
         rngs.sort_by_key(|(index, _)| *index);
-        self.chain.prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
+        self.chains[lane].prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
             &vec![0.0; count])?;
         let windows = self.windows.each_ref();
         let bindings = bindings.each_ref().map(|rows| rows.as_slice());
-        if !self.captured.contains(&count) {
-            unsafe { self.chain.capture(windows, bindings)?; }
-            self.captured.insert(count);
+        if !self.captured[lane].contains(&count) {
+            unsafe { self.chains[lane].capture(windows, bindings)?; }
+            self.captured[lane].insert(count);
         }
-        unsafe { self.chain.begin_replay(windows, bindings)?; }
-        self.pending = Some((lane, inputs.to_vec(), started));
+        unsafe { self.chains[lane].begin_replay(windows, bindings)?; }
+        self.pending[lane] = Some((inputs.to_vec(), started));
         Ok(None)
     }
 

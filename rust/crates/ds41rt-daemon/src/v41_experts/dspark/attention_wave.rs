@@ -16,7 +16,6 @@ pub(crate) struct DsparkAttentionWave<'weights, 'library> {
     q_norm: Ds41rtDeviceBuffer,
     kv_norm: Ds41rtDeviceBuffer,
     sink: Ds41rtDeviceBuffer,
-    query: DeviceAllocation<'library>,
     draft: DeviceAllocation<'library>,
     positions: DeviceAllocation<'library>,
     descriptors: DeviceAllocation<'library>,
@@ -65,7 +64,6 @@ impl<'library> DsparkWeights<'library> {
             q_norm: self.tensor(&format!("mtp.{stage}.attn.q_norm.weight"))?,
             kv_norm: self.tensor(&format!("mtp.{stage}.attn.kv_norm.weight"))?,
             sink: self.tensor(&format!("mtp.{stage}.attn.attn_sink"))?,
-            query: DeviceAllocation::new(library, rows as usize * 65536)?,
             draft: DeviceAllocation::new(library, rows as usize * 1024)?,
             positions: DeviceAllocation::new(library, rows as usize * 8)?,
             descriptors: DeviceAllocation::new(library, 128)?,
@@ -83,11 +81,11 @@ impl DsparkAttentionWave<'_, '_> {
             "invalid attention request capacity"
         );
         // Compiled storage buckets; every launch still uses requests*5 live rows.
-        Ok(if requests <= 3 { 16 } else { 80 })
+        Ok(if requests <= 3 { 16 } else if requests <= 8 { 40 } else { 80 })
     }
     pub fn additional_bytes(rows: u32) -> Result<usize> {
         ensure!((1..=4096).contains(&rows), "invalid attention wave rows");
-        Ok(rows as usize * (65536 + 1024 + 8) + 128)
+        Ok(rows as usize * (1024 + 8) + 128)
     }
     pub fn device_bytes(library: &NativeLibrary, requests: u32) -> Result<usize> {
         ensure!(
@@ -184,7 +182,7 @@ impl DsparkAttentionWave<'_, '_> {
             self.ops.rope(
                 self.qb.output_storage(),
                 self.output.frequencies(),
-                self.query.buffer,
+                self.qb.output_storage(),
                 rows,
                 64,
                 false,
@@ -201,7 +199,7 @@ impl DsparkAttentionWave<'_, '_> {
                 stream,
             )?;
             self.attention.launch(
-                self.query.buffer,
+                self.qb.output_storage(),
                 read.ring,
                 self.draft.buffer,
                 self.sink,

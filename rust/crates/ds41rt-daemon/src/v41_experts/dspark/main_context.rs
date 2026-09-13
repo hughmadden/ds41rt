@@ -34,23 +34,20 @@ impl<'library> DsparkWeights<'library> {
             DsparkMainContext::device_bytes(library, capacity)? <= budget,
             "dSpark main context exceeds budget"
         );
-        let projection = |kind| {
-            self.projection(
-                kind,
-                capacity,
-                DsparkProjection::device_bytes(library, kind, capacity)?,
-            )
+        let normalized = DeviceAllocation::new(library, capacity as usize * 10240)?;
+        let kv = |stage| unsafe {
+            self.projection_from(ProjectionKind::Kv(stage), capacity, normalized.buffer,
+                DsparkProjection::external_input_bytes(library, ProjectionKind::Kv(stage), capacity)?)
         };
         Ok(DsparkMainContext {
             stream: LoadStream {
                 library,
                 raw: library.cuda_stream_create()?,
             },
-            main: projection(ProjectionKind::Main)?,
+            main: self.projection(ProjectionKind::Main, capacity,
+                DsparkProjection::device_bytes(library, ProjectionKind::Main, capacity)?)?,
             kv: [
-                projection(ProjectionKind::Kv(0))?,
-                projection(ProjectionKind::Kv(1))?,
-                projection(ProjectionKind::Kv(2))?,
+                kv(0)?, kv(1)?, kv(2)?,
             ],
             ops: library.v41_attention_ops()?,
             main_norm: self.tensor("mtp.0.main_norm.weight")?,
@@ -59,7 +56,7 @@ impl<'library> DsparkWeights<'library> {
                 self.tensor("mtp.1.attn.kv_norm.weight")?,
                 self.tensor("mtp.2.attn.kv_norm.weight")?,
             ],
-            normalized: DeviceAllocation::new(library, capacity as usize * 10240)?,
+            normalized,
             positions: DeviceAllocation::new(library, capacity as usize * 8)?,
             frequencies: DeviceAllocation::new(library, capacity as usize * 256)?,
             rotated: [
@@ -82,7 +79,7 @@ impl DsparkMainContext<'_, '_> {
             "invalid main context capacity"
         );
         Ok(capacity as usize * (10240 + 256 + 8 + 3 * 1024)
-            + 3 * DsparkProjection::device_bytes(library, ProjectionKind::Kv(0), capacity)?)
+            + 3 * DsparkProjection::external_input_bytes(library, ProjectionKind::Kv(0), capacity)?)
     }
     pub fn device_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         Self::additional_bytes(library, capacity)?

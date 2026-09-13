@@ -18,6 +18,8 @@ pub struct V41Fp8Plan<'a> {
 }
 
 fn capacities(capacity: u32) -> Result<Vec<u32>> {
+    // Forty-row owners use the existing <=80-row kernel with live row bounds.
+    if capacity == 40 { return Ok(vec![1, 16, 80]); }
     ensure!(
         [1, 16, 80, 256, 1024, 4096].contains(&capacity),
         "unsupported FP8 plan capacity"
@@ -72,7 +74,9 @@ impl NativeLibrary {
             .into_iter()
             .map(|rows| self.v41_fp8_matrix_info(rows, k, n))
             .collect::<Result<Vec<_>>>()?;
-        Ok(layout(&infos)?.0)
+        let mut info = layout(&infos)?.0;
+        info.capacity_rows = capacity;
+        Ok(info)
     }
     pub fn v41_fp8_matrix_plan(&self, capacity: u32, k: u32, n: u32) -> Result<V41Fp8Plan<'_>> {
         let kernels = capacities(capacity)?
@@ -80,7 +84,8 @@ impl NativeLibrary {
             .map(|rows| self.v41_fp8_matrix_kernel(rows, k, n))
             .collect::<Result<Vec<_>>>()?;
         let infos: Vec<_> = kernels.iter().map(V41Fp8Kernel::info).collect();
-        let (info, offsets) = layout(&infos)?;
+        let (mut info, offsets) = layout(&infos)?;
+        info.capacity_rows = capacity;
         Ok(V41Fp8Plan {
             info,
             kernels: kernels.into_iter().zip(offsets).collect(),
@@ -231,6 +236,7 @@ mod tests {
         assert_eq!(info.scratch_bytes, (1u64 << 31) + 1792);
         assert_eq!(capacities(4096).unwrap(), [1, 16, 80, 4096]);
         assert_eq!(capacities(16).unwrap(), [1, 16]);
+        assert_eq!(capacities(40).unwrap(), [1, 16, 80]);
         assert_eq!(capacities(1).unwrap(), [1]);
         assert!(capacities(0).is_err());
         assert!(capacities(2048).is_err());

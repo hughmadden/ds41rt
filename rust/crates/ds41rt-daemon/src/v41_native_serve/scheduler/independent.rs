@@ -46,7 +46,7 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             ensure!(members.len() <= 8, "independent lane exceeds eight requests");
             let started = Instant::now();
             // Reserve target capacity and snapshot this lane's seeds, then release
-            // all bank borrows before waiting on the shared draft workspace.
+            // all bank borrows before waiting on this lane's draft workspace.
             let seeds = {
                 let active = active.borrow();
                 let mut requests = requests.borrow_mut();

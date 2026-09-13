@@ -63,6 +63,8 @@ template<int D, bool Quantize=false> __global__ void norm_kernel(const __nv_bflo
     output[base+i]=pair[0];output[base+i+1]=pair[1];
   }
 }
+// Each thread owns one complex pair and loads both values before writing it.
+// Exact in-place rotation is safe; partially overlapping vectors are rejected.
 __global__ void rope_kernel(const __nv_bfloat16* input, const float* freq,
     __nv_bfloat16* output, int heads, int inverse) {
   const uint64_t vector=blockIdx.x, base=vector*512;
@@ -92,7 +94,7 @@ extern "C" int32_t ds41rt_v41_attention_rope(const uint16_t* input, const float*
   if(rows<1 || rows>4096 || (heads!=1 && heads!=64) || (inverse!=0 && inverse!=1)) return cudaErrorInvalidValue;
   const uint64_t bytes=uint64_t(rows)*heads*1024, f=uint64_t(rows)*256;
   if (!valid(input,bytes,2) || !valid(freq,f,4) || !valid(output,bytes,2) ||
-      !disjoint(input,bytes,output,bytes) || !disjoint(freq,f,output,bytes)) return cudaErrorInvalidValue;
+      (input != output && !disjoint(input,bytes,output,bytes)) || !disjoint(freq,f,output,bytes)) return cudaErrorInvalidValue;
   rope_kernel<<<rows*heads,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(input),freq,reinterpret_cast<__nv_bfloat16*>(output),heads,inverse);
   return cudaGetLastError();

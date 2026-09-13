@@ -69,9 +69,11 @@ The joint decode path is now removed. Unconstrained decode now uses
 cooperative per-lane head completion. Continue through remaining blocking
 completion boundaries: constrained logits download and target/draft-cache commit.
 [Shared draft replay now completes cooperatively](phase1-async-draft-completion.md).
-Next investigate two lane-local eight-request draft workspaces with shared weights;
-first address the current 80-row allocation bucket so forty live draft rows do not
-duplicate oversized storage. Remove retirement coupling separately from admission.
+The [two lane-local draft workspaces](phase1-split-draft-workspaces.md) now share
+weights and use forty-row storage for eight requests each. Continue with queued
+main-context preparation and direct cache writes from lane-owned producer outputs;
+avoid copying through shared intermediate staging. Remove retirement coupling
+separately from admission.
 Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and

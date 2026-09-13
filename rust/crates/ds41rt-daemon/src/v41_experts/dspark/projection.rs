@@ -107,7 +107,8 @@ pub(crate) struct DsparkProjection<'weights, 'library> {
     scales: Ds41rtDeviceBuffer,
     scratch: DeviceAllocation<'library>,
     alpha: DeviceAllocation<'library>,
-    input: DeviceAllocation<'library>,
+    input: Ds41rtDeviceBuffer,
+    _owned_input: Option<DeviceAllocation<'library>>,
     output: DeviceAllocation<'library>,
     graph: Option<(*mut c_void, u32)>,
     ready: Option<u32>,
@@ -119,13 +120,33 @@ impl<'library> DsparkWeights<'library> {
         capacity: u32,
         budget: usize,
     ) -> Result<DsparkProjection<'_, 'library>> {
+        unsafe { self.projection_input(kind, capacity, None, budget) }
+    }
+    /// Borrow an existing producer buffer instead of allocating unused private input.
+    /// # Safety
+    /// Input remains on this device and live through this projection's destruction;
+    /// the containing owner serializes producer writes and projection reads.
+    pub unsafe fn projection_from(
+        &self, kind: ProjectionKind, capacity: u32, input: Ds41rtDeviceBuffer, budget: usize,
+    ) -> Result<DsparkProjection<'_, 'library>> {
+        unsafe { self.projection_input(kind, capacity, Some(input), budget) }
+    }
+    unsafe fn projection_input(
+        &self, kind: ProjectionKind, capacity: u32, external: Option<Ds41rtDeviceBuffer>, budget: usize,
+    ) -> Result<DsparkProjection<'_, 'library>> {
         let library = self.experts[0].buffers[0].library;
         ensure!(
-            DsparkProjection::device_bytes(library, kind, capacity)? <= budget,
+            (if external.is_some() { DsparkProjection::external_input_bytes(library, kind, capacity)? }
+                else { DsparkProjection::device_bytes(library, kind, capacity)? }) <= budget,
             "dSpark projection exceeds budget"
         );
         let (index, name, k, n) = kind.binding()?;
         let kernel = library.v41_fp8_matrix_plan(capacity, k, n)?;
+        let owned_input = if external.is_none() { Some(DeviceAllocation::new(library, capacity as usize*k as usize*2)?) } else { None };
+        let input = external.unwrap_or_else(|| owned_input.as_ref().unwrap().buffer);
+        ensure!(!input.ptr.is_null() && input.bytes >= capacity as usize*k as usize*2
+            && input.device_id == self.tensor(&format!("{name}.weight"))?.device_id,
+            "projection input extent or device differs");
         let value = DsparkProjection {
             stream: LoadStream {
                 library,
@@ -137,7 +158,8 @@ impl<'library> DsparkWeights<'library> {
             weight: self.tensor(&format!("{name}.weight"))?,
             scales: self.projection_scales[index].buffer,
             alpha: DeviceAllocation::new(library, 4)?,
-            input: DeviceAllocation::new(library, capacity as usize * k as usize * 2)?,
+            input,
+            _owned_input: owned_input,
             output: DeviceAllocation::new(library, capacity as usize * n as usize * 2)?,
             graph: None,
             ready: None,
@@ -166,12 +188,17 @@ impl DsparkProjection<'_, '_> {
         )
         .context("dSpark projection workspace overflow")
     }
+    pub fn external_input_bytes(library: &NativeLibrary, kind: ProjectionKind, capacity: u32) -> Result<usize> {
+        let (_, _, k, _) = kind.binding()?;
+        Self::device_bytes(library, kind, capacity)?
+            .checked_sub(capacity as usize*k as usize*2).context("projection input budget underflow")
+    }
     // Storage access for an exclusive containing owner that tracks completion itself.
     pub(super) fn output_storage(&self) -> Ds41rtDeviceBuffer {
         self.output.buffer
     }
     pub fn input(&self) -> Ds41rtDeviceBuffer {
-        self.input.buffer
+        self.input
     }
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
@@ -203,7 +230,7 @@ impl DsparkProjection<'_, '_> {
     /// Initialize finite BF16 input rows and finish producer writes; serialize view reuse.
     pub unsafe fn execute(&mut self, rows: u32) -> Result<Ds41rtDeviceBuffer> {
         let launched =
-            unsafe { self.enqueue(self.input.buffer, self.output.buffer, rows, self.stream.raw) };
+            unsafe { self.enqueue(self.input, self.output.buffer, rows, self.stream.raw) };
         let drained = self.synchronize();
         launched.and(drained)?;
         self.ready = Some(rows);
@@ -226,7 +253,7 @@ impl DsparkProjection<'_, '_> {
                 .cuda_graph_begin_capture(self.stream.raw)?;
         }
         let launched =
-            unsafe { self.enqueue(self.input.buffer, self.output.buffer, rows, self.stream.raw) };
+            unsafe { self.enqueue(self.input, self.output.buffer, rows, self.stream.raw) };
         let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
