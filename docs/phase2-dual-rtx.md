@@ -240,3 +240,24 @@ summation and still passes all four comparisons against the unsplit oracle:
 relative L2 is about 0.23% after final BF16 rounding. Its cross-device staging
 currently uses PyTorch for the fixture; it does not qualify the serving transfer
 loop or asynchronous lane progress. Native build and daemon offline check pass.
+
+## Chained peer reduction owner
+
+`PeerReduction` now connects the native peer-copy and FP32 reduction through one
+preallocated destination stream. A remote producer event orders the copy; a
+local producer event orders reduction after both inputs. The owner polls only
+after the whole chain is queued, with no host completion barrier between copy
+and reduction. Its callback and input/output storage remain retained through
+completion or cancellation drain. Separate owners can target either GPU.
+
+Worst-case destination storage is `capacity * 5120 * 26` bytes for six FP32
+peer routes plus BF16 output, excluding stream/event overhead. A rank that
+already emits token sums copies only its live FP32 token bytes. This owner is
+not yet connected to the serving layer loop; full lane progress and a deliberate
+pending-transfer cancellation test remain necessary.
+
+The Rust CUDA fixture passes with two opposite-direction reduction owners joined
+cooperatively on one host thread. It checks changed values, C1/C16, both route
+and token-sum layouts, correct BF16 results on both devices, and restoration of
+the caller's device. It does not deliberately stall either producer. The daemon
+offline check also passes.

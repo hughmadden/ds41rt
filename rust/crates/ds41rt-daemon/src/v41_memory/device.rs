@@ -77,7 +77,17 @@ impl Drop for Stream<'_> {
     }
 }
 
-struct Event<'a> { device: Device<'a>, raw: *mut c_void }
+pub(crate) struct Event<'a> { pub device: Device<'a>, pub raw: *mut c_void }
+impl<'a> Event<'a> {
+    pub fn new(device: Device<'a>) -> Result<Self> {
+        Ok(Self { device, raw: device.run(|| device.library.cuda_event_create())? })
+    }
+    pub fn record(&mut self, producer: &Stream<'a>) -> Result<()> {
+        ensure!(self.device.id == producer.device.id
+            && std::ptr::eq(self.device.library, producer.device.library), "event producer device mismatch");
+        self.device.run(|| unsafe { self.device.library.cuda_event_record(self.raw, producer.raw) })
+    }
+}
 impl Drop for Event<'_> {
     fn drop(&mut self) {
         if let Err(error) = self.device.run(|| unsafe { self.device.library.cuda_event_destroy(self.raw) }) {
@@ -105,6 +115,16 @@ impl<'a> PeerTransfer<'a> {
     /// producer borrows survive until completion or cancellation drains the copy.
     pub async unsafe fn copy(&mut self, source: &Allocation<'a>, destination: &mut Allocation<'a>,
         producer: &Stream<'a>, bytes: usize) -> Result<()> {
+        unsafe { self.copy_then(source, destination, producer, bytes, |_, _| Ok(())).await }
+    }
+
+    /// # Safety
+    /// Same buffer contract as `copy`. `then` enqueues only on the supplied
+    /// destination stream; its captured storage must survive completion. The
+    /// callback itself is retained until the completion/cancellation drain.
+    pub async unsafe fn copy_then(&mut self, source: &Allocation<'a>, destination: &mut Allocation<'a>,
+        producer: &Stream<'a>, bytes: usize,
+        mut then: impl FnMut(Ds41rtDeviceBuffer, *mut c_void) -> Result<()>) -> Result<()> {
         let library = self.destination.device.library;
         ensure!(source.device.id == self.ready.device.id
             && producer.device.id == source.device.id
@@ -128,7 +148,8 @@ impl<'a> PeerTransfer<'a> {
         self.ready.device.run(|| unsafe { library.cuda_event_record(self.ready.raw, producer.raw) })?;
         self.destination.device.run(|| unsafe {
             library.cuda_stream_wait_event(self.destination.raw, self.ready.raw)?;
-            library.copy_peer_async(destination.buffer, source.buffer, bytes, self.destination.raw)
+            library.copy_peer_async(destination.buffer, source.buffer, bytes, self.destination.raw)?;
+            then(destination.buffer, self.destination.raw)
         })?;
         while !self.destination.ready()? { tokio::task::yield_now().await; }
         drain.complete = true;

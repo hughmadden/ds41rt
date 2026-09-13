@@ -2,6 +2,7 @@
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 pub(crate) mod coordinator;
 pub(crate) mod local;
+pub(crate) mod tp2;
 pub(crate) mod dspark;
 mod execution;
 pub(crate) mod service;
