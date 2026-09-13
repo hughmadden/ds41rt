@@ -131,8 +131,25 @@ impl OfficialV41Catalog {
         dst: &mut [u8],
         scratch: &mut [u8],
     ) -> Result<usize> {
-        use std::os::unix::fs::FileExt;
         let bytes = usize::try_from(self.device_tensor_bytes(name, spark_rank)?)?;
+        self.read_tensor_partition(name, spark_rank, 4, bytes, dst, scratch)
+    }
+
+    pub(crate) fn read_backbone_tp2_into(
+        &self, name: &str, rank: usize, dst: &mut [u8], scratch: &mut [u8],
+    ) -> Result<usize> {
+        let tensor = self.tensor(name)?;
+        ensure!(rank < 2 && matches!(tensor.placement, V41TensorPlacement::BackboneExpertTp4 { .. }),
+            "TP2 read requires a backbone expert and rank in 0..2");
+        let bytes = usize::try_from(tensor.metadata.byte_length / 2)?;
+        self.read_tensor_partition(name, Some(rank), 2, bytes, dst, scratch)
+    }
+
+    fn read_tensor_partition(
+        &self, name: &str, spark_rank: Option<usize>, partitions: usize, bytes: usize,
+        dst: &mut [u8], scratch: &mut [u8],
+    ) -> Result<usize> {
+        use std::os::unix::fs::FileExt;
         ensure!(
             dst.len() >= bytes,
             "tensor staging buffer for {name} needs {bytes} bytes"
@@ -159,8 +176,8 @@ impl OfficialV41Catalog {
                     scratch.len() >= row_bytes,
                     "W2 scratch needs at least {row_bytes} bytes"
                 );
-                let quarter = row_bytes / 4;
-                let column = spark_rank.unwrap() * quarter;
+                let shard_bytes = row_bytes / partitions;
+                let column = spark_rank.unwrap() * shard_bytes;
                 let rows_per_read = scratch.len() / row_bytes;
                 for start in (0..rows).step_by(rows_per_read) {
                     let count = rows_per_read.min(rows - start);
@@ -174,8 +191,8 @@ impl OfficialV41Catalog {
                         .context("TP column file offset overflow")?;
                     file.read_exact_at(&mut scratch[..count * row_bytes], offset)?;
                     for row in 0..count {
-                        dst[(start + row) * quarter..(start + row + 1) * quarter].copy_from_slice(
-                            &scratch[row * row_bytes + column..row * row_bytes + column + quarter],
+                        dst[(start + row) * shard_bytes..(start + row + 1) * shard_bytes].copy_from_slice(
+                            &scratch[row * row_bytes + column..row * row_bytes + column + shard_bytes],
                         );
                     }
                 }
@@ -692,6 +709,34 @@ mod expert_staging_tests {
                 .iter()
                 .all(|&byte| byte == 205));
         }
+        // Two RTX halves reconstruct the official row and column partitions.
+        for rank in 0..2 {
+            let plan = catalog.expert_staging(V41ExpertSelection::BackboneTp2 {
+                layer: 39, expert: 383, rank,
+            }).unwrap();
+            assert_eq!(plan.intermediate_size(), 1152);
+            assert_eq!(plan.staging_bytes(), 9_400_320);
+            assert_eq!(plan.minimum_read_scratch_bytes(), 1152);
+            let mut staging = vec![205; plan.staging_bytes() + 32];
+            let mut scratch = vec![0; 1152 * 7 + 3];
+            assert!(plan.read_into(&mut staging[..plan.staging_bytes()-1], &mut scratch).is_err());
+            assert!(plan.read_into(&mut staging, &mut scratch[..1151]).is_err());
+            assert!(staging.iter().all(|&v| v == 205));
+            plan.prefetch().unwrap();
+            plan.read_into(&mut staging, &mut scratch).unwrap();
+            for (slot, range) in plan.tensor_ranges().iter().enumerate() {
+                let source = &payloads[slot];
+                let expected = if slot == 2 || slot == 5 {
+                    let row = source.len() / 5120;
+                    source.chunks_exact(row).flat_map(|r|
+                        r[rank*row/2..(rank+1)*row/2].iter().copied()).collect::<Vec<_>>()
+                } else {
+                    source[rank*source.len()/2..(rank+1)*source.len()/2].to_vec()
+                };
+                assert_eq!(&staging[range.clone()], expected.as_slice());
+            }
+            assert!(staging[plan.staging_bytes()..].iter().all(|&v| v == 205));
+        }
         // Full backbone reads must preserve every official byte, including W2
         // columns that the TP4 path normally slices into separate ranks.
         let full = catalog.expert_staging(V41ExpertSelection::BackboneFull {
@@ -726,6 +771,9 @@ mod expert_staging_tests {
         }
         for selection in [
             select(4),
+            V41ExpertSelection::BackboneTp2 { layer: 0, expert: 0, rank: 2 },
+            V41ExpertSelection::BackboneTp2 { layer: 40, expert: 0, rank: 0 },
+            V41ExpertSelection::BackboneTp2 { layer: 0, expert: 384, rank: 0 },
             V41ExpertSelection::BackboneFull { layer: 40, expert: 0 },
             V41ExpertSelection::BackboneFull { layer: 0, expert: 384 },
             V41ExpertSelection::Backbone {

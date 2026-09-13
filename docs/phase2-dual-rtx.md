@@ -151,3 +151,15 @@ the host table), duplicate/aliased tensors, all lane and prefill workspaces,
 SWA/index/KV pools, snapshots, transfer buffers, and CUDA headroom. In particular,
 moving a few ordinary attention layers saves far less than the dSpark allocation;
 the final split must be chosen using the complete ledger.
+
+## TP2 expert staging
+
+The loader now supports `BackboneTp2` with 1,152 logical intermediate channels.
+It reads W1/W3 row halves and W2 column halves directly from the official payload,
+including matching scale slices, using bounded reusable scratch and prefetch.
+Each expert/rank needs 9,400,320 staging bytes. TP4, full-width, and dSpark reads
+retain their existing contracts. Synthetic byte-level tests cover both TP2 ranks,
+weights and scales, partial final read batches, invalid rank/layer/expert IDs,
+undersized staging/scratch, and untouched trailing storage. All four catalog tests
+and the full daemon offline check pass. This is loader support; TP2 packing,
+kernel exports, reductions, and serving integration remain unfinished.
