@@ -33,11 +33,30 @@ The policy is selected before this lane's Engram preparation, but the existing
 verifier/commit round barrier remains. Removing that barrier is separate ongoing
 scheduler work. No claim of fully independent lane execution is made here.
 
-The frozen serving screen is running in `/tmp/ds41-reuse-policy`, with joint-cost
+The frozen serving screen completed in `/tmp/ds41-reuse-policy`, with joint-cost
 controls before/after and LOW/HIGH pairs 0.05/0.5 and 0.10/0.5. Each arm uses the
 same native library and Rust binary, three no-thinking code samples, a 32K prefill
 warmup and C4/C16 mixed completion checks. Hardware: one RTX PRO 6000 Blackwell,
 **400 W, standard memory speed**, four unchanged Sparks, five complete local
 expert layers, 18 × 1,048,576-token KV capacity and 24 retained snapshots. No
 builds overlap timed inference; the runner restores standard serving on exit.
-Performance and serving qualification of this candidate remain pending.
+Broader qualification and adoption remain pending.
+
+## Initial screen
+
+| Policy | C1 code tok/s | C4 mixed tok/s | C16 mixed tok/s |
+|---|---:|---:|---:|
+| cost-before | 128.81 | 126.33 | 189.45 |
+| reuse-005-050 | 125.42 | 124.79 | 187.63 |
+| reuse-010-050 | 125.62 | 123.80 | 182.44 |
+| cost-after | 127.36 | 137.22 | 183.33 |
+
+All focused code structure, prefill-answer and mixed serving completion checks
+passed. Each candidate has only one mixed batch at each concurrency; outputs
+can differ and completion checks do not establish semantic quality. These
+settings do not establish a throughput advantage and are not made defaults.
+They preserve more C1 throughput than the preceding pure cutoff screen, but
+that comparison spans separate runs. Standard serving was restored.
+[Evidence](phase1-incremental-reuse.json) retains artifact identities, commands,
+code hashes and individual rates. Next, measure the decode round barrier's
+actual delay before replacing its ownership structure with independent progress.

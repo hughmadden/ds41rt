@@ -1,0 +1,380 @@
+{
+  "scope": "Lane-local incremental reuse cutoff screen; no default adoption",
+  "pilot": {
+    "scope": "Position-first lane-local expert reuse cutoff pilot versus joint cost policy, identical native artifact and Rust binary",
+    "artifacts": {
+      "libds41rt_native.so": "9d6b8efc1836b397d714ef3546fd0a489d6507a78f8a1f26cc449357b81c325b",
+      "ds41rt": "6e891ce1549627090cd1712521e3c6878356bd677807d3d9169b60c7f0709496"
+    },
+    "arms": [
+      {
+        "label": "cost-before",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-reuse-cost-before",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-reuse-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-adaptive"
+        ],
+        "startup_seconds": 8.35368025302887,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "reuse-005-050",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-reuse-reuse-005-050",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-reuse-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-confidence-cutoff",
+          "0.5",
+          "--dspark-reuse-floor",
+          "0.05"
+        ],
+        "startup_seconds": 11.377941551967524,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "reuse-010-050",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-reuse-reuse-010-050",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-reuse-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-confidence-cutoff",
+          "0.5",
+          "--dspark-reuse-floor",
+          "0.10"
+        ],
+        "startup_seconds": 10.373103894060478,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      },
+      {
+        "label": "cost-after",
+        "command": [
+          "docker",
+          "run",
+          "-d",
+          "--name",
+          "ds41rt-reuse-cost-after",
+          "--gpus",
+          "device=GPU-fe5b6dd0-a77c-c8fb-6360-e1b9d9918ac0",
+          "--network",
+          "host",
+          "--ipc",
+          "host",
+          "--ulimit",
+          "memlock=-1:-1",
+          "--device=/dev/infiniband",
+          "-e",
+          "RUST_LOG=info",
+          "-v",
+          "/tmp/ds41-reuse-policy/artifacts:/phase1:ro",
+          "-v",
+          "/home/tj/.cache/huggingface:/root/.cache/huggingface:ro",
+          "sha256:67f2954e18f69b39f8fbb68164f7d9e2b8f4c4b9e3242281ecfcb8afec8552e9",
+          "/phase1/ds41rt",
+          "serve-native",
+          "--snapshot",
+          "/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/dba1be0a40aa45a94ad051997016db3960a90277",
+          "--native-lib",
+          "/phase1/libds41rt_native.so",
+          "--peers",
+          "10.55.0.1:19441,10.55.0.2:19441,10.55.0.3:19441,10.55.0.4:19441",
+          "--listen",
+          "0.0.0.0:8000",
+          "--prefill-batch-tokens",
+          "2048",
+          "--concurrency",
+          "16",
+          "--prefix-cache-entries",
+          "24",
+          "--max-context-tokens",
+          "1048576",
+          "--max-output-tokens",
+          "393216",
+          "--dspark",
+          "--rtx-expert-layers",
+          "5",
+          "--dspark-adaptive"
+        ],
+        "startup_seconds": 11.37167505605612,
+        "code": true,
+        "prefill": true,
+        "mixed": true
+      }
+    ],
+    "restored": true
+  },
+  "arms": {
+    "cost-before": {
+      "code_median_tps": 128.8086843454144,
+      "code_samples": [
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 119.13882810381372,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 129.08863103332587,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 128.8086843454144,
+          "passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "prefill_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 126.33441788359515
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 189.44802689638547
+        }
+      ]
+    },
+    "reuse-005-050": {
+      "code_median_tps": 125.41803184137994,
+      "code_samples": [
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 111.33377592905418,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 125.93966450883624,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 125.41803184137994,
+          "passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "prefill_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 124.78938392702275
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 187.6319284322222
+        }
+      ]
+    },
+    "reuse-010-050": {
+      "code_median_tps": 125.61989777434238,
+      "code_samples": [
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 111.65346517181062,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 127.85268398240683,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 125.61989777434238,
+          "passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "prefill_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 123.80086139746305
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 182.44358323523042
+        }
+      ]
+    },
+    "cost-after": {
+      "code_median_tps": 127.36216651595856,
+      "code_samples": [
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 113.2292969411453,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 127.36216651595856,
+          "passed": true
+        },
+        {
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "observed_decode_tokens_per_second": 127.4773377243685,
+          "passed": true
+        }
+      ],
+      "mixed_passed": true,
+      "prefill_passed": true,
+      "mixed_batches": [
+        {
+          "concurrency": 4,
+          "aggregate_tps": 137.22227579598598
+        },
+        {
+          "concurrency": 16,
+          "aggregate_tps": 183.33246191446034
+        }
+      ]
+    }
+  },
+  "raw_artifacts": {
+    "/tmp/ds41-reuse-policy/cost-after-mixed.json": "ddbfd0e5805f2f0105e619d8d97d6a10b6eb1e9f4fea85e25e9719cbe97f0772",
+    "/tmp/ds41-reuse-policy/cost-after-prefill.json": "013393d7fbf947341d57af6b4366c7ce919430696946af357c06e654977a8f76",
+    "/tmp/ds41-reuse-policy/cost-after-code.json": "d094dedf060a9027ac289e396c8b2d7beca2268f29a9058729b4f9ab14a0f40f",
+    "/tmp/ds41-reuse-policy/reuse-010-050-mixed.json": "9d1e6bc889d14d9001bc32d5dc9f176d5820178ed81b1751d45c07e1f61dec61",
+    "/tmp/ds41-reuse-policy/reuse-010-050-prefill.json": "a1caa67a6fe3a32dc78baf2be6773eb1bfde8926595ceee2be8c390796accf21",
+    "/tmp/ds41-reuse-policy/reuse-010-050-code.json": "f036c93167489eeef2caf517f30d345da7b563454e65435f29873da1e0e32985",
+    "/tmp/ds41-reuse-policy/reuse-005-050-mixed.json": "6329983dc39d92a4a474338bad21a06fe27035f9ff7534620f02f9bf0f529c91",
+    "/tmp/ds41-reuse-policy/reuse-005-050-prefill.json": "c82a21c1ea8e2035c1ff263ce781e224e3b6e96c0b8eeb5ef642e3c5b78c02f7",
+    "/tmp/ds41-reuse-policy/reuse-005-050-code.json": "560cf433b67ef62539e674ea2b40a7dde6f7a38af14e6718a5102d2f382e08b1",
+    "/tmp/ds41-reuse-policy/cost-before-mixed.json": "aa4b164bc01d64725b9d944c469e4655b6e4dcf7aca07692281fcc9a64c99972",
+    "/tmp/ds41-reuse-policy/cost-before-prefill.json": "0cd7463a3f0cb0944c40e423bbc5cac7f595cc363ca36947864ce75bce0c909c",
+    "/tmp/ds41-reuse-policy/cost-before-code.json": "f953a03e1f65b0a44c90ad9463e24d995cd594c5349d0460305f0f1011355baa",
+    "/tmp/ds41-reuse-policy/pilot-results.json": "9fe344db660d51aa94d25929d41e1cef1335af86b463d93a340bb7898812833a"
+  }
+}
