@@ -18,6 +18,24 @@ mod encoder_pair;
 mod encoder_stream;
 pub(crate) use taps::{TargetTapWave, TargetTaps};
 
+/// Target cache publication used by the independent scheduler's queued dSpark
+/// transaction. Static dispatch keeps ordinary serving on its existing path.
+pub(crate) trait TargetCache<'a> {
+    fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>>;
+    fn commit(&mut self, requests: &mut Requests<'a>, batch: &mut RequestBatch,
+        accepted: &[u32]) -> Result<()>;
+}
+impl<'a> TargetCache<'a> for TargetPass<'_, 'a> {
+    fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> { TargetPass::taps(self, batch) }
+    fn commit(&mut self, requests: &mut Requests<'a>, batch: &mut RequestBatch,
+        accepted: &[u32]) -> Result<()> { TargetPass::commit(self, requests, batch, accepted) }
+}
+impl<'a> TargetCache<'a> for DistributedTargetPass<'_, 'a> {
+    fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> { DistributedTargetPass::taps(self, batch) }
+    fn commit(&mut self, requests: &mut Requests<'a>, batch: &mut RequestBatch,
+        accepted: &[u32]) -> Result<()> { DistributedTargetPass::commit(self, requests, batch, accepted) }
+}
+
 // A remote FFN wait owns its prepared lane state, never a request-bank borrow.
 // Both ordinary serving and independent lane scheduling use the same execution
 // body, so cache production and numerical operation order remain identical.

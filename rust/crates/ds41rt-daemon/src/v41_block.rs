@@ -64,6 +64,8 @@ pub(crate) struct BackboneBlockWave<'w, 'a> {
     phase: Phase,
 }
 impl<'w, 'a> BackboneBlockWave<'w, 'a> {
+    #[cfg(test)]
+    pub fn trace_stream(&self) -> *mut std::ffi::c_void { self.ffn.stream_raw() }
     /// Reuse this lane's two mHC workspaces for the adjacent layer. Completed
     /// residual/pre values are copied before installing both validated bindings.
     /// No device allocation or graph capture occurs here.

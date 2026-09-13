@@ -679,6 +679,8 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         );
         self.block.output()
     }
+    #[cfg(test)]
+    pub fn trace_stream(&self) -> *mut std::ffi::c_void { self.block.trace_stream() }
     pub fn set_route_capture(&mut self, enabled: bool) {
         self.capture_routes = enabled;
         if enabled {

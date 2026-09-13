@@ -349,7 +349,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         }
     }
     /// Begin a completed decode batch's accepted-cache transaction on its own lane.
-    pub fn begin_queued_commit(&mut self, lane: usize, pass: &TargetPass<'_, 'a>,
+    pub fn begin_queued_commit(&mut self, lane: usize, pass: &impl crate::v41_target_pass::TargetCache<'a>,
         requests: &Requests<'a>, batch: &RequestBatch, accepted: &[u32]) -> Result<()> {
         ensure!(lane < self.mains.len() && self.pending_commit_ids[lane].is_empty(), "commit lane busy or invalid");
         requests.validate_acceptance(batch, accepted)?;
@@ -371,7 +371,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             self.windows.each_ref(), writes) }
     }
     pub fn poll_queued_commit(&self, lane: usize) -> Result<bool> { self.mains[lane].poll_commit() }
-    pub fn finish_queued_commit(&mut self, lane: usize, pass: &mut TargetPass<'_, 'a>,
+    pub fn finish_queued_commit(&mut self, lane: usize, pass: &mut impl crate::v41_target_pass::TargetCache<'a>,
         requests: &mut Requests<'a>, batch: &mut RequestBatch, accepted: &[u32]) -> Result<()> {
         self.mains[lane].publish_commit(&mut self.windows)?;
         pass.commit(requests, batch, accepted)?;

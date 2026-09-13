@@ -21,6 +21,12 @@ pub(crate) struct DistributedTargetPass<'w, 'a> {
     suffix_stream: DeviceOwner<'a, crate::v41_memory::LoadStream<'a>>,
     timeout: Duration,
     state: State,
+    #[cfg(test)]
+    trace: bool,
+    #[cfg(test)]
+    trace_records: Vec<(u64, usize, usize)>,
+    #[cfg(test)]
+    trace_buffers: [DeviceOwner<'a, crate::v41_memory::HostAllocation<'a>>; 2],
 }
 /// Execution futures drain their borrowed GPU work before this guard revokes
 /// reserved chunks, including cancellation during queued early publication.
@@ -87,6 +93,11 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                 raw: unsafe { device.library.cuda_stream_create()? },
             })
         })?;
+        #[cfg(test)]
+        let trace_buffers = [
+            lanes[0].device.own(|| crate::v41_memory::HostAllocation::new(device.library, 20 * 16 * 40960))?,
+            lanes[1].device.own(|| crate::v41_memory::HostAllocation::new(device.library, 20 * 16 * 40960))?,
+        ];
         Ok(Self {
             map,
             embedding,
@@ -100,6 +111,12 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             suffix_stream,
             timeout,
             state: State::Idle,
+            #[cfg(test)]
+            trace: false,
+            #[cfg(test)]
+            trace_records: Vec::new(),
+            #[cfg(test)]
+            trace_buffers,
         })
     }
     async unsafe fn advance(&mut self, layer: usize) -> Result<()> {
@@ -382,6 +399,20 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                     .complete_layer(guard.batch.cache()?, &mut self.lanes[gpu], completed)
                     .await?;
             }
+            #[cfg(test)]
+            if self.trace && std::env::var("DS41RT_TRACE_LAYER").ok()
+                .map_or(true, |value| value.split(',').any(|v| v.parse::<usize>().ok() == Some(layer))) {
+                let output = self.lanes[gpu].output()?;
+                let position = output.tokens[0];
+                let offset = (layer * 16 + position as usize) * 40960;
+                ensure!(position as usize + output.tokens.len() <= 16, "trace extent exceeded");
+                let bytes = &mut self.trace_buffers[gpu].bytes_mut()[offset..offset + output.residual.bytes];
+                // Queue behind this producer and before its next overwrite. No
+                // host wait is added between layers; read back after the run.
+                device.run(|| unsafe { device.library.copy_d2h_async(bytes, output.residual,
+                    self.lanes[gpu].trace_stream()) })?;
+                self.trace_records.push((position, layer, output.residual.bytes));
+            }
             if reserved {
                 unsafe {
                     self.publish_encoder_layer(requests, guard.batch, layer)
@@ -510,6 +541,18 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         self.state.ready(batch.cache()?.identity())?;
         self.head.output()
     }
+    /// Download selected head rows for sampling or constrained token selection.
+    /// Rows index the compact head output, not the original request batch.
+    pub async fn download_logits(&mut self, batch: &RequestBatch, rows: &[usize]) -> Result<Vec<u8>> {
+        self.state.ready(batch.cache()?.identity())?;
+        let device = self.head.device;
+        device.future(self.head.get_mut().download_rows(rows)).await
+    }
+    pub fn greedy_output(&mut self, batch: &RequestBatch) -> Result<Vec<(u32, f32)>> {
+        self.state.ready(batch.cache()?.identity())?;
+        let device = self.head.device;
+        device.run(|| self.head.greedy_output())
+    }
     pub fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> {
         self.state.ready(batch.cache()?.identity())?;
         self.taps.output(batch.cache()?)
@@ -613,7 +656,12 @@ mod tests {
                 id: 1,
             },
         ];
-        let map = CachePlacement::new(std::array::from_fn(|l| usize::from(l >= 14)))?;
+        // Exercise the deployment's 3/1 source split by default. Boundary 14
+        // remains available to cover a source group on the second encoder GPU.
+        let boundary = std::env::var("DS41RT_ATTENTION_BOUNDARY").ok()
+            .map(|value| value.parse::<usize>()).transpose()?.unwrap_or(20);
+        ensure!([14, 20].contains(&boundary), "unsupported fixture attention boundary");
+        let map = CachePlacement::new(std::array::from_fn(|l| usize::from(l >= boundary)))?;
         eprintln!("loading placed backbone and auxiliary weights");
         let weights = BackboneLaneWeights::load_distributed(
             &lib,
@@ -817,13 +865,23 @@ mod tests {
                     true,
                 )
             })?;
-            let next = devices[1].run(|| pass.head.greedy_output())?;
+            let next = pass.greedy_output(&batch)?;
+            let bytes = runtime.block_on(pass.download_logits(&batch, &[0]))?;
+            ensure!(bytes.len() == 129280 * 4, "distributed logit download extent differs");
+            let scores: Vec<f32> = bytes.chunks_exact(4)
+                .map(|bytes| f32::from_ne_bytes(bytes.try_into().unwrap())).collect();
+            ensure!(scores.iter().all(|score| score.is_finite()), "non-finite downloaded logits");
+            let best = scores.iter().enumerate().fold(0, |best, (index, score)|
+                if *score > scores[best] { index } else { best });
+            assert_eq!((best as u32, scores[best]), next[0]);
+            assert!(runtime.block_on(pass.download_logits(&batch, &[1])).is_err());
+            assert_eq!(lib.cuda_get_device()?, 0);
             ensure!(
                 next.len() == 1 && next[0].0 < 129280 && next[0].1.is_finite(),
                 "invalid full-pass greedy output"
             );
             ensure!(
-                pass.taps(&batch)?.rows().len() == tokens.len(),
+                crate::v41_target_pass::TargetCache::taps(&pass, &batch)?.rows().len() == tokens.len(),
                 "distributed taps lost rows"
             );
             if step == 2 {
@@ -841,7 +899,8 @@ mod tests {
                 }
                 Ok::<_, anyhow::Error>(())
             })?;
-            pass.commit(&mut requests, &mut batch, &[tokens.len() as u32])?;
+            crate::v41_target_pass::TargetCache::commit(&mut pass, &mut requests, &mut batch,
+                &[tokens.len() as u32])?;
             assert_eq!(
                 requests.cache().committed_end(lease)?,
                 if step == 3 { 6 } else { 4 + step as u64 }
@@ -973,15 +1032,74 @@ mod tests {
             )
         })?;
         other_transport.install_tp2(tp2_ffn::Wave::new(routed, shared, 20, 16)?)?;
+        if std::env::var_os("DS41RT_INDEPENDENT_ENCODER_CHECK").is_some() {
+            let counts = [3usize, 7];
+            let mut reference: [Option<Vec<u8>>; 2] = [None, None];
+            for concurrent in [false, true, true, true, true] {
+                let leases = [requests.admit(0, 94000)?, requests.admit(1, 94001)?];
+                for (lease, count) in leases.into_iter().zip(counts) { requests.begin_encoder(lease, count as u64)?; }
+                let mut batches = leases.into_iter().zip(counts).map(|(lease, count)| requests.reserve_encoder(&[
+                    crate::v41_requests::RequestTokens { lease, tokens: &prompt[..count],
+                        image_mask: None, kind: ExpertV2SourceKind::Prefill }
+                ])).collect::<Result<Vec<_>>>()?;
+                let mut suffixes = counts.into_iter().map(|count| devices[map.attention(19)?].own(||
+                    EncoderSuffix::new(&lib, count as u64, EncoderSuffix::device_bytes(count as u64)?)))
+                    .collect::<Result<Vec<_>>>()?;
+                {
+                    let bank = std::cell::RefCell::new(&mut requests);
+                    let (b0, b1) = batches.split_at_mut(1);
+                    let (s0, s1) = suffixes.split_at_mut(1);
+                    runtime.block_on(async {
+                        if concurrent {
+                            tokio::try_join!(
+                                unsafe { pass.execute(&bank, &mut b0[0], &mut transport, 0,
+                                    &[], Some(&mut s0[0]), None, false) },
+                                unsafe { other.execute(&bank, &mut b1[0], &mut other_transport, 0,
+                                    &[], Some(&mut s1[0]), None, false) },
+                            )?;
+                        } else {
+                            unsafe { pass.execute(&bank, &mut b0[0], &mut transport, 0,
+                                &[], Some(&mut s0[0]), None, false).await?; }
+                            unsafe { other.execute(&bank, &mut b1[0], &mut other_transport, 0,
+                                &[], Some(&mut s1[0]), None, false).await?; }
+                        }
+                        Ok::<_, anyhow::Error>(())
+                    })?;
+                }
+                for (index, lane) in [&mut pass, &mut other].into_iter().enumerate() {
+                    let output = suffixes[index].output()?;
+                    let mut bytes = vec![0; output.residual.bytes];
+                    devices[map.attention(19)?].run(|| lib.copy_d2h(&mut bytes, output.residual))?;
+                    if let Some(expected) = &reference[index] {
+                        ensure!(&bytes == expected,
+                            "independent encoder residual differs: concurrent={concurrent}, lane={index}");
+                    } else { reference[index] = Some(bytes); }
+                    lane.enqueue_cache_commit(&requests, &batches[index], &[counts[index] as u32])?;
+                    runtime.block_on(async {
+                        while !lane.poll_cache_commit()? { tokio::task::yield_now().await; }
+                        Ok::<_, anyhow::Error>(())
+                    })?;
+                    lane.commit(&mut requests, &mut batches[index], &[counts[index] as u32])?;
+                    requests.release(leases[index])?;
+                }
+            }
+            eprintln!("PASS independent encoder cache leases: sequential and concurrent residuals exact");
+        }
         for (case, chunks) in [
             vec![&prompt[..3], &prompt[3..]],
             vec![&prompt[..1], &prompt[1..3], &prompt[3..4], &prompt[4..]],
         ]
         .into_iter()
+        .cycle()
+        .take(std::env::var("DS41RT_STREAM_CASES").ok().map(|s| s.parse::<usize>()).transpose()?.unwrap_or(2))
         .enumerate()
         {
             let mut expected_case = None;
+            let mut expected_trace = Vec::new();
             for interleaved in [false, true] {
+                let tracing = std::env::var_os("DS41RT_TRACE_ENCODER").is_some();
+                pass.trace = tracing;
+                other.trace = tracing;
                 let lease = requests.admit(0, 93000 + case as u64)?;
                 requests.begin_encoder(lease, 7)?;
                 let mut suffix = devices[map.attention(19)?]
@@ -1022,6 +1140,37 @@ mod tests {
                         pass.enqueue_cache_commit(&requests, &batch, &[chunk.len() as u32])?;
                         assert!(pass.poll_cache_commit()?);
                         pass.commit(&mut requests, &mut batch, &[chunk.len() as u32])?;
+                    }
+                }
+                pass.trace = false;
+                other.trace = false;
+                let mut trace = Vec::new();
+                if tracing {
+                    for lane in [&mut pass, &mut other] {
+                        for gpu in 0..2 {
+                            devices[gpu].run(|| unsafe {
+                                lib.cuda_stream_synchronize(lane.lanes[gpu].trace_stream())
+                            })?;
+                        }
+                        for (position, layer, bytes) in lane.trace_records.drain(..) {
+                            let gpu = map.attention(layer)?;
+                            let offset = (layer * 16 + position as usize) * 40960;
+                            trace.push((position, layer,
+                                lane.trace_buffers[gpu].bytes_mut()[offset..offset+bytes].to_vec()));
+                        }
+                    }
+                }
+                if !interleaved { expected_trace = trace; }
+                else {
+                    for (position, layer, bytes) in &trace {
+                        let (_, _, expected) = expected_trace.iter().find(|(p,l,_)| p == position && l == layer).unwrap();
+                        if bytes != expected {
+                            let peak = bytes.chunks_exact(2).zip(expected.chunks_exact(2)).map(|(a,b)|
+                                (f32::from_bits((u16::from_ne_bytes([a[0],a[1]]) as u32)<<16) -
+                                 f32::from_bits((u16::from_ne_bytes([b[0],b[1]]) as u32)<<16)).abs()
+                            ).fold(0f32,f32::max);
+                            eprintln!("TRACE case={case} position={position} layer={layer} peak={peak}");
+                        }
                     }
                 }
                 assert_eq!(requests.cache().committed_end(lease)?, 7);

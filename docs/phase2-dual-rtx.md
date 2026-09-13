@@ -867,3 +867,46 @@ those guards and existing carry, direct-value, and abort comparisons. A later
 16-case untraced integration run passed, but a prior run with this prefix fix
 still failed. The numeric interleaving issue therefore remains unresolved;
 no throughput improvement is claimed for this correctness change.
+
+Removing the temporary native invalid-attention logging reproduced failures
+with both placements. The deployment boundary at 20 failed the 3+4 partition
+(token 200 in both paths, scores 15.589296 versus 16.83005); boundary 14 failed
+the four-chunk partition with different winning tokens (74 versus 200).
+Logs are `interleave20-clean.log` and `interleave14-clean.log` in the same
+experiment directory. The fixture now defaults to boundary 20 and accepts
+`DS41RT_ATTENTION_BOUNDARY=14` for alternate ownership coverage. Neither
+placement is qualified for interleaved execution yet.
+
+Deferred test tracing now queues pinned readback on each lane's mHC producer
+stream without a per-layer host wait, and collects after execution. Selecting
+only layer 19 reproduced differing encoder residuals for every chunk; selecting
+layer 14 likewise reproduced differing residuals. A layer-0-only capture
+reproduced the final mismatch with identical layer-0 residuals. This places the
+observed divergence after initialization and before completion of the encoder;
+decoder replay and the vocabulary head are not its first cause. Full-layer
+tracing still masks reproduction. Logs are `interleave20-deferred19.log`,
+`interleave20-deferred14.log`, and `interleave20-deferred0.log`.
+
+Single-layer captures at 1/2/3/4 matched exactly in runs that still failed at
+the head. Layer 5 captured a differing first-chunk residual, but capturing 4
+and 5 together changed the schedule and both matched despite a later failure.
+Thus the first affected layer depends on overlap timing; the evidence does not
+prove a fixed layer-5 defect. A temporary invalid-view trap in sparse attention
+did not fire in another reproducing run (`interleave20-invalid-trap.log`),
+ruling out that kernel's descriptor rejection for that failure. The trap was
+removed after the experiment. Continue with data ownership and overlap checks.
+
+An independent-request comparison now gives each lane a separate cache lease
+and compares retained encoder residuals against sequential execution. Four
+concurrent pairs passed exactly for equal three-token requests and again for
+unequal three/seven-token requests (`independent-encoder.log` and
+`independent-encoder-unequal.log`). The current fixture enables the unequal case
+with `DS41RT_INDEPENDENT_ENCODER_CHECK=1`. These short checks point toward
+same-request cache overlap; they do not establish general concurrency quality.
+
+The distributed pass also exposes device-scoped greedy/logit downloads and a
+statically dispatched target-cache interface for queued dSpark commits. The
+fixture checks finite full-vocabulary downloads, exact agreement with GPU
+argmax, compact-row bounds, and restoration of the caller's GPU. Ordinary
+serving still selects its existing target pass; installing the distributed
+pass and placing the actual draft runtime remain outstanding.
