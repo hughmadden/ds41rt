@@ -17,7 +17,7 @@ fn poll_quantum(rows: &[ExpertProtocolV2RowDescriptor]) -> std::time::Duration {
                 ExpertV2SourceKind::Decode | ExpertV2SourceKind::MtpVerify
             )
         });
-    std::time::Duration::from_micros(if decode { 50 } else { 250 })
+    std::time::Duration::from_micros(if decode { 0 } else { 250 })
 }
 
 pub struct V41Tp4Roce {
@@ -130,7 +130,8 @@ impl V41Tp4RocePending<'_, '_> {
         // Give the other execution lane its first opportunity as soon as this
         // wave must wait. A 250us initial spin can consume an entire small-row
         // FFN and serialize two otherwise independent decode stacks. Subsequent
-        // decode polls use a 50us quantum to let the peer lane progress sooner.
+        // decode polls yield after every unsuccessful poll so short GPU completions
+        // on the peer lane are not delayed by host-side receive spinning.
         // Prefill/mixed waves retain 250us. Ready responses never yield.
         let mut quantum = std::time::Instant::now();
         let mut first_wait = true;
@@ -191,7 +192,7 @@ mod tests {
             route_count: 6,
         };
         use ExpertV2SourceKind::{Benchmark, Decode, MtpVerify, Prefill};
-        assert_eq!(poll_quantum(&[row(Decode), row(MtpVerify)]).as_micros(), 50);
+        assert_eq!(poll_quantum(&[row(Decode), row(MtpVerify)]).as_micros(), 0);
         for other in [Prefill, Benchmark] {
             assert_eq!(poll_quantum(&[row(other)]).as_micros(), 250);
             assert_eq!(

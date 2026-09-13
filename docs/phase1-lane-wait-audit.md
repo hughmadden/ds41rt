@@ -74,8 +74,7 @@ completion. This is evidence for the exercised serving path, not for shutdown,
 error cleanup or excluded admission/prefill. Graph instantiation still consumes
 host CPU/driver time and is a performance concern, not a remaining GPU wait.
 
-RoCE receive polling yields on its first wait and then at a bounded 50-microsecond
-decode polling quantum. It waits for its own four results, without a peer-lane
+[RoCE decode receive polling now yields on every unsuccessful poll](phase1-async-poll-yield.md). It waits for its own four results, without a peer-lane
 round barrier. Those required within-lane data dependencies remain.
 
 ## Remaining completion order
