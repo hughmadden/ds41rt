@@ -1,0 +1,127 @@
+diff --git a/rust/crates/ds41rt-daemon/src/v41_backbone_shared.rs b/rust/crates/ds41rt-daemon/src/v41_backbone_shared.rs
+index f91663f..7b4e877 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_backbone_shared.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_backbone_shared.rs
+@@ -270,24 +270,35 @@ impl BackboneSharedWave<'_, '_> {
+                 && input.values.device_id == self.input.buffer.device_id,
+             "shared FFN block input differs"
+         );
+-        self.stream
+-            .library
+-            .copy_d2d(self.input.buffer, input.values, input.values.bytes)?;
+         let rows = input.tokens.len() as u32;
+-        if self
+-            .graphs
+-            .get_shape(self.layer, self.weights, rows)
+-            .is_none()
+-        {
+-            unsafe {
++        unsafe { self.execute_staged(input.values, rows)?; }
++        self.origin = Some(input.binding());
++        self.output()
++    }
++    /// The producer is complete and input stays borrowed until this call
++    /// drains. Stream order connects the staged copy to warmup or replay.
++    unsafe fn execute_staged(&mut self, input: Ds41rtDeviceBuffer, rows: u32) -> Result<()> {
++        self.invalidate();
++        let executed = (|| unsafe {
++            // Small decode batches benefit from lane overlap. Keep the
++            // completed-copy schedule for larger batches and prefill.
++            if rows <= 16 {
++                self.stream.library.copy_d2d_async(self.input.buffer, input, input.bytes, self.stream.raw)?;
++            } else {
++                self.stream.library.copy_d2d(self.input.buffer, input, input.bytes)?;
++            }
++            if self.graphs.get_shape(self.layer, self.weights, rows).is_none() {
+                 self.capture(rows)?;
+             }
++            self.replay(rows).map(|_| ())
++        })();
++        if executed.is_err() {
++            // Graph preparation may fail after the copy was queued. Drain
++            // before the caller can release its source, and publish nothing.
++            self.invalidate();
++            return executed.and(self.synchronize());
+         }
+-        unsafe {
+-            self.replay(rows)?;
+-        }
+-        self.origin = Some(input.binding());
+-        self.output()
++        Ok(())
+     }
+     pub fn output(&self) -> Result<SharedOutput<'_>> {
+         let rows = self.ready.context("shared FFN output unpublished")?;
+@@ -320,6 +331,72 @@ impl BackboneSharedWave<'_, '_> {
+         Ok(())
+     }
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use ds41rt_loader::{read_official_v41_catalog, OFFICIAL_V41_MODEL_ID};
++
++    #[test]
++    fn queued_shared_input_matches_completed_copy_and_drains_failure() -> Result<()> {
++        let Some(path) = std::env::var_os("DS41RT_SHARED_STAGE_LIBRARY") else {
++            eprintln!("skip shared staging GPU test: DS41RT_SHARED_STAGE_LIBRARY unset");
++            return Ok(());
++        };
++        let model = std::env::var_os("DS41RT_SHARED_STAGE_MODEL").context("DS41RT_SHARED_STAGE_MODEL required")?;
++        let library = unsafe { NativeLibrary::load(path)? };
++        let catalog = read_official_v41_catalog(OFFICIAL_V41_MODEL_ID, std::path::Path::new(&model))?;
++        let weights = (0..2).map(|layer| BackboneSharedWeights::load(&library, &catalog,
++            layer, 1 << 30, 16 << 20)).collect::<Result<Vec<_>>>()?;
++        let budget = BackboneSharedWave::device_bytes(&library, 256)?;
++        let source = DeviceAllocation::new(&library, 256 * 10240)?;
++        let mut actual = weights[0].wave(256, budget)?;
++        let mut reference = weights[0].wave(256, budget)?;
++        actual.enable_small_graph_shapes();
++        let mut handles = std::collections::BTreeMap::new();
++        let mut cases = 0;
++        for cycle in 0..2 {
++            for rows in [1, 6, 16, 48, 80, 256, 6, 1] {
++                for layer in 0..2 {
++                    actual.rebind(&weights[layer])?;
++                    reference.rebind(&weights[layer])?;
++                    let hidden: Vec<u8> = (0..rows as usize * 5120).flat_map(|i| {
++                        let x = (((i * 7 + cycle * 19 + layer * 3) % 31) as i32 - 15) as f32 / 128.;
++                        ((x.to_bits() >> 16) as u16).to_ne_bytes()
++                    }).collect();
++                    let mut input = source.buffer; input.bytes = hidden.len();
++                    library.copy_h2d(input, &hidden)?;
++                    library.copy_h2d(actual.input.buffer, &vec![0xff; actual.input.buffer.bytes])?;
++                    library.copy_h2d(actual.result.buffer, &vec![0xff; actual.result.buffer.bytes])?;
++                    unsafe { actual.execute_staged(input, rows)?; }
++                    library.copy_d2d(reference.input.buffer, input, input.bytes)?;
++                    let expected = unsafe { reference.execute(rows)? }.values;
++                    let observed = actual.output()?.values;
++                    let mut a = vec![0; observed.bytes]; let mut b = vec![0; expected.bytes];
++                    library.copy_d2h(&mut a, observed)?; library.copy_d2h(&mut b, expected)?;
++                    assert_eq!(a,b,"cycle={cycle} rows={rows} layer={layer}");
++                    assert!(a.chunks_exact(2).all(|b| {
++                        f32::from_bits((u16::from_ne_bytes([b[0],b[1]]) as u32) << 16).is_finite()
++                    }));
++                    let handle = actual.graphs.get_shape(layer,&weights[layer],rows).unwrap().0;
++                    if rows <= 48 {
++                        if let Some(old) = handles.insert((layer,rows),handle) { assert_eq!(old,handle); }
++                    }
++                    // Invalid shape fails graph warmup after the source copy
++                    // was queued; output must remain unpublished and reusable.
++                    assert!(unsafe { actual.execute_staged(input,0) }.is_err());
++                    assert!(actual.output().is_err());
++                    let mut staged = actual.input.buffer; staged.bytes = input.bytes;
++                    let mut copy = vec![0; input.bytes]; library.copy_d2h(&mut copy,staged)?;
++                    assert_eq!(copy,hidden);
++                    cases += 1;
++                }
++            }
++        }
++        eprintln!("PASS {cases} exact queued/shared comparisons and post-copy failure recoveries");
++        Ok(())
++    }
++}
+ impl Drop for BackboneSharedWave<'_, '_> {
+     fn drop(&mut self) {
+         if let Err(e) = self
