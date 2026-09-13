@@ -1,0 +1,187 @@
+--- a/b12x/moe/_shared/kernels/w4a8_v41_pipeline.py
++++ b/b12x/moe/_shared/kernels/w4a8_v41_pipeline.py
+@@ -28,6 +28,7 @@
+ from cutlass import Int32, Int64, Uint32, Float32
+ from b12x._lib.intrinsics import (
+     shared_ptr_to_u32,
++    cp_async4_shared_global,
+     get_ptr_as_int64,
+     red_add_global_f32,
+     e2m1x8_to_qmma_e2m1x8,
+@@ -45,8 +46,8 @@
+ )
+ 
+ 
+-class V41FusedSliceKernel:
+-    def __init__(self, width, *, grouped=False, atomic_tokens=False, intermediate=576):
++class V41PipelineSliceKernel:
++    def __init__(self, width, *, grouped=False, atomic_tokens=False, intermediate=576, weight_stages=2):
+         assert width in (64, 128, 192)
+         assert not atomic_tokens or grouped
+         self.atomic_tokens = atomic_tokens
+@@ -130,7 +131,7 @@
+                 Uint32, cute.make_layout(self.width * 32), byte_alignment=16
+             )
+             sf = smem.allocate_tensor(
+-                Uint32, cute.make_layout(max(self.width * 2, 256)), byte_alignment=16
++                Uint32, cute.make_layout(max(self.width * 2, 256, 2 * ((self.width + 127) // 128) * 128)), byte_alignment=16
+             )
+             mid = smem.allocate_tensor(
+                 Float32, cute.make_layout((16, self.width)), byte_alignment=16
+@@ -287,31 +288,51 @@
+                     qa[row, block * 8 + j] = payload[j]
+                 qs[row, block] = scale
+             cute.arch.sync_threads()
++            load_k = Int32(0)
++            stage_repacked_b_k_slice(
++                w2,
++                bb + (load_k % 2) * self.width * 64,
++                expert * Int64(self.kernel_intermediate * 5120 // 8),
++                Int32(self.kernel_intermediate // 128),
++                start,
++                load_k * 128,
++                tid,
++                128,
++                self.width,
++            )
++            for scale_group in cutlass.range_constexpr((self.width + 127) // 128):
++                if tid < 32:
++                    scale_row = Int64(load_k) * Int64(128) + Int64(tid) * Int64(4)
++                    scale_tile = (scale_row // Int64(256)) * Int64(self.kernel_intermediate // 128) + Int64(start) // Int64(128) + Int64(scale_group)
++                    scale_word = expert * Int64(self.kernel_intermediate * 5120 // 128) + scale_tile * Int64(256) + scale_row % Int64(256)
++                    scale_dest = sb + (load_k % 2) * ((self.width + 127) // 128) * 512 + scale_group * 512 + tid * 16
++                    cp_async4_shared_global(scale_dest, get_ptr_as_int64(s2, scale_word))
++            cute.arch.cp_async_commit_group()
+             for ot in range(40):
+-                stage_repacked_b_k_slice(
+-                    w2,
+-                    bb,
+-                    expert * Int64(self.kernel_intermediate * 5120 // 8),
+-                    Int32(self.kernel_intermediate // 128),
+-                    start,
+-                    ot * 128,
+-                    tid,
+-                    128,
+-                    self.width,
+-                )
+-                stage_repacked_sfb_k_slice(
+-                    s2,
+-                    sf,
+-                    expert * Int64(self.kernel_intermediate * 5120 // 128),
+-                    Int32(self.kernel_intermediate // 128),
+-                    start,
+-                    ot * 128,
+-                    tid,
+-                    128,
+-                    self.width,
+-                )
+-                cute.arch.cp_async_commit_group()
+-                cute.arch.cp_async_wait_group(0)
++                load_k = ot + 1
++                if load_k < 40:
++                    stage_repacked_b_k_slice(
++                        w2,
++                        bb + (load_k % 2) * self.width * 64,
++                        expert * Int64(self.kernel_intermediate * 5120 // 8),
++                        Int32(self.kernel_intermediate // 128),
++                        start,
++                        load_k * 128,
++                        tid,
++                        128,
++                        self.width,
++                    )
++                    for scale_group in cutlass.range_constexpr((self.width + 127) // 128):
++                        if tid < 32:
++                            scale_row = Int64(load_k) * Int64(128) + Int64(tid) * Int64(4)
++                            scale_tile = (scale_row // Int64(256)) * Int64(self.kernel_intermediate // 128) + Int64(start) // Int64(128) + Int64(scale_group)
++                            scale_word = expert * Int64(self.kernel_intermediate * 5120 // 128) + scale_tile * Int64(256) + scale_row % Int64(256)
++                            scale_dest = sb + (load_k % 2) * ((self.width + 127) // 128) * 512 + scale_group * 512 + tid * 16
++                            cp_async4_shared_global(scale_dest, get_ptr_as_int64(s2, scale_word))
++                    cute.arch.cp_async_commit_group()
++                    cute.arch.cp_async_wait_group(1)
++                else:
++                    cute.arch.cp_async_wait_group(0)
+                 cute.arch.sync_threads()
+                 acc = cute.make_rmem_tensor((4, 4), Float32)
+                 acc.fill(0)
+@@ -325,8 +346,16 @@
+                         scale = qs[g + c * 8, kb]
+                     for nf in cutlass.range_constexpr(4):
+                         index = ((kb * 4 + nf) * 32 + lane) * 4 + warp
+-                        b0, b1 = e2m1x8_to_qmma_e2m1x8(b[index])
+-                        sw = sf[(kb // 4) * 128 + nf * 32 + warp * 8 + g]
++                        b0, b1 = e2m1x8_to_qmma_e2m1x8(b[(ot % 2) * self.width * 16 + index])
++                        sw = sf[(ot % 2) * ((self.width + 127) // 128) * 128 + (kb // 4) * 128 + nf * 32 + warp * 8 + g]
++                        scale_shift = Uint32((start % 128) // 32 * 8)
++                        sw = sw >> scale_shift
++                        if cutlass.const_expr(kb // 4 + 1 < (self.width + 127) // 128):
++                            if scale_shift != Uint32(0):
++                                next_word = sf[(ot % 2) * ((self.width + 127) // 128) * 128 + (kb // 4 + 1) * 128 + nf * 32 + warp * 8 + g]
++                                sw |= next_word << (Uint32(32) - scale_shift)
++                        if cutlass.const_expr(self.width // 32 - (kb // 4) * 4 < 4):
++                            sw &= Uint32((1 << ((self.width // 32 - (kb // 4) * 4) * 8)) - 1)
+                         d0, d1, d2, d3 = mxfp8_mma_m16n8k32_f32_e2m1(
+                             acc[nf, 0],
+                             acc[nf, 1],
+--- /dev/null
++++ b/benchmarks/benchmark_small_pipeline.py
+@@ -0,0 +1,59 @@
++"""Isolated FC2 output-tile staging experiment; original FC2 and arithmetic preserved."""
++import json, statistics, torch, cutlass, cutlass.cute as cute
++from cutlass.cute.runtime import from_dlpack
++from b12x._lib.utils import current_cuda_stream
++from b12x.moe._shared.kernels.w4a8_v41_slice import V41FusedSliceKernel
++from b12x.moe._shared.kernels.w4a8_v41_pipeline import V41PipelineSliceKernel
++from tests.moe.test_v41_grouped_slices import _check_grouped_slices
++from benchmarks.benchmark_v41_grouped_slices import OrderedReduce
++state={}
++def measure(**case):
++    meta=case['meta_view'];m=case['rows'];routes=case['routes']
++    if not state:
++        for width in [64,128,192]:
++            for stages in [1,2]:
++                key=f'{width}x{stages}'
++                out=torch.empty(((576+width-1)//width,480,5120),device='cuda')
++                args=list(case['args']);args[-1]=from_dlpack(out,assumed_align=16)
++                kernel=V41FusedSliceKernel(width,grouped=True) if stages==1 else V41PipelineSliceKernel(width,grouped=True,weight_stages=stages)
++                compiled=cute.compile(kernel,*args,cutlass.Int32(80),current_cuda_stream(),meta,cutlass.Int32(64))
++                reduced=torch.empty((480,5120),device='cuda');rv=from_dlpack(reduced,assumed_align=16)
++                reducer=cute.compile(OrderedReduce((576+width-1)//width),args[-1],rv,cutlass.Int32(480),current_cuda_stream())
++                state[key]=(out,args,compiled,reduced,rv,reducer)
++                print('COMPILED',key,flush=True)
++    graphs={};checks={}
++    for key,(out,args,compiled,reduced,rv,reducer) in state.items():
++        out.fill_(12345);compiled(*args,m,current_cuda_stream(),meta,64)
++        reducer(args[-1],rv,routes,current_cuda_stream())
++        graph=torch.cuda.CUDAGraph()
++        with torch.cuda.graph(graph):
++            compiled(*args,m,current_cuda_stream(),meta,64)
++            reducer(args[-1],rv,routes,current_cuda_stream())
++        before=torch.cuda.memory_allocated();graph.replay()
++        assert before==torch.cuda.memory_allocated()
++        actual=torch.zeros_like(case['expected'])
++        actual.index_add_(0,case['pair_gpu'][:,0],reduced[:routes].bfloat16().float())
++        rel=((actual-case['expected']).norm()/case['expected'].norm()).item()
++        cosine=torch.nn.functional.cosine_similarity(actual.flatten(),case['expected'].flatten(),dim=0).item()
++        assert rel<0.01 and cosine>0.9999,(key,rel,cosine)
++        assert bool((out[:,routes:]==12345).all())
++        baseline=state[key.split('x')[0]+'x1'][0]
++        assert torch.equal(out[:,:routes],baseline[:,:routes]),(key,'changed numerical output')
++        graphs[key]=graph;checks[key]={'relative_l2':rel,'cosine':cosine,'bit_exact_same_width':True}
++    for _ in range(5):
++        for g in graphs.values():g.replay()
++    samples={k:[] for k in graphs};keys=list(graphs)
++    for iteration in range(9):
++        order=keys[iteration:]+keys[:iteration]
++        if iteration%2:order=order[::-1]
++        for key in order:
++            start,end=torch.cuda.Event(enable_timing=True),torch.cuda.Event(enable_timing=True)
++            start.record()
++            for _ in range(20):graphs[key].replay()
++            end.record();end.synchronize()
++            samples[key].append(start.elapsed_time(end)*1000/20)
++    print('TIMING '+json.dumps({'case':case['case'],'rows':m,'groups':case['groups'],'routes':routes,'checks':checks,'graph_us':samples,'median_us':{k:statistics.median(v) for k,v in samples.items()}}),flush=True)
++    for g in graphs.values():g.reset()
++if __name__=='__main__':
++    print('DEVICE',torch.cuda.get_device_properties(0),flush=True)
++    _check_grouped_slices(128,measure)

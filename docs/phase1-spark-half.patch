@@ -1,0 +1,286 @@
+--- a/b12x/moe/_shared/kernels/w4a8_v41_pipeline.py
++++ b/b12x/moe/_shared/kernels/w4a8_v41_pipeline.py
+@@ -45,8 +45,8 @@
+ )
+ 
+ 
+-class V41FusedSliceKernel:
+-    def __init__(self, width, *, grouped=False, atomic_tokens=False, intermediate=576):
++class V41PipelineSliceKernel:
++    def __init__(self, width, *, grouped=False, atomic_tokens=False, intermediate=576, weight_stages=2):
+         assert width in (64, 128, 192)
+         assert not atomic_tokens or grouped
+         self.atomic_tokens = atomic_tokens
+@@ -147,113 +147,104 @@
+             gate.fill(0)
+             up = cute.make_rmem_tensor((self.width // 32, 4), Float32)
+             up.fill(0)
++            load_k = Int32(0)
++            weight_half = Int32(1)
++            write_slot = Int32(0)
++            stage_repacked_b_slice(
++                w13, bb + write_slot * self.width * 64,
++                expert * Int64(self.kernel_intermediate * 5120 // 4),
++                Int32(40), load_k, start + weight_half * self.kernel_intermediate,
++                tid, 128, self.width,
++            )
++            stage_repacked_sfb_slice(
++                s13, sb + write_slot * self.width * 4,
++                expert * Int64(self.kernel_intermediate * 5120 // 64),
++                Int32(40), load_k, start + weight_half * self.kernel_intermediate,
++                tid, 128, self.width,
++            )
++            cute.arch.cp_async_commit_group()
+             for kt in range(40):
+-                stage_repacked_b_slice(
+-                    w13,
+-                    bb,
+-                    expert * Int64(self.kernel_intermediate * 5120 // 4),
+-                    Int32(40),
+-                    kt,
+-                    start,
+-                    tid,
+-                    128,
+-                    self.width,
+-                )
+-                stage_repacked_b_slice(
+-                    w13,
+-                    bb + self.width * 64,
+-                    expert * Int64(self.kernel_intermediate * 5120 // 4),
+-                    Int32(40),
+-                    kt,
+-                    start + self.kernel_intermediate,
+-                    tid,
+-                    128,
+-                    self.width,
+-                )
+-                stage_repacked_sfb_slice(
+-                    s13,
+-                    sb,
+-                    expert * Int64(self.kernel_intermediate * 5120 // 64),
+-                    Int32(40),
+-                    kt,
+-                    start,
+-                    tid,
+-                    128,
+-                    self.width,
+-                )
+-                stage_repacked_sfb_slice(
+-                    s13,
+-                    sb + self.width * 4,
+-                    expert * Int64(self.kernel_intermediate * 5120 // 64),
+-                    Int32(40),
+-                    kt,
+-                    start + self.kernel_intermediate,
+-                    tid,
+-                    128,
+-                    self.width,
+-                )
+-                cute.arch.cp_async_commit_group()
+-                cute.arch.cp_async_wait_group(0)
+-                cute.arch.sync_threads()
+-                for kb in cutlass.range_constexpr(4):
+-                    a0 = Uint32(0)
+-                    a1 = Uint32(0)
+-                    a2 = Uint32(0)
+-                    a3 = Uint32(0)
+-                    if g < rows:
+-                        a0 = x[input_lo, kt * 32 + kb * 8 + c * 2]
+-                        a2 = x[input_lo, kt * 32 + kb * 8 + c * 2 + 1]
+-                    if g + 8 < rows:
+-                        a1 = x[input_hi, kt * 32 + kb * 8 + c * 2]
+-                        a3 = x[input_hi, kt * 32 + kb * 8 + c * 2 + 1]
+-                    scale = Uint32(0)
+-                    if c < 2 and g + c * 8 < rows:
+-                        scale = Uint32(xs[input_scale, kt * 4 + kb])
+-                    for nf in cutlass.range_constexpr(self.width // 32):
+-                        index = ((kb * (self.width // 32) + nf) * 32 + lane) * 4 + warp
+-                        u0, u1 = e2m1x8_to_qmma_e2m1x8(b[index])
+-                        g0, g1 = e2m1x8_to_qmma_e2m1x8(b[index + self.width * 16])
+-                        su = sf[nf * 32 + warp * 8 + g]
+-                        sg = sf[self.width + nf * 32 + warp * 8 + g]
+-                        d0, d1, d2, d3 = mxfp8_mma_m16n8k32_f32_e2m1(
+-                            gate[nf, 0],
+-                            gate[nf, 1],
+-                            gate[nf, 2],
+-                            gate[nf, 3],
+-                            a0,
+-                            a1,
+-                            a2,
+-                            a3,
+-                            g0,
+-                            g1,
+-                            scale,
+-                            sg,
+-                            bid_b=kb,
+-                        )
+-                        gate[nf, 0] = d0
+-                        gate[nf, 1] = d1
+-                        gate[nf, 2] = d2
+-                        gate[nf, 3] = d3
+-                        d0, d1, d2, d3 = mxfp8_mma_m16n8k32_f32_e2m1(
+-                            up[nf, 0],
+-                            up[nf, 1],
+-                            up[nf, 2],
+-                            up[nf, 3],
+-                            a0,
+-                            a1,
+-                            a2,
+-                            a3,
+-                            u0,
+-                            u1,
+-                            scale,
+-                            su,
+-                            bid_b=kb,
+-                        )
+-                        up[nf, 0] = d0
+-                        up[nf, 1] = d1
+-                        up[nf, 2] = d2
+-                        up[nf, 3] = d3
+-                cute.arch.sync_threads()
++                for half in cutlass.range_constexpr(2):
++                    load_k = kt + half
++                    weight_half = Int32(half)
++                    write_slot = Int32(1 - half)
++                    if load_k < 40:
++                        stage_repacked_b_slice(
++                            w13, bb + write_slot * self.width * 64,
++                            expert * Int64(self.kernel_intermediate * 5120 // 4),
++                            Int32(40), load_k, start + weight_half * self.kernel_intermediate,
++                            tid, 128, self.width,
++                        )
++                        stage_repacked_sfb_slice(
++                            s13, sb + write_slot * self.width * 4,
++                            expert * Int64(self.kernel_intermediate * 5120 // 64),
++                            Int32(40), load_k, start + weight_half * self.kernel_intermediate,
++                            tid, 128, self.width,
++                        )
++                        cute.arch.cp_async_commit_group()
++                        cute.arch.cp_async_wait_group(1)
++                    else:
++                        cute.arch.cp_async_wait_group(0)
++                    cute.arch.sync_threads()
++                    for kb in cutlass.range_constexpr(4):
++                        a0 = Uint32(0)
++                        a1 = Uint32(0)
++                        a2 = Uint32(0)
++                        a3 = Uint32(0)
++                        if g < rows:
++                            a0 = x[input_lo, kt * 32 + kb * 8 + c * 2]
++                            a2 = x[input_lo, kt * 32 + kb * 8 + c * 2 + 1]
++                        if g + 8 < rows:
++                            a1 = x[input_hi, kt * 32 + kb * 8 + c * 2]
++                            a3 = x[input_hi, kt * 32 + kb * 8 + c * 2 + 1]
++                        scale = Uint32(0)
++                        if c < 2 and g + c * 8 < rows:
++                            scale = Uint32(xs[input_scale, kt * 4 + kb])
++                        for nf in cutlass.range_constexpr(self.width // 32):
++                            index = ((kb * (self.width // 32) + nf) * 32 + lane) * 4 + warp
++                            v0, v1 = e2m1x8_to_qmma_e2m1x8(b[half * self.width * 16 + index])
++                            sw = sf[half * self.width + nf * 32 + warp * 8 + g]
++                            if cutlass.const_expr(half == 0):
++                                d0, d1, d2, d3 = mxfp8_mma_m16n8k32_f32_e2m1(
++                                    gate[nf, 0],
++                                    gate[nf, 1],
++                                    gate[nf, 2],
++                                    gate[nf, 3],
++                                    a0,
++                                    a1,
++                                    a2,
++                                    a3,
++                                    v0,
++                                    v1,
++                                    scale,
++                                    sw,
++                                    bid_b=kb,
++                                )
++                                gate[nf, 0] = d0
++                                gate[nf, 1] = d1
++                                gate[nf, 2] = d2
++                                gate[nf, 3] = d3
++                            else:
++                                d0, d1, d2, d3 = mxfp8_mma_m16n8k32_f32_e2m1(
++                                    up[nf, 0],
++                                    up[nf, 1],
++                                    up[nf, 2],
++                                    up[nf, 3],
++                                    a0,
++                                    a1,
++                                    a2,
++                                    a3,
++                                    v0,
++                                    v1,
++                                    scale,
++                                    sw,
++                                    bid_b=kb,
++                                )
++                                up[nf, 0] = d0
++                                up[nf, 1] = d1
++                                up[nf, 2] = d2
++                                up[nf, 3] = d3
++                    cute.arch.sync_threads()
+             for nf in cutlass.range_constexpr(self.width // 32):
+                 for elem in cutlass.range_constexpr(4):
+                     row = g + (elem // 2) * 8
+--- /dev/null
++++ b/benchmarks/benchmark_small_pipeline.py
+@@ -0,0 +1,59 @@
++"""Isolated half-tile FC1 staging experiment; original FC2 and arithmetic preserved."""
++import json, statistics, torch, cutlass, cutlass.cute as cute
++from cutlass.cute.runtime import from_dlpack
++from b12x._lib.utils import current_cuda_stream
++from b12x.moe._shared.kernels.w4a8_v41_slice import V41FusedSliceKernel
++from b12x.moe._shared.kernels.w4a8_v41_pipeline import V41PipelineSliceKernel
++from tests.moe.test_v41_grouped_slices import _check_grouped_slices
++from benchmarks.benchmark_v41_grouped_slices import OrderedReduce
++state={}
++def measure(**case):
++    meta=case['meta_view'];m=case['rows'];routes=case['routes']
++    if not state:
++        for width in [64,128,192]:
++            for stages in [1,2]:
++                key=f'{width}x{stages}'
++                out=torch.empty(((576+width-1)//width,480,5120),device='cuda')
++                args=list(case['args']);args[-1]=from_dlpack(out,assumed_align=16)
++                kernel=V41FusedSliceKernel(width,grouped=True) if stages==1 else V41PipelineSliceKernel(width,grouped=True,weight_stages=stages)
++                compiled=cute.compile(kernel,*args,cutlass.Int32(80),current_cuda_stream(),meta,cutlass.Int32(64))
++                reduced=torch.empty((480,5120),device='cuda');rv=from_dlpack(reduced,assumed_align=16)
++                reducer=cute.compile(OrderedReduce((576+width-1)//width),args[-1],rv,cutlass.Int32(480),current_cuda_stream())
++                state[key]=(out,args,compiled,reduced,rv,reducer)
++                print('COMPILED',key,flush=True)
++    graphs={};checks={}
++    for key,(out,args,compiled,reduced,rv,reducer) in state.items():
++        out.fill_(12345);compiled(*args,m,current_cuda_stream(),meta,64)
++        reducer(args[-1],rv,routes,current_cuda_stream())
++        graph=torch.cuda.CUDAGraph()
++        with torch.cuda.graph(graph):
++            compiled(*args,m,current_cuda_stream(),meta,64)
++            reducer(args[-1],rv,routes,current_cuda_stream())
++        before=torch.cuda.memory_allocated();graph.replay()
++        assert before==torch.cuda.memory_allocated()
++        actual=torch.zeros_like(case['expected'])
++        actual.index_add_(0,case['pair_gpu'][:,0],reduced[:routes].bfloat16().float())
++        rel=((actual-case['expected']).norm()/case['expected'].norm()).item()
++        cosine=torch.nn.functional.cosine_similarity(actual.flatten(),case['expected'].flatten(),dim=0).item()
++        assert rel<0.01 and cosine>0.9999,(key,rel,cosine)
++        assert bool((out[:,routes:]==12345).all())
++        baseline=state[key.split('x')[0]+'x1'][0]
++        assert torch.equal(out[:,:routes],baseline[:,:routes]),(key,'changed numerical output')
++        graphs[key]=graph;checks[key]={'relative_l2':rel,'cosine':cosine,'bit_exact_same_width':True}
++    for _ in range(5):
++        for g in graphs.values():g.replay()
++    samples={k:[] for k in graphs};keys=list(graphs)
++    for iteration in range(9):
++        order=keys[iteration:]+keys[:iteration]
++        if iteration%2:order=order[::-1]
++        for key in order:
++            start,end=torch.cuda.Event(enable_timing=True),torch.cuda.Event(enable_timing=True)
++            start.record()
++            for _ in range(20):graphs[key].replay()
++            end.record();end.synchronize()
++            samples[key].append(start.elapsed_time(end)*1000/20)
++    print('TIMING '+json.dumps({'case':case['case'],'rows':m,'groups':case['groups'],'routes':routes,'checks':checks,'graph_us':samples,'median_us':{k:statistics.median(v) for k,v in samples.items()}}),flush=True)
++    for g in graphs.values():g.reset()
++if __name__=='__main__':
++    print('DEVICE',torch.cuda.get_device_properties(0),flush=True)
++    _check_grouped_slices(128,measure)
