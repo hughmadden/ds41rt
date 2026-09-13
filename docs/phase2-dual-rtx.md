@@ -1000,3 +1000,21 @@ winners/scores at rows 1/3/16/80, graph replay, ties, shard-boundary offsets,
 invalid IDs/scores, and output alias rejection. All passed; shard/full logits
 still match exactly. Native compilation and FFI checking passed. The normal
 distributed target/draft head must still be wired to these primitives.
+
+`DistributedVocabularyWave` now composes the shards into a per-lane operation:
+copy completed normalized rows from RTX1, project both ranks concurrently,
+copy RTX0's compact candidates as soon as that rank completes, and merge on
+RTX1. Each lane owns its rank streams, projection handles/workspaces, input and
+logit buffers, candidate buffers, merge stream, and shape graphs. All waits are
+cooperative; cancellation drains submitted work before reuse. The rank join
+belongs to one vocabulary operation and does not join independent lanes.
+
+`distributed_vocabulary_real_weights_match_full_and_cancel_safely` loaded real
+checkpoint weights and ran two such waves concurrently with different inputs.
+All logits matched full-head references exactly for rows 1/3/16/3 (including
+cached graph reuse), and global greedy IDs/scores matched. Cancellation at a
+submitted wait left output unpublished; subsequent execution succeeded and
+restored the caller's GPU. The test used an isolated native overlay linked to
+the existing build, leaving the running full-model sanitizer library untouched.
+This validates the normalized-input vocabulary wave; final mHC/norm selection,
+target-pass integration, draft integration and sampling remain outstanding.
