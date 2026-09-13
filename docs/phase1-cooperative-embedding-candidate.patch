@@ -1,0 +1,310 @@
+diff --git a/rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs b/rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs
+index 89dd7f2..83a5e0f 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs
+@@ -313,6 +313,17 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
+         self.phase = Phase::Query;
+         Ok(result)
+     }
++    /// # Safety
++    /// Same ownership contract as begin_embedded, retained across completion waits.
++    pub async unsafe fn begin_embedded_cooperative(&mut self, embedding: &TargetEmbedding<'_>)
++        -> Result<AttentionQueryOutput<'_>> {
++        self.enter(Phase::Idle)?;
++        ensure!(self.layer == 0, "embedding requires layer zero");
++        unsafe { self.block.initialize_embedding_cooperative(embedding).await?; }
++        let result = unsafe { self.block.begin_attention(&mut self.query, embedding.positions)? };
++        self.phase = Phase::Query;
++        Ok(result)
++    }
+     pub fn pending_engram(&self) -> Result<(usize, &[u64])> {
+         ensure!(self.phase == Phase::Prepared, "backbone lane input not prepared");
+         self.block.pending_engram()
+diff --git a/rust/crates/ds41rt-daemon/src/v41_block.rs b/rust/crates/ds41rt-daemon/src/v41_block.rs
+index 9d2ce36..d32714c 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_block.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_block.rs
+@@ -266,6 +266,27 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
+         Ok(())
+     }
+     /// # Safety
++    /// Embedding storage stays immutable and alive until completion or drained
++    /// cancellation. The block owns the destination and its attention stream.
++    pub async unsafe fn initialize_embedding_cooperative(&mut self,
++        embedding: &crate::v41_target_embedding::TargetEmbedding<'_>) -> Result<()> {
++        self.reset();
++        let rows = embedding.positions.len();
++        ensure!(self.layer == 0 && rows > 0 && rows <= self.capacity
++            && embedding.token_ids.len() == rows && embedding.residual.bytes == rows * 40960
++            && embedding.pre.bytes == rows * 16, "initial block embedding geometry differs");
++        let stream = self.attention.stream_raw();
++        let queued = (|| -> Result<()> {
++            for (destination, source) in self.inputs().into_iter().zip([embedding.residual, embedding.pre]) {
++                ensure!(destination.device_id == source.device_id, "initial block device differs");
++                unsafe { self.library.copy_d2d_async(destination, source, source.bytes, stream)?; }
++            }
++            Ok(())
++        })();
++        let drained = self.attention.wait().await;
++        queued.and(drained)
++    }
++    /// # Safety
+     /// Query and block storage have exclusive use on the embedding device.
+     /// Embeddings are finite text inputs; image replacement uses the vision path.
+     pub unsafe fn begin_embedded_attention<'q>(
+diff --git a/rust/crates/ds41rt-daemon/src/v41_hc.rs b/rust/crates/ds41rt-daemon/src/v41_hc.rs
+index 9d5bc94..7e90b52 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_hc.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_hc.rs
+@@ -121,6 +121,7 @@ impl HcSublayer<'_, '_> {
+     pub(crate) fn stream_raw(&self) -> *mut c_void {
+         self.stream.raw
+     }
++    pub(crate) async fn wait(&self) -> Result<()> { self.stream.wait().await }
+     fn synchronize(&self) -> Result<()> {
+         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
+     }
+diff --git a/rust/crates/ds41rt-daemon/src/v41_requests.rs b/rust/crates/ds41rt-daemon/src/v41_requests.rs
+index ad3876d..5d91b0b 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_requests.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_requests.rs
+@@ -357,6 +357,13 @@ impl<'a> Requests<'a> {
+         }
+         Ok(features)
+     }
++    /// Copy bounded decode metadata out of the shared request borrow before
++    /// waiting on lane-owned embedding work. Image replacement stays in prefill.
++    pub fn text_embedding_input(&self, batch: &RequestBatch) -> Result<Option<(Vec<u32>, Vec<u64>)>> {
++        self.validate(batch)?;
++        Ok(batch.image_mask.iter().all(|&b| b == 0)
++            .then(|| (batch.tokens.clone(), batch.cache.positions())))
++    }
+     /// # Safety
+     /// No external writes race embedding or lane buffers. Image rows require
+     /// completed features owned by the corresponding admitted request.
+diff --git a/rust/crates/ds41rt-daemon/src/v41_target_embedding.rs b/rust/crates/ds41rt-daemon/src/v41_target_embedding.rs
+index b4dc4d5..7c95b18 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_target_embedding.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_target_embedding.rs
+@@ -1,5 +1,5 @@
+ //! Token initialization and image replacement before the first target mHC block.
+-use crate::v41_memory::{DeviceAllocation, LoadStream};
++use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
+ use crate::v41_tensors::NativeRtxTensors;
+ use anyhow::{Context, Result, ensure};
+ use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41AttentionOps};
+@@ -15,6 +15,8 @@ pub(crate) struct TargetEmbedding<'a> {
+ 
+ pub(crate) struct TargetEmbeddingWave<'w, 'a> {
+     stream: LoadStream<'a>,
++    staging: HostAllocation<'a>,
++    pending: bool,
+     ops: V41AttentionOps<'a>,
+     table: &'w NativeRtxTensors<'a>,
+     ids: DeviceAllocation<'a>,
+@@ -60,6 +62,8 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
+                 library,
+                 raw: library.cuda_stream_create()?,
+             },
++            staging: HostAllocation::new(library, capacity * 4)?,
++            pending: false,
+             ops: library.v41_attention_ops()?,
+             table,
+             ids,
+@@ -98,39 +102,15 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
+     /// requests; request ownership remains the scheduler's responsibility.
+     /// Captures when the live shape changes, then reuses stable graph storage.
+     pub fn execute(&mut self, tokens: &[u32], positions: &[u64]) -> Result<TargetEmbedding<'_>> {
+-        self.invalidate();
++        self.prepare_text(tokens, positions)?;
+         let rows = tokens.len();
+-        ensure!(
+-            rows > 0
+-                && rows <= self.capacity
+-                && rows == positions.len()
+-                && tokens.iter().all(|&id| id < 129280)
+-                && positions.iter().all(|&p| p < 1048576),
+-            "invalid target embedding tokens or positions"
+-        );
+         let bytes: Vec<u8> = tokens.iter().flat_map(|id| id.to_ne_bytes()).collect();
+         self.stream.library.copy_h2d(self.ids.buffer, &bytes)?;
+         if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+             self.clear_graph()?;
+             let warmup = unsafe { self.enqueue(rows) };
+             warmup.and(self.synchronize())?;
+-            unsafe {
+-                self.stream
+-                    .library
+-                    .cuda_graph_begin_capture(self.stream.raw)?;
+-            }
+-            let launched = unsafe { self.enqueue(rows) };
+-            let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
+-            match (launched, captured) {
+-                (Ok(()), Ok(graph)) => self.graph = Some((graph, rows)),
+-                (Err(e), Ok(graph)) => {
+-                    unsafe {
+-                        self.stream.library.cuda_graph_exec_destroy(graph)?;
+-                    }
+-                    return Err(e);
+-                }
+-                (Err(e), Err(_)) | (Ok(()), Err(e)) => return Err(e),
+-            }
++            self.capture_ready(rows)?;
+         }
+         let graph = self.graph.context("target embedding graph missing")?.0;
+         let launched = unsafe {
+@@ -144,6 +124,79 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
+         self.ready = true;
+         self.output()
+     }
++    fn prepare_text(&mut self, tokens: &[u32], positions: &[u64]) -> Result<()> {
++        if self.pending { self.synchronize()?; self.pending = false; }
++        self.invalidate();
++        let rows = tokens.len();
++        ensure!(
++            rows > 0
++                && rows <= self.capacity
++                && rows == positions.len()
++                && tokens.iter().all(|&id| id < 129280)
++                && positions.iter().all(|&p| p < 1048576),
++            "invalid target embedding tokens or positions"
++        );
++        Ok(())
++    }
++    fn capture_ready(&mut self, rows: usize) -> Result<()> {
++        unsafe {
++            self.stream
++                .library
++                .cuda_graph_begin_capture(self.stream.raw)?;
++        }
++        let launched = unsafe { self.enqueue(rows) };
++        let captured = unsafe { self.stream.library.cuda_graph_end_capture(self.stream.raw) };
++        match (launched, captured) {
++            (Ok(()), Ok(graph)) => self.graph = Some((graph, rows)),
++            (Err(e), Ok(graph)) => {
++                unsafe {
++                    self.stream.library.cuda_graph_exec_destroy(graph)?;
++                }
++                return Err(e);
++            }
++            (Err(e), Err(_)) | (Ok(()), Err(e)) => return Err(e),
++        }
++        Ok(())
++    }
++    fn destroy_graph(&mut self) -> Result<()> {
++        if let Some((graph, _)) = self.graph.take() {
++            unsafe { self.stream.library.cuda_graph_exec_destroy(graph)?; }
++        }
++        Ok(())
++    }
++    /// Text-only decode input: token upload, warmup and replay use this lane's
++    /// stream and retain exclusive staging/output ownership through completion.
++    pub async fn execute_cooperative(&mut self, tokens: &[u32], positions: &[u64]) -> Result<TargetEmbedding<'_>> {
++        self.prepare_text(tokens, positions)?;
++        let rows = tokens.len();
++        let capture = self.graph.as_ref().is_none_or(|(_, n)| *n != rows);
++        for (dst, token) in self.staging.bytes_mut().chunks_exact_mut(4).zip(tokens) {
++            dst.copy_from_slice(&token.to_ne_bytes());
++        }
++        self.pending = true;
++        let queued = (|| -> Result<()> { unsafe {
++            self.stream.library.copy_host_buffer_h2d_async(self.ids.buffer, self.staging.buffer,
++                rows * 4, self.stream.raw)?;
++            if capture { self.enqueue(rows) }
++            else { self.stream.library.cuda_graph_launch(self.graph.unwrap().0, self.stream.raw) }
++        } })();
++        let drained = self.stream.wait().await;
++        queued.and(drained)?;
++        self.pending = false;
++        if capture {
++            self.destroy_graph()?;
++            self.capture_ready(rows)?;
++            self.pending = true;
++            let queued = unsafe { self.stream.library.cuda_graph_launch(self.graph.unwrap().0, self.stream.raw) };
++            let drained = self.stream.wait().await;
++            queued.and(drained)?;
++            self.pending = false;
++        }
++        self.tokens.extend_from_slice(tokens);
++        self.positions.extend_from_slice(positions);
++        self.ready = true;
++        self.output()
++    }
+     /// Complete image span rows include learned delimiters. The row indices are
+     /// sorted, unique positions within this flattened multi-request batch.
+     pub fn execute_with_images(&mut self, tokens: &[u32], positions: &[u64],
+@@ -188,12 +241,8 @@ impl<'w, 'a> TargetEmbeddingWave<'w, 'a> {
+     pub fn clear_graph(&mut self) -> Result<()> {
+         self.invalidate();
+         self.synchronize()?;
+-        if let Some((graph, _)) = self.graph.take() {
+-            unsafe {
+-                self.stream.library.cuda_graph_exec_destroy(graph)?;
+-            }
+-        }
+-        Ok(())
++        self.pending = false;
++        self.destroy_graph()
+     }
+ }
+ impl Drop for TargetEmbeddingWave<'_, '_> {
+diff --git a/rust/crates/ds41rt-daemon/src/v41_target_embedding/tests.rs b/rust/crates/ds41rt-daemon/src/v41_target_embedding/tests.rs
+index 423e14a..c9e1987 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_target_embedding/tests.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_target_embedding/tests.rs
+@@ -21,6 +21,9 @@ fn native_image_replacement_and_reuse() -> Result<()> {
+     )?;
+     let mut wave =
+         TargetEmbeddingWave::new(&lib, &table, 4096, TargetEmbeddingWave::device_bytes(4096)?)?;
++    let mut peer =
++        TargetEmbeddingWave::new(&lib, &table, 4096, TargetEmbeddingWave::device_bytes(4096)?)?;
++    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+     let copy = |value: TargetEmbedding<'_>| -> Result<(Vec<u8>, Vec<u8>)> {
+         let mut residual = vec![0; value.residual.bytes];
+         let mut pre = vec![0; value.pre.bytes];
+@@ -38,6 +41,15 @@ fn native_image_replacement_and_reuse() -> Result<()> {
+             tokens[row] = V41_IMAGE_TOKEN_ID;
+         }
+         let (baseline, pre) = copy(wave.execute(&tokens, &positions)?)?;
++        let peer_tokens: Vec<_> = (0..rows).map(|i| (91 + i % 127) as u32).collect();
++        let (queued, peer_queued) = runtime.block_on(async {
++            let (first, second) = tokio::join!(wave.execute_cooperative(&tokens, &positions),
++                peer.execute_cooperative(&peer_tokens, &positions));
++            Ok::<_, anyhow::Error>((copy(first?)?, copy(second?)?))
++        })?;
++        assert_eq!(queued, (baseline.clone(), pre.clone()));
++        assert_eq!(peer_queued, copy(peer.execute(&peer_tokens, &positions)?)?);
++        assert!(runtime.block_on(wave.execute_cooperative(&[129280], &[0])).is_err());
+         let features: Vec<Vec<u8>> = selected
+             .iter()
+             .map(|&row| {
+@@ -69,7 +81,7 @@ fn native_image_replacement_and_reuse() -> Result<()> {
+             }
+         }
+         assert_eq!(copy(wave.execute(&tokens, &positions)?)?, (baseline, pre));
+-        eprintln!("PASS image replacement {rows} rows / {} image rows, all HC lanes, text preservation, repeated positions and text reuse",selected.len());
++        eprintln!("PASS direct/cooperative embedding peers and image replacement {rows} rows / {} image rows, all HC lanes, text preservation, repeated positions and text reuse",selected.len());
+     }
+     let features = vec![0; 10240];
+     for (tokens, indices) in [
+diff --git a/rust/crates/ds41rt-daemon/src/v41_target_pass.rs b/rust/crates/ds41rt-daemon/src/v41_target_pass.rs
+index ae313a7..0247773 100644
+--- a/rust/crates/ds41rt-daemon/src/v41_target_pass.rs
++++ b/rust/crates/ds41rt-daemon/src/v41_target_pass.rs
+@@ -267,7 +267,15 @@ impl<'w, 'a> TargetPass<'w, 'a> {
+         } else {
+             self.lane.restart()?;
+             self.index.restart()?;
+-            unsafe { requests.with_requests(|requests| requests.begin_input(guard.batch, &mut self.embedding, &mut self.lane))?; }
++            let text = if requests.cooperative_completion() {
++                requests.with_requests(|requests| requests.text_embedding_input(guard.batch))?
++            } else { None };
++            if let Some((tokens, positions)) = text {
++                let embedded = self.embedding.execute_cooperative(&tokens, &positions).await?;
++                unsafe { self.lane.begin_embedded_cooperative(&embedded).await?; }
++            } else {
++                unsafe { requests.with_requests(|requests| requests.begin_input(guard.batch, &mut self.embedding, &mut self.lane))?; }
++            }
+         }
+         for layer in stage.windows() {
+             if layer != stage.windows().start {

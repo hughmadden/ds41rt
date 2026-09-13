@@ -36,6 +36,12 @@ Remaining synchronization work, based on the current serving source:
   and remaining component waits on the
   shared host thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
 
+The [separate cooperative embedding/handoff candidate](phase1-cooperative-embedding.md)
+was rejected after a consistent 2.3% C8 decline across three pairs. Its patch and
+exact-byte checks are archived; serving remains on the prior implementation.
+Next enqueue embedding, handoff and query preparation as a larger unit before
+yielding, then verify C8 performance. Do not re-enable the archived candidate unchanged.
+
 After these changes, first revisit the combined attention graph, which previously
 showed small target/adaptive C1 gains but a C16 decline. Rank other archived
 candidates by actual C1 serving evidence; component-only Spark FC2 gains require
