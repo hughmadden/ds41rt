@@ -184,3 +184,20 @@ successfully at width 192. They have not yet been executed or performance-qualif
 The native expert handle table currently binds each variant to its first GPU;
 TP2 needs independent per-device handles before integration. Other capacities,
 shared-expert TP2, reductions, and complete serving remain pending.
+
+## TP2 native handle ownership
+
+A separate `ds41rt_v41_tp2_expert_*` interface now provides independent module
+tables for the two coordinator-visible devices (0/1). Each capacity has distinct
+GPU0/GPU1 handles; wrong-device scratch binding, scratch initialization, and
+launch are rejected. The two selected physical GPUs must be exposed as devices
+0/1 by the eventual launcher. Full-width and dSpark interfaces remain separate.
+
+The C1/C16 TP2 library builds against the exported objects. Its handle fixture
+passes on both cards, checking distinct handles, stable repeated initialization,
+owner-local scratch initialization, and rejection of crossed handles without
+slot mutation. C1 scratch is 877,600 bytes; C16 scratch is 13,925,776 bytes per
+execution workspace. CMake now offers `DS41RT_ENABLE_V41_TP2_EXPERT_AOT` alongside
+the coordinator expert build with capacities 1/16/80/256/1024/4096. The full
+enabled CMake build, remaining capacities, Rust bindings, and numerical expert
+execution have not yet been qualified.

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <mutex>
-#ifdef DS41RT_V41_LOCAL_EXPERTS
+#ifdef DS41RT_V41_TP2_EXPERTS
+#include "v41_tp2_expert_variants.h"
+#elif defined(DS41RT_V41_LOCAL_EXPERTS)
 #include "v41_local_expert_variants.h"
 #else
 #include "v41_expert_variants.h"
@@ -31,9 +33,17 @@ struct Variant {
   ~Variant() { if (library) cudaLibraryUnload(library); }
 };
 Variant variants[] = {DS41RT_V41_VARIANTS};
+#ifdef DS41RT_V41_TP2_EXPERTS
+// The dual coordinator exposes exactly two selected GPUs as CUDA devices 0/1.
+// Each owns a separate loaded module and immutable handle per capacity.
+Variant peer_variants[] = {DS41RT_V41_VARIANTS};
+#endif
 std::mutex initialization_mutex;
 Variant* by_handle(void* handle) {
   for (auto& variant : variants) if (&variant == handle) return &variant;
+#ifdef DS41RT_V41_TP2_EXPERTS
+  for (auto& variant : peer_variants) if (&variant == handle) return &variant;
+#endif
   return nullptr;
 }
 bool valid_scratch(Variant* variant, void* storage, uint64_t bytes) {
@@ -42,6 +52,15 @@ bool valid_scratch(Variant* variant, void* storage, uint64_t bytes) {
     reinterpret_cast<uintptr_t>(storage) <= UINTPTR_MAX - variant->info.scratch_bytes;
 }
 Variant* by_capacity(int32_t capacity) {
+#ifdef DS41RT_V41_TP2_EXPERTS
+  int device = -1;
+  if (cudaGetDevice(&device) != cudaSuccess || device < 0 || device > 1) return nullptr;
+  if (device == 1) {
+    for (auto& variant : peer_variants)
+      if (variant.info.capacity_rows == static_cast<uint32_t>(capacity)) return &variant;
+    return nullptr;
+  }
+#endif
   for (auto& variant : variants)
     if (variant.info.capacity_rows == static_cast<uint32_t>(capacity)) return &variant;
   return nullptr;
@@ -55,6 +74,12 @@ extern "C" int32_t ds41rt_v41_expert_bind_scratch(void* kernel, void* storage,
     uint64_t bytes, void* tensors[DS41RT_V41_EXPERT_POINTERS]) {
   auto* variant = by_handle(kernel);
   if (!valid_scratch(variant, storage, bytes) || !tensors) return cudaErrorInvalidValue;
+#ifdef DS41RT_V41_TP2_EXPERTS
+  int device = -1;
+  const auto status = cudaGetDevice(&device);
+  if (status != cudaSuccess) return status;
+  if (device != variant->device) return cudaErrorInvalidDevice;
+#endif
   for (int slot = 0; slot < DS41RT_V41_EXPERT_POINTERS; ++slot)
     if (variant->scratch_offsets[slot] != UINT64_MAX)
       tensors[slot] = static_cast<char*>(storage) + variant->scratch_offsets[slot];
@@ -131,8 +156,7 @@ extern "C" int32_t ds41rt_v41_expert_initialize(int32_t capacity, void** out) {
 }
 
 extern "C" int32_t ds41rt_v41_expert_launch(void* kernel, const ds41rt_v41_expert_launch_t* args) {
-  Variant* variant = nullptr;
-  for (auto& candidate : variants) if (&candidate == kernel) variant = &candidate;
+  Variant* variant = by_handle(kernel);
   if (!variant || !args || variant->device < 0) return cudaErrorInvalidValue;
   const auto& info = variant->info;
   if (args->num_tokens <= 0 || static_cast<uint32_t>(args->num_tokens) > info.capacity_rows ||
