@@ -376,7 +376,8 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     /// every participating admission, including requests accepting zero rows.
     /// # Safety
     /// Proposal input belongs to this completed target batch. All windows and
-    /// producer outputs have exclusive use on this pass's CUDA device.
+    /// producer outputs are on this pass's CUDA device. Producer scratch is
+    /// exclusive; reserved draft readers of disjoint window slots may remain active.
     pub unsafe fn commit_with_dspark(
         &mut self,
         requests: &mut Requests<'a>,

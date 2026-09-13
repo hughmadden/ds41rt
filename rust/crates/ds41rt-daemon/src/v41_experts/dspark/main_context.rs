@@ -300,7 +300,8 @@ impl DsparkMainContext<'_, '_> {
     /// failure leaves a partially updated multi-stage commit. Consumes readiness.
     /// # Safety
     /// Chunks describe accepted main tokens only, with correct positions and
-    /// row mappings; windows are on this device with no outstanding consumers.
+    /// row mappings; windows are on this device. Reserved readers of disjoint slots may remain
+    /// active; no unreserved raw consumer may overlap a written slot.
     pub unsafe fn commit(
         &mut self,
         windows: &mut [&mut DsparkWindow<'_>; 3],

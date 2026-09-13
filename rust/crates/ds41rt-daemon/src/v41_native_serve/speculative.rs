@@ -10,6 +10,7 @@ pub(crate) struct DraftRuntime<'w, 'a> {
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
     captured: std::collections::BTreeSet<usize>,
+    pending: Option<(usize, Vec<(u64, u32, u64, usize)>, Instant)>,
     request_limit: usize,
     draft_limit: usize,
     // Downloaded only for the experimental adaptive policy or explicit diagnostics.
@@ -50,6 +51,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             windows: [window()?, window()?, window()?],
             requests: Default::default(),
             captured: Default::default(),
+            pending: None,
             request_limit: requests as usize,
             draft_limit: 5,
             confidence_trace: Default::default(),
@@ -282,6 +284,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
     pub fn propose(&mut self, lib: &'a NativeLibrary,
         inputs: &[(u64, u32, u64, usize)],
     ) -> Result<Vec<Vec<u32>>> {
+        ensure!(self.pending.is_none(), "shared draft proposal still pending");
         ensure!(!inputs.is_empty() && inputs.len() <= 16, "invalid draft batch size");
         let mut seen = std::collections::BTreeSet::new();
         for &(id, anchor, _, remaining) in inputs {
@@ -337,6 +340,75 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             outputs[output] = tokens[..remaining.min(self.draft_limit + 1)].to_vec();
         }
         Ok(outputs)
+    }
+
+    /// One shared draft workspace; another lane can use its target pass while
+    /// the owner waits. Short RefCell borrows never survive a scheduler yield.
+    pub fn poll_propose(&mut self, lane: usize,
+        inputs: &[(u64, u32, u64, usize)],
+    ) -> Result<Option<(Vec<Vec<u32>>, u64)>> {
+        if let Some((owner, seeds, started)) = &self.pending {
+            let started = *started;
+            if *owner != lane { return Ok(None); }
+            ensure!(seeds == inputs, "pending draft request inputs changed");
+            let completed = match self.chain.poll_replay() {
+                Ok(None) => return Ok(None),
+                Ok(Some(value)) => value,
+                Err(error) => { self.pending = None; return Err(error); },
+            };
+            self.pending = None;
+            let (packed, values) = completed;
+            let active: Vec<_> = inputs.iter().enumerate()
+                .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
+            let count = active.len();
+            ensure!(packed.len() == 6*count && values.len() == 5*count, "draft output extent differs");
+            let mut outputs: Vec<_> = inputs.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect();
+            for (row, &(output, &(id, anchor, _, remaining))) in active.iter().enumerate() {
+                if self.adaptive.is_some() || self.confidence_cutoff.is_some()
+                    || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
+                    self.confidence_trace.insert(id, (0..5).map(|step| values[step*count+row]).collect());
+                }
+                let tokens: Vec<_> = (0..6).map(|step| packed[step*count+row]).collect();
+                ensure!(tokens[0] == anchor && tokens.iter().all(|&t| t < 129280), "invalid draft tokens");
+                outputs[output] = tokens[..remaining.min(self.draft_limit+1)].to_vec();
+            }
+            return Ok(Some((outputs, started.elapsed().as_micros() as u64)));
+        }
+        let started = Instant::now();
+        ensure!(self.pending.is_none(), "shared draft proposal still pending");
+        ensure!(!inputs.is_empty() && inputs.len() <= 16, "invalid draft batch size");
+        let mut seen = std::collections::BTreeSet::new();
+        for &(id, anchor, _, remaining) in inputs {
+            ensure!(seen.insert(id) && self.requests.contains_key(&id), "invalid draft request identity");
+            ensure!(anchor < 129280 && remaining > 0, "invalid draft request input");
+        }
+        for &(id, _, _, _) in inputs {
+            self.confidence_trace.remove(&id);
+        }
+        let active: Vec<_> = inputs.iter().enumerate()
+            .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
+        let outputs: Vec<_> = inputs.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect();
+        if active.is_empty() { return Ok(Some((outputs, started.elapsed().as_micros() as u64))); }
+        let count = active.len();
+        let tokens: Vec<_> = active.iter().map(|(_, (_, anchor, _, _))| *anchor as i32).collect();
+        let bindings: [Vec<_>; 3] = std::array::from_fn(|stage| active.iter()
+            .map(|(_, (id, _, end, _))| (self.requests[id].leases[stage], *end)).collect());
+        self.chain.set_tokens(&tokens)?;
+        let mut rngs: Vec<_> = self.requests.iter_mut().filter_map(|(id, request)|
+            active.iter().position(|(_, (active_id, _, _, _))| active_id == id)
+                .map(|index| (index, &mut request.rng))).collect();
+        rngs.sort_by_key(|(index, _)| *index);
+        self.chain.prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
+            &vec![0.0; count])?;
+        let windows = self.windows.each_ref();
+        let bindings = bindings.each_ref().map(|rows| rows.as_slice());
+        if !self.captured.contains(&count) {
+            unsafe { self.chain.capture(windows, bindings)?; }
+            self.captured.insert(count);
+        }
+        unsafe { self.chain.begin_replay(windows, bindings)?; }
+        self.pending = Some((lane, inputs.to_vec(), started));
+        Ok(None)
     }
 
     pub fn confidence_trace(&self, id: u64) -> Option<&[f32]> {

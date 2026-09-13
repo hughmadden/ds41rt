@@ -43,6 +43,7 @@ impl<'a> DsparkWindow<'a> {
     }
     pub fn restore_prefix(&mut self, lease: WindowLease, prefix: &DsparkPrefix<'a>) -> Result<()> {
         let slot = self.validate(lease)?;
+        self.readers.writable(slot)?;
         ensure!(
             prefix.owner == self.owner && self.slots[slot].end.is_none(),
             "foreign draft prefix or nonfresh window"

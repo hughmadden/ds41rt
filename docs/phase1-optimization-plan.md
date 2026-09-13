@@ -67,8 +67,12 @@ latency, stable graph capture and correct cancellation, not fewer sync calls alo
 The joint decode path is now removed. Unconstrained decode now uses
 [GPU top-1 and compact transfers](phase1-compact-head-selection.md), with
 cooperative per-lane head completion. Continue through remaining blocking
-completion boundaries: constrained logits download, shared draft replay
-and confidence/token downloads, then target/draft-cache commit. Queue work and
+completion boundaries: constrained logits download and target/draft-cache commit.
+[Shared draft replay now completes cooperatively](phase1-async-draft-completion.md).
+Next investigate two lane-local eight-request draft workspaces with shared weights;
+first address the current 80-row allocation bucket so forty live draft rows do not
+duplicate oversized storage. Remove retirement coupling separately from admission.
+Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and
 expert sharing within each lane. Measure complete C2–C16 serving, preserve C1 and

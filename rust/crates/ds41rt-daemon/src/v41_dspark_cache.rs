@@ -6,6 +6,8 @@ use ds41rt_ffi::{
 };
 use std::{
     ffi::c_void,
+    cell::Cell,
+    rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
 };
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
@@ -40,6 +42,36 @@ pub(crate) struct WindowRead {
     pub ring: Ds41rtDeviceBuffer,
     pub slots: u32,
     pub descriptors: [V41AttentionWindow; 16],
+    _reservation: ReadReservation,
+}
+// Reservations outlive the short host borrow while a chain reads ring slots.
+// Other request slots may be committed, but a live read slot cannot be rewritten
+// or recycled until the chain has drained its GPU work.
+#[derive(Clone, Default)]
+struct ReadSlots(Rc<Cell<[u32; 16]>>);
+struct ReadReservation { slots: ReadSlots, used: [bool; 16] }
+impl ReadSlots {
+    fn writable(&self, slot: usize) -> Result<()> {
+        ensure!(self.0.get()[slot] == 0, "dSpark cache slot has an outstanding reader");
+        Ok(())
+    }
+    fn reserve(&self, used: [bool; 16]) -> Result<ReadReservation> {
+        let mut counts = self.0.get();
+        for (i, active) in used.iter().enumerate() {
+            if *active { counts[i] = counts[i].checked_add(1).context("dSpark reader overflow")?; }
+        }
+        self.0.set(counts);
+        Ok(ReadReservation { slots: self.clone(), used })
+    }
+}
+impl Drop for ReadReservation {
+    fn drop(&mut self) {
+        let mut counts = self.slots.0.get();
+        for (i, active) in self.used.iter().enumerate() {
+            if *active { counts[i] -= 1; }
+        }
+        self.slots.0.set(counts);
+    }
 }
 pub(crate) struct DsparkWindow<'a> {
     stream: LoadStream<'a>,
@@ -50,6 +82,7 @@ pub(crate) struct DsparkWindow<'a> {
     staging: HostAllocation<'a>,
     graph: Option<*mut c_void>,
     slots: [Slot; 16],
+    readers: ReadSlots,
     slot_count: usize,
     source_rows: u32,
     owner: u64,
@@ -87,6 +120,7 @@ impl<'a> DsparkWindow<'a> {
             staging: HostAllocation::new(library, 384)?,
             graph: None,
             slots: [Slot::default(); 16],
+            readers: ReadSlots::default(),
             slot_count: slots,
             source_rows,
             owner,
@@ -138,6 +172,7 @@ impl<'a> DsparkWindow<'a> {
             self.slots[slot].request.is_none(),
             "dSpark window slot is occupied"
         );
+        self.readers.writable(slot)?;
         let generation = self.slots[slot]
             .generation
             .checked_add(1)
@@ -176,6 +211,7 @@ impl<'a> DsparkWindow<'a> {
     }
     pub fn release(&mut self, lease: WindowLease) -> Result<()> {
         let slot = self.validate(lease)?;
+        self.readers.writable(slot)?;
         self.slots[slot].request = None;
         self.slots[slot].end = None;
         Ok(())
@@ -199,6 +235,7 @@ impl<'a> DsparkWindow<'a> {
         let mut ends = [None; 16];
         for (i, chunk) in chunks.iter().enumerate() {
             let slot = self.validate(chunk.lease)?;
+            self.readers.writable(slot)?;
             ensure!(!seen[slot], "duplicate cache slot in batch");
             seen[slot] = true;
             ensure!(
@@ -239,7 +276,8 @@ impl<'a> DsparkWindow<'a> {
     }
     /// # Safety
     /// Source rows must be initialized finite KV with producer writes completed;
-    /// serialize source use and every consumer of a borrowed ring view. Chunks
+    /// serialize source use and unreserved raw ring consumers. Reserved reads of
+    /// other slots may remain in flight; overlapping writes are rejected. Chunks
     /// contain only committed main-model positions, never unaccepted draft KV.
     pub unsafe fn write(&mut self, chunks: &[WindowChunk]) -> Result<()> {
         let (descriptors, seen, ends) = self.prepare_write(chunks, self.source_rows)?;
@@ -271,8 +309,8 @@ impl<'a> DsparkWindow<'a> {
         }
         Ok(())
     }
-    /// Validate the entire read batch before metadata upload; the caller holds
-    /// this borrow through GPU completion, preventing safe concurrent mutation.
+    /// Reserve the validated slots through GPU completion. The caller must keep
+    /// the window owner alive; disjoint slots remain available to other lanes.
     pub fn attention_read(&self, requests: &[(WindowLease, u64)]) -> Result<WindowRead> {
         ensure!(
             (1..=16).contains(&requests.len()),
@@ -303,6 +341,7 @@ impl<'a> DsparkWindow<'a> {
             ring: self.ring.buffer,
             slots: self.slot_count as u32,
             descriptors,
+            _reservation: self.readers.reserve(seen)?,
         })
     }
     /// Packed [128,528] bytes: E4M3 values and E8M0 K32 scales per row.
@@ -334,4 +373,49 @@ impl Drop for DsparkWindow<'_> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod reservation_tests {
+    use super::*;
+    #[test]
+    fn readers_block_only_their_slots_until_last_consumer_finishes() -> Result<()> {
+        let slots = ReadSlots::default();
+        let mut used = [false; 16]; used[3] = true; used[9] = true;
+        let first = slots.reserve(used)?;
+        let second = slots.reserve(used)?;
+        assert!(slots.writable(3).is_err());
+        assert!(slots.writable(9).is_err());
+        slots.writable(4)?;
+        drop(first);
+        assert!(slots.writable(3).is_err());
+        drop(second);
+        slots.writable(3)?; slots.writable(9)?;
+        Ok(())
+    }
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB and CUDA"]
+    fn native_reserved_reader_allows_disjoint_commit_and_blocks_recycle() -> Result<()> {
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let mut window = DsparkWindow::new(&lib, 2, 2, usize::MAX)?;
+        let first = window.begin_request(0, 11)?;
+        let second = window.begin_request(1, 22)?;
+        lib.copy_h2d(window.source(), &vec![0; 2*1024])?;
+        let chunk = |lease, position| WindowChunk { lease, position, source_row: 0, tokens: 2 };
+        unsafe { window.write(&[chunk(first, 0), chunk(second, 0)])?; }
+        let read = window.attention_read(&[(first, 2)])?;
+        assert!(window.validate_write(&[chunk(first, 2)], 2).is_err());
+        assert!(window.release(first).is_err());
+        unsafe { window.write(&[chunk(second, 2)])?; }
+        assert_eq!(window.committed_end(first)?, Some(2));
+        assert_eq!(window.committed_end(second)?, Some(4));
+        drop(read);
+        unsafe { window.write(&[chunk(first, 2)])?; }
+        window.release(first)?;
+        assert!(window.request_id(first).is_err());
+        let replacement = window.begin_request(0, 33)?;
+        assert_eq!(window.request_id(replacement)?, 33);
+        Ok(())
+    }
+
 }

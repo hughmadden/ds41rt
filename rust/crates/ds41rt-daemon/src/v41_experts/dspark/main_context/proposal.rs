@@ -93,7 +93,8 @@ impl MainProposal<'_, '_, '_> {
     /// Validation failures preserve the proposal for correction; starting a GPU
     /// commit consumes it. Zero acceptance leaves the corresponding rings alone.
     /// # Safety
-    /// Windows are on this producer's device with no outstanding consumers. The
+    /// Windows are on this producer's device. Reserved readers of disjoint slots
+    /// may remain active; no unreserved raw consumer may overlap written slots. The
     /// caller owns the matching target transaction and must revoke its requests
     /// if a later operation fails after these caches have advanced.
     pub unsafe fn commit(

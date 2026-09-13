@@ -1,7 +1,7 @@
 //! Draft transformer chain with optional shared embedding and terminal heads.
 use super::{DsparkStage, DsparkTerminal, DsparkWeights};
 use crate::v41_dspark_cache::{DsparkWindow, WindowLease, WindowRead};
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::{NativeRtxTensors, VocabularyHead};
 use anyhow::{ensure, Context, Result};
 use ds41rt_core::DsparkRng;
@@ -13,6 +13,8 @@ pub(crate) struct DsparkChain<'weights, 'library> {
     stages: [DsparkStage<'weights, 'library>; 3],
     graphs: std::collections::BTreeMap<usize, (*mut c_void, [u64; 3])>,
     ready: Option<usize>,
+    pending: Option<(usize, [WindowRead; 3])>,
+    download: HostAllocation<'library>,
     embedding: Option<&'weights NativeRtxTensors<'library>>,
     tokens: DeviceAllocation<'library>,
     token_count: Option<usize>,
@@ -88,6 +90,8 @@ impl<'library> DsparkWeights<'library> {
             ],
             graphs: Default::default(),
             ready: None,
+            pending: None,
+            download: HostAllocation::new(library, requests as usize * 44)?,
             embedding: None,
             tokens: DeviceAllocation::new(library, requests as usize * 4)?,
             token_count: None,
@@ -104,6 +108,7 @@ impl DsparkChain<'_, '_> {
         rngs: &mut [&mut DsparkRng],
         temperatures: &[f32],
     ) -> Result<()> {
+        ensure!(self.pending.is_none(), "dSpark chain replay still pending");
         self.invalidate();
         self.terminal
             .as_mut()
@@ -123,6 +128,7 @@ impl DsparkChain<'_, '_> {
     /// Seed IDs follow cache-binding row order; invalid input clears publication
     /// and token readiness so a subsequent execution cannot consume old IDs.
     pub fn set_tokens(&mut self, tokens: &[i32]) -> Result<()> {
+        ensure!(self.pending.is_none(), "dSpark chain replay still pending");
         self.invalidate();
         self.token_count = None;
         ensure!(
@@ -167,6 +173,7 @@ impl DsparkChain<'_, '_> {
         windows: [&DsparkWindow<'_>; 3],
         bindings: [&[(WindowLease, u64)]; 3],
     ) -> Result<[WindowRead; 3]> {
+        ensure!(self.pending.is_none(), "dSpark chain replay still pending");
         self.invalidate();
         ensure!(
             self.embedding.is_none() || self.token_count == Some(bindings[0].len()),
@@ -300,6 +307,7 @@ impl DsparkChain<'_, '_> {
         windows: [&DsparkWindow<'_>; 3],
         bindings: [&[(WindowLease, u64)]; 3],
     ) -> Result<()> {
+        ensure!(self.pending.is_none(), "dSpark chain replay still pending");
         self.invalidate();
         ensure!(!self.graphs.contains_key(&bindings[0].len()), "dSpark chain count already captured");
         unsafe {
@@ -353,6 +361,57 @@ impl DsparkChain<'_, '_> {
         self.ready = Some(count);
         self.output()
     }
+    /// Queue a captured draft and compact output copies, retaining its cache-slot
+    /// reservations until poll completes. The caller keeps all window owners alive.
+    /// # Safety
+    /// Same inputs as replay; no raw consumer may mutate the reserved ring slots.
+    pub unsafe fn begin_replay(
+        &mut self, windows: [&DsparkWindow<'_>; 3],
+        bindings: [&[(WindowLease, u64)]; 3],
+    ) -> Result<()> {
+        let reads = self.prepare(windows, bindings)?;
+        let count = bindings[0].len();
+        let &(graph, owners) = self.graphs.get(&count).context("dSpark chain count not captured")?;
+        ensure!(owners == reads.each_ref().map(|r| r.owner), "dSpark chain capture binding differs");
+        self.upload(&reads, bindings)?;
+        let output = self.terminal.as_ref().context("dSpark chain has no terminal")?.output_storage(count)?;
+        self.pending = Some((count, reads));
+        let launched = (|| unsafe {
+            self.stream.library.cuda_graph_launch(graph, self.stream.raw)?;
+            let bytes = self.download.bytes_mut();
+            self.stream.library.copy_d2h_async(&mut bytes[..count*24], output[0], self.stream.raw)?;
+            self.stream.library.copy_d2h_async(&mut bytes[count*24..count*44], output[2], self.stream.raw)
+        })();
+        if let Err(error) = launched {
+            let drained = self.synchronize();
+            self.pending = None;
+            drained?;
+            return Err(error);
+        }
+        Ok(())
+    }
+    /// Poll without blocking the CUDA owner; errors drain before releasing readers.
+    pub fn poll_replay(&mut self) -> Result<Option<(Vec<u32>, Vec<f32>)>> {
+        let count = self.pending.as_ref().context("dSpark replay not pending")?.0;
+        match unsafe { self.stream.library.cuda_stream_query(self.stream.raw) } {
+            Ok(false) => return Ok(None),
+            Ok(true) => {},
+            Err(error) => {
+                let drained = self.synchronize();
+                self.pending = None;
+                drained?;
+                return Err(error);
+            },
+        }
+        self.pending = None;
+        self.ready = Some(count);
+        let bytes = self.download.bytes_mut();
+        let tokens = bytes[..count*24].chunks_exact(4)
+            .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
+        let confidence = bytes[count*24..count*44].chunks_exact(4)
+            .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
+        Ok(Some((tokens, confidence)))
+    }
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {
         let requests = self.ready.context("dSpark chain output incomplete")?;
         let mut output = self.stages[2].output_storage();
@@ -366,6 +425,7 @@ impl Drop for DsparkChain<'_, '_> {
         if let Err(error) = self.synchronize() {
             tracing::error!(%error,"draining dSpark chain");
         }
+        self.pending = None; // GPU work has drained before read reservations release.
         for (_, (graph, _)) in std::mem::take(&mut self.graphs) {
             if let Err(error) = unsafe { self.stream.library.cuda_graph_exec_destroy(graph) } {
                 tracing::error!(%error,"destroying dSpark chain graph");

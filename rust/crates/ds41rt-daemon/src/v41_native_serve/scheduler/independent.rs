@@ -45,22 +45,37 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             if members.is_empty() { return Ok(()); }
             ensure!(members.len() <= 8, "independent lane exceeds eight requests");
             let started = Instant::now();
+            // Reserve target capacity and snapshot this lane's seeds, then release
+            // all bank borrows before waiting on the shared draft workspace.
+            let seeds = {
+                let active = active.borrow();
+                let mut requests = requests.borrow_mut();
+                let speculative = draft.borrow().is_some();
+                let capacity: Vec<_> = members.iter().map(|&slot| {
+                    let r = active[slot].as_ref().unwrap();
+                    (r.lease, if speculative { (r.job.max_tokens-r.generated).min(6) as u32 } else { 1 })
+                }).collect();
+                prefixes.borrow_mut().make_room(&mut requests, &capacity)?;
+                members.iter().map(|&slot| {
+                    let r = active[slot].as_ref().unwrap();
+                    Ok((r.id, r.anchor, requests.cache().committed_end(r.lease)?, r.job.max_tokens-r.generated))
+                }).collect::<Result<Vec<_>>>()?
+            };
+            let (mut inputs, draft_us) = loop {
+                let proposed = {
+                    let mut draft = draft.borrow_mut();
+                    if let Some(draft) = draft.as_deref_mut() { draft.poll_propose(lane, &seeds)? }
+                    else { Some((seeds.iter().map(|r| vec![r.1]).collect(), 0)) }
+                };
+                if let Some(inputs) = proposed { break inputs; }
+                // Even when a peer requests a cohort drain, finish our pending
+                // draft and transaction before retirement can recycle its slots.
+                tokio::task::yield_now().await;
+            };
             let (inputs, mut batch, capture_routes) = {
                 let active = active.borrow();
                 let mut requests = requests.borrow_mut();
-                let mut draft = draft.borrow_mut();
-                let capacity: Vec<_> = members.iter().map(|&slot| {
-                    let r = active[slot].as_ref().unwrap();
-                    (r.lease, if draft.is_some() { (r.job.max_tokens-r.generated).min(6) as u32 } else { 1 })
-                }).collect();
-                prefixes.borrow_mut().make_room(&mut requests, &capacity)?;
-                let seeds = members.iter().map(|&slot| {
-                    let r = active[slot].as_ref().unwrap();
-                    Ok((r.id, r.anchor, requests.cache().committed_end(r.lease)?, r.job.max_tokens-r.generated))
-                }).collect::<Result<Vec<_>>>()?;
-                let draft_start = Instant::now();
-                let mut inputs = if let Some(draft) = draft.as_deref_mut() { draft.propose(lib, &seeds)? }
-                    else { seeds.iter().map(|r| vec![r.1]).collect() };
+                let draft = draft.borrow();
                 for (&slot, input) in members.iter().zip(&mut inputs) {
                     let r = active[slot].as_ref().unwrap();
                     if let Some(constraint) = &r.constraint { constraint.truncate_proposal(input)?; }
@@ -76,7 +91,7 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                         // draft time. The existing cost model's cross-lane term
                         // is zero for this single-lane forecast.
                         let lengths = if draft.adaptive_enabled() {
-                            draft.select_prefixes(&candidates, draft_start.elapsed().as_micros() as u64)?
+                            draft.select_prefixes(&candidates, draft_us)?
                         } else { draft.select_reuse_prefixes(&candidates)? };
                         if let Some(lengths) = lengths {
                             for (input, length) in inputs.iter_mut().zip(lengths) { input.truncate(length+1); }
@@ -145,7 +160,7 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             }
             operation?;
             // Give already-ready remote completions an opportunity to run before
-            // queuing another synchronous draft on the shared RTX.
+            // queuing another draft on the shared RTX.
             tokio::task::yield_now().await;
         }
     }.await;
