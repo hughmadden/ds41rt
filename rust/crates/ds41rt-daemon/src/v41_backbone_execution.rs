@@ -559,6 +559,23 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         self.progress.finish();
         Ok(())
     }
+    /// # Safety
+    /// Same exact batch/result contract as complete_layer; the future retains
+    /// the transport output until mHC and queued next-input copies finish.
+    pub async unsafe fn complete_layer_cooperative(&mut self, batch: &CacheBatch,
+        lane: &mut BackboneLane<'_, '_>, completed: CompletedLayer<'_>) -> Result<()> {
+        ensure!(self.progress.invalid && self.progress.batch == Some(completed.batch)
+            && batch.identity() == completed.batch && self.progress.next == completed.layer
+            && self.progress.stage == batch.stage(), "completed backbone layer identity differs");
+        unsafe { lane.finish_ffn_cooperative(completed.result.binding(), completed.result.values).await?; }
+        tracing::debug!(target: "ds41rt::timing", layer=completed.layer, rows=completed.rows,
+            produced_us=completed.produced_us, index_us=completed.indexed_us-completed.produced_us,
+            attention_us=completed.attended_us-completed.indexed_us,
+            experts_us=completed.experts_us-completed.attended_us,
+            finish_us=completed.started.elapsed().as_micros() as u64-completed.experts_us, "target layer");
+        self.progress.finish();
+        Ok(())
+    }
     /// Commit after the same batch completed its full or CED phase. The caller
     /// determines acceptance after target-head/sampling/verification and includes
     /// engram/dSpark history in the enclosing scheduler transaction.

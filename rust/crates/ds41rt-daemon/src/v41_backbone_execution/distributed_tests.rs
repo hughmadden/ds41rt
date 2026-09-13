@@ -86,6 +86,29 @@ fn check_queued_production<'w, 'a>(lib: &NativeLibrary, runtime: &tokio::runtime
     Ok(())
 }
 
+fn queued_engram_fixture(runtime: &tokio::runtime::Runtime, requests: &Requests<'_>,
+    batch: &mut crate::v41_requests::RequestBatch, upload: &mut EngramDeviceRows<'_>,
+    gate: &mut EngramGate<'_, '_>, lane: &mut BackboneLane<'_, '_>) -> Result<()> {
+    runtime.block_on(async {
+        let start = Instant::now();
+        loop {
+            match requests.poll_engram_gather(batch, lane)? {
+                ds41rt_loader::EngramGatherPoll::Ready(lease) => {
+                    upload.check_cooperative(&lease.view()?).await?;
+                    let rows = upload.view()?;
+                    unsafe { lane.check_queued_engram(gate, &rows).await?;
+                        lane.apply_engram_cooperative(gate, &rows).await?; }
+                    return Ok(());
+                }
+                ds41rt_loader::EngramGatherPoll::Cancelled => anyhow::bail!("fixture gather cancelled"),
+                ds41rt_loader::EngramGatherPoll::Pending => {}
+            }
+            ensure!(start.elapsed() < Duration::from_secs(120), "fixture gather timeout");
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+}
+
 #[test]
 fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
     let Some(path) = std::env::var_os("DS41RT_LAYER0_LIBRARY") else {
@@ -247,7 +270,8 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
             let completed = runtime.block_on(unsafe {
                 prepared.execute(&mut transport, 0, batch.image_mask())
             })?;
-            unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
+            runtime.block_on(unsafe { lane.check_queued_finish(completed.result.binding(), completed.result.values) })?;
+            runtime.block_on(unsafe { execution.complete_layer_cooperative(batch.cache()?, &mut lane, completed) })?;
         }
         let output = lane.output()?;
         assert_eq!(output.layer, 0);
@@ -276,10 +300,14 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
         }
         previous = Some(residual);
         lane.advance()?;
+        if cycle == 0 {
+            queued_engram_fixture(&runtime, &requests, &mut batch, &mut upload, &mut gate, &mut lane)?;
+        } else {
         let deadline = Instant::now() + Duration::from_secs(120);
         while !unsafe { requests.poll_engram(&mut batch, &mut upload, &mut gate, &mut lane)? } {
             ensure!(Instant::now() < deadline, "layer-1 engram timed out");
             std::thread::sleep(Duration::from_millis(1));
+        }
         }
         let prepared = lane.prepared_input()?;
         assert_eq!(prepared.layer, 1);
@@ -311,11 +339,7 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                 if layer != 1 {
                     lane.advance()?;
                     if layer == 14 {
-                        let deadline = Instant::now() + Duration::from_secs(120);
-                        while !unsafe { requests.poll_engram(&mut batch, &mut upload, &mut gate14, &mut lane)? } {
-                            ensure!(Instant::now() < deadline, "queued layer-14 engram timed out");
-                            std::thread::sleep(Duration::from_millis(1));
-                        }
+                        queued_engram_fixture(&runtime, &requests, &mut batch, &mut upload, &mut gate14, &mut lane)?;
                     }
                     unsafe { lane.begin_prepared()?; }
                 }
@@ -324,7 +348,8 @@ fn real_layer_zero_executes_embedding_attention_tp4_and_mhc() -> Result<()> {
                     batch.cache()?, &mut lane, &mut index)? };
                 let prepared = runtime.block_on(unsafe { prepared.check_queued_ffn(batch.image_mask(), None) })?;
                 let completed = runtime.block_on(unsafe { prepared.execute(&mut transport, 0, batch.image_mask()) })?;
-                unsafe { execution.complete_layer(batch.cache()?, &mut lane, completed)?; }
+                runtime.block_on(unsafe { lane.check_queued_finish(completed.result.binding(), completed.result.values) })?;
+                runtime.block_on(unsafe { execution.complete_layer_cooperative(batch.cache()?, &mut lane, completed) })?;
             }
             eprintln!("PASS queued production/index: 37 windows, four compressed sources, eight index layers and retained source-20 candidates; cold/warm graphs, cancellation/reuse, exact direct-output parity");
         }

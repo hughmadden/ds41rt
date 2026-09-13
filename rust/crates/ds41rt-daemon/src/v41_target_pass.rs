@@ -284,7 +284,22 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 let advance_us = prepare_timing.elapsed().as_micros() as u64;
                 if let Some(gate) = [1, 14].iter().position(|&l| l == layer) {
                     let start = Instant::now();
-                    while !unsafe {
+                    if requests.cooperative_completion() {
+                        loop {
+                            let gathered = requests.with_requests(|requests| requests.poll_engram_gather(guard.batch, &self.lane))?;
+                            match gathered {
+                                ds41rt_loader::EngramGatherPoll::Ready(lease) => {
+                                    let rows = self.upload.upload_cooperative(&lease.view()?).await?;
+                                    unsafe { self.lane.apply_engram_cooperative(&mut self.gates[gate], &rows).await?; }
+                                    break;
+                                }
+                                ds41rt_loader::EngramGatherPoll::Cancelled => anyhow::bail!("engram gather cancelled"),
+                                ds41rt_loader::EngramGatherPoll::Pending => {}
+                            }
+                            ensure!(start.elapsed() < self.engram_timeout, "target engram gather timed out at layer {layer}");
+                            tokio::time::sleep(Duration::from_millis(1)).await;
+                        }
+                    } else { while !unsafe {
                         requests.with_requests(|requests| requests.poll_engram(
                             guard.batch,
                             &mut self.upload,
@@ -297,13 +312,14 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                             "target engram gather timed out at layer {layer}"
                         );
                         tokio::time::sleep(Duration::from_millis(1)).await;
-                    }
+                    } }
                 }
                 let engram_us = prepare_timing.elapsed().as_micros() as u64 - advance_us;
                 if layer >= 37 {
                     unsafe {
-                        self.taps
-                            .capture(guard.batch.cache()?, &self.lane.prepared_input()?)?;
+                        if requests.cooperative_completion() {
+                            self.taps.capture_cooperative(guard.batch.cache()?, &self.lane.prepared_input()?).await?;
+                        } else { self.taps.capture(guard.batch.cache()?, &self.lane.prepared_input()?)?; }
                     }
                 }
                 let tapped_us = prepare_timing.elapsed().as_micros() as u64;
@@ -333,7 +349,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 })?;
                 // No RefCell guard or bank reference survives into this await.
                 let completed = prepared.execute(transport, placement, guard.batch.image_mask()).await?;
-                self.execution.complete_layer(guard.batch.cache()?, &mut self.lane, completed)?;
+                if cooperative {
+                    self.execution.complete_layer_cooperative(guard.batch.cache()?, &mut self.lane, completed).await?;
+                } else { self.execution.complete_layer(guard.batch.cache()?, &mut self.lane, completed)?; }
             }
             if let Some(directory) = &activation_trace {
                 self.lane.trace_output(directory)?;

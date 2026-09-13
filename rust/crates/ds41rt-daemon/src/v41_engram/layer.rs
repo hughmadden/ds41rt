@@ -186,6 +186,11 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
         residual: Ds41rtDeviceBuffer,
         gathered: &EngramDeviceView,
     ) -> Result<()> {
+        self.synchronize()?;
+        unsafe { self.enqueue_inputs(residual, gathered) }?;
+        self.synchronize()
+    }
+    unsafe fn enqueue_inputs(&self, residual: Ds41rtDeviceBuffer, gathered: &EngramDeviceView) -> Result<()> {
         ensure!(
             gathered.layer_index == self.weights.layer_index,
             "engram gate layer mismatch"
@@ -222,7 +227,6 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
                 );
             }
         }
-        self.synchronize()?;
         let copies = (|| -> Result<()> {
             for index in 0..3 {
                 if sources[index].ptr != destinations[index].ptr {
@@ -238,10 +242,8 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
             }
             Ok(())
         })();
-        // External gather/residual storage can be released when this method returns,
-        // including failure after an earlier asynchronous copy was submitted.
-        let drained = self.synchronize();
-        copies.and(drained)
+        if let Err(error) = copies { self.synchronize()?; return Err(error); }
+        Ok(())
     }
     unsafe fn enqueue(&self, rows: usize) -> Result<()> {
         unsafe {
@@ -280,18 +282,21 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
         unsafe {
             self.execute(residual, gathered)?;
         }
+        unsafe { self.capture_ready(gathered.rows) }
+    }
+    unsafe fn capture_ready(&mut self, rows: usize) -> Result<()> {
         self.ready_rows = None;
         unsafe {
             self.weights
                 .library
                 .cuda_graph_begin_capture(self.stream.raw)?;
         }
-        let launched = unsafe { self.enqueue(gathered.rows) };
+        let launched = unsafe { self.enqueue(rows) };
         // End on both paths so a failed enqueue cannot leave the stream capturing.
         let captured = unsafe { self.weights.library.cuda_graph_end_capture(self.stream.raw) };
         match (launched, captured) {
             (Ok(()), Ok(graph)) => {
-                self.graph = Some((graph, gathered.rows));
+                self.graph = Some((graph, rows));
                 Ok(())
             }
             (Err(error), Ok(graph)) => {
@@ -326,6 +331,60 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
         launched.and(self.synchronize())?;
         self.ready_rows = Some(rows);
         self.output()
+    }
+    /// # Safety
+    /// Retain gathered storage and exclusive residual ownership through completion
+    /// or cancellation drain. The final residual copy is queued after the gate.
+    pub async unsafe fn execute_into_cooperative(&mut self, residual: Ds41rtDeviceBuffer,
+        gathered: &EngramDeviceView) -> Result<()> {
+        self.ready_rows = None;
+        let cold = self.graph.as_ref().is_none_or(|(_, rows)| *rows != gathered.rows);
+        if cold { self.clear_graph()?; }
+        let launched = (|| unsafe {
+            self.enqueue_inputs(residual, gathered)?;
+            if cold { self.enqueue(gathered.rows) } else {
+                self.weights.library.cuda_graph_launch(self.graph.unwrap().0, self.stream.raw)
+            }
+        })();
+        if let Err(error) = launched { self.synchronize()?; return Err(error); }
+        if cold {
+            self.stream.wait().await?;
+            unsafe { self.capture_ready(gathered.rows)?; }
+            let launched = unsafe { self.weights.library.cuda_graph_launch(self.graph.unwrap().0, self.stream.raw) };
+            if let Err(error) = launched { self.synchronize()?; return Err(error); }
+        }
+        let copied = unsafe { self.weights.library.copy_d2d_async(residual, self.output.buffer,
+            gathered.rows * 40960, self.stream.raw) };
+        if let Err(error) = copied { self.synchronize()?; return Err(error); }
+        self.stream.wait().await?;
+        self.ready_rows = Some(gathered.rows);
+        Ok(())
+    }
+    #[cfg(test)]
+    pub async unsafe fn check_cooperative(&mut self, residual: Ds41rtDeviceBuffer,
+        gathered: &EngramDeviceView) -> Result<()> {
+        use std::{future::Future, task::Poll};
+        let lib = self.weights.library;
+        let mut residual = residual; residual.bytes = gathered.rows * 40960;
+        let read = |buffer: Ds41rtDeviceBuffer| -> Result<Vec<u8>> {
+            let mut bytes = vec![0; buffer.bytes]; lib.copy_d2h(&mut bytes, buffer)?; Ok(bytes)
+        };
+        let original = read(residual)?;
+        let expected = read(unsafe { self.execute_captured(residual, gathered)? })?;
+        self.clear_graph()?;
+        let cancelled = {
+            let mut work = std::pin::pin!(unsafe { self.execute_into_cooperative(residual, gathered) });
+            std::future::poll_fn(|cx| Poll::Ready(work.as_mut().poll(cx).is_pending())).await
+        };
+        if cancelled { assert!(self.output().is_err()); }
+        for _ in 0..2 {
+            lib.copy_h2d(residual, &original)?;
+            unsafe { self.execute_into_cooperative(residual, gathered).await?; }
+            assert_eq!(read(residual)?, expected);
+        }
+        lib.copy_h2d(residual, &original)?;
+        eprintln!("PASS queued Engram gate {}: exact gate/residual parity, pending cancellation={cancelled}, reuse", self.layer());
+        Ok(())
     }
     pub fn clear_graph(&mut self) -> Result<()> {
         self.ready_rows = None;

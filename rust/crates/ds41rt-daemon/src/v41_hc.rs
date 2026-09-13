@@ -121,6 +121,7 @@ impl HcSublayer<'_, '_> {
     pub(crate) fn stream_raw(&self) -> *mut c_void {
         self.stream.raw
     }
+    pub(crate) async fn wait_chain(&self) -> Result<()> { self.stream.wait().await }
     fn synchronize(&self) -> Result<()> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
@@ -250,6 +251,10 @@ impl HcSublayer<'_, '_> {
         ensure!(rows > 0 && rows <= self.capacity, "invalid mHC replay rows");
         self.pending = Some(rows);
         unsafe { self.complete() }
+    }
+    #[cfg(test)]
+    pub(crate) fn rearm_finish_for_test(&mut self, rows: usize) {
+        self.begun = Some(rows); self.pending = None; self.ready = None;
     }
     /// Raw destinations for a containing owner that serializes GPU consumers.
     pub(crate) fn output_storage(&self) -> [Ds41rtDeviceBuffer; 2] {

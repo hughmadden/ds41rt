@@ -14,7 +14,7 @@ enum Phase {
     Attention(QueryBinding, usize),
     QueuedFfn(QueryBinding, usize),
     Ffn(QueryBinding, usize),
-    Ready(QueryBinding, usize),
+    Ready(QueryBinding, usize, bool),
 }
 /// Next-layer input after required engram work, before attention or dSpark taps.
 pub(crate) struct PreparedBlockInput<'a> {
@@ -70,25 +70,19 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         next: &'w crate::v41_backbone_hc::BackboneHcWeights<'a>,
     ) -> Result<()> {
         let result = (|| -> Result<()> {
-            let (binding, rows) = match self.phase {
-                Phase::Ready(binding, rows) => (binding, rows),
+            let (binding, rows, copied_next) = match self.phase {
+                Phase::Ready(binding, rows, copied_next) => (binding, rows, copied_next),
                 _ => anyhow::bail!("block advance requires a completed FFN"),
             };
             ensure!(self.layer < 39 && next.layer() == self.layer + 1
                 && binding.layer() == self.layer && self.tokens.len() == rows,
                 "block advance layer or identity differs");
             let [attention, ffn] = next.prepare_bindings(&self.attention, &self.ffn)?;
-            let stream = self.ffn.stream_raw();
-            let copied = (|| -> Result<()> {
-                for (source, destination) in self.ffn.output()?.into_iter().zip(self.inputs()) {
-                    unsafe { self.library.copy_d2d_async(destination, source, source.bytes, stream)?; }
-                }
-                Ok(())
-            })();
-            // Both destinations must be ready for taps/Engram or the next query.
-            // Drain even if only the first copy was successfully submitted.
-            let drained = unsafe { self.library.cuda_stream_synchronize(stream) };
-            copied.and(drained)?;
+            if !copied_next {
+                let copied = unsafe { self.enqueue_next_inputs(rows) };
+                let drained = unsafe { self.library.cuda_stream_synchronize(self.ffn.stream_raw()) };
+                copied.and(drained)?;
+            }
             // Backbone mHC executes on its own drained streams; it has no
             // external captured mHC graphs to invalidate during this rebind.
             unsafe {
@@ -215,6 +209,19 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
         })();
         if result.is_err() { self.reset(); }
         result
+    }
+    /// # Safety
+    /// Keep gathered upload storage and this block exclusive through the gate/copy.
+    pub async unsafe fn apply_engram_cooperative(&mut self,
+        gate: &mut crate::v41_engram::layer::EngramGate<'_, '_>,
+        gathered: &crate::v41_engram::EngramDeviceView) -> Result<()> {
+        let Phase::Prepared(binding, rows, false) = std::mem::replace(&mut self.phase, Phase::Idle) else {
+            anyhow::bail!("block is not awaiting engram");
+        };
+        ensure!(gate.layer() == self.layer && gathered.rows == rows, "block engram layer or rows differ");
+        unsafe { gate.execute_into_cooperative(self.inputs()[0], gathered).await?; }
+        self.phase = Phase::Prepared(binding, rows, true);
+        Ok(())
     }
     /// Metadata for gather association before engram makes query inputs ready.
     pub fn pending_engram(&self) -> Result<(usize, &[u64])> {
@@ -447,39 +454,88 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
     /// Result is the finite completed shared+routed FFN output for the returned
     /// FfnInput binding, in its token order, on this device. It stays immutable
     /// through the copy. Transport/expert reduction must establish this contract.
-    pub unsafe fn finish_ffn(
-        &mut self,
-        binding: QueryBinding,
-        result: Ds41rtDeviceBuffer,
-    ) -> Result<BlockOutput<'_>> {
-        let completed = (|| -> Result<()> {
+    pub unsafe fn finish_ffn(&mut self, binding: QueryBinding, result: Ds41rtDeviceBuffer) -> Result<BlockOutput<'_>> {
+        let rows = unsafe { self.enqueue_finish_ffn(binding, result, false)? };
+        if let Err(error) = unsafe { self.library.cuda_stream_synchronize(self.ffn.stream_raw()) } {
+            self.reset(); return Err(error);
+        }
+        unsafe { self.publish_finished_ffn(binding, rows, false) }
+    }
+    /// # Safety
+    /// Retain the completed transport result and exclusive block storage through
+    /// completion or cancellation drain. Next-layer copies share the mHC stream.
+    pub async unsafe fn finish_ffn_cooperative(&mut self, binding: QueryBinding,
+        result: Ds41rtDeviceBuffer) -> Result<BlockOutput<'_>> {
+        let copy_next = self.layer < 39;
+        let rows = unsafe { self.enqueue_finish_ffn(binding, result, copy_next)? };
+        if let Err(error) = self.ffn.wait_chain().await { self.reset(); return Err(error); }
+        unsafe { self.publish_finished_ffn(binding, rows, copy_next) }
+    }
+    unsafe fn enqueue_next_inputs(&self, rows: usize) -> Result<()> {
+        for ((source, destination), bytes) in self.ffn.output_storage().into_iter()
+            .zip(self.inputs()).zip([rows * 40960, rows * 16]) {
+            unsafe { self.library.copy_d2d_async(destination, source, bytes, self.ffn.stream_raw())?; }
+        }
+        Ok(())
+    }
+    unsafe fn enqueue_finish_ffn(&mut self, binding: QueryBinding,
+        result: Ds41rtDeviceBuffer, copy_next: bool) -> Result<usize> {
+        let submitted = (|| -> Result<usize> {
             let Phase::Ffn(expected, rows) = std::mem::replace(&mut self.phase, Phase::Idle) else {
                 anyhow::bail!("block FFN is not pending");
             };
-            ensure!(
-                binding == expected && result.device_id == self.inputs()[0].device_id
-                    && result.bytes >= rows * 10240 && !result.ptr.is_null(),
-                "block FFN result binding differs"
-            );
-            // Reduction has already completed. Post-mixing can consume its
-            // buffer directly instead of copying through the mHC scratch input.
-            let stream = self.ffn.stream_raw();
-            let enqueued = unsafe { self.ffn.enqueue_finish(Some(result), stream) };
-            let drained = unsafe { self.library.cuda_stream_synchronize(stream) };
-            enqueued.and(drained)?;
-            unsafe { self.ffn.complete()?; }
-            self.phase = Phase::Ready(binding, rows);
-            Ok(())
+            ensure!(binding == expected && result.device_id == self.inputs()[0].device_id
+                && result.bytes >= rows * 10240 && !result.ptr.is_null(), "block FFN result binding differs");
+            unsafe { self.ffn.enqueue_finish(Some(result), self.ffn.stream_raw())?; }
+            if copy_next { unsafe { self.enqueue_next_inputs(rows)?; } }
+            Ok(rows)
         })();
-        if let Err(e) = completed {
+        if submitted.is_err() {
+            let drained = unsafe { self.library.cuda_stream_synchronize(self.ffn.stream_raw()) };
             self.reset();
-            return Err(e);
+            return submitted.and_then(|rows| drained.map(|()| rows));
         }
+        submitted
+    }
+    unsafe fn publish_finished_ffn(&mut self, binding: QueryBinding,
+        rows: usize, copied_next: bool) -> Result<BlockOutput<'_>> {
+        if let Err(error) = unsafe { self.ffn.complete() } { self.reset(); return Err(error); }
+        self.phase = Phase::Ready(binding, rows, copied_next);
         self.output()
+    }
+    #[cfg(test)]
+    pub async unsafe fn check_queued_finish(&mut self, binding: QueryBinding,
+        result: Ds41rtDeviceBuffer) -> Result<()> {
+        use std::{future::Future, task::Poll};
+        let Phase::Ffn(expected, rows) = self.phase else { anyhow::bail!("test requires pending FFN"); };
+        let read = |library: &NativeLibrary, buffers: &[Ds41rtDeviceBuffer]| -> Result<Vec<Vec<u8>>> {
+            buffers.iter().map(|&buffer| { let mut out = vec![0; buffer.bytes];
+                library.copy_d2h(&mut out, buffer)?; Ok(out) }).collect()
+        };
+        let library = self.library;
+        let reference = { let out = unsafe { self.finish_ffn(binding, result)? };
+            read(library, &[out.residual, out.pre])? };
+        self.ffn.rearm_finish_for_test(rows); self.phase = Phase::Ffn(expected, rows);
+        let cancelled = {
+            let mut future = std::pin::pin!(unsafe { self.finish_ffn_cooperative(binding, result) });
+            std::future::poll_fn(|cx| Poll::Ready(future.as_mut().poll(cx).is_pending())).await
+        };
+        for _ in 0..2 {
+            self.ffn.rearm_finish_for_test(rows); self.phase = Phase::Ffn(expected, rows);
+            let actual = unsafe { self.finish_ffn_cooperative(binding, result).await? };
+            assert_eq!(read(library, &[actual.residual, actual.pre])?, reference);
+            if self.layer < 39 {
+                let mut input = self.inputs(); input[0].bytes = rows * 40960; input[1].bytes = rows * 16;
+                assert_eq!(read(library, &input)?, reference, "queued next-layer inputs differ");
+            }
+        }
+        self.ffn.rearm_finish_for_test(rows); self.phase = Phase::Ffn(expected, rows);
+        eprintln!("PASS queued layer finish {}: exact mHC/next-input parity, pending cancellation={cancelled}, reuse", self.layer);
+        Ok(())
     }
     pub fn output(&self) -> Result<BlockOutput<'_>> {
         let (binding, rows) = match self.phase {
-            Phase::Ready(binding, rows) => (binding, rows),
+            Phase::Ready(binding, rows, _) => (binding, rows),
             _ => return Err(anyhow::anyhow!("block output unpublished")),
         };
         ensure!(self.tokens.len() == rows, "block token count differs");

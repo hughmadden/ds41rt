@@ -46,9 +46,13 @@ Remaining synchronization work, based on the current serving source:
   Against preserved e9c07ae, the latest combined pair has C1 130.18 → 129.98,
   median C2–C14 −0.14%, C16 166.16 → 168.58, with C15 −8.0%. Functional checks
   pass; this remains exploratory progress, not final release qualification.
-- Finish final mHC/layer advance, Engram gates, dSpark taps and cold sparse graph
-  setup. Audit rebind/eviction and remaining component waits on the shared host
-  thread. Retain coordinated fatal-error cleanup and admission/prefill drains.
+- [Final mHC/next-input copies, Engram upload/gates and dSpark taps](phase1-queued-layer.md)
+  now complete cooperatively. Exact/lifecycle checks pass, but the accumulated
+  comparison has C1 130.17 → 129.63, C14 −8.8%, C15 −6.9%, C16 178.70 → 145.56.
+  This is unresolved development work, not a release-qualified improvement.
+- Finish cold sparse graph setup and audit rebind/eviction and remaining component
+  waits. Investigate accumulated high-concurrency costs against preserved e9c07ae.
+  Retain coordinated fatal-error cleanup and admission/prefill drains.
 
 The [separate cooperative embedding/handoff candidate](phase1-cooperative-embedding.md)
 was rejected after a consistent 2.3% C8 decline across three pairs. Its patch and

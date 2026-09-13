@@ -100,6 +100,22 @@ impl<'a> TargetTapWave<'a> {
         batch: &CacheBatch,
         input: &PreparedBlockInput<'_>,
     ) -> Result<()> {
+        let queued = unsafe { self.enqueue_capture(batch, input) };
+        let drained = unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) };
+        if let Err(error) = queued.and(drained) { self.reset(); return Err(error); }
+        self.progress.next += 1;
+        Ok(())
+    }
+    /// # Safety
+    /// Retain prepared input until the tap read completes or cancellation drains.
+    pub(super) async unsafe fn capture_cooperative(&mut self, batch: &CacheBatch,
+        input: &PreparedBlockInput<'_>) -> Result<()> {
+        unsafe { self.enqueue_capture(batch, input)?; }
+        if let Err(error) = self.stream.wait().await { self.reset(); return Err(error); }
+        self.progress.next += 1;
+        Ok(())
+    }
+    unsafe fn enqueue_capture(&mut self, batch: &CacheBatch, input: &PreparedBlockInput<'_>) -> Result<()> {
         let result = (|| -> Result<()> {
             self.progress.check(batch.identity(), input.layer)?;
             ensure!(
@@ -138,9 +154,10 @@ impl<'a> TargetTapWave<'a> {
                     self.stream.raw,
                 )
             };
-            let drained = unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) };
-            launched.and(drained)?;
-            self.progress.next += 1;
+            if let Err(error) = launched {
+                unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw)?; }
+                return Err(error);
+            }
             Ok(())
         })();
         if result.is_err() {

@@ -442,6 +442,21 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.phase = Phase::Prepared;
         Ok(())
     }
+    #[cfg(test)]
+    pub async unsafe fn check_queued_engram(&mut self, gate: &mut EngramGate<'_, '_>,
+        rows: &EngramDeviceView) -> Result<()> {
+        unsafe { gate.check_cooperative(self.block.inputs()[0], rows).await }
+    }
+    /// # Safety
+    /// Retain the gathered upload while this lane's gate and residual copy finish.
+    pub async unsafe fn apply_engram_cooperative(&mut self,
+        gate: &mut crate::v41_engram::layer::EngramGate<'_, '_>,
+        rows: &crate::v41_engram::EngramDeviceView) -> Result<()> {
+        self.enter(Phase::Prepared)?;
+        unsafe { self.block.apply_engram_cooperative(gate, rows).await?; }
+        self.phase = Phase::Prepared;
+        Ok(())
+    }
     /// # Safety
     /// Required dSpark tap consumers must finish before this call. The block
     /// checks that engram has completed on layers 1 and 14.
@@ -569,6 +584,22 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         let output = unsafe { self.block.finish_ffn(binding, result)? };
         self.phase = Phase::Complete;
         Ok(output)
+    }
+    /// # Safety
+    /// Same completed result and exclusive lane contract as finish_ffn, retained
+    /// through cooperative completion or cancellation drain.
+    pub async unsafe fn finish_ffn_cooperative(&mut self, binding: QueryBinding,
+        result: Ds41rtDeviceBuffer) -> Result<BlockOutput<'_>> {
+        self.enter(Phase::SharedReady)?;
+        let output = unsafe { self.block.finish_ffn_cooperative(binding, result).await? };
+        self.phase = Phase::Complete;
+        Ok(output)
+    }
+    #[cfg(test)]
+    pub async unsafe fn check_queued_finish(&mut self, binding: QueryBinding,
+        result: Ds41rtDeviceBuffer) -> Result<()> {
+        ensure!(self.phase == Phase::SharedReady, "test FFN phase differs");
+        unsafe { self.block.check_queued_finish(binding, result).await }
     }
     pub fn output(&self) -> Result<BlockOutput<'_>> {
         ensure!(
