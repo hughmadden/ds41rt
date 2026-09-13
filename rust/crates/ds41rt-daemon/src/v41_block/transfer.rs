@@ -164,6 +164,43 @@ mod tests {
             lane_bytes,
             1,
         )?;
+        let placed_engram_weights = crate::v41_engram::placement::PlacedEngramWeights::load(
+            &lib,
+            &catalog,
+            placement,
+            crate::v41_engram::placement::PlacedEngramWeights::device_bytes(
+                &lib, &catalog, placement,
+            )?,
+            1024 * 1024,
+        )?;
+        let mut placed_engram = crate::v41_engram::placement::PlacedEngram::new(
+            &placed_engram_weights,
+            16,
+            crate::v41_engram::placement::PlacedEngram::device_bytes(&lib, placement, 16)?,
+        )?;
+        let reference_engram_weights = devices[1].own(|| {
+            crate::v41_engram::layer::EngramLayerWeights::load(
+                &lib,
+                &catalog,
+                1,
+                crate::v41_engram::layer::EngramLayerWeights::device_bytes(&lib, &catalog, 1)?,
+                1024 * 1024,
+            )
+        })?;
+        let mut reference_gate = devices[1].own(|| {
+            crate::v41_engram::layer::EngramGate::new(
+                &reference_engram_weights,
+                16,
+                crate::v41_engram::layer::EngramGate::device_bytes(&lib, 16)?,
+            )
+        })?;
+        let mut reference_upload = devices[1].own(|| {
+            crate::v41_engram::EngramDeviceRows::new(
+                &lib,
+                16,
+                crate::v41_engram::EngramDeviceRows::device_bytes(16)?,
+            )
+        })?;
         let hc = devices
             .iter()
             .map(|d| {
@@ -383,6 +420,48 @@ mod tests {
                 "layer 14 bypassed required Engram"
             );
             assert_eq!(blocks[1].pending_engram()?.0, 14);
+            runtime.block_on(unsafe {
+                placed_lane
+                    .get_mut()
+                    .import_previous_cooperative(&previous, &mut transfer)
+            })?;
+            let gathered_weights = vec![0x38; rows * 24 * 256];
+            let gathered_scales = vec![127; rows * 24 * 8];
+            let mask: Vec<u8> = (0..rows).map(|i| (i % 2) as u8).collect();
+            let gathered = ds41rt_loader::EngramGatherView {
+                weights: &gathered_weights,
+                scales: &gathered_scales,
+                text_mask: &mask,
+                rows,
+                layer_index: 1,
+            };
+            runtime.block_on(unsafe { placed_engram.apply(&mut placed_lane, &gathered) })?;
+            runtime.block_on(devices[1].future(async {
+                let uploaded = reference_upload.upload_cooperative(&gathered).await?;
+                unsafe {
+                    blocks[1]
+                        .apply_engram_cooperative(&mut reference_gate, &uploaded)
+                        .await
+                }
+            }))?;
+            let actual = placed_lane.prepared_input()?;
+            let expected = blocks[1].prepared_input()?;
+            for (a, b) in [
+                (actual.residual, expected.residual),
+                (actual.pre, expected.pre),
+            ] {
+                let mut left = vec![0; a.bytes];
+                let mut right = vec![0; b.bytes];
+                devices[1].run(|| {
+                    lib.copy_d2h(&mut left, a)?;
+                    lib.copy_d2h(&mut right, b)
+                })?;
+                assert_eq!(
+                    left, right,
+                    "placed Engram residual differs from ordinary gate"
+                );
+            }
+            assert_eq!(lib.cuda_get_device()?, 0);
         }
         assert_eq!(lib.cuda_get_device()?, 0);
         Ok(())

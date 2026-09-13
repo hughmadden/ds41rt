@@ -1,5 +1,6 @@
 //! Owned native gathered-row upload and BF16 engram embedding production.
 pub(crate) mod layer;
+pub(crate) mod placement;
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};

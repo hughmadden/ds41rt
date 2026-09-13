@@ -715,3 +715,37 @@ transitions, reserved encoder publication, and startup mode selection. Indexed
 attention and live Spark-backed decoder execution need qualification through the
 connected execution owner. Full-model performance and release tables remain
 pending.
+
+## Placed Engram projection and upload
+
+Engram gate weights now follow attention layers 1 and 14. `PlacedEngram` owns
+two device-scoped gates and one gathered-row upload workspace per participating
+GPU, per request lane. Gates on the same GPU reuse that lane's upload workspace;
+split gates have separate uploads. CPU table gathering and its request/history
+validation remain unchanged. The caller retains the gather lease while upload
+and residual gating run under a device-scoped future.
+
+Application validates the gathered layer index, the lane's pending Engram layer,
+and the GPU assignment before upload. It invokes the existing cooperative
+upload and gate operations, preserving cancellation cleanup and the prepared
+state transition. No cross-lane owner or wait is introduced.
+
+Actual weight allocations and exact-budget workspace construction pass for the
+original split and the rebalanced layer-14 boundary:
+
+| Engram component, bytes | Original GPU0 | Original GPU1 | Rebalanced GPU0 | Rebalanced GPU1 |
+| --- | ---: | ---: | ---: | ---: |
+| Gate weights | 324,874,240 | 0 | 162,437,120 | 162,437,120 |
+| Per-lane workspace, C16 | 5,266,488 | 0 | 2,782,244 | 2,782,244 |
+
+The original placement saves one 298,000-byte C16 upload workspace by sharing
+it between its two gates. A budget one byte below the required GPU0 allocation
+is rejected before gate/workspace allocation.
+
+The existing real-weight block/lane handoff fixture now continues through the
+GPU1 layer-14 Engram gate. With synthetic gathered FP8 rows and mixed text masks,
+changed 16/1/16-row residual/pre outputs exactly match the ordinary upload/gate
+path and become available for subsequent attention. This verifies placed GPU
+projection/application; it is not a new CPU table-lookup or full-model quality
+evaluation. The forty-layer target-pass loop still needs to invoke this owner
+along with placed taps/head and reserved encoder publication.
