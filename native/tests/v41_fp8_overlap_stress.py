@@ -22,6 +22,8 @@ parser.add_argument('--steps', type=int, default=256)
 parser.add_argument('--trials', type=int, default=32)
 parser.add_argument('--serial', action='store_true')
 parser.add_argument('--eviction-only', action='store_true')
+parser.add_argument('--no-graphs', action='store_true', help='Issue the same work directly on the two streams')
+parser.add_argument('--check-inputs', action='store_true', help='Verify immutable inputs and weights after each trial')
 parser.add_argument('--failure-output', type=Path)
 args = parser.parse_args()
 assert args.steps > 0 and args.trials > 0 and args.evict_mib >= 0
@@ -75,19 +77,31 @@ def run(i,step):
 for i in range(2):run(i,0)
 torch.cuda.synchronize()
 assert torch.equal(retained[0].cpu(),expected),'standalone baseline differs from captured expected'
-graphs=[]
-for i in range(2):
- g=torch.cuda.CUDAGraph()
- with torch.cuda.graph(g,stream=streams[i]):
-  for step in range(steps):
+immutable = [(name, value, value.cpu().clone()) for name, value in
+             [('input', x), ('weight', w), ('packed_scales', packed)]] if args.check_inputs else []
+def enqueue(i, selected_steps):
+ with torch.cuda.stream(streams[i]):
+  for step in selected_steps:
    if i==0 or not args.eviction_only:run(i,step)
    if i==(0 if args.serial else 1) and eviction is not None:eviction.add_(0.001)
+graphs=[]
+for i in range(0 if args.no_graphs else 2):
+ g=torch.cuda.CUDAGraph()
+ with torch.cuda.graph(g,stream=streams[i]):
+  enqueue(i, range(steps))
  graphs.append(g)
-print('captured mixed capacities',capacities,'steps',steps,flush=True)
+print('direct' if args.no_graphs else 'captured', 'mixed capacities',capacities,'steps',steps,flush=True)
 for trial in range(args.trials):
- for i in range(1 if args.serial else 2):
-  with torch.cuda.stream(streams[i]):graphs[i].replay()
+ if args.no_graphs:
+  for step in range(steps):
+   for i in range(1 if args.serial else 2):enqueue(i, (step,))
+ else:
+  for i in range(1 if args.serial else 2):
+   with torch.cuda.stream(streams[i]):graphs[i].replay()
  for s in streams:s.synchronize()
+ for name, value, before in immutable:
+  assert torch.equal(value.view(torch.uint8).cpu(), before.view(torch.uint8)), f'{name} mutated'
+ if immutable:print('immutable inputs and weights exact',flush=True)
  result=retained.cpu()
  different=(result!=expected).reshape(steps,-1).any(dim=1)
  count=int(different.sum())

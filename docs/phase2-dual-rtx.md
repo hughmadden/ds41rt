@@ -1079,10 +1079,35 @@ on GPU1, so a second GEMM is not required. The repository script's short
 sanitizer experiments); it exits 1 on a numeric mismatch by design. These are
 correctness experiments, not throughput measurements.
 
-Standalone tensor race checking and initialization checking are ongoing.
+Standalone tensor race checking and initialization checking were stopped
+deliberately after confirming the processes remained live; neither completed
+a clean qualification. Race instrumentation masked the numeric failure through
+trial 10. Shared-memory initcheck, including `--check-tensor-ops yes`, reported
+uninitialized 16-byte reads at the QB kernel's `LDSM` instruction (PC `0x950`,
+first shared address `0x800`). Whether these reports describe live operands,
+padded rows, or instrumentation limitations remains unresolved.
 Filtered initialization checking emitted host-copy uninitialized-access
 reports; these have not been established as kernel defects and must not be
 reported as proof of the underlying bug. The strong result is the small
 uninstrumented concurrent-memory-traffic reproduction, with a passing serial
 control. Next investigation should use it rather than another long full-model
 sanitizer run.
+
+The reproducer now supports `--no-graphs` (round-robin host submission on the
+two streams) and `--check-inputs` (byte-exact input, weight, and packed-scale
+verification after each synchronized trial). On GPU0, direct concurrent
+eviction reproduced 255/256 bad projections, with all three immutable buffers
+unchanged; the first failing projection had 6,993 differing values and maximum
+absolute error 1.875. The direct serial control passed all 8,192 projections
+and every integrity check. Thus graph replay is not necessary for this failure.
+Logs: `qb-direct-integrity.log` and `qb-direct-serial-integrity.log` in the
+local phase2 experiment directory.
+
+A diagnostic SparkInfer worktree added a consumer-only named barrier before
+both shared-stage releases and exported fresh QB capacity-1/16 objects. Its
+standalone native overlay still failed 248/256 projections under concurrent
+eviction on GPU0 (`qb-handoff-stress.log`). An unchanged GPU1 recheck failed
+249/256 (`qb-baseline-recheck.log`). These counts are timing-sensitive correctness
+observations, not comparative performance measurements. The extra barriers
+have not been applied to the pinned production source. Next investigation
+must localize the live operand or pipeline failure without joining request lanes.
