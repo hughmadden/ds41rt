@@ -487,6 +487,11 @@ pub(crate) struct NativeServeArgs {
     #[arg(long)]
     pub memory_reservation: Option<crate::v41_native_serve::memory::Reservation>,
 
+    /// Complete bottom-up RTX routed layers: auto or 0..40. Opt-in during qualification.
+    #[arg(long, default_value = "0")]
+    pub rtx_expert_layers: crate::v41_native_serve::memory::LocalLayers,
+
+
     /// Maximum active requests, shared by both execution lanes.
     #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u32).range(1..=16))]
     pub concurrency: u32,

@@ -18,8 +18,27 @@ pub(crate) struct NativeTp4Wave<'a> {
     library: &'a NativeLibrary,
     reducer: V41CompactReducer<'a>,
     ready_rows: Option<u32>,
+    local: Option<super::local::LocalExpertWave<'a>>,
 }
 impl<'a> NativeTp4Wave<'a> {
+    pub fn install_local(&mut self, wave: super::local::LocalExpertWave<'a>) -> Result<()> {
+        ensure!(self.local.is_none(), "local expert lane already installed");
+        self.local = Some(wave);
+        Ok(())
+    }
+    pub fn has_local_layer(&self, layer: usize) -> bool {
+        self.local.as_ref().is_some_and(|wave| wave.contains(layer))
+    }
+    /// # Safety
+    /// Completed router/shared buffers stay live and unmodified through drain.
+    pub unsafe fn execute_local_ffn(&mut self,
+        routed: &crate::v41_backbone_router::RouterOutput<'_>,
+        shared: &crate::v41_backbone_shared::SharedOutput<'_>) -> Result<NativeFfnOutput<'_>> {
+        self.ready_rows = None;
+        let values = unsafe { self.local.as_mut().context("local expert lane missing")?.execute(routed, shared)? };
+        self.ready_rows = Some(routed.rows);
+        Ok(NativeFfnOutput { values, binding: routed.binding()?, _owner: std::marker::PhantomData })
+    }
     /// Admission invalidates prior output; completed RoCE sessions remain reusable.
     pub fn begin_request(&mut self) {
         self.ready_rows = None;
@@ -68,6 +87,7 @@ impl<'a> NativeTp4Wave<'a> {
             library,
             reducer,
             ready_rows: None,
+            local: None,
         })
     }
     /// RoCE execution with optional host BF16 shared-expert contribution.

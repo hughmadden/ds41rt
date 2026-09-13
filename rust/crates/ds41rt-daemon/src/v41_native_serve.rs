@@ -273,6 +273,31 @@ fn worker(
         reservation_bytes=pool.reservation_bytes, runtime_headroom_bytes=memory::RUNTIME_HEADROOM,
         "native KV pool reservation");
     let mut requests = Requests::new(&lib, pipeline, args.concurrency as usize, pool.pages, pool.cache_bytes)?;
+    if args.rtx_expert_layers != memory::LocalLayers::Count(0) {
+        use crate::v41_experts::{ExpertLayer, ExpertWeights, local::LocalExpertWave};
+        let local_started = Instant::now();
+        let per_lane = LocalExpertWave::device_bytes(&lib, capacity)?;
+        let budgets = (0..40).map(|layer| ExpertWeights::plan(&lib, &catalog,
+            ExpertLayer::BackboneFull { layer })).collect::<Result<Vec<_>>>()?;
+        let (free, total) = lib.cuda_memory_info()?;
+        let plan = memory::LocalLayerPlan::new(args.rtx_expert_layers, &budgets,
+            per_lane.checked_mul(2).context("local lane budget overflow")?, free, total, pool.reservation_bytes)?;
+        tracing::info!(layers=plan.layers, resident_bytes=plan.resident_bytes,
+            workspace_bytes=plan.workspace_bytes, peak_bytes=plan.peak_bytes,
+            "bottom-up RTX expert placement");
+        if plan.layers > 0 {
+            let mut loaded = Vec::with_capacity(plan.layers);
+            for layer in 0..plan.layers {
+                loaded.push(ExpertWeights::load(&lib, &catalog, ExpertLayer::BackboneFull { layer },
+                    budgets[layer].peak_device_bytes()?)?);
+            }
+            let weights = std::rc::Rc::new(loaded);
+            transport.install_local(LocalExpertWave::new(&lib, weights.clone(), capacity, per_lane)?)?;
+            prefill_transport.install_local(LocalExpertWave::new(&lib, weights, capacity, per_lane)?)?;
+        }
+        tracing::info!(layers=plan.layers, elapsed_ms=local_started.elapsed().as_millis(),
+            "local RTX experts ready");
+    }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;

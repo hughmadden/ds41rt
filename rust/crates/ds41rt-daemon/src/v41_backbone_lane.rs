@@ -130,6 +130,13 @@ impl LaneFfn<'_, '_, '_> {
                     .map(|routes| std::array::from_fn(|i| routes[i].expert_id)));
             }
             let routed_us = timing.elapsed().as_micros() as u64;
+            if transport.has_local_layer(input.layer) {
+                let contribution = unsafe { shared.execute_ffn(input)? };
+                let result = unsafe { transport.execute_local_ffn(&routed, &contribution) };
+                tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
+                    total_us=timing.elapsed().as_micros() as u64, "target local experts");
+                return result;
+            }
             let pending = transport.dispatch_ffn(&request).await?;
             let dispatched_us = timing.elapsed().as_micros() as u64;
             let contribution = unsafe { shared.execute_ffn(input)? };

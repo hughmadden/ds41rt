@@ -298,3 +298,77 @@ mod tests {
         .is_err());
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LocalLayers { Auto, Count(usize) }
+impl FromStr for LocalLayers {
+    type Err = anyhow::Error;
+    fn from_str(value: &str) -> Result<Self> {
+        if value == "auto" { return Ok(Self::Auto); }
+        let count: usize = value.parse().context("RTX expert layers must be auto or 0..40")?;
+        ensure!(count <= 40, "RTX expert layers must be auto or 0..40");
+        Ok(Self::Count(count))
+    }
+}
+#[derive(Debug)]
+pub(super) struct LocalLayerPlan {
+    pub layers: usize,
+    pub resident_bytes: usize,
+    pub workspace_bytes: usize,
+    pub peak_bytes: usize,
+}
+impl LocalLayerPlan {
+    /// Free memory is sampled after mandatory weights, KV and both lanes exist.
+    /// Reserve both local workspaces and bounded load staging conservatively.
+    pub fn new(requested: LocalLayers, budgets: &[crate::v41_experts::ExpertLoadBudget],
+        workspace_bytes: usize, free: usize, total: usize, ceiling: usize) -> Result<Self> {
+        ensure!(free <= total && ceiling <= total && budgets.len() <= 40, "invalid local memory inventory");
+        let available = ceiling.saturating_sub(total - free).saturating_sub(RUNTIME_HEADROOM);
+        let target = match requested { LocalLayers::Auto => budgets.len(), LocalLayers::Count(n) => n };
+        ensure!(target <= budgets.len(), "requested RTX layers exceed available layer plans");
+        let mut plan = Self { layers: 0, resident_bytes: 0, workspace_bytes: 0, peak_bytes: 0 };
+        let mut staging = 0;
+        for budget in budgets.iter().take(target) {
+            let resident = plan.resident_bytes.checked_add(budget.resident_bytes).context("local weight size overflow")?;
+            staging = staging.max(budget.device_staging_bytes);
+            let peak = resident.checked_add(workspace_bytes).and_then(|b| b.checked_add(staging))
+                .context("local layer peak size overflow")?;
+            if peak > available { break; }
+            plan = Self { layers: plan.layers + 1, resident_bytes: resident, workspace_bytes, peak_bytes: peak };
+        }
+        if let LocalLayers::Count(n) = requested {
+            ensure!(plan.layers == n, "requested {n} RTX expert layers but only {} fit after KV, workspaces, staging and runtime headroom", plan.layers);
+        }
+        Ok(plan)
+    }
+}
+
+#[cfg(test)]
+mod local_tests {
+    use super::*;
+    fn budgets() -> Vec<crate::v41_experts::ExpertLoadBudget> {
+        vec![crate::v41_experts::ExpertLoadBudget { resident_bytes: 7 << 30,
+            device_staging_bytes: 20 << 20, pinned_host_bytes: 0, read_scratch_bytes: 0 }; 40]
+    }
+    #[test]
+    fn local_prefix_respects_workspace_staging_and_ceiling() {
+        let b = budgets();
+        let p = LocalLayerPlan::new(LocalLayers::Auto, &b, 600 << 20, 38 << 30, 96 << 30, 96 << 30).unwrap();
+        assert_eq!(p.layers, 5);
+        assert_eq!(p.resident_bytes, 35 << 30);
+        let limited = LocalLayerPlan::new(LocalLayers::Auto, &b, 600 << 20, 38 << 30, 96 << 30, 90 << 30).unwrap();
+        assert_eq!(limited.layers, 4);
+        assert!(LocalLayerPlan::new(LocalLayers::Count(5), &b, 600 << 20, 38 << 30, 96 << 30, 90 << 30).is_err());
+        let exact = LocalLayerPlan::new(LocalLayers::Auto, &b, 600 << 20,
+            p.peak_bytes + RUNTIME_HEADROOM, 96 << 30, 96 << 30).unwrap();
+        assert_eq!(exact.layers, 5);
+        let short = LocalLayerPlan::new(LocalLayers::Auto, &b, 600 << 20,
+            p.peak_bytes + RUNTIME_HEADROOM - 1, 96 << 30, 96 << 30).unwrap();
+        assert_eq!(short.layers, 4);
+        let zero = LocalLayerPlan::new(LocalLayers::Auto, &b, 600 << 20, 1 << 30, 96 << 30, 96 << 30).unwrap();
+        assert_eq!((zero.layers, zero.peak_bytes), (0, 0));
+        assert!("41".parse::<LocalLayers>().is_err());
+        assert!("-1".parse::<LocalLayers>().is_err());
+        assert_eq!("auto".parse::<LocalLayers>().unwrap(), LocalLayers::Auto);
+    }
+}

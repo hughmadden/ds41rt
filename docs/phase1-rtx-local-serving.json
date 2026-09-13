@@ -1,0 +1,253 @@
+{
+  "scope": "Initial local-serving integration pilot, not final qualification",
+  "source_base": "5e260876b20ddb2967aae7e2077e7d1e888e28e5",
+  "source_sha256": {
+    "native/cuda/kernels/v41_route_reduce.cu": "97cc11c300b36c06a709d30d436e2c2fef92663d07ec994cc57a58c4920def38",
+    "native/include/ds41rt_v41_experts.h": "fbb437c0a772b8de802c932c6a20ffc5c0951b867d27130f07efff1655f8882a",
+    "rust/crates/ds41rt-daemon/src/cli.rs": "14302a4d222f9bbbb20b6da3d360d0e0967fc72789e2b8a055a3813e97ec45a2",
+    "rust/crates/ds41rt-daemon/src/v41_backbone_lane.rs": "f20c212377793980972a9ace70cc15ed105a1543b849a5d5eec23b74fdcc7fea",
+    "rust/crates/ds41rt-daemon/src/v41_experts.rs": "a66a2f2da2893de0f8e83bacfdc85b86efe1e650a1929b3bbb10f40d068be870",
+    "rust/crates/ds41rt-daemon/src/v41_experts/coordinator.rs": "0a51f562621fea0e947585896e80e2b0c129231e8ab47f2fd377db5d8f7b161c",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve.rs": "1b24d9efa0849c97837ed905913b60b0c7d58818631e25a70d55a6311e8f46e6",
+    "rust/crates/ds41rt-daemon/src/v41_native_serve/memory.rs": "b2f4c217d78eb6fe694a4aeb3e32d210241bfbc04902ebe2d064e19cfe185b69",
+    "rust/crates/ds41rt-ffi/src/lib.rs": "16ec39fb319ef68631477875d40870b9f1148278ed7103c46d1634dd99415ac6",
+    "rust/crates/ds41rt-ffi/src/v41_experts.rs": "0acfc7665b9bbcadbb8afd029abe7654641e0a1e1f00c626b42b5649245131e4",
+    "rust/crates/ds41rt-daemon/src/v41_experts/local.rs": "9dbbd9429c720b16426e05711ef79083cebd41e2880c101c7c51aeca4b76c0da",
+    "python/tools/qualify_v41_local_reduction.py": "712ffbf0c8498bcd6c03047213d560453e79b05d9479f478d612e353996f1832"
+  },
+  "artifacts": {
+    "libds41rt_native.so": "1aed37f945a4291139133b95bdef7fd5040f86164bbfcd6bf89286c98dfc9f94",
+    "ds41rt": "4051dd9b2fd9de4b650595422016f8dba668ebbde55f5d125a5079c324741d3b"
+  },
+  "arms": [
+    {
+      "option": "0",
+      "startup_seconds": 4.293650510953739,
+      "memory_ready": "3258647, 60250\n",
+      "memory_after": "3258647, 60304\n",
+      "median_tps": 118.60147684257554,
+      "samples": [
+        {
+          "tps": 116.71153934612578,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": true
+        },
+        {
+          "tps": 118.60147684257554,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": true
+        },
+        {
+          "tps": 118.71457007814287,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": true
+        }
+      ]
+    },
+    {
+      "option": "1",
+      "startup_seconds": 5.303088289918378,
+      "memory_ready": "3259362, 67758\n",
+      "memory_after": "3259362, 67812\n",
+      "median_tps": 118.96048853027277,
+      "samples": [
+        {
+          "tps": 110.68326883156088,
+          "content_sha256": "896d5c3910afcdbd73ee3468bd9723053cbe66ee5bb9751d7c1f9aa40982fdd2",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": false
+        },
+        {
+          "tps": 122.14915941284005,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": true
+        },
+        {
+          "tps": 118.96048853027277,
+          "content_sha256": "896d5c3910afcdbd73ee3468bd9723053cbe66ee5bb9751d7c1f9aa40982fdd2",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": false
+        }
+      ]
+    },
+    {
+      "option": "auto",
+      "startup_seconds": 8.337995517998934,
+      "memory_ready": "3260461, 88416\n",
+      "memory_after": "3260461, 88470\n",
+      "median_tps": 120.80143894729244,
+      "samples": [
+        {
+          "tps": 115.43290016364456,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": true
+        },
+        {
+          "tps": 120.80143894729244,
+          "content_sha256": "896d5c3910afcdbd73ee3468bd9723053cbe66ee5bb9751d7c1f9aa40982fdd2",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": false
+        },
+        {
+          "tps": 124.2775161594457,
+          "content_sha256": "aea30d7d3de93624c30a56d11825a2469affb700c2a55b977d0fec727d31faba",
+          "objective_checks": {
+            "python_structure": {
+              "passed": true,
+              "issues": []
+            }
+          },
+          "passed": true,
+          "same_as_remote": true
+        }
+      ]
+    }
+  ],
+  "auto_layers": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "local_workspace_bytes_two_lanes": 643135168,
+  "kv_global_bytes": 16827351040,
+  "kv_total_bytes": 16871855616,
+  "context_equivalents": 18,
+  "context_tokens": 1048576,
+  "snapshot_entries": 24,
+  "headroom_bytes": 2147483648,
+  "reduction_checks": [
+    {
+      "rows": 1,
+      "token_sums": false,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 1,
+      "token_sums": true,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 17,
+      "token_sums": false,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 17,
+      "token_sums": true,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 80,
+      "token_sums": false,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 80,
+      "token_sums": true,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 256,
+      "token_sums": false,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 256,
+      "token_sums": true,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 4096,
+      "token_sums": false,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    },
+    {
+      "rows": 4096,
+      "token_sums": true,
+      "exact": true,
+      "replay_allocation_free": true,
+      "rejected": 7
+    }
+  ],
+  "restored": true,
+  "limitations": [
+    "Three samples per arm, sequential ordering, no balanced repeat",
+    "Different docstring wording changes output hashes and token counts",
+    "Startup host page-cache state uncontrolled; one launch per arm",
+    "No target-only, prefill matrix, concurrency or retained-context qualification yet",
+    "All Spark layers remain resident",
+    "Local execution opt-in; zero remains the deployment default"
+  ]
+}

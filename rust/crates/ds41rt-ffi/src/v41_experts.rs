@@ -646,3 +646,29 @@ impl V41ExpertInputQuantizer<'_> {
         Ok(())
     }
 }
+
+
+type FinishLocalFn = unsafe extern "C" fn(*const f32, *const u16, *mut u16, u32, u32, *mut c_void) -> i32;
+pub struct V41LocalExpertReducer<'a> {
+    _library: &'a NativeLibrary,
+    finish: FinishLocalFn,
+}
+impl NativeLibrary {
+    pub fn v41_local_expert_reducer(&self) -> Result<V41LocalExpertReducer<'_>> {
+        Ok(V41LocalExpertReducer { _library: self,
+            finish: unsafe { *self.lib.get::<FinishLocalFn>(b"ds41rt_v41_finish_local_experts_async")? } })
+    }
+}
+impl V41LocalExpertReducer<'_> {
+    /// # Safety
+    /// Complete FP32 routes/token sums and optional BF16 shared input must be
+    /// live on the current CUDA device, ordered before this operation. Output
+    /// cannot overlap routed input, and may alias shared only exactly. Owners
+    /// must remain alive through stream completion.
+    pub unsafe fn finish(&self, routed: *const f32, shared: *const u16,
+        output: *mut u16, rows: u32, token_sums: bool, stream: *mut c_void) -> Result<()> {
+        let status = unsafe { (self.finish)(routed, shared, output, rows, u32::from(token_sums), stream) };
+        ensure!(status == 0, "local expert reduction failed with CUDA status {status}");
+        Ok(())
+    }
+}
