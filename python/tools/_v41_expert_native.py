@@ -61,7 +61,8 @@ class Launch(C.Structure):
 assert C.sizeof(Info) == 64 and C.sizeof(Launch) == 392
 
 
-def library(path, *, local=False):
+def library(path, *, local=False, tp2=False):
+    assert not (local and tp2)
     lib = C.CDLL(path)
     for name, args in {
         "ds41rt_v41_expert_info": [I, C.POINTER(Info)],
@@ -72,13 +73,16 @@ def library(path, *, local=False):
         "ds41rt_v41_pack_expert_async": [C.POINTER(P), C.POINTER(P), U, P],
         "ds41rt_v41_compact_routes_bf16_async": [P, P, U, P],
     }.items():
-        selected = name.replace("ds41rt_v41_expert_", "ds41rt_v41_local_expert_", 1) if local and name.startswith("ds41rt_v41_expert_") else name
+        prefix = "ds41rt_v41_tp2_expert_" if tp2 else "ds41rt_v41_local_expert_"
+        selected = name.replace("ds41rt_v41_expert_", prefix, 1) if (local or tp2) and name.startswith("ds41rt_v41_expert_") else name
         fn = getattr(lib, selected)
         if selected != name:
             setattr(lib, name, fn)
         fn.argtypes = args
         fn.restype = I
-    if local:
+    if tp2:
+        lib.ds41rt_v41_expert_output_kind = lib.ds41rt_v41_tp2_expert_output_kind
+    elif local:
         lib.ds41rt_v41_expert_output_kind = lib.ds41rt_v41_local_expert_output_kind
     return lib
 
@@ -88,13 +92,14 @@ def check(code):
 
 
 class Native:
-    def __init__(self, lib, capacity, weights, wire, ids, routing, *, coordinator=False, full_backbone=False, storage=None):
-        assert not (coordinator and full_backbone)
+    def __init__(self, lib, capacity, weights, wire, ids, routing, *, coordinator=False, full_backbone=False, tp2=False, storage=None):
+        assert sum((coordinator, full_backbone, tp2)) <= 1
         self.lib = lib
         self.info = info = Info()
         self.handle = P()
         check(lib.ds41rt_v41_expert_info(capacity, C.byref(info)))
-        expected = ((0, 128, 5120, 2304, 2304, 3, capacity, 1)
+        expected = ((3, 384, 5120, 1152, 1152, 6, capacity, 7) if tp2 else
+                    (0, 128, 5120, 2304, 2304, 3, capacity, 1)
                     if coordinator else (2, 384, 5120, 2304, 2304, 6, capacity, 7)
                     if full_backbone else (1, 384, 5120, 576, 640, 6, capacity, 7))
         assert (

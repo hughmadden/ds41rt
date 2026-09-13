@@ -359,20 +359,25 @@ impl NativeLibrary {
     }
 
     pub fn v41_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
-        self.expert_info_for(capacity, false)
+        self.expert_info_for(capacity, 0)
     }
 
     pub fn v41_local_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
-        self.expert_info_for(capacity, true)
+        self.expert_info_for(capacity, 2)
     }
 
-    fn expert_info_for(&self, capacity: u32, local: bool) -> Result<V41ExpertInfo> {
-        let function = unsafe { self.lib.get::<InfoFn>(if local {
-            b"ds41rt_v41_local_expert_info" as &[u8]
-        } else { b"ds41rt_v41_expert_info" }) }
-            .context(if local {
-                "native library must be built with DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT=ON"
-            } else { "native library must be built with DS41RT_ENABLE_V41_EXPERT_AOT=ON" })?;
+    pub fn v41_tp2_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
+        self.expert_info_for(capacity, 3)
+    }
+
+    fn expert_info_for(&self, capacity: u32, interface: u8) -> Result<V41ExpertInfo> {
+        let name: &[u8] = match interface {
+            2 => b"ds41rt_v41_local_expert_info",
+            3 => b"ds41rt_v41_tp2_expert_info",
+            _ => b"ds41rt_v41_expert_info",
+        };
+        let function = unsafe { self.lib.get::<InfoFn>(name) }
+            .with_context(|| format!("native library lacks expert interface {interface}; enable its AOT build"))?;
         let mut info = V41ExpertInfo::default();
         let status = unsafe { function(i32::try_from(capacity)?, &mut info) };
         ensure!(
@@ -384,13 +389,14 @@ impl NativeLibrary {
             "unsupported V4.1 native expert ABI"
         );
         ensure!(
-            info.input_dtype == 1 || (matches!(info.role, 1 | 2) && info.input_dtype == 7),
+            info.input_dtype == 1 || (matches!(info.role, 1 | 2 | 3) && info.input_dtype == 7),
             "unsupported native expert input representation"
         );
         let expected = match info.role {
             0 => (128, 2304, 2304, 3),
             1 => (384, 576, 640, 6),
             2 => (384, 2304, 2304, 6),
+            3 => (384, 1152, 1152, 6),
             _ => anyhow::bail!("unknown V4.1 expert role {}", info.role),
         };
         ensure!(
@@ -406,36 +412,42 @@ impl NativeLibrary {
             info.capacity_rows == capacity && info.scratch_bytes > 0,
             "native expert capacity does not match requested variant"
         );
-        ensure!(!local || info.role == 2, "local expert entry has incompatible role");
+        ensure!(if interface == 0 { info.role <= 1 } else { info.role == u32::from(interface) },
+            "expert entry has incompatible role");
         Ok(info)
     }
 
     /// Load the chosen variant on the current CUDA device before graph capture.
     pub fn v41_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
-        self.expert_kernel_for(capacity, false)
+        self.expert_kernel_for(capacity, 0)
     }
 
     pub fn v41_local_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
-        self.expert_kernel_for(capacity, true)
+        self.expert_kernel_for(capacity, 2)
     }
 
-    fn expert_kernel_for(&self, capacity: u32, local: bool) -> Result<V41ExpertKernel<'_>> {
-        let info = self.expert_info_for(capacity, local)?;
-        let symbol = |ordinary: &'static [u8], full: &'static [u8]| if local { full } else { ordinary };
+    pub fn v41_tp2_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
+        self.expert_kernel_for(capacity, 3)
+    }
+
+    fn expert_kernel_for(&self, capacity: u32, interface: u8) -> Result<V41ExpertKernel<'_>> {
+        let info = self.expert_info_for(capacity, interface)?;
+        let symbol = |ordinary: &'static [u8], full: &'static [u8], tp2: &'static [u8]|
+            match interface { 2 => full, 3 => tp2, _ => ordinary };
         let initialize = unsafe {
             self.lib
-                .get::<InitializeFn>(symbol(b"ds41rt_v41_expert_initialize", b"ds41rt_v41_local_expert_initialize"))?
+                .get::<InitializeFn>(symbol(b"ds41rt_v41_expert_initialize", b"ds41rt_v41_local_expert_initialize", b"ds41rt_v41_tp2_expert_initialize"))?
         };
-        let launch = unsafe { *self.lib.get::<LaunchFn>(symbol(b"ds41rt_v41_expert_launch", b"ds41rt_v41_local_expert_launch"))? };
+        let launch = unsafe { *self.lib.get::<LaunchFn>(symbol(b"ds41rt_v41_expert_launch", b"ds41rt_v41_local_expert_launch", b"ds41rt_v41_tp2_expert_launch"))? };
         let bind_scratch = unsafe {
             *self
                 .lib
-                .get::<BindScratchFn>(symbol(b"ds41rt_v41_expert_bind_scratch", b"ds41rt_v41_local_expert_bind_scratch"))?
+                .get::<BindScratchFn>(symbol(b"ds41rt_v41_expert_bind_scratch", b"ds41rt_v41_local_expert_bind_scratch", b"ds41rt_v41_tp2_expert_bind_scratch"))?
         };
         let initialize_scratch = unsafe {
             *self
                 .lib
-                .get::<InitScratchFn>(symbol(b"ds41rt_v41_expert_initialize_scratch_async", b"ds41rt_v41_local_expert_initialize_scratch_async"))?
+                .get::<InitScratchFn>(symbol(b"ds41rt_v41_expert_initialize_scratch_async", b"ds41rt_v41_local_expert_initialize_scratch_async", b"ds41rt_v41_tp2_expert_initialize_scratch_async"))?
         };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { initialize(i32::try_from(capacity)?, &mut handle) };
@@ -445,10 +457,10 @@ impl NativeLibrary {
         );
         let token_accumulation = if info.abi_version == 3 {
             type OutputKindFn = unsafe extern "C" fn(i32, *mut u32) -> i32;
-            let query = unsafe { self.lib.get::<OutputKindFn>(symbol(b"ds41rt_v41_expert_output_kind", b"ds41rt_v41_local_expert_output_kind"))? };
+            let query = unsafe { self.lib.get::<OutputKindFn>(symbol(b"ds41rt_v41_expert_output_kind", b"ds41rt_v41_local_expert_output_kind", b"ds41rt_v41_tp2_expert_output_kind"))? };
             let mut kind = u32::MAX;
             let status = unsafe { query(i32::try_from(capacity)?, &mut kind) };
-            ensure!(status == 0 && kind == 1 && matches!(info.role, 1 | 2), "unsupported V4.1 ABI 3 output layout");
+            ensure!(status == 0 && kind == 1 && matches!(info.role, 1 | 2 | 3), "unsupported V4.1 ABI 3 output layout");
             // Reject incomplete libraries at plan time, before any graph or request.
             unsafe { self.lib.get::<CompactFn>(b"ds41rt_v41_compact_tokens_bf16_async")?; }
             true

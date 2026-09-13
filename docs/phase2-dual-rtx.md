@@ -201,3 +201,24 @@ execution workspace. CMake now offers `DS41RT_ENABLE_V41_TP2_EXPERT_AOT` alongsi
 the coordinator expert build with capacities 1/16/80/256/1024/4096. The full
 enabled CMake build, remaining capacities, Rust bindings, and numerical expert
 execution have not yet been qualified.
+
+## Initial TP2 numerical execution
+
+Rust FFI now selects and validates the TP2 role and geometry, and the daemon's
+expert placement enum connects TP2 staging to its packer, metadata, and kernels.
+The full daemon passes offline `cargo check`; dual-device owner integration into
+the main serving loop remains pending.
+
+`qualify_v41_tp2_numerics.py` executes both native halves at C1 and C16 using
+synthetic full-width expert weights sliced consistently for W1/W3/W2 and scales.
+Summed rank output is compared with the unsplit FP32 oracle using the official
+BF16/FP8 projection sequence. All four initial/changed cases pass: relative L2
+is about 0.17%, cosine exceeds 0.999997. Changed-input graph replay updates
+input values, expert IDs, and routing weights without allocating during replay.
+Each GPU uses an explicit device-local capture stream; relying on the Python
+graph helper's default stream caused a wrong-device rejection on the second GPU.
+
+This validates C1/C16 synthetic expert numerics, not real checkpoint quality,
+parallel lane progress, device-side final reduction, prefill capacities, shared
+experts, or throughput. The fixture sums rank outputs on the host for comparison;
+serving must use an asynchronous device reduction.

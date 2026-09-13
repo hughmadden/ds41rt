@@ -19,6 +19,7 @@ const EXPERT_READ_LANES: usize = 16;
 pub(crate) enum ExpertLayer {
     Backbone { layer: usize, rank: usize },
     BackboneFull { layer: usize },
+    BackboneTp2 { layer: usize, rank: usize },
     Dspark { stage: usize },
 }
 impl ExpertLayer {
@@ -30,6 +31,7 @@ impl ExpertLayer {
                 expert,
             },
             Self::BackboneFull { layer } => V41ExpertSelection::BackboneFull { layer, expert },
+            Self::BackboneTp2 { layer, rank } => V41ExpertSelection::BackboneTp2 { layer, expert, rank },
             Self::Dspark { stage } => V41ExpertSelection::Dspark { stage, expert },
         }
     }
@@ -38,16 +40,21 @@ impl ExpertLayer {
             Self::Dspark { .. } => 0,
             Self::Backbone { .. } => 1,
             Self::BackboneFull { .. } => 2,
+            Self::BackboneTp2 { .. } => 3,
         }
     }
     fn info(self, library: &NativeLibrary, capacity: u32) -> Result<ds41rt_ffi::V41ExpertInfo> {
         if matches!(self, Self::BackboneFull { .. }) {
             library.v41_local_expert_info(capacity)
+        } else if matches!(self, Self::BackboneTp2 { .. }) {
+            library.v41_tp2_expert_info(capacity)
         } else { library.v41_expert_info(capacity) }
     }
     fn kernel(self, library: &NativeLibrary, capacity: u32) -> Result<V41ExpertKernel<'_>> {
         if matches!(self, Self::BackboneFull { .. }) {
             library.v41_local_expert_kernel(capacity)
+        } else if matches!(self, Self::BackboneTp2 { .. }) {
+            library.v41_tp2_expert_kernel(capacity)
         } else { library.v41_expert_kernel(capacity) }
     }
 }
