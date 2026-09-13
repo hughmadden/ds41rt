@@ -6,7 +6,7 @@ loaded), four unchanged Sparks, five complete local expert layers, 18 ×
 serving measurements. The standard service was restored after the experiment.
 
 The candidate is published as `bae6e5cf` on our SparkInfer fork's `master`.
-**The ds41rt source pin remains unchanged pending startup and C16 follow-up.**
+**The ds41rt source pin now adopts the tested commit after the follow-up below.**
 The change selects four FP32 split-K planes and a 16×64 tile for native query-A
 and KV projections at capacities 1 and 16 on the 188-SM device. Larger
 capacities, other geometries and grouped projections retain existing plans.
@@ -47,8 +47,7 @@ prefill samples answered `7` with 32,768 new tokens and no cached tokens.
 
 The C1 dSpark gain repeats, but C16's first candidate arm was lower and the
 startup samples show a possible regression. Neither is dismissed as noise.
-Before adopting the pin, compare matched warm C16 work and inspect startup
-phases. Added plan scratch totals only 487,424 bytes per complete query-plan
+The follow-up below compares matched warm C16 work and startup phases. Added plan scratch totals only 487,424 bytes per complete query-plan
 owner, but that alone cannot establish unchanged loading speed.
 
 [Evidence](phase1-narrow-fp8-split.json) preserves component/native checks,
@@ -58,3 +57,30 @@ batch rates. Raw service logs and responses remain in
 `/tmp/ds41-dense-split-native`. Reproduce component probes with
 `python/tools/bench_v41_dense_plans.py --projection q_a` or `--projection kv`
 and explicit snapshot, native-library and output arguments.
+
+## Follow-up and adoption
+
+A second ABBA used identical one-code and one-32K warmups before each mixed
+batch, without lifecycle work between arms. Every serving completion check
+passed. C4 baseline/candidate arm averages were 118.01/129.55 tok/s; C16 was
+184.81/182.37 tok/s. Individual C16 rates were 180.56/189.06 baseline and
+187.51/177.23 candidate: no repeated directional loss was established, though
+these small samples cannot rule out a small regression. Mixed outputs are not
+identical token sequences.
+
+Startup-only ABBA, with no inference between starts, measured readiness at
+6.32/6.31 seconds baseline and 6.32/7.34 candidate. One-second readiness polling
+limits resolution. Local expert setup averaged 2.204/2.198 seconds;
+backbone/index/embedding loading averaged 2.045/2.307 seconds. The earlier
+multi-second difference did not repeat under this control. This supports
+retaining fast loading, not a claim of identical startup latency or controlled
+filesystem-cache residency. Both follow-ups restored standard serving.
+
+Adopt the exact native-tested source revision and matching tree hash. The
+standard restored container still uses its existing artifact; the source pin
+controls subsequent builds. No release image was published. The independent
+per-request confidence and lane scheduling experiment is next.
+
+The component tile sweep predates the hard AOT policy adopted here: reproduce
+that historical sweep from ds41rt commit `79932c4`, whose source pin is the
+baseline. The current native capacity check exercises the adopted export.
