@@ -37,8 +37,11 @@ Compute the shared page-group count from the tighter device budget after
 weights, workspaces, snapshots, staging, and runtime headroom. Do not treat
 free memory on the other device as additional capacity for the limiting source.
 
-The user's referenced detailed layer map was not included in the received
-request. The 3/1 source placement above is a candidate pending that clarification.
+The user's explicit placement map assigns vision, embeddings, encoder attention
+and SWA (0–19), and sources 2/8/14 to RTX0. RTX1 owns decoder attention and SWA
+(20–39), source 20, and dSpark. Both cards hold half the vocabulary rows, TP2
+encoder routed experts, and TP2 shared experts for all layers. CPU Engram stays
+unchanged; Sparks retain decoder routed experts only in two-GPU mode.
 Consumer placement must follow the actual CED/index dependency map, including
 bounded decoder replay, rather than treating encoder residency as proof that
 every prefill operation is local.
@@ -82,7 +85,27 @@ CUDA ownership correctness. Those require a real transfer fixture.
 Current cache binding selects the latest source at or before the attention
 layer: source 2 serves layers 2–7, source 8 serves 8–13, source 14 serves 14–19,
 and source 20 serves 20–39. Layers 0–1 use only their sliding windows. Therefore
-the candidate 3/1 split naturally groups encoder attention on one device and
+the requested 3/1 split naturally groups encoder attention on one device and
 decoder attention on the other; TP2 FFNs still require transfers within each
 layer. Existing local expert execution only accepts full-width weights, so TP2
 requires new packing/kernel ownership rather than relabeling existing buffers.
+
+## Device-transfer checkpoint
+
+Native and Rust FFI now expose explicit current-device selection, idempotent
+direct peer enablement, and asynchronous peer copies on a destination stream.
+The existing single-device copy path is unchanged. Source readiness can use the
+existing cross-device stream/event dependency; no device-wide wait is introduced.
+These low-level APIs still require caller-owned buffer lifetimes and are not yet
+wired into model execution.
+
+`ds41rt_cuda_peer_selftest` passes on the RTX pair: three changed byte patterns
+are copied and checked in each direction, with an unrelated stream deliberately
+held pending until the copy completes. It also checks invalid extents, null
+streams, wrong current devices, buffer device IDs, and repeated peer enablement.
+The full daemon passes offline `cargo check`. This proves the transfer primitive,
+not graph replay, cancellation ownership, bandwidth, or full serving performance.
+
+The first fixture launch could not create a CUDA context beside the v2 server
+(only 305 MiB free on RTX0). The v2 coordinator container was stopped to free
+the pair for phase-2 development; its image and container remain available.

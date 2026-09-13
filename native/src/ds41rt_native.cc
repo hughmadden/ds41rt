@@ -656,6 +656,78 @@ extern "C" ds41rt_status_t ds41rt_cuda_memory_info(size_t* free_bytes, size_t* t
 #endif
 }
 
+extern "C" ds41rt_status_t ds41rt_cuda_get_device(int* device_id) {
+  if (device_id == nullptr) {
+    return fail(DS41RT_STATUS_INVALID_ARGUMENT, "device output is null");
+  }
+  *device_id = -1;
+#if DS41RT_NATIVE_ENABLE_CUDA
+  const auto err = cudaGetDevice(device_id);
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "cudaGetDevice failed", err);
+  return ok();
+#else
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "device selection requires CUDA");
+#endif
+}
+
+extern "C" ds41rt_status_t ds41rt_cuda_set_device(int device_id) {
+  if (device_id < 0) return fail(DS41RT_STATUS_INVALID_ARGUMENT, "negative CUDA device");
+#if DS41RT_NATIVE_ENABLE_CUDA
+  const auto err = cudaSetDevice(device_id);
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "cudaSetDevice failed", err);
+  return ok();
+#else
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "device selection requires CUDA");
+#endif
+}
+
+extern "C" ds41rt_status_t ds41rt_cuda_enable_peer(int peer_device_id) {
+  if (peer_device_id < 0) return fail(DS41RT_STATUS_INVALID_ARGUMENT, "negative peer device");
+#if DS41RT_NATIVE_ENABLE_CUDA
+  int device = -1;
+  auto err = cudaGetDevice(&device);
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "cudaGetDevice failed", err);
+  if (device == peer_device_id) return fail(DS41RT_STATUS_INVALID_ARGUMENT, "peer equals current device");
+  int capable = 0;
+  err = cudaDeviceCanAccessPeer(&capable, device, peer_device_id);
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "peer capability query failed", err);
+  if (!capable) return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "direct CUDA peer access unavailable");
+  err = cudaDeviceEnablePeerAccess(peer_device_id, 0);
+  if (err == cudaErrorPeerAccessAlreadyEnabled) {
+    cudaGetLastError();
+    return ok();
+  }
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "peer enable failed", err);
+  return ok();
+#else
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "peer access requires CUDA");
+#endif
+}
+
+extern "C" ds41rt_status_t ds41rt_copy_peer_async(
+    ds41rt_device_buffer_t dst, ds41rt_device_buffer_t src, size_t bytes,
+    void* cuda_stream) {
+  if (cuda_stream == nullptr || dst.ptr == nullptr || src.ptr == nullptr ||
+      dst.device_id < 0 || src.device_id < 0 || dst.device_id == src.device_id ||
+      dst.flags != DS41RT_DEVICE_BUFFER_FLAG_NONE || src.flags != DS41RT_DEVICE_BUFFER_FLAG_NONE ||
+      bytes > dst.bytes || bytes > src.bytes) {
+    return fail(DS41RT_STATUS_INVALID_ARGUMENT, "invalid peer buffers, extent, or stream");
+  }
+#if DS41RT_NATIVE_ENABLE_CUDA
+  int device = -1;
+  auto err = cudaGetDevice(&device);
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "cudaGetDevice failed", err);
+  if (device != dst.device_id) return fail(DS41RT_STATUS_INVALID_ARGUMENT, "peer destination is not current device");
+  if (bytes == 0) return ok();
+  err = cudaMemcpyPeerAsync(dst.ptr, dst.device_id, src.ptr, src.device_id, bytes,
+                            reinterpret_cast<cudaStream_t>(cuda_stream));
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_COPY_FAILED, "cudaMemcpyPeerAsync failed", err);
+  return ok();
+#else
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "peer copy requires CUDA");
+#endif
+}
+
 extern "C" ds41rt_status_t ds41rt_alloc_device_buffer(size_t bytes, ds41rt_device_buffer_t* out) {
   if (out == nullptr) {
     return fail(DS41RT_STATUS_INVALID_ARGUMENT, "device buffer output pointer is null");

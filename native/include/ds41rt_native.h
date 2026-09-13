@@ -473,6 +473,16 @@ ds41rt_status_t ds41rt_native_version(char* out, size_t out_len);
 ds41rt_status_t ds41rt_cuda_device_info(int device_id, ds41rt_cuda_device_info_t* out);
 // Current CUDA device's available and total memory, including other processes.
 ds41rt_status_t ds41rt_cuda_memory_info(size_t* free_bytes, size_t* total_bytes);
+// Device selection is host-thread-local. Restore it before yielding a task.
+ds41rt_status_t ds41rt_cuda_get_device(int* device_id);
+ds41rt_status_t ds41rt_cuda_set_device(int device_id);
+// Enable current-device access to peer. Idempotent; does not silently stage via host.
+ds41rt_status_t ds41rt_cuda_enable_peer(int peer_device_id);
+// Caller supplies a nonblocking stream on dst.device_id and orders source readiness
+// with an event. Buffers must remain live until this stream completes.
+ds41rt_status_t ds41rt_copy_peer_async(ds41rt_device_buffer_t dst,
+                                     ds41rt_device_buffer_t src, size_t bytes,
+                                     void* cuda_stream);
 ds41rt_status_t ds41rt_alloc_host_buffer(size_t bytes, ds41rt_host_buffer_t* out);
 ds41rt_status_t ds41rt_cuda_host_buffer_device_alias(ds41rt_host_buffer_t host,
                                                     ds41rt_device_buffer_t* out);

@@ -3823,6 +3823,46 @@ impl NativeLibrary {
         Ok((free, total))
     }
 
+    pub fn cuda_get_device(&self) -> Result<i32> {
+        let call: Symbol<unsafe extern "C" fn(*mut i32) -> Ds41rtStatus> =
+            unsafe { self.lib.get(b"ds41rt_cuda_get_device")? };
+        let mut device = -1;
+        self.status_to_result("ds41rt_cuda_get_device", unsafe { call(&mut device) })?;
+        Ok(device)
+    }
+
+    /// Host-thread-local selection. Restore the previous device before yielding.
+    pub fn cuda_set_device(&self, device: i32) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(i32) -> Ds41rtStatus> =
+            unsafe { self.lib.get(b"ds41rt_cuda_set_device")? };
+        self.status_to_result("ds41rt_cuda_set_device", unsafe { call(device) })
+    }
+
+    pub fn cuda_enable_peer(&self, peer: i32) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(i32) -> Ds41rtStatus> =
+            unsafe { self.lib.get(b"ds41rt_cuda_enable_peer")? };
+        self.status_to_result("ds41rt_cuda_enable_peer", unsafe { call(peer) })
+    }
+
+    /// Enqueue a cross-device transfer without joining other streams.
+    ///
+    /// # Safety
+    /// `stream` must be live on the current, destination device. Source writes
+    /// must precede the copy (use a stream event dependency). Both allocations
+    /// must remain live, with no conflicting access, until the copy completes.
+    pub unsafe fn copy_peer_async(
+        &self,
+        dst: Ds41rtDeviceBuffer,
+        src: Ds41rtDeviceBuffer,
+        bytes: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(
+            Ds41rtDeviceBuffer, Ds41rtDeviceBuffer, usize, *mut c_void,
+        ) -> Ds41rtStatus> = unsafe { self.lib.get(b"ds41rt_copy_peer_async")? };
+        self.status_to_result("ds41rt_copy_peer_async", unsafe { call(dst, src, bytes, stream) })
+    }
+
     pub fn alloc_device_buffer(&self, bytes: usize) -> Result<Ds41rtDeviceBuffer> {
         let alloc_fn: Symbol<AllocDeviceBufferFn> =
             unsafe { self.lib.get(b"ds41rt_alloc_device_buffer")? };
