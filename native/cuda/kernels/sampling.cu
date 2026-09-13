@@ -544,10 +544,12 @@ __global__ void dspark_confidence_bf16_kernel(
   }
 }
 
+template <bool CheckFinite>
 __global__ void logits_argmax_f32_kernel(const float* logits, uint32_t* out_indices,
                                          float* out_scores, size_t rows, size_t vocab) {
   __shared__ float shared_scores[kBlock];
   __shared__ uint32_t shared_indices[kBlock];
+  __shared__ int shared_invalid[kBlock];
 
   const size_t row = blockIdx.x;
   const size_t tid = threadIdx.x;
@@ -558,8 +560,10 @@ __global__ void logits_argmax_f32_kernel(const float* logits, uint32_t* out_indi
   const float* row_logits = logits + row * vocab;
   float best_score = -CUDART_INF_F;
   uint32_t best_index = 0;
+  int invalid = 0;
   for (size_t col = tid; col < vocab; col += blockDim.x) {
     const float score = row_logits[col];
+    if constexpr (CheckFinite) invalid |= !isfinite(score);
     const uint32_t token_id = static_cast<uint32_t>(col);
     if (score > best_score || (score == best_score && token_id < best_index)) {
       best_score = score;
@@ -569,9 +573,11 @@ __global__ void logits_argmax_f32_kernel(const float* logits, uint32_t* out_indi
 
   shared_scores[tid] = best_score;
   shared_indices[tid] = best_index;
+  if constexpr (CheckFinite) shared_invalid[tid] = invalid;
   __syncthreads();
   for (size_t stride = blockDim.x / 2; stride > 0; stride >>= 1) {
     if (tid < stride) {
+      if constexpr (CheckFinite) shared_invalid[tid] |= shared_invalid[tid + stride];
       const float other_score = shared_scores[tid + stride];
       const uint32_t other_index = shared_indices[tid + stride];
       if (other_score > shared_scores[tid] ||
@@ -584,7 +590,8 @@ __global__ void logits_argmax_f32_kernel(const float* logits, uint32_t* out_indi
   }
   if (tid == 0) {
     out_indices[row] = shared_indices[0];
-    out_scores[row] = shared_scores[0];
+    if constexpr (CheckFinite) out_scores[row] = shared_invalid[0] ? CUDART_NAN_F : shared_scores[0];
+    else out_scores[row] = shared_scores[0];
   }
 }
 
@@ -1467,7 +1474,21 @@ extern "C" ds41rt_status_t ds41rt_cuda_logits_argmax_f32_async(
     return valid;
   }
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
-  logits_argmax_f32_kernel<<<static_cast<int>(rows), kBlock, 0, stream>>>(
+  logits_argmax_f32_kernel<false><<<static_cast<int>(rows), kBlock, 0, stream>>>(
+      logits, out_indices, out_scores, rows, vocab);
+  return status_from_cuda(cudaGetLastError());
+}
+
+extern "C" ds41rt_status_t ds41rt_cuda_logits_argmax_checked_f32_async(
+    const float* logits, uint32_t* out_indices, float* out_scores, size_t rows, size_t vocab,
+    void* cuda_stream) {
+  const ds41rt_status_t valid =
+      validate_logits_argmax_args(logits, out_indices, out_scores, rows, vocab);
+  if (valid != DS41RT_STATUS_OK) {
+    return valid;
+  }
+  cudaStream_t stream = reinterpret_cast<cudaStream_t>(cuda_stream);
+  logits_argmax_f32_kernel<true><<<static_cast<int>(rows), kBlock, 0, stream>>>(
       logits, out_indices, out_scores, rows, vocab);
   return status_from_cuda(cudaGetLastError());
 }

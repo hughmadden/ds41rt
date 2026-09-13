@@ -64,8 +64,10 @@ A1: larger queued dependency regions around remote FFN boundaries with explicit
 buffer lifetime and publication states. Success is lower complete verification
 latency, stable graph capture and correct cancellation, not fewer sync calls alone.
 
-The joint decode path is now removed. Continue through the remaining blocking
-completion boundaries: per-lane LM head and logits download, shared draft replay
+The joint decode path is now removed. Unconstrained decode now uses
+[GPU top-1 and compact transfers](phase1-compact-head-selection.md), with
+cooperative per-lane head completion. Continue through remaining blocking
+completion boundaries: constrained logits download, shared draft replay
 and confidence/token downloads, then target/draft-cache commit. Queue work and
 poll completion while retaining exclusive buffer ownership; cancellation must
 drain before releasing storage. Keep admission at complete pass boundaries and

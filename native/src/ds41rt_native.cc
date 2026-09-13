@@ -4864,6 +4864,12 @@ extern "C" ds41rt_status_t ds41rt_cuda_logits_argmax_f32_async(const float*, uin
               "CUDA logits argmax kernel is unavailable in this build");
 }
 
+extern "C" ds41rt_status_t ds41rt_cuda_logits_argmax_checked_f32_async(
+    const float*, uint32_t*, float*, size_t, size_t, void*) {
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE,
+              "CUDA checked logits argmax kernel is unavailable in this build");
+}
+
 extern "C" ds41rt_status_t ds41rt_cuda_logits_sample_topk_topp_f32(
     const float*, const float*, uint32_t*, float*, size_t, size_t, float, size_t, float) {
   return fail(DS41RT_STATUS_CUDA_UNAVAILABLE,

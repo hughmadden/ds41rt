@@ -14219,6 +14219,40 @@ impl NativeLibrary {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub unsafe fn cuda_logits_argmax_checked_f32_async(
+        &self,
+        logits: Ds41rtDeviceBuffer,
+        out_indices: Ds41rtDeviceBuffer,
+        out_scores: Ds41rtDeviceBuffer,
+        rows: usize,
+        vocab: usize,
+        cuda_stream: *mut c_void,
+    ) -> Result<()> {
+        validate_logits_argmax_buffers(
+            "ds41rt_cuda_logits_argmax_checked_f32_async",
+            logits,
+            out_indices,
+            out_scores,
+            rows,
+            vocab,
+        )?;
+
+        let kernel_fn: Symbol<CudaLogitsArgmaxF32AsyncFn> =
+            unsafe { self.lib.get(b"ds41rt_cuda_logits_argmax_checked_f32_async")? };
+        let status = unsafe {
+            kernel_fn(
+                logits.ptr.cast::<f32>() as *const f32,
+                out_indices.ptr.cast::<u32>(),
+                out_scores.ptr.cast::<f32>(),
+                rows,
+                vocab,
+                cuda_stream,
+            )
+        };
+        self.status_to_result("ds41rt_cuda_logits_argmax_checked_f32_async", status)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn cuda_logits_sample_topk_topp_f32(
         &self,
         logits: Ds41rtDeviceBuffer,

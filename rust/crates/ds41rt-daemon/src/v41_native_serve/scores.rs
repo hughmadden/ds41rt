@@ -35,17 +35,42 @@ impl BatchScores {
         let best = bytes.chunks_exact(ROW_BYTES).map(|row| argmax(row, None)).collect::<Result<_>>()?;
         Ok(Self { bytes, best })
     }
+    pub fn from_greedy(values: Vec<(u32, f32)>) -> Result<Self> {
+        ensure!(!values.is_empty() && values.len() <= 80, "invalid compact target rows");
+        ensure!(values.iter().all(|&(id, score)| (id as usize) < VOCAB && score.is_finite()),
+            "invalid token or non-finite target logit");
+        Ok(Self { best: values.into_iter().map(|v| v.0).collect(), bytes: Vec::new() })
+    }
+    /// The completed head buffer stays unchanged until commit returns. Fetch only
+    /// a finishing request's frontier; a later grammar still sees all vocabulary scores.
+    pub fn retain_from_device(&self, lib: &ds41rt_ffi::NativeLibrary,
+        mut logits: ds41rt_ffi::Ds41rtDeviceBuffer, row: usize) -> Result<TokenScores> {
+        if !self.bytes.is_empty() { return self.retain(row); }
+        ensure!(row < self.best.len() && logits.bytes == self.best.len() * ROW_BYTES,
+            "compact retained logit extent differs");
+        logits.ptr = unsafe { logits.ptr.cast::<u8>().add(row * ROW_BYTES).cast() };
+        logits.bytes = ROW_BYTES;
+        let mut bytes = vec![0; ROW_BYTES];
+        lib.copy_d2h(&mut bytes, logits)?;
+        let retained = TokenScores::new(bytes)?;
+        ensure!(retained.best == self.best[row], "GPU and retained CPU greedy selection differ");
+        Ok(retained)
+    }
     pub fn select(&self, row: usize, mask: Option<&[u32]>) -> Result<u32> {
         ensure!(row < self.best.len(), "selected logit row is outside batch");
         match mask {
             None => Ok(self.best[row]),
-            Some(mask) => argmax(&self.bytes[row * ROW_BYTES..(row + 1) * ROW_BYTES], Some(mask)),
+            Some(mask) => {
+                ensure!(self.bytes.len() == self.best.len() * ROW_BYTES, "grammar requires full logits");
+                argmax(&self.bytes[row * ROW_BYTES..(row + 1) * ROW_BYTES], Some(mask))
+            },
         }
     }
     // Diagnostic only: scores are already on the host. Callers gate the scan
     // behind the logit trace target so normal serving incurs no extra work.
     pub fn top_two(&self, row: usize) -> Result<[(u32, f32); 2]> {
         ensure!(row < self.best.len(), "diagnostic logit row is outside batch");
+        ensure!(self.bytes.len() == self.best.len() * ROW_BYTES, "diagnostics require full logits");
         let mut top = [(0, f32::NEG_INFINITY); 2];
         for (token, bytes) in self.bytes[row * ROW_BYTES..(row + 1) * ROW_BYTES]
             .chunks_exact(4).enumerate() {
@@ -62,6 +87,7 @@ impl BatchScores {
     // Copy only a finishing request's committed frontier, never every decode row.
     pub fn retain(&self, row: usize) -> Result<TokenScores> {
         ensure!(row < self.best.len(), "retained logit row is outside batch");
+        ensure!(self.bytes.len() == self.best.len() * ROW_BYTES, "retention requires full logits");
         Ok(TokenScores {
             bytes: Arc::from(&self.bytes[row * ROW_BYTES..(row + 1) * ROW_BYTES]),
             best: self.best[row],
@@ -95,6 +121,19 @@ mod tests {
         scores[winner] = 4.;
         scores[17] = 3.;
         scores.into_iter().flat_map(f32::to_ne_bytes).collect()
+    }
+    #[test]
+    fn compact_scores_reject_invalid_rows_and_require_logits_for_masks() {
+        let scores = BatchScores::from_greedy(vec![(17, -2.), (91, 3.)]).unwrap();
+        assert_eq!(scores.select(0, None).unwrap(), 17);
+        assert!(scores.select(2, None).is_err());
+        assert!(scores.select(0, Some(&vec![u32::MAX; VOCAB.div_ceil(32)])).is_err());
+        assert!(scores.retain(0).is_err());
+        assert!(scores.top_two(0).is_err());
+        assert!(BatchScores::from_greedy(vec![(0, f32::NAN)]).is_err());
+        assert!(BatchScores::from_greedy(vec![(0, f32::INFINITY)]).is_err());
+        assert!(BatchScores::from_greedy(vec![(VOCAB as u32, 1.)]).is_err());
+        assert!(BatchScores::from_greedy(vec![]).is_err());
     }
     #[test]
     fn new_constraint_reselects_an_exact_cached_frontier() {

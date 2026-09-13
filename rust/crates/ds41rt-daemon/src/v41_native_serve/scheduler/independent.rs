@@ -94,12 +94,20 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             let operation: Result<()> = async {
                 let current = batch.as_mut().unwrap();
                 let selected: Vec<_> = (0..current.cache()?.positions().len()).collect();
-                let logits = unsafe { pass.execute_shared(requests, current, transport, 0, &selected).await? };
-                let mut bytes = vec![0; logits.logits.bytes];
-                lib.copy_d2h(&mut bytes, logits.logits)?;
-                let next = BatchScores::new(bytes)?;
+                let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
+                    && members.iter().all(|&slot| active.borrow()[slot].as_ref().unwrap().constraint.is_none());
+                let next = if compact {
+                    BatchScores::from_greedy(unsafe {
+                        pass.execute_shared_greedy(requests, current, transport, 0, &selected).await?
+                    })?
+                } else {
+                    let logits = unsafe { pass.execute_shared(requests, current, transport, 0, &selected).await? };
+                    let mut bytes = vec![0; logits.logits.bytes];
+                    lib.copy_d2h(&mut bytes, logits.logits)?;
+                    BatchScores::new(bytes)?
+                };
                 let verify_us = started.elapsed().as_micros() as u64 - prepared_us;
-                let (accepted, emitted, emissions) = commit_lane(lane, pass, &mut requests.borrow_mut(),
+                let (accepted, emitted, emissions) = commit_lane(lib, lane, pass, &mut requests.borrow_mut(),
                     &mut active.borrow_mut(), &members, &inputs, &mut batch, &next,
                     draft.borrow_mut().as_deref_mut(), capture_routes, verify_us)?;
                 tracing::debug!(target: "ds41rt::lane_schedule", lane, round_id,

@@ -244,12 +244,15 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
 
 async fn execute_logits<'a>(lib: &'a NativeLibrary, pass: &mut TargetPass<'_, 'a>,
     requests: &Requests<'a>, batch: &mut Option<RequestBatch>, transport: &mut NativeTp4Wave<'a>,
-    capture_routes: bool,
+    capture_routes: bool, compact: bool,
 ) -> Result<BatchScores> {
     let Some(batch) = batch else { return BatchScores::new(Vec::new()); };
     pass.set_route_capture(capture_routes);
     let result = async {
         let selected: Vec<_> = (0..batch.cache()?.positions().len()).collect();
+        if compact {
+            return BatchScores::from_greedy(unsafe { pass.execute_greedy(requests, batch, transport, 0, &selected).await? });
+        }
         let logits = unsafe { pass.execute(requests, batch, transport, 0, &selected).await? };
         let mut bytes = vec![0; logits.logits.bytes];
         lib.copy_d2h(&mut bytes, logits.logits)?;
@@ -308,11 +311,13 @@ fn single_lane_round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::R
     let mut batch = Some(prepare_decode_lane(requests, active, members, &inputs, speculative)?);
     let prepare_us = prepare_start.elapsed().as_micros() as u64;
     let prepared_us = started.elapsed().as_micros() as u64;
-    let next = runtime.block_on(execute_logits(lib, pass, requests, &mut batch, transport, capture_routes));
+    let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
+        && members.iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none());
+    let next = runtime.block_on(execute_logits(lib, pass, requests, &mut batch, transport, capture_routes, compact));
     let executed_us = started.elapsed().as_micros() as u64;
     let result = (|| -> Result<()> {
         let next = next?;
-        let (accepted, emitted, emissions) = commit_lane(lane, pass, requests, active, members,
+        let (accepted, emitted, emissions) = commit_lane(lib, lane, pass, requests, active, members,
             &inputs, &mut batch, &next, draft.as_deref_mut(), capture_routes, executed_us-prepared_us)?;
         for (&slot, tokens) in members.iter().zip(emissions) {
             let request = active[slot].as_mut().unwrap();
@@ -336,7 +341,7 @@ fn single_lane_round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::R
     result
 }
 
-fn commit_lane<'w, 'a>(lane: usize, pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
+fn commit_lane<'w, 'a>(lib: &'a NativeLibrary, lane: usize, pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
     active: &mut [Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
     owned_batch: &mut Option<RequestBatch>, next: &BatchScores,
     mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, verify_us: u64,
@@ -389,7 +394,7 @@ fn commit_lane<'w, 'a>(lane: usize, pass: &mut TargetPass<'w, 'a>, requests: &mu
         let finishing = decision.emitted.contains(&1)
             || request.generated + decision.emitted.len() >= request.job.max_tokens;
         next_after_commit.push(if finishing {
-            Some(next.retain(offset + decision.accepted_inputs as usize - 1)?)
+            Some(next.retain_from_device(lib, pass.output(batch)?.logits, offset + decision.accepted_inputs as usize - 1)?)
         } else { None });
         offset += input.len(); accepted.push(decision.accepted_inputs); emissions.push(decision.emitted);
     }

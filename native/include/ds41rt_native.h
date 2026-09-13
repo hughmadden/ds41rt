@@ -1640,6 +1640,9 @@ ds41rt_status_t ds41rt_cuda_logits_argmax_f32(const float* logits, uint32_t* out
 ds41rt_status_t ds41rt_cuda_logits_argmax_f32_async(const float* logits, uint32_t* out_indices,
                                                   float* out_scores, size_t rows, size_t vocab,
                                                   void* cuda_stream);
+// Lowest token ID wins ties. Any non-finite input marks its row score as NaN.
+ds41rt_status_t ds41rt_cuda_logits_argmax_checked_f32_async(const float* logits,
+    uint32_t* out_indices, float* out_scores, size_t rows, size_t vocab, void* cuda_stream);
 // Integrated DeepSeek dSpark greedy terminal. Hidden inputs are slot-major
 // [max_slots, 5, hidden]. Compact scratch/output tensors are position-major so
 // every dependency step jointly issues all active requests. Only the five

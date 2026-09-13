@@ -1,13 +1,13 @@
 //! Final target mHC collapse, RMS norm and the vocabulary shared with dSpark.
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_block::BlockOutput;
-use crate::v41_memory::{DeviceAllocation, LoadStream};
+use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};
 use crate::v41_tensors::{NativeRtxTensors, VocabularyHead};
 use anyhow::{Context, Result, ensure};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary, V41Hc, V41VocabularyProjection};
 use ds41rt_loader::OfficialV41Catalog;
 use std::{ffi::c_void, marker::PhantomData};
-const STRIDES: [usize; 5] = [40960, 16, 10240, 10240, 517120];
+const STRIDES: [usize; 7] = [40960, 16, 10240, 10240, 517120, 4, 4];
 pub(crate) struct TargetHeadWeights<'a> {
     library: &'a NativeLibrary,
     norm: NativeRtxTensors<'a>,
@@ -78,6 +78,8 @@ impl<'a> TargetHeadWeights<'a> {
             origin: None,
             selected: Vec::new(),
             tokens: Vec::new(),
+            greedy_staging: HostAllocation::new(self.library, capacity * 8)?,
+            greedy_ready: false,
         })
     }
 }
@@ -110,6 +112,8 @@ pub(crate) struct TargetHeadWave<'w, 'a> {
     origin: Option<QueryBinding>,
     selected: Vec<usize>,
     tokens: Vec<u64>,
+    greedy_staging: HostAllocation<'a>,
+    greedy_ready: bool,
 }
 impl TargetHeadWave<'_, '_> {
     /// Up to 16 decode/prefill-last rows or 80 verification rows per head wave.
@@ -130,6 +134,7 @@ impl TargetHeadWave<'_, '_> {
         unsafe { self.stream.library.cuda_stream_synchronize(self.stream.raw) }
     }
     fn invalidate(&mut self) {
+        self.greedy_ready = false;
         self.ready = None;
         self.origin = None;
         self.selected.clear();
@@ -326,6 +331,44 @@ impl TargetHeadWave<'_, '_> {
         launched.and(drained)?;
         self.publish_block(block, selected);
         self.output()
+    }
+    /// Keep logits on the device, downloading only checked greedy IDs/scores.
+    pub async unsafe fn execute_block_greedy(&mut self, block: &BlockOutput<'_>,
+        selected: &[usize], cooperative: bool) -> Result<()> {
+        unsafe { self.copy_block(block, selected)?; }
+        let rows = selected.len();
+        if self.graph.as_ref().is_none_or(|(_, n)| *n != rows) {
+            if cooperative { self.stream.wait().await?; } else { self.synchronize()?; }
+            unsafe { self.capture_block_head(rows)?; }
+        }
+        self.invalidate();
+        let graph = self.graph.context("target head graph missing")?.0;
+        let logits = Self::slice(self.b(4), 0, rows * STRIDES[4])?;
+        let indices = Self::slice(self.b(5), 0, rows * 4)?;
+        let scores = Self::slice(self.b(6), 0, rows * 4)?;
+        let launched = (|| -> Result<()> { unsafe {
+            let lib = self.stream.library;
+            lib.cuda_graph_launch(graph, self.stream.raw)?;
+            lib.cuda_logits_argmax_checked_f32_async(logits, indices, scores, rows, 129280, self.stream.raw)?;
+            let host = self.greedy_staging.bytes_mut();
+            lib.copy_d2h_async(&mut host[..rows*4], indices, self.stream.raw)?;
+            lib.copy_d2h_async(&mut host[rows*4..rows*8], scores, self.stream.raw)?;
+            Ok(())
+        } })();
+        let drained = if cooperative { self.stream.wait().await } else { self.synchronize() };
+        launched.and(drained)?;
+        self.publish_block(block, selected);
+        self.greedy_ready = true;
+        Ok(())
+    }
+    pub fn greedy_output(&mut self) -> Result<Vec<(u32, f32)>> {
+        ensure!(self.greedy_ready, "compact head output unpublished");
+        let rows = self.ready.context("compact head rows unpublished")?;
+        let host = self.greedy_staging.bytes_mut();
+        Ok((0..rows).map(|i| (
+            u32::from_ne_bytes(host[i*4..i*4+4].try_into().unwrap()),
+            f32::from_ne_bytes(host[rows*4+i*4..rows*4+i*4+4].try_into().unwrap()),
+        )).collect())
     }
     pub fn output(&self) -> Result<TargetLogits<'_>> {
         let rows = self.ready.context("target logits unpublished")?;

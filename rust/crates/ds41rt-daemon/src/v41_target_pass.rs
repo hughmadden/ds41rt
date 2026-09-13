@@ -135,7 +135,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         selected: &[usize],
     ) -> Result<TargetLogits<'_>> {
         ensure!(batch.cache()?.stage() == CacheStage::Full, "ordinary target execute requires full phase");
-        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None).await?; }
+        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None, false).await?; }
         self.head.output()
     }
     /// Execute one full verification while allowing unrelated request commits
@@ -146,13 +146,26 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize],
     ) -> Result<TargetLogits<'_>> {
         ensure!(batch.cache()?.stage() == CacheStage::Full, "shared target execute requires full phase");
-        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None).await?; }
+        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None, false).await?; }
         self.head.output()
+    }
+    pub async unsafe fn execute_greedy(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize]) -> Result<Vec<(u32, f32)>> {
+        ensure!(batch.cache()?.stage() == CacheStage::Full, "greedy target execute requires full phase");
+        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None, true).await?; }
+        self.head.greedy_output()
+    }
+    pub async unsafe fn execute_shared_greedy(&mut self,
+        requests: &std::cell::RefCell<&mut Requests<'a>>, batch: &mut RequestBatch,
+        transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize]) -> Result<Vec<(u32, f32)>> {
+        ensure!(batch.cache()?.stage() == CacheStage::Full, "shared greedy target execute requires full phase");
+        unsafe { self.execute_phase(requests, batch, transport, placement, selected, None, None, true).await?; }
+        self.head.greedy_output()
     }
     pub async unsafe fn execute_encoder(&mut self, requests: &Requests<'a>, batch: &mut RequestBatch,
         transport: &mut NativeTp4Wave<'a>, placement: u64, suffix: &mut EncoderSuffix<'a>) -> Result<()> {
         ensure!(batch.cache()?.stage() == CacheStage::Encoder, "encoder execute phase differs");
-        unsafe { self.execute_phase(requests, batch, transport, placement, &[], Some(suffix), None).await }
+        unsafe { self.execute_phase(requests, batch, transport, placement, &[], Some(suffix), None, false).await }
     }
     pub async unsafe fn execute_encoder_replay(
         &mut self,
@@ -175,6 +188,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 &[],
                 Some(suffix),
                 None,
+                false,
             )
             .await
         }
@@ -201,6 +215,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 selected,
                 None,
                 Some(encoder),
+                false,
             )
             .await?;
         }
@@ -208,7 +223,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
     }
     async unsafe fn execute_phase(&mut self, requests: &impl RequestAccess<'a>, batch: &mut RequestBatch,
         transport: &mut NativeTp4Wave<'a>, placement: u64, selected: &[usize],
-        mut suffix: Option<&mut EncoderSuffix<'a>>, encoder: Option<&BlockOutput<'_>>) -> Result<()> {
+        mut suffix: Option<&mut EncoderSuffix<'a>>, encoder: Option<&BlockOutput<'_>>, greedy: bool) -> Result<()> {
         requests.with_requests(|requests| requests.validate(batch))?;
         let id = batch.cache()?.identity();
         let rows = batch.cache()?.positions().len();
@@ -320,7 +335,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         } else {
             self.taps.output(guard.batch.cache()?)?;
             let output = self.lane.output()?;
-            if requests.cooperative_completion() {
+            if greedy {
+                unsafe { self.head.execute_block_greedy(&output, selected, requests.cooperative_completion()).await?; }
+            } else if requests.cooperative_completion() {
                 unsafe { self.head.execute_block_cooperative(&output, selected).await?; }
             } else {
                 unsafe { self.head.execute_block(&output, selected)?; }
