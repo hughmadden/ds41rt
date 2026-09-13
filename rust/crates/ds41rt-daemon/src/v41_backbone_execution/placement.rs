@@ -8,7 +8,125 @@ pub(crate) struct PlacedProducerWaves<'w, 'a> {
     pub sources: Vec<DeviceOwner<'a, CompressorWave<'w, 'a>>>,
     pending_commit: Option<(u64, [u32; 16], usize)>,
 }
+/// Borrows only this lane. The caller retains the query and admitted bank
+/// storage until completion; cancellation drains only this layer's producers.
+pub(crate) struct PendingPlacedProduction<'p, 'w, 'a> {
+    waves: &'p mut PlacedProducerWaves<'w, 'a>,
+    batch: u64,
+    layer: usize,
+    window: bool,
+    source: Option<usize>,
+    window_ready: bool,
+    source_ready: bool,
+    complete: bool,
+}
+impl PendingPlacedProduction<'_, '_, '_> {
+    /// # Safety
+    /// The original bank, query buffers and admitted slots remain alive and
+    /// immutable. No other producer may overwrite this lane's proposals.
+    pub unsafe fn poll(&mut self, bank: &BackboneCache<'_>, batch: &CacheBatch) -> Result<bool> {
+        ensure!(
+            !self.complete && batch.identity() == self.batch,
+            "placed production batch differs or already complete"
+        );
+        bank.validate_batch(batch)?;
+        if !self.window_ready {
+            let state = bank.window(batch, self.layer)?;
+            self.window_ready = self.waves.windows[self.layer]
+                .on_device_mut(|wave| unsafe { wave.poll_query(state) })?;
+        }
+        if !self.source_ready {
+            let source = self.source.context("missing placed source")?;
+            let state = bank.source(batch, self.layer)?;
+            self.source_ready = self.waves.sources[source]
+                .on_device_mut(|wave| unsafe { wave.poll_query(state) })?;
+        }
+        self.complete = self.window_ready && self.source_ready;
+        Ok(self.complete)
+    }
+}
+impl Drop for PendingPlacedProduction<'_, '_, '_> {
+    fn drop(&mut self) {
+        if self.complete {
+            return;
+        }
+        if self.window {
+            if let Err(error) =
+                self.waves.windows[self.layer].on_device_mut(|wave| wave.abort_query())
+            {
+                tracing::error!(%error, "draining cancelled placed window production");
+            }
+        }
+        if let Some(source) = self.source {
+            if let Err(error) = self.waves.sources[source].on_device_mut(|wave| wave.abort_query())
+            {
+                tracing::error!(%error, "draining cancelled placed compressed production");
+            }
+        }
+    }
+}
 impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
+    /// Enqueue the layer's SWA and, where applicable, compressed source.
+    /// Encoder boundary layer 20 produces only its compressed source.
+    /// # Safety
+    /// Query writes are complete and correspond to this admitted batch. Retain
+    /// the query buffers and bank slots until completion or drained cancellation.
+    pub unsafe fn enqueue_production(
+        &mut self,
+        bank: &BackboneCache<'_>,
+        batch: &CacheBatch,
+        query: &crate::v41_attention_query::AttentionQueryOutput<'_>,
+    ) -> Result<PendingPlacedProduction<'_, 'w, 'a>> {
+        ensure!(
+            self.pending_commit.is_none(),
+            "placed cache commit still pending"
+        );
+        bank.validate_batch(batch)?;
+        let layer = query.layer;
+        let window = batch.stage().windows().contains(&layer);
+        ensure!(
+            window || (batch.stage() == CacheStage::Encoder && layer == 20),
+            "placed production layer outside batch stage"
+        );
+        let source = SOURCES
+            .iter()
+            .position(|&l| l == layer)
+            .filter(|_| !batch.stage().reuses_sources());
+        let device = bank.attention_device(layer)?;
+        ensure!(
+            query.hidden.device_id == device.id && self.windows[layer].device.id == device.id,
+            "placed query, window and cache GPUs differ"
+        );
+        if let Some(i) = source {
+            ensure!(
+                self.sources[i].device.id == device.id,
+                "placed source GPU differs"
+            );
+        }
+        let pending = PendingPlacedProduction {
+            waves: self,
+            batch: batch.identity(),
+            layer,
+            window,
+            source,
+            window_ready: !window,
+            source_ready: source.is_none(),
+            complete: false,
+        };
+        if window {
+            let state = bank.window(batch, layer)?;
+            let chunks = batch.window_chunks(layer)?;
+            pending.waves.windows[layer]
+                .on_device_mut(|wave| unsafe { wave.enqueue_query(state, &chunks, query) })?;
+        }
+        if let Some(i) = source {
+            let state = bank.source(batch, layer)?;
+            let chunks = batch.source_chunks(layer)?;
+            pending.waves.sources[i]
+                .on_device_mut(|wave| unsafe { wave.enqueue_query(state, &chunks, query) })?;
+        }
+        Ok(pending)
+    }
     pub fn device_bytes(
         library: &NativeLibrary,
         placement: CachePlacement,
@@ -278,6 +396,152 @@ impl<'a> CacheProducerWeights<'a> {
 mod tests {
     use super::*;
     use crate::v41_window::{WindowChunk, WindowState};
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, and two CUDA GPUs"]
+    fn placed_query_production_poll_cancel_and_reuse() -> Result<()> {
+        use crate::v41_attention_query::{AttentionQueryWave, AttentionQueryWeights};
+        use crate::v41_backbone_cache::CacheWork;
+        use ds41rt_transport::ExpertV2SourceKind;
+        let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+        let catalog = ds41rt_loader::read_official_v41_catalog(
+            ds41rt_loader::OFFICIAL_V41_MODEL_ID,
+            std::path::Path::new(&std::env::var("DS41RT_SNAPSHOT")?),
+        )?;
+        lib.cuda_set_device(0)?;
+        let placement = CachePlacement::new(std::array::from_fn(|layer| usize::from(layer >= 14)))?;
+        let weights = CacheProducerWeights::load_distributed(
+            &lib,
+            &catalog,
+            placement,
+            CacheProducerWeights::distributed_device_bytes(&lib, &catalog, placement)?,
+            1024 * 1024,
+        )?;
+        let mut waves = PlacedProducerWaves::new(
+            &weights,
+            16,
+            PlacedProducerWaves::device_bytes(&lib, placement, 16)?,
+        )?;
+        for (layer, source_id) in [(2, 0), (14, 2), (20, 3)] {
+            let pages = [2, 2, 2, 4];
+            let mut bank = BackboneCache::new_distributed(
+                &lib,
+                placement,
+                2,
+                pages,
+                BackboneCache::distributed_device_bytes(placement, 2, pages)?,
+            )?;
+            let lease = bank.begin_request(0, 1)?;
+            let peer = bank.begin_request(1, 2)?;
+            if layer == 20 {
+                bank.begin_encoder(lease, 5)?;
+            }
+            let batch = bank.plan(&[CacheWork {
+                lease,
+                tokens: 5,
+                kind: ExpertV2SourceKind::Prefill,
+            }])?;
+            let wrong = bank.plan(&[CacheWork {
+                lease: peer,
+                tokens: 5,
+                kind: ExpertV2SourceKind::Prefill,
+            }])?;
+            let device = Device {
+                library: &lib,
+                id: placement.attention(layer)? as i32,
+            };
+            let qw = device.own(|| {
+                AttentionQueryWeights::load(
+                    &lib,
+                    &catalog,
+                    layer,
+                    AttentionQueryWeights::device_bytes(&lib, &catalog, layer)?,
+                    1024 * 1024,
+                )
+            })?;
+            let mut query =
+                device.own(|| qw.wave(16, AttentionQueryWave::device_bytes(&lib, 16)?))?;
+            let mut reference_window = device
+                .own(|| weights.windows[layer].wave(16, WindowWave::device_bytes(&lib, 16)?))?;
+            let mut reference_source = device.own(|| {
+                weights.sources[source_id].wave(16, CompressorWave::device_bytes(layer, 16)?)
+            })?;
+            let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+            for seed in [0, 7] {
+                let host: Vec<u8> = (0..5 * 5120)
+                    .flat_map(|i| {
+                        let value = ((i + seed) % 17) as f32 / 32.0 - 0.25;
+                        ((value.to_bits() >> 16) as u16).to_ne_bytes()
+                    })
+                    .collect();
+                device.run(|| {
+                    lib.copy_h2d(query.input(), &host)?;
+                    unsafe {
+                        query.execute_tokens(&[0, 1, 2, 3, 4])?;
+                    }
+                    Ok(())
+                })?;
+                let output = query.output()?;
+                // Cancellation drains the owned streams and allows immediate reuse.
+                drop(unsafe { waves.enqueue_production(&bank, &batch, &output)? });
+                assert_eq!(lib.cuda_get_device()?, 0);
+                let mut pending = unsafe { waves.enqueue_production(&bank, &batch, &output)? };
+                assert!(unsafe { pending.poll(&bank, &wrong) }.is_err());
+                runtime.block_on(async {
+                    loop {
+                        let complete = unsafe { pending.poll(&bank, &batch)? };
+                        assert_eq!(lib.cuda_get_device()?, 0);
+                        // Shared bank remains available while this lane is in flight.
+                        assert_eq!(bank.committed_end(peer)?, 0);
+                        if complete {
+                            break;
+                        }
+                        tokio::task::yield_now().await;
+                    }
+                    Ok::<_, anyhow::Error>(())
+                })?;
+                drop(pending);
+                device.run(|| {
+                    unsafe {
+                        if layer != 20 {
+                            bank.produce_window(&batch, &output, &mut reference_window)?;
+                        }
+                        bank.produce_source(&batch, &output, &mut reference_source)?;
+                    }
+                    let source = waves.sources[source_id].output(bank.source(&batch, layer)?)?;
+                    let expected_source = reference_source.output(bank.source(&batch, layer)?)?;
+                    let mut pairs = vec![
+                        (source.kv_values, expected_source.kv_values),
+                        (source.kv_scales, expected_source.kv_scales),
+                        (source.index_packed, expected_source.index_packed),
+                        (source.index_scales, expected_source.index_scales),
+                    ];
+                    if layer != 20 {
+                        let actual = waves.windows[layer].output(bank.window(&batch, layer)?)?;
+                        let expected = reference_window.output(bank.window(&batch, layer)?)?;
+                        pairs.extend([
+                            (actual.values, expected.values),
+                            (actual.scales, expected.scales),
+                        ]);
+                    } else {
+                        assert!(bank.window(&batch, layer).is_err());
+                    }
+                    for (a, b) in pairs {
+                        let mut left = vec![0; a.bytes];
+                        let mut right = vec![0; b.bytes];
+                        lib.copy_d2h(&mut left, a)?;
+                        lib.copy_d2h(&mut right, b)?;
+                        assert_eq!(
+                            left, right,
+                            "placed query production differs from direct execution"
+                        );
+                    }
+                    Ok(())
+                })?;
+            }
+            assert_eq!(lib.cuda_get_device()?, 0);
+        }
+        Ok(())
+    }
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, and two CUDA GPUs"]
     fn real_placed_producers_and_window_graphs_match_across_devices() -> Result<()> {

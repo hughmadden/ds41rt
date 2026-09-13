@@ -529,3 +529,28 @@ transactions, bounded replay, encoder reservations/publication, late source-pool
 exhaustion, lease revocation, and recovery. These checks cover cache transactions;
 the complete distributed layer loop, attention/index placement, startup mode
 selection, and serving performance qualification still remain.
+
+## Placed asynchronous query production
+
+Placed producer workspaces now accept completed attention-query outputs and
+return a pending owner that borrows only the current lane. Enqueue, stream
+queries, graph capture/replay, and cancellation cleanup run on the assigned GPU;
+each call restores the caller's CUDA device. The shared cache bank is supplied
+only during enqueue/poll and is not retained across waits. Device and batch
+checks reject mismatched inputs. Dropping unfinished production drains that
+layer's producers before their storage can be reused.
+
+Ordinary layers enqueue SWA and their compressed source when applicable. At the
+encoder boundary, layer 20 enqueues only source compression, preserving the CED
+separation from decoder SWA execution. Replayed phases keep their existing
+compressed sources. This owner adds no new cross-lane barrier; underlying
+producer preparation retains its existing staging behavior.
+
+The official-weight CUDA fixture passes for layers 2 on GPU0 and 14 on GPU1,
+and for source-only layer 20 on GPU1. Queued outputs match direct production
+byte-for-byte for SWA values/scales and compressed FP4 KV/index values/scales,
+including changed-input graph replay. Cancellation followed by immediate reuse,
+wrong-batch rejection, shared-bank access while pending, and caller-device
+restoration also pass. This is not an end-to-end serving or throughput result.
+The full execution loop still requires attention/index/layer-state placement
+and selection of these placed producers.
