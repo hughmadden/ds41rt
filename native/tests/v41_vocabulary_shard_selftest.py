@@ -20,6 +20,8 @@ def main():
     launch.argtypes = [ptr, ptr, ptr, ptr, C.c_int32, ptr]
     destroy = lib.ds41rt_v41_markov_destroy
     destroy.argtypes = [ptr]
+    merge = lib.ds41rt_v41_vocabulary_merge_greedy
+    merge.argtypes = [ptr, ptr, ptr, ptr, ptr, ptr, C.c_int32, C.c_int32, ptr]
     assert torch.cuda.device_count() >= 2, 'two CUDA GPUs required'
     torch.manual_seed(41)
     vocab, width, split = 129280, 5120, 64640
@@ -51,6 +53,31 @@ def main():
                             outputs[rank].data_ptr(), rows, streams[rank].cuda_stream)
             assert status == 0, status
 
+    def gpu_merge(ids0, scores0, ids1, scores1, capture=False):
+        with torch.cuda.device(0):
+            ids0, ids1 = [x.to(device='cuda:0', dtype=torch.int32) for x in (ids0, ids1)]
+            scores0, scores1 = [x.to(device='cuda:0', dtype=torch.float32) for x in (scores0, scores1)]
+            out_ids = torch.empty_like(ids0)
+            out_scores = torch.empty_like(scores0)
+            for device in (0, 1):
+                torch.cuda.synchronize(device)
+            args = [x.data_ptr() for x in (ids0, scores0, ids1, scores1, out_ids, out_scores)]
+            args += [ids0.numel(), split, streams[0].cuda_stream]
+            assert merge(*args) == 0
+            streams[0].synchronize()
+            if capture:
+                graph = torch.cuda.CUDAGraph()
+                with torch.cuda.graph(graph, stream=streams[0]):
+                    assert merge(*args) == 0
+                graph.replay()
+                streams[0].synchronize()
+                graph.reset()
+            # Outputs may not alias an input or each other.
+            bad = args.copy()
+            bad[4] = ids0.data_ptr()
+            assert merge(*bad) != 0
+            return out_ids.cpu(), out_scores.cpu()
+
     def verify(rows):
         for stream in streams:
             stream.synchronize()
@@ -62,6 +89,11 @@ def main():
         ids = torch.stack([parts[0].argmax(dim=1), parts[1].argmax(dim=1) + split], dim=1)
         winners = ids.gather(1, scores.argmax(dim=1)[:, None]).squeeze(1)
         assert torch.equal(winners, full.argmax(dim=1))
+        local = [o[:rows].max(dim=1) for o in outputs[:2]]
+        gpu_ids, gpu_scores = gpu_merge(local[0].indices, local[0].values,
+                                       local[1].indices, local[1].values, capture=rows == 3)
+        assert torch.equal(gpu_ids.long(), winners)
+        assert torch.equal(gpu_scores, full.max(dim=1).values)
         # Independent FP32 reference on columns spanning the shard boundary.
         columns = [0, split - 1, split, vocab - 1]
         reference = xs[0][:rows].float().cpu() @ weight[columns].float().cpu().T
@@ -94,6 +126,14 @@ def main():
                 assert not bad.value
             assert launch(handles[0], xs[0].data_ptr(), weights[0].data_ptr(), outputs[0].data_ptr(), 81, streams[0].cuda_stream) != 0
             assert launch(handles[1], xs[0].data_ptr(), weights[0].data_ptr(), outputs[0].data_ptr(), 1, streams[0].cuda_stream) != 0
+        edge_ids, edge_scores = gpu_merge(
+            torch.tensor([0, split - 1, 1, -1, 0, 0, 0]),
+            torch.tensor([1., 2., -5., 1., 1., float('nan'), 1.]),
+            torch.tensor([0, 0, split - 1, 0, vocab - split, 0, 0]),
+            torch.tensor([2., 2., -4., 2., 2., 2., float('inf')]), capture=True)
+        assert edge_ids.tolist() == [split, split - 1, vocab - 1, -1, -1, -1, -1]
+        assert torch.isnan(edge_scores[3:]).all()
+        print('PASS GPU merge ties, boundary offsets, invalid candidates, and graph replay', flush=True)
         print('PASS graph replay, invalid shard/row bounds, and wrong-device rejection', flush=True)
     finally:
         for rank, handle in enumerate(handles):

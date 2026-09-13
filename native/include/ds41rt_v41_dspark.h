@@ -29,6 +29,14 @@ int32_t ds41rt_v41_vocabulary_head_launch(void* handle, const uint16_t* input,
 // Same per-wave workspace/device/graph lifetime and destruction contract.
 int32_t ds41rt_v41_vocabulary_shard_create(void* workspace, uint64_t bytes,
     int32_t vocab_rows, void** handle);
+// Merge checked local argmax candidates for contiguous shards [0,split) and
+// [split,129280). Six arrays of rows elements on the stream's device; rows
+// 1..80, split 1..129279. Lower global token wins ties. Any invalid local ID or
+// nonfinite score produces UINT32_MAX/NaN. Outputs must be mutually disjoint
+// and disjoint from inputs. No allocations or synchronization.
+int32_t ds41rt_v41_vocabulary_merge_greedy(const uint32_t* ids0, const float* scores0,
+    const uint32_t* ids1, const float* scores1, uint32_t* ids, float* scores,
+    int32_t rows, int32_t split, void* stream);
 // One draft position: FP32 shared/bias/adjusted [rows,129280], temperatures
 // [rows], u64 RNG [rows,2] (seed, first Philox subsequence), u32 tokens [rows].
 // Temperature must be finite/nonnegative; shared+bias finite. RNG base must leave

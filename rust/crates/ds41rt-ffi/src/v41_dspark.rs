@@ -114,6 +114,33 @@ impl NativeLibrary {
         Ok(V41VocabularyProjection { _library: self, handle, launch, destroy,
             width: 5120, max_rows: 80, vocab_rows })
     }
+    /// Merge local greedy candidates after the peer candidates arrive.
+    ///
+    /// # Safety
+    /// All six buffers belong to the stream's device and remain live through
+    /// completion. Inputs are complete and outputs are disjoint from each other
+    /// and the inputs. Invalid candidates publish UINT32_MAX/NaN.
+    pub unsafe fn v41_vocabulary_merge_greedy(
+        &self, candidates: [(Ds41rtDeviceBuffer, Ds41rtDeviceBuffer); 2],
+        output: (Ds41rtDeviceBuffer, Ds41rtDeviceBuffer), rows: usize,
+        split: usize, stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=80).contains(&rows) && (1..129280).contains(&split),
+            "invalid vocabulary greedy merge shape");
+        for buffer in [candidates[0].0, candidates[0].1, candidates[1].0,
+            candidates[1].1, output.0, output.1] {
+            ensure!(!buffer.ptr.is_null() && buffer.bytes >= rows * 4
+                && buffer.device_id == output.0.device_id, "invalid vocabulary merge buffer");
+        }
+        type Merge = unsafe extern "C" fn(*const u32, *const f32, *const u32,
+            *const f32, *mut u32, *mut f32, i32, i32, *mut c_void) -> i32;
+        let launch = unsafe { *self.lib.get::<Merge>(b"ds41rt_v41_vocabulary_merge_greedy")? };
+        let status = unsafe { launch(candidates[0].0.ptr.cast(), candidates[0].1.ptr.cast(),
+            candidates[1].0.ptr.cast(), candidates[1].1.ptr.cast(), output.0.ptr.cast(),
+            output.1.ptr.cast(), rows as i32, split as i32, stream) };
+        ensure!(status == 0, "vocabulary greedy merge status {status}");
+        Ok(())
+    }
     unsafe fn v41_head_projection(
         &self,
         workspace: Ds41rtDeviceBuffer,

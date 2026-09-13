@@ -989,3 +989,14 @@ checkpoint halves with 7 MiB staging and compared every uploaded byte back to
 the corresponding checkpoint range. Both halves matched exactly, budget and
 range rejection passed, and owner destruction restored GPU 0. This validates
 shard loading, not end-to-end two-GPU head execution or startup performance.
+
+The vocabulary primitive now merges two checked local greedy candidates on the
+GPU after their peer transfer. Only per-row token/score candidates are needed;
+no full-logit download or host decision is required. Ties select the lower
+global token; a nonfinite score or out-of-range local token on either rank
+publishes the existing invalid-candidate representation (UINT32_MAX/NaN).
+The synthetic two-GPU self-test now checks this native merge against full-head
+winners/scores at rows 1/3/16/80, graph replay, ties, shard-boundary offsets,
+invalid IDs/scores, and output alias rejection. All passed; shard/full logits
+still match exactly. Native compilation and FFI checking passed. The normal
+distributed target/draft head must still be wired to these primitives.

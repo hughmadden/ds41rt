@@ -142,6 +142,40 @@ extern "C" int32_t ds41rt_v41_vocabulary_head_launch(void* handle, const uint16_
 }
 
 namespace {
+__global__ void vocabulary_merge_greedy(const uint32_t* ids0, const float* scores0,
+    const uint32_t* ids1, const float* scores1, uint32_t* ids, float* scores,
+    int rows, uint32_t split) {
+  const int row = threadIdx.x;
+  if (row >= rows) return;
+  const auto a = ids0[row], b = ids1[row];
+  const float x = scores0[row], y = scores1[row];
+  if (a >= split || b >= 129280u - split || !isfinite(x) || !isfinite(y)) {
+    ids[row] = UINT32_MAX;
+    scores[row] = CUDART_NAN_F;
+  } else {
+    const bool first = x >= y;
+    ids[row] = first ? a : split + b;
+    scores[row] = first ? x : y;
+  }
+}
+}
+extern "C" int32_t ds41rt_v41_vocabulary_merge_greedy(const uint32_t* ids0,
+    const float* scores0, const uint32_t* ids1, const float* scores1,
+    uint32_t* ids, float* scores, int32_t rows, int32_t split, void* stream) {
+  if (rows < 1 || rows > 80 || split < 1 || split >= 129280) return cudaErrorInvalidValue;
+  const uint64_t bytes = uint64_t(rows) * 4;
+  const void* buffers[] = {ids0, scores0, ids1, scores1, ids, scores};
+  for (int i = 0; i < 6; ++i) {
+    if (!span(buffers[i], bytes, 4)) return cudaErrorInvalidValue;
+    if (i >= 4) for (int j = 0; j < i; ++j)
+      if (!disjoint(buffers[i], bytes, buffers[j], bytes)) return cudaErrorInvalidValue;
+  }
+  vocabulary_merge_greedy<<<1, 128, 0, reinterpret_cast<cudaStream_t>(stream)>>>(
+      ids0, scores0, ids1, scores1, ids, scores, rows, uint32_t(split));
+  return cudaGetLastError();
+}
+
+namespace {
 // Position-local logits remain raw for verification. Sampling uses log-space
 // exponential racing, equivalent in distribution to softmax(logits/T)/Exp(1).
 constexpr int kDraftVocab = 129280;
