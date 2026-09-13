@@ -286,3 +286,20 @@ Pending, another stream remains ready, and dropping the future drains both copy
 and its queued follow-up before returning. The test releases the producer after
 50 ms and checks final data and device restoration. Cancellation can block for
 cleanup; normal progress still polls cooperatively with no cross-lane join.
+
+## Shared-expert TP2 kernels
+
+The FP8 exporter and native shape checks now support `[1152,5120]` up/gate
+weights and `[5120,1152]` down weights. A separate 1,152-wide SwiGLU entry
+preserves the full-width entry. FP8 matrix and mHC module ownership now allows
+two device-specific module tables; the first device may retain any CUDA ordinal.
+Module loading remains at initialization, not in graph replay.
+
+C1/C16 shared TP2 projections export and build. The official layer-0 shared
+weight fixture runs both halves on their own devices, including changed-input
+graph replay, and checks distinct matrix handles. Summed BF16 half outputs
+match the full-width quantized reference within about 0.23% relative L2, with
+cosine above 0.999992. The daemon offline check passes. This fixture stages
+weights and sums halves in Python; Rust shared-weight slicing, shared execution
+ownership, peer reduction, other capacities, and serving integration remain
+pending. No single-GPU throughput claim follows from these numerical checks.

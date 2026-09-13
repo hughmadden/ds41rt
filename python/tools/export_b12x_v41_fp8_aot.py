@@ -14,6 +14,7 @@ PROJECTIONS = (
     ('engram', 25600, 6144), ('ffn_up', 2304, 5120), ('ffn_down', 5120, 2304),
     ('main', 5120, 15360), ('q_a', 1280, 5120), ('q_b', 32768, 1280),
     ('kv', 512, 5120), ('o_b', 5120, 8192), ('o_a', 8192, 32768), ('index_q', 4096, 1280),
+    ('ffn_tp2_up', 1152, 5120), ('ffn_tp2_down', 5120, 1152),
 )
 
 def validate_abi(path: Path, label: str, kind: str) -> dict:
@@ -80,7 +81,7 @@ def dispatch_header(output: Path, manifest: dict) -> None:
     (output / 'v41_fp8_variants.h').write_text('\n'.join(lines) + '\n')
 
 
-def export(output: Path, rows: tuple[int, ...]) -> None:
+def export(output: Path, rows: tuple[int, ...], projections=PROJECTIONS) -> None:
     os.environ['B12X_COMPILE_DISK_CACHE'] = '0'
     os.environ['B12X_COMPILE_MEMORY_CACHE'] = '0'
     import torch
@@ -100,10 +101,10 @@ def export(output: Path, rows: tuple[int, ...]) -> None:
                 'physical_sms': props.multi_processor_count, 'device': props.name,
                 'projections': [{'name': name, 'n': n, 'k': k, 'weight_block': [32,32],
                                  'groups': 8 if name == 'o_a' else 1,
-                                 'activation_block': 32, 'activation_amax_floor': 0.0 if name == 'o_a' else 1e-4} for name,n,k in PROJECTIONS],
+                                 'activation_block': 32, 'activation_amax_floor': 0.0 if name == 'o_a' else 1e-4} for name,n,k in projections],
                 'sparkinfer_revision': json.loads((Path(__file__).resolve().parents[2] / 'third_party/sparkinfer.lock.json').read_text())['revision'],
                 'variants': []}
-    for name, n, k in PROJECTIONS:
+    for name, n, k in projections:
         for capacity in rows:
             label = f'v41_{name}_fp8_m{capacity}'
             groups = 8 if name == 'o_a' else 1
@@ -172,11 +173,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--rows', default='1,16,80,256,1024,4096')
+    parser.add_argument('--projections', help='Comma-separated projection names; default exports all')
     args = parser.parse_args()
     rows = tuple(int(value) for value in args.rows.split(','))
     if not rows or len(set(rows)) != len(rows) or any(value not in (1,16,80,256,1024,4096) for value in rows):
         parser.error('rows must be distinct native capacities: 1,16,80,256,1024,4096')
-    export(args.output_dir, rows)
+    selected = args.projections.split(',') if args.projections else [p[0] for p in PROJECTIONS]
+    if len(selected) != len(set(selected)) or set(selected) - {p[0] for p in PROJECTIONS}:
+        parser.error('projections must be distinct supported names')
+    export(args.output_dir, rows, tuple(p for p in PROJECTIONS if p[0] in selected))
 
 
 if __name__ == '__main__':

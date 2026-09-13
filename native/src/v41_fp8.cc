@@ -24,11 +24,30 @@ struct Variant {
   int device = -1;
 };
 Variant variants[] = {DS41RT_V41_FP8_VARIANTS};
-Module hc_project = DS41RT_V41_HC_PROJECT_MODULE;
-int hc_device = -1;
+Variant peer_variants[] = {DS41RT_V41_FP8_VARIANTS};
+Module hc_project[] = {DS41RT_V41_HC_PROJECT_MODULE, DS41RT_V41_HC_PROJECT_MODULE};
+int hc_device[] = {-1, -1};
+int owner_device[] = {-1, -1};
 std::mutex mutex;
-Variant* capacity(int rows, int k, int n) { for (auto& v : variants) if (int(v.info.capacity_rows) == rows && int(v.info.input_dim) == k && int(v.info.output_dim) == n) return &v; return nullptr; }
-Variant* handle(void* p) { for (auto& v : variants) if (&v == p) return &v; return nullptr; }
+// Called only under initialization mutex. Preserve arbitrary first-device IDs.
+int device_slot(int device) {
+  for (int slot=0; slot<2; ++slot) if (owner_device[slot] == device) return slot;
+  for (int slot=0; slot<2; ++slot) if (owner_device[slot] < 0) { owner_device[slot]=device; return slot; }
+  return -1;
+}
+Variant* capacity(int rows, int k, int n, int slot=0) {
+  auto* table = slot == 0 ? variants : peer_variants;
+  for (size_t i=0; i<sizeof(variants)/sizeof(variants[0]); ++i) {
+    auto& v=table[i];
+    if (int(v.info.capacity_rows)==rows && int(v.info.input_dim)==k && int(v.info.output_dim)==n) return &v;
+  }
+  return nullptr;
+}
+Variant* handle(void* p) {
+  for (auto& v : variants) if (&v == p) return &v;
+  for (auto& v : peer_variants) if (&v == p) return &v;
+  return nullptr;
+}
 int load(Module& m, int device) {
   auto* ptr = &m.library;
   int status = 0;
@@ -65,6 +84,9 @@ extern "C" int32_t ds41rt_v41_fp8_matrix_initialize(int32_t rows, int32_t k, int
   status = cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, device); if (status) return status;
   if (major != 12 || minor != 0 || sms != DS41RT_V41_FP8_SMS) return cudaErrorInvalidDevice;
   std::lock_guard<std::mutex> lock(mutex);
+  const int slot=device_slot(device);
+  if (slot<0) return cudaErrorInvalidDevice;
+  v=capacity(rows,k,n,slot);
   if (v->device >= 0) {
     if (v->device != device) return cudaErrorInvalidDevice;
   } else {
@@ -147,9 +169,11 @@ extern "C" int32_t ds41rt_v41_hc_project_initialize() {
   status=cudaDeviceGetAttribute(&minor,cudaDevAttrComputeCapabilityMinor,device); if(status) return status;
   if(major!=12 || minor!=0) return cudaErrorInvalidDevice;
   std::lock_guard<std::mutex> lock(mutex);
-  if(hc_device>=0) return hc_device==device ? 0 : int(cudaErrorInvalidDevice);
-  int result=load(hc_project,device);
-  if(!result) hc_device=device;
+  const int slot=device_slot(device);
+  if(slot<0) return cudaErrorInvalidDevice;
+  if(hc_device[slot]>=0) return hc_device[slot]==device ? 0 : int(cudaErrorInvalidDevice);
+  int result=load(hc_project[slot],device);
+  if(!result) hc_device[slot]=device;
   return result;
 }
 // Internal launch: buffer validation is performed by hc_mixes_workspace.
@@ -157,11 +181,12 @@ extern "C" int32_t ds41rt_v41_hc_project_launch(const uint16_t* residual,
     const float* weight, float* partials, int32_t rows, void* stream) {
   int device=-1;
   int status=cudaGetDevice(&device); if(status) return status;
-  if(hc_device<0 || device!=hc_device) return cudaErrorInvalidDevice;
+  const int slot=hc_device[0]==device ? 0 : hc_device[1]==device ? 1 : -1;
+  if(slot<0) return cudaErrorInvalidDevice;
   void* r=const_cast<uint16_t*>(residual);
   void* w=const_cast<float*>(weight);
   void* p=partials;
   void* args[]={&r,&w,&p,&rows,&stream,&status};
-  hc_project.launch(args,6);
+  hc_project[slot].launch(args,6);
   return status;
 }
