@@ -8,7 +8,7 @@
 //! (`ds41rt-core::prefix`), so a host hit is exactly a snapshot the device tier would have
 //! chosen. Eviction follows the same bank order (prompts before turns, oldest access first) and
 //! never touches a pinned snapshot.
-use crate::pool::{Class, PoolExhausted, Slab, SlabPool};
+use crate::pool::{Class, HostRange, PoolExhausted, Slab, SlabPool};
 use crate::SnapshotKind;
 use crate::COMPRESSORS;
 use ds41rt_core::prefix::Retention;
@@ -368,6 +368,46 @@ impl Snapshots {
     /// Bytes currently held, exactly the pool's `bytes_used()`.
     pub fn bytes_used(&self) -> u64 {
         self.pool.bytes_used()
+    }
+
+    /// The pinned host range of a held slab; its length is the class size. Invariant: `slab` is
+    /// held by this store (the pool debug-asserts it), so the range names live pinned memory.
+    pub fn location(&self, slab: Slab) -> HostRange {
+        self.pool.location(slab)
+    }
+
+    /// The pinned host range of a live shared page, or `None` when its index is free. Invariant:
+    /// the range names the slab that holds the page's bytes.
+    pub fn page_location(&self, page: PageRef) -> Option<HostRange> {
+        self.pages
+            .get(page.0 as usize)
+            .and_then(Option::as_ref)
+            .map(|entry| self.pool.location(entry.slab))
+    }
+
+    /// Record that device page `id` now holds the bytes of host page `page` (after a restore), so
+    /// a later store of `id` shares `page` instead of copying it. Invariant: `page` is live; the
+    /// map holds at most one identity per live page, so the page's previous identity is dropped.
+    pub fn register_device_page(&mut self, id: DevicePageId, page: PageRef) {
+        let Some(previous) = self.live_page_mut(page).map(|entry| entry.device) else {
+            debug_assert!(false, "registered a page that is not live");
+            return;
+        };
+        if let Some(previous) = previous {
+            if previous != id && self.device_map.get(&previous) == Some(&page) {
+                self.device_map.remove(&previous);
+            }
+        }
+        if let Some(existing) = self.device_map.insert(id, page) {
+            if existing != page {
+                if let Some(entry) = self.live_page_mut(existing) {
+                    entry.device = None;
+                }
+            }
+        }
+        if let Some(entry) = self.live_page_mut(page) {
+            entry.device = Some(id);
+        }
     }
 
     /// The radix, for the suites that assert a host hit equals a `Retention` hit.

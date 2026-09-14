@@ -7,6 +7,8 @@ use serde::Serialize;
 pub struct Snapshot {
     pub stores_issued: u64,
     pub stores_completed: u64,
+    /// Completed stores that replaced a resident snapshot with the same kind and tokens.
+    pub stores_replaced: u64,
     pub stores_failed: u64,
     pub stores_skipped: u64,
     pub store_bytes: u64,
