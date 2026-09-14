@@ -361,10 +361,14 @@ fn single_lane_round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::R
     let prepared_us = started.elapsed().as_micros() as u64;
     let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
         && members.iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none());
+    let batch_id = batch.as_ref().unwrap().cache()?.identity();
     let next = runtime.block_on(execute_logits(lib, pass, requests, &mut batch, transport, capture_routes, compact));
     let executed_us = started.elapsed().as_micros() as u64;
     let result = (|| -> Result<()> {
         let next = next?;
+        tracing::debug!(target: "ds41rt::cost_model", batch=batch_id, lane,
+            requests=members.len(), rows=inputs.iter().map(Vec::len).sum::<usize>(),
+            prepared_us, verify_us=executed_us-prepared_us, "verification round cost");
         let (accepted, emitted, emissions) = commit_lane(lib, lane, pass, requests, active, members,
             &inputs, &mut batch, &next, draft.as_deref_mut(), capture_routes, executed_us-prepared_us)?;
         for (&slot, tokens) in members.iter().zip(emissions) {

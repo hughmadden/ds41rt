@@ -203,6 +203,11 @@ impl DsparkRouteForecast {
     /// Sum of each lane's mean unique experts over all forty layers. Shared
     /// histories deduplicate within a lane; separately executing lanes each pay.
     pub fn mean_unique_experts(&self, lengths: &[usize]) -> f64 {
+        self.unique_experts_by_layer(lengths).iter().sum::<usize>() as f64 / 40.0
+    }
+    /// Keep layer identity so callers can price the configured expert backend.
+    /// Requests share experts within a lane; independent lanes each pay for them.
+    pub fn unique_experts_by_layer(&self, lengths: &[usize]) -> [usize; 40] {
         assert_eq!(lengths.len(), self.prefixes.len());
         let mut sets = [[[0u64; 6]; 40]; 2];
         for ((&lane, curve), &length) in self.lanes.iter().zip(&self.prefixes).zip(lengths) {
@@ -210,12 +215,31 @@ impl DsparkRouteForecast {
                 for (out, &value) in output.iter_mut().zip(input) { *out |= value; }
             }
         }
-        sets.iter().flatten().flatten().map(|w| w.count_ones() as f64).sum::<f64>() / 40.0
+        std::array::from_fn(|layer| sets.iter().map(|lane|
+            lane[layer].iter().map(|w| w.count_ones() as usize).sum::<usize>()).sum())
     }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn expert_forecast_preserves_layer_costs_and_lane_independence() {
+        let mut history = DsparkRouteHistory::default();
+        for id in [1, 2] {
+            for layer in 0..40 {
+                let older = if layer < 20 { [0; 6] } else { [1; 6] };
+                history.observe_accepted(id, layer, &[older, [0; 6]]).unwrap();
+            }
+        }
+        let shared = history.forecast(&[(1, 0, 1), (2, 0, 1)]).unwrap();
+        let costs = shared.unique_experts_by_layer(&[1, 1]);
+        assert_eq!(&costs[..20], &[1; 20]);
+        assert_eq!(&costs[20..], &[2; 20]);
+        assert_eq!(shared.unique_experts_by_layer(&[0, 0]), [1; 40]);
+        let separate = history.forecast(&[(1, 0, 1), (2, 1, 1)]).unwrap();
+        assert_eq!(separate.unique_experts_by_layer(&[1, 1]), costs.map(|n| n * 2));
+        assert_eq!(shared.mean_unique_experts(&[1, 1]), 1.5);
+    }
     #[test]
     fn seven_draft_history_stays_bounded_and_packed_counts_do_not_carry() {
         let mut history = DsparkRouteHistory::default();

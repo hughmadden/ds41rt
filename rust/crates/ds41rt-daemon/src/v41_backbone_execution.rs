@@ -44,6 +44,30 @@ pub(crate) struct CompletedLayer<'t> {
     indexed_us: u64,
     attended_us: u64,
     experts_us: u64,
+    routed_backend: &'static str,
+    shared_tp: usize,
+}
+impl CompletedLayer<'_> {
+    /// Opt-in calibration uses routes already captured by the lane. These are
+    /// elapsed stage times (including scheduling/transport), not GPU kernel times.
+    fn log_cost(&self, captured: &[Vec<[u32; 6]>]) {
+        if !tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG) { return; }
+        let Some(routes) = captured.get(self.layer).filter(|r| r.len() == self.rows) else { return; };
+        let mut counts = [0usize; 384];
+        for &expert in routes.iter().flatten() {
+            let Some(count) = counts.get_mut(expert as usize) else { return; };
+            *count += 1;
+        }
+        let total_us = self.started.elapsed().as_micros() as u64;
+        tracing::debug!(target: "ds41rt::cost_model", batch=self.batch, layer=self.layer,
+            rows=self.rows, routed_backend=self.routed_backend, shared_tp=self.shared_tp,
+            distinct_experts=counts.iter().filter(|&&n| n != 0).count(),
+            expert_groups_16=counts.iter().map(|&n| n.div_ceil(16)).sum::<usize>(),
+            produced_us=self.produced_us, index_us=self.indexed_us-self.produced_us,
+            attention_us=self.attended_us-self.indexed_us,
+            experts_us=self.experts_us-self.attended_us,
+            finish_us=total_us-self.experts_us, total_us, "verification layer cost");
+    }
 }
 impl PreparedLayer<'_, '_, '_> {
     #[cfg(test)]
@@ -92,8 +116,12 @@ impl PreparedLayer<'_, '_, '_> {
                 (ffn, self.started.elapsed().as_micros() as u64)
             }
         };
+        let routed_backend = if transport.has_tp2_layer(self.layer) { "rtx_tp2" }
+            else if transport.has_local_layer(self.layer) { "rtx_local" } else { "spark_tp4" };
+        let shared_tp = if transport.has_tp2_shared_layer(self.layer) { 2 } else { 1 };
         let result = unsafe { ffn.execute_tp4(transport, placement, image_mask, &self.rows).await? };
         Ok(CompletedLayer { result, batch: self.batch, layer: self.layer, rows: self.rows.len(),
+            routed_backend, shared_tp,
             started: self.started, produced_us: self.produced_us, indexed_us: self.indexed_us,
             attended_us, experts_us: self.started.elapsed().as_micros() as u64 })
     }
@@ -544,6 +572,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             && batch.identity() == completed.batch && self.progress.next == completed.layer
             && self.progress.stage == batch.stage(), "completed backbone layer identity differs");
         unsafe { lane.finish_ffn(completed.result.binding(), completed.result.values)?; }
+        completed.log_cost(lane.captured_routes());
         tracing::debug!(target: "ds41rt::timing", layer=completed.layer, rows=completed.rows,
             produced_us=completed.produced_us, index_us=completed.indexed_us-completed.produced_us,
             attention_us=completed.attended_us-completed.indexed_us,
@@ -561,6 +590,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             && batch.identity() == completed.batch && self.progress.next == completed.layer
             && self.progress.stage == batch.stage(), "completed backbone layer identity differs");
         unsafe { lane.finish_ffn_cooperative(completed.result.binding(), completed.result.values).await?; }
+        completed.log_cost(lane.captured_routes());
         tracing::debug!(target: "ds41rt::timing", layer=completed.layer, rows=completed.rows,
             produced_us=completed.produced_us, index_us=completed.indexed_us-completed.produced_us,
             attention_us=completed.attended_us-completed.indexed_us,

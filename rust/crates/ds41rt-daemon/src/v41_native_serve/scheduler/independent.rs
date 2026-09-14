@@ -118,6 +118,7 @@ async fn lane<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lane: usize, lib
             let operation: Result<()> = async {
                 pass.set_route_capture(capture_routes)?;
                 let current = batch.as_mut().unwrap();
+                let batch_id = current.cache()?.identity();
                 let selected: Vec<_> = (0..current.cache()?.positions().len()).collect();
                 let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
                     && members.iter().all(|&slot| active.borrow()[slot].as_ref().unwrap().constraint.is_none());
@@ -130,6 +131,9 @@ async fn lane<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lane: usize, lib
                     BatchScores::new(pass.download_logits(current, &selected).await?)?
                 };
                 let verify_us = started.elapsed().as_micros() as u64 - prepared_us;
+                tracing::debug!(target: "ds41rt::cost_model", batch=batch_id, lane, round_id,
+                    requests=members.len(), rows=selected.len(), prepared_us, verify_us,
+                    "verification round cost");
                 let mut decision = prepare_commit_lane(lane, &requests.borrow(),
                     &active.borrow(), &members, &inputs, &next, draft.borrow().as_deref(), verify_us)?;
                 if !decision.frontier_downloads.is_empty() {

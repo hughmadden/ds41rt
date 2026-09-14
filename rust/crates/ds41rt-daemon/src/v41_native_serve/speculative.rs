@@ -143,7 +143,10 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
     }
     pub fn adaptive_enabled(&self) -> bool { self.adaptive.is_some() && self.reuse_floor.is_none() }
     pub fn reuse_enabled(&self) -> bool { self.reuse_floor.is_some() }
-    pub fn capture_routes(&self) -> bool { self.adaptive.is_some() }
+    pub fn capture_routes(&self) -> bool {
+        self.adaptive.is_some()
+            || tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG)
+    }
     pub fn select_reuse_prefixes(&self, requests: &[(u64, usize, usize)]) -> Result<Option<Vec<usize>>> {
         let Some(floor) = self.reuse_floor else { return Ok(None); };
         let Some(forecast) = self.adaptive.as_ref().unwrap().forecast_work(requests) else {

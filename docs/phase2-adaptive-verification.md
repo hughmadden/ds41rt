@@ -68,6 +68,49 @@ The one-RTX configuration also needs a fresh calibration: its current partial
 RTX residency is not an input to the existing cost formula. No new policy default
 is justified by the external throughput headline alone.
 
+### Placement-aware calibration
+
+The replacement cost model should sum layer costs using the **actual installed
+expert placement**, rather than infer placement from GPU count or encoder/decoder
+names. Its execution classes are Spark TP4, local RTX, and RTX TP2. Shared-expert
+TP width is a separate feature: Spark routed experts can run alongside RTX TP2
+shared experts. Hardware and topology identify a calibration profile; layer
+placement determines which profile entries contribute to a candidate prefix.
+Measured batch-shape boundaries and within-layer expert sharing must remain
+visible. Concurrent shared/routed work must be priced by its combined elapsed
+stage cost, not by adding overlapping GPU times.
+
+The route forecast now exposes distinct experts per layer, preserving sharing
+within each lane and charging independent lanes separately. The original mean
+API and serving cost coefficients remain in use pending calibration.
+
+`RUST_LOG=info,ds41rt::cost_model=debug` enables calibration records. Each layer
+records its globally unique cache batch ID, layer, verification rows, installed
+routed backend, shared TP width, distinct experts, 16-route group count, and
+elapsed production/index/attention/expert/finish stages. Round records use the
+same batch ID and add lane, request count, preparation time and total verification
+time, so interleaved lane records can be joined without assuming log order.
+These are elapsed serving-stage measurements, including scheduling and transport,
+not isolated GPU kernel durations. The 16-route group count is a workload feature,
+not an assertion that every backend uses that tile size.
+
+Fixed-prefix runs also enable the existing adaptive route-capture and small-shape
+graph paths under this logging target. This deliberately measures the path that
+adaptive selection uses, without trimming prefixes. Instrumented throughput is
+not a substitute for the final uninstrumented comparison. Normal logging does
+not enable this extra capture, and no startup profiling pass or cross-lane wait
+was added.
+
+Validation: the optimized daemon build passed, and route-forecast tests passed
+(9 passed, 1 ignored), including distinct layer counts and independent-lane
+charging. A fixed-K5 serving smoke and C1/C2/C4/C8/C16 code sweep produced 1,374
+complete round records / 54,960 layer records across both lanes. Every round
+joined to exactly forty layers with matching row counts, correct installed
+backends and TP width, and consistent elapsed stage totals. All 93 code checks
+passed. This validates the instrumentation; it does not validate a replacement
+cost fit or adaptive K7. Artifacts are under
+`~/.cache/ds41rt-experiments/phase2-planner/placement-cost-*`.
+
 ## K7 implementation progress
 
 Native draft attention, embedding and request/position transpose now have
