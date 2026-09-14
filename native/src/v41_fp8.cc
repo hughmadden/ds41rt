@@ -1,5 +1,6 @@
 #include "ds41rt_v41_fp8.h"
 #include <cuda_runtime.h>
+#include <cstdio>
 #include <mutex>
 #include "v41_fp8_variants.h"
 static_assert(sizeof(ds41rt_v41_fp8_info_t) == 56);
@@ -66,6 +67,17 @@ bool span(const void* p, uint64_t bytes, uintptr_t& start, uintptr_t& end) {
   if (!start || start % 16 || start > UINTPTR_MAX - bytes) return false;
   end = start + bytes; return true;
 }
+// The AOT kernels are exported for one exact device: the SM count (and the launch grids
+// sized from it) come from the GPU that ran export_b12x_v41_fp8_aot.py. A bare
+// cudaErrorInvalidDevice (101) gives the operator nothing to act on, so name the mismatch.
+int reject_device(int device, int major, int minor, int sms) {
+  std::fprintf(stderr,
+               "ds41rt: v41 fp8 AOT kernels were exported for compute 12.0 with %d SMs, but "
+               "device %d is compute %d.%d with %d SMs; rebuild the coordinator AOT export on "
+               "the target GPU (cudaErrorInvalidDevice)\n",
+               int(DS41RT_V41_FP8_SMS), device, major, minor, sms);
+  return int(cudaErrorInvalidDevice);
+}
 int device_matches(Variant* v) {
   if (!v || v->device < 0) return cudaErrorInvalidValue;
   int device = -1; auto status = cudaGetDevice(&device);
@@ -87,7 +99,7 @@ extern "C" int32_t ds41rt_v41_fp8_matrix_initialize(int32_t rows, int32_t k, int
   status = cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device); if (status) return status;
   status = cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device); if (status) return status;
   status = cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, device); if (status) return status;
-  if (major != 12 || minor != 0 || sms != DS41RT_V41_FP8_SMS) return cudaErrorInvalidDevice;
+  if (major != 12 || minor != 0 || sms != DS41RT_V41_FP8_SMS) return reject_device(device, major, minor, sms);
   std::lock_guard<std::mutex> lock(mutex);
   const int slot=device_slot(device);
   if (slot<0) return cudaErrorInvalidDevice;
