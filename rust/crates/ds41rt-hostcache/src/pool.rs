@@ -36,6 +36,10 @@ impl Class {
 
 /// Slab sizes in bytes. The engine layout uses the crate constants for pages, tails and drafts;
 /// the scores row size comes from the engine at boot (verified in the daemon binding).
+///
+/// A size of zero disables that class: the pool allocates nothing for it, [`SlabPool::take`]
+/// always reports [`PoolExhausted`] with `free_bytes` 0, [`SlabPool::free_bytes`] reports 0, and
+/// its occupancy stays zero. The engine uses `Layout::engine(0)` because scores are host memory.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Layout {
     /// Bytes of a page slab.
@@ -112,7 +116,8 @@ pub struct HostRange {
     pub bytes: usize,
 }
 
-/// No free slab or free chunk can satisfy a `take` of `class`.
+/// No free slab or free chunk can satisfy a `take` of `class`. A disabled (zero-size) class
+/// always reports exhaustion with `needed_bytes` and `free_bytes` both 0.
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 #[error("pinned pool exhausted for {class:?}: {free_bytes} bytes free, {needed_bytes} needed")]
 pub struct PoolExhausted {
@@ -181,10 +186,10 @@ pub struct SlabPool {
     /// Indices of chunks not carved for any class.
     free_chunks: Vec<u32>,
     /// Head of each class's list of carved chunks that still have free slabs.
-    class_head: [u32; 4],
-    slabs_in_use: [u64; 4],
-    slabs_free: [u64; 4],
-    chunks_carved: [u32; 4],
+    class_head: [u32; Class::ALL.len()],
+    slabs_in_use: [u64; Class::ALL.len()],
+    slabs_free: [u64; Class::ALL.len()],
+    chunks_carved: [u32; Class::ALL.len()],
     bytes_used: u64,
 }
 
@@ -201,8 +206,8 @@ impl SlabPool {
         for class in Class::ALL {
             let size = layout.size(class);
             anyhow::ensure!(
-                size > 0 && size <= chunk_bytes,
-                "{class:?} slab size {size} must be in 1..={chunk_bytes}"
+                size <= chunk_bytes,
+                "{class:?} slab size {size} must be <= {chunk_bytes}"
             );
         }
         let count = (quota_bytes / chunk_bytes as u64) as usize;
@@ -225,18 +230,26 @@ impl SlabPool {
             layout,
             chunks,
             free_chunks,
-            class_head: [NONE; 4],
-            slabs_in_use: [0; 4],
-            slabs_free: [0; 4],
-            chunks_carved: [0; 4],
+            class_head: [NONE; Class::ALL.len()],
+            slabs_in_use: [0; Class::ALL.len()],
+            slabs_free: [0; Class::ALL.len()],
+            chunks_carved: [0; Class::ALL.len()],
             bytes_used: 0,
         })
     }
 
     /// Hand out one slab of `class`, carving a free chunk if the class has no free slab. O(1).
+    /// A disabled (zero-size) class always reports exhaustion.
     pub fn take(&mut self, class: Class) -> Result<Slab, PoolExhausted> {
         let ci = class.index();
         let size = self.layout.size(class);
+        if size == 0 {
+            return Err(PoolExhausted {
+                class,
+                needed_bytes: 0,
+                free_bytes: 0,
+            });
+        }
         let slab = if self.class_head[ci] != NONE {
             self.pop_free(self.class_head[ci], class)
         } else if let Some(chunk) = self.free_chunks.pop() {
@@ -310,16 +323,21 @@ impl SlabPool {
         self.quota_bytes
     }
 
-    /// Bytes a `take` of `class` could still satisfy from free slabs and free chunks.
+    /// Bytes a `take` of `class` could still satisfy from free slabs and free chunks. A disabled
+    /// (zero-size) class reports 0.
     pub fn free_bytes(&self, class: Class) -> u64 {
         let ci = class.index();
-        let size = self.layout.size(class) as u64;
+        let size = self.layout.size(class);
+        if size == 0 {
+            return 0;
+        }
+        let size = size as u64;
         let per_chunk = (self.chunk_bytes / self.layout.size(class)) as u64;
         self.slabs_free[ci] * size + self.free_chunks.len() as u64 * per_chunk * size
     }
 
     /// Per-class held, free and carved-chunk counts, in [`Class::ALL`] order.
-    pub fn occupancy(&self) -> [(Class, ClassOccupancy); 4] {
+    pub fn occupancy(&self) -> [(Class, ClassOccupancy); Class::ALL.len()] {
         Class::ALL.map(|class| {
             let ci = class.index();
             (
@@ -461,8 +479,29 @@ impl SlabPool {
 /// reuse it.
 #[doc(hidden)]
 pub mod testing {
-    use super::{HostChunk, PinnedMemory};
+    use super::{HostChunk, Layout, PinnedMemory, SlabPool};
     use std::collections::HashMap;
+
+    /// The chunk size the pool suites use: small enough to exhaust in a few takes.
+    pub const CHUNK: usize = 1 << 16;
+
+    /// The layout the pool suites use: four distinct sizes, none a divisor of [`CHUNK`].
+    pub fn layout() -> Layout {
+        Layout {
+            page: 4096,
+            tail: 8192,
+            draft: 2048,
+            scores: 1024,
+        }
+    }
+
+    /// A pool of `quota` bytes over [`CHUNK`] and [`layout`], with its provider. The provider
+    /// never refuses a chunk, so the pool's own quota is the only limit.
+    pub fn pool(quota: u64) -> (SlabPool, FakePinned) {
+        let mut mem = FakePinned::new(usize::MAX);
+        let pool = SlabPool::new(quota, CHUNK, layout(), &mut mem).expect("pool");
+        (pool, mem)
+    }
 
     /// A [`PinnedMemory`] that hands out sequential chunk ids, counts allocations and releases,
     /// and refuses to allocate more than `limit` chunks at once.
@@ -535,25 +574,8 @@ pub mod testing {
 
 #[cfg(test)]
 mod tests {
-    use super::testing::FakePinned;
+    use super::testing::{layout, pool, FakePinned, CHUNK};
     use super::*;
-
-    const CHUNK: usize = 1 << 16;
-
-    fn layout() -> Layout {
-        Layout {
-            page: 4096,
-            tail: 8192,
-            draft: 2048,
-            scores: 1024,
-        }
-    }
-
-    fn pool(quota: u64) -> (SlabPool, FakePinned) {
-        let mut mem = FakePinned::new(usize::MAX);
-        let pool = SlabPool::new(quota, CHUNK, layout(), &mut mem).expect("pool");
-        (pool, mem)
-    }
 
     #[test]
     fn is_held_tracks_take_and_give_back() {
@@ -600,5 +622,15 @@ mod tests {
         let slab = pool.take(Class::Page).expect("take");
         pool.give_back(slab);
         pool.give_back(slab);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "location of a slab not held")]
+    fn location_of_unheld_slab_panics_in_debug() {
+        let (mut pool, _mem) = pool(CHUNK as u64);
+        let slab = pool.take(Class::Page).expect("take");
+        pool.give_back(slab);
+        let _ = pool.location(slab);
     }
 }

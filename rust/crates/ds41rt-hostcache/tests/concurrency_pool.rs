@@ -3,24 +3,14 @@
 //! operations are interleaved by a seeded schedule, with releases deferred to model asynchronous
 //! copy completions. Every step re-checks the pool's invariants; a failure prints its seed and
 //! the tail of the schedule that produced it.
-use ds41rt_hostcache::pool::testing::FakePinned;
-use ds41rt_hostcache::pool::{Class, Layout, Slab, SlabPool};
+use ds41rt_hostcache::pool::testing::{layout, FakePinned, CHUNK};
+use ds41rt_hostcache::pool::{Class, Slab, SlabPool};
 use std::collections::HashSet;
 
-const CHUNK: usize = 1 << 16;
 const QUOTA: u64 = 4 * CHUNK as u64;
 const LANES: usize = 8;
 const STEPS: usize = 4_000;
 const LOG_TAIL: usize = 200;
-
-fn layout() -> Layout {
-    Layout {
-        page: 4096,
-        tail: 8192,
-        draft: 2048,
-        scores: 1024,
-    }
-}
 
 /// splitmix64: a tiny deterministic PRNG so a failing schedule reproduces from its seed.
 struct Rng(u64);

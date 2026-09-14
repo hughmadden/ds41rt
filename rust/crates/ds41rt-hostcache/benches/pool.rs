@@ -25,8 +25,8 @@ fn take(pool: &mut SlabPool, class: Class) -> Slab {
 
 fn take_give_back(c: &mut Criterion) {
     let mut group = c.benchmark_group("pool_take_give_back");
+    group.throughput(Throughput::Elements(1));
     for class in Class::ALL {
-        group.throughput(Throughput::Elements(1));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{class:?}")),
             &class,
