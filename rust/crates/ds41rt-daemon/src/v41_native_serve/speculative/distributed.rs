@@ -117,7 +117,7 @@ mod tests {
         }
         devices[1].run(|| actual.queue_prefix(0, 1000, 8))?;
         while !devices[1].run(|| actual.prefix_ready(0, 1000))? { std::thread::yield_now(); }
-        let saved = devices[1].own(|| actual.finish_prefix(0, 1000))?;
+        let saved = devices[1].run(|| actual.finish_prefix(0, 1000))?;
         devices[1].run(|| {
             actual.release(1000)?;
             actual.admit(2000)?;
@@ -127,6 +127,10 @@ mod tests {
             actual.release(2000)?;
             Ok(())
         })?;
+        assert_eq!(lib.cuda_get_device()?, 0);
+        drop(actual); // Retained snapshot storage outlives the producing runtime.
+        assert_eq!(lib.cuda_get_device()?, 0);
+        drop(saved); // The prefix carries GPU1 ownership even outside its runtime.
         assert_eq!(lib.cuda_get_device()?, 0);
         eprintln!("PASS distributed runtime queued prefix, release/re-admission, restore and device restoration");
         Ok(())

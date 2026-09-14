@@ -118,6 +118,9 @@ pub(crate) struct DsparkWindow<'a> {
     owner: u64,
 }
 impl<'a> DsparkWindow<'a> {
+    pub fn device(&self) -> crate::v41_memory::device::Device<'a> {
+        crate::v41_memory::device::Device { library: self.stream.library, id: self.ring.buffer.device_id }
+    }
     pub fn device_bytes(slots: usize, source_rows: u32) -> Result<usize> {
         ensure!(
             (1..=16).contains(&slots) && (1..=4096).contains(&source_rows),

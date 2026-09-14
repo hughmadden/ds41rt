@@ -1344,7 +1344,7 @@ The existing single-GPU constructor and synchronous proposal API remain
 specialized to the original chain. A distributed constructor creates GPU1 main
 contexts/windows plus independent distributed draft chains, returning an
 explicit GPU1 owner. Callers must scope synchronous runtime work and destruction
-to that device; retained prefixes also need GPU1 ownership at their consumer.
+to that device; retained prefixes now carry their GPU ownership to the consumer.
 The production worker/scheduler still needs that owner integration.
 
 The real-weight runtime fixture compares distributed and full-head runtimes at
@@ -1363,3 +1363,12 @@ commits. A permanent local mask row costs 10 KiB, and eight staged seed rows cos
 verification; the available overlap must be measured at the actual selection
 point. Keep the full embedding table on RTX0 and keep preparation/completion
 dependencies lane-local.
+
+Retained `DraftPrefix` values carry a device owner for their three window
+snapshots, so eviction or final destruction from a different current device
+uses the originating GPU. Restore rejects a different GPU/library before
+touching cache storage. The runtime fixture now drops the GPU1 runtime first,
+then releases its retained prefix while GPU0 is current, checking device
+restoration after both destructors. This closes the snapshot ownership handoff
+needed by the shared serving prefix cache; runtime/scheduler construction is
+still outstanding. The fixture passed in 2.61 seconds (`draft-prefix-owner.log`).

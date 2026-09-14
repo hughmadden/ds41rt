@@ -29,7 +29,7 @@ struct DraftRequest {
     slot: usize,
 }
 pub(crate) struct DraftPrefix<'a> {
-    windows: Vec<crate::v41_dspark_cache::DsparkPrefix<'a>>,
+    windows: crate::v41_memory::device::DeviceOwner<'a, Vec<crate::v41_dspark_cache::DsparkPrefix<'a>>>,
 }
 impl<'w, 'a> DraftRuntime<'w, 'a> {
     pub fn new(
@@ -240,8 +240,9 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         for (window, lease) in self.windows.iter().zip(request.leases) {
             ensure!(window.committed_end(lease)? == Some(end), "draft and target prefix frontiers differ");
         }
-        let windows = self.windows.iter_mut().zip(request.leases)
-            .map(|(window, lease)| window.retain_prefix(lease)).collect::<Result<Vec<_>>>()?;
+        let device = self.windows[0].device();
+        let windows = device.own(|| self.windows.iter_mut().zip(request.leases)
+            .map(|(window, lease)| window.retain_prefix(lease)).collect::<Result<Vec<_>>>())?;
         Ok(DraftPrefix { windows })
     }
     pub fn queue_prefix(&mut self, lane: usize, id: u64, end: u64) -> Result<()> {
@@ -275,8 +276,9 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
     pub fn finish_prefix(&mut self, lane: usize, id: u64) -> Result<DraftPrefix<'a>> {
         ensure!(self.prefix_ready(lane, id)?, "draft snapshot copies are incomplete");
         let leases = self.requests[&id].leases;
-        let windows = self.windows.iter_mut().zip(leases)
-            .map(|(window, lease)| window.finish_prefix(lane, lease)).collect::<Result<Vec<_>>>()?;
+        let device = self.windows[0].device();
+        let windows = device.own(|| self.windows.iter_mut().zip(leases)
+            .map(|(window, lease)| window.finish_prefix(lane, lease)).collect::<Result<Vec<_>>>())?;
         self.pending_prefix_ids[lane] = None;
         Ok(DraftPrefix { windows })
     }
@@ -290,6 +292,9 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         failure.map_or(Ok(()), Err)
     }
     pub fn restore_prefix(&mut self, id: u64, end: u64, prefix: &DraftPrefix<'a>) -> Result<()> {
+        let device = self.windows[0].device();
+        ensure!(prefix.windows.device.id == device.id
+            && std::ptr::eq(prefix.windows.device.library, device.library), "draft prefix device differs from runtime");
         let request = self.requests.get(&id).context("draft request not admitted")?;
         ensure!(prefix.windows.len() == 3 && prefix.windows.iter().all(|p| p.end() == end),
             "retained draft and target frontiers differ");
