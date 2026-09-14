@@ -1140,3 +1140,50 @@ and exported objects for the operand/output probes remain in local
 logs use the corresponding `*-stress.log` names. No diagnostic kernel replaces
 the pinned production source. The next useful boundary is the register
 fragments consumed by MMA, with checker coverage verified explicitly.
+
+The register trace subsequently found the first concrete corruption boundary.
+It retained A/B/scale register words immediately before MMA for the first 16
+output tiles. Serial traced output matched; concurrent output differed. In
+`qb-fragments-detail.log`, changed A/B words occur only at K blocks
+3, 7, 11, ..., 35. For example, the second compute warp's K-block-7 operands
+exactly match the serial K-block-23 operands: the same shared-memory slot after
+four stages of ring reuse. The sparse paired words are in local
+`qb-fragments-diff.json`. A positive control flips one expected scale byte in
+each scale checker: both report exactly one affected thread, while the real
+projection output remains unchanged (`qb-check-sf-positive.log`).
+
+Moving the release after MMA in source still failed, and disassembly showed
+release instructions before final MMA instructions. A warp barrier also
+failed. Adding `cute.arch.fence_view_async_shared()` before both consumer
+releases passed the captured stress:
+
+| Fixed-kernel stress | Result |
+| --- | --- |
+| GPU0, one row, concurrent 256 MiB memory traffic | 8,192/8,192 exact |
+| GPU1, one row, competing GEMM plus memory traffic | 8,192/8,192 exact |
+| GPU0, three rows/capacity 16, concurrent memory traffic | 8,192/8,192 exact |
+
+The fork regression `tests/gemm/test_dense_gemm_concurrent_reuse.py` uses
+synthetic weights and independent replay streams, without model captures.
+Both row cases fail on the old source (14.2% and 0.2% differing elements in
+the observed first trials) and pass with the fences. All 13 targeted regression
+and V4.1 block-FP8 correctness tests passed. The change is pushed to the fork's
+master at `3882b935ede761d6c73a5d6fd68e690f1e3f5380`; DS41RT pins that revision.
+
+This does not yet establish end-to-end completion or throughput. The full
+target fixture with only QB replaced still failed reserved encoder/replay
+comparison (`16.83005` versus `16.138021`). All projection kernels must be
+rebuilt from the fixed source, followed by the full distributed fixture and
+performance checks. The fix introduces no cross-lane synchronization or replay
+allocation. Rebuild log: local `native-proxy-release-build.log`.
+
+The complete native rebuild subsequently succeeded, and
+`distributed_target_prefill_decode_commit_smoke` passed with two RTX GPUs,
+four live Sparks, the split vocabulary head, and `DS41RT_STREAM_CASES=32`.
+The uninstrumented run completed in 19.36 seconds with zero failed tests
+(`interleave-all-proxy-release.log`). This clears the reproduced target-pass
+concurrency correctness gate; it is not a serving throughput measurement or
+completion of the remaining phase-2 startup/scheduler/release work. The prior
+native library is preserved locally as `libds41rt-before-proxy-release.so`
+(SHA-256 `1d7b0aeb2a6b47bdbb98605959c068b6ab639ea5b6fcc1a9f8e8811feef8c590`)
+for matched performance checks.
