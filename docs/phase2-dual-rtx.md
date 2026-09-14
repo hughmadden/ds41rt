@@ -1,6 +1,7 @@
 # Phase 2: two RTX coordinators and four Sparks
 
-Status: forced dual-GPU worker serves long prompts at the release prefill step; further workspace/KV sizing, automatic deployment selection and release qualification remain incomplete.
+Status: forced dual-GPU serving and automatic deployment selection are implemented;
+clean release-container validation and release qualification remain incomplete.
 
 ## Required outcome
 
@@ -91,6 +92,37 @@ every prefill operation is local.
    memory, cache reuse, constrained/tool output, and weighted real workloads.
    Compare one-GPU performance against v2 under matched settings and preserve
    all results, including losses. Count remote encoder calls explicitly.
+
+## Automatic release launcher
+
+The standard launcher accepts `--rtx-gpus auto|1|2`, with `auto` in the release
+configuration. It keeps the configured physical coordinator as logical RTX0
+and chooses the highest-free-memory peer as logical RTX1 only when both cards
+fit the requested deployment and advertise peer reads in both directions. The
+feasibility ledger includes fixed weights and workspaces, 800 MiB runtime
+headroom, per-source cache ownership, the default 14M pool or an explicit pool,
+and an explicit occupancy ceiling. Its conservative fixed allocation is the
+measured K7 footprint, so the default K5 launch retains a small safety margin.
+
+Selection runs before any service is stopped. During `--restart`, only GPU
+memory attributed by `nvidia-smi` to PIDs inside the exact existing coordinator
+container is treated as reclaimable. Unrelated allocations remain charged.
+The selected physical UUID order is recorded in the release fingerprint and
+passed to both Docker and `CUDA_VISIBLE_DEVICES`. Dual mode passes
+`--rtx-gpus 2` to the coordinator and `--first-layer 20` to every Spark; single
+mode passes one GPU and keeps Spark layer zero. `--dry-run` reports the resolved
+host indices, UUIDs, and Spark boundary.
+
+Eleven launcher/selector tests pass. They cover automatic dual selection and
+single fallback, forced one/two behavior, peer rejection, exact-pool and
+reservation effects, replacement-process accounting, configuration defaults,
+and the generated coordinator/Spark arguments. The selector chooses both cards
+on the development host at the default C16/24/14M settings: its calibrated
+requirements are 96,176 MiB for logical RTX0 and 96,778 MiB for logical RTX1,
+against 97,249/97,236 MiB currently free. A temporary two-device Docker probe
+confirmed that the quoted UUID request and ordered visibility expose two CUDA
+devices. The complete `run.sh --dry-run` now reaches the expected stale-image
+revision gate; a clean `build.sh` is the next validation step.
 
 Commit and push each completed development increment on `dev`. Keep `main`,
 `release/v2`, and the published v2 images as the qualified rollback baseline.

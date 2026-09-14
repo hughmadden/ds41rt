@@ -146,6 +146,7 @@ Command-line values override [`ds41rt.config`](ds41rt.config) for one launch:
 | Option | Default | Purpose |
 |---|---:|---|
 | `--listen HOST:PORT` | `0.0.0.0:8000` | API bind address |
+| `--rtx-gpus auto\|1\|2` | `auto` | Select two feasible peer GPUs automatically, or force a layout |
 | `--concurrency N` | `16` | Active requests, 1–16 |
 | `--kv-pool-size SIZE` | automatic | Exact global KV/index pool; B, MB, GB, MiB, or GiB |
 | `--memory-reservation SIZE` | device plan | Total GPU occupancy ceiling as bytes or a percentage |
@@ -157,7 +158,21 @@ Command-line values override [`ds41rt.config`](ds41rt.config) for one launch:
 | `--restart` | off | Replace the running five-host deployment |
 | `--dry-run` | off | Validate configuration, images, hosts, model, and devices without starting services |
 
-With no explicit pool setting, the planner starts from sixteen maximum-context active requests plus two additional maximum-context equivalents, then trades enough global KV pages for preallocated snapshot storage. At default C16 with dSpark, this gives a **16.681 GB global pool for 18,710,016 tokens plus 32,768 private-tail tokens**, with 139.4 MiB of snapshot arenas. The 24 completed-turn and prompt-snapshot limits remain independent of this aggregate token budget. `--kv-pool-size` selects the exact global pool; `--memory-reservation` caps total planned device occupancy; when both are present, the exact pool must fit under the ceiling. Smaller values are useful for side-by-side development servers:
+Automatic RTX selection checks physical UUIDs, bidirectional peer reads, the
+requested cache or memory ceiling, and available memory. With `--restart`, it
+adds back only memory owned by the coordinator container being replaced; other
+GPU processes still count against feasibility. The chosen UUID order is passed
+through unchanged as logical RTX0/RTX1. Dual mode starts Spark routed experts at
+layer 20, while single mode keeps all 40 layers on every Spark.
+
+With no explicit pool setting, single-RTX mode uses a **16.681 GB global pool
+for 18,710,016 tokens plus 32,768 private-tail tokens**. Dual-RTX mode targets a
+**13.094 GB global pool with 14,712,832 source-token positions**, including
+32,768 tail/COW positions. The 24 completed-turn and prompt-snapshot limits
+remain independent of the aggregate token budget. `--kv-pool-size` selects the
+exact global pool; `--memory-reservation` caps total planned device occupancy;
+when both are present, the exact pool must fit under the ceiling. Smaller values
+are useful for side-by-side development servers:
 
 ```bash
 ./run.sh --listen 0.0.0.0:18000 --concurrency 2 \

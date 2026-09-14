@@ -24,6 +24,7 @@ class NativeReleaseLauncherTest(unittest.TestCase):
         ).stdout
         for option in (
             "--listen",
+            "--rtx-gpus",
             "--concurrency",
             "--kv-pool-size",
             "--memory-reservation",
@@ -42,7 +43,7 @@ source scripts/release-common.sh
 release_load_config ds41rt.config
 printf '%s\n' "$MODEL_ID" "$MODEL_REVISION" "$EXPERT_FORMAT" "$SPARKINFER_EXL3" \
   "$CONCURRENCY" "$PREFIX_CACHE_ENTRIES" "$MAX_CONTEXT_TOKENS" \
-  "$MAX_OUTPUT_TOKENS" "$ADDR" "$EXPERT_PORT"
+  "$MAX_OUTPUT_TOKENS" "$ADDR" "$EXPERT_PORT" "$RTX_GPUS"
 '''
         values = subprocess.run(
             ["bash", "-c", script],
@@ -64,6 +65,7 @@ printf '%s\n' "$MODEL_ID" "$MODEL_REVISION" "$EXPERT_FORMAT" "$SPARKINFER_EXL3" 
                 "393216",
                 "0.0.0.0:8000",
                 "19441",
+                "auto",
             ],
         )
 
@@ -79,6 +81,9 @@ printf '%s\n' "$MODEL_ID" "$MODEL_REVISION" "$EXPERT_FORMAT" "$SPARKINFER_EXL3" 
     def test_standard_launch_records_runtime_placement(self) -> None:
         script = (ROOT / "run.sh").read_text()
         self.assertIn('RUST_LOG=${RUST_LOG:-info}', script)
+        self.assertIn('--rtx-gpus "$RELEASE_RTX_GPUS"', script)
+        self.assertIn('--first-layer "$first_layer"', script)
+        self.assertIn('CUDA_VISIBLE_DEVICES=$gpu_uuid_csv', script)
 
     def test_invalid_direct_overrides_fail_before_external_checks(self) -> None:
         for args, message in (
@@ -86,6 +91,7 @@ printf '%s\n' "$MODEL_ID" "$MODEL_REVISION" "$EXPERT_FORMAT" "$SPARKINFER_EXL3" 
             (["--prefix-cache-entries", "129"], "PREFIX_CACHE_ENTRIES must be in 0..128"),
             (["--max-context-tokens", "1048577"], "MAX_CONTEXT_TOKENS must be in 1..1048576"),
             (["--max-output-tokens", "393217"], "MAX_OUTPUT_TOKENS must be in 1..393216"),
+            (["--rtx-gpus", "3"], "RTX_GPUS must be auto, 1, or 2"),
         ):
             result = subprocess.run(
                 ["./run.sh", *args], cwd=ROOT, capture_output=True, text=True
