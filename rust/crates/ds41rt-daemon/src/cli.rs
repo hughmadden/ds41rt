@@ -410,6 +410,17 @@ mod tests {
             ["--dspark", "--dspark-fixed", "--dspark-confidence-cutoff", "0.5"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-adaptive"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark", "--dspark-adaptive"])).is_ok());
+        for (flags, expected) in [
+            (vec!["--dspark"], 5),
+            (vec!["--dspark", "--rtx-gpus", "1"], 5),
+            (vec!["--dspark", "--rtx-gpus", "2"], 5),
+            (vec!["--dspark", "--dspark-draft-limit", "5"], 5),
+            (vec!["--dspark", "--rtx-gpus", "2", "--dspark-draft-limit", "7"], 7),
+        ] {
+            let super::Commands::ServeNative(args) = super::Cli::try_parse_from(
+                base.into_iter().chain(flags)).unwrap().command else { panic!("expected native serving"); };
+            assert_eq!(args.dspark_draft_limit, expected);
+        }
         for limit in ["1", "2", "3", "4", "5", "6", "7"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_ok());
         }
@@ -524,7 +535,7 @@ pub(crate) struct NativeServeArgs {
 
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
-    /// Maximum verified draft tokens per request; fixed-length policy control.
+    /// Maximum draft tokens per request, for adaptive or fixed verification.
     #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=7))]
     pub dspark_draft_limit: u8,
     /// Compatibility spelling: dSpark uses lane-local adaptive selection by default.

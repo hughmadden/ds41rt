@@ -169,6 +169,14 @@ The API supports incremental SSE, cancellation, tools, parallel tool calls, JSON
 
 ## Engineering
 
+Single-RTX dSpark defaults to adaptive K5 with placement-aware costs calibrated
+for the 400 W RTX and four Spark configuration. The binary embeds the profile
+and selects costs from the expert layers actually installed on each backend.
+Native serving accepts `--dspark-draft-limit 7` for K7;
+`DS41RT_ADAPTIVE_COST_PROFILE=legacy` restores the previous cost formula.
+The [development comparison](docs/phase2-adaptive-verification.md#single-rtx-default-comparison)
+records the measured tradeoffs; the release performance tables above predate this change.
+
 The coordinator owns attention, mHC residuals, embeddings, mapped Engram lookup, routers, shared experts, vision, all three dSpark stages, the vocabulary head, sampling, cache ownership, and the API. Four Sparks hold tensor-parallel slices of the backbone routed experts and return reduced expert contributions over persistent transport buffers.
 
 Compressed global KV uses FP4 E2M1 values with group-16 E4M3 scales. The 128-token sliding windows remain FP8, and the independent selection index uses its own FP4 format. A token radix shares immutable pages, uses copy-on-write for divergent suffixes, and restores retained target/dSpark state. Partial matches replay no more than the final 128 encoder tokens; exact hits can reuse saved first-token logits. The default keeps 24 completed turns and 24 prompt snapshots under LRU eviction.

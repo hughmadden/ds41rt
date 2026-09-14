@@ -302,9 +302,8 @@ the earlier tables remain records of their actual measured configurations.
 | mixed aggregate tok/s | 150.9 | 138.1 | 159.3 | 199.1 | 291.6 |
 
 The full graph cache is kept. The bounded-cache experiment is not part of the
-implementation. Placement-aware costs and K7 remain experimental; the completed single-RTX
-comparison below does not support a universal default change. The dual-RTX pool
-default changes independently.
+implementation. The completed single-RTX comparison and selected policy are recorded below.
+The dual-RTX pool default changes independently.
 
 
 ### Single-RTX default comparison
@@ -335,8 +334,13 @@ whole-layer placement threshold. The pool stayed at 16,681,077,760 bytes /
 K7 improved code C8/C16 from approximately 555/918 to 606/970 tok/s, but
 mixed C16 fell from 202 to 172 tok/s. Placement-aware K5 improved several
 mixed concurrency cells but reduced mixed C1 from 121 to 105 tok/s. These
-measurements do not support a universal default change. Single-RTX remains
-on legacy adaptive K5; placement-aware costs and K7 remain opt-in. The dual
-14M pool decision is unchanged. Artifact hashes and all samples are recorded
-in `phase2-adaptive-serving-comparison.json`; run directories are named
+measurements do not support a universal K7 default. The selected single-RTX
+default is **placement-aware adaptive K5**, accepting the measured mixed C1
+tradeoff for the improvements at C2–C16. K7 remains selectable with
+`--dspark-draft-limit 7`. The calibrated profile is embedded in the binary,
+so the new single-RTX default needs no external profile file. Set
+`DS41RT_ADAPTIVE_COST_PROFILE=legacy` to restore the old formula, or provide
+a profile path to override the embedded fit. Dual-RTX policy defaults are
+unchanged by this selection, as is the dual 14M pool decision. Artifact hashes
+and all samples are recorded in `phase2-adaptive-serving-comparison.json`; run directories are named
 `cost-single-{legacy,placement}-v4-rtx1-k{5,7}` in the experiment cache.

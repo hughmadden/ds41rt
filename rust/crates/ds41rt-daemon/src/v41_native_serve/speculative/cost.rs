@@ -21,11 +21,11 @@ pub(super) struct Model {
 }
 
 impl Model {
-    /// Explicit experimental override until held-out prediction and serving
-    /// comparisons justify installing a built-in replacement for the old fit.
+    /// Single-RTX uses the calibrated placement profile by default. Explicit
+    /// profiles override either layout; "legacy" restores the original formula.
     pub fn from_environment(transport: &NativeTp4Wave<'_>) -> Result<Option<Self>> {
-        let Some(path) = std::env::var_os("DS41RT_ADAPTIVE_COST_PROFILE") else { return Ok(None); };
-        let bytes = std::fs::read(&path).context("reading adaptive cost profile")?;
+        let path = std::env::var_os("DS41RT_ADAPTIVE_COST_PROFILE");
+        if path.as_deref() == Some(std::ffi::OsStr::new("legacy")) { return Ok(None); }
         let placement: [String; 40] = std::array::from_fn(|layer| {
             let backend = if transport.has_tp2_layer(layer) { "rtx_tp2" }
                 else if transport.has_local_layer(layer) { "rtx_local" } else { "spark_tp4" };
@@ -34,9 +34,14 @@ impl Model {
         });
         let gpus = if (0..40).any(|layer| transport.has_tp2_shared_layer(layer)
             || transport.has_tp2_layer(layer)) { 2 } else { 1 };
+        let bytes = match &path {
+            Some(path) => std::fs::read(path).context("reading adaptive cost profile")?,
+            None if gpus == 1 => include_bytes!("cost-profile.json").to_vec(),
+            None => return Ok(None),
+        };
         let model = Self::parse(&bytes, &placement, gpus)?;
         tracing::info!(profile=?path, gpus, placement=?placement,
-            "experimental placement-aware adaptive costs loaded");
+            "placement-aware adaptive costs loaded");
         Ok(Some(model))
     }
 
@@ -87,6 +92,18 @@ mod tests {
             assert_eq!(original.verify_us(rows, 2, &unique)-moved.verify_us(rows, 2, &unique), difference);
         }
         assert!(moved.verify_us(32, 4, &unique) >= moved.verify_us(16, 4, &unique));
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_profile_covers_single_rtx_residency_changes() -> Result<()> {
+        for local_layers in 0..=40 {
+            let placement = std::array::from_fn(|layer| if layer < local_layers {
+                "rtx_local_shared1".to_owned()
+            } else { "spark_tp4_shared1".to_owned() });
+            let model = Model::parse(include_bytes!("cost-profile.json"), &placement, 1)?;
+            assert!(model.verify_us(64, 8, &[384; 40]).is_finite());
+        }
         Ok(())
     }
 
