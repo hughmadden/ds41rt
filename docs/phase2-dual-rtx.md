@@ -113,6 +113,15 @@ passed to both Docker and `CUDA_VISIBLE_DEVICES`. Dual mode passes
 mode passes one GPU and keeps Spark layer zero. `--dry-run` reports the resolved
 host indices, UUIDs, and Spark boundary.
 
+The first clean standard launch exposed two packaging/lifecycle defects before
+model loading. The coordinator release artifact enabled full-width local expert
+AOT but omitted TP2 expert AOT, leaving `ds41rt_v41_tp2_expert_info` undefined.
+The release builder now enables both interfaces for the coordinator and checks
+both symbols before assembling the image. Launcher cleanup is attached to the
+shell `EXIT` path so an explicit startup failure also removes the partial
+coordinator and four already-started Spark containers; the earlier `ERR` trap
+did not run when `release_die` exited explicitly.
+
 Eleven launcher/selector tests pass. They cover automatic dual selection and
 single fallback, forced one/two behavior, peer rejection, exact-pool and
 reservation effects, replacement-process accounting, configuration defaults,

@@ -162,7 +162,7 @@ cleanup() {
   docker rm -f "$coordinator" >/dev/null 2>&1 || true
   for i in 0 1 2 3; do ssh -o BatchMode=yes "${hosts[$i]}" "docker rm -f '${spark_prefix}-${hosts[$i]}-${EXPERT_PORT}' >/dev/null 2>&1 || true" || true; done
 }
-trap cleanup ERR
+trap cleanup EXIT
 
 echo "== starting native Spark experts =="
 pids=()
@@ -203,7 +203,7 @@ until curl -fsS "$api_url/health" >/dev/null 2>&1 &&
   ((SECONDS < deadline)) || { docker logs --tail 200 "$coordinator" >&2 || true; release_die "native API did not become ready"; }
   sleep 1
 done
-trap - ERR
+trap - EXIT
 echo "DS41RT native API is ready at $api_url/v1/"
 echo "  model: $RELEASE_MODEL_ID@$RELEASE_MODEL_REVISION"
 echo "  RTX layout: $RELEASE_RTX_GPUS GPU(s), host indices $gpu_index_csv ($gpu_uuid_csv)"

@@ -84,6 +84,14 @@ printf '%s\n' "$MODEL_ID" "$MODEL_REVISION" "$EXPERT_FORMAT" "$SPARKINFER_EXL3" 
         self.assertIn('--rtx-gpus "$RELEASE_RTX_GPUS"', script)
         self.assertIn('--first-layer "$first_layer"', script)
         self.assertIn('CUDA_VISIBLE_DEVICES=$gpu_uuid_csv', script)
+        self.assertIn("trap cleanup EXIT", script)
+
+    def test_coordinator_release_contains_both_rtx_expert_interfaces(self) -> None:
+        script = (ROOT / "scripts/build-release-artifacts.sh").read_text()
+        self.assertIn('-DDS41RT_ENABLE_V41_LOCAL_EXPERT_AOT="$coordinator_aot"', script)
+        self.assertIn('-DDS41RT_ENABLE_V41_TP2_EXPERT_AOT="$coordinator_aot"', script)
+        self.assertIn('"ds41rt_v41_local_expert_info"', script)
+        self.assertIn('"ds41rt_v41_tp2_expert_info"', script)
 
     def test_invalid_direct_overrides_fail_before_external_checks(self) -> None:
         for args, message in (
