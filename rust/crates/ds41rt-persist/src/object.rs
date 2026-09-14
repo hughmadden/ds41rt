@@ -29,7 +29,10 @@ pub fn hex(bytes: &[u8]) -> String {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum SnapshotKind { Prompt, Turn }
+pub enum SnapshotKind {
+    Prompt,
+    Turn,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PageRef {

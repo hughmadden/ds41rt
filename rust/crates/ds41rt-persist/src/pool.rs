@@ -44,7 +44,13 @@ pub trait PagePool {
     fn slot_rows(&self, slot: usize) -> usize;
     fn reserve(&mut self, appends: &[Append]) -> Result<Self::Plan, PoolExhausted>;
     fn apply(&mut self, plan: Self::Plan) -> Result<()>;
-    fn write_rows(&mut self, plan: &Self::Plan, slot: usize, first_row: usize, bytes: &[u8]) -> Result<()>;
+    fn write_rows(
+        &mut self,
+        plan: &Self::Plan,
+        slot: usize,
+        first_row: usize,
+        bytes: &[u8],
+    ) -> Result<()>;
     fn read_rows(&self, slot: usize, first_row: usize, rows: usize) -> Result<Vec<u8>>;
     fn retain_prefix(&mut self, slot: usize, rows: usize) -> Result<Self::Prefix>;
     /// Attach a retained prefix to an empty slot (restore).

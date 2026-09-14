@@ -9,13 +9,36 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum RetentionEvent {
-    Admit { request: u64, tokens: Vec<u32>, at_ns: u64 },
-    PrefillDone { request: u64, at_ns: u64 },
-    RetainPrompt { request: u64, at_ns: u64 },
-    RetireTurn { request: u64, cacheable: bool, at_ns: u64 },
-    Step { at_ns: u64, decode_tokens: u32 },
-    PoolPressure { needed_pages: usize, at_ns: u64 },
-    Cancel { request: u64, at_ns: u64 },
+    Admit {
+        request: u64,
+        tokens: Vec<u32>,
+        at_ns: u64,
+    },
+    PrefillDone {
+        request: u64,
+        at_ns: u64,
+    },
+    RetainPrompt {
+        request: u64,
+        at_ns: u64,
+    },
+    RetireTurn {
+        request: u64,
+        cacheable: bool,
+        at_ns: u64,
+    },
+    Step {
+        at_ns: u64,
+        decode_tokens: u32,
+    },
+    PoolPressure {
+        needed_pages: usize,
+        at_ns: u64,
+    },
+    Cancel {
+        request: u64,
+        at_ns: u64,
+    },
 }
 
 pub trait Clock {
