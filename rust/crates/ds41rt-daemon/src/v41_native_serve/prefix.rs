@@ -5,7 +5,7 @@ use speculative::DraftPrefix;
 mod images;
 pub(super) use images::ImageKeys;
 use images::ImageKeySpace;
-pub(super) use ds41rt_core::prefix::{Radix, Retention, SnapshotKind};
+pub(super) use ds41rt_core::prefix::{Retention, SnapshotKind};
 mod host_cache;
 pub(super) use host_cache::HostCacheBinding;
 struct Saved<'a> {

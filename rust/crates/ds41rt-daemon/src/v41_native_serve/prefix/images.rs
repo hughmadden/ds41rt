@@ -156,7 +156,7 @@ impl ImageKeySpace {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Radix, Retention, SnapshotKind};
+    use ds41rt_core::prefix::{Radix, Retention, SnapshotKind};
     use super::*;
 
     fn prompt(text: usize, images: usize) -> Vec<u32> {

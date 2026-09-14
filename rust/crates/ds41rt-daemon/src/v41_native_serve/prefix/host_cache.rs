@@ -334,7 +334,7 @@ impl<'a> HostCacheBinding<'a> {
     }
 
     /// Issue the write-behind copy of a freshly retained snapshot; the ticket lives in the `Saved`.
-    pub fn store(
+    pub(super) fn store(
         &mut self,
         kind: SnapshotKind,
         keys: &[u32],
@@ -348,22 +348,22 @@ impl<'a> HostCacheBinding<'a> {
         })
     }
     /// The key-space tokens a resident host snapshot is keyed by.
-    pub fn snapshot_tokens(&self, key: ds41rt_hostcache::snapshot::Key) -> Option<Vec<u32>> {
+    pub(super) fn snapshot_tokens(&self, key: ds41rt_hostcache::snapshot::Key) -> Option<Vec<u32>> {
         self.cache.snapshot_tokens(key).map(<[u32]>::to_vec)
     }
-    pub fn tick(&mut self) {
+    pub(super) fn tick(&mut self) {
         self.cache.tick();
     }
     /// The engine is dropping a `Saved`: let its copy finish within budget or count the loss.
-    pub fn before_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
+    pub(super) fn before_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
         self.cache.before_device_evict(ticket)
     }
-    pub fn lookup(&mut self, keys: &[u32]) -> Option<Hit> {
+    pub(super) fn lookup(&mut self, keys: &[u32]) -> Option<Hit> {
         self.cache.lookup(keys)
     }
     /// Rebuild a `Saved` from the host copy. `Ok(None)` when the restore timed out or failed (the
     /// caller prefills); allocations are released only after the restore stream drained.
-    pub fn restore(
+    pub(super) fn restore(
         &mut self,
         hit: &Hit,
         requests: &Requests<'a>,
@@ -470,7 +470,7 @@ impl<'a> HostCacheBinding<'a> {
             ticket: None,
         }))
     }
-    pub fn metrics(&self) -> MetricsSnapshot {
+    pub(super) fn metrics(&self) -> MetricsSnapshot {
         self.cache.metrics()
     }
 }
