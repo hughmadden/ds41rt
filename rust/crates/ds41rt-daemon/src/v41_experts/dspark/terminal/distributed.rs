@@ -33,6 +33,7 @@ impl<'w, 'a> DistributedDsparkTerminal<'w, 'a> {
     }
     /// GPU1 residual/pre-mix and anchor storage, with the ordinary terminal layout.
     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] { self.terminal.inputs() }
+    pub fn validate_sampling(&self, requests: usize) -> Result<()> { self.terminal.validate_sampling(requests) }
     pub fn stage_sampling(&mut self, rngs: &mut [&mut DsparkRng], temperatures: &[f32]) -> Result<()> {
         self.ready = None;
         self.terminal.stage_sampling(rngs, temperatures)

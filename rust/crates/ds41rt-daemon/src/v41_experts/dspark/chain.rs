@@ -7,6 +7,8 @@ use anyhow::{ensure, Context, Result};
 use ds41rt_core::DsparkRng;
 use ds41rt_ffi::{Ds41rtDeviceBuffer, V41AttentionOps};
 use std::ffi::c_void;
+mod distributed;
+pub(crate) use distributed::DistributedDsparkChain;
 
 pub(crate) struct DsparkChain<'weights, 'library> {
     stream: LoadStream<'library>,

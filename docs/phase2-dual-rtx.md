@@ -1288,8 +1288,8 @@ two concurrent lanes, cold execution, graph replay, changed inputs, greedy and
 0.7-temperature sampling, cancellation/reuse and device restoration. Tokens,
 all corrected logits and raw confidence matched the full-head terminal byte
 for byte. It completed in 3.45 seconds (`distributed-terminal.log`). This does
-not yet connect the distributed terminal to the draft transformer chain or the
-serving scheduler, and does not establish a throughput improvement.
+not establish a throughput improvement. The draft-chain connection is described
+below; serving scheduler integration remains outstanding.
 
 The existing single-RTX target/draft fixture also passed after this refactor:
 three 16-request draft cycles, greedy and 0.7-temperature sampling, graph-exact
@@ -1299,3 +1299,21 @@ Both the target and transport must select the CUDA library in this fixture;
 the initial invocation omitted `DS41RT_NATIVE_LIB` and selected the non-CUDA
 transport fallback before any draft execution. The corrected invocation passed.
 This verifies behavior, not single-RTX serving throughput.
+
+`DistributedDsparkChain` connects the sole GPU0 embedding table, three GPU1
+draft transformer stages and the distributed terminal. Each lane owns its chain
+graphs, staging and terminal workspaces. Cache read reservations are acquired
+before submission and released after transformer completion; cancellation drops
+the reservation guard under the GPU1 device scope after draining submitted work.
+Completed transformer outputs are reordered into terminal layout on GPU1. The
+head stages then run cooperatively without holding a shared request-lane join.
+
+The complete-chain fixture uses real checkpoint weights and synthetic committed
+FP8 cache contents. At 1, 3, 8 and 16 requests, it compares two concurrent lanes
+against the full-head chain while changing cache contents/positions, seed IDs,
+request order and temperatures. Tokens, every corrected logit and confidence
+matched exactly on cold execution and graph replay; floating-point outputs were
+finite. Cancellation, reuse, cache lease release and device restoration also
+passed (`distributed-chain.log`, 5.30 seconds). This is a component fixture,
+not an agentic serving or performance qualification. The normal serving runtime
+still needs to drive the distributed chain through its independent scheduler.

@@ -1,6 +1,6 @@
 //! RTX-only ownership for every native dSpark tensor and independent stage experts.
 mod chain;
-pub(crate) use chain::DsparkChain;
+pub(crate) use chain::{DsparkChain, DistributedDsparkChain};
 mod stage;
 pub(crate) use stage::DsparkStage;
 mod main_context;
