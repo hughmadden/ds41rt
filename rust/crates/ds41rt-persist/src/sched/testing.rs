@@ -1,13 +1,6 @@
-// Shared fixtures for the P0-4 suites and bench.
-//
-// The yield-N-times task is the smallest stand-in for a lane's shared-state boundaries. Keeping
-// one copy here means the functional suite, the scheduler's unit tests and the bench all exercise
-// the same task shape.
-//
-// This file is compiled into several targets, each of which uses a subset of it, so unused items
-// are expected rather than dead code; every including module allows dead code.
-
-use ds41rt_persist::sched::Task;
+//! Test support shared by the functional suite, the bench and the scheduler's unit tests: the
+//! smallest task shapes that exercise a lane's shared-state boundaries. Not production API.
+use super::Task;
 
 /// The production task population: sixteen decode lanes plus two retention lanes.
 pub const PRODUCTION_TASKS: usize = 18;

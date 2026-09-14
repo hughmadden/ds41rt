@@ -12,10 +12,7 @@ use ds41rt_persist::sched::{explore, Interleaver, ReplayError, Shared, XorShift6
 use proptest::prelude::*;
 use std::cell::Cell;
 
-#[allow(dead_code)]
-mod common;
-
-use common::{yielders, PRODUCTION_TASKS};
+use ds41rt_persist::sched::testing::{yielders, PRODUCTION_TASKS};
 
 const SOLO: &str = include_str!("data/cap2-solo.json");
 const C4: &str = include_str!("data/cap2-c4.json");

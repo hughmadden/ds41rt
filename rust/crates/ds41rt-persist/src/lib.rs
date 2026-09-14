@@ -12,11 +12,6 @@
 //! the packets add stub implementations plus functional, performance and concurrency suites.
 //! Nothing here links a native library; the engine binding lands in Phase 4 on the daemon side.
 
-// The shared test fixture under `tests/common/` names this crate as `ds41rt_persist`; in the unit
-// test build the crate is not otherwise reachable by its own name, so alias it there.
-#[cfg(test)]
-extern crate self as ds41rt_persist;
-
 pub mod arena;
 pub mod copy;
 pub mod events;

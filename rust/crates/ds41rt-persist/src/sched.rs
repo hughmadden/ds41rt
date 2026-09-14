@@ -7,6 +7,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Test support shared by this module's unit tests, the functional suite and the bench.
+#[doc(hidden)]
+pub mod testing;
+
 pub trait Task {
     /// Run until the next yield point. Returns `false` when finished.
     fn step(&mut self) -> bool;
@@ -312,15 +316,8 @@ impl XorShift64 {
 
 #[cfg(test)]
 mod tests {
-    // The fixture lives with the integration suites; `include!` resolves relative to this file's
-    // real directory (`src/`), which `#[path]` cannot do from a virtual module directory.
-    #[allow(dead_code)]
-    mod common {
-        include!("../tests/common/mod.rs");
-    }
-
+    use super::testing::yielders;
     use super::*;
-    use common::yielders;
 
     #[test]
     fn xorshift_never_reaches_its_fixed_point() {

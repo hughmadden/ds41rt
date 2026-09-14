@@ -7,11 +7,7 @@ use ds41rt_persist::events::{synthetic, TraceReplay};
 use ds41rt_persist::sched::Interleaver;
 use std::hint::black_box;
 
-#[allow(dead_code)]
-#[path = "../tests/common/mod.rs"]
-mod common;
-
-use common::{lanes, PRODUCTION_TASKS};
+use ds41rt_persist::sched::testing::{lanes, PRODUCTION_TASKS};
 
 /// Turns per session in the replay bench: the recorded captures hold twelve.
 const BENCH_TURNS: usize = 12;
