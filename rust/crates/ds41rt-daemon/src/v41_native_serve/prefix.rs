@@ -54,6 +54,27 @@ impl<'a> PrefixCache<'a> {
     pub fn host_metrics(&self) -> Option<ds41rt_hostcache::metrics::Snapshot> {
         self.host.as_ref().map(HostCacheBinding::metrics)
     }
+    /// The host cache's effective configuration, exported with the metrics.
+    pub fn host_config(&self) -> Option<&ds41rt_hostcache::config::Config> {
+        self.host.as_ref().map(HostCacheBinding::config)
+    }
+    /// Once per prefill chunk (packet HC-9): observe the store stream (`tick`) first — a
+    /// completion is otherwise only seen at the scheduler loop's `tick`, which a synchronous
+    /// prefill blocks for its whole duration — then the bounded pacing hold that limits how
+    /// long the oldest pending store copy may stay outstanding. The observation runs on
+    /// every prefill chunk regardless of `store_pace_ns`; the pacing hold itself is a no-op
+    /// and moves no hold metric when `store_pace_ns` is 0 (store metrics may move, because
+    /// the observation commits completions). No-op without a host cache; the full contract
+    /// lives at `ds41rt_hostcache::HostCache::prefill_hold`.
+    pub fn prefill_hold(&mut self) -> anyhow::Result<()> {
+        match &mut self.host {
+            Some(host) => {
+                host.tick();
+                host.prefill_hold()
+            }
+            None => Ok(()),
+        }
+    }
     /// Replace a same-key snapshot or evict the oldest when the bank is full, before another
     /// arena slot is taken; every dropped snapshot passes through the host cache first.
     fn make_bank_room(&mut self, kind: SnapshotKind, keys: &[u32]) {

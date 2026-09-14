@@ -532,6 +532,12 @@ pub(crate) struct NativeServeArgs {
     /// Longest a host restore waits before the request falls through to prefill.
     #[arg(long, default_value_t = 500, env = "DS41RT_HOST_CACHE_RESTORE_BUDGET_MS")]
     pub host_cache_restore_budget_ms: u64,
+    /// Pace prefill chunks against pending host-cache stores: when the oldest in-flight
+    /// store copy is older than this, each prefill chunk boundary waits on its event for at
+    /// most this long again. Zero disables the guard (no holds, no hold metrics). The
+    /// recommended fleet value is 500 ms.
+    #[arg(long, default_value_t = 0, env = "DS41RT_HOST_CACHE_STORE_PACE_MS")]
+    pub host_cache_store_pace_ms: u64,
     /// Snapshots shorter than this are not cached.
     #[arg(long, default_value_t = 512, env = "DS41RT_HOST_CACHE_MIN_TOKENS")]
     pub host_cache_min_tokens: u32,
@@ -611,6 +617,7 @@ impl NativeServeArgs {
             },
             copy_budget_ns: self.host_cache_copy_budget_ms * 1_000_000,
             restore_budget_ns: self.host_cache_restore_budget_ms * 1_000_000,
+            store_pace_ns: self.host_cache_store_pace_ms * 1_000_000,
             min_tokens: self.host_cache_min_tokens,
             max_tokens: self.host_cache_max_tokens,
             kinds,

@@ -1,6 +1,6 @@
-//! The cache facade (packet HC-5): the five calls the engine's scheduler makes, all on its own
-//! thread, none of which blocks except the two whose whole purpose is to wait a bounded time
-//! (`before_device_evict`, `restore`).
+//! The cache facade (packet HC-5): the six calls the engine's scheduler makes, all on its own
+//! thread, none of which blocks except the three whose whole purpose is to wait a bounded
+//! time (`before_device_evict`, `restore`, `prefill_hold`).
 //!
 //! The engine attaches a payload `P` to every store (its host-side descriptors: image keys,
 //! Engram history, logits, window and compressor metadata); the cache hands it back on a hit
@@ -521,6 +521,49 @@ impl<E: CopyEngine, P> HostCache<E, P> {
             self.metrics.get_mut().evict_drops_uncached += 1;
             EvictDecision::DroppedUncached
         }
+    }
+
+    /// The scheduler's prefill pacing guard (packet HC-9), called at each prefill chunk
+    /// boundary — the full contract lives here; the daemon's wrappers delegate. If the
+    /// oldest in-flight store copy has been outstanding longer than `store_pace_ns`, wait
+    /// on that store's event for at most `store_pace_ns` more, then return regardless.
+    /// Invariants: never blocks longer than `store_pace_ns` — on engines that poll between
+    /// probes, a timed-out wait is bounded by the budget plus at most one poll quantum,
+    /// since the inter-poll sleep is clipped to the remaining budget; with the knob at 0,
+    /// or when the cache is disabled, or when nothing is in flight, the pacing hold itself
+    /// is a no-op — no clock read, no hold metric moves (the daemon's wrapper observes the
+    /// store stream with `tick` on every prefill chunk regardless of the knob, so store
+    /// metrics may still move at that level); it never fails the request (a wait error is
+    /// counted as a timeout); a store that completes during the hold is left for `tick` to
+    /// commit, so its latency — which already includes the hold time — lands in the
+    /// store-latency histogram exactly once and is never double-counted here.
+    pub fn prefill_hold(&mut self) -> anyhow::Result<()> {
+        let pace = self.config.store_pace_ns;
+        if !self.enabled() || pace == 0 {
+            return Ok(());
+        }
+        let oldest = self
+            .pending
+            .iter()
+            .filter_map(|pending| match &pending.kind {
+                PendingKind::Issued {
+                    event, issued_ns, ..
+                } => Some((*event, *issued_ns)),
+                _ => None,
+            })
+            .min_by_key(|&(_, issued_ns)| issued_ns);
+        let Some((event, issued_ns)) = oldest else {
+            return Ok(());
+        };
+        // One clock read serves both the age check and the hold's start.
+        let now = self.engine.now_ns();
+        if now.saturating_sub(issued_ns) <= pace {
+            return Ok(());
+        }
+        let completed = self.engine.wait(event, pace).unwrap_or(false);
+        let ns = self.engine.now_ns().saturating_sub(now);
+        self.metrics.record_prefill_hold(ns, !completed);
+        Ok(())
     }
 
     /// The key-space tokens of a resident snapshot (the sequence its radix entry is keyed by).

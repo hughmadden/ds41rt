@@ -246,6 +246,33 @@ pub fn settle(cache: &mut HostCache<StubCopyEngine, Payload>) {
     cache.engine_mut().advance(1_000_000_000);
 }
 
+/// The stub's modelled duration of one store of `snapshot` under `model`: a serial chain on
+/// the store stream — each copy costs the per-copy latency plus its transfer time at the
+/// modelled bandwidth, and the event completes with the last copy.
+pub fn modelled_store_ns(model: CopyModel, snapshot: &DeviceSnapshot) -> u64 {
+    let mut total = 0u64;
+    let mut chain = |bytes: usize| {
+        total += model.per_copy_latency_ns + (bytes as f64 / model.d2h_bytes_per_ns).ceil() as u64;
+    };
+    for page in snapshot.pages.iter().flatten() {
+        for segment in &page.segments {
+            chain(segment.bytes);
+        }
+    }
+    for segment in &snapshot.tail {
+        chain(segment.bytes);
+    }
+    if let Some(draft) = &snapshot.draft {
+        for segment in draft {
+            chain(segment.bytes);
+        }
+    }
+    for segment in &snapshot.scores {
+        chain(segment.bytes);
+    }
+    total
+}
+
 /// Store `snapshot` and make it resident, whichever mode the cache uses: `OnRetain` issues at
 /// store time and `tick` commits; `OnEvict` issues and commits on the device-evict path.
 pub fn store_resident(

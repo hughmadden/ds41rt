@@ -39,6 +39,23 @@ pub struct Snapshot {
     pub evict_waits: u64,
     pub evict_wait_ns: u64,
     pub evict_drops_uncached: u64,
+    /// Prefill pacing holds (`HostCache::prefill_hold` calls that waited on the oldest
+    /// pending store's event). One per hold call that found an overdue store, whether the
+    /// wait completed or timed out. Zero whenever `store_pace_ns` is 0: with the knob off
+    /// the pacing hold is a no-op and never counts (store metrics may still move, because
+    /// the daemon's wrapper observes completions with `tick` on every prefill chunk
+    /// regardless of the knob). Invariant: `prefill_hold_timeouts <= prefill_holds`.
+    pub prefill_holds: u64,
+    /// Sum of the wall nanoseconds every hold waited: each summand is at most
+    /// `store_pace_ns` (exact on the stub; on engines that poll, at most one poll quantum
+    /// more — see `HostCache::prefill_hold`), so `prefill_hold_ns_sum <= prefill_holds *
+    /// store_pace_ns`. The completing store's own latency — which naturally includes the
+    /// hold time it observed — is recorded by the store-latency histogram exactly once at
+    /// its commit, never here, so a hold is never double-counted.
+    pub prefill_hold_ns_sum: u64,
+    /// Holds whose budgeted wait ran out before the store's event completed. Counted,
+    /// never an error: the hold returns regardless and the request is never failed.
+    pub prefill_hold_timeouts: u64,
     /// Device snapshots the engine evicted while the cache was on: incremented exactly once per
     /// `HostCache::before_device_evict` call — every snapshot the engine evicts from a device
     /// bank or via `make_room` — before any budget wait and whatever the outcome (host copy
@@ -100,6 +117,16 @@ impl Metrics {
         s.store_latency_sum_ns += latency_ns;
         s.store_latency_buckets[latency_bucket(latency_ns)] += 1;
     }
+    /// Count one prefill pacing hold: `ns` waited (at most the configured pace, plus at
+    /// most one poll quantum on engines that poll) and whether the wait timed out. A store
+    /// whose copy completes during the hold keeps its latency for the store histogram's
+    /// single commit-time entry; only the wait itself is here.
+    pub fn record_prefill_hold(&mut self, ns: u64, timed_out: bool) {
+        let s = &mut self.snapshot;
+        s.prefill_holds += 1;
+        s.prefill_hold_ns_sum += ns;
+        s.prefill_hold_timeouts += u64::from(timed_out);
+    }
 }
 
 #[cfg(test)]
@@ -131,5 +158,27 @@ mod tests {
             let store: u64 = snapshot.store_latency_buckets.iter().sum();
             assert_eq!(restore, store, "latency {latency} placed differently");
         }
+    }
+
+    /// `record_prefill_hold` (packet HC-9) keeps its counters ordered and the sum within
+    /// `holds * pace` for every mix of completions and timeouts.
+    #[test]
+    fn record_prefill_hold_keeps_its_invariants() {
+        let mut metrics = Metrics::default();
+        for &(ns, timed_out) in &[
+            (0, false),
+            (1_000_000, false),
+            (50_000_000, true),
+            (100_000_000, true),
+        ] {
+            metrics.record_prefill_hold(ns, timed_out);
+            let snapshot = metrics.snapshot();
+            assert!(snapshot.prefill_hold_timeouts <= snapshot.prefill_holds);
+            assert!(snapshot.prefill_hold_ns_sum <= snapshot.prefill_holds * 100_000_000);
+        }
+        let snapshot = metrics.snapshot();
+        assert_eq!(snapshot.prefill_holds, 4);
+        assert_eq!(snapshot.prefill_hold_timeouts, 2);
+        assert_eq!(snapshot.prefill_hold_ns_sum, 151_000_000);
     }
 }

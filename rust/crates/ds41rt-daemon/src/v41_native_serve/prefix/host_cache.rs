@@ -215,10 +215,13 @@ impl CopyEngine for CudaCopyEngine<'_> {
             if self.completed(event)? {
                 return Ok(true);
             }
-            if self.now_ns() >= deadline {
+            // Clip the inter-poll sleep to the remaining budget: a timed-out wait then
+            // overshoots the deadline by at most one probe, not one full sleep quantum.
+            let remaining = deadline.saturating_sub(self.now_ns());
+            if remaining == 0 {
                 return Ok(false);
             }
-            std::thread::sleep(Duration::from_micros(20));
+            std::thread::sleep(Duration::from_nanos(remaining.min(20_000)));
         }
     }
     fn now_ns(&self) -> u64 {
@@ -363,6 +366,16 @@ impl<'a> HostCacheBinding<'a> {
     /// The engine is dropping a `Saved`: let its copy finish within budget or count the loss.
     pub(super) fn before_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
         self.cache.before_device_evict(ticket)
+    }
+    /// Delegates to [`HostCache::prefill_hold`]; the full contract lives there. The
+    /// scheduler's wrapper observes the store stream (`tick`) on every prefill chunk
+    /// regardless of `store_pace_ns` before calling this hold.
+    pub(super) fn prefill_hold(&mut self) -> anyhow::Result<()> {
+        self.cache.prefill_hold()
+    }
+    /// The effective configuration, exported with the metrics.
+    pub(super) fn config(&self) -> &Config {
+        self.cache.config()
     }
     pub(super) fn lookup(&mut self, keys: &[u32]) -> Option<Hit> {
         self.cache.lookup(keys)

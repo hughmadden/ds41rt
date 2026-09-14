@@ -6,8 +6,8 @@
 mod common_hc_5;
 
 use common_hc_5::{
-    cache as build_cache, config, default_cache, settle, snapshot, tokens, write_snapshot, Device,
-    FailAfter, DEVICE_BYTES,
+    cache as build_cache, config, default_cache, modelled_store_ns, settle, snapshot, tokens,
+    write_snapshot, Device, FailAfter, DEVICE_BYTES,
 };
 use ds41rt_hostcache::cache::{DeviceSnapshot, EvictDecision, StoreOutcome};
 use ds41rt_hostcache::config::StoreMode;
@@ -16,33 +16,6 @@ use ds41rt_hostcache::metrics::RESTORE_BUCKETS_NS;
 use ds41rt_hostcache::pool::testing::{layout, CHUNK};
 use ds41rt_hostcache::SnapshotKind;
 use proptest::prelude::*;
-
-/// The stub's modelled duration of one store of `snapshot`: a serial chain on the store
-/// stream — each copy costs the per-copy latency plus its transfer time at the modelled
-/// bandwidth, and the event completes with the last copy.
-fn modelled_store_ns(model: CopyModel, snapshot: &DeviceSnapshot) -> u64 {
-    let mut total = 0u64;
-    let mut chain = |bytes: usize| {
-        total += model.per_copy_latency_ns + (bytes as f64 / model.d2h_bytes_per_ns).ceil() as u64;
-    };
-    for page in snapshot.pages.iter().flatten() {
-        for segment in &page.segments {
-            chain(segment.bytes);
-        }
-    }
-    for segment in &snapshot.tail {
-        chain(segment.bytes);
-    }
-    if let Some(draft) = &snapshot.draft {
-        for segment in draft {
-            chain(segment.bytes);
-        }
-    }
-    for segment in &snapshot.scores {
-        chain(segment.bytes);
-    }
-    total
-}
 
 /// The histogram bucket a latency belongs to: the first bound it does not exceed, else overflow.
 fn expected_bucket(latency_ns: u64) -> usize {
