@@ -17,31 +17,21 @@ use ds41rt_hostcache::pool::testing::{layout, CHUNK};
 use ds41rt_hostcache::SnapshotKind;
 use proptest::prelude::*;
 
-/// The stub's modelled duration of one store of `snapshot`: a serial chain on the store
-/// stream — each copy costs the per-copy latency plus its transfer time at the modelled
-/// bandwidth, and the event completes with the last copy.
+/// The stub's modelled duration of one store of `snapshot`: since HC-8 the cache issues a
+/// store as one coalesced batch, charged as one per-copy latency plus the transfer of the
+/// summed bytes at the modelled bandwidth, every extent completing at that one time.
 fn modelled_store_ns(model: CopyModel, snapshot: &DeviceSnapshot) -> u64 {
-    let mut total = 0u64;
-    let mut chain = |bytes: usize| {
-        total += model.per_copy_latency_ns + (bytes as f64 / model.d2h_bytes_per_ns).ceil() as u64;
-    };
-    for page in snapshot.pages.iter().flatten() {
-        for segment in &page.segments {
-            chain(segment.bytes);
-        }
-    }
-    for segment in &snapshot.tail {
-        chain(segment.bytes);
-    }
-    if let Some(draft) = &snapshot.draft {
-        for segment in draft {
-            chain(segment.bytes);
-        }
-    }
-    for segment in &snapshot.scores {
-        chain(segment.bytes);
-    }
-    total
+    let bytes: usize = snapshot
+        .pages
+        .iter()
+        .flatten()
+        .flat_map(|page| &page.segments)
+        .chain(snapshot.tail.iter())
+        .chain(snapshot.draft.iter().flatten())
+        .chain(snapshot.scores.iter())
+        .map(|segment| segment.bytes)
+        .sum();
+    model.per_copy_latency_ns + (bytes as f64 / model.d2h_bytes_per_ns).ceil() as u64
 }
 
 /// The histogram bucket a latency belongs to: the first bound it does not exceed, else overflow.
@@ -201,9 +191,10 @@ fn store_latency_matches_the_modelled_copy_time() {
 #[test]
 fn store_latency_lands_past_the_first_bucket() {
     // A modelled latency in the 10–50 ms band must land in bucket 3, not bucket 0: the
-    // placement is by value, not by "any copy fits the first bound".
+    // placement is by value, not by "any copy fits the first bound". A store is one batch
+    // since HC-8, so the band is set by the per-submission latency alone.
     let model = CopyModel {
-        per_copy_latency_ns: 1_000_000,
+        per_copy_latency_ns: 20_000_000,
         ..CopyModel::default()
     };
     let config = config(4 * CHUNK as u64, StoreMode::OnRetain);

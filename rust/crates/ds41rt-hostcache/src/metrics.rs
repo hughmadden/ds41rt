@@ -49,6 +49,11 @@ pub struct Snapshot {
     pub device_evictions: u64,
     pub host_evictions: u64,
     pub host_evicted_bytes: u64,
+    /// Engine submissions issued so far: one per 1D copy and one per coalesced batch, so the
+    /// fleet report can show submissions per snapshot before and after coalescing. Gauge,
+    /// refreshed with the other pool gauges; engines without submission instrumentation
+    /// report 0.
+    pub copy_submissions: u64,
     pub resident_snapshots: u64,
     pub bytes_used: u64,
     pub quota_bytes: u64,

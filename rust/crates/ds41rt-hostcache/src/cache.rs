@@ -18,7 +18,7 @@
 //! With `StoreMode::OnEvict`, `store` only records the snapshot and the copy is issued by
 //! `before_device_evict`, which then waits within the copy budget.
 use crate::config::{Config, StoreMode};
-use crate::copy::{CopyEngine, DeviceRange, Event, Stream};
+use crate::copy::{coalesce, coalesce_restore, CopyEngine, DeviceRange, Event, Stream};
 use crate::metrics::{Metrics, Snapshot as MetricsSnapshot};
 use crate::pool::{HostRange, Layout, SlabPool};
 use crate::snapshot::{
@@ -599,6 +599,7 @@ impl<E: CopyEngine, P> HostCache<E, P> {
             .unwrap_or(false);
         let ns = self.engine.now_ns().saturating_sub(start);
         self.unpin(key);
+        self.refresh_gauges();
         if completed {
             if let Some(snapshots) = self.snapshots.as_mut() {
                 for &(id, page) in &plan.shared {
@@ -917,10 +918,12 @@ impl<E: CopyEngine, P> HostCache<E, P> {
             None => (0, 0),
         };
         let quota = self.config.bytes;
+        let submissions = self.engine.submission_count();
         let metrics = self.metrics.get_mut();
         metrics.resident_snapshots = resident;
         metrics.bytes_used = bytes;
         metrics.quota_bytes = quota;
+        metrics.copy_submissions = submissions;
     }
 }
 
@@ -929,83 +932,81 @@ fn segment_bytes(segments: &[DeviceRange]) -> usize {
     segments.iter().map(|segment| segment.bytes).sum()
 }
 
-/// Copy `segments` into `dst` on the store stream, concatenated in order.
-fn copy_out<E: CopyEngine>(
-    engine: &mut E,
-    segments: &[DeviceRange],
-    dst: HostRange,
-) -> anyhow::Result<()> {
-    let mut offset = 0;
-    for segment in segments {
-        engine.d2h(
-            Stream::Store,
-            *segment,
-            HostRange {
-                chunk: dst.chunk,
-                offset: dst.offset + offset,
-                bytes: segment.bytes,
-            },
-        )?;
+/// `host` sliced per segment: the window each segment of `segments` occupies when they are
+/// concatenated at `host`, in order.
+fn host_windows(host: HostRange, segments: &[DeviceRange]) -> impl Iterator<Item = HostRange> + '_ {
+    let mut offset = host.offset;
+    segments.iter().map(move |segment| {
+        let window = HostRange {
+            chunk: host.chunk,
+            offset,
+            bytes: segment.bytes,
+        };
         offset += segment.bytes;
-    }
-    Ok(())
+        window
+    })
 }
 
-/// Copy `segments` out of `src` on the restore stream, concatenated in order.
-fn copy_in<E: CopyEngine>(
-    engine: &mut E,
+/// Append a store's copies for `segments` to `pairs`: each segment with the window it occupies
+/// at `host`, in order.
+fn append_store_pairs(
+    pairs: &mut Vec<(DeviceRange, HostRange)>,
     segments: &[DeviceRange],
-    src: HostRange,
-) -> anyhow::Result<()> {
-    let mut offset = 0;
-    for segment in segments {
-        engine.h2d(
-            Stream::Restore,
-            HostRange {
-                chunk: src.chunk,
-                offset: src.offset + offset,
-                bytes: segment.bytes,
-            },
-            *segment,
-        )?;
-        offset += segment.bytes;
-    }
-    Ok(())
+    host: HostRange,
+) {
+    pairs.extend(segments.iter().copied().zip(host_windows(host, segments)));
 }
 
-/// Issue every copy `plan` owes on the store stream, concatenated in order.
+/// Append a restore's copies for `segments` to `pairs`: each segment's window at `host` with
+/// the segment, in order.
+fn append_restore_pairs(
+    pairs: &mut Vec<(HostRange, DeviceRange)>,
+    segments: &[DeviceRange],
+    host: HostRange,
+) {
+    pairs.extend(host_windows(host, segments).zip(segments.iter().copied()));
+}
+
+/// Issue every copy `plan` owes on the store stream as one coalesced batch, concatenated in
+/// order: adjacent copies merge (see [`coalesce`]), so a snapshot allocated from a fresh pool
+/// costs a handful of submissions instead of thousands.
 fn issue_store_copies<E: CopyEngine>(
     engine: &mut E,
     snapshots: &Snapshots,
     plan: &StorePlan,
     parts: &StoreParts,
 ) -> anyhow::Result<()> {
+    let mut pairs = Vec::new();
     for (index, &(_, _, _, slab)) in plan.copies.iter().enumerate() {
-        copy_out(engine, &parts.pages[index], snapshots.location(slab))?;
+        append_store_pairs(&mut pairs, &parts.pages[index], snapshots.location(slab));
     }
-    copy_out(engine, &parts.tail, snapshots.location(plan.tail))?;
+    append_store_pairs(&mut pairs, &parts.tail, snapshots.location(plan.tail));
     if let (Some(slab), Some(segments)) = (plan.draft, parts.draft.as_deref()) {
-        copy_out(engine, segments, snapshots.location(slab))?;
+        append_store_pairs(&mut pairs, segments, snapshots.location(slab));
     }
     if let (Some(slab), segments) = (plan.scores, parts.scores.as_slice()) {
-        copy_out(engine, segments, snapshots.location(slab))?;
+        append_store_pairs(&mut pairs, segments, snapshots.location(slab));
     }
-    Ok(())
+    let merged = coalesce(&pairs);
+    engine.d2h_many(Stream::Store, &merged)
 }
 
-/// Issue every copy a restore owes on the restore stream, concatenated in order.
+/// Issue every copy a restore owes on the restore stream as one coalesced batch,
+/// concatenated in order (see [`issue_store_copies`]).
 fn issue_restore_copies<E: CopyEngine>(engine: &mut E, plan: &RestorePlan) -> anyhow::Result<()> {
+    let mut pairs = Vec::new();
     for (host, segments) in &plan.pages {
-        copy_in(engine, segments, *host)?;
+        append_restore_pairs(&mut pairs, segments, *host);
     }
-    copy_in(engine, plan.tail.1, plan.tail.0)?;
+    append_restore_pairs(&mut pairs, plan.tail.1, plan.tail.0);
     if let Some((host, segments)) = plan.draft {
-        copy_in(engine, segments, host)?;
+        append_restore_pairs(&mut pairs, segments, host);
     }
     if let Some((host, segments)) = plan.scores {
-        copy_in(engine, segments, host)?;
+        append_restore_pairs(&mut pairs, segments, host);
     }
-    Ok(())
+    let merged = coalesce_restore(&pairs);
+    engine.h2d_many(Stream::Restore, &merged)
 }
 
 #[cfg(test)]

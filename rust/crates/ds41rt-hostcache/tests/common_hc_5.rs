@@ -317,6 +317,10 @@ impl CopyEngine for FailAfter {
         self.inner.h2d(stream, src, dst)
     }
 
+    fn submission_count(&self) -> u64 {
+        self.inner.submission_count()
+    }
+
     fn record(&mut self, stream: Stream) -> anyhow::Result<Event> {
         self.inner.record(stream)
     }
