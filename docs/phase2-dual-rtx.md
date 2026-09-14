@@ -1187,3 +1187,27 @@ completion of the remaining phase-2 startup/scheduler/release work. The prior
 native library is preserved locally as `libds41rt-before-proxy-release.so`
 (SHA-256 `1d7b0aeb2a6b47bdbb98605959c068b6ab639ea5b6fcc1a9f8e8811feef8c590`)
 for matched performance checks.
+
+A matched, cache-hot QB timing probe used the preserved old library and rebuilt
+library in before/after/after/before order, 128 projections per graph, 16 graph
+replays per timed sample, and 15 samples per arm. Outputs matched exactly in
+the serial timing workload. Mean arm medians were 17.336 versus 17.337 µs for
+one row and 16.899 versus 16.899 µs for three rows. No measurable difference
+appeared in this probe. These are local projection timings, without a formal
+clock/throttle qualification, and do not replace single-RTX serving regression
+or real/weighted throughput tables. Commands/scripts and raw samples remain in
+local `bench-qb-fence.py`, `run-qb-fence-bench.py`, and `qb-fence-bench-*.log`.
+
+The distributed target pass now assembles adaptive route history for all 40
+layers from the router output already present in each owning GPU's completed
+host staging. Host vectors are reserved during pass construction; collection
+adds no CUDA transfer or wait. Together the lane-owned and assembled vectors
+reserve 7.5 MiB of host row storage per pass at the maximum 4,096-row bound.
+The single-GPU serving path is unchanged. Normal serving still needs the
+distributed pass and transport connected to its independent scheduler and
+dSpark runtime; exposing route history is one prerequisite for that connection.
+The distributed fixture verifies per-layer row counts, unique expert IDs in
+the official 384-expert range, exact agreement with each GPU owner's history,
+unchanged history-vector capacities, and rejection of resetting a ready pass.
+The complete fixture, including 32 interleaved cases and cancellation cleanup,
+passed in 18.39 seconds (`distributed-route-history.log`).

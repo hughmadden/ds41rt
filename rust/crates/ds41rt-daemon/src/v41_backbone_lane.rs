@@ -694,6 +694,15 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         }
     }
     pub fn captured_routes(&self) -> &[Vec<[u32; 6]>] { &self.route_capture }
+    /// Reserve adaptive route history during planning, before lane execution.
+    pub fn reserve_route_capture(&mut self, layers: std::ops::Range<usize>, rows: usize) -> Result<()> {
+        ensure!(layers.end <= 40 && rows <= 4096, "route history reservation exceeds model bounds");
+        self.route_capture.resize_with(40, Vec::new);
+        for layer in layers {
+            self.route_capture[layer].reserve(rows);
+        }
+        Ok(())
+    }
     /// Opt-in diagnostic at a completed layer boundary; never used by normal serving.
     pub fn trace_output(&self, directory: &std::path::Path) -> Result<()> {
         use std::io::Write;

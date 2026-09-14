@@ -36,6 +36,8 @@ pub(crate) struct DistributedTargetPass<'w, 'a> {
     suffix_stream: DeviceOwner<'a, crate::v41_memory::LoadStream<'a>>,
     timeout: Duration,
     state: State,
+    capture_routes: bool,
+    route_capture: Vec<Vec<[u32; 6]>>,
     #[cfg(test)]
     trace: bool,
     #[cfg(test)]
@@ -122,6 +124,13 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             lanes[0].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 60 * 16 * 131072))?,
             lanes[1].device.own(|| crate::v41_memory::DeviceAllocation::new(device.library, 60 * 16 * 131072))?,
         ];
+        let mut lanes = lanes;
+        // Reserve host history at planning time. The per-layer IDs are already
+        // present in each router's completed pinned staging; collecting them
+        // introduces no device transfer, wait, or cross-lane dependency.
+        for layer in 0..40 {
+            lanes[map.attention(layer)?].reserve_route_capture(layer..layer + 1, 4096)?;
+        }
         Ok(Self {
             map,
             embedding,
@@ -135,6 +144,8 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             suffix_stream,
             timeout,
             state: State::Idle,
+            capture_routes: false,
+            route_capture: (0..40).map(|_| Vec::with_capacity(4096)).collect(),
             #[cfg(test)]
             trace: false,
             #[cfg(test)]
@@ -147,6 +158,20 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             trace_buffers,
         })
     }
+    pub fn set_route_capture(&mut self, enabled: bool) -> Result<()> {
+        ensure!(!enabled || self.state == State::Idle,
+            "cannot reset route capture during a target pass");
+        for lane in &mut self.lanes {
+            let device = lane.device;
+            device.run(|| { lane.set_route_capture(enabled); Ok(()) })?;
+        }
+        self.capture_routes = enabled;
+        if enabled {
+            for rows in &mut self.route_capture { rows.clear(); }
+        }
+        Ok(())
+    }
+    pub fn captured_routes(&self) -> &[Vec<[u32; 6]>] { &self.route_capture }
     async unsafe fn advance(&mut self, layer: usize) -> Result<()> {
         ensure!((1..40).contains(&layer), "invalid distributed next layer");
         let source = self.map.attention(layer - 1)?;
@@ -499,6 +524,9 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
                 self.execution
                     .complete_layer(guard.batch.cache()?, &mut self.lanes[gpu], completed)
                     .await?;
+            }
+            if self.capture_routes {
+                self.route_capture[layer].clone_from(&self.lanes[gpu].captured_routes()[layer]);
             }
             #[cfg(test)]
             if let Some(progress) = &self.observed_layer { progress.set(layer + 1); }
@@ -947,6 +975,8 @@ mod tests {
         .into_iter()
         .enumerate()
         {
+            pass.set_route_capture(true)?;
+            let route_capacities: Vec<_> = pass.route_capture.iter().map(Vec::capacity).collect();
             eprintln!(
                 "executing distributed full pass step={step} rows={}",
                 tokens.len()
@@ -969,6 +999,17 @@ mod tests {
                     true,
                 )
             })?;
+            ensure!(pass.captured_routes().len() == 40, "distributed route history has missing layers");
+            for (layer, routes) in pass.captured_routes().iter().enumerate() {
+                ensure!(routes.len() == tokens.len(), "distributed route row count differs at layer {layer}");
+                ensure!(routes == &pass.lanes[pass.map.attention(layer)?].captured_routes()[layer],
+                    "distributed route history differs from its GPU owner");
+                ensure!(routes.iter().all(|row| row.iter().enumerate().all(|(i, id)|
+                    *id < 384 && !row[..i].contains(id))), "invalid captured top-six routes at layer {layer}");
+                ensure!(routes.capacity() == route_capacities[layer], "route history allocated during execution");
+            }
+            assert!(pass.set_route_capture(true).is_err());
+            pass.set_route_capture(false)?;
             let next = pass.greedy_output(&batch)?;
             let bytes = runtime.block_on(pass.download_logits(&batch, &[0]))?;
             ensure!(bytes.len() == 129280 * 4, "distributed logit download extent differs");
