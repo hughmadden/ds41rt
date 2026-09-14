@@ -74,9 +74,9 @@ impl<'w, 'a> IndexLane<'w, 'a> {
     ) -> Result<[usize; 3]> {
         ensure!(gpu < 2, "invalid index workspace GPU");
         let mut bytes = Self::workspace_bytes(library, capacity)?;
-        if placement.attention(20)? != gpu {
-            bytes[2] = 0;
-        }
+        bytes[2] = if placement.attention(20)? == gpu {
+            crate::v41_index_selection::IndexSelectionWave::shared_device_bytes(capacity as usize)?
+        } else { 0 };
         if !LAYERS
             .iter()
             .any(|&layer| placement.attention(layer).ok() == Some(gpu))

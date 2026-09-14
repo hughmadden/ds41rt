@@ -27,6 +27,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         tracing::info!(stage, occupied_bytes=?occupied, "dual RTX startup memory");
         Ok(())
     };
+    memory_checkpoint("CUDA contexts and peer access")?;
     let catalog = ds41rt_loader::read_official_v41_catalog(ds41rt_loader::OFFICIAL_V41_MODEL_ID, &args.snapshot)?;
     let map = CachePlacement::encoder_decoder();
     let started = Instant::now();
@@ -45,6 +46,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         BackboneLaneWeights::distributed_device_bytes(&lib, &catalog, map)?,
         16 << 20,
     )?;
+    memory_checkpoint("attention mHC router weights")?;
     let producers = CacheProducerWeights::load_distributed(
         &lib,
         &catalog,
@@ -52,6 +54,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         CacheProducerWeights::distributed_device_bytes(&lib, &catalog, map)?,
         16 << 20,
     )?;
+    memory_checkpoint("cache producer weights")?;
     let iw = IndexLaneWeights::load_distributed(
         &lib,
         &catalog,
@@ -59,6 +62,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         IndexLaneWeights::distributed_device_bytes(&lib, &catalog, map)?,
         16 << 20,
     )?;
+    memory_checkpoint("index query weights")?;
     let ew = PlacedEngramWeights::load(
         &lib,
         &catalog,
@@ -66,6 +70,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         PlacedEngramWeights::device_bytes(&lib, &catalog, map)?,
         16 << 20,
     )?;
+    memory_checkpoint("Engram weights")?;
     let names = ["embed.weight".to_string()];
     let table = devices[0].own(|| {
         NativeRtxTensors::load(
@@ -76,10 +81,12 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
             16 << 20,
         )
     })?;
+    memory_checkpoint("embedding weights")?;
     let vocab = [
         devices[0].own(|| crate::v41_tensors::VocabularyShard::load(&lib, &catalog, 0..64640, 1 << 30, 16 << 20))?,
         devices[1].own(|| crate::v41_tensors::VocabularyShard::load(&lib, &catalog, 64640..129280, 1 << 30, 16 << 20))?,
     ];
+    memory_checkpoint("vocabulary weights")?;
     let hw = devices[1].own(|| {
         TargetHeadWeights::load(
             &lib,
@@ -88,11 +95,13 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
             16 << 20,
         )
     })?;
+    memory_checkpoint("head normalization weights")?;
     eprintln!("loading all 20 encoder expert layers as TP2");
     let routed = [
         Rc::new(RankWeights::load(devices[0], &catalog, 20, rank_budget)?),
         Rc::new(RankWeights::load(devices[1], &catalog, 20, rank_budget)?),
     ];
+    memory_checkpoint("encoder routed TP2 weights")?;
     let shared: [Rc<Vec<SharedWeights<'_>>>; 2] = [0, 1]
         .map(|r| {
             (0..40)
@@ -116,7 +125,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
     tracing::info!(capacity, backbone_lane_bytes=BackboneLane::placed_workspace_bytes(&lib, capacity)?,
         producer_bytes=?crate::v41_backbone_execution::PlacedProducerWaves::device_bytes(&lib, map, capacity)?,
         "dual RTX per-lane workspace plan");
-    let make_pass = || -> Result<DistributedTargetPass<'_, '_>> {
+    let make_pass = |decoder_capacity: u32| -> Result<DistributedTargetPass<'_, '_>> {
         let lanes = [
             BackboneLane::new_on_device(
                 &weights,
@@ -142,8 +151,8 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
             )?),
             Some(IndexLane::new_on_device(
                 &iw,
-                capacity,
-                IndexLane::placed_workspace_bytes(&lib, map, capacity, 1)?
+                decoder_capacity,
+                IndexLane::placed_workspace_bytes(&lib, map, decoder_capacity, 1)?
                     .iter()
                     .sum(),
                 1,
@@ -172,13 +181,18 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
             DistributedTargetHead::new(devices, &hw, [&vocab[0], &vocab[1]], 48,
                 DistributedTargetHead::device_bytes(48, 64640)?)?,
             devices[1]
-                .own(|| TargetTapWave::new(&lib, capacity as usize, TargetTapWave::device_bytes(capacity as usize)?))?,
+                .own(|| TargetTapWave::new(&lib, decoder_capacity as usize, TargetTapWave::device_bytes(decoder_capacity as usize)?))?,
             Duration::from_secs(120),
         )
     };
-    let mut pass = make_pass().context("constructing first distributed target lane")?;
+    let mut pass = make_pass(capacity).context("constructing first distributed target lane")?;
     memory_checkpoint("first target lane")?;
-    let mut second = make_pass().context("constructing second distributed target lane")?;
+    // Both lanes also produce source 20 from every encoder row on GPU1, so
+    // backbone/query and producer buffers retain full prefill capacity there.
+    // Only the first pass handles decoder replay and full cached continuation;
+    // lane 1's GPU1 index selection and taps serve at most 48 verify rows.
+    // TP2 expert workspaces remain full capacity on both GPUs and lanes.
+    let mut second = make_pass(80).context("constructing second distributed target lane")?;
     memory_checkpoint("second target lane")?;
     let make_transport = || {
         let mut transport = devices[1].own(|| NativeTp4Wave::new(&lib,
@@ -195,6 +209,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         Some(devices[1].own(|| crate::v41_experts::dspark::DsparkWeights::load_serving(&lib, &catalog,
             capacity, args.concurrency, 32 << 30, 16 << 20))?)
     } else { None };
+    memory_checkpoint("draft weights")?;
     let mut draft = draft_weights.as_ref().map(|weights| DraftRuntime::with_distributed_requests(
         devices, weights, &table, [&vocab[0], &vocab[1]], capacity, args.concurrency)).transpose()?;
     if let Some(draft) = &mut draft {
@@ -214,6 +229,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         &lib, crate::v41_backbone_cache::BackbonePrefix::device_bytes(), snapshot_slots)).transpose()?;
     let draft_snapshot_bytes = draft.as_mut().map(|d| d.reserve_prefixes(snapshot_slots)).transpose()?.unwrap_or(0);
     let snapshot_bytes = target_prefix_pool.as_ref().map_or(0, crate::v41_memory::SnapshotPool::device_bytes) + draft_snapshot_bytes;
+    memory_checkpoint("snapshot arenas")?;
     let memory = [devices[0].run(|| lib.cuda_memory_info())?, devices[1].run(|| lib.cuda_memory_info())?];
     let pool = memory::distributed::PoolPlan::new(map, args.concurrency as usize,
         args.max_context_tokens as usize, args.prefix_cache_entries as usize, snapshot_bytes,
@@ -229,6 +245,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
     let mut requests = Requests::new_distributed(&lib, pipeline, args.concurrency as usize,
         pool.pages, map, pool.cache_bytes)?;
     if let Some(pool) = target_prefix_pool { requests.install_prefix_pool(pool)?; }
+    memory_checkpoint("allocated KV cache")?;
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     tracing::info!(elapsed_ms=started.elapsed().as_millis(), "dual RTX serving owners ready");
     ready.take().context("startup readiness missing")?.send(Ok(()))

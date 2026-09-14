@@ -76,11 +76,13 @@ impl<'w, 'a> IndexLane<'w, 'a> {
         ensure!(weights.placement.is_some() == device.is_some(), "index workspace placement differs from weights");
         let first = Self::next_owned(weights, device, 0);
         ensure!(first < LAYERS.len(), "GPU has no index producers");
+        let query = weights.weights[first].wave(capacity, bytes[0])?;
+        let mut source = IndexSelectionWave::new(weights.library, capacity as usize, bytes[1])?;
+        let reindex = if bytes[2] == 0 { None } else if device.is_some() {
+            Some(IndexSelectionWave::sharing_scratch(&mut source, bytes[2])?)
+        } else { Some(IndexSelectionWave::new(weights.library, capacity as usize, bytes[2])?) };
         Ok(Self {
-            weights,
-            query: weights.weights[first].wave(capacity, bytes[0])?,
-            source: IndexSelectionWave::new(weights.library, capacity as usize, bytes[1])?,
-            reindex: if bytes[2] == 0 { None } else { Some(IndexSelectionWave::new(weights.library, capacity as usize, bytes[2])?) },
+            weights, query, source, reindex,
             next: first,
             device,
             ready: None,

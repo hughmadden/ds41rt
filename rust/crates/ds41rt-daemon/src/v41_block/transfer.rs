@@ -87,7 +87,9 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
                 && previous.tokens.iter().all(|&p| p < 1048576)
                 && previous.residual.bytes == rows * 40960
                 && previous.pre.bytes == rows * 16,
-            "imported block layer, tokens or extents differ"
+            "imported block layer, tokens or extents differ: previous={}, next={}, binding={}, rows={rows}, capacity={}, residual_bytes={}, pre_bytes={}",
+            previous.layer, next.layer(), previous.binding.layer(), self.capacity,
+            previous.residual.bytes, previous.pre.bytes
         );
         let device = transfer.destination.device;
         ensure!(
