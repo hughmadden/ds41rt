@@ -51,7 +51,9 @@ and [completed checklist](https://github.com/tpurtell/ds41rt/blob/v3/docs/releas
 
 Container images:
 
-- `ghcr.io/tpurtell/ds41rt-coordinator:v3` (`linux/amd64`)
-- `ghcr.io/tpurtell/ds41rt-spark-expert:v3` (`linux/arm64`)
+- `ghcr.io/tpurtell/ds41rt-coordinator:v3` (`linux/amd64`), digest
+  `sha256:354561f06863b5f5ce9632edddee4a2d4e008a90d2d61d2ab8c309a3dc371f43`
+- `ghcr.io/tpurtell/ds41rt-spark-expert:v3` (`linux/arm64`), digest
+  `sha256:78819846cd2514db80ff6196709ca778fdce245d9967dfbdccef928ac032c09e`
 
 The `v3` and `latest` tags are identical for each role.

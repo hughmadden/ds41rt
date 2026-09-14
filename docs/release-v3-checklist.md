@@ -23,9 +23,9 @@ Status: release candidate qualified; final publication remains.
 - [x] Replicate every performance-report table in the README, state the 400 W
   limit and stock memory speed, show cache bytes with token capacity, and replace
   the obsolete single-RTX diagram.
-- [ ] Build the final source revision and verify a clean standard launch from
+- [x] Build the final source revision and verify a clean standard launch from
   the exact resulting images.
-- [ ] Retire the unrelated pre-existing coordinator and Spark `v3` package
+- [x] Retire the unrelated pre-existing coordinator and Spark `v3` package
   versions, then publish the candidate as `v3` and `latest` and verify manifest,
   platform, label, and digest identity.
 - [ ] Assemble binary and evidence assets with checksums, publish the GitHub v3

@@ -1,0 +1,62 @@
+{
+  "schema": "ds41rt-release-v3-build-run-v1",
+  "source_revision": "c38746aeac9204eff12b7d2f0433013ed24526c4",
+  "measured_execution_revision": "f652dc848e24335242ae245d92f18f7d73cd0f39",
+  "model_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+  "sparkinfer_revision": "3882b935ede761d6c73a5d6fd68e690f1e3f5380",
+  "xgrammar_revision": "557becfb64c503ae9c04344b0047661f43f44320",
+  "containers": {
+    "coordinator": {
+      "repository": "ghcr.io/tpurtell/ds41rt-coordinator",
+      "tags": ["v3", "latest"],
+      "digest": "sha256:354561f06863b5f5ce9632edddee4a2d4e008a90d2d61d2ab8c309a3dc371f43",
+      "platform": "linux/amd64",
+      "platform_digest": "sha256:36f2197dadbb4f561c0b339cf8f1e6e389c68b6294419816b285a273c95bea85",
+      "config_digest": "sha256:b088cf290844c33ec77270f799b6ab7b63a596eabd4c9fbd447dbe4fd9f9f090",
+      "package_version_id": 1245518160
+    },
+    "spark_expert": {
+      "repository": "ghcr.io/tpurtell/ds41rt-spark-expert",
+      "tags": ["v3", "latest"],
+      "digest": "sha256:78819846cd2514db80ff6196709ca778fdce245d9967dfbdccef928ac032c09e",
+      "platform": "linux/arm64",
+      "config_digest": "sha256:622398bf2562f3d570fa8821715b501bfe69be718a00dc0dcf7304420fe4287b",
+      "package_version_id": 1245519610
+    }
+  },
+  "superseded_v3_versions": {
+    "coordinator": {"package_version_id": 1241412765, "tags": []},
+    "spark_expert": {"package_version_id": 1241413357, "tags": []}
+  },
+  "assets": [
+    {
+      "name": "ds41rt-v3-coordinator-linux-amd64.tar.gz",
+      "bytes": 17772772,
+      "sha256": "14e1fc097184eb3a8f375cc6ed16c82f551a208b7cd8a10c3e3e3fdc56a30aa1"
+    },
+    {
+      "name": "ds41rt-v3-spark-expert-linux-arm64.tar.gz",
+      "bytes": 15889235,
+      "sha256": "9ba75ff744262a639beed7cb8a5197c42cc984c4379e41793f86ab90c7e934de"
+    },
+    {
+      "name": "ds41rt-v3-qualification-evidence.tar.gz",
+      "bytes": 22918901,
+      "sha256": "4d724a2ef7c78a93ff63f5bf1814c89c7a380338d61bb1c19b7bbbfa7dd03295"
+    },
+    {
+      "name": "SHA256SUMS",
+      "bytes": 321,
+      "sha256": "35ba1d5f9f6dd148f715e31980bfa74a068ffb930c7f2069abd1e0e55fb66e17"
+    }
+  ],
+  "verification": {
+    "artifact_manifests": true,
+    "v3_latest_manifest_identity": true,
+    "packages_public": true,
+    "automatic_rtx_gpus": 2,
+    "spark_first_routed_layer": 20,
+    "standard_port": 8000,
+    "api_smoke": "V3 READY"
+  }
+}
