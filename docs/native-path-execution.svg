@@ -1,132 +1,153 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
-<title id="title">DS41RT native execution across one coordinator and four expert workers</title>
-<desc id="desc">The RTX coordinator owns admission, prefix state, attention, Engram projections, shared experts, dSpark and greedy verification. Four DGX Spark workers provide intermediate-dimension tensor-parallel routed experts. Two execution lanes serve up to sixteen requests. Partial matches replay at most 128 encoder tokens. Compressed source KV uses FP4 and window KV uses FP8. Vision accepts up to sixteen images. The corrected FP4 release reaches 2668 prompt tokens per second, 60.68 weighted dSpark decode tokens per second, 127.70 counting dSpark tokens per second, and 683.70 aggregate tokens per second at concurrency sixteen.</desc>
-<defs>
-<linearGradient id="panel" x2="1" y2="1"><stop stop-color="#10243a"/><stop offset="1" stop-color="#0d1b2d"/></linearGradient>
-<marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 Z" fill="#46d7e8"/></marker>
-<style>
-text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#b9cde0}
-.title{font-size:30px;font-weight:700;fill:#e9f3ff}.sub{font-size:16px;fill:#91a8bf}
-.section{font-size:20px;font-weight:700;fill:#e9f3ff}.label{font-size:17px;font-weight:700;fill:#e9f3ff}
-.body{font-size:15px}.small{font-size:13px;fill:#91a8bf}.badge{font-size:18px;font-weight:700;fill:#e9f3ff}
-</style></defs><rect width="1600" height="1200" fill="#07111f"/>
-<text x="44" y="54" class="title" text-anchor="start">DS41RT · NATIVE EXECUTION</text>
-<text x="44" y="83" class="sub" text-anchor="start">DeepSeek V4.1 Flash · one RTX PRO 6000 Blackwell coordinator · four DGX Spark expert workers</text>
-<rect x="44" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#5d8cff" stroke-width="1.3"/>
-<text x="62" y="138" class="badge" text-anchor="start">2,668 tok/s</text>
-<text x="62" y="160" class="small" text-anchor="start">BEST MEDIAN PREFILL</text>
-<rect x="426" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#46d7e8" stroke-width="1.3"/>
-<text x="444" y="138" class="badge" text-anchor="start">60.68 tok/s</text>
-<text x="444" y="160" class="small" text-anchor="start">WEIGHTED DSPARK DECODE</text>
-<rect x="808" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#a978ff" stroke-width="1.3"/>
-<text x="826" y="138" class="badge" text-anchor="start">127.70 tok/s</text>
-<text x="826" y="160" class="small" text-anchor="start">LOW-ENTROPY DSPARK</text>
-<rect x="1190" y="110" width="366" height="65" rx="12" fill="#0b192a" stroke="#56d69c" stroke-width="1.3"/>
-<text x="1208" y="138" class="badge" text-anchor="start">683.70 tok/s</text>
-<text x="1208" y="160" class="small" text-anchor="start">C16 AGGREGATE DECODE</text>
-<rect x="326" y="207" width="844" height="782" rx="18" fill="url(#panel)" stroke="#5d8cff" stroke-width="1.3"/>
-<text x="350" y="242" class="section" text-anchor="start">RTX COORDINATOR</text>
-<text x="350" y="267" class="small" text-anchor="start">Rust request ownership · native GPU execution · independent lane workspaces</text>
-<rect x="44" y="294" width="248" height="123" rx="12" fill="#10243a" stroke="#46d7e8" stroke-width="1.3"/>
-<rect x="44" y="304" width="4" height="103" rx="2" fill="#46d7e8"/>
-<text x="62" y="322" class="label" text-anchor="start">OpenAI-compatible API</text>
-<text x="62" y="348" class="body" text-anchor="start">Render and tokenize</text>
-<text x="62" y="370" class="body" text-anchor="start">Streaming output</text>
-<text x="62" y="392" class="body" text-anchor="start">Cancellation and reuse</text>
-<path d="M292 352 H350" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="350" y="294" width="794" height="112" rx="12" fill="#10243a" stroke="#46d7e8" stroke-width="1.3"/>
-<rect x="350" y="304" width="4" height="92" rx="2" fill="#46d7e8"/>
-<text x="368" y="322" class="label" text-anchor="start">1 · Admission and prefix lookup</text>
-<text x="368" y="348" class="body" text-anchor="start">Token radix → exact restoration or bounded partial replay → new suffix</text>
-<text x="368" y="370" class="body" text-anchor="start">Exact prompt hits reuse saved logits; each request gets a fresh lease</text>
-<path d="M747 406 V436" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="350" y="436" width="794" height="98" rx="12" fill="#10243a" stroke="#56d69c" stroke-width="1.3"/>
-<rect x="350" y="446" width="4" height="78" rx="2" fill="#56d69c"/>
-<text x="368" y="464" class="label" text-anchor="start">2 · Embed and prepare known tokens</text>
-<text x="368" y="490" class="body" text-anchor="start">Text embeddings and residual input · start Engram gathers for both layers</text>
-<text x="368" y="512" class="body" text-anchor="start">Fresh prefill builds encoder sources; decoder prefill uses the final 128 rows</text>
-<path d="M747 534 V564" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="350" y="564" width="794" height="249" rx="12" fill="#0a1728" stroke="#203a55" stroke-width="1.3"/>
-<text x="369" y="594" class="section" text-anchor="start">3 · TARGET BACKBONE · 40 LAYERS</text>
-<text x="369" y="618" class="small" text-anchor="start">128-token local windows · four shared global KV sources at layers 2 / 8 / 14 / 20</text>
-<rect x="370" y="640" width="361" height="144" rx="12" fill="#10243a" stroke="#46d7e8" stroke-width="1.3"/>
-<rect x="370" y="650" width="4" height="124" rx="2" fill="#46d7e8"/>
-<text x="388" y="668" class="label" text-anchor="start">Attention and local work</text>
-<text x="388" y="694" class="body" text-anchor="start">mHC, normalization, SWA</text>
-<text x="388" y="716" class="body" text-anchor="start">Compression and index selection</text>
-<text x="388" y="738" class="body" text-anchor="start">Engram gates at layers 1 and 14</text>
-<text x="388" y="760" class="body" text-anchor="start">Router and shared expert</text>
-<rect x="760" y="640" width="365" height="144" rx="12" fill="#10243a" stroke="#a978ff" stroke-width="1.3"/>
-<rect x="760" y="650" width="4" height="124" rx="2" fill="#a978ff"/>
-<text x="778" y="668" class="label" text-anchor="start">Routed expert boundary</text>
-<text x="778" y="694" class="body" text-anchor="start">Send activations and routing</text>
-<text x="778" y="716" class="body" text-anchor="start">Four ranks compute TP slices</text>
-<text x="778" y="738" class="body" text-anchor="start">Sum returns; join shared output</text>
-<text x="778" y="760" class="body" text-anchor="start">Advance this layer’s residual</text>
-<path d="M731 705 H760" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)"/>
-<path d="M1125 703 H1205" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
-<path d="M747 813 V843" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="350" y="843" width="794" height="118" rx="12" fill="#10243a" stroke="#ffc35a" stroke-width="1.3"/>
-<rect x="350" y="853" width="4" height="98" rx="2" fill="#ffc35a"/>
-<text x="368" y="871" class="label" text-anchor="start">4 · Head, verify and commit</text>
-<text x="368" y="897" class="body" text-anchor="start">Greedy target check → accept a token prefix → commit every cache owner</text>
-<text x="368" y="919" class="body" text-anchor="start">Emit accepted output; retain completed target / draft tails with the token radix</text>
-<text x="368" y="941" class="body" text-anchor="start">Evict old retained branches under entry and source-page capacity limits</text>
-<rect x="44" y="451" width="248" height="160" rx="12" fill="#10243a" stroke="#56d69c" stroke-width="1.3"/>
-<rect x="44" y="461" width="4" height="140" rx="2" fill="#56d69c"/>
-<text x="62" y="479" class="label" text-anchor="start">Host Engram tables</text>
-<text x="62" y="505" class="body" text-anchor="start">Mapped weights and scales</text>
-<text x="62" y="527" class="body" text-anchor="start">Known IDs → background I/O</text>
-<text x="62" y="549" class="body" text-anchor="start">Bounded staging buffers</text>
-<text x="62" y="571" class="body" text-anchor="start">GPU dequantization / gates</text>
-<path d="M292 491 H350" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="44" y="652" width="248" height="195" rx="12" fill="#10243a" stroke="#5d8cff" stroke-width="1.3"/>
-<rect x="44" y="662" width="4" height="175" rx="2" fill="#5d8cff"/>
-<text x="62" y="680" class="label" text-anchor="start">Request cache state</text>
-<text x="62" y="706" class="body" text-anchor="start">40 local FP8 SWA rings</text>
-<text x="62" y="728" class="body" text-anchor="start">Shared FP4 compressed KV</text>
-<text x="62" y="750" class="body" text-anchor="start">FP4 index keys + scales</text>
-<text x="62" y="772" class="body" text-anchor="start">Odd compressor carry</text>
-<text x="62" y="794" class="body" text-anchor="start">Engram history + draft rings</text>
-<text x="62" y="816" class="body" text-anchor="start">Copy shared tails on append</text>
-<rect x="44" y="883" width="248" height="106" rx="12" fill="#10243a" stroke="#91a8bf" stroke-width="1.3"/>
-<rect x="44" y="893" width="4" height="86" rx="2" fill="#91a8bf"/>
-<text x="62" y="911" class="label" text-anchor="start">Vision ownership</text>
-<text x="62" y="937" class="body" text-anchor="start">Encoder and aligner on RTX</text>
-<text x="62" y="959" class="body" text-anchor="start">Up to 16 images per prompt</text>
-<rect x="1205" y="207" width="351" height="606" rx="18" fill="#121c36" stroke="#a978ff" stroke-width="1.3"/>
-<text x="1225" y="242" class="section" text-anchor="start">FOUR DGX SPARKS</text>
-<text x="1225" y="269" class="sub" text-anchor="start">Intermediate-dimension TP4</text>
-<rect x="1225" y="294" width="311" height="72" rx="12" fill="#10243a" stroke="#a978ff" stroke-width="1.3"/>
-<rect x="1225" y="304" width="4" height="52" rx="2" fill="#a978ff"/>
-<text x="1243" y="322" class="label" text-anchor="start">Rank 0 · DGX Spark</text>
-<text x="1243" y="348" class="body" text-anchor="start">One quarter of each routed expert</text>
-<rect x="1225" y="384" width="311" height="72" rx="12" fill="#10243a" stroke="#a978ff" stroke-width="1.3"/>
-<rect x="1225" y="394" width="4" height="52" rx="2" fill="#a978ff"/>
-<text x="1243" y="412" class="label" text-anchor="start">Rank 1 · DGX Spark</text>
-<text x="1243" y="438" class="body" text-anchor="start">One quarter of each routed expert</text>
-<rect x="1225" y="474" width="311" height="72" rx="12" fill="#10243a" stroke="#a978ff" stroke-width="1.3"/>
-<rect x="1225" y="484" width="4" height="52" rx="2" fill="#a978ff"/>
-<text x="1243" y="502" class="label" text-anchor="start">Rank 2 · DGX Spark</text>
-<text x="1243" y="528" class="body" text-anchor="start">One quarter of each routed expert</text>
-<rect x="1225" y="564" width="311" height="72" rx="12" fill="#10243a" stroke="#a978ff" stroke-width="1.3"/>
-<rect x="1225" y="574" width="4" height="52" rx="2" fill="#a978ff"/>
-<text x="1243" y="592" class="label" text-anchor="start">Rank 3 · DGX Spark</text>
-<text x="1243" y="618" class="body" text-anchor="start">One quarter of each routed expert</text>
-<text x="1225" y="667" class="body" text-anchor="start">All four ranks participate per layer</text>
-<text x="1225" y="735" class="small" text-anchor="start">Persistent transport and GPU buffers</text>
-<text x="1225" y="758" class="small" text-anchor="start">Coordinator combines the partial outputs</text>
-<rect x="1205" y="843" width="351" height="146" rx="12" fill="#10243a" stroke="#56d69c" stroke-width="1.3"/>
-<rect x="1205" y="853" width="4" height="126" rx="2" fill="#56d69c"/>
-<text x="1223" y="871" class="label" text-anchor="start">dSpark · local on RTX</text>
-<text x="1223" y="897" class="body" text-anchor="start">Three draft stages, including experts</text>
-<text x="1223" y="919" class="body" text-anchor="start">Condition on target layers 37 / 38 / 39</text>
-<text x="1223" y="941" class="body" text-anchor="start">Propose → target verify → accept</text>
-<text x="1223" y="963" class="body" text-anchor="start">Target-only mode omits drafting</text>
-<path d="M1205 913 H1144" fill="none" stroke="#46d7e8" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
-<rect x="44" y="1025" width="1512" height="121" rx="12" fill="#0b192a" stroke="#203a55" stroke-width="1.3"/>
-<text x="66" y="1056" class="label" text-anchor="start">TWO LANES · UP TO EIGHT REQUESTS PER LANE</text>
-<text x="66" y="1082" class="body" text-anchor="start">Independent target stacks overlap around remote expert work. Admission, migration and retirement occur after both stacks drain.</text>
-<text x="66" y="1107" class="body" text-anchor="start">Speculative proposals stay private until verification commits the same accepted prefix to target, draft and Engram state.</text>
-<text x="44" y="1178" class="small" text-anchor="start">Qualified release design · FP4 compressed KV / FP8 SWA · headline metrics use release workloads · schematic, not a measured timeline</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" role="img" aria-labelledby="title desc">
+  <title id="title">DS41RT automatic one or two RTX execution with four DGX Spark workers</title>
+  <desc id="desc">The launcher selects two peer-connected RTX PRO 6000 GPUs when memory permits and otherwise uses one. In two-GPU mode, RTX0 owns embeddings, vision, encoder attention, and three compressed KV sources. RTX1 owns decoder attention, dSpark, and the fourth compressed KV source. Both GPUs execute tensor-parallel encoder routed experts, shared experts, and vocabulary selection. Four DGX Spark workers retain decoder routed experts. Two asynchronous serving lanes support sixteen active requests with FP4 compressed KV, FP8 sliding-window attention, and twenty-four retained turns.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#07111f"/>
+      <stop offset="1" stop-color="#0b1728"/>
+    </linearGradient>
+    <linearGradient id="gpu0" x2="1" y2="1">
+      <stop stop-color="#102944"/>
+      <stop offset="1" stop-color="#0d2037"/>
+    </linearGradient>
+    <linearGradient id="gpu1" x2="1" y2="1">
+      <stop stop-color="#25204a"/>
+      <stop offset="1" stop-color="#161d3b"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto-start-reverse">
+      <path d="M0 0 L9 4.5 L0 9 Z" fill="#56d7e8"/>
+    </marker>
+    <style>
+      text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#c7d8e8}
+      .title{font-size:31px;font-weight:700;fill:#f1f7ff}
+      .subtitle{font-size:16px;fill:#93abc0}
+      .section{font-size:21px;font-weight:700;fill:#f1f7ff}
+      .label{font-size:17px;font-weight:700;fill:#edf6ff}
+      .body{font-size:15px}
+      .small{font-size:13px;fill:#91a8bf}
+      .metric{font-size:21px;font-weight:700;fill:#f1f7ff}
+      .metric-label{font-size:12px;fill:#91a8bf;letter-spacing:.7px}
+    </style>
+  </defs>
+
+  <rect width="1600" height="1100" fill="url(#background)"/>
+  <text x="40" y="51" class="title">DS41RT · BALANCED NATIVE EXECUTION</text>
+  <text x="40" y="80" class="subtitle">DeepSeek V4.1 Flash · automatic 1× / 2× RTX PRO 6000 · four DGX Spark expert workers</text>
+
+  <g aria-label="headline performance">
+    <rect x="40" y="105" width="370" height="68" rx="12" fill="#0d1e32" stroke="#5d8cff" stroke-width="1.4"/>
+    <text x="59" y="135" class="metric">8,454 tok/s</text>
+    <text x="59" y="158" class="metric-label">BEST 2×RTX PREFILL</text>
+    <rect x="423" y="105" width="370" height="68" rx="12" fill="#0d1e32" stroke="#56d7e8" stroke-width="1.4"/>
+    <text x="442" y="135" class="metric">79.33 tok/s</text>
+    <text x="442" y="158" class="metric-label">WEIGHTED DSPARK DECODE</text>
+    <rect x="806" y="105" width="370" height="68" rx="12" fill="#0d1e32" stroke="#a978ff" stroke-width="1.4"/>
+    <text x="825" y="135" class="metric">1,181.49 tok/s</text>
+    <text x="825" y="158" class="metric-label">C16 CODE AGGREGATE</text>
+    <rect x="1189" y="105" width="371" height="68" rx="12" fill="#0d1e32" stroke="#56d69c" stroke-width="1.4"/>
+    <text x="1208" y="135" class="metric">309.06 tok/s</text>
+    <text x="1208" y="158" class="metric-label">C16 MIXED AGGREGATE</text>
+  </g>
+
+  <g aria-label="automatic GPU selection">
+    <rect x="40" y="196" width="1520" height="82" rx="14" fill="#0d1e32" stroke="#56d69c" stroke-width="1.4"/>
+    <text x="61" y="226" class="section">Automatic release layout</text>
+    <text x="61" y="253" class="body">Inventory free memory + bidirectional peer reads before replacement · prefer 2×RTX when the complete 14M-token plan fits · fall back to 1×RTX</text>
+    <rect x="1190" y="211" width="346" height="48" rx="10" fill="#102a30" stroke="#56d69c"/>
+    <text x="1363" y="232" class="label" text-anchor="middle">C16 · 24 retained turns</text>
+    <text x="1363" y="250" class="small" text-anchor="middle">two independent serving lanes</text>
+  </g>
+
+  <g aria-label="RTX zero">
+    <rect x="40" y="308" width="735" height="414" rx="18" fill="url(#gpu0)" stroke="#5d8cff" stroke-width="1.6"/>
+    <text x="64" y="342" class="section">RTX0 · encoder owner</text>
+    <text x="64" y="366" class="small">lower-stack inputs and every consumer of compressed sources 2 / 8 / 14</text>
+
+    <rect x="64" y="390" width="324" height="135" rx="12" fill="#10243a" stroke="#56d7e8"/>
+    <text x="83" y="419" class="label">Admission + encoder path</text>
+    <text x="83" y="447" class="body">Embeddings and vision</text>
+    <text x="83" y="471" class="body">Attention / mHC / routers 0–19</text>
+    <text x="83" y="495" class="body">FP8 SWA 0–19</text>
+
+    <rect x="411" y="390" width="340" height="135" rx="12" fill="#10243a" stroke="#5d8cff"/>
+    <text x="430" y="419" class="label">FP4 cache ownership</text>
+    <text x="430" y="447" class="body">Sources 2, 8, 14 + indices</text>
+    <text x="430" y="471" class="body">3/5 of global source storage</text>
+    <text x="430" y="495" class="body">No remote attention reads</text>
+
+    <rect x="64" y="549" width="687" height="145" rx="12" fill="#0e2035" stroke="#a9b8ff"/>
+    <text x="83" y="578" class="label">Tensor-parallel work · rank 0 halves</text>
+    <text x="83" y="606" class="body">Encoder routed experts 0–19 · shared experts 0–39</text>
+    <text x="83" y="632" class="body">Half vocabulary rows → local top-1 candidate</text>
+    <text x="83" y="658" class="body">Lane-owned target workspaces · asynchronous peer events</text>
+    <text x="83" y="681" class="small">Vision stays here because it is infrequent; embeddings remain next to layer 0.</text>
+  </g>
+
+  <g aria-label="RTX one">
+    <rect x="825" y="308" width="735" height="414" rx="18" fill="url(#gpu1)" stroke="#a978ff" stroke-width="1.6"/>
+    <text x="849" y="342" class="section">RTX1 · decoder + draft owner</text>
+    <text x="849" y="366" class="small">upper-stack attention, final compressed source, and lane-local dSpark</text>
+
+    <rect x="849" y="390" width="324" height="135" rx="12" fill="#1c2140" stroke="#a978ff"/>
+    <text x="868" y="419" class="label">Decoder path</text>
+    <text x="868" y="447" class="body">Attention / mHC / routers 20–39</text>
+    <text x="868" y="471" class="body">FP8 SWA 20–39</text>
+    <text x="868" y="495" class="body">FP4 source 20 + index</text>
+
+    <rect x="1196" y="390" width="340" height="135" rx="12" fill="#1c2140" stroke="#56d69c"/>
+    <text x="1215" y="419" class="label">dSpark · adaptive K5</text>
+    <text x="1215" y="447" class="body">Three native draft blocks</text>
+    <text x="1215" y="471" class="body">Lane-local draft workspaces</text>
+    <text x="1215" y="495" class="body">Placement-aware verify length</text>
+
+    <rect x="849" y="549" width="687" height="145" rx="12" fill="#171d39" stroke="#a9b8ff"/>
+    <text x="868" y="578" class="label">Tensor-parallel work · rank 1 halves</text>
+    <text x="868" y="606" class="body">Encoder routed experts 0–19 · shared experts 0–39</text>
+    <text x="868" y="632" class="body">Half vocabulary rows → local top-1 candidate</text>
+    <text x="868" y="658" class="body">Deterministic global token winner · no full-vocabulary download</text>
+    <text x="868" y="681" class="small">Fixed mask embedding is local; lane seed rows arrive through tiny asynchronous copies.</text>
+  </g>
+
+  <path d="M775 565 H825" fill="none" stroke="#56d7e8" stroke-width="2.2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="800" y="545" class="small" text-anchor="middle">P2P</text>
+
+  <g aria-label="DGX Spark expert workers">
+    <rect x="40" y="764" width="1520" height="215" rx="18" fill="#0d1e32" stroke="#56d69c" stroke-width="1.5"/>
+    <text x="64" y="799" class="section">Four DGX Spark ranks · decoder routed experts 20–39</text>
+    <text x="64" y="824" class="small">Each worker keeps one TP4 slice under a 100 GiB device budget · persistent dual-rail transport · encoder layers are absent in 2×RTX mode</text>
+
+    <rect x="64" y="851" width="343" height="94" rx="12" fill="#102a30" stroke="#56d69c"/>
+    <text x="84" y="881" class="label">Rank 0 · ostrich</text>
+    <text x="84" y="908" class="body">decoder expert TP4 slice</text>
+    <text x="84" y="930" class="small">layers 20–39</text>
+    <rect x="440" y="851" width="343" height="94" rx="12" fill="#102a30" stroke="#56d69c"/>
+    <text x="460" y="881" class="label">Rank 1 · dodo</text>
+    <text x="460" y="908" class="body">decoder expert TP4 slice</text>
+    <text x="460" y="930" class="small">layers 20–39</text>
+    <rect x="816" y="851" width="343" height="94" rx="12" fill="#102a30" stroke="#56d69c"/>
+    <text x="836" y="881" class="label">Rank 2 · emu</text>
+    <text x="836" y="908" class="body">decoder expert TP4 slice</text>
+    <text x="836" y="930" class="small">layers 20–39</text>
+    <rect x="1192" y="851" width="344" height="94" rx="12" fill="#102a30" stroke="#56d69c"/>
+    <text x="1212" y="881" class="label">Rank 3 · kiwi</text>
+    <text x="1212" y="908" class="body">decoder expert TP4 slice</text>
+    <text x="1212" y="930" class="small">layers 20–39</text>
+  </g>
+
+  <path d="M800 722 V758" fill="none" stroke="#56d7e8" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <text x="820" y="749" class="small">20 fewer RDMA expert rounds per target pass</text>
+
+  <g aria-label="cache and fallback policy">
+    <rect x="40" y="1005" width="475" height="58" rx="11" fill="#0d1e32" stroke="#5d8cff"/>
+    <text x="58" y="1030" class="label">13.094 GB FP4 source pool</text>
+    <text x="58" y="1051" class="small">14,680,064 logical + 32,768 tail tokens</text>
+    <rect x="532" y="1005" width="475" height="58" rx="11" fill="#0d1e32" stroke="#56d7e8"/>
+    <text x="550" y="1030" class="label">Exact reuse + bounded replay</text>
+    <text x="550" y="1051" class="small">FP8 SWA · final 128 encoder tokens · 24 turns</text>
+    <rect x="1024" y="1005" width="536" height="58" rx="11" fill="#0d1e32" stroke="#a978ff"/>
+    <text x="1042" y="1030" class="label">1×RTX fallback</text>
+    <text x="1042" y="1051" class="small">layers 0–4 local · Sparks 0–39 · placement-aware K5</text>
+  </g>
+
+  <text x="40" y="1085" class="small">Qualified release design · schematic, not a measured timeline · 400 W RTX limit · standard memory speed</text>
 </svg>
