@@ -60,10 +60,10 @@ async fn lane<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lane: usize, lib
             let seeds = {
                 let active = active.borrow();
                 let mut requests = requests.borrow_mut();
-                let speculative = draft.borrow().is_some();
+                let verify_rows = draft.borrow().as_ref().map_or(1, |d| d.max_verify_rows());
                 let capacity: Vec<_> = members.iter().map(|&slot| {
                     let r = active[slot].as_ref().unwrap();
-                    (r.lease, if speculative { (r.job.max_tokens-r.generated).min(6) as u32 } else { 1 })
+                    (r.lease, (r.job.max_tokens-r.generated).min(verify_rows) as u32)
                 }).collect();
                 prefixes.borrow_mut().make_room(&mut requests, &capacity)?;
                 members.iter().map(|&slot| {

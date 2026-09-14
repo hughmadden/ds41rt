@@ -178,8 +178,8 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
                 )?,
             )?,
             PlacedEngram::new(&ew, capacity as usize, PlacedEngram::device_bytes(&lib, map, capacity as usize)?)?,
-            DistributedTargetHead::new(devices, &hw, [&vocab[0], &vocab[1]], 48,
-                DistributedTargetHead::device_bytes(48, 64640)?)?,
+            DistributedTargetHead::new(devices, &hw, [&vocab[0], &vocab[1]], if args.dspark_draft_limit > 5 { 64 } else { 48 },
+                DistributedTargetHead::device_bytes(if args.dspark_draft_limit > 5 { 64 } else { 48 }, 64640)?)?,
             devices[1]
                 .own(|| TargetTapWave::new(&lib, decoder_capacity as usize, TargetTapWave::device_bytes(decoder_capacity as usize)?))?,
             Duration::from_secs(120),
@@ -206,8 +206,8 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
     let mut second_transport = make_transport()?;
     memory_checkpoint("TP2 transports")?;
     let draft_weights = if args.dspark {
-        Some(devices[1].own(|| crate::v41_experts::dspark::DsparkWeights::load_serving(&lib, &catalog,
-            capacity, args.concurrency, 32 << 30, 16 << 20))?)
+        Some(devices[1].own(|| crate::v41_experts::dspark::DsparkWeights::load_serving_with_width(&lib, &catalog,
+            capacity, args.concurrency, 32 << 30, 16 << 20, if args.dspark_draft_limit > 5 { 7 } else { 5 }))?)
     } else { None };
     memory_checkpoint("draft weights")?;
     let mut draft = draft_weights.as_ref().map(|weights| DraftRuntime::with_distributed_requests(

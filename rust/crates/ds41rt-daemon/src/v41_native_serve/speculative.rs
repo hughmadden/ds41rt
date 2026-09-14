@@ -17,6 +17,7 @@ pub(crate) struct DraftRuntime<'w, 'a, C = DsparkChain<'w, 'a>> {
     pending: Vec<Option<(Vec<(u64, u32, u64, usize)>, Instant)>>,
     request_limit: usize,
     draft_limit: usize,
+    draft_width: usize,
     // Downloaded only for the experimental adaptive policy or explicit diagnostics.
     confidence_trace: std::collections::BTreeMap<u64, Vec<f32>>,
     adaptive: Option<ds41rt_core::DsparkRouteHistory>,
@@ -57,7 +58,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         if lane_count > 1 { mains.push(weights.main_context(80, DsparkMainContext::device_bytes(lib, 80)?)?); }
         let chains = (0..lane_count).map(|_| weights.draft(table, head, lane_requests, lane_bytes))
             .collect::<Result<Vec<_>>>()?;
-        tracing::info!(lanes=lane_count, lane_requests, shared_workspace_bytes=shared_bytes,
+        tracing::info!(lanes=lane_count, lane_requests, draft_width=weights.draft_width(), shared_workspace_bytes=shared_bytes,
             lane_workspace_bytes=lane_bytes, total_workspace_bytes=lane_bytes*lane_count,
             additional_workspace_bytes=(lane_bytes*lane_count).saturating_sub(shared_bytes),
             "lane-local dSpark draft workspaces (weights shared)");
@@ -71,6 +72,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             pending: vec![None; lane_count],
             request_limit: requests as usize,
             draft_limit: 5,
+            draft_width: weights.draft_width(),
             confidence_trace: Default::default(),
             adaptive: None,
             confidence_cutoff: None,
@@ -103,8 +105,9 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
         });
         Ok(())
     }
+    pub fn max_verify_rows(&self) -> usize { self.draft_limit + 1 }
     pub fn set_draft_limit(&mut self, limit: u8) -> Result<()> {
-        ensure!((1..=5).contains(&limit), "draft limit must be one through five");
+        ensure!((1..=self.draft_width as u8).contains(&limit), "draft limit exceeds generated width");
         self.draft_limit = limit as usize;
         Ok(())
     }
@@ -197,7 +200,7 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
             1. + p.iter().map(|v| { product *= v; product }).sum::<f64>()
         }).sum();
         let full_cost = cost(&full);
-        // The pilot qualifies 2..6 verifier rows. M1 uses separate numerical
+        // Retain at least two verifier rows. M1 uses separate numerical
         // specializations and is not entered voluntarily by this policy.
         let minimum: Vec<_> = probabilities.iter().map(|p| usize::from(!p.is_empty())).collect();
         let result = ds41rt_core::select_dspark_prefixes_bounded(
@@ -440,14 +443,14 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
             let active: Vec<_> = inputs.iter().enumerate()
                 .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
             let count = active.len();
-            ensure!(packed.len() == 6*count && values.len() == 5*count, "draft output extent differs");
+            ensure!(packed.len() == (self.draft_width+1)*count && values.len() == self.draft_width*count, "draft output extent differs");
             let mut outputs: Vec<_> = inputs.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect();
             for (row, &(output, &(id, anchor, _, remaining))) in active.iter().enumerate() {
                 if self.adaptive.is_some() || self.confidence_cutoff.is_some()
                     || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
-                    self.confidence_trace.insert(id, (0..5).map(|step| values[step*count+row]).collect());
+                    self.confidence_trace.insert(id, (0..self.draft_width).map(|step| values[step*count+row]).collect());
                 }
-                let tokens: Vec<_> = (0..6).map(|step| packed[step*count+row]).collect();
+                let tokens: Vec<_> = (0..=self.draft_width).map(|step| packed[step*count+row]).collect();
                 ensure!(tokens[0] == anchor && tokens.iter().all(|&t| t < 129280), "invalid draft tokens");
                 outputs[output] = tokens[..remaining.min(self.draft_limit+1)].to_vec();
             }
@@ -531,23 +534,23 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         let buffer = self.chains[0].draft_output()?[0];
         let mut bytes = vec![0; buffer.bytes];
         lib.copy_d2h(&mut bytes, buffer)?;
-        ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
+        ensure!(bytes.len() == (self.draft_width + 1) * count * 4, "draft token extent differs");
         let packed: Vec<_> = bytes.chunks_exact(4)
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
         if self.adaptive.is_some() || self.confidence_cutoff.is_some() || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
             let confidence = self.chains[0].draft_output()?[2];
-            ensure!(confidence.bytes == 5 * count * 4, "draft confidence extent differs");
+            ensure!(confidence.bytes == self.draft_width * count * 4, "draft confidence extent differs");
             let mut bytes = vec![0; confidence.bytes];
             lib.copy_d2h(&mut bytes, confidence)?;
             let values: Vec<_> = bytes.chunks_exact(4)
                 .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
             for (row, &(_, &(id, _, _, _))) in active.iter().enumerate() {
                 self.confidence_trace.insert(id,
-                    (0..5).map(|step| values[step * count + row]).collect());
+                    (0..self.draft_width).map(|step| values[step * count + row]).collect());
             }
         }
         for (row, &(output, &(_, anchor, _, remaining))) in active.iter().enumerate() {
-            let tokens: Vec<_> = (0..6).map(|step| packed[step * count + row]).collect();
+            let tokens: Vec<_> = (0..=self.draft_width).map(|step| packed[step * count + row]).collect();
             ensure!(tokens[0] == anchor && tokens.iter().all(|&token| token < 129280), "invalid draft tokens");
             outputs[output] = tokens[..remaining.min(self.draft_limit + 1)].to_vec();
         }

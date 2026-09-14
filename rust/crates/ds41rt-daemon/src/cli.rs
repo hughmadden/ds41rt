@@ -410,10 +410,10 @@ mod tests {
             ["--dspark", "--dspark-fixed", "--dspark-confidence-cutoff", "0.5"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-adaptive"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark", "--dspark-adaptive"])).is_ok());
-        for limit in ["1", "2", "3", "4", "5"] {
+        for limit in ["1", "2", "3", "4", "5", "6", "7"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_ok());
         }
-        for limit in ["0", "6"] {
+        for limit in ["0", "8"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_err());
         }
         for entries in ["0", "2", "24", "128"] {
@@ -525,7 +525,7 @@ pub(crate) struct NativeServeArgs {
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
     /// Maximum verified draft tokens per request; fixed-length policy control.
-    #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=5))]
+    #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=7))]
     pub dspark_draft_limit: u8,
     /// Compatibility spelling: dSpark uses lane-local adaptive selection by default.
     #[arg(long, requires = "dspark", hide = true)]

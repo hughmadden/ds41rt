@@ -202,7 +202,7 @@ fn worker(
         TargetHeadWeights::device_bytes(&catalog)?,
         16 * 1024 * 1024,
     )?;
-    let head = head_weights.wave(&vocabulary, 48, TargetHeadWave::device_bytes(48)?)?;
+    let head = head_weights.wave(&vocabulary, if args.dspark_draft_limit > 5 { 64 } else { 48 }, TargetHeadWave::device_bytes(if args.dspark_draft_limit > 5 { 64 } else { 48 })?)?;
     let mut pass = TargetPass::new(
         embedding,
         lane,
@@ -239,7 +239,7 @@ fn worker(
         EngramDeviceRows::new(&lib, rows, EngramDeviceRows::device_bytes(rows)?)?,
         [EngramGate::new(&engram_weights[0], rows, 1024 * 1024 * 1024)?,
          EngramGate::new(&engram_weights[1], rows, 1024 * 1024 * 1024)?],
-        head_weights.wave(&vocabulary, 48, TargetHeadWave::device_bytes(48)?)?,
+        head_weights.wave(&vocabulary, if args.dspark_draft_limit > 5 { 64 } else { 48 }, TargetHeadWave::device_bytes(if args.dspark_draft_limit > 5 { 64 } else { 48 })?)?,
         crate::v41_target_pass::TargetTapWave::new(&lib, rows, crate::v41_target_pass::TargetTapWave::device_bytes(rows)?)?,
         Duration::from_secs(120),
     )?;
@@ -248,13 +248,14 @@ fn worker(
         TcpTransportConfig { timeout: Duration::from_secs(120), max_frame_bytes: 64 * 1024 * 1024 })?;
     let mut prefill_transport = NativeTp4Wave::new(&lib, prefill_roce, NativeTp4Wave::device_bytes(capacity)?)?;
     let draft_weights = if args.dspark {
-        Some(crate::v41_experts::dspark::DsparkWeights::load_serving(
+        Some(crate::v41_experts::dspark::DsparkWeights::load_serving_with_width(
             &lib,
             &catalog,
             capacity,
             args.concurrency,
             32 * 1024 * 1024 * 1024,
             16 * 1024 * 1024,
+            if args.dspark_draft_limit > 5 { 7 } else { 5 },
         )?)
     } else {
         None

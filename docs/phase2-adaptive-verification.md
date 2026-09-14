@@ -57,11 +57,12 @@ the fixed control. [Raw summaries and artifact hashes](phase2-adaptive-verificat
 2. Support seven proposals end to end: draft attention layout and embedding,
    stage/terminal storage, output extents, RNG ranges, route history and target
    verification. Merely widening the CLI limit is insufficient.
-3. Compare fixed K7 and adaptive K7 with the same prompts, output checks and
-   measurement windows; preserve independent lanes.
-4. Calibrate timing for the current single- and dual-RTX layouts. Separate encoder
+3. Calibrate timing for the current single- and dual-RTX layouts before evaluating
+   adaptive K7. Separate encoder
    and decoder expert costs, preserve measured shape discontinuities, and include
    request count. Check predictions against held-out code and mixed workloads.
+4. Compare fixed K7 and adaptive K7 with the same prompts, output checks and
+   measurement windows; preserve independent lanes.
 
 The one-RTX configuration also needs a fresh calibration: its current partial
 RTX residency is not an input to the existing cost formula. No new policy default
@@ -84,7 +85,7 @@ BF16). `v41_dspark_peer_embedding_selftest.py` passed both widths with GPU0's so
 embedding table and two independently replayed GPU1 graphs, including changed
 and invalid seeds. The Rust FFI and daemon compile checks passed.
 
-These tests cover native components, not end-to-end K7 generation. Serving still
-uses K5 until draft workspace sizing, terminal output extents, route history,
-RNG reservations and target verification are updated and checked. No K7 throughput
-result or serving default change is claimed.
+K7 is now connected through workspace sizing, terminal output extents, route
+history, RNG reservations and target verification. The [initial fixed-K7
+experiment](phase2-k7-experiment.md) records serving results and lifecycle checks.
+The serving default remains K5; adaptive-K7 evaluation awaits cost recalibration.

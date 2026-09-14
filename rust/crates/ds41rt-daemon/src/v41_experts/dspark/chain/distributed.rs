@@ -17,7 +17,7 @@ pub(crate) struct DistributedDsparkChain<'w, 'a> {
 impl<'w, 'a> DistributedDsparkChain<'w, 'a> {
     pub fn device(&self) -> Device<'a> { self.chain.device }
     pub fn device_bytes(weights: &DsparkWeights<'a>, requests: u32, split: usize) -> Result<[usize; 2]> {
-        let mut bytes = DistributedDsparkTerminal::device_bytes(requests as usize, split)?;
+        let mut bytes = DistributedDsparkTerminal::device_bytes_with_width(requests as usize, split, weights.draft_width)?;
         bytes[1] = bytes[1].checked_add(weights.chain_bytes(requests)?).context("distributed draft budget overflow")?;
         Ok(bytes)
     }
@@ -27,7 +27,7 @@ impl<'w, 'a> DistributedDsparkChain<'w, 'a> {
         let required = devices[1].run(|| Self::device_bytes(weights, requests, shards[0].tokens().end))?;
         ensure!(required.iter().zip(budgets).all(|(need, budget)| *need <= budget), "distributed draft exceeds budget");
         ensure!(weights.tensor("mtp.2.norm.weight")?.device_id == devices[1].id, "draft weights must reside on rank 1");
-        let terminal_bytes = DistributedDsparkTerminal::device_bytes(requests as usize, shards[0].tokens().end)?;
+        let terminal_bytes = DistributedDsparkTerminal::device_bytes_with_width(requests as usize, shards[0].tokens().end, weights.draft_width)?;
         Ok(Self {
             chain: devices[1].own(|| weights.embedded_chain(embedding, requests, weights.chain_bytes(requests)?))?,
             terminal: DistributedDsparkTerminal::new(devices, weights, shards, requests as usize, terminal_bytes)?,
@@ -128,8 +128,8 @@ impl<'w, 'a> DistributedDsparkChain<'w, 'a> {
                     let chain = self.chain.get_mut();
                     unsafe {
                         let bytes = chain.download.bytes_mut();
-                        chain.stream.library.copy_d2h_async(&mut bytes[..count * 24], output[0], chain.stream.raw)?;
-                        chain.stream.library.copy_d2h_async(&mut bytes[count * 24..count * 44], output[2], chain.stream.raw)?;
+                        chain.stream.library.copy_d2h_async(&mut bytes[..count * (chain.width + 1) * 4], output[0], chain.stream.raw)?;
+                        chain.stream.library.copy_d2h_async(&mut bytes[count * (chain.width + 1) * 4..count * (2 * chain.width + 1) * 4], output[2], chain.stream.raw)?;
                     }
                     self.pending = Some(Phase::Download(count));
                 }
@@ -146,10 +146,11 @@ impl<'w, 'a> DistributedDsparkChain<'w, 'a> {
     pub fn poll_replay(&mut self) -> Result<Option<(Vec<u32>, Vec<f32>)>> {
         if !self.poll_execute()? { return Ok(None); }
         let count = self.ready.unwrap();
-        let bytes = self.chain.download.bytes_mut();
-        let tokens = bytes[..count * 24].chunks_exact(4)
+        let chain = self.chain.get_mut();
+        let bytes = chain.download.bytes_mut();
+        let tokens = bytes[..count * (chain.width + 1) * 4].chunks_exact(4)
             .map(|v| u32::from_ne_bytes(v.try_into().unwrap())).collect();
-        let confidence = bytes[count * 24..count * 44].chunks_exact(4)
+        let confidence = bytes[count * (chain.width + 1) * 4..count * (2 * chain.width + 1) * 4].chunks_exact(4)
             .map(|v| f32::from_ne_bytes(v.try_into().unwrap())).collect();
         Ok(Some((tokens, confidence)))
     }

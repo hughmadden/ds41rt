@@ -112,7 +112,7 @@ impl NativeLibrary {
         let status = unsafe { create(workspace.ptr, workspace.bytes as u64, vocab_rows as i32, &mut handle) };
         ensure!(status == 0 && !handle.is_null(), "vocabulary shard initialization status {status}");
         Ok(V41VocabularyProjection { _library: self, handle, launch, destroy,
-            width: 5120, max_rows: 80, vocab_rows })
+            width: 5120, max_rows: 128, vocab_rows })
     }
     /// Merge local greedy candidates after the peer candidates arrive.
     ///
@@ -125,7 +125,7 @@ impl NativeLibrary {
         output: (Ds41rtDeviceBuffer, Ds41rtDeviceBuffer), rows: usize,
         split: usize, stream: *mut c_void,
     ) -> Result<()> {
-        ensure!((1..=80).contains(&rows) && (1..129280).contains(&split),
+        ensure!((1..=128).contains(&rows) && (1..129280).contains(&split),
             "invalid vocabulary greedy merge shape");
         for buffer in [candidates[0].0, candidates[0].1, candidates[1].0,
             candidates[1].1, output.0, output.1] {
@@ -175,7 +175,7 @@ impl NativeLibrary {
             launch,
             destroy,
             width: if full { 5120 } else { 256 },
-            max_rows: if full { 80 } else { 16 },
+            max_rows: if full { 128 } else { 16 },
             vocab_rows: 129280,
         })
     }
@@ -258,7 +258,7 @@ impl V41DraftStep<'_> {
     /// # Safety
     /// All buffers must live on the stream device through completion. Shared+bias
     /// must be finite and temperatures finite/nonnegative. RNG [rows,2] contains
-    /// seeds and base Philox subsequences with room for 1280 subsequences each.
+    /// seeds and base Philox subsequences with room for (position+1)*256 draws.
     /// Output spans must not overlap each other or any input.
     pub unsafe fn launch(
         &self,
@@ -273,7 +273,7 @@ impl V41DraftStep<'_> {
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!((1..=16).contains(&rows), "invalid draft sampling rows");
-        ensure!(position < 5, "invalid draft position");
+        ensure!(position < 7, "invalid draft position");
         for (buffer, bytes) in [
             (shared, rows * 129280 * 4),
             (bias, rows * 129280 * 4),

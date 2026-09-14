@@ -259,7 +259,7 @@ pub(super) fn serve<'w, 'a, P: ServingTarget<'w, 'a>>(lib: &'a NativeLibrary, ar
         if members.iter().all(Vec::is_empty) { continue; }
         let capacity: Vec<_> = members.iter().flatten().map(|&slot| {
             let r = active[slot].as_ref().unwrap();
-            (r.lease, if draft.is_some() { (r.job.max_tokens - r.generated).min(6) as u32 } else { 1 })
+            (r.lease, (r.job.max_tokens - r.generated).min(draft.as_ref().map_or(1, |d| d.max_verify_rows())) as u32)
         }).collect();
         let room = prefixes.make_room(requests, &capacity);
         if let Err(error) = &room {

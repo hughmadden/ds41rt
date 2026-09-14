@@ -1,4 +1,4 @@
-//! Request-owned Philox subsequences for five-position native dSpark sampling.
+//! Request-owned Philox subsequences for native dSpark sampling.
 /// Each position uses 256 independent thread subsequences. Request compaction or
 /// alternating waves do not affect draws, which depend on this seed and range.
 #[derive(Debug)]
@@ -19,18 +19,19 @@ impl DsparkRng {
             next_subsequence: 0,
         }
     }
-    pub fn can_reserve(&self) -> bool {
-        self.next_subsequence
-            .checked_add(Self::SUBSEQUENCES_PER_DRAFT)
-            .is_some()
+    pub fn can_reserve(&self) -> bool { self.can_reserve_width(5) }
+    pub fn can_reserve_width(&self, width: usize) -> bool {
+        (1..=crate::MAX_DSPARK_PROPOSALS).contains(&width)
+            && self.next_subsequence.checked_add(width as u64 * 256).is_some()
     }
     /// Reserve before submission. Cancellation consumes the reservation, so a new
     /// attempt cannot reuse its draws; an explicit replay may reuse the ticket.
     /// Exhaustion leaves state unchanged and requires a new request/seed policy.
-    pub fn reserve(&mut self) -> Option<DsparkRngReservation> {
-        let next = self
-            .next_subsequence
-            .checked_add(Self::SUBSEQUENCES_PER_DRAFT)?;
+    pub fn reserve(&mut self) -> Option<DsparkRngReservation> { self.reserve_width(5) }
+    /// Reserve a width-specific range without changing the legacy K5 sequence.
+    pub fn reserve_width(&mut self, width: usize) -> Option<DsparkRngReservation> {
+        if !self.can_reserve_width(width) { return None; }
+        let next = self.next_subsequence.checked_add(width as u64 * 256)?;
         let reservation = DsparkRngReservation {
             seed: self.seed,
             first_subsequence: self.next_subsequence,
@@ -43,6 +44,23 @@ impl DsparkRng {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn seven_position_ranges_do_not_overlap_on_retry_or_width_change() {
+        let mut request = DsparkRng::new(41);
+        let first = request.reserve_width(7).unwrap();
+        let retry = request.reserve_width(7).unwrap();
+        let legacy = request.reserve().unwrap();
+        assert_eq!(retry.first_subsequence, first.first_subsequence + 7 * 256);
+        assert_eq!(legacy.first_subsequence, retry.first_subsequence + 7 * 256);
+        let before = request.next_subsequence;
+        assert!(request.reserve_width(0).is_none());
+        assert!(request.reserve_width(8).is_none());
+        assert_eq!(request.next_subsequence, before);
+        request.next_subsequence = u64::MAX - 7 * 256 + 1;
+        assert!(!request.can_reserve_width(7));
+        assert!(request.reserve_width(7).is_none());
+        assert!(request.can_reserve());
+    }
     #[test]
     fn cancellation_does_not_recycle_reserved_draws() {
         let mut request = DsparkRng::new(41);

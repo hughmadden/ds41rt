@@ -16,7 +16,7 @@ pub struct DsparkPrefixSelection {
 /// Every candidate is rescored against all prefix lengths in that batch.
 /// Continue even through a temporary rate loss: crossing a kernel bucket can
 /// require several removals. Return the best visited shape, never a predicted
-/// regression from the original full prefixes. At most 1 + 5*16*16 cost calls.
+/// regression from the original full prefixes. At most 1 + MAX_DSPARK_PROPOSALS*16*16 cost calls.
 pub fn select_dspark_prefixes(
     confidence: &[&[f64]],
     cost_us: impl FnMut(&[usize]) -> f64,
@@ -38,7 +38,7 @@ pub fn select_dspark_prefixes_bounded(
     }
     let mut expected = Vec::with_capacity(confidence.len());
     for probabilities in confidence {
-        if probabilities.len() > 5 || probabilities.iter().any(|p| !p.is_finite() || !(0.0..=1.0).contains(p)) {
+        if probabilities.len() > crate::MAX_DSPARK_PROPOSALS || probabilities.iter().any(|p| !p.is_finite() || !(0.0..=1.0).contains(p)) {
             return Err("invalid conditional draft confidence");
         }
         let mut row = vec![1.0]; // Correction/bonus from the mandatory anchor.
@@ -87,6 +87,16 @@ pub fn select_dspark_prefixes_bounded(
 mod tests {
     use super::*;
     #[test]
+    fn seven_proposals_can_be_retained_or_trimmed_per_request() {
+        let certain = [1.; 7];
+        let unlikely = [0.; 7];
+        let selected = select_dspark_prefixes_bounded(&[&certain, &unlikely], &[1, 1],
+            |lengths| 100. + lengths.iter().sum::<usize>() as f64).unwrap();
+        assert_eq!(selected.lengths, [7, 1]);
+        assert_eq!(select_dspark_confidence_prefix(&certain, 0.9, 1), Ok(7));
+        assert!(select_dspark_prefixes(&[&[1.; 8]], |_| 1.).is_err());
+    }
+    #[test]
     fn confidence_is_conditional_and_anchor_is_always_retained() {
         let p = select_dspark_prefixes(&[&[0.8, 0.5]], |_| 10.).unwrap();
         assert_eq!(p.lengths, [2]);
@@ -132,7 +142,7 @@ pub fn select_dspark_confidence_prefix(
     probabilities: &[f64], threshold: f64, minimum: usize,
 ) -> Result<usize, &'static str> {
     if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold)
-        || minimum > probabilities.len() || probabilities.len() > 5
+        || minimum > probabilities.len() || probabilities.len() > crate::MAX_DSPARK_PROPOSALS
         || probabilities.iter().any(|p| !p.is_finite() || !(0.0..=1.0).contains(p)) {
         return Err("invalid confidence prefix parameters");
     }

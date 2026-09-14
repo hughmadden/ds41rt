@@ -18,7 +18,7 @@ int32_t ds41rt_v41_markov_destroy(void* handle);
 int32_t ds41rt_v41_markov_launch(void* handle, const uint16_t* embedding,
     const uint16_t* weight, float* logits, int32_t rows, void* stream);
 // Shared vocabulary head: same ownership/status contract as Markov, but
-// BF16 input [rows,5120], weight [129280,5120], FP32 output [rows,129280], rows 1..80.
+// BF16 input [rows,5120], weight [129280,5120], FP32 output [rows,129280], rows 1..128.
 // Release with ds41rt_v41_markov_destroy after destroying captured graphs.
 int32_t ds41rt_v41_vocabulary_head_create(void* workspace, uint64_t bytes, void** handle);
 int32_t ds41rt_v41_vocabulary_head_launch(void* handle, const uint16_t* input,
@@ -31,7 +31,7 @@ int32_t ds41rt_v41_vocabulary_shard_create(void* workspace, uint64_t bytes,
     int32_t vocab_rows, void** handle);
 // Merge checked local argmax candidates for contiguous shards [0,split) and
 // [split,129280). Six arrays of rows elements on the stream's device; rows
-// 1..80, split 1..129279. Lower global token wins ties. Any invalid local ID or
+// 1..128, split 1..129279. Lower global token wins ties. Any invalid local ID or
 // nonfinite score produces UINT32_MAX/NaN. Outputs must be mutually disjoint
 // and disjoint from inputs. No allocations or synchronization.
 int32_t ds41rt_v41_vocabulary_merge_greedy(const uint32_t* ids0, const float* scores0,

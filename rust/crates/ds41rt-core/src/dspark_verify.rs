@@ -1,4 +1,6 @@
-//! Greedy verification of an already emitted anchor and up to five draft tokens.
+//! Greedy verification of an already emitted anchor and up to seven draft tokens.
+pub const MAX_DSPARK_PROPOSALS: usize = 7;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct GreedyVerification {
     /// Input rows to publish, including the anchor. A correction/bonus token
@@ -19,8 +21,8 @@ pub fn verify_dspark_greedy(
     eos: u32,
     remaining: usize,
 ) -> Result<GreedyVerification, &'static str> {
-    if inputs.is_empty() || inputs.len() > 6 || inputs.len() != target_next.len() {
-        return Err("verification requires one to six corresponding target rows");
+    if inputs.is_empty() || inputs.len() > MAX_DSPARK_PROPOSALS + 1 || inputs.len() != target_next.len() {
+        return Err("verification requires one to eight corresponding target rows");
     }
     if remaining == 0 || inputs[0] == eos {
         return Err("completed request cannot verify another anchor");
@@ -52,6 +54,35 @@ pub fn verify_dspark_greedy(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn seven_drafts_correct_at_every_position_and_stop() {
+        let inputs = [10, 11, 12, 13, 14, 15, 16, 17];
+        let full = [11, 12, 13, 14, 15, 16, 17, 18];
+        for mismatch in 0..8 {
+            let mut target = full;
+            target[mismatch] = 99;
+            let result = verify_dspark_greedy(&inputs, &target, 1, 100).unwrap();
+            assert_eq!(result.accepted_inputs, mismatch as u32 + 1);
+            assert_eq!(result.emitted, target[..=mismatch]);
+        }
+        let bonus = verify_dspark_greedy(&inputs, &full, 1, 100).unwrap();
+        assert_eq!(bonus.accepted_inputs, 8);
+        assert_eq!(bonus.emitted, full);
+        for remaining in 1..=8 {
+            let result = verify_dspark_greedy(&inputs, &full, 1, remaining).unwrap();
+            assert_eq!(result.emitted, full[..remaining]);
+            assert_eq!(result.accepted_inputs as usize, (remaining + 1).min(8));
+            assert!(result.length_limit);
+        }
+        for eos_position in 0..8 {
+            let mut target = full;
+            target[eos_position] = 1;
+            let result = verify_dspark_greedy(&inputs, &target, 1, 100).unwrap();
+            assert_eq!(result.emitted, target[..=eos_position]);
+            assert!(result.eos);
+        }
+        assert!(verify_dspark_greedy(&[10; 9], &[11; 9], 1, 100).is_err());
+    }
     #[test]
     fn greedy_prefix_correction_bonus_and_stopping() {
         let inputs = [10, 11, 12, 13, 14, 15];

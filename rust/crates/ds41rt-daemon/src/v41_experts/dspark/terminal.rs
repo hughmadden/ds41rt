@@ -14,7 +14,7 @@ struct LocalHead<'w, 'a> {
     weights: &'w VocabularyHead<'a>,
 }
 
-/// Five dependent Markov/sample positions followed by raw confidence, on one
+/// Width-dependent Markov/sample positions followed by raw confidence, on one
 /// stream. All draft tensors use [position,request,...] order at live row count.
 pub(crate) struct DsparkTerminal<'weights, 'library> {
     stream: LoadStream<'library>,
@@ -53,7 +53,7 @@ impl<'library> DsparkWeights<'library> {
         &'weights self, head: Option<&'weights VocabularyHead<'library>>,
         capacity: usize, budget: usize,
     ) -> Result<DsparkTerminal<'weights, 'library>> {
-        let bytes = DsparkTerminal::device_bytes(capacity)?
+        let bytes = DsparkTerminal::device_bytes_with_width(capacity, self.draft_width)?
             - if head.is_none() { V41VocabularyProjection::WORKSPACE_BYTES } else { 0 };
         ensure!(bytes <= budget, "dSpark terminal exceeds budget");
         let library = self.experts[0].buffers[0].library;
@@ -66,7 +66,7 @@ impl<'library> DsparkWeights<'library> {
         }).transpose()?;
         Ok(DsparkTerminal {
             local_head,
-            normalized: DeviceAllocation::new(library, capacity * 5 * 10240)?,
+            normalized: DeviceAllocation::new(library, capacity * self.draft_width * 10240)?,
             weights: self,
             stream: LoadStream {
                 library,
@@ -74,18 +74,18 @@ impl<'library> DsparkWeights<'library> {
             },
             markov: self.markov(capacity, DsparkMarkov::device_bytes(capacity)?)?,
             confidence: self
-                .confidence(capacity * 5, DsparkConfidence::device_bytes(capacity * 5)?)?,
+                .confidence(capacity * self.draft_width, DsparkConfidence::device_bytes(capacity * self.draft_width)?)?,
             sample: library.v41_draft_step()?,
             hc: library.v41_hc()?,
-            residual: DeviceAllocation::new(library, capacity * 5 * 40960)?,
-            pre_mix: DeviceAllocation::new(library, capacity * 5 * 16)?,
-            shared_logits: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
-            adjusted_logits: DeviceAllocation::new(library, capacity * 5 * 129280 * 4)?,
+            residual: DeviceAllocation::new(library, capacity * self.draft_width * 40960)?,
+            pre_mix: DeviceAllocation::new(library, capacity * self.draft_width * 16)?,
+            shared_logits: DeviceAllocation::new(library, capacity * self.draft_width * 129280 * 4)?,
+            adjusted_logits: DeviceAllocation::new(library, capacity * self.draft_width * 129280 * 4)?,
             rng: DeviceAllocation::new(library, capacity * 16)?,
             sampling_requests: None,
             sampling_staging: HostAllocation::new(library, capacity * 20)?,
             temperatures: DeviceAllocation::new(library, capacity * 4)?,
-            tokens: DeviceAllocation::new(library, capacity * 6 * 4)?,
+            tokens: DeviceAllocation::new(library, capacity * (self.draft_width + 1) * 4)?,
             capacity,
             graph: None,
             ready_requests: None,
@@ -94,21 +94,28 @@ impl<'library> DsparkWeights<'library> {
 }
 impl DsparkTerminal<'_, '_> {
     pub fn additional_bytes(capacity: usize) -> Result<usize> {
+        Self::additional_bytes_with_width(capacity, 5)
+    }
+    pub fn additional_bytes_with_width(capacity: usize, width: usize) -> Result<usize> {
+        ensure!(matches!(width, 5 | 7), "draft width must be five or seven");
         ensure!(
             (1..=16).contains(&capacity),
             "terminal request capacity must be 1 through 16"
         );
         Ok(
-            capacity * (5 * 129280 * 4 * 2 + 7 * 4 + 16 + 5 * 10240 + 5 * (40960 + 16))
+            capacity * (width * 129280 * 4 * 2 + (width + 2) * 4 + 16 + width * 10240 + width * (40960 + 16))
                 + V41VocabularyProjection::WORKSPACE_BYTES,
         )
     }
     pub fn device_bytes(capacity: usize) -> Result<usize> {
-        Ok(Self::additional_bytes(capacity)?
-            + DsparkMarkov::device_bytes(capacity)?
-            + DsparkConfidence::device_bytes(capacity * 5)?)
+        Self::device_bytes_with_width(capacity, 5)
     }
-    /// Stable inputs: BF16 residual [5,R,4,5120], FP32 incoming pre-mix [5,R,4]
+    pub fn device_bytes_with_width(capacity: usize, width: usize) -> Result<usize> {
+        Ok(Self::additional_bytes_with_width(capacity, width)?
+            + DsparkMarkov::device_bytes(capacity)?
+            + DsparkConfidence::device_bytes(capacity * width)?)
+    }
+    /// Stable inputs: BF16 residual [K,R,4,5120], FP32 incoming pre-mix [K,R,4]
     /// and anchor IDs [R]. Sampling is set via `prepare_sampling`.
     /// Use live R densely, without capacity padding between positions. Never free
     /// or retain after drop; finish all producer writes before execute/replay.
@@ -150,12 +157,12 @@ impl DsparkTerminal<'_, '_> {
             "invalid draft temperature"
         );
         ensure!(
-            rngs.iter().all(|rng| rng.can_reserve()),
+            rngs.iter().all(|rng| rng.can_reserve_width(self.weights.draft_width)),
             "dSpark RNG exhausted"
         );
         let bytes = self.sampling_staging.bytes_mut();
         for (i, rng) in rngs.iter_mut().enumerate() {
-            let reservation = rng.reserve().context("dSpark RNG exhausted")?;
+            let reservation = rng.reserve_width(self.weights.draft_width).context("dSpark RNG exhausted")?;
             bytes[i * 16..i * 16 + 8].copy_from_slice(&reservation.seed.to_ne_bytes());
             bytes[i * 16 + 8..i * 16 + 16].copy_from_slice(&reservation.first_subsequence.to_ne_bytes());
         }
@@ -214,7 +221,7 @@ impl DsparkTerminal<'_, '_> {
         unsafe {
             self.enqueue_normalize_on(requests, stream)?;
             head.kernel.launch(self.normalized.buffer, head.weights.weight()?,
-                self.shared_logits.buffer, requests * 5, stream)?;
+                self.shared_logits.buffer, requests * self.weights.draft_width, stream)?;
             self.enqueue_sampling_on(requests, stream)
         }
     }
@@ -226,7 +233,7 @@ impl DsparkTerminal<'_, '_> {
                 self.residual.buffer,
                 self.pre_mix.buffer,
                 self.confidence.inputs()[0],
-                requests * 5,
+                requests * self.weights.draft_width,
                 stream,
             )?;
             // This RNE variant matches the reference's one final BF16 rounding.
@@ -234,7 +241,7 @@ impl DsparkTerminal<'_, '_> {
                 self.confidence.inputs()[0],
                 self.weights.tensor("mtp.2.norm.weight")?,
                 self.normalized.buffer,
-                (requests * 5) as i32,
+                (requests * self.weights.draft_width) as i32,
                 5120,
                 1e-20,
                 stream,
@@ -253,7 +260,7 @@ impl DsparkTerminal<'_, '_> {
                 requests * 4,
                 stream,
             )?;
-            for position in 0..5 {
+            for position in 0..self.weights.draft_width {
                 self.markov.enqueue_on(requests, stream)?;
                 let [embedding, bias] = self.markov.storage();
                 let confidence_embedding = Self::slice(
@@ -278,11 +285,11 @@ impl DsparkTerminal<'_, '_> {
                     position,
                     stream,
                 )?;
-                if position < 4 {
+                if position + 1 < self.weights.draft_width {
                     library.copy_d2d_async(self.markov.tokens(), next, requests * 4, stream)?;
                 }
             }
-            self.confidence.enqueue_on(requests * 5, stream)?;
+            self.confidence.enqueue_on(requests * self.weights.draft_width, stream)?;
         }
         Ok(())
     }
@@ -366,8 +373,8 @@ impl DsparkTerminal<'_, '_> {
         }
         Ok(())
     }
-    /// Tokens [6,R] (anchor then five drafts), corrected raw logits [5,R,V],
-    /// raw confidence [5,R]. Borrowed until reuse/drop; no history is committed.
+    /// Tokens [K+1,R] (anchor then K drafts), corrected raw logits [K,R,V],
+    /// raw confidence [K,R]. Borrowed until reuse/drop; no history is committed.
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 3]> {
         let requests = self
             .ready_requests
@@ -377,9 +384,9 @@ impl DsparkTerminal<'_, '_> {
     pub(super) fn output_storage(&self, requests: usize) -> Result<[Ds41rtDeviceBuffer; 3]> {
         self.validate_sampling(requests)?;
         Ok([
-            Self::slice(self.tokens.buffer, 0, requests * 6 * 4)?,
-            Self::slice(self.adjusted_logits.buffer, 0, requests * 5 * 129280 * 4)?,
-            Self::slice(self.confidence.storage()[0], 0, requests * 5 * 4)?,
+            Self::slice(self.tokens.buffer, 0, requests * (self.weights.draft_width + 1) * 4)?,
+            Self::slice(self.adjusted_logits.buffer, 0, requests * self.weights.draft_width * 129280 * 4)?,
+            Self::slice(self.confidence.storage()[0], 0, requests * self.weights.draft_width * 4)?,
         ])
     }
 }

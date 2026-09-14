@@ -16,22 +16,25 @@ pub(crate) struct DistributedDsparkTerminal<'w, 'a> {
 }
 impl<'w, 'a> DistributedDsparkTerminal<'w, 'a> {
     pub fn device_bytes(capacity: usize, split: usize) -> Result<[usize; 2]> {
-        let terminal = DsparkTerminal::device_bytes(capacity)? - V41VocabularyProjection::WORKSPACE_BYTES;
-        let mut bytes = DistributedVocabularyWave::device_bytes(capacity * 5, split)?;
+        Self::device_bytes_with_width(capacity, split, 5)
+    }
+    pub fn device_bytes_with_width(capacity: usize, split: usize, width: usize) -> Result<[usize; 2]> {
+        let terminal = DsparkTerminal::device_bytes_with_width(capacity, width)? - V41VocabularyProjection::WORKSPACE_BYTES;
+        let mut bytes = DistributedVocabularyWave::device_bytes(capacity * width, split)?;
         bytes[1] += terminal;
         Ok(bytes)
     }
     pub fn new(devices: [Device<'a>; 2], weights: &'w DsparkWeights<'a>,
         shards: [&'w VocabularyShard<'a>; 2], capacity: usize, budgets: [usize; 2]) -> Result<Self> {
-        let required = Self::device_bytes(capacity, shards[0].tokens().end)?;
+        let required = Self::device_bytes_with_width(capacity, shards[0].tokens().end, weights.draft_width)?;
         ensure!(required.iter().zip(budgets).all(|(need, budget)| *need <= budget),
             "distributed draft terminal exceeds budget");
         ensure!(weights.tensor("mtp.2.norm.weight")?.device_id == devices[1].id,
             "draft terminal weights must reside on rank 1");
-        let head_bytes = DistributedVocabularyWave::device_bytes(capacity * 5, shards[0].tokens().end)?;
+        let head_bytes = DistributedVocabularyWave::device_bytes(capacity * weights.draft_width, shards[0].tokens().end)?;
         Ok(Self {
             terminal: devices[1].own(|| weights.terminal_storage(None, capacity, required[1] - head_bytes[1]))?,
-            head: DistributedVocabularyWave::new(devices, shards, capacity * 5, head_bytes)?,
+            head: DistributedVocabularyWave::new(devices, shards, capacity * weights.draft_width, head_bytes)?,
             graphs: [[None; 16]; 2], ready: None, pending: None,
         })
     }
@@ -122,7 +125,7 @@ impl<'w, 'a> DistributedDsparkTerminal<'w, 'a> {
                             self.ready = Some(requests);
                             return Ok(true);
                         }
-                        unsafe { self.head.begin_logits(self.terminal.normalized.buffer, requests * 5)?; }
+                        unsafe { self.head.begin_logits(self.terminal.normalized.buffer, requests * self.terminal.weights.draft_width)?; }
                         self.pending = Some((requests, Phase::Project));
                     }
                     Phase::Project => {
@@ -162,6 +165,14 @@ mod tests {
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT and two CUDA GPUs"]
     fn distributed_dspark_terminal_matches_full_head() -> Result<()> {
+        check_terminal_width(5)
+    }
+    #[test]
+    #[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT and two CUDA GPUs"]
+    fn distributed_dspark_k7_terminal_matches_full_head() -> Result<()> {
+        check_terminal_width(7)
+    }
+    fn check_terminal_width(width: usize) -> Result<()> {
         let lib = unsafe { ds41rt_ffi::NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let catalog = ds41rt_loader::read_official_v41_catalog(ds41rt_loader::OFFICIAL_V41_MODEL_ID,
             std::path::Path::new(&std::env::var("DS41RT_SNAPSHOT")?))?;
@@ -170,11 +181,11 @@ mod tests {
         let shards = [devices[0].own(|| VocabularyShard::load(&lib, &catalog, 0..64640, 1 << 30, 16 << 20))?,
             devices[1].own(|| VocabularyShard::load(&lib, &catalog, 64640..129280, 1 << 30, 16 << 20))?];
         let full = devices[1].own(|| VocabularyHead::load(&lib, &catalog, 2 << 30, 16 << 20))?;
-        let weights = devices[1].own(|| DsparkWeights::load(&lib, &catalog, 80, 1, 32usize << 30, 16 << 20))?;
-        let budgets = DistributedDsparkTerminal::device_bytes(16, 64640)?;
+        let weights = devices[1].own(|| DsparkWeights::load_with_width(&lib, &catalog, if width == 7 { 256 } else { 80 }, 1, 32usize << 30, 16 << 20, width))?;
+        let budgets = DistributedDsparkTerminal::device_bytes_with_width(16, 64640, width)?;
         let mut lanes = [DistributedDsparkTerminal::new(devices, &weights, [&shards[0], &shards[1]], 16, budgets)?,
             DistributedDsparkTerminal::new(devices, &weights, [&shards[0], &shards[1]], 16, budgets)?];
-        let mut reference = devices[1].own(|| weights.terminal(&full, 16, DsparkTerminal::device_bytes(16)?))?;
+        let mut reference = devices[1].own(|| weights.terminal(&full, 16, DsparkTerminal::device_bytes_with_width(16, width)?))?;
         let runtime = tokio::runtime::Builder::new_current_thread().build()?;
         let download = |buffers: [Ds41rtDeviceBuffer; 3]| -> Result<Vec<Vec<u8>>> {
             buffers.into_iter().map(|buffer| {
@@ -186,11 +197,11 @@ mod tests {
         for (cycle, count) in [1, 3, 8, 16, 3].into_iter().enumerate() {
             let mut expected = Vec::new();
             for (lane, terminal) in lanes.iter_mut().enumerate() {
-                let residual: Vec<u8> = (0..count * 5 * 4 * 5120).flat_map(|i| {
+                let residual: Vec<u8> = (0..count * width * 4 * 5120).flat_map(|i| {
                     let value = ((i * (17 + lane * 2) + cycle * 7) % 127) as f32 / 64. - 1.;
                     ((value.to_bits() >> 16) as u16).to_ne_bytes()
                 }).collect();
-                let pre: Vec<u8> = (0..count * 5 * 4).flat_map(|i| (0.1f32 * (1 + i % 4) as f32).to_ne_bytes()).collect();
+                let pre: Vec<u8> = (0..count * width * 4).flat_map(|i| (0.1f32 * (1 + i % 4) as f32).to_ne_bytes()).collect();
                 let anchors: Vec<u8> = (0..count).flat_map(|i| ((i * 31 + lane * 11 + cycle * 5) as u32).to_ne_bytes()).collect();
                 for inputs in [terminal.inputs(), reference.inputs()] {
                     for (buffer, bytes) in inputs.into_iter().zip([&residual, &pre, &anchors]) {
@@ -220,7 +231,7 @@ mod tests {
                     }
                 }
             }
-            eprintln!("PASS distributed dSpark requests={count}: tokens, corrected logits and confidence exact; concurrent cold/replay, mixed temperatures");
+            eprintln!("PASS distributed dSpark K{width} requests={count}: tokens, corrected logits and confidence exact; concurrent cold/replay, mixed temperatures");
         }
         use std::{future::Future, task::{Context, Poll, Waker}};
         unsafe { lanes[0].begin(3)?; lanes[1].begin(3)?; }

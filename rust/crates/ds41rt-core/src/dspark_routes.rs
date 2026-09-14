@@ -11,8 +11,8 @@ pub struct DsparkRouteForecast {
     prefixes: Vec<Vec<LayerSets>>,
 }
 // Seven independent 9-bit counters per word. Each lane has at most eight
-// requests, each with six history rows and six routes: even duplicate route IDs
-// cannot exceed 288, so addition has no carry between fields. The +15 group
+// requests, each with eight history rows and six routes: even duplicate route IDs
+// cannot exceed 384, so addition has no carry between fields. The +15 group
 // rounding below also remains below 512.
 const COUNT_WORDS: usize = 384usize.div_ceil(7);
 type LayerCounts = [[u64; COUNT_WORDS]; 40];
@@ -27,7 +27,7 @@ pub struct DsparkWorkForecast {
 
 #[cfg(test)]
 fn packed_work(counts: u64) -> (u32, u32) {
-    // ceil(count/16) fits five bits (maximum 18 groups). The guard bit
+    // ceil(count/16) fits five bits (maximum 24 groups). The guard bit
     // isolates zero detection; multiplication sums the seven 9-bit fields.
     let groups = ((counts + COUNT_LOW * 15) >> 4) & (COUNT_LOW * 31);
     let unique = (((groups | (COUNT_LOW << 8)) - COUNT_LOW) & (COUNT_LOW << 8)).count_ones();
@@ -73,7 +73,7 @@ impl DsparkWorkForecast {
         let mut cumulative = vec![1.; lengths.len()];
         let mut evaluator = self.evaluator();
         let (mut unique, _) = evaluator.mean_expert_work(&lengths);
-        for position in 1..=5 {
+        for position in 1..=crate::MAX_DSPARK_PROPOSALS {
             for request in 0..lengths.len() {
                 let p = probabilities[request];
                 if position > p.len() { continue; }
@@ -149,7 +149,7 @@ impl DsparkRouteHistory {
         let mut lanes = [0usize; 2];
         let mut rows = Vec::with_capacity(requests.len());
         for (i, &(id, lane, maximum)) in requests.iter().enumerate() {
-            if lane > 1 || maximum > 5 || requests[..i].iter().any(|r| r.0 == id) { return None; }
+            if lane > 1 || maximum > crate::MAX_DSPARK_PROPOSALS || requests[..i].iter().any(|r| r.0 == id) { return None; }
             lanes[lane] += 1;
             if lanes[lane] > 8 { return None; }
             let history = self.requests.get(&id)?;
@@ -161,12 +161,12 @@ impl DsparkRouteHistory {
     }
     pub fn release(&mut self, request: u64) { self.requests.remove(&request); }
     pub fn observe_accepted(&mut self, request: u64, layer: usize, routes: &[[u32; 6]]) -> Result<(), &'static str> {
-        if layer >= 40 || routes.len() > 6 || routes.iter().flatten().any(|&e| e >= 384) {
+        if layer >= 40 || routes.len() > crate::MAX_DSPARK_PROPOSALS + 1 || routes.iter().flatten().any(|&e| e >= 384) {
             return Err("invalid accepted route observation");
         }
-        let history = self.requests.entry(request).or_insert_with(|| (0..40).map(|_| VecDeque::with_capacity(6)).collect());
+        let history = self.requests.entry(request).or_insert_with(|| (0..40).map(|_| VecDeque::with_capacity(crate::MAX_DSPARK_PROPOSALS + 1)).collect());
         for &row in routes {
-            if history[layer].len() == 6 { history[layer].pop_front(); }
+            if history[layer].len() == crate::MAX_DSPARK_PROPOSALS + 1 { history[layer].pop_front(); }
             history[layer].push_back(row);
         }
         Ok(())
@@ -178,7 +178,7 @@ impl DsparkRouteHistory {
         if requests.is_empty() || requests.len() > 16 { return None; }
         let mut prefixes = Vec::with_capacity(requests.len());
         for &(id, lane, maximum) in requests {
-            if lane > 1 || maximum > 5 { return None; }
+            if lane > 1 || maximum > crate::MAX_DSPARK_PROPOSALS { return None; }
             let history = self.requests.get(&id)?;
             if history.iter().any(|h| h.len() < maximum + 1) { return None; }
             let mut curve = Vec::with_capacity(maximum + 1);
@@ -216,6 +216,27 @@ impl DsparkRouteForecast {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn seven_draft_history_stays_bounded_and_packed_counts_do_not_carry() {
+        let mut history = DsparkRouteHistory::default();
+        for id in 0..8 {
+            for layer in 0..40 {
+                history.observe_accepted(id, layer, &[[383; 6]; 8]).unwrap();
+            }
+        }
+        let requests: Vec<_> = (0..8).map(|id| (id, 0, 7)).collect();
+        assert_eq!(history.forecast(&requests).unwrap().mean_unique_experts(&[7; 8]), 1.);
+        let forecast = history.forecast_work(&requests).unwrap();
+        let mut evaluator = forecast.evaluator();
+        assert_eq!(evaluator.mean_expert_work(&[7; 8]), (1., 24.));
+        assert_eq!(evaluator.mean_expert_work(&[0; 8]), (1., 3.));
+        assert_eq!(evaluator.mean_expert_work(&[7; 8]), (1., 24.));
+        for layer in 0..40 {
+            history.observe_accepted(0, layer, &[[0; 6]; 8]).unwrap();
+        }
+        assert_eq!(history.forecast(&[(0, 0, 7)]).unwrap().mean_unique_experts(&[7]), 1.);
+        assert!(history.forecast(&[(0, 0, 8)]).is_none());
+    }
     #[test]
     #[ignore = "explicit optimized-build host cost probe"]
     fn work_forecast_joint_search_cost_probe() {
