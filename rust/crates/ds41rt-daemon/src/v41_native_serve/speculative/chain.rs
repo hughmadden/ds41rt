@@ -2,7 +2,8 @@
 use super::*;
 use crate::v41_experts::dspark::DistributedDsparkChain;
 
-pub(crate) trait DraftChain {
+pub(crate) trait DraftChain<'a> {
+    fn execution_device(&self) -> Option<crate::v41_memory::device::Device<'a>>;
     fn stage_tokens(&mut self, tokens: &[i32]) -> Result<()>;
     fn stage_sampling(&mut self, rngs: &mut [&mut ds41rt_core::DsparkRng], temperatures: &[f32]) -> Result<()>;
     /// # Safety
@@ -13,8 +14,9 @@ pub(crate) trait DraftChain {
     fn poll_replay(&mut self) -> Result<Option<(Vec<u32>, Vec<f32>)>>;
 }
 macro_rules! chain {
-    ($ty:ident) => {
-        impl DraftChain for $ty<'_, '_> {
+    ($ty:ident, $device:expr) => {
+        impl<'w, 'a> DraftChain<'a> for $ty<'w, 'a> {
+            fn execution_device(&self) -> Option<crate::v41_memory::device::Device<'a>> { ($device)(self) }
             fn stage_tokens(&mut self, tokens: &[i32]) -> Result<()> { self.stage_tokens(tokens) }
             fn stage_sampling(&mut self, rngs: &mut [&mut ds41rt_core::DsparkRng], temperatures: &[f32]) -> Result<()> {
                 self.stage_sampling(rngs, temperatures)
@@ -27,5 +29,5 @@ macro_rules! chain {
         }
     };
 }
-chain!(DsparkChain);
-chain!(DistributedDsparkChain);
+chain!(DsparkChain, |_: &DsparkChain| None);
+chain!(DistributedDsparkChain, |chain: &DistributedDsparkChain<'w, 'a>| Some(chain.device()));

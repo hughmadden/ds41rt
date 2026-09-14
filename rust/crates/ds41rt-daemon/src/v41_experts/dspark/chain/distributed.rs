@@ -15,6 +15,7 @@ pub(crate) struct DistributedDsparkChain<'w, 'a> {
     pending: Option<Phase<'a>>,
 }
 impl<'w, 'a> DistributedDsparkChain<'w, 'a> {
+    pub fn device(&self) -> Device<'a> { self.chain.device }
     pub fn device_bytes(weights: &DsparkWeights<'a>, requests: u32, split: usize) -> Result<[usize; 2]> {
         let mut bytes = DistributedDsparkTerminal::device_bytes(requests as usize, split)?;
         bytes[1] = bytes[1].checked_add(weights.chain_bytes(requests)?).context("distributed draft budget overflow")?;

@@ -1,3 +1,4 @@
+use super::speculative::DraftChain;
 use super::*;
 use crate::v41_target_pass::VerificationTarget;
 mod independent;
@@ -356,9 +357,9 @@ struct CommitDecision {
     next_after_commit: Vec<Option<TokenScores>>,
     frontier_downloads: Vec<(usize, usize)>,
 }
-fn prepare_commit_lane<'a>(lane: usize,
+fn prepare_commit_lane<'a, C: DraftChain<'a>>(lane: usize,
     requests: &Requests<'a>, active: &[Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
-    next: &BatchScores, draft: Option<&DraftRuntime<'_, 'a>>, verify_us: u64,
+    next: &BatchScores, draft: Option<&DraftRuntime<'_, 'a, C>>, verify_us: u64,
 ) -> Result<CommitDecision> {
     let mut accepted_drafts = 0u32;
     let mut emitted = 0usize;
@@ -418,9 +419,9 @@ fn prepare_commit_lane<'a>(lane: usize,
     }
     Ok(CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit, frontier_downloads })
 }
-fn publish_commit_lane<'a>(pass: &impl VerificationTarget<'a>, active: &mut [Option<Active<'a>>],
+fn publish_commit_lane<'a, C: DraftChain<'a>>(pass: &impl VerificationTarget<'a>, active: &mut [Option<Active<'a>>],
     members: &[usize], inputs: &[Vec<u32>], owned_batch: &mut Option<RequestBatch>,
-    mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, decision: CommitDecision,
+    mut draft: Option<&mut DraftRuntime<'_, 'a, C>>, capture_routes: bool, decision: CommitDecision,
 ) -> Result<(u32, usize, Vec<Vec<u32>>)> {
     let CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit, frontier_downloads } = decision;
     ensure!(frontier_downloads.is_empty(), "retained frontier downloads are incomplete");

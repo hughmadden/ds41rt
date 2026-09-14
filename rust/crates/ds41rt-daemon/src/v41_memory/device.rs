@@ -21,6 +21,12 @@ pub(crate) fn cache_test_device(library: &NativeLibrary) -> Result<Device<'_>> {
 }
 
 impl<'a> Device<'a> {
+    /// Scope a synchronous method body. Never retain this guard across a yield.
+    pub fn enter(&self) -> Result<DeviceScope<'a>> {
+        let previous = self.library.cuda_get_device()?;
+        if previous != self.id { self.library.cuda_set_device(self.id)?; }
+        Ok(DeviceScope { library: self.library, previous, changed: previous != self.id })
+    }
     /// Scope every poll and cancellation cleanup, never an entire async wait.
     pub fn future<F: Future>(&self, future: F) -> DeviceFuture<'a, F> {
         DeviceFuture { device: *self, future: ManuallyDrop::new(future) }
@@ -52,6 +58,17 @@ impl<'a> Device<'a> {
         self.library.cuda_set_device(previous)?;
         restore.armed = false;
         result
+    }
+}
+
+pub(crate) struct DeviceScope<'a> { library: &'a NativeLibrary, previous: i32, changed: bool }
+impl Drop for DeviceScope<'_> {
+    fn drop(&mut self) {
+        if self.changed {
+            if let Err(error) = self.library.cuda_set_device(self.previous) {
+                tracing::error!(%error, "restoring synchronous CUDA device scope");
+            }
+        }
     }
 }
 

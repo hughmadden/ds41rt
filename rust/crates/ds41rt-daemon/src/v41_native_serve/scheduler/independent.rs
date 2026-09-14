@@ -2,10 +2,10 @@
 use super::*;
 use std::cell::{Cell, RefCell};
 
-pub(super) fn run<'a, P: VerificationTarget<'a>>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+pub(super) fn run<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     first: &mut P, second: &mut P, requests: &mut Requests<'a>,
     first_transport: &mut P::Transport, second_transport: &mut P::Transport,
-    active: &mut [Option<Active<'a>>], draft: Option<&mut DraftRuntime<'_, 'a>>,
+    active: &mut [Option<Active<'a>>], draft: Option<&mut DraftRuntime<'_, 'a, C>>,
     prefixes: &mut PrefixCache<'a>, receive: &mpsc::Receiver<NativeRequest>,
 ) -> Result<()> {
     let requests = RefCell::new(requests);
@@ -22,9 +22,9 @@ pub(super) fn run<'a, P: VerificationTarget<'a>>(lib: &'a NativeLibrary, runtime
     Ok(())
 }
 
-async fn lane<'a, P: VerificationTarget<'a>>(lane: usize, lib: &'a NativeLibrary, pass: &mut P,
+async fn lane<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lane: usize, lib: &'a NativeLibrary, pass: &mut P,
     transport: &mut P::Transport, requests: &RefCell<&mut Requests<'a>>,
-    active: &RefCell<&mut [Option<Active<'a>>]>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a>>>,
+    active: &RefCell<&mut [Option<Active<'a>>]>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a, C>>>,
     prefixes: &RefCell<&mut PrefixCache<'a>>, receive: &mpsc::Receiver<NativeRequest>, drain: &Cell<bool>,
 ) -> Result<()> {
     let result = async {
@@ -218,8 +218,8 @@ async fn lane<'a, P: VerificationTarget<'a>>(lane: usize, lib: &'a NativeLibrary
     result
 }
 
-async fn retire<'a>(lane: usize, request: Active<'a>, requests: &RefCell<&mut Requests<'a>>,
-    prefixes: &RefCell<&mut PrefixCache<'a>>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a>>>) -> Result<()> {
+async fn retire<'a, C: DraftChain<'a>>(lane: usize, request: Active<'a>, requests: &RefCell<&mut Requests<'a>>,
+    prefixes: &RefCell<&mut PrefixCache<'a>>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a, C>>>) -> Result<()> {
     let cacheable = request.cacheable && requests.borrow().cache().request_id(request.lease).is_ok();
     if cacheable {
         let retained: Result<()> = async {

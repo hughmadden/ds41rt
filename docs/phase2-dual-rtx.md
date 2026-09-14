@@ -1343,9 +1343,9 @@ shared admission, proposal polling, adaptive history and cache-prefix lifecycle.
 The existing single-GPU constructor and synchronous proposal API remain
 specialized to the original chain. A distributed constructor creates GPU1 main
 contexts/windows plus independent distributed draft chains, returning an
-explicit GPU1 owner. Callers must scope synchronous runtime work and destruction
-to that device; retained prefixes now carry their GPU ownership to the consumer.
-The production worker/scheduler still needs that owner integration.
+explicit GPU1 owner. Synchronous runtime methods now scope their own GPU work;
+the owner scopes destruction, and retained prefixes carry their GPU ownership
+to the consumer. Production worker construction remains outstanding.
 
 The real-weight runtime fixture compares distributed and full-head runtimes at
 1, 3 and 8 requests per lane while changing committed cache contents, positions
@@ -1372,3 +1372,20 @@ then releases its retained prefix while GPU0 is current, checking device
 restoration after both destructors. This closes the snapshot ownership handoff
 needed by the shared serving prefix cache; runtime/scheduler construction is
 still outstanding. The fixture passed in 2.61 seconds (`draft-prefix-owner.log`).
+
+The independent scheduler and its commit/publication and prefix helpers now
+accept either static draft-chain type. Distributed request-runtime methods
+select GPU1 for their synchronous CUDA work and restore the caller's device
+before returning. The single-RTX specialization returns no execution-device
+scope, so it adds no CUDA device-query/selection calls. No scope is retained
+across scheduler yields. Production startup still needs to construct the
+distributed target, cache, draft and transport owners and invoke this path.
+
+The runtime fixture now calls proposal polling, queued snapshots, release and
+restore directly with GPU0 current, checking device restoration while comparing
+outputs with the full-head runtime. It passed (`scheduler-draft-device.log`,
+2.62 seconds); all 25 serving unit tests passed. The existing single-RTX
+target/draft fixture passed its three 16-request cycles, graph-exact output,
+queued commits and cancellation/reuse checks (`scheduler-draft-single-regression.log`,
+8.41 seconds). These checks do not yet exercise complete dual-RTX serving or
+establish throughput gains.

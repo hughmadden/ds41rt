@@ -5,9 +5,9 @@ use crate::v41_memory::device::{Device, DeviceOwner};
 use crate::v41_tensors::VocabularyShard;
 
 impl<'w, 'a> DraftRuntime<'w, 'a, DistributedDsparkChain<'w, 'a>> {
-    /// The returned owner scopes all runtime CUDA calls and destruction to GPU1.
-    /// Call synchronous methods through its device scope; do not hold that scope
-    /// across a scheduler yield. Individual chains also scope their peer work.
+    /// The returned owner scopes destruction to GPU1. Synchronous runtime methods
+    /// select their execution device internally and restore it before returning;
+    /// no device scope survives a scheduler yield.
     pub fn with_distributed_requests(devices: [Device<'a>; 2], weights: &'w DsparkWeights<'a>,
         table: &'w NativeRtxTensors<'a>, shards: [&'w VocabularyShard<'a>; 2],
         capacity: u32, requests: u32) -> Result<DeviceOwner<'a, Self>> {
@@ -41,7 +41,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a, DistributedDsparkChain<'w, 'a>> {
 mod tests {
     use super::*;
     use crate::v41_dspark_cache::WindowChunk;
-    fn append<C: DraftChain>(runtime: &mut DraftRuntime<'_, '_, C>, lib: &NativeLibrary, cycle: usize) -> Result<u64> {
+    fn append<'a, C: DraftChain<'a>>(runtime: &mut DraftRuntime<'_, 'a, C>, lib: &NativeLibrary, cycle: usize) -> Result<u64> {
         let position = if cycle == 0 { 0 } else { 4 + cycle as u64 };
         let tokens = if cycle == 0 { 5 } else { 1 };
         for stage in 0..3 {
@@ -95,16 +95,17 @@ mod tests {
             let mut observed = [None, None];
             // Admit both lanes, then finish lane 1 while lane 0 is left unpolled.
             for lane in 0..2 {
-                observed[lane] = devices[1].run(|| actual.poll_propose(lane, &inputs[lane]))?;
+                observed[lane] = actual.poll_propose(lane, &inputs[lane])?;
+                assert_eq!(lib.cuda_get_device()?, 0);
                 expected[lane] = devices[1].run(|| reference.poll_propose(lane, &inputs[lane]))?;
             }
             for lane in [1, 0] {
                 while observed[lane].is_none() || expected[lane].is_none() {
-                    devices[1].run(|| {
-                        if observed[lane].is_none() { observed[lane] = actual.poll_propose(lane, &inputs[lane])?; }
-                        if expected[lane].is_none() { expected[lane] = reference.poll_propose(lane, &inputs[lane])?; }
-                        Ok(())
-                    })?;
+                    if observed[lane].is_none() { observed[lane] = actual.poll_propose(lane, &inputs[lane])?; }
+                    assert_eq!(lib.cuda_get_device()?, 0);
+                    if expected[lane].is_none() {
+                        expected[lane] = devices[1].run(|| reference.poll_propose(lane, &inputs[lane]))?;
+                    }
                     std::thread::yield_now();
                 }
                 ensure!(observed[lane].as_ref().unwrap().0 == expected[lane].as_ref().unwrap().0, "runtime proposal differs");
@@ -115,18 +116,15 @@ mod tests {
             }
             eprintln!("PASS distributed runtime requests_per_lane={count}: identical proposals/confidence and independent polling");
         }
-        devices[1].run(|| actual.queue_prefix(0, 1000, 8))?;
-        while !devices[1].run(|| actual.prefix_ready(0, 1000))? { std::thread::yield_now(); }
-        let saved = devices[1].run(|| actual.finish_prefix(0, 1000))?;
-        devices[1].run(|| {
-            actual.release(1000)?;
-            actual.admit(2000)?;
-            actual.restore_prefix(2000, 8, &saved)?;
-            actual.validate_position(2000, 8)?;
-            for id in 1001..1016 { actual.release(id)?; }
-            actual.release(2000)?;
-            Ok(())
-        })?;
+        actual.queue_prefix(0, 1000, 8)?;
+        while !actual.prefix_ready(0, 1000)? { std::thread::yield_now(); }
+        let saved = actual.finish_prefix(0, 1000)?;
+        actual.release(1000)?;
+        actual.admit(2000)?;
+        actual.restore_prefix(2000, 8, &saved)?;
+        actual.validate_position(2000, 8)?;
+        for id in 1001..1016 { actual.release(id)?; }
+        actual.release(2000)?;
         assert_eq!(lib.cuda_get_device()?, 0);
         drop(actual); // Retained snapshot storage outlives the producing runtime.
         assert_eq!(lib.cuda_get_device()?, 0);

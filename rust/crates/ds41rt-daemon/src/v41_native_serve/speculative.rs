@@ -78,8 +78,9 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         })
     }
 }
-impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
+impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
     pub fn admit(&mut self, id: u64) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(!self.requests.contains_key(&id), "draft request already admitted");
         let slot = (0..self.request_limit).find(|slot| self.requests.values().all(|request| request.slot != *slot))
             .context("draft request capacity exhausted")?;
@@ -211,6 +212,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         Ok(enabled.then_some(result.lengths))
     }
     pub fn release(&mut self, id: u64) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(!self.pending_prefix_ids.contains(&Some(id)), "cannot release a request with pending snapshot copies");
         ensure!(!self.pending.iter().flatten().any(|(seeds, _)| seeds.iter().any(|seed| seed.0 == id)),
             "cannot release a request with a pending draft");
@@ -231,11 +233,13 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         failure.map_or(Ok(()), Err)
     }
     pub fn reserve_prefixes(&mut self, slots: usize) -> Result<usize> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         let mut bytes = 0;
         for window in &mut self.windows { bytes += window.reserve_prefixes(slots)?; }
         Ok(bytes)
     }
     pub fn retain_prefix(&mut self, id: u64, end: u64) -> Result<DraftPrefix<'a>> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         let request = self.requests.get(&id).context("draft request not admitted")?;
         for (window, lease) in self.windows.iter().zip(request.leases) {
             ensure!(window.committed_end(lease)? == Some(end), "draft and target prefix frontiers differ");
@@ -246,6 +250,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         Ok(DraftPrefix { windows })
     }
     pub fn queue_prefix(&mut self, lane: usize, id: u64, end: u64) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(self.pending_prefix_ids.get(lane).context("invalid draft snapshot lane")?.is_none(),
             "draft snapshot lane is occupied");
         ensure!(!self.pending_prefix_ids.contains(&Some(id)), "draft snapshot already pending");
@@ -266,6 +271,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         Ok(())
     }
     pub fn prefix_ready(&self, lane: usize, id: u64) -> Result<bool> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(self.pending_prefix_ids.get(lane) == Some(&Some(id)), "draft snapshot owner differs");
         let request = self.requests.get(&id).context("draft snapshot request missing")?;
         for (window, lease) in self.windows.iter().zip(request.leases) {
@@ -274,6 +280,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         Ok(true)
     }
     pub fn finish_prefix(&mut self, lane: usize, id: u64) -> Result<DraftPrefix<'a>> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(self.prefix_ready(lane, id)?, "draft snapshot copies are incomplete");
         let leases = self.requests[&id].leases;
         let device = self.windows[0].device();
@@ -283,6 +290,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         Ok(DraftPrefix { windows })
     }
     pub fn abort_prefix(&mut self, lane: usize) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(lane < self.pending_prefix_ids.len(), "invalid draft snapshot lane");
         let mut failure = None;
         for window in &mut self.windows {
@@ -292,6 +300,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         failure.map_or(Ok(()), Err)
     }
     pub fn restore_prefix(&mut self, id: u64, end: u64, prefix: &DraftPrefix<'a>) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         let device = self.windows[0].device();
         ensure!(prefix.windows.device.id == device.id
             && std::ptr::eq(prefix.windows.device.library, device.library), "draft prefix device differs from runtime");
@@ -325,6 +334,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         batch: &mut RequestBatch,
         accepted: u32,
     ) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         self.commit_batch(pass, requests, batch, &[accepted])
     }
     pub fn commit_batch(
@@ -334,6 +344,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         batch: &mut RequestBatch,
         accepted: &[u32],
     ) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         let ids = batch.cache()?.request_ids();
         ensure!(ids.len() == accepted.len(), "draft acceptance count differs");
         let leases = ids.iter().map(|id| self.requests.get(id)
@@ -361,6 +372,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
     /// Begin a completed decode batch's accepted-cache transaction on its own lane.
     pub fn begin_queued_commit(&mut self, lane: usize, pass: &impl crate::v41_target_pass::TargetCache<'a>,
         requests: &Requests<'a>, batch: &RequestBatch, accepted: &[u32]) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(lane < self.mains.len() && self.pending_commit_ids[lane].is_empty(), "commit lane busy or invalid");
         requests.validate_acceptance(batch, accepted)?;
         ensure!(accepted.iter().any(|&n| n > 0), "queued decode commit has no accepted rows");
@@ -380,9 +392,13 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
         unsafe { self.mains[lane].enqueue_commit(taps.values(), &batch.cache()?.positions(),
             self.windows.each_ref(), writes) }
     }
-    pub fn poll_queued_commit(&self, lane: usize) -> Result<bool> { self.mains[lane].poll_commit() }
+    pub fn poll_queued_commit(&self, lane: usize) -> Result<bool> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
+        self.mains[lane].poll_commit()
+    }
     pub fn finish_queued_commit(&mut self, lane: usize, pass: &mut impl crate::v41_target_pass::TargetCache<'a>,
         requests: &mut Requests<'a>, batch: &mut RequestBatch, accepted: &[u32]) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         self.mains[lane].publish_commit(&mut self.windows)?;
         pass.commit(requests, batch, accepted)?;
         self.pending_commit_ids[lane].clear();
@@ -391,6 +407,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
     /// Drain before revoking any target/cache storage, including partial enqueue.
     pub fn abort_queued_commit(&mut self, lane: usize, requests: &mut Requests<'a>,
         batch: &mut RequestBatch) -> Result<()> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         // Target publication may have cancelled the batch before returning an
         // error. Keep cleanup independent of its now-unavailable cache view.
         let ids = if self.pending_commit_ids[lane].is_empty() {
@@ -408,6 +425,7 @@ impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
     pub fn poll_propose(&mut self, lane: usize,
         inputs: &[(u64, u32, u64, usize)],
     ) -> Result<Option<(Vec<Vec<u32>>, u64)>> {
+        let _device = self.chains[0].execution_device().map(|device| device.enter()).transpose()?;
         ensure!(lane < self.chains.len(), "invalid draft lane");
         if let Some((seeds, started)) = &self.pending[lane] {
             let started = *started;
