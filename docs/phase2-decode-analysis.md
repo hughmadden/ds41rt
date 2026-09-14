@@ -99,6 +99,8 @@ reference, not a controlled implementation comparison. Our no-thinking
 merge_intervals result should not be substituted for this Sieve measurement.
 
 Next is a fixed K7 feasibility and performance experiment against adaptive drafting.
+The [adaptive policy comparison](phase2-adaptive-verification.md) identifies the
+current hardware-independent cost fit as another variable to measure.
 The current draft generation, terminal outputs and verification limit are built
 around five proposals; changing only the CLI range would not implement K7.
 

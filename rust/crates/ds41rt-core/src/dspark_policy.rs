@@ -11,8 +11,9 @@ pub struct DsparkPrefixSelection {
 
 /// Select among the full batch and a greedy suffix-removal trajectory.
 /// Confidence at j means acceptance conditional on all earlier proposals matching.
-/// The cost includes draft generation, both verifier lanes, and serving overhead.
-/// Every candidate is rescored against the current *joint* prefix lengths.
+/// The caller supplies the cost of draft generation, verification and overhead
+/// for its execution batch. Serving invokes this independently for each lane.
+/// Every candidate is rescored against all prefix lengths in that batch.
 /// Continue even through a temporary rate loss: crossing a kernel bucket can
 /// require several removals. Return the best visited shape, never a predicted
 /// regression from the original full prefixes. At most 1 + 5*16*16 cost calls.
