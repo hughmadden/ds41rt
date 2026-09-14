@@ -158,6 +158,15 @@ impl<T> Node<T> {
             .strip_prefix(child.edge.as_slice())
             .and_then(|rest| child.exact_clock(rest))
     }
+    fn oldest_where(&self, keep: &dyn Fn(&T) -> bool) -> Option<u64> {
+        self.value
+            .as_ref()
+            .filter(|(_, value)| !keep(value))
+            .map(|v| v.0)
+            .into_iter()
+            .chain(self.children.values().filter_map(|child| child.oldest_where(keep)))
+            .min()
+    }
     fn evict(&mut self, clock: u64) {
         if self.value.as_ref().is_some_and(|v| v.0 == clock) {
             self.value = None;
@@ -246,6 +255,15 @@ impl<T> Radix<T> {
         self.entries -= 1;
         true
     }
+    /// Evict the least recently used entry for which `keep` is false; true if one was evicted.
+    pub fn evict_oldest_where(&mut self, keep: &dyn Fn(&T) -> bool) -> bool {
+        let Some(oldest) = self.root.oldest_where(keep) else {
+            return false;
+        };
+        self.root.evict(oldest);
+        self.entries -= 1;
+        true
+    }
     /// Drop the entry whose token sequence is exactly `tokens`; false if there is none.
     pub fn remove_exact(&mut self, tokens: &[u32]) -> bool {
         let Some(clock) = self.root.exact_clock(tokens) else {
@@ -291,6 +309,10 @@ impl<T> Retention<T> {
             (None, None) => return None,
         };
         self.bank_mut(kind).lookup_reusable(tokens)
+    }
+    /// `evict_one` restricted to entries for which `keep` is false, same bank order.
+    pub fn evict_one_where(&mut self, keep: &dyn Fn(&T) -> bool) -> bool {
+        self.prompts.evict_oldest_where(keep) || self.turns.evict_oldest_where(keep)
     }
     pub fn evict_one(&mut self) -> bool {
         // Under global-page pressure, reclaim prompt snapshots before completed
@@ -377,6 +399,21 @@ mod tests {
         radix.insert(&[10, 20], 99);
         assert_eq!(radix.entries, 3);
         assert_eq!(radix.lookup(&[10, 20]), Some((2, &99)));
+    }
+    #[test]
+    fn evict_oldest_where_skips_kept_entries_in_bank_order() {
+        let mut retained = Retention::new(16);
+        retained.bank_mut(SnapshotKind::Prompt).insert(&[1, 2], "p-old");
+        retained.bank_mut(SnapshotKind::Prompt).insert(&[1, 3], "p-new");
+        retained.bank_mut(SnapshotKind::Turn).insert(&[9, 9], "t-old");
+        let keep = |v: &&str| *v == "p-old";
+        assert!(retained.evict_one_where(&keep));
+        assert_eq!(retained.lookup_reusable(&[1, 3]), None);
+        assert_eq!(retained.lookup_reusable(&[1, 2]), Some((2, 2, &"p-old")));
+        assert!(retained.evict_one_where(&keep));
+        assert_eq!(retained.lookup_reusable(&[9, 9]), None);
+        assert!(!retained.evict_one_where(&keep));
+        assert_eq!(retained.bank(SnapshotKind::Prompt).entries(), 1);
     }
     #[test]
     fn radix_eviction_drops_saved_owners_and_preserves_recent_branch() {
