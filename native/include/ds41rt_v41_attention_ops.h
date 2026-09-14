@@ -65,6 +65,9 @@ extern "C" {
 // Invalid device seed IDs zero that request's complete output; hosts validate IDs.
 int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t* tokens,
     uint16_t* residual, float* pre, int32_t requests, void* stream);
+// Same contract with draft width 5 or 7; the seed occupies position zero.
+int32_t ds41rt_v41_dspark_embed_width(const uint16_t* table, const int32_t* tokens,
+    uint16_t* residual, float* pre, int32_t requests, int32_t width, void* stream);
 // Target IDs [rows] -> four identical BF16 embedding copies and [1,0,0,0]
 // pre-mix per row. rows=1..4096. Invalid IDs zero that row; hosts validate IDs.
 // Inputs and outputs are disjoint on the stream device and live through replay.
@@ -81,6 +84,9 @@ extern "C" {
 // Disjoint input/output storage, live R (no capacity padding), R=1..16.
 int32_t ds41rt_v41_dspark_terminal_layout(const uint16_t* residual,
     const float* pre, uint16_t* output, float* output_pre, int32_t requests, void* stream);
+// Same transpose with draft width 5 or 7, from [R,width,...] to [width,R,...].
+int32_t ds41rt_v41_dspark_terminal_layout_width(const uint16_t* residual,
+    const float* pre, uint16_t* output, float* output_pre, int32_t requests, int32_t width, void* stream);
 #ifdef __cplusplus
 }
 #endif

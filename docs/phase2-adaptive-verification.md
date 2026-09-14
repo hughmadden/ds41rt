@@ -66,3 +66,25 @@ the fixed control. [Raw summaries and artifact hashes](phase2-adaptive-verificat
 The one-RTX configuration also needs a fresh calibration: its current partial
 RTX residency is not an input to the existing cost formula. No new policy default
 is justified by the external throughput headline alone.
+
+## K7 implementation progress
+
+Native draft attention, embedding and request/position transpose now have
+compile-time K5/K7 specializations with width-selecting entry points. Legacy K5
+symbols remain available. Rust FFI owners select the width before capture and
+validate the corresponding buffer extents; default constructors retain K5 and
+do not require the new symbols. No allocation or synchronization was added to
+these kernel launch paths.
+
+`v41_dspark_width_selftest.py` passed on both RTX cards for K5/K7 and request counts
+1/3/8/16: FP32 attention reference, graph replay with changed inputs, exact layout
+transpose, invalid geometry/alias rejection, and bitwise K5 legacy parity. Maximum
+attention absolute error was 0.002562 (the native path rounds probabilities to
+BF16). `v41_dspark_peer_embedding_selftest.py` passed both widths with GPU0's sole
+embedding table and two independently replayed GPU1 graphs, including changed
+and invalid seeds. The Rust FFI and daemon compile checks passed.
+
+These tests cover native components, not end-to-end K7 generation. Serving still
+uses K5 until draft workspace sizing, terminal output extents, route history,
+RNG reservations and target verification are updated and checked. No K7 throughput
+result or serving default change is claimed.
