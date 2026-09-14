@@ -24,7 +24,7 @@ mod terminal;
 pub(crate) use confidence::DsparkConfidence;
 pub(crate) use markov::DsparkMarkov;
 pub(crate) use router::DsparkRouter;
-pub(crate) use terminal::DsparkTerminal;
+pub(crate) use terminal::{DsparkTerminal, DistributedDsparkTerminal};
 
 use super::{ExpertExecution, ExpertLayer, ExpertWeights};
 use crate::v41_dspark_cache::DsparkWindow;

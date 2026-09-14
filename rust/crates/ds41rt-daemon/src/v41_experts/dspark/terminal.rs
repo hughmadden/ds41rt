@@ -5,6 +5,14 @@ use anyhow::{ensure, Context, Result};
 use ds41rt_core::DsparkRng;
 use ds41rt_ffi::{Ds41rtDeviceBuffer, V41DraftStep, V41Hc, V41VocabularyProjection};
 use std::ffi::c_void;
+mod distributed;
+pub(crate) use distributed::DistributedDsparkTerminal;
+
+struct LocalHead<'w, 'a> {
+    kernel: V41VocabularyProjection<'a>,
+    _workspace: DeviceAllocation<'a>,
+    weights: &'w VocabularyHead<'a>,
+}
 
 /// Five dependent Markov/sample positions followed by raw confidence, on one
 /// stream. All draft tensors use [position,request,...] order at live row count.
@@ -16,10 +24,8 @@ pub(crate) struct DsparkTerminal<'weights, 'library> {
     hc: V41Hc<'library>,
     residual: DeviceAllocation<'library>,
     pre_mix: DeviceAllocation<'library>,
-    head_kernel: V41VocabularyProjection<'library>,
-    _head_workspace: DeviceAllocation<'library>,
+    local_head: Option<LocalHead<'weights, 'library>>,
     normalized: DeviceAllocation<'library>,
-    head: &'weights VocabularyHead<'library>,
     weights: &'weights DsparkWeights<'library>,
     shared_logits: DeviceAllocation<'library>,
     adjusted_logits: DeviceAllocation<'library>,
@@ -41,21 +47,26 @@ impl<'library> DsparkWeights<'library> {
         capacity: usize,
         budget: usize,
     ) -> Result<DsparkTerminal<'weights, 'library>> {
-        ensure!(
-            DsparkTerminal::device_bytes(capacity)? <= budget,
-            "dSpark terminal exceeds budget"
-        );
+        self.terminal_storage(Some(head), capacity, budget)
+    }
+    fn terminal_storage<'weights>(
+        &'weights self, head: Option<&'weights VocabularyHead<'library>>,
+        capacity: usize, budget: usize,
+    ) -> Result<DsparkTerminal<'weights, 'library>> {
+        let bytes = DsparkTerminal::device_bytes(capacity)?
+            - if head.is_none() { V41VocabularyProjection::WORKSPACE_BYTES } else { 0 };
+        ensure!(bytes <= budget, "dSpark terminal exceeds budget");
         let library = self.experts[0].buffers[0].library;
-        head.weight()?;
         self.tensor("mtp.2.norm.weight")?;
-        let head_workspace =
-            DeviceAllocation::new(library, V41VocabularyProjection::WORKSPACE_BYTES)?;
-        let head_kernel = unsafe { library.v41_vocabulary_head(head_workspace.buffer)? };
+        let local_head = head.map(|weights| -> Result<_> {
+            weights.weight()?;
+            let workspace = DeviceAllocation::new(library, V41VocabularyProjection::WORKSPACE_BYTES)?;
+            let kernel = unsafe { library.v41_vocabulary_head(workspace.buffer)? };
+            Ok(LocalHead { kernel, _workspace: workspace, weights })
+        }).transpose()?;
         Ok(DsparkTerminal {
-            head_kernel,
-            _head_workspace: head_workspace,
+            local_head,
             normalized: DeviceAllocation::new(library, capacity * 5 * 10240)?,
-            head,
             weights: self,
             stream: LoadStream {
                 library,
@@ -199,8 +210,17 @@ impl DsparkTerminal<'_, '_> {
     }
     pub(super) unsafe fn enqueue_on(&self, requests: usize, stream: *mut c_void) -> Result<()> {
         self.validate_sampling(requests)?;
+        let head = self.local_head.as_ref().context("terminal requires external vocabulary projection")?;
+        unsafe {
+            self.enqueue_normalize_on(requests, stream)?;
+            head.kernel.launch(self.normalized.buffer, head.weights.weight()?,
+                self.shared_logits.buffer, requests * 5, stream)?;
+            self.enqueue_sampling_on(requests, stream)
+        }
+    }
+    unsafe fn enqueue_normalize_on(&self, requests: usize, stream: *mut c_void) -> Result<()> {
+        self.validate_sampling(requests)?;
         let library = self.stream.library;
-        let row_bytes = requests * 129280 * 4;
         unsafe {
             self.hc.pre(
                 self.residual.buffer,
@@ -219,13 +239,14 @@ impl DsparkTerminal<'_, '_> {
                 1e-20,
                 stream,
             )?;
-            self.head_kernel.launch(
-                self.normalized.buffer,
-                self.head.weight()?,
-                self.shared_logits.buffer,
-                requests * 5,
-                stream,
-            )?;
+        }
+        Ok(())
+    }
+    unsafe fn enqueue_sampling_on(&self, requests: usize, stream: *mut c_void) -> Result<()> {
+        self.validate_sampling(requests)?;
+        let library = self.stream.library;
+        let row_bytes = requests * 129280 * 4;
+        unsafe {
             library.copy_d2d_async(
                 self.markov.tokens(),
                 self.tokens.buffer,

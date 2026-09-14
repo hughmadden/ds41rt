@@ -1245,8 +1245,8 @@ dSpark's subsequent Markov correction and sampling. Each rank has separate
 graph entries for projection-only and greedy execution. Projection-only work
 skips candidate reduction, candidate transfer and winner merging; it publishes
 only the two logits shards and rejects access to stale greedy output. Neither
-mode introduces a dependency on the other request lane. Connection to the
-draft terminal remains to be implemented.
+mode introduces a dependency on the other request lane. The distributed draft
+terminal connection is described below.
 
 The real-checkpoint vocabulary fixture passed for 1, 3, 16, 40 and 80 rows,
 with two independent waves, cold/captured execution and repeated changes
@@ -1273,3 +1273,29 @@ and both projection modes. It also checks undersized/foreign destinations and
 cancellation followed by copy reuse. All checks passed in 12.18 seconds
 (`vocabulary-assembly.log`). End-to-end draft integration and transfer-cost
 measurement remain outstanding.
+
+`DistributedDsparkTerminal` now connects RTX1 normalization, TP2 vocabulary
+projection, GPU1 logits assembly and RTX1 Markov correction/sampling/confidence.
+It owns per-lane streams and per-shape normalization/sampling graphs; waits are
+cooperative and scoped only to its own dependencies. Sampling metadata uploads
+are ordered with normalization without a separate upload-completion wait. The
+shared terminal implementation keeps the same single-GPU operation order. A
+distributed terminal omits the local full-head workspace and budgets the two
+shard projection workspaces separately.
+
+The real-checkpoint terminal fixture passed at 1, 3, 8 and 16 requests, including
+two concurrent lanes, cold execution, graph replay, changed inputs, greedy and
+0.7-temperature sampling, cancellation/reuse and device restoration. Tokens,
+all corrected logits and raw confidence matched the full-head terminal byte
+for byte. It completed in 3.45 seconds (`distributed-terminal.log`). This does
+not yet connect the distributed terminal to the draft transformer chain or the
+serving scheduler, and does not establish a throughput improvement.
+
+The existing single-RTX target/draft fixture also passed after this refactor:
+three 16-request draft cycles, greedy and 0.7-temperature sampling, graph-exact
+outputs, queued cancellation/reuse, accepted-prefix cache checks, and target
+prefill/decode commits (`terminal-single-chain-regression.log`, 8.32 seconds).
+Both the target and transport must select the CUDA library in this fixture;
+the initial invocation omitted `DS41RT_NATIVE_LIB` and selected the non-CUDA
+transport fallback before any draft execution. The corrected invocation passed.
+This verifies behavior, not single-RTX serving throughput.
