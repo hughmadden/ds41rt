@@ -862,3 +862,18 @@ mod context_geometry_tests {
         assert!(BackboneCache::pages_for_context(1, 1048577).is_err());
     }
 }
+
+impl<'a> BackboneCache<'a> {
+    pub fn owner(&self) -> u64 {
+        self.owner
+    }
+    pub fn prefix_pool(&self) -> Option<&crate::v41_memory::SnapshotPool<'a>> {
+        self.prefix_pool.as_ref()
+    }
+    pub fn prefix_library(&self) -> &'a NativeLibrary {
+        self.prefix_stream.library
+    }
+    pub fn sources(&self) -> &[CompressorState<'a>] {
+        &self.sources
+    }
+}

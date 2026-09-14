@@ -167,12 +167,15 @@ impl<T> Node<T> {
             .chain(self.children.values().filter_map(|child| child.oldest_where(keep)))
             .min()
     }
-    fn evict(&mut self, clock: u64) {
-        if self.value.as_ref().is_some_and(|v| v.0 == clock) {
-            self.value = None;
-        }
+    fn evict(&mut self, clock: u64) -> Option<T> {
+        let mut evicted = match self.value.as_ref() {
+            Some((c, _)) if *c == clock => self.value.take().map(|(_, value)| value),
+            _ => None,
+        };
         for child in self.children.values_mut() {
-            child.evict(clock);
+            if let Some(value) = child.evict(clock) {
+                evicted = Some(value);
+            }
         }
         self.children
             .retain(|_, child| child.value.is_some() || !child.children.is_empty());
@@ -184,6 +187,7 @@ impl<T> Node<T> {
                 child.children = next.children;
             }
         }
+        evicted
     }
 }
 pub struct Radix<T> {
@@ -248,21 +252,21 @@ impl<T> Radix<T> {
         self.root.value.is_none() && self.root.children.is_empty()
     }
     pub fn evict_one(&mut self) -> bool {
-        let Some(oldest) = self.root.oldest() else {
-            return false;
-        };
-        self.root.evict(oldest);
-        self.entries -= 1;
-        true
+        self.evict_oldest().is_some()
     }
-    /// Evict the least recently used entry for which `keep` is false; true if one was evicted.
-    pub fn evict_oldest_where(&mut self, keep: &dyn Fn(&T) -> bool) -> bool {
-        let Some(oldest) = self.root.oldest_where(keep) else {
-            return false;
-        };
-        self.root.evict(oldest);
+    /// Evict the least recently used entry and return it; `None` when empty.
+    pub fn evict_oldest(&mut self) -> Option<T> {
+        let oldest = self.root.oldest()?;
+        let evicted = self.root.evict(oldest);
         self.entries -= 1;
-        true
+        evicted
+    }
+    /// Evict the least recently used entry for which `keep` is false and return it.
+    pub fn evict_oldest_where(&mut self, keep: &dyn Fn(&T) -> bool) -> Option<T> {
+        let oldest = self.root.oldest_where(keep)?;
+        let evicted = self.root.evict(oldest);
+        self.entries -= 1;
+        evicted
     }
     /// Drop the entry whose token sequence is exactly `tokens`; false if there is none.
     pub fn remove_exact(&mut self, tokens: &[u32]) -> bool {
@@ -310,14 +314,24 @@ impl<T> Retention<T> {
         };
         self.bank_mut(kind).lookup_reusable(tokens)
     }
-    /// `evict_one` restricted to entries for which `keep` is false, same bank order.
-    pub fn evict_one_where(&mut self, keep: &dyn Fn(&T) -> bool) -> bool {
-        self.prompts.evict_oldest_where(keep) || self.turns.evict_oldest_where(keep)
+    /// `evict_one`, returning the evicted entry and its bank.
+    pub fn evict_oldest(&mut self) -> Option<(SnapshotKind, T)> {
+        self.prompts
+            .evict_oldest()
+            .map(|value| (SnapshotKind::Prompt, value))
+            .or_else(|| self.turns.evict_oldest().map(|value| (SnapshotKind::Turn, value)))
+    }
+    /// `evict_oldest` restricted to entries for which `keep` is false, same bank order.
+    pub fn evict_one_where(&mut self, keep: &dyn Fn(&T) -> bool) -> Option<(SnapshotKind, T)> {
+        self.prompts
+            .evict_oldest_where(keep)
+            .map(|value| (SnapshotKind::Prompt, value))
+            .or_else(|| self.turns.evict_oldest_where(keep).map(|value| (SnapshotKind::Turn, value)))
     }
     pub fn evict_one(&mut self) -> bool {
         // Under global-page pressure, reclaim prompt snapshots before completed
         // turns; their pages may remain shared until the turn also expires.
-        self.prompts.evict_one() || self.turns.evict_one()
+        self.evict_oldest().is_some()
     }
 }
 
@@ -407,13 +421,15 @@ mod tests {
         retained.bank_mut(SnapshotKind::Prompt).insert(&[1, 3], "p-new");
         retained.bank_mut(SnapshotKind::Turn).insert(&[9, 9], "t-old");
         let keep = |v: &&str| *v == "p-old";
-        assert!(retained.evict_one_where(&keep));
+        assert_eq!(retained.evict_one_where(&keep), Some((SnapshotKind::Prompt, "p-new")));
         assert_eq!(retained.lookup_reusable(&[1, 3]), None);
         assert_eq!(retained.lookup_reusable(&[1, 2]), Some((2, 2, &"p-old")));
-        assert!(retained.evict_one_where(&keep));
+        assert_eq!(retained.evict_one_where(&keep), Some((SnapshotKind::Turn, "t-old")));
         assert_eq!(retained.lookup_reusable(&[9, 9]), None);
-        assert!(!retained.evict_one_where(&keep));
+        assert_eq!(retained.evict_one_where(&keep), None);
         assert_eq!(retained.bank(SnapshotKind::Prompt).entries(), 1);
+        assert_eq!(retained.evict_oldest(), Some((SnapshotKind::Prompt, "p-old")));
+        assert!(retained.bank(SnapshotKind::Prompt).is_empty());
     }
     #[test]
     fn radix_eviction_drops_saved_owners_and_preserves_recent_branch() {

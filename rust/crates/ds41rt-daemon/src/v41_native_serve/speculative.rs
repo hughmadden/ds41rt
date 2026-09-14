@@ -524,3 +524,17 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         self.confidence_trace.get(&id).map(Vec::as_slice)
     }
 }
+
+impl<'a> DraftPrefix<'a> {
+    pub fn parts(&self) -> &[crate::v41_dspark_cache::DsparkPrefix<'a>] {
+        &self.windows
+    }
+    pub fn from_parts(windows: Vec<crate::v41_dspark_cache::DsparkPrefix<'a>>) -> Self {
+        Self { windows }
+    }
+}
+impl<'w, 'a> DraftRuntime<'w, 'a> {
+    pub fn windows(&self) -> &[DsparkWindow<'a>; 3] {
+        &self.windows
+    }
+}
