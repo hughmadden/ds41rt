@@ -2,6 +2,10 @@
 //! thread, none of which blocks except the two whose whole purpose is to wait a bounded time
 //! (`before_device_evict`, `restore`).
 //!
+//! The engine attaches a payload `P` to every store (its host-side descriptors: image keys,
+//! Engram history, logits, window and compressor metadata); the cache hands it back on a hit
+//! and drops it when the snapshot is evicted, so the engine keeps no side table.
+//!
 //! Life of a snapshot: the engine retains it → `store` plans slabs and enqueues device→host
 //! copies on the store stream, returning a ticket → the engine keeps the device snapshot alive
 //! while the ticket is pending → `tick` reports completion and the snapshot becomes
@@ -31,25 +35,28 @@ pub struct DevicePage {
     pub segments: Vec<DeviceRange>,
 }
 
-/// A retained snapshot as it sits on the device.
+/// A retained snapshot as it sits on the device. Tail and draft are segment lists like pages
+/// (the draft is three dSpark rings of varying length); each list's bytes must fit its slab and
+/// is stored concatenated. `scores` is empty when the layout's scores class is zero.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceSnapshot {
     pub meta: SnapshotMeta,
     pub pages: [Vec<DevicePage>; COMPRESSORS],
-    pub tail: DeviceRange,
-    pub draft: Option<DeviceRange>,
-    pub scores: DeviceRange,
+    pub tail: Vec<DeviceRange>,
+    pub draft: Option<Vec<DeviceRange>>,
+    pub scores: Vec<DeviceRange>,
 }
 
-/// Where a restore writes: the engine's reserved destinations, in the same shape. Pages carry
-/// their new device identities so the cache can record them as shared after a successful
-/// restore (a later store of the same snapshot then copies nothing).
+/// Where a restore writes: the engine's fresh destinations, in the same shape and with the same
+/// segment lengths as the stored snapshot. Pages carry their new device identities so the cache
+/// records them as shared after a successful restore (a later store of the same snapshot then
+/// copies nothing).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RestoreTarget {
     pub pages: [Vec<DevicePage>; COMPRESSORS],
-    pub tail: DeviceRange,
-    pub draft: Option<DeviceRange>,
-    pub scores: DeviceRange,
+    pub tail: Vec<DeviceRange>,
+    pub draft: Option<Vec<DeviceRange>>,
+    pub scores: Vec<DeviceRange>,
 }
 
 /// Handle for a store in flight. The engine keeps the device snapshot alive (it is retained
@@ -104,12 +111,13 @@ pub enum RestoreOutcome {
 /// The cache. Invariants: `metrics().bytes_used <= quota`; a snapshot with a restore in flight
 /// is never evicted; every ticket is reported exactly once; a `lookup` hit is a `Retention` hit
 /// over the resident snapshots; when disabled every call is a no-op returning the neutral value.
-pub struct HostCache<E: CopyEngine> {
+pub struct HostCache<E: CopyEngine, P> {
     _engine: E,
+    _payload: std::marker::PhantomData<P>,
     _private: (),
 }
 
-impl<E: CopyEngine> HostCache<E> {
+impl<E: CopyEngine, P> HostCache<E, P> {
     /// Validates `config`, allocates the pinned pool through `engine` (nothing when disabled).
     pub fn new(config: Config, layout: Layout, engine: E) -> anyhow::Result<Self> {
         let _ = (config, layout, engine);
@@ -118,22 +126,31 @@ impl<E: CopyEngine> HostCache<E> {
     pub fn enabled(&self) -> bool {
         unimplemented!("HC-5")
     }
-    pub fn store(&mut self, snapshot: &DeviceSnapshot) -> StoreOutcome {
-        let _ = snapshot;
+    /// Plan and issue the store; `payload` travels with the snapshot until it is evicted.
+    pub fn store(&mut self, snapshot: &DeviceSnapshot, payload: P) -> StoreOutcome {
+        let _ = (snapshot, payload);
+        unimplemented!("HC-5")
+    }
+    /// The engine's payload for a resident snapshot.
+    pub fn payload(&self, key: Key) -> Option<&P> {
+        let _ = key;
         unimplemented!("HC-5")
     }
     /// Poll the store stream; completed stores become lookup-visible.
     pub fn tick(&mut self) -> TickReport {
         unimplemented!("HC-5")
     }
-    /// The engine is about to evict this device snapshot. With a pending ticket, wait within the
-    /// copy budget (issuing the copy first under `OnEvict`); without one, `Clean`.
-    pub fn before_device_evict(
-        &mut self,
-        ticket: Option<StoreTicket>,
-        snapshot: &DeviceSnapshot,
-    ) -> EvictDecision {
-        let _ = (ticket, snapshot);
+    /// The engine is about to drop a device snapshot. With a pending ticket, wait within the
+    /// copy budget (under `OnEvict`, issue the copy first from the plan recorded at store time,
+    /// whose device ranges are still valid because the snapshot is still alive); without a
+    /// ticket, `Clean`.
+    pub fn before_device_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
+        let _ = ticket;
+        unimplemented!("HC-5")
+    }
+    /// The key-space tokens of a resident snapshot (the sequence its radix entry is keyed by).
+    pub fn snapshot_tokens(&self, key: Key) -> Option<&[u32]> {
+        let _ = key;
         unimplemented!("HC-5")
     }
     pub fn device_page_freed(&mut self, id: DevicePageId) {

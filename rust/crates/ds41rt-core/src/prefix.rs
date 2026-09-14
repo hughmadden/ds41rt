@@ -205,18 +205,22 @@ impl<T> Radix<T> {
             limit,
         }
     }
-    pub fn insert(&mut self, tokens: &[u32], value: T) {
+    /// Insert, evicting the least recently used entry if the bank is over its limit; returns
+    /// that evicted entry so its owner can act before it is dropped.
+    pub fn insert(&mut self, tokens: &[u32], value: T) -> Option<T> {
         if self.limit == 0 || tokens.is_empty() {
-            return;
+            return None;
         }
         self.clock = self
             .clock
             .checked_add(1)
             .expect("prefix access clock exhausted");
         self.entries += usize::from(self.root.insert(tokens, value, self.clock));
+        let mut evicted = None;
         while self.entries > self.limit {
-            self.evict_one();
+            evicted = self.evict_oldest();
         }
+        evicted
     }
     pub fn lookup(&mut self, tokens: &[u32]) -> Option<(usize, &T)> {
         self.clock = self
@@ -268,14 +272,12 @@ impl<T> Radix<T> {
         self.entries -= 1;
         evicted
     }
-    /// Drop the entry whose token sequence is exactly `tokens`; false if there is none.
-    pub fn remove_exact(&mut self, tokens: &[u32]) -> bool {
-        let Some(clock) = self.root.exact_clock(tokens) else {
-            return false;
-        };
-        self.root.evict(clock);
+    /// Remove and return the entry whose token sequence is exactly `tokens`.
+    pub fn remove_exact(&mut self, tokens: &[u32]) -> Option<T> {
+        let clock = self.root.exact_clock(tokens)?;
+        let removed = self.root.evict(clock);
         self.entries -= 1;
-        true
+        removed
     }
 }
 /// Prompt repeats and completed agentic turns have separate bounded banks.

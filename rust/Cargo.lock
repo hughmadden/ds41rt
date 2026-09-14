@@ -784,6 +784,7 @@ dependencies = [
  "ds41rt-api",
  "ds41rt-core",
  "ds41rt-ffi",
+ "ds41rt-hostcache",
  "ds41rt-loader",
  "ds41rt-transport",
  "io-uring",

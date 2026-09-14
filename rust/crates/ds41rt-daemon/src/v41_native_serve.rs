@@ -38,11 +38,13 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
     let limits = ds41rt_api::native_v41::NativeLimits::new(args.max_context_tokens, args.max_output_tokens)?;
     let (send, receive) = mpsc::channel(args.concurrency as usize);
     let (ready, readiness) = oneshot::channel();
+    let stats = std::sync::Arc::new(std::sync::Mutex::new(serde_json::Value::Null));
+    let worker_stats = stats.clone();
     let worker_thread = std::thread::Builder::new()
         .name("v41-target-cuda".into())
         .spawn(move || {
             let mut ready = Some(ready);
-            let result = worker(args, receive, &mut ready);
+            let result = worker(args, receive, &mut ready, worker_stats);
             if let Some(ready) = ready.take() {
                 let _ = ready.send(Err(result
                     .as_ref()
@@ -60,7 +62,7 @@ pub(crate) async fn run(args: crate::cli::NativeServeArgs) -> Result<()> {
         .map_err(anyhow::Error::msg)?;
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     tracing::info!(%listen,"native V4.1 target API ready");
-    axum::serve(listener, ds41rt_api::native_v41::router_with_limits(send, limits))
+    axum::serve(listener, ds41rt_api::native_v41::router_with_limits_and_stats(send, limits, stats))
         .with_graceful_shutdown(async {
             let mut term =
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
@@ -114,6 +116,7 @@ fn worker(
     args: crate::cli::NativeServeArgs,
     mut receive: mpsc::Receiver<NativeRequest>,
     ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>,
+    stats: std::sync::Arc<std::sync::Mutex<serde_json::Value>>,
 ) -> Result<()> {
     let capacity = prefill_capacity(args.prefill_batch_tokens)?;
     let rows = capacity as usize;
@@ -322,7 +325,7 @@ fn worker(
         .send(Ok(()))
         .map_err(|_| anyhow::anyhow!("API startup cancelled"))?;
     scheduler::serve(&lib, &args, &runtime, &mut receive, &mut pass, &mut prefill_pass,
-        &mut requests, &mut transport, &mut prefill_transport, draft.as_mut(), &mut vision)
+        &mut requests, &mut transport, &mut prefill_transport, draft.as_mut(), &mut vision, stats)
 }
 
 fn prefill<'w, 'a>(
