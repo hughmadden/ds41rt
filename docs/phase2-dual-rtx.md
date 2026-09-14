@@ -1111,3 +1111,32 @@ eviction on GPU0 (`qb-handoff-stress.log`). An unchanged GPU1 recheck failed
 observations, not comparative performance measurements. The extra barriers
 have not been applied to the pinned production source. Next investigation
 must localize the live operand or pipeline failure without joining request lanes.
+
+The subsequent `--gemm-only` probe reuses quantization from the synchronized
+warmup and calls the initialized AOT GEMM using its manifest-declared ABI.
+Both quantized scratch buffers are checked byte-for-byte after each trial.
+Concurrent eviction still caused 253/256 differing projections on GPU0, with
+unchanged scratch, input, weight, and packed scales (`qb-gemm-only.log`). The
+serial GPU1 control passed 8,192 projections, and a capacity-16/three-live-row
+serial control passed 32 (`qb-gemm-only-serial.log` and
+`qb-gemm-only-rows3-serial.log`). Repeated activation quantization is therefore
+not necessary to trigger the defect.
+
+Further isolated kernel probes have not produced a fix:
+
+| Probe | Concurrent result | Diagnostic observation |
+| --- | --- | --- |
+| Remove the explicit TMA cache hint | 243/256 differ | Immutable operands unchanged |
+| Compare each acquired activation stage against global input | 88/256 differ | No shared activation mismatch reported |
+| Compare each acquired weight stage against global weight | 9/256 differ | No shared weight mismatch reported |
+| Compare acquired activation/weight scale stages against global scales | 142/256 differ | Neither scale checker reported a mismatch |
+| Store accumulators directly to output, bypassing the shared-memory epilogue | 250/256 differ | Standalone baseline still matches |
+
+These are separate, timing-changing diagnostics, not a combined operand proof
+or performance comparison. The checker flags also need positive-control
+coverage before relying on their silence as a conclusive exclusion. Sources
+and exported objects for the operand/output probes remain in local
+`qb-check-a`, `qb-check-b`, `qb-check-sf`, and `qb-direct-output` directories;
+logs use the corresponding `*-stress.log` names. No diagnostic kernel replaces
+the pinned production source. The next useful boundary is the register
+fragments consumed by MMA, with checker coverage verified explicitly.

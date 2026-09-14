@@ -24,6 +24,8 @@ parser.add_argument('--serial', action='store_true')
 parser.add_argument('--eviction-only', action='store_true')
 parser.add_argument('--no-graphs', action='store_true', help='Issue the same work directly on the two streams')
 parser.add_argument('--check-inputs', action='store_true', help='Verify immutable inputs and weights after each trial')
+parser.add_argument('--gemm-only', action='store_true', help='Reuse warmup quantization and call the initialized AOT GEMM directly')
+parser.add_argument('--aot-manifest', type=Path, help='AOT manifest for --gemm-only; defaults to native_lib parent/v41_fp8/v41_fp8.json')
 parser.add_argument('--failure-output', type=Path)
 args = parser.parse_args()
 assert args.steps > 0 and args.trials > 0 and args.evict_mib >= 0
@@ -70,15 +72,36 @@ torch.cuda.synchronize()
 pack(scales.data_ptr(),packed.data_ptr(),1280,32768,streams[0].cuda_stream)
 for i,s in enumerate(streams):init_scratch(handles[i],a[i].data_ptr(),infos[i].scratch,alpha[i].data_ptr(),s.cuda_stream)
 torch.cuda.synchronize()
+gemms=[]
+manifest=json.loads((args.aot_manifest or args.native_lib.parent/'v41_fp8/v41_fp8.json').read_text()) if args.gemm_only else None
+for capacity in capacities:
+ abi=next(v['gemm_abi'] for v in manifest['variants'] if v['label']==f'v41_q_b_fp8_m{capacity}') if manifest else None
+ if abi:
+  assert abi['argument_count']==12 and abi['i32']==['m'] and abi['stream']=='current_stream'
+  assert abi['pointers']==['a_ptr','b_ptr','sfa_ptr','sfb_ptr','c_ptr','quant_c_values_ptr','quant_c_scale_rows_ptr','quant_c_scale_mma_ptr','alpha_ptr']
+ fn=getattr(lib,abi['symbol']) if abi else None
+ if fn is not None:fn.argtypes=[C.POINTER(P),I];fn.restype=None
+ gemms.append(fn)
+warmed_up=False
 def run(i,step):
  value=x if i==0 else y
  output=retained[step] if i==0 else other
- launch(handles[i],value.data_ptr(),w.data_ptr(),packed.data_ptr(),a[i].data_ptr(),infos[i].scratch,alpha[i].data_ptr(),output.data_ptr(),value.shape[0],streams[i].cuda_stream)
+ if args.gemm_only and warmed_up:
+  pointers=[a[i].data_ptr()+infos[i].values,w.data_ptr(),a[i].data_ptr()+infos[i].mma_scales,packed.data_ptr(),*[output.data_ptr()]*4,alpha[i].data_ptr()]
+  values=[*[P(p) for p in pointers],I(value.shape[0]),P(streams[i].cuda_stream),I(0)]
+  argv=(P*len(values))(*[C.cast(C.pointer(v),P) for v in values])
+  gemms[i](argv,len(values))
+  if values[-1].value:raise RuntimeError('direct GEMM',values[-1].value)
+ else:
+  launch(handles[i],value.data_ptr(),w.data_ptr(),packed.data_ptr(),a[i].data_ptr(),infos[i].scratch,alpha[i].data_ptr(),output.data_ptr(),value.shape[0],streams[i].cuda_stream)
 for i in range(2):run(i,0)
 torch.cuda.synchronize()
 assert torch.equal(retained[0].cpu(),expected),'standalone baseline differs from captured expected'
+warmed_up=True
 immutable = [(name, value, value.cpu().clone()) for name, value in
              [('input', x), ('weight', w), ('packed_scales', packed)]] if args.check_inputs else []
+if args.gemm_only:
+ immutable += [(f'quantized_scratch_{i}',value,value.cpu().clone()) for i,value in enumerate(a)]
 def enqueue(i, selected_steps):
  with torch.cuda.stream(streams[i]):
   for step in selected_steps:
