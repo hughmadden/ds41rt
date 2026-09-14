@@ -19,8 +19,9 @@ impl Class {
     pub const ALL: [Class; 4] = [Class::Page, Class::Tail, Class::Draft, Class::Scores];
 }
 
-/// Slab sizes in bytes. The engine layout uses the crate constants for pages, tails and drafts;
-/// the scores row size comes from the engine at boot (verified in the daemon binding).
+/// Slab sizes in bytes. The engine layout uses the crate constants for pages, tails and drafts.
+/// A class whose size is zero is disabled: `take` reports it exhausted and stores never plan
+/// it (the engine keeps its logit row host-side, so `scores` is zero in the daemon binding).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Layout {
     pub page: usize,
@@ -30,6 +31,7 @@ pub struct Layout {
 }
 
 impl Layout {
+    /// The DS41RT layout; `scores` is zero because the engine's `TokenScores` is host memory.
     pub fn engine(scores: usize) -> Self {
         Self {
             page: crate::PAGE_BYTES,

@@ -21,11 +21,14 @@ use crate::snapshot::{DevicePageId, Hit, Key, SnapshotMeta};
 use crate::COMPRESSORS;
 use serde::Serialize;
 
-/// One device page as the engine addresses it: identity plus where its bytes are.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// One device page as the engine addresses it: identity plus where its bytes are. The engine
+/// keeps a page's rows in several device buffers (packed index, index scales, KV values, KV
+/// scales), so a page is a list of segments whose lengths sum to the layout's page size; the
+/// host slab holds them concatenated in this order.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DevicePage {
     pub id: DevicePageId,
-    pub range: DeviceRange,
+    pub segments: Vec<DeviceRange>,
 }
 
 /// A retained snapshot as it sits on the device.
@@ -38,10 +41,12 @@ pub struct DeviceSnapshot {
     pub scores: DeviceRange,
 }
 
-/// Where a restore writes: the engine's reserved destinations, in the same shape.
+/// Where a restore writes: the engine's reserved destinations, in the same shape. Pages carry
+/// their new device identities so the cache can record them as shared after a successful
+/// restore (a later store of the same snapshot then copies nothing).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RestoreTarget {
-    pub pages: [Vec<DeviceRange>; COMPRESSORS],
+    pub pages: [Vec<DevicePage>; COMPRESSORS],
     pub tail: DeviceRange,
     pub draft: Option<DeviceRange>,
     pub scores: DeviceRange,
