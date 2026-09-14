@@ -354,6 +354,12 @@ impl<'a> HostCacheBinding<'a> {
     pub(super) fn tick(&mut self) {
         self.cache.tick();
     }
+    /// A host hit whose restore could not be carried out (for example no device pages for it):
+    /// counted with the copy failures so `/v1/stats` shows every abandoned restore; the request
+    /// prefills instead.
+    pub(super) fn count_abandoned_restore(&mut self) {
+        self.cache.metrics_mut().get_mut().restore_failures += 1;
+    }
     /// The engine is dropping a `Saved`: let its copy finish within budget or count the loss.
     pub(super) fn before_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
         self.cache.before_device_evict(ticket)

@@ -99,8 +99,18 @@ impl<'a> PrefixCache<'a> {
         let Some(hit) = host.lookup(keys) else {
             return Ok(());
         };
-        let Some(saved) = host.restore(&hit, requests, draft)? else {
-            return Ok(());
+        // A restore that cannot complete (device pool exhausted for its pages, a missing part,
+        // a copy failure) is abandoned and counted; the request then prefills exactly as it
+        // would with no cache, where the engine's own admission makes room by evicting device
+        // snapshots. The cache must never turn a cache miss into a request error.
+        let saved = match host.restore(&hit, requests, draft) {
+            Ok(Some(saved)) => saved,
+            Ok(None) => return Ok(()),
+            Err(error) => {
+                tracing::warn!(target: "ds41rt::host_cache", %error, "host restore abandoned; prefilling");
+                host.count_abandoned_restore();
+                return Ok(());
+            }
         };
         let tokens = host.snapshot_tokens(hit.key).context("restored host snapshot has no tokens")?;
         if let Some(evicted) = self.retained.bank_mut(hit.kind).insert(&tokens, saved) {
