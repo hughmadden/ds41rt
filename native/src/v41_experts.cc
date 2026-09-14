@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <mutex>
 #ifdef DS41RT_V41_TP2_EXPERTS
 #include "v41_tp2_expert_variants.h"
@@ -113,6 +114,19 @@ extern "C" int32_t ds41rt_v41_expert_output_kind(int32_t capacity, uint32_t* out
   return cudaSuccess;
 }
 
+namespace {
+// Same contract as v41_fp8.cc: the AOT export pins compute capability and SM count of the
+// GPU that ran export_b12x_v41_experts_aot.py. Name the mismatch instead of returning a
+// bare cudaErrorInvalidDevice (101).
+int32_t reject_expert_device(const char* what, int device, int major, int minor, int sms) {
+  std::fprintf(stderr,
+               "ds41rt: %s AOT kernels were exported for compute 12.%d with %d SMs, but device "
+               "%d is compute %d.%d with %d SMs; rebuild the AOT export on the target GPU "
+               "(cudaErrorInvalidDevice)\n",
+               what, int(DS41RT_V41_CC_MINOR), int(DS41RT_V41_SMS), device, major, minor, sms);
+  return cudaErrorInvalidDevice;
+}
+}  // namespace
 extern "C" int32_t ds41rt_v41_expert_initialize(int32_t capacity, void** out) {
   if (!out) return cudaErrorInvalidValue;
   *out = nullptr;
@@ -128,7 +142,7 @@ extern "C" int32_t ds41rt_v41_expert_initialize(int32_t capacity, void** out) {
   status = cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, device);
   if (status != cudaSuccess) return status;
   if (major != 12 || minor != DS41RT_V41_CC_MINOR || sms != DS41RT_V41_SMS)
-    return cudaErrorInvalidDevice;
+    return reject_expert_device("v41 expert", device, major, minor, sms);
   std::lock_guard<std::mutex> lock(initialization_mutex);
   if (variant->device >= 0) {
     if (variant->device != device) return cudaErrorInvalidDevice;
@@ -214,7 +228,7 @@ extern "C" int32_t ds41rt_v41_expert_input_quant_initialize(void** out) {
   status = cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device); if (status) return status;
   status = cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, device); if (status) return status;
   if (major != 12 || minor != DS41RT_V41_CC_MINOR || sms != DS41RT_V41_SMS)
-    return cudaErrorInvalidDevice;
+    return reject_expert_device("v41 expert input-quant", device, major, minor, sms);
   std::lock_guard<std::mutex> lock(initialization_mutex);
   auto* owner = input_quant.device == device ? &input_quant :
       (peer_input_quant.device == device ? &peer_input_quant :
