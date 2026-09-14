@@ -1415,3 +1415,28 @@ construction and selection of the distributed serving loop remain outstanding.
 All 25 serving unit tests passed, and the existing single-RTX target/draft
 correctness fixture passed in 8.62 seconds (`prefill-interface-single.log`).
 These checks do not replace the required serving performance regression tests.
+
+
+The outer serving loop now accepts a static `ServingTarget` layout, including
+admission prefill, prefix restoration/retention, request retirement and transport
+reset. The layout ties each target to its matching draft-chain type while keeping
+target and draft weight lifetimes independent. The single-RTX layout retains the
+existing C1 round and uses independent scheduling when both lanes have work. The
+distributed layout uses independent polling even at C1; an empty peer returns
+without adding per-token synchronization. Distributed transport reset runs on its
+owning GPU. This adds no boxed dispatch or common execution stream.
+
+The distributed fixture now follows both shared-prefill chunk configurations
+with the actual layout-selected decode round: cached continuation enters dSpark
+verification, streaming emits exactly one finish, the scheduler retires the target
+and draft owners, the draft request ID can be admitted again, and transport reset
+restores the caller's GPU. The fixture and its 32 interleaved cases passed
+(`outer-serving-distributed.log`, 20.81 seconds); all 25 serving unit tests passed
+(`outer-serving-unit.log`). This exercises the decode/retirement selection, not
+complete production startup or the outer admission loop. Worker construction,
+vision ownership and deployment selection remain outstanding; no serving speedup
+is established by these fixture timings.
+
+The existing single-RTX target/draft correctness fixture also passed
+(`outer-serving-single.log`, 8.27 seconds). This is not a throughput regression
+measurement; end-to-end single-RTX performance remains a release gate.

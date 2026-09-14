@@ -131,3 +131,6 @@ impl<'a> PrefillTarget<'a> for DistributedTargetPass<'_, 'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+pub(crate) use super::scheduler::exercise_distributed_decode;

@@ -1209,9 +1209,11 @@ mod tests {
             ensure!(next < 129280, "invalid continuation anchor");
             assert_eq!(requests.cache().committed_end(lease)?, 9);
             draft.validate_position(id, 9)?;
-            requests.release(lease)?;
-            draft.release(id)?;
+            crate::v41_native_serve::prefill_target::exercise_distributed_decode(&lib, &runtime,
+                std::path::Path::new(&snapshot), &mut pass, &mut other, &mut requests, [&mut transport, &mut other_transport],
+                lease, id, &continued, next, draft.get_mut())?;
             assert_eq!(lib.cuda_get_device()?, 0);
+            eprintln!("PASS serving distributed decode: streamed finish, target/draft retirement, transport reset");
             eprintln!("PASS serving distributed prefill chunk_rows={chunk_rows}: encoder/replay, draft handoff, cached continuation, target/draft commits");
         }
         drop(draft_weights);
