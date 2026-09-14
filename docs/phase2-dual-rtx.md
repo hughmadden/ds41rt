@@ -1,6 +1,6 @@
 # Phase 2: two RTX coordinators and four Sparks
 
-Status: TP2 expert execution and peer-transfer foundations verified; dual-GPU serving is not yet implemented.
+Status: forced dual-GPU worker serves text with dSpark; large-prefill workspace sizing, automatic deployment selection and release qualification remain incomplete.
 
 ## Required outcome
 
@@ -1440,3 +1440,60 @@ is established by these fixture timings.
 The existing single-RTX target/draft correctness fixture also passed
 (`outer-serving-single.log`, 8.27 seconds). This is not a throughput regression
 measurement; end-to-end single-RTX performance remains a release gate.
+
+
+Production worker construction is now connected to `serve-native --rtx-gpus 2`.
+The binary still defaults to one RTX until automatic deployment preflight is
+implemented. Two-GPU mode requires `auto` or exactly 20 routed encoder layers;
+it validates bidirectional peer access before loading. Both target lanes use the
+20/20 attention map, all encoder routed and all shared experts use TP2, vocabulary
+rows are split, dSpark lives on GPU1, and vision plus target snapshot arenas live
+on GPU0. Both draft policy and the configured prompt/turn retention limits feed
+the shared serving loop. The launcher has not yet been changed to expose both
+cards or select this mode, and Sparks still need decoder-only loading.
+
+The new complete-cache planner uses measured free/total memory after both target
+lanes, transports, draft runtime, vision and snapshot arenas are live. It counts
+per-device SWA, compressor scratch and page tables as well as global source data,
+then searches the tighter device's whole-group capacity with 2 GiB runtime
+headroom per GPU. Explicit KV byte budgets must fit after rounding; the ordinary
+aggregate-context default may shrink to fit and logs its desired group count.
+Explicit occupancy reservations maximize the fitting pool. The source-only
+planner remains available for preliminary accounting. Eleven memory tests passed,
+including complete-cache limits on either GPU and exact-budget rejection/rounding.
+
+The actual forced-mode worker served two real text requests through admission,
+prefill, adaptive dSpark verification, streaming and retirement at prefill step
+80 (workspace capacity 256), default C16 admission capacity and 24 entries in each
+retention bank. The arithmetic response was `Four.`; the eight-token code response
+began with a Python function heading. This is a startup/lifecycle check, not a
+quality or throughput qualification. In `dual-worker-serving-forced.log`, startup
+reported 12.903 seconds to worker readiness; complete fixture time was 16.60
+seconds. The global source pool was 16,681,077,760 bytes (15.535 GiB), representing
+18,742,784 source-token positions including tail/COW allowance. Fixed occupancy
+before cache allocation was 83,625,246,720 bytes on GPU0 and 88,597,594,112 on GPU1;
+cache allocations added 10,031,259,520 and 6,694,322,816 bytes respectively. These
+are intermediate short-step settings, not the final release memory headline.
+
+The release prefill step 2048 (workspace capacity 4096) currently fails before KV
+allocation. `dual-worker-serving-2048-diagnostic.log` shows fixed model weights at
+78,814,380,032 / 77,153,435,648 bytes, each full-capacity target lane adding about
+8.5 GB per GPU, and occupancy after TP2 transports reaching 98,726,838,272 /
+97,577,598,976 bytes. The following dSpark load runs out of memory. Reducing KV
+cannot repair this: next work must right-size stage-specific workspaces and
+examine live-row capacity versus AOT allocation padding while preserving lane
+independence. The release prefill configuration has not been reduced to hide this
+failure. Both success and failure logs are retained.
+
+
+The expanded forced-worker fixture adds a third request repeating the first
+prompt. Its admission reports a complete prompt-cache hit, and the response is
+again `Four.`. All three requests finish and retire successfully
+(`dual-worker-serving-reuse.log`, 16.47 seconds). The serving unit filter passed
+27 tests with two hardware fixtures ignored (`dual-worker-unit.log`). These
+checks still do not exercise images, constrained tools, large prompts or sustained
+C16 traffic, and do not establish a throughput improvement.
+
+The existing single-RTX target/draft correctness fixture passed in 8.24 seconds
+(`dual-worker-single-regression.log`); single-RTX throughput remains unmeasured
+for this integration increment.

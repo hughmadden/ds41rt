@@ -52,9 +52,121 @@ impl SourcePoolPlan {
     }
 }
 
+/// Complete cache allocation plan, evaluated after fixed owners and snapshot
+/// arenas are live. The byte ceiling applies independently to each GPU.
+#[derive(Debug)]
+pub(crate) struct PoolPlan {
+    pub pages: [usize; 4],
+    pub global_bytes: usize,
+    pub cache_bytes: [usize; 2],
+    pub occupied_before: [usize; 2],
+    pub reservation_bytes: [usize; 2],
+    pub unused_bytes: [usize; 2],
+    pub desired_groups: usize,
+}
+impl PoolPlan {
+    pub fn new(placement: crate::v41_backbone_cache::CachePlacement,
+        slots: usize, context: usize, retained_turns: usize, snapshot_bytes: usize,
+        exact: Option<super::ByteSize>, reservation: Option<super::Reservation>,
+        memory: [(usize, usize); 2]) -> anyhow::Result<Self> {
+        use anyhow::{ensure, Context};
+        use super::{BackboneCache, GROUP_BYTES, MAX_GROUPS, RETAINED_CONTEXTS, RUNTIME_HEADROOM};
+        ensure!((1..=16).contains(&slots), "invalid concurrency limit");
+        ensure!((1..=1_048_576).contains(&context), "invalid pool context limit");
+        ensure!(retained_turns <= 128, "invalid retained-turn limit");
+        let mut occupied_before = [0; 2];
+        let mut reservation_bytes = [0; 2];
+        let mut available = [0; 2];
+        for (gpu, (free, total)) in memory.into_iter().enumerate() {
+            ensure!(total > 0 && free <= total, "invalid GPU {gpu} memory information");
+            occupied_before[gpu] = total - free;
+            reservation_bytes[gpu] = reservation.map(|r| r.bytes(total)).transpose()?.unwrap_or(total);
+            available[gpu] = reservation_bytes[gpu].checked_sub(occupied_before[gpu])
+                .and_then(|n| n.checked_sub(RUNTIME_HEADROOM))
+                .with_context(|| format!("GPU {gpu} reservation leaves no cache space after fixed owners and runtime headroom"))?;
+        }
+        let cache_bytes = |groups| BackboneCache::distributed_device_bytes(placement, slots,
+            [groups, groups, groups, groups * 2]);
+        let fits = |groups| -> anyhow::Result<bool> {
+            Ok(cache_bytes(groups)?.iter().zip(available).all(|(&used, free)| used <= free))
+        };
+        let minimum = 2 * slots + 2 * retained_turns;
+        ensure!(fits(minimum)?, "distributed cache cannot fit minimum admission and copy-on-write tails");
+        let (mut low, mut high) = (minimum, MAX_GROUPS);
+        while low < high {
+            let mid = (low + high).div_ceil(2);
+            if fits(mid)? { low = mid; } else { high = mid - 1; }
+        }
+        let desired_groups = if let Some(exact) = exact {
+            exact.0 / GROUP_BYTES
+        } else if reservation.is_some() {
+            low
+        } else {
+            (context.div_ceil(512) * (slots + RETAINED_CONTEXTS) + slots + 2 * retained_turns)
+                .saturating_sub(snapshot_bytes.div_ceil(GROUP_BYTES)).max(minimum)
+        };
+        ensure!(desired_groups >= minimum && desired_groups <= MAX_GROUPS,
+            "distributed KV pool is outside admission or physical page limits");
+        // The default targets the existing aggregate context capacity but may
+        // shrink to the tighter card. Explicit byte requests must fit exactly
+        // after whole-group rounding; never silently shrink an override.
+        ensure!(exact.is_none() || desired_groups <= low,
+            "explicit KV pool needs {desired_groups} groups but the tighter GPU fits {low}");
+        let groups = desired_groups.min(low);
+        let cache_bytes = cache_bytes(groups)?;
+        Ok(Self { pages: [groups, groups, groups, groups * 2],
+            global_bytes: groups * GROUP_BYTES, cache_bytes, occupied_before, reservation_bytes,
+            unused_bytes: std::array::from_fn(|gpu| available[gpu] - cache_bytes[gpu]), desired_groups })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn complete_cache_respects_each_card_and_counts_non_global_storage() -> anyhow::Result<()> {
+        use crate::v41_backbone_cache::{BackboneCache, CachePlacement};
+        use super::super::{ByteSize, Reservation, GROUP_BYTES, RUNTIME_HEADROOM};
+        let map = CachePlacement::encoder_decoder();
+        let bytes = BackboneCache::distributed_device_bytes(map, 16, [100, 100, 100, 200])?;
+        assert!(bytes.iter().sum::<usize>() > 100 * GROUP_BYTES);
+        let memory = [(bytes[0] + RUNTIME_HEADROOM, 96 << 30), (20 << 30, 96 << 30)];
+        let plan = PoolPlan::new(map, 16, 1_048_576, 24, 0, None,
+            Some(Reservation::Percent(100_000_000)), memory)?;
+        assert_eq!(plan.pages, [100, 100, 100, 200]);
+        assert_eq!(plan.cache_bytes, bytes);
+        assert_eq!(plan.unused_bytes[0], 0);
+        assert!(plan.unused_bytes[1] > 0);
+        assert!(PoolPlan::new(map, 16, 1_048_576, 24, 0,
+            Some(ByteSize(101 * GROUP_BYTES)), None, memory).is_err());
+        let rounded = PoolPlan::new(map, 16, 1_048_576, 24, 0,
+            Some(ByteSize(101 * GROUP_BYTES - 1)), None, memory)?;
+        assert_eq!(rounded.pages, plan.pages);
+        let default = PoolPlan::new(map, 16, 1_048_576, 24, 0, None, None, memory)?;
+        assert_eq!(default.pages, plan.pages);
+        assert!(default.desired_groups > default.pages[0]);
+        Ok(())
+    }
+
+    #[test]
+    fn complete_cache_handles_second_card_limit_and_invalid_budgets() -> anyhow::Result<()> {
+        use crate::v41_backbone_cache::{BackboneCache, CachePlacement};
+        use super::super::{Reservation, RUNTIME_HEADROOM};
+        let map = CachePlacement::encoder_decoder();
+        let bytes = BackboneCache::distributed_device_bytes(map, 2, [64, 64, 64, 128])?;
+        let memory = [(20 << 30, 96 << 30), (bytes[1] + RUNTIME_HEADROOM, 96 << 30)];
+        let plan = PoolPlan::new(map, 2, 4096, 24, 0, None,
+            Some(Reservation::Percent(100_000_000)), memory)?;
+        assert_eq!(plan.pages[0], 64);
+        assert_eq!(plan.unused_bytes[1], 0);
+        assert!(PoolPlan::new(map, 2, 4096, 24, 0, None,
+            Some(Reservation::Percent(99_000_000)), memory).is_err());
+        for invalid in [[(1, 0); 2], [(2, 1); 2], [(RUNTIME_HEADROOM, 96 << 30); 2]] {
+            assert!(PoolPlan::new(map, 2, 4096, 24, 0, None, None, invalid).is_err());
+        }
+        Ok(())
+    }
 
     #[test]
     fn asymmetric_sources_obey_the_tighter_card() {

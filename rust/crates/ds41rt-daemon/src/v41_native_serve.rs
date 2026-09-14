@@ -3,6 +3,7 @@ use prefill_target::PrefillTarget;
 use speculative::DraftChain;
 pub(crate) mod speculative;
 mod scheduler;
+mod distributed;
 mod scores;
 mod constraints;
 use scores::TokenScores;
@@ -118,6 +119,7 @@ fn worker(
     mut receive: mpsc::Receiver<NativeRequest>,
     ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>,
 ) -> Result<()> {
+    if args.rtx_gpus == 2 { return distributed::worker(args, receive, ready); }
     let capacity = prefill_capacity(args.prefill_batch_tokens)?;
     let rows = capacity as usize;
     let lib = unsafe { NativeLibrary::load(&args.native_lib)? };
