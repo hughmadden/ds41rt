@@ -56,6 +56,16 @@ at most 64 target rows or 56 draft rows, before that standalone-limit extension.
 
 ## Next comparison
 
+The cost-calibration audit found another K5 limit: the per-layer graph bank
+retained only shapes through 48 rows. It now retains all decode shapes through
+64 rows, so changing K7 prefixes can reuse previously captured larger shapes.
+The CUDA tests passed exact replay after changed inputs, repeated 64/56/63/64
+transitions, weight-owner replacement, and the existing independent-lane checks.
+The daemon unit and integration test targets also compile after making the
+vocabulary-shard module path explicit for the integration fixture.
+The throughput results above predate this retention fix; no serving gain from
+the fix has yet been established.
+
 The adaptive cost formula has not yet been recalibrated. Per the requested
 experiment order, measure current hardware costs **before** evaluating adaptive
 K7. Include a fresh K5 control with matching binaries, then compare code and mixed
