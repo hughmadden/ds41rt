@@ -1,7 +1,8 @@
 # Phase 2: two RTX coordinators and four Sparks
 
-Status: forced dual-GPU serving and automatic deployment selection are implemented;
-clean release-container validation and release qualification remain incomplete.
+Status: forced dual-GPU serving, automatic deployment selection, and clean
+release-container startup are implemented; release qualification remains
+incomplete.
 
 ## Required outcome
 
@@ -122,7 +123,7 @@ shell `EXIT` path so an explicit startup failure also removes the partial
 coordinator and four already-started Spark containers; the earlier `ERR` trap
 did not run when `release_die` exited explicitly.
 
-Eleven launcher/selector tests pass. They cover automatic dual selection and
+Twelve launcher/selector tests pass. They cover automatic dual selection and
 single fallback, forced one/two behavior, peer rejection, exact-pool and
 reservation effects, replacement-process accounting, configuration defaults,
 and the generated coordinator/Spark arguments. The selector chooses both cards
@@ -130,8 +131,23 @@ on the development host at the default C16/24/14M settings: its calibrated
 requirements are 96,176 MiB for logical RTX0 and 96,778 MiB for logical RTX1,
 against 97,249/97,236 MiB currently free. A temporary two-device Docker probe
 confirmed that the quoted UUID request and ordered visibility expose two CUDA
-devices. The complete `run.sh --dry-run` now reaches the expected stale-image
-revision gate; a clean `build.sh` is the next validation step.
+devices.
+
+A clean `build.sh` at `f652dc848e24335242ae245d92f18f7d73cd0f39`
+compiled and packaged both expert interfaces, verified all release provenance
+and checksums, rebuilt both container roles, and distributed the Spark image to
+all four hosts. The standard `run.sh` then selected both RTX cards and reached
+API readiness in 10.771 seconds of coordinator startup. It loaded all twenty
+encoder expert layers as TP2, placed dSpark on RTX1 and vision on RTX0, and
+reserved source pages `[28736, 28736, 28736, 57472]` with 13,094,420,480 global
+cache bytes. Final device use was 95,338/95,578 MiB, leaving 1,913/1,670 MiB
+free. A no-thinking request returned the exact requested `READY` response.
+Every Spark command used `--first-layer 20`. A subsequent standard
+`run.sh --restart` also selected the two-card layout while the old deployment
+occupied both GPUs, reclaimed only its coordinator allocation, stopped all five
+containers, and returned the API to readiness. Single-card dry-run selection
+continues to choose GPU0 and Spark layer zero. Release performance and focused
+quality qualification remain.
 
 Commit and push each completed development increment on `dev`. Keep `main`,
 `release/v2`, and the published v2 images as the qualified rollback baseline.
