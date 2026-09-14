@@ -1,8 +1,8 @@
 # Phase 2: two RTX coordinators and four Sparks
 
-Status: forced dual-GPU serving, automatic deployment selection, and clean
-release-container startup are implemented. Scoped one/two-RTX release
-qualification is complete; formal packaging and publication remain.
+Status: complete. Forced dual-GPU serving, automatic deployment selection,
+clean release-container startup, scoped one/two-RTX qualification, formal
+packaging, and v3 publication are complete.
 
 ## Required outcome
 
@@ -148,8 +148,9 @@ occupied both GPUs, reclaimed only its coordinator allocation, stopped all five
 containers, and returned the API to readiness. Single-card dry-run selection
 continues to choose GPU0 and Spark layer zero. Release performance and focused
 quality qualification are recorded in the [Phase 2 release performance
-report](phase2-release-performance.md). Formal release packaging and publication
-remain.
+report](phase2-release-performance.md). The exact final images, packages, and
+public registry identities are recorded in the [v3 build and registry
+report](release-v3-build-run.md) and [publication record](release-v3-publication.md).
 
 Commit and push each completed development increment on `dev`. Keep `main`,
 `release/v2`, and the published v2 images as the qualified rollback baseline.

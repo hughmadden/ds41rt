@@ -1,0 +1,61 @@
+{
+  "schema": "ds41rt-release-v3-publication-v1",
+  "release": {
+    "id": 388252464,
+    "tag": "v3",
+    "name": "DS41RT v3",
+    "url": "https://github.com/tpurtell/ds41rt/releases/tag/v3",
+    "draft": false,
+    "prerelease": false
+  },
+  "assets": [
+    {
+      "id": 562979524,
+      "name": "ds41rt-v3-coordinator-linux-amd64.tar.gz",
+      "bytes": 17772772,
+      "sha256": "14e1fc097184eb3a8f375cc6ed16c82f551a208b7cd8a10c3e3e3fdc56a30aa1",
+      "url": "https://github.com/tpurtell/ds41rt/releases/download/v3/ds41rt-v3-coordinator-linux-amd64.tar.gz"
+    },
+    {
+      "id": 562979519,
+      "name": "ds41rt-v3-spark-expert-linux-arm64.tar.gz",
+      "bytes": 15889235,
+      "sha256": "9ba75ff744262a639beed7cb8a5197c42cc984c4379e41793f86ab90c7e934de",
+      "url": "https://github.com/tpurtell/ds41rt/releases/download/v3/ds41rt-v3-spark-expert-linux-arm64.tar.gz"
+    },
+    {
+      "id": 562979514,
+      "name": "ds41rt-v3-qualification-evidence.tar.gz",
+      "bytes": 22918901,
+      "sha256": "4d724a2ef7c78a93ff63f5bf1814c89c7a380338d61bb1c19b7bbbfa7dd03295",
+      "url": "https://github.com/tpurtell/ds41rt/releases/download/v3/ds41rt-v3-qualification-evidence.tar.gz"
+    },
+    {
+      "id": 562979518,
+      "name": "SHA256SUMS",
+      "bytes": 321,
+      "sha256": "35ba1d5f9f6dd148f715e31980bfa74a068ffb930c7f2069abd1e0e55fb66e17",
+      "url": "https://github.com/tpurtell/ds41rt/releases/download/v3/SHA256SUMS"
+    }
+  ],
+  "containers": {
+    "coordinator": {
+      "reference": "ghcr.io/tpurtell/ds41rt-coordinator:v3",
+      "digest": "sha256:354561f06863b5f5ce9632edddee4a2d4e008a90d2d61d2ab8c309a3dc371f43",
+      "platform": "linux/amd64"
+    },
+    "spark_expert": {
+      "reference": "ghcr.io/tpurtell/ds41rt-spark-expert:v3",
+      "digest": "sha256:78819846cd2514db80ff6196709ca778fdce245d9967dfbdccef928ac032c09e",
+      "platform": "linux/arm64"
+    }
+  },
+  "qualified_image_revision": "c38746aeac9204eff12b7d2f0433013ed24526c4",
+  "refs": ["dev", "main", "release/v3", "v3"],
+  "live_service": {
+    "port": 8000,
+    "rtx_gpus": 2,
+    "dspark": true,
+    "healthy": true
+  }
+}

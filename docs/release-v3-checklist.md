@@ -1,6 +1,6 @@
 # DS41RT v3 release checklist
 
-Status: release candidate qualified; final publication remains.
+Status: complete.
 
 - [x] Implement forced and automatic one/two-RTX serving without changing the
   one-RTX execution path.
@@ -28,12 +28,14 @@ Status: release candidate qualified; final publication remains.
 - [x] Retire the unrelated pre-existing coordinator and Spark `v3` package
   versions, then publish the candidate as `v3` and `latest` and verify manifest,
   platform, label, and digest identity.
-- [ ] Assemble binary and evidence assets with checksums, publish the GitHub v3
+- [x] Assemble binary and evidence assets with checksums, publish the GitHub v3
   release notes/assets/tag, and record the final publication identities.
-- [ ] Update `main` and `release/v3`, leave the standard service healthy, and
+- [x] Update `main` and `release/v3`, leave the standard service healthy, and
   push every final commit.
 
 See the [v3 release notes](release-v3-notes.md), [performance
 report](phase2-release-performance.md), [machine-readable
 results](phase2-release-performance.json), and [implementation/evidence
-log](phase2-dual-rtx.md).
+log](phase2-dual-rtx.md). Exact build, registry, and asset identities are in the
+[build report](release-v3-build-run.md) and [publication
+record](release-v3-publication.md).
