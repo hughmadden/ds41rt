@@ -6,7 +6,10 @@
 //!   `ds41rt_core::prefix::Retention` with the engine's bank sizes, and the `make_room`
 //!   eviction the engine performs under exhaustion. Pool exhaustion raises the modelled
 //!   `SourcePoolExhausted`: the run aborts with an invariant failure, because a well-formed
-//!   workload must fit its live lanes on the device.
+//!   workload must fit its live lanes on the device. The map is dense — pool pages striped
+//!   per compressor, then a tails arena (one slot per retained snapshot and lane), then draft
+//!   rings — so `EngineModel::device_bytes` sizes the stub's flat fake device exactly and
+//!   every address the simulator hands out is in bounds.
 //! - **Requests**: each advances through admission → device-bank `lookup_reusable` → on miss
 //!   [`CacheOps::lookup`] → [`CacheOps::restore`] into freshly reserved pages (or prefill at
 //!   the modelled rate on miss/timeout) → decode → retire ([`CacheOps::store`]). Up to
@@ -26,9 +29,10 @@
 //! never freed while referenced, restore targets reproducing exactly what was stored (content
 //! fidelity), and every store ticket settled exactly once — by `tick` or on the evict path.
 //!
-//! Two caches can be driven: the real [`HostCache`] (once packet HC-5 lands, through the
-//! [`CacheOps`] delegation) and [`testing::RecordingCache`], a trivial cache for the suites on
-//! this branch that records every call and never waits.
+//! Two caches can be driven: the real [`HostCache`] over [`StubCopyEngine`] (the HC-6 suites
+//! drive it through [`clocked::ClockedCache`], which advances the stub's clock one poll quantum
+//! per `tick` so issued copies complete between polls) and [`testing::RecordingCache`], a
+//! trivial cache for the HC-4 suites that records every call and never waits.
 //!
 //! Modelling notes: sessions own disjoint token streams (every token is hashed with the session
 //! id), so a reusable hit — device or host — is always an exact ancestor of the request, and a
@@ -44,7 +48,8 @@ use crate::cache::{
 use crate::copy::{CopyEngine, DeviceRange, StubCopyEngine};
 use crate::snapshot::{DevicePageId, Hit, Key, SnapshotMeta};
 use crate::{
-    SnapshotKind, COMPRESSORS, KV_BYTES_PER_TOKEN, PAGE_BYTES, REPLAY_WINDOW_TOKENS, TAIL_BYTES,
+    SnapshotKind, COMPRESSORS, DRAFT_BYTES, KV_BYTES_PER_TOKEN, PAGE_BYTES, REPLAY_WINDOW_TOKENS,
+    TAIL_BYTES,
 };
 use ds41rt_core::prefix::Retention;
 use serde::Serialize;
@@ -78,12 +83,92 @@ fn splitmix64(z: u64) -> u64 {
     z ^ (z >> 31)
 }
 
-/// A deterministic, collision-free device address for a pool slot and segment offset: the
-/// compressor bank in the top bits, then the page at its true byte stride. `PAGE_BYTES` exceeds
-/// 2^16, so packing the page index at bit 16 would alias consecutive pages' segment ranges;
-/// addressed by the stride, every page's range is disjoint from every other page's.
-fn page_addr(id: DevicePageId, offset: usize) -> u64 {
-    ((id.compressor as u64) << 48) | (id.page as u64 * PAGE_BYTES as u64 + offset as u64)
+/// The dense fake-device map: pool pages striped per compressor, then a tails arena (one slot
+/// per retained snapshot and per lane — the most tails alive at once), then draft rings (the
+/// model never addresses them, but the layout reserves their space so `EngineModel::device_bytes`
+/// sizes the whole map). Every address the simulator hands out lies below
+/// [`EngineModel::device_bytes`], so a suite can give the stub's flat fake device exactly that
+/// many bytes.
+struct Addressing {
+    /// Pages per compressor pool; `Device::new` derives the same number from the model.
+    pool_pages: usize,
+    /// First byte of the tails arena, directly after the pages.
+    tails_base: u64,
+    /// Tail arena slots: `2 * retain + lanes`, every simultaneously live tail fits.
+    tail_slots: u64,
+}
+
+impl Addressing {
+    fn new(model: &EngineModel) -> Self {
+        let pool_pages = model.pool_pages();
+        let tails_base = (pool_pages * COMPRESSORS * PAGE_BYTES) as u64;
+        Self {
+            pool_pages,
+            tails_base,
+            tail_slots: (2 * model.retain + model.lanes).max(1) as u64,
+        }
+    }
+
+    /// A deterministic device address for a pool slot and segment offset: the compressor bank at
+    /// its true page stride, every bank `pool_pages` pages wide. `PAGE_BYTES` is not a power of
+    /// two, so a stride-based layout (not bit packing) is what keeps every page's range disjoint
+    /// from every other page's.
+    fn page_addr(&self, id: DevicePageId, offset: usize) -> u64 {
+        (id.compressor as u64 * self.pool_pages as u64 + id.page as u64) * PAGE_BYTES as u64
+            + offset as u64
+    }
+
+    /// The modelled device address of a snapshot's backbone tail arena slot. The slot is
+    /// token-hash derived: it lies in the tails arena, and the token fold keeps a restore target
+    /// built for another snapshot's tokens from reproducing this one by construction. The arena
+    /// holds one slot per simultaneously live tail; two live snapshots can share a slot, which
+    /// is sound here because the suites check shapes and accounting, never the arena's bytes
+    /// (the fake device carries zeros and the cache keys every part host-side).
+    fn tail_addr(&self, tokens: &[u32]) -> u64 {
+        let mut hash = tokens.len() as u64;
+        for &token in tokens {
+            hash = splitmix64(hash ^ u64::from(token));
+        }
+        self.tails_base + (hash % self.tail_slots) * TAIL_BYTES as u64
+    }
+
+    /// The modelled tail arena slot of the snapshot covering `tokens`: one range.
+    fn tail_range(&self, tokens: &[u32]) -> Vec<DeviceRange> {
+        vec![DeviceRange {
+            addr: self.tail_addr(tokens),
+            bytes: TAIL_BYTES,
+        }]
+    }
+
+    /// The page's rows as the engine addresses them: packed index, index scales, KV values, KV
+    /// scales (64 B + 4 B + 288 B per row over `PAGE_ROWS` rows; the four lengths sum to
+    /// [`PAGE_BYTES`]).
+    fn page_segments(&self, id: DevicePageId) -> Vec<DeviceRange> {
+        let mut offset = 0;
+        PAGE_SEGMENTS
+            .iter()
+            .map(|&bytes| {
+                let range = DeviceRange {
+                    addr: self.page_addr(id, offset),
+                    bytes,
+                };
+                offset += bytes;
+                range
+            })
+            .collect()
+    }
+
+    /// Group logically-ordered pages per compressor, preserving logical order within each bank.
+    fn group_pages(&self, pages: &[DevicePageId]) -> [Vec<DevicePage>; COMPRESSORS] {
+        let mut by_compressor: [Vec<DevicePage>; COMPRESSORS] = std::array::from_fn(|_| Vec::new());
+        for &id in pages {
+            by_compressor[id.compressor as usize].push(DevicePage {
+                id,
+                segments: self.page_segments(id),
+            });
+        }
+        by_compressor
+    }
 }
 
 /// Tokens of context occupy this many whole pages, rounded up.
@@ -159,6 +244,26 @@ impl Default for EngineModel {
             decode_tokens_per_s: 74.1,
             lanes: 8,
         }
+    }
+}
+
+impl EngineModel {
+    /// Pages in each compressor pool: the device model spreads the pool capacity over the
+    /// four compressors at [`KV_BYTES_PER_TOKEN`] per token.
+    fn pool_pages(&self) -> usize {
+        (self.device_pool_tokens as usize).saturating_mul(KV_BYTES_PER_TOKEN)
+            / PAGE_BYTES
+            / COMPRESSORS
+    }
+
+    /// Bytes of the dense fake device the simulator addresses: the pool pages, then one tail
+    /// arena slot per retained snapshot and lane (the most tails alive at once), then the same
+    /// number of draft-ring slots. A suite sizes `StubCopyEngine::new(model, device_bytes,
+    /// host_bytes)` with exactly this so every address the simulator hands out is in bounds.
+    pub fn device_bytes(&self) -> usize {
+        let pages = self.pool_pages() * COMPRESSORS * PAGE_BYTES;
+        let slots = 2 * self.retain + self.lanes;
+        pages + slots * (TAIL_BYTES + DRAFT_BYTES)
     }
 }
 
@@ -323,6 +428,8 @@ impl CompressorPool {
 struct Device {
     pools: Vec<CompressorPool>,
     banks: Retention<Retained>,
+    /// The dense fake-device map this device addresses pages and tails through.
+    addressing: Addressing,
     /// Page references held by bank entries.
     bank_refs: usize,
     /// Page references held by in-flight requests.
@@ -334,15 +441,14 @@ struct Device {
 impl Device {
     fn new(model: &EngineModel) -> Self {
         assert!(model.lanes >= 1, "EngineModel.lanes must be at least 1");
-        let pages = (model.device_pool_tokens as usize).saturating_mul(KV_BYTES_PER_TOKEN)
-            / PAGE_BYTES
-            / COMPRESSORS;
+        let pages = model.pool_pages();
         assert!(pages >= 1, "device_pool_tokens yields an empty page pool");
         Self {
             pools: (0..COMPRESSORS)
                 .map(|_| CompressorPool::new(pages))
                 .collect(),
             banks: Retention::new(model.retain),
+            addressing: Addressing::new(model),
             bank_refs: 0,
             request_refs: 0,
             refs_sum: 0,
@@ -753,7 +859,8 @@ struct Request {
 
 /// The simulator: an engine model around a cache, driven by a seeded interleaver on a virtual
 /// clock. Generic over the cache through [`CacheOps`]; the default type argument is the real
-/// facade, the suites on this branch drive [`testing::RecordingCache`].
+/// facade over the stub copy engine, the HC-4 suites drive [`testing::RecordingCache`] and the
+/// HC-6 suites drive the real facade through [`clocked::ClockedCache`].
 pub struct Simulator<C: CacheOps = HostCache<StubCopyEngine, ()>> {
     model: EngineModel,
     device: Device,
@@ -798,6 +905,13 @@ where
     /// Run a workload to completion, asserting the invariants after every step. A violation
     /// aborts the run and lands in `RunReport::invariant_failures`; with a well-formed workload
     /// that list is empty.
+    ///
+    /// The run must be monotonic in the key space: a request's tokens are never shorter than a
+    /// snapshot retained by a previous run on this simulator, because a host hit is restored
+    /// exactly and the retained snapshot must stay an ancestor of the request. Fresh
+    /// simulators always qualify; so do phased workloads whose contexts only grow (the HC-6
+    /// soak's phases). Re-running a workload whose contexts restart at a shorter prefix panics
+    /// on the restore slice instead of returning a misleading report.
     pub fn run(&mut self, workload: &Workload) -> RunReport {
         let (queue, lanes) = RequestPlan::queue(workload, self.model.lanes);
         let sessions = queue
@@ -1136,7 +1250,11 @@ where
         request.pages.extend_from_slice(&fresh);
         // The restore covers the hit's frontier tokens; a host hit is an exact ancestor of the
         // request, so that slice is the stored snapshot's token sequence.
-        let target = restore_target(&request.tokens[..hit.frontier], &request.pages);
+        let target = restore_target(
+            &self.device.addressing,
+            &request.tokens[..hit.frontier],
+            &request.pages,
+        );
         match self.cache.restore(hit.key, &target) {
             RestoreOutcome::Done { ns, bytes } => {
                 self.now += ns;
@@ -1198,7 +1316,12 @@ where
         if request.plan.retire_kind == SnapshotKind::Turn && !prompt_retained[request.plan.session]
         {
             prompt_retained[request.plan.session] = true;
-            let snapshot = build_snapshot(SnapshotKind::Prompt, &request.tokens, &request.pages);
+            let snapshot = build_snapshot(
+                &self.device.addressing,
+                SnapshotKind::Prompt,
+                &request.tokens,
+                &request.pages,
+            );
             let outcome = self.cache.store(&snapshot, C::Payload::default());
             let ticket = track_ticket(outcome, outstanding);
             let mut handle = evict_handle(&mut self.cache, outstanding);
@@ -1232,7 +1355,12 @@ where
         outstanding: &mut HashSet<StoreTicket>,
     ) -> Result<String, String> {
         let kind = request.plan.retire_kind;
-        let snapshot = build_snapshot(kind, &request.tokens, &request.pages);
+        let snapshot = build_snapshot(
+            &self.device.addressing,
+            kind,
+            &request.tokens,
+            &request.pages,
+        );
         let outcome = self.cache.store(&snapshot, C::Payload::default());
         let ticket = track_ticket(outcome, outstanding);
         // The retained snapshot takes over the request's page references.
@@ -1301,26 +1429,6 @@ fn track_ticket(
     }
 }
 
-/// The modelled device address of a snapshot's backbone tail arena slot, derived from the
-/// snapshot's tokens: distinct snapshots never alias, so a restore target built for the wrong
-/// snapshot cannot reproduce the stored tail address (a shared constant would let one pass).
-/// The derivation lives above every page address (the compressor banks occupy the low bits).
-fn tail_addr(tokens: &[u32]) -> u64 {
-    let mut hash = tokens.len() as u64;
-    for &token in tokens {
-        hash = splitmix64(hash ^ u64::from(token));
-    }
-    (1 << 60) | (hash & 0x0000_FFFF_FFFF_FFFF)
-}
-
-/// The modelled tail arena slot of the snapshot covering `tokens`: one range.
-fn tail_range(tokens: &[u32]) -> Vec<DeviceRange> {
-    vec![DeviceRange {
-        addr: tail_addr(tokens),
-        bytes: TAIL_BYTES,
-    }]
-}
-
 /// The parts a modelled snapshot never carries: no dSpark draft rings, host-side scores.
 fn empty_parts() -> (Option<Vec<DeviceRange>>, Vec<DeviceRange>) {
     (None, Vec::new())
@@ -1329,7 +1437,12 @@ fn empty_parts() -> (Option<Vec<DeviceRange>>, Vec<DeviceRange>) {
 /// The store/restore shape of a snapshot covering `tokens` tokens: striped pages of four
 /// segments each, one snapshot-derived tail range, no draft, no scores (the engine layout
 /// keeps scores host-side).
-fn build_snapshot(kind: SnapshotKind, tokens: &[u32], pages: &[DevicePageId]) -> DeviceSnapshot {
+fn build_snapshot(
+    addressing: &Addressing,
+    kind: SnapshotKind,
+    tokens: &[u32],
+    pages: &[DevicePageId],
+) -> DeviceSnapshot {
     let (draft, scores) = empty_parts();
     DeviceSnapshot {
         meta: SnapshotMeta {
@@ -1338,8 +1451,8 @@ fn build_snapshot(kind: SnapshotKind, tokens: &[u32], pages: &[DevicePageId]) ->
             end: tokens.len() as u32,
             has_draft: false,
         },
-        pages: group_pages(pages),
-        tail: tail_range(tokens),
+        pages: addressing.group_pages(pages),
+        tail: addressing.tail_range(tokens),
         draft,
         scores,
     }
@@ -1347,41 +1460,18 @@ fn build_snapshot(kind: SnapshotKind, tokens: &[u32], pages: &[DevicePageId]) ->
 
 /// The restore destination for the first `tokens` of a request, in the same shape as the
 /// stored snapshot.
-fn restore_target(tokens: &[u32], pages: &[DevicePageId]) -> RestoreTarget {
+fn restore_target(
+    addressing: &Addressing,
+    tokens: &[u32],
+    pages: &[DevicePageId],
+) -> RestoreTarget {
     let (draft, scores) = empty_parts();
     RestoreTarget {
-        pages: group_pages(pages),
-        tail: tail_range(tokens),
+        pages: addressing.group_pages(pages),
+        tail: addressing.tail_range(tokens),
         draft,
         scores,
     }
-}
-
-/// Group logically-ordered pages per compressor, preserving logical order within each bank.
-fn group_pages(pages: &[DevicePageId]) -> [Vec<DevicePage>; COMPRESSORS] {
-    let mut by_compressor: [Vec<DevicePage>; COMPRESSORS] = std::array::from_fn(|_| Vec::new());
-    for &id in pages {
-        by_compressor[id.compressor as usize].push(DevicePage {
-            id,
-            segments: page_segments(id),
-        });
-    }
-    by_compressor
-}
-
-fn page_segments(id: DevicePageId) -> Vec<DeviceRange> {
-    let mut offset = 0;
-    PAGE_SEGMENTS
-        .iter()
-        .map(|&bytes| {
-            let range = DeviceRange {
-                addr: page_addr(id, offset),
-                bytes,
-            };
-            offset += bytes;
-            range
-        })
-        .collect()
 }
 
 /// A trivial cache for the suites on this branch: records every call, never waits. Store
@@ -1681,6 +1771,111 @@ pub mod testing {
     }
 }
 
+/// The HC-6 bridge from the simulator to the real facade: a [`HostCache`] over the
+/// [`StubCopyEngine`] whose `tick` first advances the stub's clock by one scheduler poll
+/// quantum. The simulator's virtual clock advances on prefill and decode, but the stub's copies
+/// complete only when its own clock passes their completion time, and the simulator never
+/// touches the engine directly — without this, stores issued after the last restore would stay
+/// pending forever and the run's ticket drain would abort. One quantum per tick models the
+/// daemon's poll cadence; restores and eviction waits advance the clock themselves, inside the
+/// facade's bounded waits.
+#[doc(hidden)]
+pub mod clocked {
+    use super::{CacheOps, Hit};
+    use crate::cache::{
+        DeviceSnapshot, EvictDecision, HostCache, RestoreOutcome, RestoreTarget, StoreOutcome,
+        StoreTicket, TickReport,
+    };
+    use crate::config::{Config, StoreMode};
+    use crate::copy::{CopyModel, StubCopyEngine};
+    use crate::pool::Layout;
+    use crate::snapshot::{DevicePageId, Key};
+    use crate::KV_BYTES_PER_TOKEN;
+
+    /// The HC-6 chunk granularity: 8 MiB chunks carve two tail slabs (2.6 MiB each) or 91 page
+    /// slabs apiece, with little waste either way.
+    pub const CHUNK_BYTES: u64 = 8 << 20;
+
+    /// The daemon's config at `quota_bytes` of pinned host memory: on-retain stores, the
+    /// documented budgets, 512-token minimum, both kinds.
+    pub fn config(quota_bytes: u64) -> Config {
+        Config {
+            bytes: quota_bytes,
+            chunk_bytes: CHUNK_BYTES,
+            store: StoreMode::OnRetain,
+            ..Config::default()
+        }
+    }
+
+    /// A stub over the dense fake device the model addresses (`EngineModel::device_bytes`,
+    /// so every range the simulator hands out is in bounds) with `host_bytes` of fake pinned
+    /// host memory, on the design's copy model.
+    pub fn engine(model: &super::EngineModel, host_bytes: u64) -> StubCopyEngine {
+        StubCopyEngine::new(
+            CopyModel::default(),
+            model.device_bytes(),
+            host_bytes as usize,
+        )
+    }
+
+    /// One third of the live sessions' KV bytes: the soak's quota policy — under the
+    /// serialized `AgentLoop` the working set is the few concurrent sessions, so this holds
+    /// them comfortably while forcing eviction of the accumulated store stream. Note this is
+    /// far too small to serve visit-major `Churn` revisits (see the concurrency suite's quota
+    /// policy); the two workloads size their quotas differently on purpose.
+    pub fn third_of_live(sessions: usize, context_tokens: usize) -> u64 {
+        sessions as u64 * context_tokens as u64 * KV_BYTES_PER_TOKEN as u64 / 3
+    }
+
+    /// The modelled scheduler poll quantum: one `tick` advances the stub clock this many
+    /// nanoseconds, so copies issued this quantum complete by the next poll (a store's copies
+    /// cost ~150 µs on the default copy model).
+    pub const POLL_QUANTUM_NS: u64 = 1_000_000;
+
+    /// The real facade over the stub copy engine, driven by the simulator through [`CacheOps`].
+    pub struct ClockedCache {
+        cache: HostCache<StubCopyEngine, ()>,
+    }
+
+    impl ClockedCache {
+        /// Build the facade: `config` and `engine` exactly as the daemon would, over the engine
+        /// layout the simulator's snapshots are shaped for (`Layout::engine(0)`).
+        pub fn new(config: Config, engine: StubCopyEngine) -> anyhow::Result<Self> {
+            Ok(Self {
+                cache: HostCache::new(config, Layout::engine(0), engine)?,
+            })
+        }
+
+        /// The facade under test; its `metrics` are the suite's observability.
+        pub fn cache(&self) -> &HostCache<StubCopyEngine, ()> {
+            &self.cache
+        }
+    }
+
+    impl CacheOps for ClockedCache {
+        type Payload = ();
+        fn store(&mut self, snapshot: &DeviceSnapshot, (): ()) -> StoreOutcome {
+            self.cache.store(snapshot, ())
+        }
+        fn tick(&mut self) -> TickReport {
+            self.cache.engine_mut().advance(POLL_QUANTUM_NS);
+            self.cache.tick()
+        }
+        fn before_device_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
+            self.cache.before_device_evict(ticket)
+        }
+        fn lookup(&mut self, tokens: &[u32]) -> Option<Hit> {
+            self.cache.lookup(tokens)
+        }
+        fn restore(&mut self, key: Key, target: &RestoreTarget) -> RestoreOutcome {
+            self.cache.restore(key, target)
+        }
+        fn device_page_freed(&mut self, id: DevicePageId) {
+            self.cache.device_page_freed(id);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::testing::RecordingCache;
@@ -1698,17 +1893,18 @@ mod tests {
     #[test]
     fn page_segments_sum_to_page_bytes() {
         assert_eq!(PAGE_SEGMENTS.iter().sum::<usize>(), PAGE_BYTES);
+        let addressing = Addressing::new(&EngineModel::default());
         let id = DevicePageId {
             compressor: 2,
             page: 7,
             generation: 1,
         };
-        let segments = page_segments(id);
+        let segments = addressing.page_segments(id);
         assert_eq!(
             segments.iter().map(|segment| segment.bytes).sum::<usize>(),
             PAGE_BYTES
         );
-        assert_eq!(segments[0].addr, page_addr(id, 0));
+        assert_eq!(segments[0].addr, addressing.page_addr(id, 0));
         assert!(segments
             .windows(2)
             .all(|w| w[0].addr + w[0].bytes as u64 <= w[1].addr));
@@ -1840,6 +2036,7 @@ mod tests {
     #[test]
     fn recording_cache_reports_every_ticket_once() {
         let mut cache = RecordingCache::with_completion_ticks(3);
+        let addressing = Addressing::new(&EngineModel::default());
         let tokens = token_prefix(0, 512);
         let pages = (0..5)
             .map(|i| DevicePageId {
@@ -1848,7 +2045,7 @@ mod tests {
                 generation: 0,
             })
             .collect::<Vec<_>>();
-        let snapshot = build_snapshot(SnapshotKind::Prompt, &tokens, &pages);
+        let snapshot = build_snapshot(&addressing, SnapshotKind::Prompt, &tokens, &pages);
         let StoreOutcome::Issued(ticket) = CacheOps::store(&mut cache, &snapshot, ()) else {
             panic!("store must issue a ticket");
         };
@@ -1862,6 +2059,7 @@ mod tests {
     #[test]
     fn recording_cache_restore_checks_fidelity() {
         let mut cache = RecordingCache::new();
+        let addressing = Addressing::new(&EngineModel::default());
         let tokens = token_prefix(0, 512);
         let pages = (0..5)
             .map(|i| DevicePageId {
@@ -1870,16 +2068,16 @@ mod tests {
                 generation: 0,
             })
             .collect::<Vec<_>>();
-        let snapshot = build_snapshot(SnapshotKind::Prompt, &tokens, &pages);
+        let snapshot = build_snapshot(&addressing, SnapshotKind::Prompt, &tokens, &pages);
         let StoreOutcome::Issued(_) = CacheOps::store(&mut cache, &snapshot, ()) else {
             panic!("store must issue a ticket");
         };
         CacheOps::tick(&mut cache);
         CacheOps::tick(&mut cache);
-        let done = CacheOps::restore(&mut cache, 0, &restore_target(&tokens, &pages));
+        let done = CacheOps::restore(&mut cache, 0, &restore_target(&addressing, &tokens, &pages));
         assert!(matches!(done, RestoreOutcome::Done { .. }));
         // An unknown key fails.
-        let unknown = restore_target(&tokens, &pages);
+        let unknown = restore_target(&addressing, &tokens, &pages);
         assert!(matches!(
             CacheOps::restore(&mut cache, 99, &unknown),
             RestoreOutcome::Failed
@@ -1887,13 +2085,13 @@ mod tests {
         // A target for another snapshot's tokens fails: the tail address is snapshot-derived,
         // so the fingerprints cannot match.
         let other_tokens = token_prefix(1, 512);
-        let wrong_tail = restore_target(&other_tokens, &pages);
+        let wrong_tail = restore_target(&addressing, &other_tokens, &pages);
         assert!(matches!(
             CacheOps::restore(&mut cache, 0, &wrong_tail),
             RestoreOutcome::Failed
         ));
         // A target with a different page structure fails.
-        let wrong_pages = restore_target(&tokens, &pages[..4]);
+        let wrong_pages = restore_target(&addressing, &tokens, &pages[..4]);
         assert!(matches!(
             CacheOps::restore(&mut cache, 0, &wrong_pages),
             RestoreOutcome::Failed
@@ -1904,6 +2102,8 @@ mod tests {
     fn page_addresses_are_disjoint_across_pages() {
         // Every page's segments must be disjoint from every other page's: addresses are the
         // true page stride apart, so no two ranges may overlap.
+        let model = EngineModel::default();
+        let addressing = Addressing::new(&model);
         let ids: Vec<DevicePageId> = (0..4)
             .flat_map(|compressor| {
                 (0..8).map(move |page| DevicePageId {
@@ -1915,7 +2115,7 @@ mod tests {
             .collect();
         let mut ranges: Vec<(u64, u64)> = ids
             .iter()
-            .flat_map(|&id| page_segments(id))
+            .flat_map(|&id| addressing.page_segments(id))
             .map(|range| (range.addr, range.addr + range.bytes as u64))
             .collect();
         ranges.sort_unstable();
@@ -1923,6 +2123,63 @@ mod tests {
             ranges.windows(2).all(|w| w[0].1 <= w[1].0),
             "segment ranges must be pairwise disjoint: {ranges:?}"
         );
+    }
+
+    /// Every address the simulator can hand out — every pool page's segments, every tail slot —
+    /// must lie inside `EngineModel::device_bytes`, the exact size a suite gives the stub's
+    /// flat fake device.
+    #[test]
+    fn every_address_lies_below_device_bytes() {
+        for model in [
+            EngineModel::default(),
+            EngineModel {
+                device_pool_tokens: 65_536,
+                ..EngineModel::default()
+            },
+            EngineModel {
+                device_pool_tokens: 30_000,
+                retain: 2,
+                lanes: 3,
+                ..EngineModel::default()
+            },
+        ] {
+            let device_bytes = model.device_bytes() as u64;
+            let addressing = Addressing::new(&model);
+            let pages = model.pool_pages() as u32;
+            for compressor in 0..COMPRESSORS as u8 {
+                for page in 0..pages {
+                    let id = DevicePageId {
+                        compressor,
+                        page,
+                        generation: 0,
+                    };
+                    for range in addressing.page_segments(id) {
+                        assert!(
+                            range.addr + range.bytes as u64 <= device_bytes,
+                            "page range {range:?} on {id:?} escapes {device_bytes}"
+                        );
+                    }
+                }
+            }
+            // Tails: hash-derived slots across the arena, and many distinct snapshots to
+            // sample the hash (the arena holds one slot per live tail, so slot reuse is
+            // expected across a run; every slot must still be in bounds).
+            for session in 0..64 {
+                for len in [1usize, 512, 4096] {
+                    let tokens = token_prefix(session, len);
+                    for range in addressing.tail_range(&tokens) {
+                        assert!(
+                            range.addr + range.bytes as u64 <= device_bytes,
+                            "tail range {range:?} escapes {device_bytes}"
+                        );
+                        assert!(
+                            range.addr >= addressing.tails_base,
+                            "tail range {range:?} is not in the tails arena"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
