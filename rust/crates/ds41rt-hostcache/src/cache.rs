@@ -133,11 +133,13 @@ pub struct HostCache<E: CopyEngine, P> {
 
 /// Where a store in flight is in its life.
 enum PendingKind {
-    /// Copies are on the store stream; `event` completes when they land.
+    /// Copies are on the store stream; `event` completes when they land. `issued_ns` is the
+    /// engine clock when the copies were enqueued: the store-latency histogram's start.
     Issued {
         plan: StorePlan,
         bytes: u64,
         event: Event,
+        issued_ns: u64,
     },
     /// `OnEvict`: the device snapshot is recorded and nothing is planned until the engine
     /// evicts it.
@@ -363,6 +365,7 @@ impl<E: CopyEngine, P> HostCache<E, P> {
                     plan: *plan,
                     bytes,
                     event,
+                    issued_ns: self.engine.now_ns(),
                 },
                 StoreIssue::Failed => PendingKind::Failed,
                 StoreIssue::Exhausted => {
@@ -455,6 +458,9 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         if !self.enabled() {
             return EvictDecision::Clean;
         }
+        // One counted device eviction per consultation, before any budget wait and whatever
+        // the outcome; the disabled case above never reaches here.
+        self.metrics.get_mut().device_evictions += 1;
         let Some(ticket) = ticket else {
             return EvictDecision::Clean;
         };
@@ -473,6 +479,7 @@ impl<E: CopyEngine, P> HostCache<E, P> {
                         plan: *plan,
                         bytes,
                         event,
+                        issued_ns: self.engine.now_ns(),
                     };
                     self.pending.insert(index, pending);
                 }
@@ -739,10 +746,18 @@ impl<E: CopyEngine, P> HostCache<E, P> {
     }
 
     /// Make a completed store resident, drop the payload it replaced, and bring the pool under
-    /// quota. Invariant: the payload is resident exactly while its snapshot is.
+    /// quota. Invariant: the payload is resident exactly while its snapshot is. Records the
+    /// store-latency histogram entry exactly once, here, wherever the completion was observed
+    /// (`tick` or the evict path's bounded wait).
     fn commit_pending(&mut self, pending: PendingStore<P>, now: u64) {
         let PendingStore { kind, payload, .. } = pending;
-        let PendingKind::Issued { plan, bytes, .. } = kind else {
+        let PendingKind::Issued {
+            plan,
+            bytes,
+            issued_ns,
+            ..
+        } = kind
+        else {
             return;
         };
         let copied = plan.copies.len() as u64;
@@ -771,6 +786,7 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         metrics.pages_copied += copied;
         metrics.pages_shared += total - copied;
         metrics.store_bytes += bytes;
+        self.metrics.record_store(now.saturating_sub(issued_ns));
         self.evict_to_quota();
     }
 
