@@ -139,9 +139,9 @@ Edit [`ds41rt.config`](ds41rt.config) for the deployment. At minimum, verify the
 To use the published images, pull the coordinator image locally and the Spark image on each worker:
 
 ```bash
-docker pull ghcr.io/tpurtell/ds41rt-coordinator:v2
+docker pull ghcr.io/tpurtell/ds41rt-coordinator:v3
 for host in ostrich dodo emu kiwi; do
-  ssh "$host" docker pull ghcr.io/tpurtell/ds41rt-spark-expert:v2
+  ssh "$host" docker pull ghcr.io/tpurtell/ds41rt-spark-expert:v3
 done
 ./run.sh --dry-run
 ./run.sh
@@ -232,7 +232,7 @@ The [engineering report](docs/ENGINEERING.md) covers the final kernels, executio
 
 ## Qualification
 
-The clean Phase 2 candidate passed the scoped release qualification:
+The clean v3 candidate passed the scoped release qualification:
 
 - matched one/two-RTX target-only and dSpark throughput across eight content types and warm exact counting;
 - fresh one/two-RTX prefill matrices covering 30 base/suffix cells and three measured samples per cell;
