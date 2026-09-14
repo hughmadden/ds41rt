@@ -4,6 +4,8 @@
 //! concurrency suite can interleave plan, commit and abort steps.
 #![allow(dead_code)]
 use ds41rt_core::prefix::{Retention, SnapshotKind};
+use ds41rt_hostcache::cache::HostCache;
+use ds41rt_hostcache::copy::StubCopyEngine;
 use ds41rt_hostcache::pool::testing::layout;
 use ds41rt_hostcache::pool::Layout;
 use ds41rt_hostcache::snapshot::{DevicePageId, Key, SnapshotMeta, Snapshots, StorePlan};
@@ -237,21 +239,28 @@ impl Model {
         let mut evicted = Vec::new();
         let mut freed = 0;
         while self.bytes > quota {
-            let next = {
-                let snapshots = &self.snapshots;
-                self.retention.evict_one_where(&|key: &Key| {
-                    snapshots.get(key).is_some_and(|snapshot| snapshot.pins > 0)
-                })
-            };
-            let Some((_kind, key)) = next else {
+            let Some((key, bytes)) = self.evict_one() else {
                 break;
             };
-            let before = self.bytes;
-            self.release(key);
-            freed += before - self.bytes;
             evicted.push(key);
+            freed += bytes;
         }
         (evicted, freed)
+    }
+
+    /// Evict the least recently used unpinned snapshot; `None` when only pinned snapshots
+    /// remain. Mirrors `Snapshots::evict_one`.
+    pub fn evict_one(&mut self) -> Option<(Key, u64)> {
+        let next = {
+            let snapshots = &self.snapshots;
+            self.retention.evict_one_where(&|key: &Key| {
+                snapshots.get(key).is_some_and(|snapshot| snapshot.pins > 0)
+            })
+        };
+        let (_kind, key) = next?;
+        let before = self.bytes;
+        self.release(key);
+        Some((key, before - self.bytes))
     }
 
     pub fn remove(&mut self, key: Key) -> bool {
@@ -487,6 +496,16 @@ pub fn apply(
             assert_eq!(store.remove(*key), model.remove(*key), "remove");
             model.check(store);
             None
+        }
+    }
+}
+
+/// Mirror the cache's eviction-on-exhaustion: while planning a store the cache may evict
+/// unpinned snapshots, so bring the model's resident set down to the cache's.
+pub fn reconcile<P>(cache: &HostCache<StubCopyEngine, P>, model: &mut Model) {
+    while model.snapshots.len() > cache.metrics().resident_snapshots as usize {
+        if model.evict_one().is_none() {
+            break;
         }
     }
 }
