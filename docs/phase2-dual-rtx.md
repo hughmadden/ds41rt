@@ -32,6 +32,10 @@ Status: forced dual-GPU worker serves long prompts at the release prefill step; 
   Replicate all performance-report tables in the README with short descriptions;
   state the 400 W RTX limit and standard memory speed before the results, and
   accompany headline cache bytes with the corresponding token capacity.
+  `scripts/bench-ds41-concurrent-api.py --case counting|code|topic` now
+  supports each concurrency workload. Keep the label and nonce identical across
+  GPU layouts so their request prompts match. Code uses the existing objective
+  structure check; topic prose is not automatically scored.
 
 ## Initial evidence and placement constraint
 
