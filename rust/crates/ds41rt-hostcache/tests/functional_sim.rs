@@ -1,7 +1,8 @@
 //! Functional suite for the simulator (HC-4): every workload on its happy path, the documented
-//! device-pool exhaustion error path, determinism of the seeded interleaver, TTFT accounting,
-//! content fidelity through the recording cache, and a proptest that random workload
-//! parameters never violate the invariants.
+//! device-pool exhaustion error path, determinism of the seeded interleaver, TTFT and virtual
+//! clock accounting, content fidelity through the recording cache, the recording cache's
+//! lookup counters, and a proptest that random workload parameters never violate the
+//! invariants.
 use ds41rt_hostcache::sim::testing::RecordingCache;
 use ds41rt_hostcache::sim::{EngineModel, RunReport, Simulator, Workload, PREFILL_QUANTUM_TOKENS};
 use proptest::strategy::Strategy as _;
@@ -216,6 +217,70 @@ fn ttft_is_the_modelled_time_to_first_token() {
 }
 
 #[test]
+fn now_ns_is_the_sum_of_modelled_prefill_and_decode_time() {
+    let model = EngineModel::default();
+    let quantum_ns = |tokens: u32, rate: f64| (tokens as f64 / rate * 1e9).ceil() as u64;
+    // A lone cold prompt: the clock is exactly its prefills, quantum rounding included.
+    let tokens = 3 * PREFILL_QUANTUM_TOKENS as u32;
+    let workload = Workload::Burst { prompts: 1, tokens };
+    let mut sim = Simulator::new(model.clone(), RecordingCache::new(), 7);
+    let report = sim.run(&workload);
+    assert_happy(&report, &workload);
+    assert_eq!(
+        sim.now_ns(),
+        3 * quantum_ns(PREFILL_QUANTUM_TOKENS as u32, model.prefill_tokens_per_s),
+        "the clock advanced by exactly the modelled prefill time"
+    );
+    // One turn with decode: prefill of one quantum plus one modelled decode step per token.
+    let new_tokens = 5;
+    let agent = Workload::AgentLoop {
+        sessions: 1,
+        turns: 1,
+        context_tokens: PREFILL_QUANTUM_TOKENS as u32,
+        new_tokens_per_turn: new_tokens,
+        think_ns: 0,
+    };
+    let mut sim = Simulator::new(model.clone(), RecordingCache::new(), 7);
+    let report = sim.run(&agent);
+    assert_happy(&report, &agent);
+    assert_eq!(
+        sim.now_ns(),
+        quantum_ns(PREFILL_QUANTUM_TOKENS as u32, model.prefill_tokens_per_s)
+            + u64::from(new_tokens) * quantum_ns(1, model.decode_tokens_per_s),
+        "the clock advanced by exactly the modelled prefill and decode time"
+    );
+}
+
+#[test]
+fn recording_cache_lookup_and_hit_counters_match_the_report() {
+    // Every request that misses the device consults the host cache exactly once, so the
+    // recording cache's counters must mirror the report's miss and host-hit counts.
+    let workload = Workload::Churn {
+        sessions: 48,
+        turns: 6,
+        context_tokens: 2048,
+        live_ratio: 1.0,
+    };
+    let mut sim = Simulator::new(EngineModel::default(), RecordingCache::new(), 3);
+    let report = sim.run(&workload);
+    assert_happy(&report, &workload);
+    let cache = sim.cache();
+    assert!(
+        report.host_hits > 0 && report.misses > 0,
+        "the workload must exercise both host hits and misses"
+    );
+    assert_eq!(
+        cache.lookups,
+        report.misses + report.host_hits,
+        "one host lookup per request the device missed"
+    );
+    assert_eq!(
+        cache.hits, report.host_hits,
+        "one recorded hit per host hit the report counted"
+    );
+}
+
+#[test]
 fn a_simulator_serves_back_to_back_workloads() {
     // State carries over between runs like a live engine: the second burst repeats the first
     // burst's sessions and hits the snapshots the first run retained.
@@ -286,11 +351,6 @@ fn make_room_evicts_before_it_ever_exhausts() {
     );
 }
 
-#[test]
-fn proptest_invariants_hold_for_random_workloads() {
-    invariants_hold();
-}
-
 // Pools are generated far above the lanes' worst concurrent footprint, so exhaustion — the
 // documented error path — cannot trigger inside this property.
 proptest::proptest! {
@@ -324,8 +384,7 @@ proptest::proptest! {
     ) {
         let model = EngineModel {
             device_pool_tokens: pool_tokens,
-            retain_prompts: retain,
-            retain_turns: retain,
+            retain,
             ..EngineModel::default()
         };
         let mut sim = Simulator::new(

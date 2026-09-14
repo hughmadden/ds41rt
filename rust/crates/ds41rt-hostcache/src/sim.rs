@@ -9,20 +9,22 @@
 //!   workload must fit its live lanes on the device.
 //! - **Requests**: each advances through admission → device-bank `lookup_reusable` → on miss
 //!   [`CacheOps::lookup`] → [`CacheOps::restore`] into freshly reserved pages (or prefill at
-//!   the modelled rate on miss/timeout) → decode → retire ([`CacheOps::store`]); every
-//!   scheduler step calls [`CacheOps::tick`]. Up to `EngineModel::lanes` requests run
-//!   concurrently in lane slots; a workload is a FIFO queue of requests the slots pull.
-//! - **Interleaver**: a seeded PRNG picks the next runnable request; when none is runnable the
-//!   clock advances to the next admission, which is what lets asynchronous store copies land.
-//!   One line per choice lands in `RunReport::schedule_log`, so a failure reproduces from its
-//!   seed.
+//!   the modelled rate on miss/timeout) → decode → retire ([`CacheOps::store`]). Up to
+//!   `EngineModel::lanes` requests run concurrently in lane slots; a workload is a FIFO queue
+//!   of requests the slots pull.
+//! - **Interleaver**: a seeded PRNG picks the next runnable action — one occupied lane's
+//!   request step, or advancing the copy engine ([`CacheOps::tick`]) so asynchronous store
+//!   completions interleave with lane steps; when no request is runnable the clock advances to
+//!   the next admission. The schedule log holds one line per interleaver choice, plus one line
+//!   per deterministic bookkeeping event (admissions, eviction consultations, clock advances,
+//!   invariant violations), so a failure reproduces from its seed.
 //! - **Workloads**: `AgentLoop` (sessions × turns with context growth and think time),
 //!   `Burst` (many cold prompts), `Churn` (many sessions revisited round-robin, more live
 //!   conversations than the device banks hold — the pressure case).
 //!
 //! The simulator asserts the invariants after every step: device pool accounting exact, pages
-//! never freed while referenced, restore targets byte-equal to what was stored (content
-//! fidelity), and every store ticket reported exactly once.
+//! never freed while referenced, restore targets reproducing exactly what was stored (content
+//! fidelity), and every store ticket settled exactly once — by `tick` or on the evict path.
 //!
 //! Two caches can be driven: the real [`HostCache`] (once packet HC-5 lands, through the
 //! [`CacheOps`] delegation) and [`testing::RecordingCache`], a trivial cache for the suites on
@@ -34,7 +36,7 @@
 //! the rebuilt `Saved`. Copy latency on the recording cache is counted in scheduler ticks, not
 //! nanoseconds; restores and evict waits report zero nanoseconds, which is what "never waits"
 //! means. `ds41rt_core::prefix::Retention` takes one limit for both banks (the engine's single
-//! `--prefix-cache-entries` flag), so the model asserts `retain_prompts == retain_turns`.
+//! `--prefix-cache-entries` flag), so the model carries a single `retain` limit.
 use crate::cache::{
     DevicePage, DeviceSnapshot, EvictDecision, HostCache, RestoreOutcome, RestoreTarget,
     StoreOutcome, StoreTicket, TickReport,
@@ -64,9 +66,24 @@ const CHURN_TURN_GROWTH_TOKENS: usize = 16;
 /// (64 B + 4 B + 288 B per row over `PAGE_ROWS` rows; the four lengths sum to [`PAGE_BYTES`]).
 const PAGE_SEGMENTS: [usize; 4] = [64 * 256, 4 * 256, 144 * 256, 144 * 256];
 
-/// A deterministic, collision-free device address for a pool slot and segment offset.
+/// The splitmix64 increment: the state advance between draws.
+const SPLITMIX_INCREMENT: u64 = 0x9E37_79B9_7F4A_7C15;
+
+/// The splitmix64 finalizer: a bijective, well-mixed 64-bit hash. The token stream, the
+/// interleaver's PRNG and the tail-address derivation all share this one mixer, so a schedule
+/// reproduces from its seed across every use.
+fn splitmix64(z: u64) -> u64 {
+    let z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    let z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// A deterministic, collision-free device address for a pool slot and segment offset: the
+/// compressor bank in the top bits, then the page at its true byte stride. `PAGE_BYTES` exceeds
+/// 2^16, so packing the page index at bit 16 would alias consecutive pages' segment ranges;
+/// addressed by the stride, every page's range is disjoint from every other page's.
 fn page_addr(id: DevicePageId, offset: usize) -> u64 {
-    ((id.compressor as u64) << 40) | ((id.page as u64) << 16) | offset as u64
+    ((id.compressor as u64) << 48) | (id.page as u64 * PAGE_BYTES as u64 + offset as u64)
 }
 
 /// Tokens of context occupy this many whole pages, rounded up.
@@ -90,10 +107,7 @@ fn reusable_tokens(common: usize, frontier: usize) -> usize {
 /// Key-space token `i` of session `s`: splitmix64 over the pair, so every session owns a
 /// disjoint token stream and prefixes are stable across visits.
 fn token_at(session: usize, i: usize) -> u32 {
-    let mut z = ((session as u64) << 32 | i as u64).wrapping_add(0x9E37_79B9_7F4A_7C15);
-    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    (z ^ (z >> 31)) as u32
+    splitmix64(((session as u64) << 32 | i as u64).wrapping_add(SPLITMIX_INCREMENT)) as u32
 }
 
 fn token_prefix(session: usize, len: usize) -> Vec<u32> {
@@ -108,24 +122,30 @@ impl Rng {
         Self(seed)
     }
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
+        self.0 = self.0.wrapping_add(SPLITMIX_INCREMENT);
+        splitmix64(self.0)
     }
     fn below(&mut self, n: usize) -> usize {
         (self.next() % n.max(1) as u64) as usize
     }
 }
 
+/// The engine configuration the simulator models: the knobs a deployment sets.
+/// [`EngineModel::default`] is the capacity-1024 configuration of record.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct EngineModel {
+    /// Device KV pool capacity in tokens, shared by in-flight requests and the retention
+    /// banks; exhausting it is the modelled `SourcePoolExhausted`.
     pub device_pool_tokens: u64,
-    pub retain_prompts: usize,
-    pub retain_turns: usize,
+    /// Retention limit of each device bank, in entries. `ds41rt_core::prefix::Retention`
+    /// takes one limit for both banks (the engine's single `--prefix-cache-entries` flag), so
+    /// the model carries a single value.
+    pub retain: usize,
+    /// Modelled prefill throughput in tokens per second; prefill advances the virtual clock.
     pub prefill_tokens_per_s: f64,
+    /// Modelled decode throughput in tokens per second; decode advances the virtual clock.
     pub decode_tokens_per_s: f64,
+    /// Concurrent request lane slots; the workload's FIFO queue pulls through these.
     pub lanes: usize,
 }
 
@@ -134,8 +154,7 @@ impl Default for EngineModel {
     fn default() -> Self {
         Self {
             device_pool_tokens: 2_500_000,
-            retain_prompts: 24,
-            retain_turns: 24,
+            retain: 24,
             prefill_tokens_per_s: 5_377.0,
             decode_tokens_per_s: 74.1,
             lanes: 8,
@@ -143,38 +162,72 @@ impl Default for EngineModel {
     }
 }
 
+/// A workload the simulator runs to completion: a FIFO queue of requests the lane slots pull.
+/// Sessions own disjoint token streams (see the module doc), so every reusable match — device
+/// or host — is an exact ancestor of the request.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Workload {
+    /// Sessions run their turns back to back, the context growing by `new_tokens_per_turn` and
+    /// the session pausing `think_ns` between turns: the standing-conversation case.
     AgentLoop {
+        /// Distinct conversations in the workload.
         sessions: usize,
+        /// Turns each session runs.
         turns: usize,
+        /// Context length at the first turn, in tokens.
         context_tokens: u32,
+        /// Tokens each turn adds to the context.
         new_tokens_per_turn: u32,
+        /// Pause after each turn but the last, in virtual nanoseconds.
         think_ns: u64,
     },
+    /// Independent cold prompts: the all-miss case.
     Burst {
+        /// Number of prompts.
         prompts: usize,
+        /// Tokens per prompt.
         tokens: u32,
     },
+    /// Sessions revisited round-robin (visit-major order), the context growing a little each
+    /// visit: more live conversations than the device banks hold, so returning visits miss the
+    /// device and are served by the host cache — the pressure case.
     Churn {
+        /// Distinct conversations in the workload.
         sessions: usize,
+        /// Visits each session receives.
         turns: usize,
+        /// Context length at the first visit, in tokens.
         context_tokens: u32,
+        /// Fraction of the lane slots the run uses, within `[0, 1]`.
         live_ratio: f64,
     },
 }
 
-/// What a run measured.
+/// What a run measured: every counter the engine would report, plus the seed and schedule log
+/// that reproduce the run exactly.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct RunReport {
+    /// The seed the interleaver ran from: rebuilding the simulator with it reproduces this
+    /// report and the schedule log byte for byte.
+    pub seed: u64,
+    /// Interleaver choices taken: lane steps plus copy-engine advances.
     pub steps: u64,
+    /// Tokens prefilled from cold across the run.
     pub prefilled_tokens: u64,
+    /// Frontier tokens replayed from restored host snapshots across the run.
     pub restored_tokens: u64,
+    /// Requests answered by a device-bank hit.
     pub device_hits: u64,
+    /// Requests answered by a host-cache hit (a restore).
     pub host_hits: u64,
+    /// Requests that found no reusable snapshot anywhere and prefilled from cold.
     pub misses: u64,
+    /// One time-to-first-token sample per request, in virtual nanoseconds.
     pub ttft_ns: Vec<u64>,
+    /// Invariant violations the run aborted on; empty exactly when the run was clean.
     pub invariant_failures: Vec<String>,
+    /// One line per interleaver choice, plus deterministic bookkeeping lines; see the module
+    /// doc for the format.
     pub schedule_log: Vec<String>,
 }
 
@@ -183,9 +236,11 @@ pub struct RunReport {
 /// [`before_device_evict`](CacheOps::before_device_evict), [`lookup`](CacheOps::lookup),
 /// [`restore`](CacheOps::restore)) plus the page-free notification the engine raises on the
 /// eviction path. Implementations must keep the `HostCache` invariants the simulator asserts: a
-/// hit is a `Retention` hit, a restore target is byte-equal to what was stored, and every ticket
-/// is reported exactly once — by `tick`, or by `before_device_evict` if the device drops the
-/// snapshot first.
+/// hit is a `Retention` hit, a restore target reproduces exactly what was stored (content
+/// fidelity), and every store ticket is settled exactly once — by `tick` reporting it among
+/// the completed or failed, or by `before_device_evict` resolving it on the evict path: a
+/// [`EvictDecision::WaitedClean`] or [`EvictDecision::DroppedUncached`] decision settles the
+/// ticket there, and a settled ticket must never be reported by a later `tick`.
 pub trait CacheOps {
     /// The engine's host-side descriptor; handed back on a hit and dropped on eviction.
     type Payload;
@@ -238,6 +293,9 @@ struct CompressorPool {
     /// Generation per slot; increments on every free, so a reused index is a new identity.
     generation: Vec<u32>,
     refcount: Vec<u32>,
+    /// Sum of `refcount`, maintained at every mutation; the per-step check verifies this
+    /// against the device total, and `Device::audit` recomputes it from the array.
+    slot_refs: usize,
     /// Indices with `refcount == 0`, ready for allocation.
     free: Vec<u32>,
     allocated: usize,
@@ -248,6 +306,7 @@ impl CompressorPool {
         Self {
             generation: vec![0; pages],
             refcount: vec![0; pages],
+            slot_refs: 0,
             free: (0..pages as u32).rev().collect(),
             allocated: 0,
         }
@@ -275,11 +334,6 @@ struct Device {
 impl Device {
     fn new(model: &EngineModel) -> Self {
         assert!(model.lanes >= 1, "EngineModel.lanes must be at least 1");
-        assert_eq!(
-            model.retain_prompts, model.retain_turns,
-            "ds41rt_core::prefix::Retention takes one limit for both banks (the engine's single \
-             --prefix-cache-entries flag); set retain_prompts == retain_turns"
-        );
         let pages = (model.device_pool_tokens as usize).saturating_mul(KV_BYTES_PER_TOKEN)
             / PAGE_BYTES
             / COMPRESSORS;
@@ -288,7 +342,7 @@ impl Device {
             pools: (0..COMPRESSORS)
                 .map(|_| CompressorPool::new(pages))
                 .collect(),
-            banks: Retention::new(model.retain_prompts),
+            banks: Retention::new(model.retain),
             bank_refs: 0,
             request_refs: 0,
             refs_sum: 0,
@@ -304,6 +358,7 @@ impl Device {
         *slot = slot
             .checked_add(1)
             .ok_or_else(|| format!("refcount overflow on {id:?}"))?;
+        pool.slot_refs += 1;
         self.refs_sum += 1;
         Ok(())
     }
@@ -317,6 +372,7 @@ impl Device {
         *slot = slot
             .checked_sub(1)
             .ok_or_else(|| format!("refcount underflow freeing {id:?}"))?;
+        pool.slot_refs -= 1;
         self.refs_sum -= 1;
         if *slot == 0 {
             if pool.generation[id.page as usize] != id.generation {
@@ -354,6 +410,7 @@ impl Device {
             }
             pool.free.pop();
             pool.refcount[idx as usize] = 1;
+            pool.slot_refs += 1;
             pool.allocated += 1;
             self.refs_sum += 1;
             out.push(DevicePageId {
@@ -447,8 +504,14 @@ impl Device {
         Ok(())
     }
 
-    /// Invariant check after every scheduler step.
+    /// Invariant check after every scheduler step, cheap enough to run per step: the per-pool
+    /// reference sums (maintained at every mutation) must equal the device's running total,
+    /// which must equal the references the banks and the requests declare. Together with
+    /// [`Device::audit`]'s from-scratch recomputation these imply every page a bank entry or a
+    /// request holds is live: a dead identity — freed, or re-generated under a stale one —
+    /// would leave the slot sums, the free lists or the generation discipline inconsistent.
     fn check(&self) -> Result<(), String> {
+        let mut slot_refs = 0usize;
         for (c, pool) in self.pools.iter().enumerate() {
             if pool.allocated + pool.free.len() != pool.pages() {
                 return Err(format!(
@@ -458,6 +521,13 @@ impl Device {
                     pool.pages()
                 ));
             }
+            slot_refs += pool.slot_refs;
+        }
+        if slot_refs != self.refs_sum {
+            return Err(format!(
+                "refcount drift: slots hold {slot_refs} refs, the device counted {}",
+                self.refs_sum
+            ));
         }
         if self.refs_sum != self.bank_refs + self.request_refs {
             return Err(format!(
@@ -466,6 +536,32 @@ impl Device {
             ));
         }
         Ok(())
+    }
+
+    /// The from-scratch version of [`Device::check`], run once when a simulation ends: sums
+    /// the per-slot refcounts straight from the arrays and scans the free lists, proving the
+    /// incremental counters the per-step check relies on still mirror the arrays. This is
+    /// `O(pool pages)`; per scheduler step it would dominate the suites' debug runtime.
+    fn audit(&self) -> Result<(), String> {
+        let mut slot_refs = 0usize;
+        for (c, pool) in self.pools.iter().enumerate() {
+            slot_refs += pool.refcount.iter().map(|&rc| rc as usize).sum::<usize>();
+            for &idx in &pool.free {
+                let rc = pool.refcount[idx as usize];
+                if rc != 0 {
+                    return Err(format!(
+                        "free slot {idx} on compressor {c} holds refcount {rc}"
+                    ));
+                }
+            }
+        }
+        if slot_refs != self.refs_sum {
+            return Err(format!(
+                "refcount drift: slots hold {slot_refs} refs, the device counted {}",
+                self.refs_sum
+            ));
+        }
+        self.check()
     }
 }
 
@@ -491,9 +587,9 @@ impl<T: CacheOps> CacheOpsHandle for T {
 }
 
 /// The handle the simulator hands the device model: forwards the two eviction-path calls and
-/// folds `before_device_evict` into the simulator's ticket ledger — a `WaitedClean` decision
-/// means the cache resolved that ticket on the evict path, so it will never come through
-/// `tick`.
+/// folds `before_device_evict` into the simulator's ticket ledger. `WaitedClean` and
+/// `DroppedUncached` both settle the ticket on the evict path — the snapshot leaves the device
+/// and the ticket must never come through `tick` — so the ledger drops it on either decision.
 struct EvictHandle<'a, C: CacheOps> {
     cache: &'a mut C,
     outstanding: &'a mut HashSet<StoreTicket>,
@@ -505,13 +601,30 @@ impl<C: CacheOps> CacheOpsHandle for EvictHandle<'_, C> {
     }
     fn before_device_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
         let decision = self.cache.before_device_evict(ticket);
-        if matches!(decision, EvictDecision::WaitedClean { .. }) {
+        if matches!(
+            decision,
+            EvictDecision::WaitedClean { .. } | EvictDecision::DroppedUncached
+        ) {
             if let Some(ticket) = ticket {
                 self.outstanding.remove(&ticket);
             }
         }
         decision
     }
+}
+
+/// The eviction handle for one device-model call: the cache under test plus the run's
+/// outstanding-ticket ledger.
+fn evict_handle<'a, C: CacheOps>(
+    cache: &'a mut C,
+    outstanding: &'a mut HashSet<StoreTicket>,
+) -> EvictHandle<'a, C> {
+    EvictHandle { cache, outstanding }
+}
+
+/// A schedule-log sink for one device-model call.
+fn log_sink(log: &mut Vec<String>) -> impl FnMut(String) + '_ {
+    move |line| log.push(line)
 }
 
 /// One request of a workload, as queued for the lane slots.
@@ -645,6 +758,7 @@ pub struct Simulator<C: CacheOps = HostCache<StubCopyEngine, ()>> {
     model: EngineModel,
     device: Device,
     cache: C,
+    seed: u64,
     rng: Rng,
     now: u64,
     steps: u64,
@@ -663,6 +777,7 @@ where
             device: Device::new(&model),
             model,
             cache,
+            seed,
             rng: Rng::new(seed),
             now: 0,
             steps: 0,
@@ -694,7 +809,10 @@ where
         let mut session_ready = vec![0u64; sessions];
         let mut prompt_retained = vec![false; sessions];
         let mut slots: Vec<Option<Request>> = (0..lanes).map(|_| None).collect();
-        let mut report = RunReport::default();
+        let mut report = RunReport {
+            seed: self.seed,
+            ..RunReport::default()
+        };
         let mut outstanding: HashSet<StoreTicket> = HashSet::new();
         self.steps = 0;
 
@@ -710,7 +828,8 @@ where
                 occupied if occupied.is_empty() => {
                     // No request can run: wait for the front session's next admission. (A queued
                     // session is never blocked by itself: its in-flight predecessor occupies a
-                    // slot, so `ready` here is always finite.)
+                    // slot, so `ready` here is always finite.) Forced, not an interleaver
+                    // choice: no PRNG draw.
                     let next = queue
                         .front()
                         .map(|plan| session_ready[plan.session])
@@ -720,41 +839,48 @@ where
                     format!("step={} advance now={next}", self.steps)
                 }
                 occupied => {
-                    let idx = occupied[self.rng.below(occupied.len())];
-                    let result = match slots[idx].as_mut() {
-                        Some(request) => self.step_request(
-                            request,
-                            &mut prompt_retained,
-                            &mut report,
-                            &mut outstanding,
-                        ),
-                        None => Err("interleaver picked an empty slot".to_string()),
-                    };
-                    let line = match result {
-                        Ok(line) => line,
-                        Err(failure) => {
-                            report.invariant_failures.push(failure.clone());
-                            self.log(format!(
-                                "step={} INVARIANT VIOLATION: {failure}",
-                                self.steps
-                            ));
-                            break;
+                    // The interleaver picks the next runnable action: one occupied lane's
+                    // request step, or advancing the copy engine so asynchronous store
+                    // completions interleave with the lanes.
+                    let pick = self.rng.below(occupied.len() + 1);
+                    if pick == occupied.len() {
+                        self.tick(&mut report, &mut outstanding)
+                    } else {
+                        let idx = occupied[pick];
+                        let result = match slots[idx].as_mut() {
+                            Some(request) => self.step_request(
+                                request,
+                                &mut prompt_retained,
+                                &mut report,
+                                &mut outstanding,
+                            ),
+                            None => Err("interleaver picked an empty slot".to_string()),
+                        };
+                        let line = match result {
+                            Ok(line) => line,
+                            Err(failure) => {
+                                report.invariant_failures.push(failure.clone());
+                                self.log(format!(
+                                    "step={} INVARIANT VIOLATION: {failure}",
+                                    self.steps
+                                ));
+                                break;
+                            }
+                        };
+                        // A finished request frees its slot; the session thinks before its
+                        // next admission.
+                        if let Some(request) =
+                            slots[idx].take_if(|r| matches!(r.stage, Stage::Finished))
+                        {
+                            session_ready[request.plan.session] = self.now + request.plan.think_ns;
                         }
-                    };
-                    // A finished request frees its slot; the session thinks before its next
-                    // admission.
-                    if let Some(request) =
-                        slots[idx].take_if(|r| matches!(r.stage, Stage::Finished))
-                    {
-                        session_ready[request.plan.session] = self.now + request.plan.think_ns;
+                        line
                     }
-                    line
                 }
             };
             self.log(line);
             self.steps += 1;
             report.steps = self.steps;
-            self.tick(&mut report, &mut outstanding);
             if let Err(failure) = self.check(&slots) {
                 report.invariant_failures.push(failure.clone());
                 self.log(format!(
@@ -768,7 +894,8 @@ where
             }
         }
 
-        // Settle store tickets that outlived their requests.
+        // Settle store tickets that outlived their requests. Drain ticks are not interleaver
+        // choices and are not logged.
         let mut drain = 0;
         while !outstanding.is_empty() && drain < MAX_DRAIN_TICKS {
             drain += 1;
@@ -780,7 +907,7 @@ where
                 outstanding.len()
             ));
         }
-        if let Err(failure) = self.device.check() {
+        if let Err(failure) = self.device.audit() {
             report.invariant_failures.push(failure);
         }
         report.schedule_log = std::mem::take(&mut self.schedule_log);
@@ -826,9 +953,10 @@ where
         self.schedule_log.push(line);
     }
 
-    /// One scheduler step's tick: fold the report into the outstanding set, flagging any ticket
-    /// that was not issued or was reported twice.
-    fn tick(&mut self, report: &mut RunReport, outstanding: &mut HashSet<StoreTicket>) {
+    /// Advance the copy engine: one `CacheOps::tick`, folding the report into the outstanding
+    /// set and flagging any ticket that was not issued or was reported twice. Returns the
+    /// schedule-log line for this interleaver choice.
+    fn tick(&mut self, report: &mut RunReport, outstanding: &mut HashSet<StoreTicket>) -> String {
         let tick = self.cache.tick();
         for ticket in tick.completed.iter().chain(tick.failed.iter()) {
             if !outstanding.remove(ticket) {
@@ -840,6 +968,10 @@ where
                 report.invariant_failures.push(failure);
             }
         }
+        format!(
+            "tick completed={:?} failed={:?}",
+            tick.completed, tick.failed
+        )
     }
 
     /// Advance one request one stage; returns the schedule-log line for the choice.
@@ -895,15 +1027,12 @@ where
         outstanding: &mut HashSet<StoreTicket>,
     ) -> Result<Vec<DevicePageId>, String> {
         let total = pages_for(request.tokens.len());
-        let mut handle = EvictHandle {
-            cache: &mut self.cache,
-            outstanding,
-        };
+        let mut handle = evict_handle(&mut self.cache, outstanding);
         self.device.allocate(
             request.pages.len(),
             total - request.pages.len(),
             &mut handle,
-            &mut |line| self.schedule_log.push(line),
+            &mut log_sink(&mut self.schedule_log),
         )
     }
 
@@ -996,34 +1125,32 @@ where
     ) -> Result<String, String> {
         let usable = reusable_tokens(hit.common, hit.frontier).min(request.tokens.len());
         let fresh = {
-            let mut handle = EvictHandle {
-                cache: &mut self.cache,
-                outstanding: &mut *outstanding,
-            };
-            self.device
-                .allocate(0, pages_for(hit.frontier), &mut handle, &mut |line| {
-                    self.schedule_log.push(line)
-                })?
+            let mut handle = evict_handle(&mut self.cache, &mut *outstanding);
+            self.device.allocate(
+                0,
+                pages_for(hit.frontier),
+                &mut handle,
+                &mut log_sink(&mut self.schedule_log),
+            )?
         };
         request.pages.extend_from_slice(&fresh);
-        let target = restore_target(&request.pages);
+        // The restore covers the hit's frontier tokens; a host hit is an exact ancestor of the
+        // request, so that slice is the stored snapshot's token sequence.
+        let target = restore_target(&request.tokens[..hit.frontier], &request.pages);
         match self.cache.restore(hit.key, &target) {
             RestoreOutcome::Done { ns, bytes } => {
                 self.now += ns;
                 report.restored_tokens += hit.frontier as u64;
                 // The engine re-inserts the rebuilt snapshot into the device bank.
                 let entry = request.pages[..pages_for(usable)].to_vec();
-                let mut handle = EvictHandle {
-                    cache: &mut self.cache,
-                    outstanding: &mut *outstanding,
-                };
+                let mut handle = evict_handle(&mut self.cache, &mut *outstanding);
                 self.device.insert_entry(
                     hit.kind,
                     &request.tokens[..usable],
                     entry,
                     None,
                     &mut handle,
-                    &mut |line| self.schedule_log.push(line),
+                    &mut log_sink(&mut self.schedule_log),
                 )?;
                 let rest = request.tokens.len() - usable;
                 if rest > 0 {
@@ -1074,17 +1201,14 @@ where
             let snapshot = build_snapshot(SnapshotKind::Prompt, &request.tokens, &request.pages);
             let outcome = self.cache.store(&snapshot, C::Payload::default());
             let ticket = track_ticket(outcome, outstanding);
-            let mut handle = EvictHandle {
-                cache: &mut self.cache,
-                outstanding,
-            };
+            let mut handle = evict_handle(&mut self.cache, outstanding);
             self.device.insert_entry(
                 SnapshotKind::Prompt,
                 &request.tokens,
                 request.pages.clone(),
                 ticket,
                 &mut handle,
-                &mut |line| self.schedule_log.push(line),
+                &mut log_sink(&mut self.schedule_log),
             )?;
         }
         self.record_ttft(request, report);
@@ -1114,17 +1238,14 @@ where
         // The retained snapshot takes over the request's page references.
         let pages = std::mem::take(&mut request.pages);
         self.device.request_refs -= pages.len();
-        let mut handle = EvictHandle {
-            cache: &mut self.cache,
-            outstanding,
-        };
+        let mut handle = evict_handle(&mut self.cache, outstanding);
         self.device.adopt_entry(
             kind,
             &request.tokens,
             pages,
             ticket,
             &mut handle,
-            &mut |line| self.schedule_log.push(line),
+            &mut log_sink(&mut self.schedule_log),
         )?;
         request.stage = Stage::Finished;
         Ok(format!(
@@ -1164,8 +1285,9 @@ fn occupied_slots(slots: &[Option<Request>]) -> Vec<usize> {
         .collect()
 }
 
-/// Track a store outcome: the ticket the cache hands back must be reported exactly once, by
-/// `tick` or by `before_device_evict`.
+/// Track a store outcome: an issued or deferred ticket lands in the outstanding ledger and
+/// must be settled exactly once — by `tick` reporting it, or by `before_device_evict`
+/// resolving it (`WaitedClean`/`DroppedUncached`). A skipped store has no ticket.
 fn track_ticket(
     outcome: StoreOutcome,
     outstanding: &mut HashSet<StoreTicket>,
@@ -1179,10 +1301,36 @@ fn track_ticket(
     }
 }
 
+/// The modelled device address of a snapshot's backbone tail arena slot, derived from the
+/// snapshot's tokens: distinct snapshots never alias, so a restore target built for the wrong
+/// snapshot cannot reproduce the stored tail address (a shared constant would let one pass).
+/// The derivation lives above every page address (the compressor banks occupy the low bits).
+fn tail_addr(tokens: &[u32]) -> u64 {
+    let mut hash = tokens.len() as u64;
+    for &token in tokens {
+        hash = splitmix64(hash ^ u64::from(token));
+    }
+    (1 << 60) | (hash & 0x0000_FFFF_FFFF_FFFF)
+}
+
+/// The modelled tail arena slot of the snapshot covering `tokens`: one range.
+fn tail_range(tokens: &[u32]) -> Vec<DeviceRange> {
+    vec![DeviceRange {
+        addr: tail_addr(tokens),
+        bytes: TAIL_BYTES,
+    }]
+}
+
+/// The parts a modelled snapshot never carries: no dSpark draft rings, host-side scores.
+fn empty_parts() -> (Option<Vec<DeviceRange>>, Vec<DeviceRange>) {
+    (None, Vec::new())
+}
+
 /// The store/restore shape of a snapshot covering `tokens` tokens: striped pages of four
-/// segments each, one tail range, no draft, no scores (the engine layout keeps scores
-/// host-side).
+/// segments each, one snapshot-derived tail range, no draft, no scores (the engine layout
+/// keeps scores host-side).
 fn build_snapshot(kind: SnapshotKind, tokens: &[u32], pages: &[DevicePageId]) -> DeviceSnapshot {
+    let (draft, scores) = empty_parts();
     DeviceSnapshot {
         meta: SnapshotMeta {
             kind,
@@ -1191,24 +1339,21 @@ fn build_snapshot(kind: SnapshotKind, tokens: &[u32], pages: &[DevicePageId]) ->
             has_draft: false,
         },
         pages: group_pages(pages),
-        tail: vec![DeviceRange {
-            addr: 1 << 60,
-            bytes: TAIL_BYTES,
-        }],
-        draft: None,
-        scores: Vec::new(),
+        tail: tail_range(tokens),
+        draft,
+        scores,
     }
 }
 
-fn restore_target(pages: &[DevicePageId]) -> RestoreTarget {
+/// The restore destination for the first `tokens` of a request, in the same shape as the
+/// stored snapshot.
+fn restore_target(tokens: &[u32], pages: &[DevicePageId]) -> RestoreTarget {
+    let (draft, scores) = empty_parts();
     RestoreTarget {
         pages: group_pages(pages),
-        tail: vec![DeviceRange {
-            addr: 1 << 60,
-            bytes: TAIL_BYTES,
-        }],
-        draft: None,
-        scores: Vec::new(),
+        tail: tail_range(tokens),
+        draft,
+        scores,
     }
 }
 
@@ -1241,12 +1386,15 @@ fn page_segments(id: DevicePageId) -> Vec<DeviceRange> {
 
 /// A trivial cache for the suites on this branch: records every call, never waits. Store
 /// copies land `completion_ticks` scheduler ticks after issue (each `tick` is one tick);
-/// restores and evict waits complete immediately; every ticket is reported exactly once — by
-/// `tick`, or by `before_device_evict` if the device drops the snapshot first.
+/// restores and evict waits complete immediately; every ticket is settled exactly once — by
+/// `tick` reporting it, or by `before_device_evict` resolving it (`WaitedClean` on a pending
+/// copy, `Clean` when there is nothing to wait for).
 #[doc(hidden)]
 pub mod testing {
     use super::{CacheOps, Hit};
-    use crate::cache::{EvictDecision, RestoreOutcome, RestoreTarget, StoreOutcome, StoreTicket};
+    use crate::cache::{
+        DevicePage, EvictDecision, RestoreOutcome, RestoreTarget, StoreOutcome, StoreTicket,
+    };
     use crate::copy::DeviceRange;
     use crate::snapshot::{DevicePageId, Key};
     use crate::SnapshotKind;
@@ -1260,7 +1408,7 @@ pub mod testing {
 
     /// Bytes a stored snapshot or a restore target carries across all its parts.
     fn snapshot_bytes(
-        pages: &[Vec<crate::cache::DevicePage>],
+        pages: &[Vec<DevicePage>],
         tail: &[DeviceRange],
         draft: &Option<Vec<DeviceRange>>,
         scores: &[DeviceRange],
@@ -1276,26 +1424,63 @@ pub mod testing {
         )
     }
 
+    /// The structural fingerprint of a snapshot's parts: per page the segment lengths in
+    /// order (flattened across the compressor banks), then the tail, draft and scores range
+    /// lists verbatim. A restore target must reproduce the stored snapshot's fingerprint
+    /// exactly; tail addresses are snapshot-derived, so a target built for the wrong snapshot
+    /// cannot alias them.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct PartShape {
+        pages: Vec<Vec<usize>>,
+        tail: Vec<DeviceRange>,
+        draft: Option<Vec<DeviceRange>>,
+        scores: Vec<DeviceRange>,
+    }
+
+    /// The fingerprint of the given parts, in a canonical order both sides build.
+    fn part_shape(
+        pages: &[Vec<DevicePage>],
+        tail: &[DeviceRange],
+        draft: &Option<Vec<DeviceRange>>,
+        scores: &[DeviceRange],
+    ) -> PartShape {
+        PartShape {
+            pages: pages
+                .iter()
+                .flat_map(|bank| bank.iter())
+                .map(|page| page.segments.iter().map(|segment| segment.bytes).collect())
+                .collect(),
+            tail: tail.to_vec(),
+            draft: draft.clone(),
+            scores: scores.to_vec(),
+        }
+    }
+
     struct PendingStore {
         ticket: StoreTicket,
         key: Key,
         tokens: Vec<u32>,
         kind: SnapshotKind,
         bytes: u64,
+        shape: PartShape,
         ticks_remaining: u32,
     }
 
     /// A record of one completed store.
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct RecordedStore {
+        /// The key the stored snapshot was assigned.
         pub key: Key,
+        /// Bytes the snapshot carried across all its parts.
         pub bytes: u64,
     }
 
     /// A record of one completed restore.
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct RecordedRestore {
+        /// The key of the restored snapshot.
         pub key: Key,
+        /// Bytes the restore target carried across all its parts.
         pub bytes: u64,
     }
 
@@ -1310,8 +1495,9 @@ pub mod testing {
         pub evictions: Vec<Option<StoreTicket>>,
         /// Pages the simulator reported freed, in free order.
         pub freed_pages: Vec<DevicePageId>,
-        /// Host lookups issued and hits returned.
+        /// Host lookups issued.
         pub lookups: u64,
+        /// Host lookup hits returned.
         pub hits: u64,
         /// The most stores concurrently in flight at any point.
         pub max_pending: usize,
@@ -1323,6 +1509,7 @@ pub mod testing {
         resident: Retention<Key>,
         kinds: HashMap<Key, SnapshotKind>,
         stored_bytes: HashMap<Key, u64>,
+        shapes: HashMap<Key, PartShape>,
         restored_bytes: u64,
     }
 
@@ -1337,8 +1524,13 @@ pub mod testing {
         pub fn new() -> Self {
             Self::with_completion_ticks(2)
         }
-        /// A cache whose store copies complete after `completion_ticks` scheduler ticks.
+        /// A cache whose store copies complete after `completion_ticks` scheduler ticks (at
+        /// least one: zero would report every store a full tick before it was issued).
         pub fn with_completion_ticks(completion_ticks: u32) -> Self {
+            assert!(
+                completion_ticks >= 1,
+                "completion_ticks must be at least one tick"
+            );
             Self {
                 stores: Vec::new(),
                 restores: Vec::new(),
@@ -1355,6 +1547,7 @@ pub mod testing {
                 resident: Retention::new(usize::MAX),
                 kinds: HashMap::new(),
                 stored_bytes: HashMap::new(),
+                shapes: HashMap::new(),
                 restored_bytes: 0,
             }
         }
@@ -1374,6 +1567,7 @@ pub mod testing {
                     .insert(&pending.tokens, pending.key);
                 self.kinds.insert(pending.key, pending.kind);
                 self.stored_bytes.insert(pending.key, pending.bytes);
+                self.shapes.insert(pending.key, pending.shape);
                 self.stores.push(RecordedStore {
                     key: pending.key,
                     bytes: pending.bytes,
@@ -1385,6 +1579,12 @@ pub mod testing {
     impl CacheOps for RecordingCache {
         type Payload = ();
         fn store(&mut self, snapshot: &crate::cache::DeviceSnapshot, (): ()) -> StoreOutcome {
+            let shape = part_shape(
+                &snapshot.pages,
+                &snapshot.tail,
+                &snapshot.draft,
+                &snapshot.scores,
+            );
             let bytes = snapshot_bytes(
                 &snapshot.pages,
                 &snapshot.tail,
@@ -1402,6 +1602,7 @@ pub mod testing {
                 tokens: snapshot.meta.tokens.clone(),
                 kind: snapshot.meta.kind,
                 bytes,
+                shape,
                 ticks_remaining: self.completion_ticks,
             });
             self.max_pending = self.max_pending.max(self.pending.len());
@@ -1455,9 +1656,18 @@ pub mod testing {
             hit
         }
         fn restore(&mut self, key: Key, target: &RestoreTarget) -> RestoreOutcome {
-            let bytes = snapshot_bytes(&target.pages, &target.tail, &target.draft, &target.scores);
-            // Content fidelity: a restore must ask for exactly the bytes that were stored.
-            if self.stored_bytes.get(&key) == Some(&bytes) {
+            // Content fidelity: a restore must ask for exactly the parts that were stored —
+            // per page the segment lengths in order, and the tail, draft and scores lists.
+            if self.shapes.get(&key)
+                == Some(&part_shape(
+                    &target.pages,
+                    &target.tail,
+                    &target.draft,
+                    &target.scores,
+                ))
+            {
+                let bytes =
+                    snapshot_bytes(&target.pages, &target.tail, &target.draft, &target.scores);
                 self.restored_bytes += bytes;
                 self.restores.push(RecordedRestore { key, bytes });
                 RestoreOutcome::Done { ns: 0, bytes }
@@ -1666,12 +1876,145 @@ mod tests {
         };
         CacheOps::tick(&mut cache);
         CacheOps::tick(&mut cache);
-        let done = CacheOps::restore(&mut cache, 0, &restore_target(&pages));
+        let done = CacheOps::restore(&mut cache, 0, &restore_target(&tokens, &pages));
         assert!(matches!(done, RestoreOutcome::Done { .. }));
-        let unknown = restore_target(&pages);
+        // An unknown key fails.
+        let unknown = restore_target(&tokens, &pages);
         assert!(matches!(
             CacheOps::restore(&mut cache, 99, &unknown),
             RestoreOutcome::Failed
         ));
+        // A target for another snapshot's tokens fails: the tail address is snapshot-derived,
+        // so the fingerprints cannot match.
+        let other_tokens = token_prefix(1, 512);
+        let wrong_tail = restore_target(&other_tokens, &pages);
+        assert!(matches!(
+            CacheOps::restore(&mut cache, 0, &wrong_tail),
+            RestoreOutcome::Failed
+        ));
+        // A target with a different page structure fails.
+        let wrong_pages = restore_target(&tokens, &pages[..4]);
+        assert!(matches!(
+            CacheOps::restore(&mut cache, 0, &wrong_pages),
+            RestoreOutcome::Failed
+        ));
+    }
+
+    #[test]
+    fn page_addresses_are_disjoint_across_pages() {
+        // Every page's segments must be disjoint from every other page's: addresses are the
+        // true page stride apart, so no two ranges may overlap.
+        let ids: Vec<DevicePageId> = (0..4)
+            .flat_map(|compressor| {
+                (0..8).map(move |page| DevicePageId {
+                    compressor,
+                    page,
+                    generation: 0,
+                })
+            })
+            .collect();
+        let mut ranges: Vec<(u64, u64)> = ids
+            .iter()
+            .flat_map(|&id| page_segments(id))
+            .map(|range| (range.addr, range.addr + range.bytes as u64))
+            .collect();
+        ranges.sort_unstable();
+        assert!(
+            ranges.windows(2).all(|w| w[0].1 <= w[1].0),
+            "segment ranges must be pairwise disjoint: {ranges:?}"
+        );
+    }
+
+    #[test]
+    fn device_hit_shares_pages_without_fresh_allocation() {
+        // Copy-on-write: a request that hits a bank entry takes a reference per shared page —
+        // the page's refcount rises above one and no fresh allocation happens.
+        let model = EngineModel {
+            device_pool_tokens: 100_000,
+            ..EngineModel::default()
+        };
+        let mut device = Device::new(&model);
+        let mut cache = RecordingCache::new();
+        let tokens = token_prefix(0, 512);
+        let pages = device
+            .allocate(0, 5, &mut cache, &mut |_| {})
+            .expect("allocation must fit");
+        // The request retires its turn; the bank takes over the references.
+        device.request_refs -= pages.len();
+        device
+            .adopt_entry(
+                SnapshotKind::Turn,
+                &tokens,
+                pages.clone(),
+                None,
+                &mut cache,
+                &mut |_| {},
+            )
+            .expect("bank insert");
+        for &id in &pages {
+            assert_eq!(
+                device.pools[id.compressor as usize].refcount[id.page as usize],
+                1
+            );
+        }
+        // A returning request hits the bank and shares every page (the device_lookup path).
+        let shared = pages.len();
+        for &id in &pages {
+            device.add_ref(id).expect("share bank page");
+        }
+        device.request_refs += shared;
+        for &id in &pages {
+            assert_eq!(
+                device.pools[id.compressor as usize].refcount[id.page as usize], 2,
+                "page {id:?} is shared between the bank entry and the request"
+            );
+        }
+        let free: usize = device.pools.iter().map(|pool| pool.free.len()).sum();
+        assert_eq!(
+            free,
+            device.pools[0].pages() * COMPRESSORS - pages.len(),
+            "a device hit allocates no fresh pages"
+        );
+        device.check().expect("device invariants hold");
+    }
+
+    #[test]
+    fn device_check_sums_refcounts_and_flags_free_slots() {
+        let model = EngineModel {
+            device_pool_tokens: 100_000,
+            ..EngineModel::default()
+        };
+        let mut device = Device::new(&model);
+        let mut cache = RecordingCache::new();
+        let pages = device
+            .allocate(0, 4, &mut cache, &mut |_| {})
+            .expect("allocation must fit");
+        device.check().expect("fresh device is consistent");
+        device.audit().expect("fresh device audits clean");
+
+        // A reference the per-pool sums counted but the device total did not is drift the
+        // per-step check catches.
+        device.pools[0].slot_refs += 1;
+        let err = device.check().expect_err("uncounted reference must trip");
+        assert!(err.contains("slots hold"), "got {err}");
+        device.pools[0].slot_refs -= 1;
+
+        // A reference taken without going through the device is drift the from-scratch audit
+        // catches straight from the refcount array.
+        device.pools[0].refcount[pages[0].page as usize] += 1;
+        let err = device.audit().expect_err("array corruption must trip");
+        assert!(err.contains("slots hold"), "got {err}");
+        device.pools[0].refcount[pages[0].page as usize] -= 1;
+
+        // A live slot parked on the free list is caught by the audit's free-slot scan.
+        device.pools[0].free.push(pages[0].page);
+        let err = device
+            .audit()
+            .expect_err("live slot on the free list must trip");
+        assert!(err.contains("free slot"), "got {err}");
+        device.pools[0].free.pop();
+
+        device.check().expect("restored device is consistent");
+        device.audit().expect("restored device audits clean");
     }
 }
