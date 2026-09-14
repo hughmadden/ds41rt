@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/ds41rt-persist",
   "crates/ds41rt-api",
   "crates/ds41rt-core",
   "crates/ds41rt-daemon",
