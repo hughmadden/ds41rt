@@ -2,6 +2,10 @@
 //! Budgets are residual bytes after all non-global allocations and headroom.
 //! No GPU allocation, device selection, or serving-loop policy occurs here.
 
+// Dual-RTX owners preallocate execution storage before sizing the pool.
+// Keep room for request-time graphs and transient admission allocations.
+pub(crate) const RUNTIME_HEADROOM: usize = 800 * 1024 * 1024;
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SourcePoolPlan {
     pub groups: usize,
@@ -66,11 +70,11 @@ pub(crate) struct PoolPlan {
 }
 impl PoolPlan {
     pub fn new(placement: crate::v41_backbone_cache::CachePlacement,
-        slots: usize, context: usize, retained_turns: usize, snapshot_bytes: usize,
+        slots: usize, context: usize, retained_turns: usize, _snapshot_bytes: usize,
         exact: Option<super::ByteSize>, reservation: Option<super::Reservation>,
         memory: [(usize, usize); 2]) -> anyhow::Result<Self> {
         use anyhow::{ensure, Context};
-        use super::{BackboneCache, GROUP_BYTES, MAX_GROUPS, RETAINED_CONTEXTS, RUNTIME_HEADROOM};
+        use super::{BackboneCache, GROUP_BYTES, MAX_GROUPS};
         ensure!((1..=16).contains(&slots), "invalid concurrency limit");
         ensure!((1..=1_048_576).contains(&context), "invalid pool context limit");
         ensure!(retained_turns <= 128, "invalid retained-turn limit");
@@ -102,8 +106,10 @@ impl PoolPlan {
         } else if reservation.is_some() {
             low
         } else {
-            (context.div_ceil(512) * (slots + RETAINED_CONTEXTS) + slots + 2 * retained_turns)
-                .saturating_sub(snapshot_bytes.div_ceil(GROUP_BYTES)).max(minimum)
+            // Snapshot arenas are already charged to fixed occupancy. Retain
+            // complete context capacity for each admitted request, independently
+            // of those arenas, plus partial-tail/copy-on-write page allowance.
+            (context.div_ceil(512) * slots + slots + 2 * retained_turns).max(minimum)
         };
         ensure!(desired_groups >= minimum && desired_groups <= MAX_GROUPS,
             "distributed KV pool is outside admission or physical page limits");
@@ -125,9 +131,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn measured_dual_budget_covers_sixteen_full_contexts_and_tails() -> anyhow::Result<()> {
+        let totals = [101_973_491_712usize, 101_970_345_984];
+        let occupied = [92_070_477_824usize, 94_956_158_976];
+        let memory = std::array::from_fn(|gpu| (totals[gpu] - occupied[gpu], totals[gpu]));
+        let plan = PoolPlan::new(crate::v41_backbone_cache::CachePlacement::encoder_decoder(),
+            16, 1_048_576, 24, 146_150_400, None, None, memory)?;
+        assert_eq!(plan.pages, [32_832, 32_832, 32_832, 65_664]);
+        assert_eq!(plan.global_bytes, 14_960_885_760);
+        for gpu in 0..2 {
+            assert!(occupied[gpu] + plan.cache_bytes[gpu] + RUNTIME_HEADROOM <= totals[gpu]);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn complete_cache_respects_each_card_and_counts_non_global_storage() -> anyhow::Result<()> {
         use crate::v41_backbone_cache::{BackboneCache, CachePlacement};
-        use super::super::{ByteSize, Reservation, GROUP_BYTES, RUNTIME_HEADROOM};
+        use super::super::{ByteSize, Reservation, GROUP_BYTES};
         let map = CachePlacement::encoder_decoder();
         let bytes = BackboneCache::distributed_device_bytes(map, 16, [100, 100, 100, 200])?;
         assert!(bytes.iter().sum::<usize>() > 100 * GROUP_BYTES);
@@ -152,7 +173,7 @@ mod tests {
     #[test]
     fn complete_cache_handles_second_card_limit_and_invalid_budgets() -> anyhow::Result<()> {
         use crate::v41_backbone_cache::{BackboneCache, CachePlacement};
-        use super::super::{Reservation, RUNTIME_HEADROOM};
+        use super::super::Reservation;
         let map = CachePlacement::encoder_decoder();
         let bytes = BackboneCache::distributed_device_bytes(map, 2, [64, 64, 64, 128])?;
         let memory = [(20 << 30, 96 << 30), (bytes[1] + RUNTIME_HEADROOM, 96 << 30)];

@@ -69,7 +69,8 @@ pub(super) fn run(config: NativeExpertServiceConfig, listen: &str) -> Result<()>
     tracing::info!(
         rank = config.rank,
         capacity = config.capacity,
-        layers = 40,
+        first_layer = config.first_layer,
+        layers = weights.len(),
         "native local RoCE expert worker ready"
     );
     loop {
@@ -87,7 +88,10 @@ pub(super) fn run(config: NativeExpertServiceConfig, listen: &str) -> Result<()>
             let mut execution_failed = false;
             let result = connections[index].poll(|view, mapped, emit| {
                 let request = V41BackboneRequest::parse(view.frame_bytes(), config.capacity)?;
-                execution.bind_layer(&weights[request.layer() as usize])?;
+                let weight = (request.layer() as usize).checked_sub(config.first_layer)
+                    .and_then(|index| weights.get(index))
+                    .context("requested expert layer is not resident on this Spark")?;
+                execution.bind_layer(weight)?;
                 if let Some(slot) = mapped.response_slot {
                     let response = unsafe { execution.execute_mapped_request(&request,
                         config.rank as u64 + 1, &mut exchange, slot) };

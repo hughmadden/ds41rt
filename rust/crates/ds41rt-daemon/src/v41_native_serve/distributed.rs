@@ -237,6 +237,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
     tracing::info!(source_pages=?pool.pages, global_bytes=pool.global_bytes, cache_bytes=?pool.cache_bytes,
         occupied_before=?pool.occupied_before, reservation_bytes=?pool.reservation_bytes,
         unused_bytes=?pool.unused_bytes, desired_groups=pool.desired_groups, snapshot_slots, snapshot_bytes,
+        runtime_headroom_bytes=memory::distributed::RUNTIME_HEADROOM,
         encoder_layers=20, "dual RTX cache reservation after fixed allocations");
     let token_map = ds41rt_loader::EngramTokenMap::from_file(&args.snapshot.join("tokenizer.json"))?;
     let rows = capacity as usize;

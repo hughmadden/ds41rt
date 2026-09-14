@@ -143,6 +143,9 @@ pub(crate) struct ExpertDaemonArgs {
 
 #[derive(Debug, Args)]
 pub(crate) struct NativeExpertDaemonArgs {
+    /// First resident backbone layer; use 20 when both RTX GPUs host the encoder.
+    #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..40))]
+    pub(crate) first_layer: u32,
     /// Official local snapshot directory, including all shard headers.
     #[arg(long)]
     pub(crate) snapshot: PathBuf,

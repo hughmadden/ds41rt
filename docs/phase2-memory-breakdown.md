@@ -28,14 +28,14 @@ The tiny head-normalization allocation did not change rounded occupancy separate
 | TP2 expert/shared and transport workspaces, both lanes | 1.521 | 1.756 |
 | dSpark runtime/workspaces including split vocabulary | 0.154 | 1.041 |
 | Prompt/turn snapshot arenas | 0.127 | 0.012 |
-| FP4 compressed KV + index + FP8 SWA and cache state | 6.797 | 4.535 |
+| FP4 compressed KV + index + FP8 SWA and cache state | 8.398 | 5.598 |
 | CUDA contexts and peer access | 0.546 | 0.556 |
-| **Total occupied at readiness** | **92.544** | **92.970** |
-| Unallocated, including approximately 2 GiB runtime headroom | 2.426 | 1.997 |
+| **Total occupied at readiness** | **94.146** | **94.032** |
+| Unallocated, including 800 MiB runtime headroom | 0.824 | 0.935 |
 | **CUDA-visible total** | **94.970** | **94.967** |
 
-The global compressed/index pool is **12,111,974,400 bytes (12.11 GB / 11.280 GiB)**,
-representing **13,608,960 source-token positions including COW/tail allowance**.
+The global compressed/index pool is **14,960,885,760 bytes (14.96 GB / 13.933 GiB)**,
+representing **16,809,984 source-token positions including COW/tail allowance**.
 Source ownership remains 2/8/14 on RTX0 and 20 on RTX1; SWA follows attention
 layers 0–19 and 20–39 respectively. CUDA-visible capacity excludes device-reserved
 memory, so it differs from the nominal capacity shown by `nvidia-smi`.
@@ -62,9 +62,8 @@ The first lane retains full capacity for decoder replay and cached continuation.
 
 Compared with full-size second-lane index/tap buffers, fixed RTX1 occupancy fell
 by approximately 0.885 GiB and the pool grew from 9.74 GB / 10.94M positions to
-12.11 GB / 13.61M positions. RTX1 still limits the pool; RTX0 has approximately
-0.43 GiB surplus beyond the reserved runtime headroom. Moving vision from RTX0
-to RTX1 would worsen this measured balance. Embeddings remain on RTX0 beside
+12.11 GB / 13.61M positions. That intermediate configuration was limited by RTX1, with approximately
+0.43 GiB surplus on RTX0 beyond its then-2-GiB runtime reserve. Embeddings remain on RTX0 beside
 layer 0. A dSpark TP2 split needs a separate performance assessment and would move
 much more memory than the current imbalance warrants.
 
@@ -79,3 +78,13 @@ Source measurements are retained in
 `~/.cache/ds41rt-experiments/phase2-planner/lane-capacity-server.log` and
 `lane-capacity-api.json` in the same directory. The preceding full-size measurement
 is in `memory-audit-server.log` and `memory-audit-api.json`.
+
+The approved default now targets sixteen full 1,048,576-token contexts plus 64
+page groups for partial tails/COW, while preserving 24 prompt and 24 turn snapshot
+slots. Dual-RTX runtime headroom is 800 MiB per GPU; single-RTX headroom is unchanged.
+The table reflects the larger pool allocated by the optimized serving binary,
+with measurements in `dual-release-server.log`. Warmed C16 counting and same-code
+requests have completed; a chart-description vision request, 32K needle, retained continuation and cancellation
+checks also passed. Broader peak-allocation checks remain pending.
+This is pool capacity, not a claim that sixteen simultaneous 1M-token requests
+have yet been exercised. Retained snapshots share the global pool.
