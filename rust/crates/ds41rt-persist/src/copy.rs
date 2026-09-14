@@ -18,7 +18,11 @@ pub struct DeviceBuf {
 impl DeviceBuf {
     pub fn slice(self, offset: usize, bytes: usize) -> DeviceBuf {
         debug_assert!(offset + bytes <= self.bytes);
-        DeviceBuf { id: self.id, offset: self.offset + offset, bytes }
+        DeviceBuf {
+            id: self.id,
+            offset: self.offset + offset,
+            bytes,
+        }
     }
 }
 
@@ -58,8 +62,17 @@ pub struct CopyModel {
 }
 impl CopyModel {
     /// RTX 5090 on PCIe 5.0 x16, conservative measured-class figures.
-    pub const RTX5090: CopyModel =
-        CopyModel { h2d_bps: 25_000_000_000, d2h_bps: 25_000_000_000, d2d_bps: 1_000_000_000_000, launch_ns: 5_000 };
+    pub const RTX5090: CopyModel = CopyModel {
+        h2d_bps: 25_000_000_000,
+        d2h_bps: 25_000_000_000,
+        d2d_bps: 1_000_000_000_000,
+        launch_ns: 5_000,
+    };
     /// Instant copies for functional tests.
-    pub const INSTANT: CopyModel = CopyModel { h2d_bps: u64::MAX, d2h_bps: u64::MAX, d2d_bps: u64::MAX, launch_ns: 0 };
+    pub const INSTANT: CopyModel = CopyModel {
+        h2d_bps: u64::MAX,
+        d2h_bps: u64::MAX,
+        d2d_bps: u64::MAX,
+        launch_ns: 0,
+    };
 }
