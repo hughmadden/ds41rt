@@ -2,6 +2,40 @@ use super::*;
 
 #[test]
 #[ignore = "requires DS41RT_NATIVE_LIB and two CUDA GPUs"]
+fn k7_sparse_reservation_preserves_k5_accounting_and_stable_query_storage() -> Result<()> {
+    let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
+    for gpu in 0..2 {
+        crate::v41_memory::device::Device { library: &lib, id: gpu }.run(|| {
+            let budget = SparseAttentionWave::device_bytes(80)?;
+            let mut wave = SparseAttentionWave::new(&lib, 80, budget)?;
+            let used = |wave: &SparseAttentionWave<'_>| wave.query.buffer.bytes + wave.output.buffer.bytes
+                + wave.metadata.buffer.bytes + wave.replay_begins.buffer.bytes
+                + wave.descriptors.buffer.bytes + wave.split_scratch.buffer.bytes;
+            assert_eq!(used(&wave), budget);
+            let query = wave.query.buffer.ptr;
+            let output = wave.output.buffer.ptr;
+            let original_scratch = wave.split_scratch.buffer.ptr;
+            wave.reserve_decode_rows(48)?;
+            assert_eq!(wave.split_scratch.buffer.ptr, original_scratch);
+            assert_eq!(used(&wave), budget);
+            wave.reserve_decode_rows(64)?;
+            assert_eq!(used(&wave) - budget, 16 * (10 * 64 * 514 * 4 + 120));
+            assert_eq!(wave.query.buffer.ptr, query);
+            assert_eq!(wave.output.buffer.ptr, output);
+            let scratch = wave.split_scratch.buffer.ptr;
+            wave.reserve_decode_rows(64)?;
+            assert_eq!(wave.split_scratch.buffer.ptr, scratch);
+            assert!(wave.reserve_decode_rows(65).is_err());
+            wave.enable_small_graph_shapes();
+            assert_eq!(wave.graph_limit, 64);
+            Ok(())
+        })?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires DS41RT_NATIVE_LIB and two CUDA GPUs"]
 fn committed_prefix_survives_append_but_private_boundary_stays_exact() -> Result<()> {
     let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
     for gpu in 0..2 {

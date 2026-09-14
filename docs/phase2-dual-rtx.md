@@ -22,6 +22,12 @@ Status: forced dual-GPU worker serves long prompts at the release prefill step; 
   prefill and verification.
 - Preserve FP4 compressed KV, FP8 SWA, exact reuse, retained snapshots,
   constraints, tool calling, cancellation, and rapid startup.
+- Release concurrency tables must include counting, code, and topic at
+  C1/C2/C4/C8/C16 for both one-RTX and two-RTX configurations, with three runs
+  per cell. Retain the mixed-traffic comparison alongside these tables.
+  Replicate all performance-report tables in the README with short descriptions;
+  state the 400 W RTX limit and standard memory speed before the results, and
+  accompany headline cache bytes with the corresponding token capacity.
 
 ## Initial evidence and placement constraint
 

@@ -3,6 +3,7 @@ use crate::v41_dspark_cache::{DsparkWindow, WindowLease};
 use crate::v41_experts::dspark::{DsparkChain, DsparkMainContext, DsparkWeights};
 use crate::v41_requests::RequestBatch;
 mod chain;
+mod cost;
 pub(crate) use chain::DraftChain;
 mod distributed;
 
@@ -23,6 +24,7 @@ pub(crate) struct DraftRuntime<'w, 'a, C = DsparkChain<'w, 'a>> {
     adaptive: Option<ds41rt_core::DsparkRouteHistory>,
     confidence_cutoff: Option<f64>,
     reuse_floor: Option<f64>,
+    cost_model: Option<cost::Model>,
 }
 struct DraftRequest {
     leases: [WindowLease; 3],
@@ -77,6 +79,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             adaptive: None,
             confidence_cutoff: None,
             reuse_floor: None,
+            cost_model: None,
         })
     }
 }
@@ -113,6 +116,10 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
     }
     pub fn set_adaptive(&mut self, enabled: bool) {
         self.adaptive = enabled.then(ds41rt_core::DsparkRouteHistory::default);
+    }
+    pub fn configure_cost_model(&mut self, transport: &NativeTp4Wave<'_>) -> Result<()> {
+        self.cost_model = cost::Model::from_environment(transport)?;
+        Ok(())
     }
     pub fn set_confidence_cutoff(&mut self, threshold: Option<f64>) {
         self.confidence_cutoff = threshold;
@@ -178,6 +185,18 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
         }
         Ok(())
     }
+    pub fn trace_cost_forecast(&self, batch: u64, requests: &[(u64, usize, usize)]) {
+        if !tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG) { return; }
+        let Some(forecast) = self.adaptive.as_ref().and_then(|h| h.forecast(requests)) else { return; };
+        let lengths: Vec<_> = requests.iter().map(|r| r.2).collect();
+        let rows = requests.len() + lengths.iter().sum::<usize>();
+        let unique = forecast.unique_experts_by_layer(&lengths);
+        let predicted_verify_us = if let Some(model) = &self.cost_model {
+            model.verify_us(rows, requests.len(), &unique)
+        } else { 19864. + 803.*rows as f64 + 636.*unique.iter().sum::<usize>() as f64/40. };
+        tracing::debug!(target: "ds41rt::cost_model", batch, rows, requests=requests.len(),
+            predicted_verify_us, forecast_unique=?unique, "verification cost forecast");
+    }
     pub fn select_prefixes(&self, requests: &[(u64, usize, usize)], draft_us: u64)
         -> Result<Option<Vec<usize>>> {
         let started = std::time::Instant::now();
@@ -194,9 +213,15 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
         ensure!(forecast.lane_count() == 1, "adaptive selection must be lane-local");
         // Preliminary corrected-path fit in microseconds, evaluated only for
         // this lane. Missing history retains full fixed-length prefixes.
-        let cost = |lengths: &[usize]| draft_us as f64 + 1000. + 19864.
-            + 803. * (requests.len() + lengths.iter().sum::<usize>()) as f64
-            + 636. * forecast.mean_unique_experts(lengths);
+        let cost = |lengths: &[usize]| {
+            let rows = requests.len() + lengths.iter().sum::<usize>();
+            let verify_us = if let Some(model) = &self.cost_model {
+                model.verify_us(rows, requests.len(), &forecast.unique_experts_by_layer(lengths))
+            } else {
+                19864. + 803. * rows as f64 + 636. * forecast.mean_unique_experts(lengths)
+            };
+            draft_us as f64 + 1000. + verify_us
+        };
         let full: Vec<_> = requests.iter().map(|r| r.2).collect();
         let expected_full: f64 = probabilities.iter().map(|p| {
             let mut product = 1.;

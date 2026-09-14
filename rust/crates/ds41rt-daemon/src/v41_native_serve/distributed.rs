@@ -186,13 +186,15 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         )
     };
     let mut pass = make_pass(capacity).context("constructing first distributed target lane")?;
+    if args.dspark && args.dspark_draft_limit > 5 { pass.reserve_sparse_decode_rows(64)?; }
     memory_checkpoint("first target lane")?;
     // Both lanes also produce source 20 from every encoder row on GPU1, so
     // backbone/query and producer buffers retain full prefill capacity there.
     // Only the first pass handles decoder replay and full cached continuation;
-    // lane 1's GPU1 index selection and taps serve at most 48 verify rows.
+    // lane 1's GPU1 index selection and taps serve at most 64 verify rows.
     // TP2 expert workspaces remain full capacity on both GPUs and lanes.
     let mut second = make_pass(80).context("constructing second distributed target lane")?;
+    if args.dspark && args.dspark_draft_limit > 5 { second.reserve_sparse_decode_rows(64)?; }
     memory_checkpoint("second target lane")?;
     let make_transport = || {
         let mut transport = devices[1].own(|| NativeTp4Wave::new(&lib,
@@ -217,6 +219,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
         draft.set_adaptive(args.adaptive_dspark());
         draft.set_confidence_cutoff(args.dspark_confidence_cutoff);
         draft.set_reuse_floor(args.dspark_reuse_floor)?;
+        draft.configure_cost_model(&transport)?;
     }
     memory_checkpoint("draft runtime")?;
     // Vision and target snapshot copies use GPU0. These allocations precede KV sizing.

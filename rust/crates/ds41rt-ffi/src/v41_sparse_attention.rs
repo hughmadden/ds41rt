@@ -224,7 +224,7 @@ impl V41SparseAttention<'_> {
         self.batch_validate.is_some() && self.batch_launch.is_some()
     }
     pub fn batch_descriptor_bytes(rows: usize) -> Result<usize> {
-        ensure!((1..=48).contains(&rows), "invalid sparse batch rows");
+        ensure!((1..=64).contains(&rows), "invalid sparse batch rows");
         Ok(rows * 120)
     }
     /// Validate the complete batch before descriptor upload and EVERY graph replay.

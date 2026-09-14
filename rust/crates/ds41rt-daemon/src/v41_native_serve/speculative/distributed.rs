@@ -32,6 +32,7 @@ impl<'w, 'a> DraftRuntime<'w, 'a, DistributedDsparkChain<'w, 'a>> {
                 request_limit: requests as usize, draft_limit: 5, draft_width: weights.draft_width(),
                 confidence_trace: Default::default(), adaptive: None,
                 confidence_cutoff: None, reuse_floor: None,
+                cost_model: None,
             })
         })
     }

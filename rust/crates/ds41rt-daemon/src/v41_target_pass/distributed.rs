@@ -175,6 +175,13 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
         Ok(())
     }
     pub fn captured_routes(&self) -> &[Vec<[u32; 6]>] { &self.route_capture }
+    pub fn reserve_sparse_decode_rows(&mut self, rows: usize) -> Result<()> {
+        for lane in &mut self.lanes {
+            let device = lane.device;
+            device.run(|| lane.get_mut().reserve_sparse_decode_rows(rows))?;
+        }
+        Ok(())
+    }
     async unsafe fn advance(&mut self, layer: usize) -> Result<()> {
         ensure!((1..40).contains(&layer), "invalid distributed next layer");
         let source = self.map.attention(layer - 1)?;

@@ -27,10 +27,14 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--serving-native', action='store_true', help='Exercise public batch validation and launch ABI')
     parser.add_argument('--skip-timing', action='store_true', help='Numerical and replay checks only, for sanitizer runs')
+    parser.add_argument('--max-rows', type=int, choices=[48, 64], default=48,
+                        help='Include K7 layouts through 64 rows with the serving ABI')
+    parser.add_argument('--device', type=int, choices=[0, 1], default=0)
     args = parser.parse_args()
     assert not args.output.exists()
     assert C.sizeof(View) == 120
-    torch.cuda.set_device(0)
+    assert args.max_rows == 48 or args.serving_native, '64 rows requires the serving ABI'
+    torch.cuda.set_device(args.device)
     torch.manual_seed(7183)
     baseline, candidate = (C.CDLL(p) for p in (args.baseline, args.candidate))
     assert baseline.ds41rt_v41_sparse_attention_initialize() == 0
@@ -49,7 +53,7 @@ def main():
         # Distinct allocations for each request, including private compressor rows.
         fixtures = []
         for request in range(8):
-            capacities = (128, 6, 768, 3)
+            capacities = (128, 8, 768, 3)
             values = [torch.randn(n, 512, device='cuda').to(torch.float8_e4m3fn).view(torch.uint8)
                       for n in capacities]
             scales = [torch.full((n, 16), 125, device='cuda', dtype=torch.uint8) for n in capacities]
@@ -62,9 +66,12 @@ def main():
             pages = torch.tensor([2, 0], device='cuda', dtype=torch.int32)
             view = View((C.c_void_p*4)(*[v.data_ptr() for v in values]),
                 (C.c_void_p*4)(*[s.data_ptr() for s in scales]), end.data_ptr(), pages.data_ptr(),
-                source_end.data_ptr(), 6, 768, 3, 2, compressed)
+                source_end.data_ptr(), 8, 768, 3, 2, compressed)
             fixtures.append((view, end, values, scales, source_end, pages))
-        for base_layout in ([1], [6], [1, 2, 3, 4, 5, 6, 1, 2], [6]*8):
+        layouts = [[1], [6], [1, 2, 3, 4, 5, 6, 1, 2], [6]*8]
+        if args.max_rows == 64:
+            layouts += [[8], [7]*8, [8, 7, 8, 7, 8, 7, 8, 7], [8]*8]
+        for base_layout in layouts:
             layout = list(base_layout)
             rows = sum(layout)
             query = (torch.randn(rows, 64, 512, device='cuda')*.2).bfloat16()
@@ -123,7 +130,7 @@ def main():
                             ('bounds-output-alias', 8, output.data_ptr()),
                             ('scratch-output-alias', 9, output.data_ptr()),
                             ('scratch-undersized', 10, 4), ('wrong-parts', 11, 1),
-                            ('too-many-rows', 5, 49), ('wrong-format', 12, 1 if compressed != 1 else 2)]:
+                            ('too-many-rows', 5, 65), ('wrong-format', 12, 1 if compressed != 1 else 2)]:
                             bad = list(validation_args)
                             bad[index] = value
                             assert validator(*bad) != 0, name
@@ -181,7 +188,8 @@ def main():
                 scratch_bytes=scratch.numel()*4, baseline_us=statistics.median(samples[0]),
                 candidate_us=statistics.median(samples[1]), samples_us=samples))
             print(timings[-1] | {'samples_us': 'omitted'}, flush=True)
-    args.output.write_text(json.dumps(dict(scope=__doc__, cases=results, timings=timings, validation_rejections=rejections, capacity_checks=capacity_checks), indent=2)+'\n')
+    args.output.write_text(json.dumps(dict(scope=__doc__, device=args.device, max_rows=args.max_rows,
+        cases=results, timings=timings, validation_rejections=rejections, capacity_checks=capacity_checks), indent=2)+'\n')
     print(f'PASS {len(results)} byte-exact cases with changed descriptor graph replay', flush=True)
 
 if __name__ == '__main__':

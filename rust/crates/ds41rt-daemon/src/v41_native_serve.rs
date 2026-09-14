@@ -243,6 +243,10 @@ fn worker(
         crate::v41_target_pass::TargetTapWave::new(&lib, rows, crate::v41_target_pass::TargetTapWave::device_bytes(rows)?)?,
         Duration::from_secs(120),
     )?;
+    if args.dspark && args.dspark_draft_limit > 5 {
+        pass.reserve_sparse_decode_rows(64)?;
+        prefill_pass.reserve_sparse_decode_rows(64)?;
+    }
     let prefill_roce = V41Tp4Roce::new(args.peers.clone().try_into()
         .map_err(|_| anyhow::anyhow!("four Spark peers required"))?, [1, 2, 3, 4], capacity,
         TcpTransportConfig { timeout: Duration::from_secs(120), max_frame_bytes: 64 * 1024 * 1024 })?;
@@ -319,6 +323,7 @@ fn worker(
         tracing::info!(layers=plan.layers, elapsed_ms=local_started.elapsed().as_millis(),
             "local RTX experts ready");
     }
+    if let Some(draft) = &mut draft { draft.configure_cost_model(&transport)?; }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;

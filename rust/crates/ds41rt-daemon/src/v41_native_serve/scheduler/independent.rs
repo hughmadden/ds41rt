@@ -119,6 +119,13 @@ async fn lane<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lane: usize, lib
                 pass.set_route_capture(capture_routes)?;
                 let current = batch.as_mut().unwrap();
                 let batch_id = current.cache()?.identity();
+                if tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG) {
+                    if let Some(draft) = draft.borrow().as_deref() {
+                        let candidates: Vec<_> = members.iter().zip(&inputs).map(|(&slot, input)|
+                            (active.borrow()[slot].as_ref().unwrap().id, lane, input.len()-1)).collect();
+                        draft.trace_cost_forecast(batch_id, &candidates);
+                    }
+                }
                 let selected: Vec<_> = (0..current.cache()?.positions().len()).collect();
                 let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
                     && members.iter().all(|&slot| active.borrow()[slot].as_ref().unwrap().constraint.is_none());

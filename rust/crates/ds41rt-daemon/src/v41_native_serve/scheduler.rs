@@ -362,6 +362,13 @@ fn single_lane_round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::R
     let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
         && members.iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none());
     let batch_id = batch.as_ref().unwrap().cache()?.identity();
+    if tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG) {
+        if let Some(draft) = draft.as_deref() {
+            let candidates: Vec<_> = members.iter().zip(&inputs).map(|(&slot, input)|
+                (active[slot].as_ref().unwrap().id, lane, input.len()-1)).collect();
+            draft.trace_cost_forecast(batch_id, &candidates);
+        }
+    }
     let next = runtime.block_on(execute_logits(lib, pass, requests, &mut batch, transport, capture_routes, compact));
     let executed_us = started.elapsed().as_micros() as u64;
     let result = (|| -> Result<()> {

@@ -65,11 +65,12 @@ pub(crate) struct SparseAttentionWave<'a> {
     staging: HostAllocation<'a>,
     replay_staging: HostAllocation<'a>,
     capacity: usize,
+    batch_rows: usize,
     // Batched keys retain row count and stable wave/selection/sink storage;
     // current descriptors are validated and uploaded before EVERY replay.
     // For other paths, complete external-pointer and launch-geometry fingerprints are checked
     // against live proposals before every replay. Inactive graphs never launch.
-    // Adaptive mode keeps at most 48 variants per layer, including prefill;
+    // Adaptive mode keeps at most batch_rows variants per layer, including prefill;
     // request layouts can have many more combinations than total row counts.
     graphs: [VecDeque<(*mut c_void, Vec<usize>)>; 40],
     graph_limit: usize,
@@ -134,13 +135,38 @@ impl<'a> SparseAttentionWave<'a> {
             staging: HostAllocation::new(library, capacity * 80)?,
             replay_staging: HostAllocation::new(library, capacity * 8)?,
             capacity,
+            batch_rows: capacity.min(48),
             graphs: std::array::from_fn(|_| VecDeque::new()),
             graph_limit: 1,
             warmed_kernels: 0,
             cold: None,
         })
     }
-    pub fn enable_small_graph_shapes(&mut self) { self.graph_limit = 48; }
+    /// Reserve wider decode batching before any execution and before KV sizing.
+    /// K5 retains its original allocation; K7 pays only for the extra 16 rows.
+    pub fn reserve_decode_rows(&mut self, rows: usize) -> Result<()> {
+        ensure!(rows > 0 && rows <= self.capacity && rows <= 64,
+            "invalid sparse decode reservation");
+        ensure!(self.cold.is_none() && self.graphs.iter().all(VecDeque::is_empty),
+            "sparse decode reservation requires an unused wave");
+        if rows <= self.batch_rows { return Ok(()); }
+        let library = self.stream.library;
+        let scratch = DeviceAllocation::new(library, V41SparseAttention::split_scratch_bytes(rows, 10)?)?;
+        let bytes = V41SparseAttention::batch_descriptor_bytes(rows)?;
+        let descriptors = DeviceAllocation::new(library, bytes)?;
+        let staging = HostAllocation::new(library, bytes)?;
+        let additional_device_bytes = scratch.buffer.bytes + descriptors.buffer.bytes
+            - self.split_scratch.buffer.bytes - self.descriptors.buffer.bytes;
+        self.split_scratch = scratch;
+        self.descriptors = descriptors;
+        self.descriptor_staging = staging;
+        self.batch_rows = rows;
+        if self.graph_limit > 1 { self.graph_limit = rows; }
+        tracing::info!(device=self.query.buffer.device_id, rows, additional_device_bytes,
+            "sparse decode batch reservation before KV sizing");
+        Ok(())
+    }
+    pub fn enable_small_graph_shapes(&mut self) { self.graph_limit = self.batch_rows; }
     pub fn input(&self) -> Ds41rtDeviceBuffer {
         self.query.buffer
     }
@@ -540,7 +566,7 @@ impl<'a> SparseAttentionWave<'a> {
         };
         // Only small multi-request split launches use descriptor batching. C1
         // and large prefill retain their existing arithmetic and dispatch.
-        let batch = if self.kernel.supports_batch() && launches.len() > 1 && rows <= 48
+        let batch = if self.kernel.supports_batch() && launches.len() > 1 && rows <= self.batch_rows
             && launches.iter().all(|launch| launch.rows <= 16) {
             let bindings: Vec<_> = launches.iter()
                 .map(|launch| (&launch.window, launch.source.as_ref(), launch.rows)).collect();
@@ -597,7 +623,7 @@ impl<'a> SparseAttentionWave<'a> {
         } else {
             tracing::debug!(target: "ds41rt::timing", layer, rows, batched = batch.is_some(), "sparse graph capture");
             if !defer_warmup { self.synchronize()?; }
-            let limit = if batch.is_some() { 48 } else { self.graph_limit };
+            let limit = if batch.is_some() { self.batch_rows } else { self.graph_limit };
             if self.graphs[layer].len() >= limit {
                 let (old, _) = self.graphs[layer].pop_front().unwrap();
                 unsafe { self.stream.library.cuda_graph_exec_destroy(old)?; }
