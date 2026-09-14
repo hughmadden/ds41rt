@@ -4,11 +4,15 @@ use crate::v41_memory::device::{Device, DeviceOwner};
 use crate::v41_target_head::distributed::DistributedVocabularyWave;
 use crate::v41_tensors::VocabularyShard;
 
+#[derive(Clone, Copy)]
+enum Phase { Normalize, Project, Assemble, Sample }
+
 pub(crate) struct DistributedDsparkTerminal<'w, 'a> {
     terminal: DeviceOwner<'a, DsparkTerminal<'w, 'a>>,
     head: DistributedVocabularyWave<'w, 'a>,
     graphs: [[Option<*mut c_void>; 16]; 2],
     ready: Option<usize>,
+    pending: Option<(usize, Phase)>,
 }
 impl<'w, 'a> DistributedDsparkTerminal<'w, 'a> {
     pub fn device_bytes(capacity: usize, split: usize) -> Result<[usize; 2]> {
@@ -28,35 +32,36 @@ impl<'w, 'a> DistributedDsparkTerminal<'w, 'a> {
         Ok(Self {
             terminal: devices[1].own(|| weights.terminal_storage(None, capacity, required[1] - head_bytes[1]))?,
             head: DistributedVocabularyWave::new(devices, shards, capacity * 5, head_bytes)?,
-            graphs: [[None; 16]; 2], ready: None,
+            graphs: [[None; 16]; 2], ready: None, pending: None,
         })
     }
     /// GPU1 residual/pre-mix and anchor storage, with the ordinary terminal layout.
     pub fn inputs(&self) -> [Ds41rtDeviceBuffer; 3] { self.terminal.inputs() }
     pub fn validate_sampling(&self, requests: usize) -> Result<()> { self.terminal.validate_sampling(requests) }
     pub fn stage_sampling(&mut self, rngs: &mut [&mut DsparkRng], temperatures: &[f32]) -> Result<()> {
+        ensure!(self.pending.is_none(), "distributed terminal still pending");
         self.ready = None;
         self.terminal.stage_sampling(rngs, temperatures)
     }
-    async unsafe fn stage(&mut self, requests: usize, sampling: bool) -> Result<()> {
+    unsafe fn enqueue_stage(&self, requests: usize, sampling: bool) -> Result<()> {
+        let device = self.terminal.device;
+        let terminal = self.terminal.get();
+        device.run(|| unsafe {
+            if let Some(graph) = self.graphs[usize::from(sampling)][requests - 1] {
+                device.library.cuda_graph_launch(graph, terminal.stream.raw)
+            } else if sampling { terminal.enqueue_sampling_on(requests, terminal.stream.raw) }
+            else { terminal.enqueue_normalize_on(requests, terminal.stream.raw) }
+        })
+    }
+    unsafe fn capture_stage(&mut self, requests: usize, sampling: bool) -> Result<()> {
         let device = self.terminal.device;
         let terminal = self.terminal.get();
         let mode = usize::from(sampling);
-        let enqueue = || unsafe {
-            if sampling { terminal.enqueue_sampling_on(requests, terminal.stream.raw) }
-            else { terminal.enqueue_normalize_on(requests, terminal.stream.raw) }
-        };
-        let queued = device.run(|| unsafe {
-            if let Some(graph) = self.graphs[mode][requests - 1] {
-                device.library.cuda_graph_launch(graph, terminal.stream.raw)
-            } else { enqueue() }
-        });
-        let drained = device.future(terminal.stream.wait()).await;
-        queued.and(drained)?;
         if self.graphs[mode][requests - 1].is_none() {
             let graph = device.run(|| unsafe {
                 device.library.cuda_graph_begin_capture(terminal.stream.raw)?;
-                let queued = enqueue();
+                let queued = if sampling { terminal.enqueue_sampling_on(requests, terminal.stream.raw) }
+                    else { terminal.enqueue_normalize_on(requests, terminal.stream.raw) };
                 let captured = device.library.cuda_graph_end_capture(terminal.stream.raw);
                 match (queued, captured) {
                     (Ok(()), Ok(graph)) => Ok(graph),
@@ -73,25 +78,78 @@ impl<'w, 'a> DistributedDsparkTerminal<'w, 'a> {
     /// below 129280. GPU1 producers have completed. Inputs and borrowed weights
     /// stay immutable until return/cancellation. No external consumer races outputs.
     pub async unsafe fn execute(&mut self, requests: usize) -> Result<[Ds41rtDeviceBuffer; 3]> {
+        unsafe { self.begin(requests)?; }
+        struct Cancel<'s, 'w, 'a> { terminal: &'s mut DistributedDsparkTerminal<'w, 'a>, armed: bool }
+        impl Drop for Cancel<'_, '_, '_> {
+            fn drop(&mut self) { if self.armed { self.terminal.cancel(); } }
+        }
+        let mut pending = Cancel { terminal: self, armed: true };
+        while !pending.terminal.poll()? { tokio::task::yield_now().await; }
+        pending.armed = false;
+        pending.terminal.output()
+    }
+    /// # Safety
+    /// Same inputs as `execute`, retained without conflicting access until
+    /// successful polling or cancellation. No scheduler borrow survives this call.
+    pub unsafe fn begin(&mut self, requests: usize) -> Result<()> {
+        ensure!(self.pending.is_none(), "distributed terminal still pending");
         self.ready = None;
         self.terminal.validate_sampling(requests)?;
+        self.pending = Some((requests, Phase::Normalize));
         let device = self.terminal.device;
         let queued = device.run(|| unsafe {
             let terminal = self.terminal.get_mut();
             terminal.upload_sampling_on(terminal.stream.raw)
-        });
-        if let Err(error) = queued {
-            let _ = device.future(self.terminal.stream.wait()).await;
-            return Err(error);
+        }).and_then(|_| unsafe { self.enqueue_stage(requests, false) });
+        if queued.is_err() { self.cancel(); }
+        queued
+    }
+    pub fn poll(&mut self) -> Result<bool> {
+        ensure!(self.pending.is_some(), "distributed terminal not pending");
+        let result = (|| -> Result<bool> {
+            loop {
+                let (requests, phase) = self.pending.unwrap();
+                match phase {
+                    Phase::Normalize | Phase::Sample => {
+                        let device = self.terminal.device;
+                        if !device.run(|| unsafe { device.library.cuda_stream_query(self.terminal.stream.raw) })? {
+                            return Ok(false);
+                        }
+                        let sampling = matches!(phase, Phase::Sample);
+                        unsafe { self.capture_stage(requests, sampling)?; }
+                        if sampling {
+                            self.pending = None;
+                            self.ready = Some(requests);
+                            return Ok(true);
+                        }
+                        unsafe { self.head.begin_logits(self.terminal.normalized.buffer, requests * 5)?; }
+                        self.pending = Some((requests, Phase::Project));
+                    }
+                    Phase::Project => {
+                        if !self.head.poll_logits()? { return Ok(false); }
+                        unsafe { self.head.begin_copy_logits(self.terminal.shared_logits.buffer)?; }
+                        self.pending = Some((requests, Phase::Assemble));
+                    }
+                    Phase::Assemble => {
+                        if !self.head.poll_copy_logits()? { return Ok(false); }
+                        unsafe { self.enqueue_stage(requests, true)?; }
+                        self.pending = Some((requests, Phase::Sample));
+                    }
+                }
+            }
+        })();
+        if result.is_err() { self.cancel(); }
+        result
+    }
+    pub fn cancel(&mut self) {
+        if self.pending.take().is_some() {
+            self.head.cancel_copy_logits();
+            self.head.cancel_logits();
+            if let Err(error) = self.terminal.device.run(|| self.terminal.synchronize()) {
+                tracing::error!(%error, "draining cancelled distributed terminal");
+            }
         }
-        // No yield between uploads and normalization submission. The stage's
-        // completion guard covers both, avoiding an extra upload-only wait.
-        unsafe { self.stage(requests, false).await?; }
-        unsafe { self.head.execute_logits(self.terminal.normalized.buffer, requests * 5).await?; }
-        unsafe { self.head.copy_logits_to(self.terminal.shared_logits.buffer).await?; }
-        unsafe { self.stage(requests, true).await?; }
-        self.ready = Some(requests);
-        self.output()
+        self.ready = None;
     }
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 3]> {
         self.terminal.output_storage(self.ready.context("distributed draft terminal output unpublished")?)
@@ -165,6 +223,16 @@ mod tests {
             eprintln!("PASS distributed dSpark requests={count}: tokens, corrected logits and confidence exact; concurrent cold/replay, mixed temperatures");
         }
         use std::{future::Future, task::{Context, Poll, Waker}};
+        unsafe { lanes[0].begin(3)?; lanes[1].begin(3)?; }
+        assert!(unsafe { lanes[0].begin(3) }.is_err());
+        assert!(lanes[0].stage_sampling(&mut [], &[]).is_err());
+        while !lanes[1].poll()? { std::thread::yield_now(); }
+        assert!(lanes[1].output().is_ok());
+        assert!(lanes[0].output().is_err());
+        assert!(matches!(lanes[0].pending, Some((3, Phase::Normalize))));
+        lanes[0].cancel();
+        assert!(lanes[0].output().is_err());
+        eprintln!("PASS terminal begin/poll: one lane completes while its peer remains unpolled; pending reuse rejected");
         let mut pending = Box::pin(unsafe { lanes[0].execute(3) });
         assert!(matches!(pending.as_mut().poll(&mut Context::from_waker(Waker::noop())), Poll::Pending));
         drop(pending);
@@ -178,6 +246,7 @@ mod tests {
 }
 impl Drop for DistributedDsparkTerminal<'_, '_> {
     fn drop(&mut self) {
+        self.cancel();
         let device = self.terminal.device;
         if let Err(error) = device.run(|| {
             self.terminal.synchronize()?;

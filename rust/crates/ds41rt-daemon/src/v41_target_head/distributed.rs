@@ -48,9 +48,9 @@ impl<'w, 'a> Rank<'w, 'a> {
             Ok(())
         }
     }
-    async unsafe fn execute(&mut self, input: Ds41rtDeviceBuffer, rows: usize, greedy: bool) -> Result<()> {
+    unsafe fn begin(&mut self, input: Ds41rtDeviceBuffer, rows: usize, greedy: bool) -> Result<()> {
         let mode = usize::from(greedy);
-        let queued = (|| -> Result<()> { unsafe {
+        unsafe {
             let lib = self.stream.library;
             if input.device_id == self.input.buffer.device_id {
                 lib.copy_d2d_async(self.input.buffer, input, rows * 10240, self.stream.raw)?;
@@ -59,9 +59,10 @@ impl<'w, 'a> Rank<'w, 'a> {
             }
             if let Some(graph) = self.graphs[mode][rows - 1] { lib.cuda_graph_launch(graph, self.stream.raw) }
             else { self.enqueue(rows, greedy) }
-        } })();
-        let drained = self.stream.wait().await;
-        queued.and(drained)?;
+        }
+    }
+    unsafe fn capture_ready(&mut self, rows: usize, greedy: bool) -> Result<()> {
+        let mode = usize::from(greedy);
         if self.graphs[mode][rows - 1].is_none() {
             let lib = self.stream.library;
             unsafe { lib.cuda_graph_begin_capture(self.stream.raw)?; }
@@ -77,6 +78,13 @@ impl<'w, 'a> Rank<'w, 'a> {
         }
         Ok(())
     }
+    async unsafe fn execute(&mut self, input: Ds41rtDeviceBuffer, rows: usize, greedy: bool) -> Result<()> {
+        let queued = unsafe { self.begin(input, rows, greedy) };
+        let drained = self.stream.wait().await;
+        queued.and(drained)?;
+        unsafe { self.capture_ready(rows, greedy) }
+    }
+
 }
 impl Drop for Rank<'_, '_> {
     fn drop(&mut self) {
@@ -101,6 +109,8 @@ pub(crate) struct DistributedVocabularyWave<'w, 'a> {
     split: usize,
     ready: Option<usize>,
     greedy_ready: bool,
+    pending_logits: Option<(usize, [bool; 2])>,
+    copy_pending: bool,
 }
 impl<'w, 'a> DistributedVocabularyWave<'w, 'a> {
     pub fn device_bytes(capacity: usize, split: usize) -> Result<[usize; 2]> {
@@ -126,7 +136,7 @@ impl<'w, 'a> DistributedVocabularyWave<'w, 'a> {
             merge_stream: Stream::new(devices[1])?,
             remote: Allocation::new(devices[1], capacity * 8)?,
             merged: Allocation::new(devices[1], capacity * 8)?,
-            capacity, split, ready: None, greedy_ready: false,
+            capacity, split, ready: None, greedy_ready: false, pending_logits: None, copy_pending: false,
         })
     }
     /// # Safety
@@ -134,6 +144,7 @@ impl<'w, 'a> DistributedVocabularyWave<'w, 'a> {
     /// remains alive and immutable until return/cancellation. All rank, copy,
     /// and merge work drains on errors/cancellation before buffers can be reused.
     pub async unsafe fn execute(&mut self, normalized: Ds41rtDeviceBuffer, rows: usize) -> Result<()> {
+        ensure!(self.pending_logits.is_none() && !self.copy_pending, "distributed vocabulary work still pending");
         self.ready = None;
         self.greedy_ready = false;
         ensure!((1..=self.capacity).contains(&rows) && normalized.bytes >= rows * 10240
@@ -175,24 +186,82 @@ impl<'w, 'a> DistributedVocabularyWave<'w, 'a> {
     /// # Safety
     /// The same input lifetime and completion requirements as `execute` apply.
     pub async unsafe fn execute_logits(&mut self, normalized: Ds41rtDeviceBuffer, rows: usize) -> Result<()> {
-        self.ready = None;
-        self.greedy_ready = false;
-        ensure!((1..=self.capacity).contains(&rows) && normalized.bytes >= rows * 10240
-            && normalized.device_id == self.ranks[1].device.id, "invalid distributed vocabulary input");
-        let [first, second] = &mut self.ranks;
-        let first_device = first.device;
-        let second_device = second.device;
-        let (a, b) = tokio::join!(
-            first_device.future(unsafe { first.get_mut().execute(normalized, rows, false) }),
-            second_device.future(unsafe { second.get_mut().execute(normalized, rows, false) }));
-        a.and(b)?;
-        self.ready = Some(rows);
+        unsafe { self.begin_logits(normalized, rows)?; }
+        struct Cancel<'s, 'w, 'a> { wave: &'s mut DistributedVocabularyWave<'w, 'a>, armed: bool }
+        impl Drop for Cancel<'_, '_, '_> {
+            fn drop(&mut self) { if self.armed { self.wave.cancel_logits(); } }
+        }
+        let mut pending = Cancel { wave: self, armed: true };
+        while !pending.wave.poll_logits()? { tokio::task::yield_now().await; }
+        pending.armed = false;
         Ok(())
     }
+
     pub fn greedy(&self) -> Result<(Ds41rtDeviceBuffer, Ds41rtDeviceBuffer)> {
         ensure!(self.greedy_ready, "distributed vocabulary greedy output unpublished");
         let rows = self.ready.context("distributed vocabulary output unpublished")?;
         Ok((slice(self.merged.buffer, 0, rows * 4)?, slice(self.merged.buffer, self.capacity * 4, rows * 4)?))
+    }
+    /// Submit both projections without retaining a scheduler borrow.
+    ///
+    /// # Safety
+    /// Same normalized-input contract as `execute_logits`. Input storage stays
+    /// live and immutable until `poll_logits` completes or `cancel_logits` drains.
+    pub unsafe fn begin_logits(&mut self, normalized: Ds41rtDeviceBuffer, rows: usize) -> Result<()> {
+        ensure!(self.pending_logits.is_none() && !self.copy_pending, "distributed vocabulary work still pending");
+        self.ready = None;
+        self.greedy_ready = false;
+        ensure!((1..=self.capacity).contains(&rows) && normalized.bytes >= rows * 10240
+            && normalized.device_id == self.ranks[1].device.id, "invalid distributed vocabulary input");
+        self.pending_logits = Some((rows, [false; 2]));
+        let queued = (|| -> Result<()> {
+            for rank in &mut self.ranks {
+                let device = rank.device;
+                device.run(|| unsafe { rank.get_mut().begin(normalized, rows, false) })?;
+            }
+            Ok(())
+        })();
+        if queued.is_err() { self.cancel_logits(); }
+        queued
+    }
+    /// Queries only this wave's rank streams. Warm graph capture happens once
+    /// each rank completes; a slow rank does not delay capture on the other GPU.
+    pub fn poll_logits(&mut self) -> Result<bool> {
+        let (rows, mut complete) = self.pending_logits.context("distributed vocabulary projection not pending")?;
+        let result = (|| -> Result<bool> {
+            for (index, rank) in self.ranks.iter_mut().enumerate() {
+                if !complete[index] {
+                    let device = rank.device;
+                    complete[index] = device.run(|| unsafe {
+                        if !rank.stream.library.cuda_stream_query(rank.stream.raw)? { return Ok(false); }
+                        rank.get_mut().capture_ready(rows, false)?;
+                        Ok(true)
+                    })?;
+                }
+            }
+            if complete == [true; 2] {
+                self.pending_logits = None;
+                self.ready = Some(rows);
+                Ok(true)
+            } else {
+                self.pending_logits = Some((rows, complete));
+                Ok(false)
+            }
+        })();
+        if result.is_err() { self.cancel_logits(); }
+        result
+    }
+    /// Error/cancellation cleanup only; ordinary progress uses stream queries.
+    pub fn cancel_logits(&mut self) {
+        if self.pending_logits.take().is_some() {
+            for rank in &self.ranks {
+                if let Err(error) = rank.device.run(|| unsafe { rank.stream.library.cuda_stream_synchronize(rank.stream.raw) }) {
+                    tracing::error!(%error, "draining cancelled vocabulary projection");
+                }
+            }
+        }
+        self.ready = None;
+        self.greedy_ready = false;
     }
     pub fn logits(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {
         let rows = self.ready.context("distributed vocabulary output unpublished")?;
@@ -205,12 +274,28 @@ impl<'w, 'a> DistributedVocabularyWave<'w, 'a> {
     /// Destination storage remains live and has no conflicting access through
     /// return or cancellation. It must not alias either shard. The lane's own
     /// copy stream drains before return/cancellation; no other lane is joined.
-    pub async unsafe fn copy_logits_to(&self, destination: Ds41rtDeviceBuffer) -> Result<()> {
+    pub async unsafe fn copy_logits_to(&mut self, destination: Ds41rtDeviceBuffer) -> Result<()> {
+        unsafe { self.begin_copy_logits(destination)?; }
+        struct Cancel<'s, 'w, 'a> { wave: &'s mut DistributedVocabularyWave<'w, 'a>, armed: bool }
+        impl Drop for Cancel<'_, '_, '_> {
+            fn drop(&mut self) { if self.armed { self.wave.cancel_copy_logits(); } }
+        }
+        let mut pending = Cancel { wave: self, armed: true };
+        while !pending.wave.poll_copy_logits()? { tokio::task::yield_now().await; }
+        pending.armed = false;
+        Ok(())
+    }
+    /// # Safety
+    /// Same destination contract as `copy_logits_to`, lasting until successful
+    /// polling or cancellation. Source shards cannot be reused while pending.
+    pub unsafe fn begin_copy_logits(&mut self, destination: Ds41rtDeviceBuffer) -> Result<()> {
+        ensure!(!self.copy_pending && self.pending_logits.is_none(), "distributed vocabulary work still pending");
         let rows = self.ready.context("distributed vocabulary output unpublished")?;
         let bytes = rows * 129280 * 4;
         ensure!(destination.device_id == self.merge_stream.device.id && destination.bytes >= bytes,
             "invalid distributed logits destination");
         let sources = self.logits()?;
+        self.copy_pending = true;
         let queued = self.merge_stream.device.run(|| unsafe {
             for rank in 0..2 {
                 let offset = if rank == 0 { 0 } else { self.split * 4 };
@@ -221,8 +306,36 @@ impl<'w, 'a> DistributedVocabularyWave<'w, 'a> {
             }
             Ok(())
         });
-        let drained = self.merge_stream.wait().await;
-        queued.and(drained)
+        if queued.is_err() { self.cancel_copy_logits(); }
+        queued
+    }
+    pub fn poll_copy_logits(&mut self) -> Result<bool> {
+        ensure!(self.copy_pending, "distributed vocabulary copy not pending");
+        let ready = self.merge_stream.device.run(|| unsafe {
+            self.merge_stream.device.library.cuda_stream_query(self.merge_stream.raw)
+        });
+        match ready {
+            Ok(true) => { self.copy_pending = false; Ok(true) }
+            Ok(false) => Ok(false),
+            Err(error) => { self.cancel_copy_logits(); Err(error) }
+        }
+    }
+    pub fn cancel_copy_logits(&mut self) {
+        if self.copy_pending {
+            if let Err(error) = self.merge_stream.drain() {
+                tracing::error!(%error, "draining cancelled vocabulary assembly");
+            }
+            self.copy_pending = false;
+        }
+    }
+
+}
+
+impl Drop for DistributedVocabularyWave<'_, '_> {
+    fn drop(&mut self) {
+        // Assembly reads rank buffers: drain before their field destructors run.
+        self.cancel_copy_logits();
+        self.cancel_logits();
     }
 }
 
@@ -334,6 +447,21 @@ mod tests {
         // Cancel after submission at the first asynchronous wait. Reuse must
         // succeed and abandoned outputs must remain unpublished.
         use std::{future::Future, task::{Context, Poll, Waker}};
+        unsafe { first.begin_logits(input.buffer, 80)?; second.begin_logits(other_input.buffer, 3)?; }
+        assert!(unsafe { first.begin_logits(input.buffer, 3) }.is_err());
+        assert!(runtime.block_on(unsafe { first.execute(input.buffer, 3) }).is_err());
+        while !second.poll_logits()? { std::thread::yield_now(); }
+        assert!(second.logits().is_ok());
+        assert!(first.logits().is_err());
+        assert!(first.pending_logits.is_some());
+        first.cancel_logits();
+        assert!(first.logits().is_err());
+        unsafe { second.begin_copy_logits(assembled[1].buffer)?; }
+        assert!(unsafe { second.begin_logits(other_input.buffer, 3) }.is_err());
+        assert!(unsafe { second.begin_copy_logits(assembled[1].buffer) }.is_err());
+        while !second.poll_copy_logits()? { std::thread::yield_now(); }
+        assert!(second.poll_copy_logits().is_err());
+        eprintln!("PASS vocabulary begin/poll: lane completes without polling its peer; pending projection/copy reuse rejected");
         let mut pending = Box::pin(unsafe { first.execute(input.buffer, 16) });
         assert!(matches!(pending.as_mut().poll(&mut Context::from_waker(Waker::noop())), Poll::Pending));
         drop(pending);

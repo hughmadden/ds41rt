@@ -1317,3 +1317,23 @@ finite. Cancellation, reuse, cache lease release and device restoration also
 passed (`distributed-chain.log`, 5.30 seconds). This is a component fixture,
 not an agentic serving or performance qualification. The normal serving runtime
 still needs to drive the distributed chain through its independent scheduler.
+
+The distributed vocabulary, terminal and complete draft chain now expose
+begin/poll/cancel operations for that scheduler connection. Pending stages are
+stored directly in each lane owner, without a boxed future or a shared borrow
+across a scheduler yield. The chain progresses through transformer completion,
+terminal work and compact token/confidence downloads using its existing pinned
+storage. Ordinary polling queries only the relevant lane streams; blocking
+drains are reserved for errors, cancellation and destruction. Projection/copy
+reuse while pending is rejected, and assembly drains before its source rank
+buffers can be destroyed. The async component APIs use these same polling paths.
+
+The vocabulary fixture passed its existing exact-output checks through 80 rows
+plus explicit begin/poll, pending-reuse rejection and cancellation/reuse checks
+(`vocabulary-poll.log`, 12.37 seconds). Terminal and complete-chain fixtures
+passed together (`draft-poll.log`, 7.78 seconds), including exact compact output.
+Both fixtures also submit two lanes, leave one unpolled and complete the other;
+the unpolled lane remains unpublished in its initial stage. This verifies that
+host progress on one lane does not require advancing the other. Normal serving
+still needs to construct and select the distributed runtime, and end-to-end
+throughput remains unmeasured.

@@ -72,11 +72,29 @@ fn distributed_dspark_chain_matches_full_head() -> Result<()> {
         }
         for replay in 0..2 {
             let [first, second] = &mut lanes;
-            runtime.block_on(async {
+            if replay == 0 { runtime.block_on(async {
                 let (a, b) = tokio::join!(unsafe { first.execute(window_refs, [&bindings[0][0], &bindings[0][1], &bindings[0][2]]) },
                     unsafe { second.execute(window_refs, [&bindings[1][0], &bindings[1][1], &bindings[1][2]]) });
                 a.and(b).map(|_| ())
-            })?;
+            })?; } else {
+                unsafe {
+                    first.begin_replay(window_refs, [&bindings[0][0], &bindings[0][1], &bindings[0][2]])?;
+                    second.begin_replay(window_refs, [&bindings[1][0], &bindings[1][1], &bindings[1][2]])?;
+                }
+                assert!(first.stage_tokens(&[42]).is_err());
+                let mut compact = [None, None];
+                while compact[1].is_none() { compact[1] = second.poll_replay()?; std::thread::yield_now(); }
+                assert!(first.output().is_err());
+                assert!(matches!(first.pending, Some(Phase::Transformer(_))));
+                while compact[0].is_none() { compact[0] = first.poll_replay()?; std::thread::yield_now(); }
+                for (lane, value) in compact.into_iter().enumerate() {
+                    let (tokens, confidence) = value.unwrap();
+                    let token_bytes: Vec<_> = tokens.into_iter().flat_map(u32::to_ne_bytes).collect();
+                    let confidence_bytes: Vec<_> = confidence.into_iter().flat_map(f32::to_ne_bytes).collect();
+                    ensure!(token_bytes == expected[lane][0] && confidence_bytes == expected[lane][2],
+                        "compact polled draft output differs");
+                }
+            }
             for (lane, chain) in lanes.iter().enumerate() {
                 let actual = download(chain.output()?)?;
                 for part in 0..3 {
