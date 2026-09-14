@@ -1,4 +1,5 @@
 use super::*;
+use crate::v41_target_pass::VerificationTarget;
 mod independent;
 use super::scores::BatchScores;
 use crate::v41_backbone_cache::CacheLease;
@@ -417,7 +418,7 @@ fn prepare_commit_lane<'a>(lane: usize,
     }
     Ok(CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit, frontier_downloads })
 }
-fn publish_commit_lane<'a>(pass: &TargetPass<'_, 'a>, active: &mut [Option<Active<'a>>],
+fn publish_commit_lane<'a>(pass: &impl VerificationTarget<'a>, active: &mut [Option<Active<'a>>],
     members: &[usize], inputs: &[Vec<u32>], owned_batch: &mut Option<RequestBatch>,
     mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, decision: CommitDecision,
 ) -> Result<(u32, usize, Vec<Vec<u32>>)> {

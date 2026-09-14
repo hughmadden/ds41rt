@@ -2,9 +2,9 @@
 use super::*;
 use std::cell::{Cell, RefCell};
 
-pub(super) fn run<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
-    first: &mut TargetPass<'w, 'a>, second: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
-    first_transport: &mut NativeTp4Wave<'a>, second_transport: &mut NativeTp4Wave<'a>,
+pub(super) fn run<'a, P: VerificationTarget<'a>>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    first: &mut P, second: &mut P, requests: &mut Requests<'a>,
+    first_transport: &mut P::Transport, second_transport: &mut P::Transport,
     active: &mut [Option<Active<'a>>], draft: Option<&mut DraftRuntime<'_, 'a>>,
     prefixes: &mut PrefixCache<'a>, receive: &mpsc::Receiver<NativeRequest>,
 ) -> Result<()> {
@@ -22,8 +22,8 @@ pub(super) fn run<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runt
     Ok(())
 }
 
-async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass<'w, 'a>,
-    transport: &mut NativeTp4Wave<'a>, requests: &RefCell<&mut Requests<'a>>,
+async fn lane<'a, P: VerificationTarget<'a>>(lane: usize, lib: &'a NativeLibrary, pass: &mut P,
+    transport: &mut P::Transport, requests: &RefCell<&mut Requests<'a>>,
     active: &RefCell<&mut [Option<Active<'a>>]>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a>>>,
     prefixes: &RefCell<&mut PrefixCache<'a>>, receive: &mpsc::Receiver<NativeRequest>, drain: &Cell<bool>,
 ) -> Result<()> {
@@ -115,8 +115,8 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             round_id += 1;
             tracing::debug!(target: "ds41rt::lane_schedule", lane, round_id, requests=members.len(),
                 "independent verifier issued");
-            pass.set_route_capture(capture_routes);
             let operation: Result<()> = async {
+                pass.set_route_capture(capture_routes)?;
                 let current = batch.as_mut().unwrap();
                 let selected: Vec<_> = (0..current.cache()?.positions().len()).collect();
                 let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
@@ -200,13 +200,15 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                     "native independent lane round");
                 Ok(())
             }.await;
-            pass.set_route_capture(false);
-            if let Some(batch) = &mut batch {
+            let stopped_capture = pass.set_route_capture(false);
+            let discarded = if let Some(batch) = &mut batch {
                 // Successful commits relinquish ownership. Failed execution or
                 // commit must drain/discard this lane before the outer reset.
-                pass.discard(batch)?;
-            }
+                pass.discard(batch)
+            } else { Ok(()) };
             operation?;
+            stopped_capture?;
+            discarded?;
             // Give already-ready remote completions an opportunity to run before
             // queuing another draft on the shared RTX.
             tokio::task::yield_now().await;

@@ -1211,3 +1211,22 @@ the official 384-expert range, exact agreement with each GPU owner's history,
 unchanged history-vector capacities, and rejection of resetting a ready pass.
 The complete fixture, including 32 interleaved cases and cancellation cleanup,
 passed in 18.39 seconds (`distributed-route-history.log`).
+
+The independent scheduler now uses `VerificationTarget`, a statically
+dispatched interface implemented by both target passes. Its associated
+transport remains the ordinary Spark wave for one RTX and the GPU-owned wave
+for two RTX. Verification futures are not boxed, and no common stream or new
+lane join is introduced. Compact greedy results, selected full-logit downloads,
+route history, queued cache commit/poll/abort, and discard use the same scheduler
+body. Cleanup attempts both stopping capture and discarding the batch before
+propagating an execution error.
+
+The distributed fixture alternates compact greedy and full-logit verification
+through this interface, checks logits against the returned greedy result,
+checks missing compact output in the full-logit mode, and exercises the shared
+commit/discard interface. It passed with 32 interleaved cases in 18.56 seconds
+(`verification-distributed-fixture.log`); all 25 serving unit tests passed
+(`verification-serving-tests.log`). This does not yet connect dual-GPU startup
+to the scheduler. dSpark's draft chain still assumes a co-located embedding and
+full vocabulary head; it needs the planned GPU1 execution with GPU0 embedding
+access and split-head integration before complete speculative serving can run.

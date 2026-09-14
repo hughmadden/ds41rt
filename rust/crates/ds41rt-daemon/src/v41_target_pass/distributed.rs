@@ -987,17 +987,21 @@ mod tests {
                 image_mask: None,
                 kind,
             }])?;
-            runtime.block_on(unsafe {
-                pass.execute(
-                    &std::cell::RefCell::new(&mut requests),
-                    &mut batch,
-                    &mut transport,
-                    0,
-                    &[tokens.len() - 1],
-                    None,
-                    None,
-                    true,
-                )
+            let next = runtime.block_on(async {
+                let requests = std::cell::RefCell::new(&mut requests);
+                if step % 2 == 0 {
+                    Ok::<_, anyhow::Error>(Some(unsafe {
+                        VerificationTarget::execute_shared_greedy(&mut pass, &requests, &mut batch,
+                            &mut transport, 0, &[tokens.len() - 1]).await?
+                    }))
+                } else {
+                    unsafe {
+                        VerificationTarget::execute_shared(&mut pass, &requests, &mut batch,
+                            &mut transport, 0, &[tokens.len() - 1]).await?;
+                    }
+                    assert!(pass.greedy_output(&batch).is_err());
+                    Ok(None)
+                }
             })?;
             ensure!(pass.captured_routes().len() == 40, "distributed route history has missing layers");
             for (layer, routes) in pass.captured_routes().iter().enumerate() {
@@ -1010,14 +1014,14 @@ mod tests {
             }
             assert!(pass.set_route_capture(true).is_err());
             pass.set_route_capture(false)?;
-            let next = pass.greedy_output(&batch)?;
-            let bytes = runtime.block_on(pass.download_logits(&batch, &[0]))?;
+            let bytes = runtime.block_on(VerificationTarget::download_logits(&mut pass, &batch, &[0]))?;
             ensure!(bytes.len() == 129280 * 4, "distributed logit download extent differs");
             let scores: Vec<f32> = bytes.chunks_exact(4)
                 .map(|bytes| f32::from_ne_bytes(bytes.try_into().unwrap())).collect();
             ensure!(scores.iter().all(|score| score.is_finite()), "non-finite downloaded logits");
             let best = scores.iter().enumerate().fold(0, |best, (index, score)|
                 if *score > scores[best] { index } else { best });
+            let next = next.unwrap_or_else(|| vec![(best as u32, scores[best])]);
             assert_eq!((best as u32, scores[best]), next[0]);
             assert!(runtime.block_on(pass.download_logits(&batch, &[1])).is_err());
             assert_eq!(lib.cuda_get_device()?, 0);
@@ -1030,16 +1034,16 @@ mod tests {
                 "distributed taps lost rows"
             );
             if step == 2 {
-                pass.discard(&mut batch)?;
+                VerificationTarget::discard(&mut pass, &mut batch)?;
                 assert!(requests.validate(&batch).is_err());
                 assert_eq!(requests.cache().committed_end(lease)?, 5);
                 assert_eq!(lib.cuda_get_device()?, 0);
                 eprintln!("PASS discarded full distributed proposal without advancing history");
                 continue;
             }
-            pass.enqueue_cache_commit(&requests, &batch, &[tokens.len() as u32])?;
+            VerificationTarget::enqueue_cache_commit(&mut pass, &requests, &batch, &[tokens.len() as u32])?;
             runtime.block_on(async {
-                while !pass.poll_cache_commit()? {
+                while !VerificationTarget::poll_cache_commit(&pass)? {
                     tokio::task::yield_now().await;
                 }
                 Ok::<_, anyhow::Error>(())

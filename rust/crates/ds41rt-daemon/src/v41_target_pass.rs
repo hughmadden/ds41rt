@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 mod taps;
 mod distributed;
 pub(crate) use distributed::DistributedTargetPass;
+mod verification;
+pub(crate) use verification::VerificationTarget;
 mod encoder_pair;
 mod encoder_stream;
 pub(crate) use taps::{TargetTapWave, TargetTaps};
