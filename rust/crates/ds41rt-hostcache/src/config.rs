@@ -39,14 +39,14 @@ pub struct Config {
 }
 
 impl Default for Config {
-    /// The documented defaults: off, 256 MiB chunks, store on retain, 50 ms / 500 ms budgets,
+    /// The documented defaults: off, 256 MiB chunks, store on retain, 1 s / 500 ms budgets,
     /// 512 tokens minimum, both kinds.
     fn default() -> Self {
         Self {
             bytes: 0,
             chunk_bytes: 256 << 20,
             store: StoreMode::OnRetain,
-            copy_budget_ns: 50_000_000,
+            copy_budget_ns: 1_000_000_000,
             restore_budget_ns: 500_000_000,
             min_tokens: 512,
             max_tokens: MAX_CONTEXT_TOKENS,

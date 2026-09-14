@@ -525,7 +525,9 @@ pub(crate) struct NativeServeArgs {
     #[arg(long, value_enum, default_value_t = HostCacheStore::OnRetain, env = "DS41RT_HOST_CACHE_STORE")]
     pub host_cache_store: HostCacheStore,
     /// Longest the device-evict path waits for an in-flight store before dropping it uncached.
-    #[arg(long, default_value_t = 50, env = "DS41RT_HOST_CACHE_COPY_BUDGET_MS")]
+    /// A dropped snapshot costs its next visit a full re-prefill (minutes at long contexts), so the
+    /// budget errs long: a bounded stall of the scheduler beats losing the snapshot.
+    #[arg(long, default_value_t = 1000, env = "DS41RT_HOST_CACHE_COPY_BUDGET_MS")]
     pub host_cache_copy_budget_ms: u64,
     /// Longest a host restore waits before the request falls through to prefill.
     #[arg(long, default_value_t = 500, env = "DS41RT_HOST_CACHE_RESTORE_BUDGET_MS")]
