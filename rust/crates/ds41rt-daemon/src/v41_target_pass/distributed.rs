@@ -73,6 +73,9 @@ impl Drop for ReservedPassGuard<'_, '_, '_, '_, '_> {
     }
 }
 impl<'w, 'a> DistributedTargetPass<'w, 'a> {
+    pub fn encoder_device(&self) -> Result<crate::v41_memory::device::Device<'a>> {
+        Ok(self.lanes[self.map.attention(19)?].device)
+    }
     pub fn new(
         map: CachePlacement,
         embedding: DeviceOwner<'a, TargetEmbeddingWave<'w, 'a>>,
@@ -769,6 +772,8 @@ mod tests {
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, DS41RT_DUAL_PEERS, two GPUs and live Sparks"]
     fn distributed_target_prefill_decode_commit_smoke() -> Result<()> {
+        use crate::v41_native_serve::prefill_target::PrefillTarget;
+        use crate::v41_experts::dspark::{DsparkChain, DsparkWeights};
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let snapshot = std::env::var("DS41RT_SNAPSHOT")?;
         let catalog = ds41rt_loader::read_official_v41_catalog(
@@ -964,6 +969,10 @@ mod tests {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
+        let draft_weights = devices[1].own(|| DsparkWeights::load(&lib, &catalog, 80, 1, 32usize << 30, 16 << 20))?;
+        let mut draft = crate::v41_native_serve::speculative::DraftRuntime::with_distributed_requests(
+            devices, &draft_weights, &table, [&vocab[0], &vocab[1]], 16, 2)?;
+        draft.admit(91001)?;
         let lease = requests.admit(0, 91001)?;
         let mut tokens = vec![100u32, 200, 300, 400];
         for (step, kind) in [
@@ -996,8 +1005,8 @@ mod tests {
                     }))
                 } else {
                     unsafe {
-                        VerificationTarget::execute_shared(&mut pass, &requests, &mut batch,
-                            &mut transport, 0, &[tokens.len() - 1]).await?;
+                        pass.prefill_logits(&lib, &mut requests.borrow_mut(), &mut batch,
+                            &mut transport, &[tokens.len() - 1], None).await?;
                     }
                     assert!(pass.greedy_output(&batch).is_err());
                     Ok(None)
@@ -1041,15 +1050,9 @@ mod tests {
                 eprintln!("PASS discarded full distributed proposal without advancing history");
                 continue;
             }
-            VerificationTarget::enqueue_cache_commit(&mut pass, &requests, &batch, &[tokens.len() as u32])?;
-            runtime.block_on(async {
-                while !VerificationTarget::poll_cache_commit(&pass)? {
-                    tokio::task::yield_now().await;
-                }
-                Ok::<_, anyhow::Error>(())
-            })?;
-            crate::v41_target_pass::TargetCache::commit(&mut pass, &mut requests, &mut batch,
-                &[tokens.len() as u32])?;
+            runtime.block_on(pass.commit_prefill(&mut requests, &mut batch,
+                Some(draft.get_mut()), tokens.len() as u32))?;
+            draft.validate_position(91001, if step == 3 { 6 } else { 4 + step as u64 })?;
             assert_eq!(
                 requests.cache().committed_end(lease)?,
                 if step == 3 { 6 } else { 4 + step as u64 }
@@ -1062,6 +1065,9 @@ mod tests {
             assert_eq!(lib.cuda_get_device()?, 0);
         }
         requests.release(lease)?;
+        draft.release(91001)?;
+        drop(draft);
+        eprintln!("PASS distributed prefill commit: target and all three dSpark cache frontiers agree");
         let prompt = [100u32, 200, 300, 400, 500, 600, 700];
         let baseline = requests.admit(1, 92000)?;
         let mut baseline_batch = requests.prepare(&[crate::v41_requests::RequestTokens {
@@ -1087,13 +1093,7 @@ mod tests {
         requests.release(baseline)?;
         let lease = requests.admit(0, 92001)?;
         requests.begin_encoder(lease, prompt.len() as u64)?;
-        let mut suffix = devices[map.attention(19)?].own(|| {
-            EncoderSuffix::new(
-                &lib,
-                prompt.len() as u64,
-                EncoderSuffix::device_bytes(prompt.len() as u64)?,
-            )
-        })?;
+        let mut suffix = pass.new_suffix(&lib, prompt.len() as u64)?;
         for chunk in [&prompt[..3], &prompt[3..]] {
             let mut batch = requests.reserve_encoder(&[crate::v41_requests::RequestTokens {
                 lease,
@@ -1101,21 +1101,8 @@ mod tests {
                 image_mask: None,
                 kind: ExpertV2SourceKind::Prefill,
             }])?;
-            runtime.block_on(unsafe {
-                pass.execute(
-                    &std::cell::RefCell::new(&mut requests),
-                    &mut batch,
-                    &mut transport,
-                    0,
-                    &[],
-                    Some(&mut suffix),
-                    None,
-                    false,
-                )
-            })?;
-            pass.enqueue_cache_commit(&requests, &batch, &[chunk.len() as u32])?;
-            assert!(pass.poll_cache_commit()?);
-            pass.commit(&mut requests, &mut batch, &[chunk.len() as u32])?;
+            runtime.block_on(unsafe { pass.encoder_part(&mut requests, &mut batch, &mut transport, &mut suffix) })?;
+            runtime.block_on(pass.commit_prefill::<DsparkChain<'_, '_>>(&mut requests, &mut batch, None, chunk.len() as u32))?;
             assert_eq!(lib.cuda_get_device()?, 0);
         }
         assert_eq!(requests.cache().committed_end(lease)?, 7);
@@ -1125,20 +1112,13 @@ mod tests {
             tokens: 7,
             kind: ExpertV2SourceKind::Prefill,
         }])?;
-        let encoded = suffix.output()?;
-        runtime.block_on(unsafe {
-            pass.execute(
-                &std::cell::RefCell::new(&mut requests),
-                &mut batch,
-                &mut transport,
-                0,
-                &[6],
-                None,
-                Some(&encoded),
-                true,
-            )
+        let bytes = runtime.block_on(unsafe {
+            pass.prefill_logits(&lib, &mut requests, &mut batch, &mut transport, &[6], Some(&suffix))
         })?;
-        let next = pass.head.greedy_output()?.to_vec();
+        let scores: Vec<_> = bytes.chunks_exact(4).map(|v| f32::from_ne_bytes(v.try_into().unwrap())).collect();
+        ensure!(scores.len() == 129280 && scores.iter().all(|v| v.is_finite()), "invalid prefill replay logits");
+        let best = (0..scores.len()).fold(0, |best, i| if scores[i] > scores[best] { i } else { best });
+        let next = vec![(best as u32, scores[best])];
         assert!(next[0].0 < 129280 && next[0].1.is_finite());
         assert_eq!(
             next[0].0, expected[0].0,
@@ -1181,6 +1161,60 @@ mod tests {
             )
         })?;
         other_transport.install_tp2(tp2_ffn::Wave::new(routed, shared, 20, 16)?)?;
+        for chunk_rows in [3, 16] {
+            let reference_lease = requests.admit(0, 92900 + chunk_rows as u64)?;
+            requests.begin_encoder(reference_lease, prompt.len() as u64)?;
+            let mut reference_suffix = pass.new_suffix(&lib, prompt.len() as u64)?;
+            for chunk in prompt.chunks(chunk_rows) {
+                let mut batch = requests.reserve_encoder(&[crate::v41_requests::RequestTokens {
+                    lease: reference_lease, tokens: chunk, image_mask: None, kind: ExpertV2SourceKind::Prefill,
+                }])?;
+                runtime.block_on(unsafe { pass.encoder_part(&mut requests, &mut batch, &mut transport, &mut reference_suffix) })?;
+                runtime.block_on(pass.commit_prefill::<DsparkChain<'_, '_>>(&mut requests, &mut batch, None, chunk.len() as u32))?;
+            }
+            let start = requests.begin_decoder_replay(reference_lease)?;
+            let replay_rows = prompt.len() as u32 - start as u32;
+            let mut batch = requests.prepare_replay(&[crate::v41_backbone_cache::CacheWork {
+                lease: reference_lease, tokens: replay_rows, kind: ExpertV2SourceKind::Prefill,
+            }])?;
+            let reference_bytes = runtime.block_on(unsafe { pass.prefill_logits(&lib, &mut requests, &mut batch,
+                &mut transport, &[replay_rows as usize - 1], Some(&reference_suffix)) })?;
+            let reference_scores: Vec<_> = reference_bytes.chunks_exact(4)
+                .map(|v| f32::from_ne_bytes(v.try_into().unwrap())).collect();
+            let reference_anchor = (0..reference_scores.len()).fold(0, |best, i|
+                if reference_scores[i] > reference_scores[best] { i } else { best }) as u32;
+            runtime.block_on(pass.commit_prefill::<DsparkChain<'_, '_>>(&mut requests, &mut batch, None, replay_rows))?;
+            requests.release(reference_lease)?;
+            eprintln!("serving prefill reference chunk_rows={chunk_rows} sequential_anchor={reference_anchor} one_shot_anchor={}", expected[0].0);
+            let id = 93000 + chunk_rows as u64;
+            let lease = requests.admit(0, id)?;
+            let mut draft = crate::v41_native_serve::speculative::DraftRuntime::with_distributed_requests(
+                devices, &draft_weights, &table, [&vocab[0], &vocab[1]], 16, 2)?;
+            draft.admit(id)?;
+            let anchor = crate::v41_native_serve::prefill_target::exercise_prefill(&lib, &runtime,
+                &mut pass, &mut other, &mut requests, [&mut transport, &mut other_transport], lease,
+                &prompt, chunk_rows, Some(draft.get_mut()))?;
+            assert_eq!(anchor, reference_anchor, "serving prefill anchor differs from matching sequential chunks");
+            draft.validate_position(id, 7)?;
+            let proposed = loop {
+                if let Some((rows, _)) = draft.poll_propose(0, &[(id, anchor, 7, 12)])? { break rows; }
+                std::thread::yield_now();
+            };
+            ensure!(proposed.len() == 1 && proposed[0].len() == 6 && proposed[0][0] == anchor,
+                "serving prefill to draft handoff differs");
+            let continued: Vec<_> = prompt.into_iter().chain([800, 900]).collect();
+            let next = crate::v41_native_serve::prefill_target::exercise_prefill(&lib, &runtime,
+                &mut pass, &mut other, &mut requests, [&mut transport, &mut other_transport], lease,
+                &continued, chunk_rows, Some(draft.get_mut()))?;
+            ensure!(next < 129280, "invalid continuation anchor");
+            assert_eq!(requests.cache().committed_end(lease)?, 9);
+            draft.validate_position(id, 9)?;
+            requests.release(lease)?;
+            draft.release(id)?;
+            assert_eq!(lib.cuda_get_device()?, 0);
+            eprintln!("PASS serving distributed prefill chunk_rows={chunk_rows}: encoder/replay, draft handoff, cached continuation, target/draft commits");
+        }
+        drop(draft_weights);
         if std::env::var_os("DS41RT_INDEPENDENT_ENCODER_CHECK").is_some() {
             let counts = [3usize, 7];
             let mut reference: [Option<Vec<u8>>; 2] = [None, None];

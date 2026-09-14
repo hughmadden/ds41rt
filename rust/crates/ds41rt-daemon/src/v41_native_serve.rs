@@ -1,3 +1,6 @@
+pub(crate) mod prefill_target;
+use prefill_target::PrefillTarget;
+use speculative::DraftChain;
 pub(crate) mod speculative;
 mod scheduler;
 mod scores;
@@ -325,22 +328,21 @@ fn worker(
         &mut requests, &mut transport, &mut prefill_transport, draft.as_mut(), &mut vision)
 }
 
-fn prefill<'w, 'a>(
+fn prefill<'a, P: PrefillTarget<'a>, C: DraftChain<'a>>(
     lib: &'a NativeLibrary,
     runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'w, 'a>,
-    other: &mut TargetPass<'w, 'a>,
+    pass: &mut P,
+    other: &mut P,
     requests: &mut Requests<'a>,
-    transport: &mut NativeTp4Wave<'a>,
-    other_transport: &mut NativeTp4Wave<'a>,
+    transport: &mut P::Transport,
+    other_transport: &mut P::Transport,
     lease: crate::v41_backbone_cache::CacheLease,
     tokens: &[u32],
     chunk_rows: usize,
     job: &NativeRequest,
-    draft: Option<&mut DraftRuntime<'_, 'a>>,
+    draft: Option<&mut DraftRuntime<'_, 'a, C>>,
 ) -> Result<TokenScores> {
     use crate::v41_backbone_cache::{CacheStage, CacheWork};
-    use crate::v41_block::EncoderSuffix;
     let end = tokens.len() as u64;
     let cached = requests.cache().committed_end(lease)? as usize;
     let stage = requests.cache().stage(lease)?;
@@ -359,7 +361,7 @@ fn prefill<'w, 'a>(
             draft,
         );
     }
-    let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
+    let mut suffix = pass.new_suffix(lib, end)?;
     if replay {
         let start = requests.cache().history_end(lease)? as usize;
         ensure!(
@@ -376,10 +378,10 @@ fn prefill<'w, 'a>(
             }])?;
             let result = (|| -> Result<()> {
                 runtime.block_on(unsafe {
-                    pass.execute_encoder_replay(requests, &mut batch, transport, 0, &mut suffix)
+                    pass.encoder_part(requests, &mut batch, transport, &mut suffix)
                 })?;
                 ensure!(!job.events.is_closed(), "client disconnected");
-                pass.commit(requests, &mut batch, &[chunk.len() as u32])
+                runtime.block_on(pass.commit_prefill::<C>(requests, &mut batch, None, chunk.len() as u32))
             })();
             if result.is_err() {
                 pass.discard(&mut batch)?;
@@ -398,9 +400,9 @@ fn prefill<'w, 'a>(
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
         let started = Instant::now();
         let result = (|| -> Result<()> {
-            runtime.block_on(unsafe { pass.execute_encoder(requests, &mut batch, transport, 0, &mut suffix) })?;
+            runtime.block_on(unsafe { pass.encoder_part(requests, &mut batch, transport, &mut suffix) })?;
             ensure!(!job.events.is_closed(), "client disconnected");
-            pass.commit(requests, &mut batch, &[chunk.len() as u32])
+            runtime.block_on(pass.commit_prefill::<C>(requests, &mut batch, None, chunk.len() as u32))
         })();
         if result.is_err() { pass.discard(&mut batch)?; }
         result?;
@@ -409,7 +411,7 @@ fn prefill<'w, 'a>(
     if chunks.len() != 0 {
         let chunks: Vec<_> = chunks.collect();
         let started = Instant::now();
-        runtime.block_on(unsafe { pass.execute_encoder_stream(other, requests, lease, &chunks,
+        runtime.block_on(unsafe { pass.encoder_stream(other, requests, lease, &chunks,
             [transport, other_transport], &mut suffix, &|| !job.events.is_closed()) })?;
         tracing::debug!(target: "ds41rt::timing", rows=tokens.len(),
             total_us=started.elapsed().as_micros() as u64, "target encoder stream");
@@ -420,14 +422,11 @@ fn prefill<'w, 'a>(
     let mut batch = requests.prepare_replay(&[CacheWork { lease, tokens: rows, kind: ExpertV2SourceKind::Prefill }])?;
     let started = Instant::now();
     let result = (|| -> Result<TokenScores> {
-        let encoder = suffix.output()?;
-        let logits = runtime.block_on(unsafe { pass.execute_replay(requests, &mut batch,
-            transport, 0, &[rows as usize - 1], &encoder) })?;
-        let mut bytes = vec![0; logits.logits.bytes]; lib.copy_d2h(&mut bytes, logits.logits)?;
+        let bytes = runtime.block_on(unsafe { pass.prefill_logits(lib, requests, &mut batch,
+            transport, &[rows as usize - 1], Some(&suffix)) })?;
         let scores = TokenScores::new(bytes)?;
         ensure!(!job.events.is_closed(), "client disconnected");
-        if let Some(draft) = draft { draft.commit(pass, requests, &mut batch, rows)?; }
-        else { pass.commit(requests, &mut batch, &[rows])?; }
+        runtime.block_on(pass.commit_prefill(requests, &mut batch, draft, rows))?;
         Ok(scores)
     })();
     if result.is_err() { pass.discard(&mut batch)?; }
@@ -435,10 +434,10 @@ fn prefill<'w, 'a>(
     result
 }
 
-fn prefill_continuation<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>, transport: &mut NativeTp4Wave<'a>,
+fn prefill_continuation<'a, P: PrefillTarget<'a>, C: DraftChain<'a>>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    pass: &mut P, requests: &mut Requests<'a>, transport: &mut P::Transport,
     lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
-    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<TokenScores> {
+    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a, C>>) -> Result<TokenScores> {
     ensure!(!tokens.is_empty(), "prefix continuation has no uncached rows");
     let mut anchor = None;
     for chunk in tokens.chunks(chunk_rows) {
@@ -446,14 +445,11 @@ fn prefill_continuation<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime
         let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
         let result = (|| -> Result<TokenScores> {
-            let logits = runtime.block_on(unsafe { pass.execute(requests, &mut batch, transport,
-                0, &[chunk.len() - 1]) })?;
-            let mut bytes = vec![0; logits.logits.bytes];
-            lib.copy_d2h(&mut bytes, logits.logits)?;
+            let bytes = runtime.block_on(unsafe { pass.prefill_logits(lib, requests, &mut batch, transport,
+                &[chunk.len() - 1], None) })?;
             let scores = TokenScores::new(bytes)?;
             ensure!(!job.events.is_closed(), "client disconnected");
-            if let Some(draft) = draft.as_deref_mut() { draft.commit(pass, requests, &mut batch, chunk.len() as u32)?; }
-            else { pass.commit(requests, &mut batch, &[chunk.len() as u32])?; }
+            runtime.block_on(pass.commit_prefill(requests, &mut batch, draft.as_deref_mut(), chunk.len() as u32))?;
             Ok(scores)
         })();
         if result.is_err() { pass.discard(&mut batch)?; }

@@ -1389,3 +1389,29 @@ target/draft fixture passed its three 16-request cycles, graph-exact output,
 queued commits and cancellation/reuse checks (`scheduler-draft-single-regression.log`,
 8.41 seconds). These checks do not yet exercise complete dual-RTX serving or
 establish throughput gains.
+
+The shared serving prefill/continuation function now uses static `PrefillTarget`
+operations for either target layout. It covers bounded encoder-prefix replay,
+short encoder chunks, paired encoder streaming, decoder suffix replay and full
+cached-context continuation. The distributed suffix is allocated on the device
+owning layer 19. Distributed replay/continuation commits queue the target and
+dSpark cache writes, poll both cooperatively and publish their accepted frontier;
+error/cancellation cleanup drains the pending transactions. The single-GPU
+implementation retains its existing projection/download and commit operations.
+
+The distributed fixture now invokes the actual shared serving-prefill function
+with chunk sizes 3 and 16, checks its anchor against sequential execution with
+matching chunks, runs the first dSpark proposal from the resulting context, and
+continues from seven to nine cached tokens. Target and all three draft cache
+frontiers agree. The complete fixture, including 32 interleaved cases and
+cancellation checks, passed in 19.84 seconds (`prefill-interface-distributed.log`).
+The initial comparison against a one-shot pass exposed chunk-size sensitivity
+for the synthetic token sequence: three-row chunks produce anchor 74 in both
+sequential and serving-streamed execution, while the one-shot pass produces 200.
+The test therefore compares matching partitions; this is not a production
+quality qualification or evidence of an end-to-end speedup. Production worker
+construction and selection of the distributed serving loop remain outstanding.
+
+All 25 serving unit tests passed, and the existing single-RTX target/draft
+correctness fixture passed in 8.62 seconds (`prefill-interface-single.log`).
+These checks do not replace the required serving performance regression tests.
