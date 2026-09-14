@@ -115,18 +115,22 @@ pub(crate) struct RankWave<'a> {
     capacity: u32,
 }
 impl<'a> RankWave<'a> {
+    fn kernel_capacities(capacity: u32) -> Result<Vec<u32>> {
+        ensure!((1..=4096).contains(&capacity), "invalid TP2 rank capacity");
+        let compiled = [1, 16, 80, 256, 1024, 4096].into_iter().find(|&c| c >= capacity).unwrap();
+        Ok([1, 16, 80, 256, 1024, 4096].into_iter().filter(|&c| c <= compiled).collect())
+    }
+
     pub fn device_bytes(library: &ds41rt_ffi::NativeLibrary, capacity: u32) -> Result<usize> {
-        ensure!([1,16,80,256,1024,4096].contains(&capacity), "invalid TP2 rank capacity");
-        let scratch = [1,16,80,256,1024,4096].into_iter().filter(|&c| c <= capacity)
+        let scratch = Self::kernel_capacities(capacity)?.into_iter()
             .map(|c| Ok(usize::try_from(library.v41_tp2_expert_info(c)?.scratch_bytes)?))
             .collect::<Result<Vec<_>>>()?.into_iter().max().unwrap();
         scratch.checked_add(capacity as usize*5120*6*4)
             .ok_or_else(|| anyhow::anyhow!("TP2 rank workspace overflow"))
     }
     pub fn new(weights: Rc<RankWeights<'a>>, capacity: u32) -> Result<Self> {
-        ensure!(matches!(capacity, 1 | 16 | 80 | 256 | 1024 | 4096), "invalid TP2 rank capacity");
         let device = weights.device;
-        let capacities: Vec<u32> = [1, 16, 80, 256, 1024, 4096].into_iter().filter(|&c| c <= capacity).collect();
+        let capacities = Self::kernel_capacities(capacity)?;
         let kernels = device.run(|| capacities.iter().map(|&c| device.library.v41_tp2_expert_kernel(c))
             .collect::<Result<Vec<_>>>())?;
         let bytes = kernels.iter().map(|k| k.info().scratch_bytes as usize).max().unwrap();

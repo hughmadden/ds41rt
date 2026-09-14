@@ -138,7 +138,7 @@ pub(crate) struct RankWave<'a> {
 }
 impl<'a> RankWave<'a> {
     pub fn device_bytes(library: &ds41rt_ffi::NativeLibrary, capacity: u32) -> Result<usize> {
-        ensure!([1,16,80,256,1024,4096].contains(&capacity), "invalid shared TP2 capacity");
+        ensure!((1..=4096).contains(&capacity), "invalid shared TP2 capacity");
         let up = library.v41_fp8_matrix_plan(capacity,5120,1152)?;
         let down = library.v41_fp8_matrix_plan(capacity,1152,5120)?;
         usize::try_from(up.info().scratch_bytes)?.checked_add(usize::try_from(down.info().scratch_bytes)?)
@@ -204,7 +204,7 @@ mod tests {
     #[ignore = "requires shared TP2 DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, two GPUs"]
     fn real_shared_tp2_complete_independent_lanes() -> Result<()> {
         let capacity: u32 = std::env::var("DS41RT_TP2_TEST_CAPACITY").unwrap_or_else(|_| "16".into()).parse()?;
-        ensure!([1,16,80,256,1024,4096].contains(&capacity), "invalid fixture capacity");
+        ensure!((1..=4096).contains(&capacity), "invalid fixture capacity");
         let lib = unsafe { ds41rt_ffi::NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let catalog = ds41rt_loader::read_official_v41_catalog(ds41rt_loader::OFFICIAL_V41_MODEL_ID,
             std::path::Path::new(&std::env::var("DS41RT_SNAPSHOT")?))?;

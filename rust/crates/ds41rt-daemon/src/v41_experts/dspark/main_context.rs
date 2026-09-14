@@ -83,7 +83,7 @@ impl DsparkMainContext<'_, '_> {
     /// committed and private-draft KV use separate projection workspaces.
     pub fn additional_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         ensure!(
-            [1, 16, 80, 256, 1024, 4096].contains(&capacity),
+            (1..=4096).contains(&capacity),
             "invalid main context capacity"
         );
         Ok(1152 + capacity as usize * (10240 + 256 + 8 + 3 * 1024)

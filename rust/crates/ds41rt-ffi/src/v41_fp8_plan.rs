@@ -18,14 +18,14 @@ pub struct V41Fp8Plan<'a> {
 }
 
 fn capacities(capacity: u32) -> Result<Vec<u32>> {
-    // Forty-row owners use the existing <=80-row kernel with live row bounds.
-    if capacity == 40 { return Ok(vec![1, 16, 80]); }
-    ensure!(
-        [1, 16, 80, 256, 1024, 4096].contains(&capacity),
-        "unsupported FP8 plan capacity"
-    );
-    let mut result: Vec<_> = [1, 16, 80].into_iter().filter(|&n| n < capacity).collect();
-    result.push(capacity);
+    ensure!((1..=4096).contains(&capacity), "unsupported FP8 plan capacity");
+    // The plan bounds live rows independently of the AOT kernel's maximum.
+    // Kernel scratch remains fully sized; callers may size input/output storage
+    // to live capacity because launches validate and predicate on actual rows.
+    let compiled = [1, 16, 80, 256, 1024, 4096].into_iter()
+        .find(|&n| n >= capacity).context("FP8 capacity has no compiled kernel")?;
+    let mut result: Vec<_> = [1, 16, 80].into_iter().filter(|&n| n < compiled).collect();
+    result.push(compiled);
     Ok(result)
 }
 
@@ -239,7 +239,10 @@ mod tests {
         assert_eq!(capacities(40).unwrap(), [1, 16, 80]);
         assert_eq!(capacities(1).unwrap(), [1]);
         assert!(capacities(0).is_err());
-        assert!(capacities(2048).is_err());
+        assert_eq!(capacities(2048).unwrap(), [1, 16, 80, 4096]);
+        assert_eq!(capacities(128).unwrap(), [1, 16, 80, 256]);
+        assert_eq!(capacities(257).unwrap(), [1, 16, 80, 1024]);
+        assert!(capacities(4097).is_err());
         let mut invalid = infos;
         invalid[0].scratch_bytes = u64::MAX;
         assert!(layout(&invalid).is_err());

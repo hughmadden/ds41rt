@@ -1,6 +1,6 @@
 # Phase 2: two RTX coordinators and four Sparks
 
-Status: forced dual-GPU worker serves text with dSpark; large-prefill workspace sizing, automatic deployment selection and release qualification remain incomplete.
+Status: forced dual-GPU worker serves long prompts at the release prefill step; further workspace/KV sizing, automatic deployment selection and release qualification remain incomplete.
 
 ## Required outcome
 
@@ -1497,3 +1497,46 @@ C16 traffic, and do not establish a throughput improvement.
 The existing single-RTX target/draft correctness fixture passed in 8.24 seconds
 (`dual-worker-single-regression.log`); single-RTX throughput remains unmeasured
 for this integration increment.
+
+
+Live row capacity is now separate from compiled FP8 and TP2 kernel capacity.
+For a 2048-row serving step, the target, TP2 transfer/output and dSpark main-context
+buffers hold 2048 live rows while the selected 4096-row AOT kernels retain their
+full required scratch. FP8 plans and TP2 rank plans select the covering compiled
+shape; their live-row bounds reject oversized launches. Existing supported
+capacities keep the same kernel choices and scratch layouts. Single-RTX startup
+continues using its existing rounded capacities. No allocation or synchronization
+was added to the decode loop, and lane owners remain independent.
+
+This resolves the prior 2048-step startup OOM. Reducing target row buffers first
+lowered occupancy after both target lanes from 95,788,728,320 / 94,136,172,544 to
+88,731,811,840 / 86,875,832,320 bytes. Extending live-row sizing to TP2 buffers and
+dSpark main context then lowered GPU1 occupancy before cache allocation from
+99,553,116,160 to 97,873,297,408 bytes. The fitting global pool grew from
+619,724,800 bytes (696,320 source-token positions) to 4,818,816,000 bytes
+(5,414,400 positions, both including tail/COW allowance). This is still an interim
+pool below the intended aggregate capacity, with GPU1 limiting it and about
+4.54 GB left unused on GPU0 beyond reserved runtime headroom. These are memory
+measurements, not throughput gains.
+
+`live-capacity-all-worker-long.log` passed the actual forced worker at the release
+2048 prefill step: the first prompt has 3013 tokens and runs paired encoder chunks
+of 2048 and 965 rows, followed by decoder replay, adaptive dSpark generation and
+retirement. A second code request and a third exact-repeat prompt also complete;
+the repeated arithmetic prompt reports a full cache hit and both arithmetic
+responses are `Four.`. The full fixture took 16.96 seconds. Earlier target-only
+live-row checks are in `live-capacity-worker-2048.log` and
+`live-capacity-worker-long.log`. FP8 scratch/layout unit tests passed
+(`live-capacity-plan-tests.log`), as did 27 serving unit tests with two hardware
+fixtures ignored (`live-capacity-unit.log`). This is not tool/vision qualification
+or a serving throughput benchmark.
+
+Further GPU1 workspace reductions must account for full cached continuation:
+`prefill_continuation` can currently submit an entire requested chunk through all
+forty layers. Fresh-prompt decoder replay is bounded, but that alone does not
+justify a 128-row decoder workspace. Do not silently truncate or overrun cached
+continuation when introducing stage-specific capacities.
+
+The single-RTX target/draft correctness fixture passed in 8.40 seconds
+(`live-capacity-single-regression.log`). End-to-end single-RTX throughput and
+startup comparisons are still required.

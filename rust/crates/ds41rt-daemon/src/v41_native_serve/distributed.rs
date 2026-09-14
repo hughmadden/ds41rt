@@ -14,7 +14,9 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
     ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>) -> Result<()> {
     ensure!(matches!(args.rtx_expert_layers, memory::LocalLayers::Auto | memory::LocalLayers::Count(20)),
         "two RTX serving requires all 20 encoder expert layers");
-    let capacity = prefill_capacity(args.prefill_batch_tokens)?;
+    prefill_capacity(args.prefill_batch_tokens)?;
+    // AOT kernels keep their full scratch; row storage follows live capacity.
+    let capacity = args.prefill_batch_tokens.max(256);
     let lib = unsafe { NativeLibrary::load(&args.native_lib)? };
     lib.cuda_set_device(0)?;
     let devices = [Device { library: &lib, id: 0 }, Device { library: &lib, id: 1 }];
@@ -254,8 +256,10 @@ mod tests {
         let args = crate::cli::NativeServeArgs::from_arg_matches(&matches)?;
         let (send, receive) = mpsc::channel(16);
         let mut outputs = Vec::new();
-        for text in ["What is two plus two? Answer briefly.", "Write a Python function that adds two numbers.",
-            "What is two plus two? Answer briefly."] {
+        let arithmetic = if std::env::var_os("DS41RT_WORKER_LONG").is_some() {
+            format!("{}\nWhat is two plus two? Answer briefly.", "This is background context.\n".repeat(600))
+        } else { "What is two plus two? Answer briefly.".into() };
+        for text in [arithmetic.as_str(), "Write a Python function that adds two numbers.", arithmetic.as_str()] {
             let (events, output) = mpsc::channel(64);
             send.blocking_send(NativeRequest { prompt: format!("<｜begin▁of▁sentence｜><｜User｜>{text}<｜Assistant｜></think>"),
                 constraint: None, images: Vec::new(), max_tokens: 8, events })?;
