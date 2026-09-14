@@ -174,9 +174,10 @@ fn store_latency_matches_the_modelled_copy_time() {
 #[test]
 fn store_latency_lands_past_the_first_bucket() {
     // A modelled latency in the 10–50 ms band must land in bucket 3, not bucket 0: the
-    // placement is by value, not by "any copy fits the first bound".
+    // placement is by value, not by "any copy fits the first bound". A store is one batch
+    // since HC-8, so the band is set by the per-submission latency alone.
     let model = CopyModel {
-        per_copy_latency_ns: 1_000_000,
+        per_copy_latency_ns: 20_000_000,
         ..CopyModel::default()
     };
     let config = config(4 * CHUNK as u64, StoreMode::OnRetain);

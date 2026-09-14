@@ -15,7 +15,7 @@ use crate::v41_dspark_cache::DsparkPrefix;
 use crate::v41_memory::SnapshotStorage;
 use crate::v41_window::WindowPrefix;
 use ds41rt_core::EngramHistory;
-use ds41rt_ffi::{Ds41rtDeviceBuffer, Ds41rtHostBuffer, NativeLibrary};
+use ds41rt_ffi::{CopyMechanism, CudaRuntime, Ds41rtDeviceBuffer, Ds41rtHostBuffer, NativeLibrary};
 use ds41rt_hostcache::cache::{
     DevicePage, DeviceSnapshot, EvictDecision, HostCache, RestoreOutcome, RestoreTarget,
     StoreOutcome, StoreTicket,
@@ -70,6 +70,20 @@ pub(crate) struct CudaCopyEngine<'a> {
     streams: [StreamState; 2],
     next_event: u64,
     started: Instant,
+    /// The CUDA runtime already loaded in the process, when it carries
+    /// `cudaMemcpyBatchAsync` (CUDA ≥ 12.8); `None` selects the merged-1D fallback.
+    runtime: Option<CudaRuntime>,
+    /// Engine submissions issued so far, for the `copy_submissions` metric.
+    submissions: u64,
+    /// Per-engine scratch for the batch pointer/size arrays, reused across restores so a
+    /// fragmented snapshot costs no allocation churn; grows unbounded with the plan.
+    batch_dsts: Vec<*mut c_void>,
+    batch_srcs: Vec<*const c_void>,
+    batch_sizes: Vec<usize>,
+    /// Per-engine scratch that flips `d2h_many`'s `(device, host)` pairs into the
+    /// `(host, device)` orientation `issue_many` consumes, reused across restores so no
+    /// per-restore reorder allocation is needed.
+    ordered: Vec<(HostRange, DeviceRange)>,
 }
 
 impl<'a> CudaCopyEngine<'a> {
@@ -85,6 +99,22 @@ impl<'a> CudaCopyEngine<'a> {
             });
         }
         let streams = streams.try_into().ok().expect("two streams");
+        // Probe the already-loaded runtime once; absence or a pre-12.8 runtime is not an
+        // error, it selects the merged-1D fallback the cache's coalescing already feeds.
+        let runtime = CudaRuntime::load();
+        // `load()` already applied the version selection, so `Some` always means
+        // batch-capable: the mechanism is fully determined by presence, and the fallback is
+        // `None` (absent or pre-12.8 runtime).
+        let mechanism = match &runtime {
+            Some(_) => CopyMechanism::MemcpyBatch,
+            None => CopyMechanism::Merged1d,
+        };
+        tracing::info!(
+            target: "ds41rt::host_cache",
+            mechanism = mechanism.name(),
+            runtime_version = runtime.as_ref().map(CudaRuntime::version).unwrap_or(0),
+            "host snapshot cache copy mechanism"
+        );
         Ok(Self {
             library,
             template,
@@ -92,6 +122,12 @@ impl<'a> CudaCopyEngine<'a> {
             streams,
             next_event: 0,
             started: Instant::now(),
+            runtime,
+            submissions: 0,
+            batch_dsts: Vec::new(),
+            batch_srcs: Vec::new(),
+            batch_sizes: Vec::new(),
+            ordered: Vec::new(),
         })
     }
     fn state(&mut self, stream: Stream) -> &mut StreamState {
@@ -105,8 +141,15 @@ impl<'a> CudaCopyEngine<'a> {
         }
     }
     fn host(&self, range: HostRange) -> Result<Ds41rtHostBuffer> {
-        let chunk = self
-            .chunks
+        Self::resolve_host(&self.chunks, range)
+    }
+    /// Resolve a `HostRange` against the live chunk table — the single bounds-check every
+    /// copy path goes through.
+    fn resolve_host(
+        chunks: &[Option<Ds41rtHostBuffer>],
+        range: HostRange,
+    ) -> Result<Ds41rtHostBuffer> {
+        let chunk = chunks
             .get(range.chunk as usize)
             .and_then(Option::as_ref)
             .context("host cache chunk released")?;
@@ -132,6 +175,61 @@ impl<'a> CudaCopyEngine<'a> {
                 .iter()
                 .any(|&(id, _)| id == event.0)
         })
+    }
+
+    /// Issue a whole coalesced copy list: `(host, device)` pairs with `d2h` selecting the
+    /// direction. Every extent is bounds-validated through `host()` before anything is
+    /// submitted, exactly as the 1D path validates a single copy. With a batch-capable runtime
+    /// the list goes to `cudaMemcpyBatchAsync` as one submission through the reused scratch
+    /// arrays; without one (older or absent runtime) the merged extents fall back to 1D
+    /// copies, one submission each.
+    fn issue_many(
+        &mut self,
+        stream: Stream,
+        copies: &[(HostRange, DeviceRange)],
+        d2h: bool,
+    ) -> Result<()> {
+        if copies.is_empty() {
+            return Ok(());
+        }
+        let Some(runtime) = self.runtime.clone() else {
+            for &(host, device) in copies {
+                if d2h {
+                    self.d2h(stream, device, host)?;
+                } else {
+                    self.h2d(stream, host, device)?;
+                }
+            }
+            return Ok(());
+        };
+        let raw = self.state(stream).raw;
+        self.batch_dsts.clear();
+        self.batch_srcs.clear();
+        self.batch_sizes.clear();
+        self.batch_dsts.reserve(copies.len());
+        self.batch_srcs.reserve(copies.len());
+        self.batch_sizes.reserve(copies.len());
+        for &(host, device) in copies {
+            ensure!(host.bytes == device.bytes, "copy length mismatch");
+            // Resolve and bounds-check in the same pass that builds the pointers: every
+            // copy is looked up exactly once, and nothing is submitted until the whole
+            // list has validated.
+            let host = Self::resolve_host(&self.chunks, host)?;
+            let device_ptr = device.addr as *mut c_void;
+            let (dst, src) = if d2h {
+                (host.ptr, device_ptr.cast_const())
+            } else {
+                (device_ptr, host.ptr.cast_const())
+            };
+            self.batch_dsts.push(dst);
+            self.batch_srcs.push(src);
+            self.batch_sizes.push(device.bytes);
+        }
+        unsafe {
+            runtime.memcpy_batch_async(&self.batch_dsts, &self.batch_srcs, &self.batch_sizes, raw)
+        }?;
+        self.submissions += 1;
+        Ok(())
     }
 }
 
@@ -161,7 +259,9 @@ impl CopyEngine for CudaCopyEngine<'_> {
         unsafe {
             self.library
                 .copy_d2h_host_buffer_async(host, device, src.bytes, raw)
-        }
+        }?;
+        self.submissions += 1;
+        Ok(())
     }
     fn h2d(&mut self, stream: Stream, src: HostRange, dst: DeviceRange) -> Result<()> {
         ensure!(src.bytes == dst.bytes, "copy length mismatch");
@@ -169,7 +269,26 @@ impl CopyEngine for CudaCopyEngine<'_> {
         unsafe {
             self.library
                 .copy_host_buffer_h2d_async(device, host, src.bytes, raw)
-        }
+        }?;
+        self.submissions += 1;
+        Ok(())
+    }
+    fn d2h_many(&mut self, stream: Stream, copies: &[(DeviceRange, HostRange)]) -> Result<()> {
+        // Flip into the reused scratch instead of allocating a reorder Vec per call; taken
+        // out for the issue_many call so the engine borrows do not conflict.
+        self.ordered.clear();
+        self.ordered
+            .extend(copies.iter().map(|&(device, host)| (host, device)));
+        let ordered = std::mem::take(&mut self.ordered);
+        let result = self.issue_many(stream, &ordered, true);
+        self.ordered = ordered;
+        result
+    }
+    fn h2d_many(&mut self, stream: Stream, copies: &[(HostRange, DeviceRange)]) -> Result<()> {
+        self.issue_many(stream, copies, false)
+    }
+    fn submission_count(&self) -> u64 {
+        self.submissions
     }
     fn record(&mut self, stream: Stream) -> Result<Event> {
         let event = self.library.cuda_event_create()?;
