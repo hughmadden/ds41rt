@@ -4,42 +4,18 @@
 mod common;
 
 use common::{apply, Model, Op};
-use ds41rt_hostcache::pool::Class;
-use ds41rt_hostcache::snapshot::{DevicePageId, SnapshotMeta, Snapshots};
-use ds41rt_hostcache::testing::{resident_snapshots, test_layout, FakePool};
-use ds41rt_hostcache::{SnapshotKind, COMPRESSORS};
+use ds41rt_hostcache::pool::testing::CHUNK;
+use ds41rt_hostcache::pool::{Class, Layout};
+use ds41rt_hostcache::snapshot::testing::{
+    id, meta, pages, resident_snapshots, snapshots, snapshots_with_layout,
+};
+use ds41rt_hostcache::snapshot::DevicePageId;
+use ds41rt_hostcache::SnapshotKind;
 use proptest::prelude::*;
-
-fn id(page: u32) -> DevicePageId {
-    DevicePageId {
-        compressor: 0,
-        page,
-        generation: 0,
-    }
-}
-
-fn meta(kind: SnapshotKind, tokens: &[u32], has_draft: bool) -> SnapshotMeta {
-    SnapshotMeta {
-        kind,
-        tokens: tokens.to_vec(),
-        end: tokens.len() as u32,
-        has_draft,
-    }
-}
-
-fn pages(ids: &[DevicePageId]) -> [Vec<DevicePageId>; COMPRESSORS] {
-    let mut pages: [Vec<DevicePageId>; COMPRESSORS] = std::array::from_fn(|_| Vec::new());
-    pages[0].extend_from_slice(ids);
-    pages
-}
-
-fn store(quota: u64) -> Snapshots<FakePool> {
-    Snapshots::new(FakePool::new(quota, test_layout()))
-}
 
 #[test]
 fn store_lookup_evict_happy_path() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let plan = store
         .plan_store(
             meta(SnapshotKind::Turn, &[1, 2, 3], true),
@@ -66,8 +42,8 @@ fn store_lookup_evict_happy_path() {
 
 #[test]
 fn plan_exhaustion_holds_nothing() {
-    let layout = test_layout();
-    let mut store = store((layout.tail + layout.scores) as u64);
+    // Two chunks: the tail and scores classes take one each, leaving none for a page.
+    let mut store = snapshots(2 * CHUNK as u64);
     let error = store
         .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&[id(1)]))
         .expect_err("page class exhausted");
@@ -79,7 +55,7 @@ fn plan_exhaustion_holds_nothing() {
 
 #[test]
 fn exact_sharing_copies_shared_pages_once() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let first = store
         .plan_store(
             meta(SnapshotKind::Turn, &[1, 2, 3], false),
@@ -97,21 +73,20 @@ fn exact_sharing_copies_shared_pages_once() {
     assert_eq!(second.copies.len(), 1);
     assert_eq!(second.copies[0].2, id(4));
     let second_key = store.commit_store(second, 1);
-    assert_eq!(store.pool().slabs_in_use(Class::Page), 4);
     assert_eq!(store.live_pages(), 4);
     let shared = store.get(first_key).expect("first").pages[0][0];
     assert_eq!(store.page_ref_count(shared), 2);
     assert!(store.remove(first_key));
     // id(3) was private to the first snapshot; the two shared pages stay.
-    assert_eq!(store.pool().slabs_in_use(Class::Page), 3);
+    assert_eq!(store.live_pages(), 3);
     assert!(store.remove(second_key));
-    assert_eq!(store.pool().slabs_in_use(Class::Page), 0);
+    assert_eq!(store.live_pages(), 0);
     assert_eq!(store.bytes_used(), 0);
 }
 
 #[test]
 fn freed_device_page_is_copied_again_while_the_old_host_page_persists() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let first = store
         .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&[id(1)]))
         .expect("plan");
@@ -136,7 +111,7 @@ fn freed_device_page_is_copied_again_while_the_old_host_page_persists() {
 
 #[test]
 fn replace_on_same_tokens_releases_the_old_snapshot() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let first = store
         .plan_store(meta(SnapshotKind::Turn, &[5, 6], false), &pages(&[id(1)]))
         .expect("plan");
@@ -149,12 +124,11 @@ fn replace_on_same_tokens_releases_the_old_snapshot() {
     assert!(store.get(first_key).is_none());
     assert!(store.get(second_key).is_some());
     assert_eq!(store.live_pages(), 1);
-    assert_eq!(store.pool().slabs_in_use(Class::Page), 1);
 }
 
 #[test]
 fn pin_blocks_eviction_until_unpinned() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let a = store
         .plan_store(meta(SnapshotKind::Prompt, &[1], false), &pages(&[id(1)]))
         .expect("plan");
@@ -176,8 +150,30 @@ fn pin_blocks_eviction_until_unpinned() {
 }
 
 #[test]
+fn a_snapshot_pinned_twice_survives_one_unpin() {
+    let mut store = snapshots(1 << 30);
+    let plan = store
+        .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&[id(1)]))
+        .expect("plan");
+    let key = store.commit_store(plan, 0);
+    store.pin(key);
+    store.pin(key);
+    let (evicted, _) = store.evict_to(0);
+    assert!(evicted.is_empty());
+    assert!(store.get(key).is_some());
+    store.unpin(key);
+    let (evicted, _) = store.evict_to(0);
+    assert!(evicted.is_empty());
+    assert!(store.get(key).is_some());
+    store.unpin(key);
+    let (evicted, _) = store.evict_to(0);
+    assert_eq!(evicted, vec![key]);
+    assert!(store.is_empty());
+}
+
+#[test]
 fn eviction_order_is_prompts_before_turns_oldest_first() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let p1 = store
         .plan_store(meta(SnapshotKind::Prompt, &[1], false), &pages(&[id(1)]))
         .expect("plan");
@@ -197,7 +193,7 @@ fn eviction_order_is_prompts_before_turns_oldest_first() {
 
 #[test]
 fn remove_reports_whether_the_key_was_present() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let plan = store
         .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&[id(1)]))
         .expect("plan");
@@ -209,7 +205,7 @@ fn remove_reports_whether_the_key_was_present() {
 
 #[test]
 fn abort_store_releases_every_part() {
-    let mut store = store(1 << 30);
+    let mut store = snapshots(1 << 30);
     let plan = store
         .plan_store(
             meta(SnapshotKind::Turn, &[1, 2], true),
@@ -220,6 +216,91 @@ fn abort_store_releases_every_part() {
     assert_eq!(store.bytes_used(), 0);
     assert_eq!(store.live_pages(), 0);
     assert!(store.is_empty());
+}
+
+#[test]
+fn abort_of_a_plan_that_shared_a_committed_page_restores_the_count() {
+    let mut store = snapshots(1 << 30);
+    let first = store
+        .plan_store(
+            meta(SnapshotKind::Turn, &[1], false),
+            &pages(&[id(1), id(2)]),
+        )
+        .expect("plan");
+    let first_key = store.commit_store(first, 0);
+    let shared = store.get(first_key).expect("first").pages[0][0];
+    assert_eq!(store.page_ref_count(shared), 1);
+    let second = store
+        .plan_store(
+            meta(SnapshotKind::Turn, &[2], false),
+            &pages(&[id(1), id(3)]),
+        )
+        .expect("plan");
+    assert_eq!(store.page_ref_count(shared), 2);
+    store.abort_store(second);
+    assert_eq!(store.page_ref_count(shared), 1);
+    assert_eq!(store.live_pages(), 2);
+}
+
+#[test]
+fn plan_exhaustion_restores_shared_page_counts() {
+    // Three chunks: tail, scores and exactly sixteen pages fill them.
+    let mut store = snapshots(3 * CHUNK as u64);
+    let ids: Vec<DevicePageId> = (0..16).map(id).collect();
+    let first = store
+        .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&ids))
+        .expect("plan");
+    let first_key = store.commit_store(first, 0);
+    let before = store.page_ref_counts();
+    // The second plan shares all sixteen pages and then needs a seventeenth, which the pool
+    // cannot supply; the shared counts must return to their prior values.
+    let mut more = ids.clone();
+    more.push(id(99));
+    let error = store
+        .plan_store(meta(SnapshotKind::Turn, &[2], false), &pages(&more))
+        .expect_err("page class exhausted");
+    assert_eq!(error.class, Class::Page);
+    assert_eq!(store.page_ref_counts(), before);
+    assert_eq!(store.live_pages(), 16);
+    assert!(store.get(first_key).is_some());
+}
+
+#[test]
+fn two_plans_of_a_live_page_before_commit_do_not_share() {
+    let mut store = snapshots(1 << 30);
+    let first = store
+        .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&[id(1)]))
+        .expect("plan");
+    let second = store
+        .plan_store(meta(SnapshotKind::Turn, &[2], false), &pages(&[id(1)]))
+        .expect("plan");
+    // The identity is not mapped until commit, so both plans copy it.
+    assert_eq!(first.copies.len(), 1);
+    assert_eq!(second.copies.len(), 1);
+    assert_eq!(store.live_pages(), 2);
+    // The first copy fails; its page is released.
+    store.abort_store(first);
+    assert_eq!(store.live_pages(), 1);
+    // The second commits with the correct bytes and references.
+    let second_key = store.commit_store(second, 1);
+    assert_eq!(store.live_pages(), 1);
+    assert_eq!(store.page_ref_total(), 1);
+    let page = store.get(second_key).expect("second").pages[0][0];
+    assert_eq!(store.page_device(page), Some(id(1)));
+    assert_eq!(store.page_ref_count(page), 1);
+}
+
+#[test]
+fn zero_scores_layout_stores_without_a_scores_slab() {
+    let layout = Layout::engine(0);
+    let mut store = snapshots_with_layout(8 * layout.tail as u64, layout);
+    let plan = store
+        .plan_store(meta(SnapshotKind::Turn, &[1, 2], false), &pages(&[id(1)]))
+        .expect("plan");
+    assert!(plan.scores.is_none());
+    let key = store.commit_store(plan, 0);
+    assert!(store.get(key).expect("snapshot").scores.is_none());
+    assert_eq!(store.bytes_used(), (layout.tail + layout.page) as u64);
 }
 
 fn device_id() -> impl Strategy<Value = DevicePageId> {
@@ -267,10 +348,10 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(256))]
     #[test]
     fn random_sequences_match_the_model(ops in prop::collection::vec(operation(), 1..40)) {
-        let mut store = Snapshots::new(FakePool::new(1 << 40, test_layout()));
+        let mut store = snapshots(1 << 24);
         let mut model = Model::new();
         for (step, op) in ops.iter().enumerate() {
-            apply(&mut store, &mut model, op, step as u64);
+            apply(&mut store, &mut model, op, step as u64, &mut None);
         }
     }
 }

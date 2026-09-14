@@ -1,12 +1,12 @@
 //! Concurrency suite for packet HC-2. The crate is single-threaded by design, so "concurrency"
-//! means interleaving: several lanes of store/lookup/pin/evict/free steps are run in a seeded,
-//! logged order with shared device pages, and the model is checked after every step. A failure
-//! reproduces from its seed.
+//! means interleaving: several lanes of plan/commit/abort/lookup/pin/evict/free steps are run in
+//! a seeded, logged order with shared device pages, and the model is checked after every step.
+//! A failure prints the schedule log and reproduces from its seed.
 mod common;
 
 use common::{apply, Model, Op};
-use ds41rt_hostcache::snapshot::{DevicePageId, Snapshots};
-use ds41rt_hostcache::testing::{test_layout, FakePool};
+use ds41rt_hostcache::snapshot::testing::snapshots;
+use ds41rt_hostcache::snapshot::{DevicePageId, StorePlan};
 use ds41rt_hostcache::SnapshotKind;
 
 /// A small deterministic generator so a schedule reproduces from its seed.
@@ -55,32 +55,34 @@ fn page_list(rng: &mut Rng, ids: &[DevicePageId]) -> Vec<DevicePageId> {
         .collect()
 }
 
+/// A lane's script: plans interleaved with commits and aborts, plus lookups, evictions, frees
+/// and pins. A commit or abort with no pending plan is a no-op.
 fn lane_script(lane: usize, rng: &mut Rng, ids: &[DevicePageId], tokens: &[Vec<u32>]) -> Vec<Op> {
     (0..24)
-        .map(|step| match (lane + step) % 4 {
-            0 => Op::Store {
-                kind: SnapshotKind::Prompt,
+        .map(|step| match (lane + step) % 6 {
+            0 | 2 => Op::Plan {
+                kind: if (lane + step).is_multiple_of(4) {
+                    SnapshotKind::Prompt
+                } else {
+                    SnapshotKind::Turn
+                },
                 tokens: tokens[rng.below(tokens.len() as u64) as usize].clone(),
                 has_draft: rng.below(2) == 0,
                 pages: page_list(rng, ids),
             },
-            1 => Op::Store {
-                kind: SnapshotKind::Turn,
-                tokens: tokens[rng.below(tokens.len() as u64) as usize].clone(),
-                has_draft: false,
-                pages: page_list(rng, ids),
-            },
-            2 => Op::Lookup {
-                tokens: tokens[rng.below(tokens.len() as u64) as usize].clone(),
-            },
-            _ => match rng.below(4) {
-                0 => Op::Evict {
+            1 => Op::Commit,
+            3 => Op::Abort,
+            _ => match rng.below(5) {
+                0 => Op::Lookup {
+                    tokens: tokens[rng.below(tokens.len() as u64) as usize].clone(),
+                },
+                1 => Op::Evict {
                     quota: rng.below(3) * 1_000_000,
                 },
-                1 => Op::Free {
+                2 => Op::Free {
                     id: ids[rng.below(ids.len() as u64) as usize],
                 },
-                2 => Op::Pin { key: rng.below(20) },
+                3 => Op::Pin { key: rng.below(20) },
                 _ => Op::Unpin { key: rng.below(20) },
             },
         })
@@ -94,8 +96,9 @@ fn run_seed(seed: u64) -> Vec<String> {
     let mut lanes: Vec<Vec<Op>> = (0..4)
         .map(|lane| lane_script(lane, &mut rng, &ids, &tokens))
         .collect();
-    let mut store = Snapshots::new(FakePool::new(1 << 40, test_layout()));
+    let mut store = snapshots(1 << 24);
     let mut model = Model::new();
+    let mut pending: Vec<Option<StorePlan>> = (0..lanes.len()).map(|_| None).collect();
     let mut log = Vec::new();
     let mut now = 0u64;
     while lanes.iter().any(|lane| !lane.is_empty()) {
@@ -105,7 +108,16 @@ fn run_seed(seed: u64) -> Vec<String> {
         }
         let op = lanes[lane].remove(0);
         log.push(format!("{now}: lane {lane} {op:?}"));
-        apply(&mut store, &mut model, &op, now);
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            apply(&mut store, &mut model, &op, now, &mut pending[lane]);
+        }));
+        if let Err(payload) = outcome {
+            eprintln!("seed {seed}: model mismatch after step {now}");
+            for line in &log {
+                eprintln!("  {line}");
+            }
+            std::panic::resume_unwind(payload);
+        }
         now += 1;
     }
     assert_eq!(store.len(), model.snapshots.len());

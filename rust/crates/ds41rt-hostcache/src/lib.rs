@@ -24,8 +24,6 @@ pub mod metrics;
 pub mod pool;
 pub mod sim;
 pub mod snapshot;
-#[doc(hidden)]
-pub mod testing;
 
 pub use ds41rt_core::prefix::SnapshotKind;
 

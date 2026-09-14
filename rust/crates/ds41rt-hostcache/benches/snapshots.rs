@@ -1,8 +1,8 @@
 //! Criterion groups for packet HC-2: lookup throughput at 10k resident snapshots, `plan_store`
 //! cost for a 1M-token snapshot, and eviction throughput. Sizes use the crate's engine constants.
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
-use ds41rt_hostcache::snapshot::{DevicePageId, SnapshotMeta, Snapshots};
-use ds41rt_hostcache::testing::{resident_snapshots, test_layout, FakePool};
+use ds41rt_hostcache::snapshot::testing::{resident_snapshots, snapshots};
+use ds41rt_hostcache::snapshot::{DevicePageId, SnapshotMeta};
 use ds41rt_hostcache::{SnapshotKind, COMPRESSORS};
 
 /// Lookups per second over 10k resident 4k-token snapshots sharing a 2k-token prefix.
@@ -23,7 +23,7 @@ fn lookup(c: &mut Criterion) {
 
 /// Planning a 1M-token snapshot: one page slab per 100 tokens across four compressors.
 fn plan_store(c: &mut Criterion) {
-    let mut store = Snapshots::new(FakePool::new(1 << 42, test_layout()));
+    let mut store = snapshots(1 << 28);
     let tokens: Vec<u32> = (0..1_000_000).collect();
     let pages: [Vec<DevicePageId>; COMPRESSORS] = std::array::from_fn(|compressor| {
         (0..(1_000_000 / 100) as u32)
