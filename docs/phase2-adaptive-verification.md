@@ -302,5 +302,41 @@ the earlier tables remain records of their actual measured configurations.
 | mixed aggregate tok/s | 150.9 | 138.1 | 159.3 | 199.1 | 291.6 |
 
 The full graph cache is kept. The bounded-cache experiment is not part of the
-implementation. Placement-aware costs and K7 remain experimental pending the
-single-RTX comparison; the dual-RTX pool default changes independently.
+implementation. Placement-aware costs and K7 remain experimental; the completed single-RTX
+comparison below does not support a universal default change. The dual-RTX pool
+default changes independently.
+
+
+### Single-RTX default comparison
+
+The optimized, uninstrumented single-RTX comparison completed three code
+samples per concurrency and three mixed sweeps per arm, with the existing
+single-RTX pool unchanged. All 279 measured code responses passed the static
+code contract, all nine mixed sweeps passed their streaming checks, and no
+server warning or error was logged. Mixed lifecycle probes were skipped; this
+is a focused performance comparison, not a full quality qualification.
+
+| Policy / workload (aggregate tok/s) | C1 | C2 | C4 | C8 | C16 |
+|---|---:|---:|---:|---:|---:|
+| Legacy K5 / code | 126.2 | 202.9 | 361.2 | 554.7 | 918.3 |
+| Legacy K5 / mixed | 121.1 | 70.6 | 95.3 | 118.4 | 201.6 |
+| Placement K5 / code | 124.1 | 203.0 | 366.1 | 539.7 | 933.0 |
+| Placement K5 / mixed | 105.5 | 87.2 | 120.2 | 170.6 | 212.1 |
+| Placement K7 / code | 124.8 | 193.1 | 356.8 | 605.9 | 969.7 |
+| Placement K7 / mixed | 113.7 | 81.2 | 109.7 | 155.3 | 172.4 |
+
+K7 is not an isolated draft-width change on this memory budget: both K5 arms
+loaded five local RTX expert layers, while K7 loaded four. Startup occupied
+memory before expert placement rose by 421,527,552 bytes (402 MiB), including
+the larger draft workspaces and sparse decode reservation, crossing the next
+whole-layer placement threshold. The pool stayed at 16,681,077,760 bytes /
+18,742,784 source-token positions in every arm.
+
+K7 improved code C8/C16 from approximately 555/918 to 606/970 tok/s, but
+mixed C16 fell from 202 to 172 tok/s. Placement-aware K5 improved several
+mixed concurrency cells but reduced mixed C1 from 121 to 105 tok/s. These
+measurements do not support a universal default change. Single-RTX remains
+on legacy adaptive K5; placement-aware costs and K7 remain opt-in. The dual
+14M pool decision is unchanged. Artifact hashes and all samples are recorded
+in `phase2-adaptive-serving-comparison.json`; run directories are named
+`cost-single-{legacy,placement}-v4-rtx1-k{5,7}` in the experiment cache.
