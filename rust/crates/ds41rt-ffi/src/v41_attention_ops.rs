@@ -125,8 +125,11 @@ impl V41AttentionOps<'_> {
     }
 
     /// # Safety
-    /// Shared BF16 embedding weights and I32 seed IDs are initialized on the
-    /// stream device; all input/output storage is live and outputs are disjoint.
+    /// BF16 embedding rows are initialized and immutable for the launch. The
+    /// table may reside on a peer GPU whose access was enabled during planning;
+    /// its producer must complete before this stream reads it. I32 seed IDs and
+    /// outputs belong to the stream device. All storage stays live and outputs
+    /// are disjoint until completion, including captured graph replays.
     pub unsafe fn embed(
         &self,
         table: Ds41rtDeviceBuffer,
@@ -144,6 +147,8 @@ impl V41AttentionOps<'_> {
         buffer(tokens, requests as usize * 4)?;
         buffer(residual, requests as usize * 5 * 40960)?;
         buffer(pre, requests as usize * 5 * 16)?;
+        ensure!(tokens.device_id == residual.device_id && pre.device_id == residual.device_id,
+            "draft embedding token/output devices differ");
         let status = unsafe {
             (self.embed)(
                 table.ptr.cast(),

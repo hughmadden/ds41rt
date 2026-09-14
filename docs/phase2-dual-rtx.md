@@ -1227,6 +1227,31 @@ checks missing compact output in the full-logit mode, and exercises the shared
 commit/discard interface. It passed with 32 interleaved cases in 18.56 seconds
 (`verification-distributed-fixture.log`); all 25 serving unit tests passed
 (`verification-serving-tests.log`). This does not yet connect dual-GPU startup
-to the scheduler. dSpark's draft chain still assumes a co-located embedding and
-full vocabulary head; it needs the planned GPU1 execution with GPU0 embedding
-access and split-head integration before complete speculative serving can run.
+to the scheduler. dSpark still needs GPU1 draft execution and split-head
+integration before complete speculative serving can run.
+
+dSpark chain construction now enables peer access when its shared embedding
+table resides on the other GPU. The table remains on RTX0; seed IDs, draft
+residuals and transformer execution stay on RTX1. The embedding operation's
+safety contract requires immutable, completed table data and local token/output
+buffers. `native/tests/v41_dspark_peer_embedding_selftest.py` passed at 1, 3, 8
+and 16 requests, including two independent streams and captured graphs, changed
+token IDs, invalid seeds and no additional GPU allocations during replay
+(`dspark-peer-embedding.log`). This tests the peer embedding operation, not yet
+the complete distributed draft pipeline.
+
+The distributed vocabulary wave also supports projection-only execution for
+dSpark's subsequent Markov correction and sampling. Each rank has separate
+graph entries for projection-only and greedy execution. Projection-only work
+skips candidate reduction, candidate transfer and winner merging; it publishes
+only the two logits shards and rejects access to stale greedy output. Neither
+mode introduces a dependency on the other request lane. GPU-side assembly of
+the shards and connection to the draft terminal remain to be implemented.
+
+The real-checkpoint vocabulary fixture passed for 1, 3, 16, 40 and 80 rows,
+with two independent waves, cold/captured execution and repeated changes
+between greedy and projection-only modes. Every shard logit matched the full
+head exactly (maximum error zero); greedy results, cancellation, unpublished
+output guards, reuse and device restoration passed. The fixture completed in
+11.92 seconds (`vocabulary-projection-only.log`). This is correctness evidence,
+not a serving throughput measurement.

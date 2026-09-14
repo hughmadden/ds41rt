@@ -81,6 +81,12 @@ impl<'library> DsparkWeights<'library> {
             "invalid shared embedding extent"
         );
         let mut chain = self.chain(requests, budget)?;
+        let table_device = embedding.get("embed.weight")?.device_id;
+        if table_device != chain.tokens.buffer.device_id {
+            // Plan peer access once. Draft graphs only read the shared table;
+            // tokens, residuals and all transformer work stay on this device.
+            chain.stream.library.cuda_enable_peer(table_device)?;
+        }
         chain.embedding = Some(embedding);
         Ok(chain)
     }
