@@ -328,6 +328,14 @@ fn worker(
         &mut requests, &mut transport, &mut prefill_transport, draft.as_mut(), &mut vision, stats)
 }
 
+/// The HC-9 prefill pacing hold at a chunk boundary: bounded by the host cache's store
+/// pace, counted in its metrics, and never a reason to fail the request.
+fn prefill_hold(hold: &mut dyn FnMut() -> Result<()>) {
+    if let Err(error) = hold() {
+        tracing::warn!(target: "ds41rt::host_cache", %error, "prefill hold failed; continuing");
+    }
+}
+
 fn prefill<'w, 'a>(
     lib: &'a NativeLibrary,
     runtime: &tokio::runtime::Runtime,
@@ -341,6 +349,7 @@ fn prefill<'w, 'a>(
     chunk_rows: usize,
     job: &NativeRequest,
     draft: Option<&mut DraftRuntime<'_, 'a>>,
+    hold: &mut dyn FnMut() -> Result<()>,
 ) -> Result<TokenScores> {
     use crate::v41_backbone_cache::{CacheStage, CacheWork};
     use crate::v41_block::EncoderSuffix;
@@ -360,6 +369,7 @@ fn prefill<'w, 'a>(
             chunk_rows,
             job,
             draft,
+            hold,
         );
     }
     let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
@@ -371,6 +381,7 @@ fn prefill<'w, 'a>(
         );
         for chunk in tokens[start..cached].chunks(chunk_rows) {
             ensure!(!job.events.is_closed(), "client disconnected");
+            prefill_hold(hold);
             let mut batch = requests.prepare(&[RequestTokens {
                 lease,
                 tokens: chunk,
@@ -397,6 +408,7 @@ fn prefill<'w, 'a>(
     if chunks.len() == 1 {
         let chunk = chunks.next().expect("one chunk");
         ensure!(!job.events.is_closed(), "client disconnected");
+        prefill_hold(hold);
         let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
         let started = Instant::now();
@@ -412,8 +424,16 @@ fn prefill<'w, 'a>(
     if chunks.len() != 0 {
         let chunks: Vec<_> = chunks.collect();
         let started = Instant::now();
-        runtime.block_on(unsafe { pass.execute_encoder_stream(other, requests, lease, &chunks,
-            [transport, other_transport], &mut suffix, &|| !job.events.is_closed()) })?;
+        // The hold must reach every chunk the stream dispatches; both lanes share one
+        // `&dyn Fn` hook, so the mutable callback goes through a RefCell (calls are
+        // synchronous, single-threaded, never nested).
+        let hold = std::cell::RefCell::new(&mut *hold);
+        let before_chunk = || -> Result<()> {
+            prefill_hold(&mut *hold.borrow_mut());
+            Ok(())
+        };
+        runtime.block_on(unsafe { pass.execute_encoder_stream_held(other, requests, lease, &chunks,
+            [transport, other_transport], &mut suffix, &|| !job.events.is_closed(), &before_chunk) })?;
         tracing::debug!(target: "ds41rt::timing", rows=tokens.len(),
             total_us=started.elapsed().as_micros() as u64, "target encoder stream");
     }
@@ -441,11 +461,13 @@ fn prefill<'w, 'a>(
 fn prefill_continuation<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>, transport: &mut NativeTp4Wave<'a>,
     lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
-    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<TokenScores> {
+    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a>>,
+    hold: &mut dyn FnMut() -> Result<()>) -> Result<TokenScores> {
     ensure!(!tokens.is_empty(), "prefix continuation has no uncached rows");
     let mut anchor = None;
     for chunk in tokens.chunks(chunk_rows) {
         ensure!(!job.events.is_closed(), "client disconnected");
+        prefill_hold(hold);
         let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
         let result = (|| -> Result<TokenScores> {

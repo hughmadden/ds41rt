@@ -10,7 +10,10 @@
 //! Everything here is host-only and single-threaded: the cache lives on the scheduler thread,
 //! the GPU copies asynchronously through a [`copy::CopyEngine`], and completion is polled per
 //! tick. The daemon supplies the CUDA copy engine and three hooks; every suite in this crate
-//! runs against [`copy::StubCopyEngine`] on a virtual clock.
+//! runs against [`copy::StubCopyEngine`] on a virtual clock. Budgeted waits (the prefill
+//! pacing hold, eviction waits) are bounded by their configured budget; on engines that poll
+//! between probes, a timed-out wait is bounded by the budget plus at most one poll quantum,
+//! because the inter-poll sleep is clipped to the remaining budget.
 //!
 //! Module map: [`config`] (the knobs), [`pool`] (pinned slab pool), [`copy`] (copy engine trait
 //! and stub), [`snapshot`] (host snapshots, exact page sharing, the reuse radix, eviction),

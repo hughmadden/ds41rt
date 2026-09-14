@@ -32,6 +32,12 @@ pub struct Config {
     pub copy_budget_ns: u64,
     /// Longest a restore waits before the request falls through to prefill.
     pub restore_budget_ns: u64,
+    /// How old the oldest pending store copy may grow before a prefill chunk boundary
+    /// pauses to let it finish: at each `HostCache::prefill_hold` call, if the oldest
+    /// in-flight store is older than this, the cache waits on its event for at most this
+    /// long again. Zero disables the guard: the call is a no-op and moves no hold metric.
+    /// The fleet-recommended value is 500 ms (see the daemon's flag help).
+    pub store_pace_ns: u64,
     /// Snapshots outside `[min_tokens, max_tokens]` are not cached.
     pub min_tokens: u32,
     pub max_tokens: u32,
@@ -48,6 +54,7 @@ impl Default for Config {
             store: StoreMode::OnRetain,
             copy_budget_ns: 50_000_000,
             restore_budget_ns: 500_000_000,
+            store_pace_ns: 0,
             min_tokens: 512,
             max_tokens: MAX_CONTEXT_TOKENS,
             kinds: Kinds {

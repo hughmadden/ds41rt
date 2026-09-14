@@ -100,7 +100,14 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
             stats_published = Instant::now();
             if let Some(metrics) = prefixes.host_metrics() {
                 if let Ok(mut slot) = stats.lock() {
-                    *slot = serde_json::json!({ "host_cache": metrics });
+                    // Deliberately exports the cache's whole effective `Config` under
+                    // `host_cache_config` (packet HC-9), not just `store_pace_ns`: fleet
+                    // operators tune several of these knobs, and one key keeps the export
+                    // forward-compatible as new knobs land.
+                    *slot = serde_json::json!({
+                        "host_cache": metrics,
+                        "host_cache_config": prefixes.host_config(),
+                    });
                 }
             }
         }
@@ -157,6 +164,9 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 let source_end = requests.cache().committed_end(lease)? as usize;
                 prefixes.make_room(requests, &[(lease, (prompt.len() - source_end) as u32)])?;
                 if !images.is_empty() {
+                    // Deliberately unheld (packet HC-9): this is per-image pre-prefill
+                    // preparation, not a batch-tokens chunk, so the store-pace pacing hold
+                    // does not apply here; the hold covers prefill chunk dispatch only.
                     let start = if requests.cache().stage(lease)? == crate::v41_backbone_cache::CacheStage::EncoderReplay {
                         requests.cache().history_end(lease)? as usize
                     } else { source_end };
@@ -182,7 +192,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 let scores = if cached == prompt.len() { hit.expect("complete prefix hit").1.context("exact prefix has no logits")? }
                 else { prefill(lib, runtime, first, second, requests, first_transport,
                     second_transport, lease, &prompt, args.prefill_batch_tokens as usize, &job,
-                    draft.as_deref_mut())? };
+                    draft.as_deref_mut(), &mut || prefixes.prefill_hold())? };
                 if cached != prompt.len() {
                   if let Err(error) = prefixes.retain(SnapshotKind::Prompt, &prompt, &image_keys, &scores, id, lease, requests, draft.as_deref_mut()) {
                     tracing::warn!(%error, "prompt prefix was not retained");
@@ -239,6 +249,9 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
         }
         // With one active lane there is no peer to overlap. Retain the
         // ordinary C1 path and avoid shared-bank/async-delivery overhead.
+        // Decode rounds are deliberately unheld (packet HC-9): the store-pace pacing hold
+        // paces prefill chunk dispatch against pending store copies; decode steps issue no
+        // stores and never hold.
         let result = room.and_then(|_| if members.iter().all(|lane| !lane.is_empty()) {
             independent::run(lib, runtime, first, second, requests, first_transport,
                 second_transport, &mut active, draft.as_deref_mut(), &mut prefixes, receive)

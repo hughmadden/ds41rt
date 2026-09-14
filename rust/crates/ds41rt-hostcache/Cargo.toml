@@ -32,3 +32,6 @@ harness = false
 [[bench]]
 name = "cache"
 harness = false
+[[bench]]
+name = "prefill_hold"
+harness = false
