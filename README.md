@@ -1,92 +1,124 @@
 # DS41RT
 
-DS41RT serves the official [DeepSeek V4.1 Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) checkpoint across one RTX PRO 6000 Blackwell coordinator and four DGX Spark expert workers. It combines native target execution, local dSpark speculative decoding, token-level prefix reuse, tools, constrained output, and vision in one OpenAI-compatible service.
+DS41RT serves the official [DeepSeek V4.1 Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) checkpoint across one or two RTX PRO 6000 Blackwell coordinator GPUs and four DGX Spark expert workers. It combines native target execution, local dSpark speculative decoding, token-level prefix reuse, tools, constrained output, and vision in one OpenAI-compatible service.
 
 All reported RTX measurements use an enforced **400 W power limit** and **standard 14,001 MHz maximum memory speed with no memory overclock**. The loaded memory clock reached 13,365 MHz; the RTX driver was 595.91.07. The four GB10 workers used driver 580.159.03.
 
-[![DS41RT native execution across one coordinator and four expert workers](docs/native-path-execution.svg)](docs/native-path-execution.svg)
+[![DS41RT native execution across RTX coordinators and four expert workers](docs/native-path-execution.svg)](docs/native-path-execution.svg)
 
 ## Performance
 
-The standard `v2` build uses independent adaptive dSpark lanes, architectural FP4 compressed KV, bottom-up RTX expert placement, and cooperative decode completion. Local target-only and dSpark workloads ran sequentially. Throughput tests use temperature zero and thinking disabled; tool evaluation uses thinking enabled at high effort and C16. Against v1, weighted dSpark decode rose from 70.43 to 79.80 tok/s and aggregate C16 decode rose from 742.91 to 934.05 tok/s.
+The standard launcher now selects two feasible peer-connected RTX cards automatically and falls back to one. Two-RTX mode hosts all twenty encoder expert layers TP2 on the RTX pair; one-RTX mode uses bottom-up local placement and the new placement-aware adaptive K5 default. Throughput uses temperature zero and thinking disabled. Every cell below has three fresh samples from the same release image and matched prompts.
 
 **Headline results.** Median throughput, the qualified cache and placement policy, memory use, and clean startup.
 
-| Measurement | Result |
-|---|---:|
-| Best median prefill, 0 base + 32K new (preserved v1) | **7,743.47 tok/s** |
-| Low-entropy target-only decode, counting 1–200 warm median | 45.08 tok/s |
-| Low-entropy dSpark decode, counting 1–200 warm median | **155.91 tok/s** |
-| Weighted eight-type target-only median | 44.29 tok/s |
-| Weighted eight-type dSpark median | **79.80 tok/s** |
-| dSpark gain on weighted mix | 80.17% |
-| C16 aggregate warm decode median | **934.05 tok/s** |
-| Standard RTX routed-expert placement | **5 layers (0–4)** |
-| Spark expert residency / configured budget | 40 layers per worker / 100 GiB |
-| Global FP4 source pool | 16.681 GB for 18,710,016 logical tokens (+32,768 private-tail tokens) |
-| Exact prompt / completed-turn retention | 24 / 24 entries |
-| Peak observed coordinator GPU memory used | 96,950 MiB |
-| Clean build / standard dSpark launch | 304.85 s / 57.76 s |
+| Measurement | 1 RTX | 2 RTX | 2 RTX change |
+|---|---:|---:|---:|
+| Best median prefill | 7,878 tok/s (0 + 32K) | **8,454 tok/s** (0 + 16K) | +7.3% |
+| Counting target-only decode | 44.95 tok/s | **48.41 tok/s** | +7.7% |
+| Counting dSpark decode | 156.08 tok/s | **181.31 tok/s** | +16.2% |
+| Weighted eight-type target-only decode | 43.04 tok/s | **46.14 tok/s** | +7.2% |
+| Weighted eight-type dSpark decode | 76.72 tok/s | **79.33 tok/s** | +3.4% |
+| C16 code aggregate | 992.78 tok/s | **1,181.49 tok/s** | +19.0% |
+| C16 topic aggregate | 514.96 tok/s | **596.14 tok/s** | +15.8% |
+| C16 counting aggregate | 1,161.12 tok/s | **1,333.57 tok/s** | +14.9% |
+| C16 mixed aggregate | 196.46 tok/s | **309.06 tok/s** | +57.3% |
+| RTX routed-expert placement | Layers 0–4, full width | Encoder 0–19, TP2 | — |
+| Spark expert residency / configured budget | 40 layers / 100 GiB each | 20 layers / 100 GiB each | — |
+| Global FP4 source pool | 16.681 GB / 18,710,016 logical tokens + 32,768 private-tail | 13.094 GB / 14,680,064 logical tokens + 32,768 private-tail | — |
+| Exact prompt / completed-turn retention | 24 / 24 entries | 24 / 24 entries | — |
+| Loaded RTX memory after readiness | 95,080 MiB | 95,338 / 95,578 MiB | — |
+| Standard restart to API readiness | 58.05 s | **46.00 s** | −20.8% |
 
-**Eight content types and counting.** Three local samples per mode. The official Flash column is the preserved one-request v1 reference and was not called again. Counting is outside the weighted score.
+The weighted direct-corpus result is the main real-content decode headline. Counting is retained as a low-entropy throughput reference. The mixed workload has different prompt and output lengths from the same-code workload and should be compared only against its matching layout.
 
-| Case | Target tok/s | dSpark tok/s | Official Flash tok/s | Target completed | dSpark completed | Official completed |
-|---|---:|---:|---:|---:|---:|---:|
-| Code | 44.87 | 126.21 | 345.90 | 3/3 | 3/3 | 1/1 |
-| Math | 44.61 | 135.07 | 285.33 | 3/3 | 3/3 | 1/1 |
-| Fable | 43.90 | 54.31 | 123.63 | 3/3 | 3/3 | 1/1 |
-| Hello | 42.48 | 77.55 | 141.10 | 3/3 | 3/3 | 1/1 |
-| Topic | 44.93 | 72.06 | 169.24 | 3/3 | 3/3 | 1/1 |
-| Natural JSON | 44.30 | 92.42 | 175.33 | 3/3 | 3/3 | 1/1 |
-| Schema JSON | 44.07 | 94.09 | HTTP 400 | 3/3 | 3/3 | 0/1 (HTTP 400) |
-| Multilingual | 43.69 | 71.33 | 183.61 | 3/3 | 3/3 | 1/1 |
-| Counting 1–200 | **45.08** | **155.91** | **427.29** | 3/3 warm | 3/3 warm | 1/1 |
+**Eight content types and counting.** Three samples per local mode. The official Flash column is the preserved one-request reference and was not called again. Counting is outside the weighted score. Every local response completed; code, math, and JSON objective checks passed, while open prose was intentionally left unscored.
 
-**Prefill matrix.** Preserved v1 target-only measurements; this matrix was intentionally excluded from the scoped v2 rerun.
+| Case | 1 RTX target | 1 RTX dSpark | 2 RTX target | 2 RTX dSpark | Official Flash |
+|---|---:|---:|---:|---:|---:|
+| Code | 44.90 | 127.62 | 48.10 | **149.07** | 345.90 |
+| Math | 41.93 | 119.56 | 47.76 | **135.72** | 285.33 |
+| Fable | 41.31 | 51.88 | 44.39 | **52.64** | 123.63 |
+| Hello | 41.58 | 69.89 | 45.40 | **84.69** | 141.10 |
+| Topic | 42.48 | 71.86 | 45.27 | **75.28** | 169.24 |
+| Natural JSON | 44.04 | 102.23 | 47.11 | **121.76** | 175.33 |
+| Schema JSON | 43.65 | 104.65 | 46.53 | **107.63** | HTTP 400 |
+| Multilingual | 42.69 | 66.27 | 46.07 | **66.31** | 183.61 |
+| Counting 1–200 | 44.95 | 156.08 | 48.41 | **181.31** | 427.29 |
+
+The median weighted target-to-dSpark gain is 78.3% on one RTX and 72.0% on two RTX cards. Two RTX improves target-only weighted throughput by 7.2% and dSpark weighted throughput by 3.4% on this prompt set.
+
+**One-RTX prefill matrix.** Median effective prefill tokens per second after one shape warmup. Each measured request uses a unique marker; retained rows verify the exact parent cache hit.
 
 | Retained base | +1K | +2K | +4K | +8K | +16K | +32K |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0 | 2,818 | 3,757 | 6,922 | 7,414 | 7,660 | 7,743 |
-| 32K | 2,440 | 3,319 | 6,055 | 6,736 | 7,086 | 7,119 |
-| 64K | 2,251 | 3,112 | 5,557 | 6,255 | 6,594 | 6,768 |
-| 128K | 1,942 | 2,724 | 4,724 | 5,432 | 5,785 | 5,961 |
-| 256K | 1,477 | 2,148 | 3,565 | 4,123 | 4,444 | 4,612 |
+| 0 | 3,084 | 4,078 | 6,709 | 7,064 | 7,726 | 7,878 |
+| 32K | 2,513 | 3,442 | 5,261 | 6,073 | 6,619 | 6,894 |
+| 64K | 2,326 | 3,214 | 4,845 | 5,590 | 6,116 | 6,322 |
+| 128K | 2,007 | 2,813 | 4,129 | 4,842 | 5,308 | 5,514 |
+| 256K | 1,507 | 2,192 | 3,111 | 3,711 | 4,108 | 4,284 |
 
-**Decode over retained context.** Three samples for each of eight content types, with verified exact retained-prefix reuse.
+**Two-RTX prefill matrix.** The same prompts and token shapes with all twenty encoder expert layers hosted TP2 on the RTX pair.
 
-| Retained base | Weighted dSpark tok/s | Completed with verified cache reuse |
-|---:|---:|---:|
-| 0 | 77.97 | 24/24 |
-| 32K | 71.60 | 24/24 |
-| 64K | 71.97 | 24/24 |
-| 128K | 70.99 | 24/24 |
-| 256K | 66.82 | 24/24 |
+| Retained base | +1K | +2K | +4K | +8K | +16K | +32K |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 4,850 | 6,471 | 7,982 | 8,331 | 8,454 | 8,348 |
+| 32K | 3,736 | 5,068 | 5,633 | 6,434 | 6,937 | 7,101 |
+| 64K | 3,318 | 4,543 | 5,066 | 5,832 | 6,316 | 6,459 |
+| 128K | 2,748 | 3,790 | 4,258 | 4,949 | 5,329 | 5,483 |
+| 256K | 1,923 | 2,731 | 3,213 | 3,729 | 4,052 | 4,198 |
 
-**Concurrency scaling.** Three exact 599-token counting samples per concurrency after one fully cached prime; aggregate timing includes admission gaps.
+Two RTX gains 57–59% on cold +1K/+2K prefills and 18–19% on cold +4K/+8K. At deep retained context with long suffixes, attention dominates; the +16K and +32K cells are close, including small measured losses at 256K retained context.
 
-| Concurrency | Median aggregate tok/s | Range | Scale vs C1 |
-|---:|---:|---:|---:|
-| 1 | 151.12 | 150.21–151.73 | 1.00× |
-| 2 | 238.85 | 230.28–239.94 | 1.58× |
-| 4 | 393.38 | 382.04–420.01 | 2.60× |
-| 8 | 582.56 | 577.00–586.01 | 3.85× |
-| 16 | 934.05 | 932.59–936.37 | 6.18× |
+**Decode over retained context.** Three samples for each of eight content types at every base size. All 240 requests completed with verified exact retained-prefix reuse, and every assessed objective passed.
 
-**High-thinking tool evaluation.** Three hard-mode campaigns use C16, thinking enabled, high reasoning effort, temperature zero, a 900-second timeout, and the normal output policy.
-
-| Run | Basic | Hard | Total | Pass / partial / fail |
+| Retained base | 1 RTX weighted dSpark | 2 RTX weighted dSpark | 1 RTX completed/reused | 2 RTX completed/reused |
 |---:|---:|---:|---:|---:|
-| 1 | 122/138 | 33/38 | 155/176 | 71 / 13 / 4 |
-| 2 | 118/138 | 35/38 | 153/176 | 69 / 15 / 4 |
-| 3 | 122/138 | 36/38 | 158/176 | 73 / 12 / 3 |
+| 0 | 76.75 | **93.58** | 24/24 | 24/24 |
+| 32K | 71.97 | **85.82** | 24/24 | 24/24 |
+| 64K | 70.73 | **86.82** | 24/24 | 24/24 |
+| 128K | 68.32 | **84.20** | 24/24 | 24/24 |
+| 256K | 67.39 | **78.08** | 24/24 | 24/24 |
 
-The [v2 performance report](docs/release-v2-performance.md) records methodology, artifact identities, memory, startup, and qualification scope. [Machine-readable v2 results](docs/release-v2-performance.json) preserve exact summaries and evidence hashes, and the [release evidence archive](https://github.com/tpurtell/ds41rt/releases/download/v2/ds41rt-v2-qualification-evidence.tar.gz) contains the raw samples and traces. The v1 prefill matrix and one-shot official API comparison remain clearly labeled prior measurements; the full v1 qualification was intentionally not repeated.
+**Concurrency scaling.** Each cell is the median of three warm runs. Aggregate timing spans earliest first content through final completion and includes admission gaps. Code and topic are the useful serving curves; counting is the low-entropy ceiling.
+
+| Concurrency | 1 RTX counting | 2 RTX counting | 1 RTX code | 2 RTX code | 1 RTX topic | 2 RTX topic |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 152.65 | **186.83** | 124.18 | **148.83** | 71.93 | **81.13** |
+| 2 | 246.29 | **294.15** | 196.77 | **231.63** | 122.43 | **131.94** |
+| 4 | 437.02 | **524.04** | 355.92 | **412.60** | 222.72 | **242.58** |
+| 8 | 693.73 | **808.47** | 586.58 | **712.09** | 358.31 | **415.86** |
+| 16 | 1,161.12 | **1,333.57** | 992.78 | **1,181.49** | 514.96 | **596.14** |
+
+**Mixed traffic.** The fixed code/fable/topic mix uses simultaneous admission and nonce seed 56001. Ranges are retained because request order and output mix create visible noise.
+
+| Concurrency | 1 RTX median (range) | 2 RTX median (range) |
+|---:|---:|---:|
+| 1 | 113.35 (109.40–128.59) | **151.26 (150.21–154.21)** |
+| 2 | 80.83 (72.82–104.85) | **141.54 (123.44–143.40)** |
+| 4 | 118.20 (104.83–152.12) | **181.74 (173.78–192.51)** |
+| 8 | 124.14 (110.56–170.85) | **203.05 (195.39–216.16)** |
+| 16 | 196.46 (195.53–197.69) | **309.06 (300.63–311.28)** |
+
+**Memory and startup.** The loaded measurements were taken immediately after API readiness. The clean release build packaged both local and TP2 expert interfaces and distributed the rebuilt Spark image to all four workers.
+
+| Resource | 1 RTX | 2 RTX |
+|---|---:|---:|
+| Loaded RTX memory | 95,080 MiB | 95,338 / 95,578 MiB |
+| Free RTX memory after readiness | 2,171 MiB | 1,913 / 1,670 MiB |
+| Runtime headroom policy | 2 GiB | 800 MiB per GPU |
+| Global FP4 source pool | 16,681,077,760 bytes / 18,710,016 logical + 32,768 tail tokens | 13,094,420,480 bytes / 14,680,064 logical + 32,768 tail tokens |
+| Standard restart to readiness | 58.05 s | 46.00 s |
+
+The focused dual lifecycle check passed a 32K needle, cold and exact-warm prompt reuse, a retained continuation, eight simultaneous cancellations with eight surviving peers, and post-cancellation recovery. The full qualification suite was intentionally not repeated.
+
+The [Phase 2 performance report](docs/phase2-release-performance.md) records methodology, memory, startup, and qualification scope. [Machine-readable results](docs/phase2-release-performance.json) preserve exact summaries, ranges, controls, and raw-evidence hashes; the [release evidence archive](docs/evidence/phase2-release-performance.tar.gz) contains every raw sample. The one-shot official API comparison is retained as a clearly labeled prior reference.
 
 ## Getting started
 
 The release topology requires:
 
-- one Linux amd64 host with an RTX PRO 6000 Blackwell 96 GB GPU;
+- one Linux amd64 host with one or two RTX PRO 6000 Blackwell 96 GB GPUs;
 - four ARM64 DGX Spark hosts reachable over passwordless SSH;
 - Docker with the NVIDIA Container Toolkit on all five hosts;
 - IP connectivity for the expert fabric and `/dev/infiniband` access for the qualified RoCE path;
@@ -190,9 +222,9 @@ and selects costs from the expert layers actually installed on each backend.
 Native serving accepts `--dspark-draft-limit 7` for K7;
 `DS41RT_ADAPTIVE_COST_PROFILE=legacy` restores the previous cost formula.
 The [development comparison](docs/phase2-adaptive-verification.md#single-rtx-default-comparison)
-records the measured tradeoffs; the release performance tables above predate this change.
+records the policy tradeoffs; the release performance tables above measure the selected K5 default.
 
-The coordinator owns attention, mHC residuals, embeddings, mapped Engram lookup, routers, shared experts, vision, all three dSpark stages, the vocabulary head, sampling, cache ownership, and the API. Four Sparks hold tensor-parallel slices of the backbone routed experts and return reduced expert contributions over persistent transport buffers.
+The coordinator owns attention, mHC residuals, embeddings, mapped Engram lookup, routers, shared experts, vision, all three dSpark stages, the vocabulary head, sampling, cache ownership, and the API. Dual mode splits this work by dependency across the RTX pair, uses TP2 for all shared experts and encoder routed experts, and partitions vocabulary rows for deterministic parallel greedy selection. Four Sparks retain only decoder routed experts in dual mode and all routed experts in single mode.
 
 Compressed global KV uses FP4 E2M1 values with group-16 E4M3 scales. The 128-token sliding windows remain FP8, and the independent selection index uses its own FP4 format. A token radix shares immutable pages, uses copy-on-write for divergent suffixes, and restores retained target/dSpark state. Partial matches replay no more than the final 128 encoder tokens; exact hits can reuse saved first-token logits. The default keeps 24 completed turns and 24 prompt snapshots under LRU eviction.
 
@@ -200,16 +232,16 @@ The [engineering report](docs/ENGINEERING.md) covers the final kernels, executio
 
 ## Qualification
 
-The clean v2 candidate passed the scoped release qualification:
+The clean Phase 2 candidate passed the scoped release qualification:
 
-- three-sample target-only and dSpark throughput across eight content types and warm exact counting;
-- retained-prefix decode at 0, 32K, 64K, 128K, and 256K, with verified reuse in all 120 requests;
-- warm exact counting at C1, C2, C4, C8, and C16;
-- three C16 high-thinking tool-eval campaigns scoring 155, 153, and 158 of 176 points;
-- automatic placement of routed-expert layers 0–4 on the RTX while all 40 layers remain on every Spark;
-- a clean five-host image build and standard `run.sh` launch on port 8000.
+- matched one/two-RTX target-only and dSpark throughput across eight content types and warm exact counting;
+- fresh one/two-RTX prefill matrices covering 30 base/suffix cells and three measured samples per cell;
+- retained-prefix decode at 0, 32K, 64K, 128K, and 256K, with exact reuse in all 240 requests;
+- warm counting, code, and topic at C1, C2, C4, C8, and C16, plus three mixed-traffic sweeps per layout;
+- a focused dual lifecycle check covering a 32K needle, exact prompt reuse, retained continuation, cancellation, survivors, and recovery;
+- a clean five-host image build, automatic one/two-RTX selection, replacement accounting, and standard launch on port 8000.
 
-The prefill matrix and one-shot official API comparison are preserved v1 measurements. The full needle, vision, cache, and agentic suites were intentionally not repeated; their detailed v1 evidence remains available for the unchanged serving interfaces. The [v2 release checklist](docs/release-v2-checklist.md) separates fresh coverage from inherited evidence.
+The one-shot official API comparison is a preserved prior measurement. The full vision, tool, and agentic suites were intentionally not repeated; their detailed earlier evidence remains available for the unchanged serving interfaces. The [Phase 2 plan and evidence log](docs/phase2-dual-rtx.md) separates fresh coverage from inherited checks.
 
 ## RDMA tools for DGX Spark and RoCE PCs
 
