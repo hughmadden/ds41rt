@@ -91,18 +91,38 @@ impl<'a> PrefixCache<'a> {
         drop(saved);
     }
     /// On a device-bank miss, rebuild the best host snapshot into the bank so the engine's own
-    /// restore finds it.
-    fn host_restore(&mut self, keys: &[u32], requests: &Requests<'a>, draft: Option<&DraftRuntime<'_, 'a>>) -> Result<()> {
+    /// restore finds it. The snapshot needs device pages exactly as a prefill of the same tokens
+    /// would, so room is made the same way first: the oldest retained device snapshots are
+    /// evicted (through the host cache) until the pool can take it.
+    fn host_restore(
+        &mut self,
+        keys: &[u32],
+        lease: CacheLease,
+        requests: &Requests<'a>,
+        draft: Option<&DraftRuntime<'_, 'a>>,
+    ) -> Result<()> {
         let Some(host) = &mut self.host else {
             return Ok(());
         };
         let Some(hit) = host.lookup(keys) else {
             return Ok(());
         };
-        // A restore that cannot complete (device pool exhausted for its pages, a missing part,
-        // a copy failure) is abandoned and counted; the request then prefills exactly as it
-        // would with no cache, where the engine's own admission makes room by evicting device
-        // snapshots. The cache must never turn a cache miss into a request error.
+        let tokens = host.snapshot_tokens(hit.key).context("host snapshot has no tokens")?;
+        if let Err(error) = self.make_room(requests, &[(lease, tokens.len() as u32)]) {
+            if error.downcast_ref::<crate::v41_compressor::SourcePoolExhausted>().is_none() {
+                return Err(error);
+            }
+            // Nothing left to evict and the pool still cannot hold the snapshot: the prefill
+            // that follows faces the same pool, so this is the engine's pressure path, not a
+            // cache fault.
+            tracing::warn!(target: "ds41rt::host_cache", %error, "host restore abandoned: no device room; prefilling");
+            self.host.as_mut().unwrap().count_abandoned_restore();
+            return Ok(());
+        }
+        let host = self.host.as_mut().unwrap();
+        // A restore that still cannot complete (a missing part, a copy failure) is abandoned and
+        // counted; the request then prefills exactly as it would with no cache. The cache must
+        // never turn a cache miss into a request error.
         let saved = match host.restore(&hit, requests, draft) {
             Ok(Some(saved)) => saved,
             Ok(None) => return Ok(()),
@@ -112,7 +132,6 @@ impl<'a> PrefixCache<'a> {
                 return Ok(());
             }
         };
-        let tokens = host.snapshot_tokens(hit.key).context("restored host snapshot has no tokens")?;
         if let Some(evicted) = self.retained.bank_mut(hit.kind).insert(&tokens, saved) {
             self.host_dropped(evicted);
         }
@@ -215,7 +234,7 @@ impl<'a> PrefixCache<'a> {
     ) -> Result<Option<(usize, Option<TokenScores>)>> {
         let keys = images.encode(tokens)?;
         if self.retained.lookup_reusable(&keys).is_none() {
-            self.host_restore(&keys, requests, draft.as_deref())?;
+            self.host_restore(&keys, lease, requests, draft.as_deref())?;
         }
         let Some((end, frontier, saved)) = self.retained.lookup_reusable(&keys) else {
             return Ok(None);
