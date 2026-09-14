@@ -3865,6 +3865,25 @@ impl NativeLibrary {
         self.status_to_result("ds41rt_copy_peer_async", unsafe { call(dst, src, bytes, stream) })
     }
 
+    /// Copy pitched byte rows locally or between peer GPUs without synchronization.
+    ///
+    /// # Safety
+    /// The stream belongs to the current destination device. Source writes are
+    /// complete or ordered before this copy. Buffers remain live and disjoint,
+    /// without conflicting access, until stream completion.
+    pub unsafe fn copy_device_rows_async(
+        &self, dst: Ds41rtDeviceBuffer, src: Ds41rtDeviceBuffer,
+        width: usize, rows: usize, dst_pitch: usize, src_pitch: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(
+            Ds41rtDeviceBuffer, Ds41rtDeviceBuffer, usize, usize, usize, usize, *mut c_void,
+        ) -> Ds41rtStatus> = unsafe { self.lib.get(b"ds41rt_copy_device_rows_async")? };
+        self.status_to_result("ds41rt_copy_device_rows_async", unsafe {
+            call(dst, src, width, rows, dst_pitch, src_pitch, stream)
+        })
+    }
+
     pub fn alloc_device_buffer(&self, bytes: usize) -> Result<Ds41rtDeviceBuffer> {
         let alloc_fn: Symbol<AllocDeviceBufferFn> =
             unsafe { self.lib.get(b"ds41rt_alloc_device_buffer")? };

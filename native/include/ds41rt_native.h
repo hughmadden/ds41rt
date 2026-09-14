@@ -483,6 +483,12 @@ ds41rt_status_t ds41rt_cuda_enable_peer(int peer_device_id);
 ds41rt_status_t ds41rt_copy_peer_async(ds41rt_device_buffer_t dst,
                                      ds41rt_device_buffer_t src, size_t bytes,
                                      void* cuda_stream);
+// Copy non-overlapping byte rows locally or between peers on the destination
+// stream. Pitches are in bytes. Source must be ready; storage stays live until
+// completion. This call allocates no storage and performs no synchronization.
+ds41rt_status_t ds41rt_copy_device_rows_async(ds41rt_device_buffer_t dst,
+    ds41rt_device_buffer_t src, size_t width, size_t rows,
+    size_t dst_pitch, size_t src_pitch, void* cuda_stream);
 ds41rt_status_t ds41rt_alloc_host_buffer(size_t bytes, ds41rt_host_buffer_t* out);
 ds41rt_status_t ds41rt_cuda_host_buffer_device_alias(ds41rt_host_buffer_t host,
                                                     ds41rt_device_buffer_t* out);

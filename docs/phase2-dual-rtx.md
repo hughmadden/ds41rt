@@ -1245,8 +1245,8 @@ dSpark's subsequent Markov correction and sampling. Each rank has separate
 graph entries for projection-only and greedy execution. Projection-only work
 skips candidate reduction, candidate transfer and winner merging; it publishes
 only the two logits shards and rejects access to stale greedy output. Neither
-mode introduces a dependency on the other request lane. GPU-side assembly of
-the shards and connection to the draft terminal remain to be implemented.
+mode introduces a dependency on the other request lane. Connection to the
+draft terminal remains to be implemented.
 
 The real-checkpoint vocabulary fixture passed for 1, 3, 16, 40 and 80 rows,
 with two independent waves, cold/captured execution and repeated changes
@@ -1255,3 +1255,21 @@ head exactly (maximum error zero); greedy results, cancellation, unpublished
 output guards, reuse and device restoration passed. The fixture completed in
 11.92 seconds (`vocabulary-projection-only.log`). This is correctness evidence,
 not a serving throughput measurement.
+
+Published vocabulary shards can now be assembled directly into RTX1's full
+row-major logits buffer. The wave enqueues one pitched peer copy from RTX0 and
+one pitched local copy on its own stream, then waits cooperatively for that
+stream. It performs no host logits transfer or temporary GPU allocation. Error
+and cancellation cleanup drain submitted copies before destination reuse.
+The native row-copy API validates pitches, spans, address overflow, overlap and
+the destination device before submission. Its bidirectional/local selftest
+checks changed data, untouched padding and invalid extents, and proves copies
+complete while an unrelated stream remains deliberately blocked
+(`device-rows-selftest.log`).
+
+The real-checkpoint vocabulary fixture compares GPU-assembled logits byte for
+byte with the full head at 1, 3, 16, 40 and 80 rows across both independent waves
+and both projection modes. It also checks undersized/foreign destinations and
+cancellation followed by copy reuse. All checks passed in 12.18 seconds
+(`vocabulary-assembly.log`). End-to-end draft integration and transfer-cost
+measurement remain outstanding.

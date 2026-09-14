@@ -728,6 +728,52 @@ extern "C" ds41rt_status_t ds41rt_copy_peer_async(
 #endif
 }
 
+extern "C" ds41rt_status_t ds41rt_copy_device_rows_async(
+    ds41rt_device_buffer_t dst, ds41rt_device_buffer_t src, size_t width,
+    size_t rows, size_t dst_pitch, size_t src_pitch, void* cuda_stream) {
+  const auto span = [width, rows](size_t pitch, size_t bytes) {
+    return width > 0 && rows > 0 && pitch >= width && bytes >= width &&
+        rows - 1 <= (bytes - width) / pitch;
+  };
+  if (!cuda_stream || !dst.ptr || !src.ptr || dst.device_id < 0 || src.device_id < 0 ||
+      dst.flags != DS41RT_DEVICE_BUFFER_FLAG_NONE || src.flags != DS41RT_DEVICE_BUFFER_FLAG_NONE ||
+      !span(dst_pitch, dst.bytes) || !span(src_pitch, src.bytes)) {
+    return fail(DS41RT_STATUS_INVALID_ARGUMENT, "invalid row copy buffers, pitches, extent, or stream");
+  }
+  const size_t dst_span = (rows - 1) * dst_pitch + width;
+  const size_t src_span = (rows - 1) * src_pitch + width;
+  const auto d = reinterpret_cast<uintptr_t>(dst.ptr);
+  const auto s = reinterpret_cast<uintptr_t>(src.ptr);
+  if (dst_span > std::numeric_limits<uintptr_t>::max() - d ||
+      src_span > std::numeric_limits<uintptr_t>::max() - s ||
+      (d < s + src_span && s < d + dst_span)) {
+    return fail(DS41RT_STATUS_INVALID_ARGUMENT, "overlapping or overflowing row copy addresses");
+  }
+#if DS41RT_NATIVE_ENABLE_CUDA
+  int device = -1;
+  auto err = cudaGetDevice(&device);
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_INTERNAL_ERROR, "cudaGetDevice failed", err);
+  if (device != dst.device_id) return fail(DS41RT_STATUS_INVALID_ARGUMENT, "row destination is not current device");
+  auto stream = reinterpret_cast<cudaStream_t>(cuda_stream);
+  if (dst.device_id == src.device_id) {
+    err = cudaMemcpy2DAsync(dst.ptr, dst_pitch, src.ptr, src_pitch, width, rows,
+                            cudaMemcpyDeviceToDevice, stream);
+  } else {
+    cudaMemcpy3DPeerParms params{};
+    params.srcPtr = cudaPitchedPtr{src.ptr, src_pitch, width, rows};
+    params.srcDevice = src.device_id;
+    params.dstPtr = cudaPitchedPtr{dst.ptr, dst_pitch, width, rows};
+    params.dstDevice = dst.device_id;
+    params.extent = cudaExtent{width, rows, 1};
+    err = cudaMemcpy3DPeerAsync(&params, stream);
+  }
+  if (err != cudaSuccess) return fail_cuda(DS41RT_STATUS_COPY_FAILED, "device row copy failed", err);
+  return ok();
+#else
+  return fail(DS41RT_STATUS_CUDA_UNAVAILABLE, "device row copy requires CUDA");
+#endif
+}
+
 extern "C" ds41rt_status_t ds41rt_alloc_device_buffer(size_t bytes, ds41rt_device_buffer_t* out) {
   if (out == nullptr) {
     return fail(DS41RT_STATUS_INVALID_ARGUMENT, "device buffer output pointer is null");

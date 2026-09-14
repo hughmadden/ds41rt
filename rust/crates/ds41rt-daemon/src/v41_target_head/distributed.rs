@@ -199,6 +199,31 @@ impl<'w, 'a> DistributedVocabularyWave<'w, 'a> {
         Ok([slice(self.ranks[0].logits.buffer, 0, rows * self.split * 4)?,
             slice(self.ranks[1].logits.buffer, 0, rows * (129280 - self.split) * 4)?])
     }
+    /// Assemble published shards in row-major vocabulary order on rank 1.
+    ///
+    /// # Safety
+    /// Destination storage remains live and has no conflicting access through
+    /// return or cancellation. It must not alias either shard. The lane's own
+    /// copy stream drains before return/cancellation; no other lane is joined.
+    pub async unsafe fn copy_logits_to(&self, destination: Ds41rtDeviceBuffer) -> Result<()> {
+        let rows = self.ready.context("distributed vocabulary output unpublished")?;
+        let bytes = rows * 129280 * 4;
+        ensure!(destination.device_id == self.merge_stream.device.id && destination.bytes >= bytes,
+            "invalid distributed logits destination");
+        let sources = self.logits()?;
+        let queued = self.merge_stream.device.run(|| unsafe {
+            for rank in 0..2 {
+                let offset = if rank == 0 { 0 } else { self.split * 4 };
+                let width = if rank == 0 { self.split * 4 } else { (129280 - self.split) * 4 };
+                self.merge_stream.device.library.copy_device_rows_async(
+                    slice(destination, offset, bytes - offset)?, sources[rank],
+                    width, rows, 129280 * 4, width, self.merge_stream.raw)?;
+            }
+            Ok(())
+        });
+        let drained = self.merge_stream.wait().await;
+        queued.and(drained)
+    }
 }
 
 #[cfg(test)]
@@ -234,6 +259,8 @@ mod tests {
         let budgets = DistributedVocabularyWave::device_bytes(80, 64640)?;
         let mut first = DistributedVocabularyWave::new(devices, [&a, &b], 80, budgets)?;
         let mut second = DistributedVocabularyWave::new(devices, [&a, &b], 80, budgets)?;
+        let assembled = [Allocation::new(devices[1], 80 * 129280 * 4)?,
+            Allocation::new(devices[1], 80 * 129280 * 4)?];
         let runtime = tokio::runtime::Builder::new_current_thread().build()?;
         for rows in [1, 3, 16, 40, 80, 3] {
             let mut references = Vec::new();
@@ -256,7 +283,15 @@ mod tests {
                         a.and(b)
                     }
                 })?;
-                for (wave, expected) in [&first, &second].into_iter().zip(&references) {
+                runtime.block_on(async {
+                    let (a, b) = tokio::join!(unsafe { first.copy_logits_to(assembled[0].buffer) },
+                        unsafe { second.copy_logits_to(assembled[1].buffer) });
+                    a.and(b)
+                })?;
+                for ((wave, expected), output) in [&first, &second].into_iter().zip(&references).zip(&assembled) {
+                    let mut combined = vec![0u8; rows * 129280 * 4];
+                    devices[1].run(|| lib.copy_d2h(&mut combined, slice(output.buffer, 0, rows * 129280 * 4)?))?;
+                    ensure!(combined == *expected, "GPU-assembled vocabulary differs from full head");
                     let logits = wave.logits()?;
                     let mut parts = [vec![0u8; rows * 64640 * 4], vec![0u8; rows * 64640 * 4]];
                     for rank in 0..2 { devices[rank].run(|| lib.copy_d2h(&mut parts[rank], logits[rank]))?; }
@@ -313,6 +348,15 @@ mod tests {
         runtime.block_on(unsafe { first.execute_logits(input.buffer, 3) })?;
         assert!(first.logits().is_ok());
         assert!(first.greedy().is_err());
+        assert!(runtime.block_on(unsafe { first.copy_logits_to(input.buffer) }).is_err());
+        let foreign = Ds41rtDeviceBuffer { device_id: 0, ..assembled[0].buffer };
+        assert!(runtime.block_on(unsafe { first.copy_logits_to(foreign) }).is_err());
+        runtime.block_on(unsafe { first.execute_logits(input.buffer, 80) })?;
+        let mut pending = Box::pin(unsafe { first.copy_logits_to(assembled[0].buffer) });
+        assert!(matches!(pending.as_mut().poll(&mut Context::from_waker(Waker::noop())), Poll::Pending));
+        drop(pending);
+        runtime.block_on(unsafe { first.copy_logits_to(assembled[0].buffer) })?;
+        assert!(first.logits().is_ok());
         assert_eq!(lib.cuda_get_device()?, 0);
         eprintln!("PASS distributed vocabulary cancellation, reuse and device restoration");
         Ok(())
