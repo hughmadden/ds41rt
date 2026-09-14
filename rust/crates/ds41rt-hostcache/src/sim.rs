@@ -84,7 +84,7 @@ pub struct Simulator {
 }
 
 impl Simulator {
-    pub fn new(model: EngineModel, cache: HostCache<StubCopyEngine>, seed: u64) -> Self {
+    pub fn new(model: EngineModel, cache: HostCache<StubCopyEngine, ()>, seed: u64) -> Self {
         let _ = (model, cache, seed);
         unimplemented!("HC-4")
     }
@@ -92,7 +92,7 @@ impl Simulator {
         let _ = workload;
         unimplemented!("HC-4")
     }
-    pub fn cache(&self) -> &HostCache<StubCopyEngine> {
+    pub fn cache(&self) -> &HostCache<StubCopyEngine, ()> {
         unimplemented!("HC-4")
     }
     pub fn now_ns(&self) -> u64 {

@@ -60,9 +60,7 @@ impl<'a> PrefixCache<'a> {
         let keys = images.encode(&tokens[..end as usize])?;
         // Evict before allocating another tail, keeping peak retained residency
         // within the configured number of completed states.
-        if !bank.remove_exact(&keys)
-            && bank.entries() >= bank.limit()
-        {
+        if bank.remove_exact(&keys).is_none() && bank.entries() >= bank.limit() {
             bank.evict_one();
         }
         let target = requests.retain_prefix(lease, BackbonePrefix::device_bytes())?;
@@ -87,7 +85,7 @@ impl<'a> PrefixCache<'a> {
         let end = requests.cache().committed_end(lease)?;
         ensure!(end > 0 && end as usize <= tokens.len(), "retained token frontier differs");
         let keys = images.encode(&tokens[..end as usize])?;
-        if !bank.remove_exact(&keys) && bank.entries() >= bank.limit() { bank.evict_one(); }
+        if bank.remove_exact(&keys).is_none() && bank.entries() >= bank.limit() { bank.evict_one(); }
         requests.queue_prefix(lane, lease)?;
         if let Some(draft) = draft.as_deref_mut() {
             if let Err(error) = draft.queue_prefix(lane, id, end) {
