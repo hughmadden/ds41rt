@@ -225,5 +225,17 @@ failed the streaming gate. The original helper did not retain the failed SSE
 response, and the server log contains no corresponding error, so the cause is
 not yet established. The benchmark now records failed requests and incomplete
 SSE events to distinguish empty stops from transport or usage failures. A repeat
-of the same sequence is in progress. Neither the K7 mixed result nor the new
+of the same sequence passed all three sweeps, with mixed medians of
+156.5 / 141.7 / 177.9 / 211.6 / 295.4 tok/s at C1/C2/C4/C8/C16. The
+original failed SSE remains unexplained; this successful repeat does not resolve
+it. Both attempts are retained in the raw summary. Neither the K7 mixed result nor the new
 cost model is promoted to a serving default.
+
+
+The matched high-thinking Sieve check (one warmup, three measured requests per
+arm, temperature zero, 2,000-token limit) measured 120.26 / 119.43 / 122.85 tok/s for legacy K5 / placement K5 / placement K7. All nine measured
+responses stopped naturally at 802 tokens and produced the same Python function.
+Each passed an independent trial-division prime oracle at limits -1, 0, 1, 2,
+3, 10, 997, and 10,000. K7's approximately 2% Sieve improvement is modest;
+this check does not resolve the intermittent mixed-stream failure. A focused
+six-sweep mixed repetition is running with failed-response capture enabled.

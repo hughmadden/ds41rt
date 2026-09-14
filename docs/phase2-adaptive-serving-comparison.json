@@ -295,5 +295,166 @@
         "server.log": "12dd6d3e1fa96a6a9f54c916a4d14800a0e585e0852e52af050e2cf90c721c42"
       }
     }
+  },
+  "diagnostic_repeat": {
+    "scope": "Diagnostic repeat of the original K7 code plus three mixed sweeps, same binary/profile/prompts. All passed; this does not resolve the earlier unrecorded failed SSE.",
+    "mixed_passed": [
+      true,
+      true,
+      true
+    ],
+    "mixed": {
+      "1": {
+        "samples": [
+          156.47463431161344,
+          157.18442275741592,
+          154.17130072288478
+        ],
+        "median": 156.47463431161344
+      },
+      "2": {
+        "samples": [
+          141.73872014622515,
+          145.3174703340216,
+          139.89007983049882
+        ],
+        "median": 141.73872014622515
+      },
+      "4": {
+        "samples": [
+          180.22141647179984,
+          177.8931126200008,
+          169.7331503865327
+        ],
+        "median": 177.8931126200008
+      },
+      "8": {
+        "samples": [
+          211.58844078939055,
+          212.10232723963455,
+          196.30181203058618
+        ],
+        "median": 211.58844078939055
+      },
+      "16": {
+        "samples": [
+          295.4062686304461,
+          307.53582012157887,
+          279.97921966750164
+        ],
+        "median": 295.4062686304461
+      }
+    },
+    "artifact_sha256": {
+      "code.json": "d44ffaf1756cb2728a5d2a34cac4e4c74973dfb4644b1d1a2939a6ed42639656",
+      "mixed1.json": "2d9c7cd6236ceac4382863e7c490e8c982f41536a51aac71e21eab2e66b984db",
+      "mixed2.json": "96f249a214536bbd4f4d9f72caa54b0d4a9a856aa92582d42fd107ea53d652b8",
+      "mixed3.json": "82e13930e7582d4173ba4156356f4bab388e50815295834570d7eac2076ee421",
+      "server.log": "e3c2d319de271665fb321d41a5acf7dcdd97431b1f42cc83b337272f1140c1f2"
+    }
+  },
+  "high_thinking_sieve": {
+    "cost-sieve-legacy-v2-rtx2-k5": {
+      "runs": [
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 120.17484107027452,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 120.26436808964931,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 120.27520502088623,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        }
+      ],
+      "median_tokens_per_second": 120.26436808964931,
+      "limits": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        10,
+        997,
+        10000
+      ],
+      "artifact_sha256": "bac139e9fb032e5a31c0bfedf156e2a446807b357a2682a593f07e8e83159024"
+    },
+    "cost-sieve-placement-v2-rtx2-k5": {
+      "runs": [
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 119.13562095346394,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 119.6241400741949,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 119.43494126726736,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        }
+      ],
+      "median_tokens_per_second": 119.43494126726736,
+      "limits": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        10,
+        997,
+        10000
+      ],
+      "artifact_sha256": "088f7cc132398d9c4a94e274bd381e00d0609085f306a4c7dac79405e7a44825"
+    },
+    "cost-sieve-placement-v2-rtx2-k7": {
+      "runs": [
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 122.84724231335068,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 122.99118884640207,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 122.83459905769585,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        }
+      ],
+      "median_tokens_per_second": 122.84724231335068,
+      "limits": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        10,
+        997,
+        10000
+      ],
+      "artifact_sha256": "3246777ad3c810f0f7aea3fa4189d6f52d46aa348da21b09b139f71f62d58044"
+    }
   }
 }
