@@ -1,5 +1,12 @@
 # Measured dual-RTX memory breakdown
 
+The table below records the earlier K5 configuration with a 16M pool target.
+The updated dual-RTX default targets **14×1,048,576 tokens**, plus tail/COW
+allowance, while keeping concurrency 16 and 24 retained turns. At those defaults
+the compressed/index allocation is **13.09 GB / 14,712,832 source positions**
+(including allowance). Current graph-memory validation is recorded in the
+[adaptive comparison](phase2-adaptive-verification.md).
+
 Measured 2026-09-14 using the serving binary (not the test binary), after startup
 and before request-time graph warmup. Settings: 2048-row prefill, C16 admission,
 dSpark enabled, 24 prompt and 24 turn snapshots plus two in-flight snapshot slots,

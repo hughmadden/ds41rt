@@ -279,6 +279,7 @@ pub(super) fn serve<'w, 'a, P: ServingTarget<'w, 'a>>(lib: &'a NativeLibrary, ar
             requests, first_transport, second_transport, &mut active, &members,
             draft.as_deref_mut(), &mut prefixes, receive));
         if let Err(error) = result {
+            tracing::error!(error=%format!("{error:#}"), "native decode round failed");
             P::reset_connections(first_transport)?; P::reset_connections(second_transport)?;
             for request in active.iter_mut().flatten() {
                 let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));

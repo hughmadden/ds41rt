@@ -20,6 +20,10 @@ Status: forced dual-GPU worker serves long prompts at the release prefill step; 
 - Reduce Spark residency for layers fully hosted on RTX, preserve decoder
   execution and bounded replay, and measure the actual remote calls during
   prefill and verification.
+- Default the dual-RTX shared pool to 14×1,048,576 tokens plus COW/tail
+  allowance, preserving 16-request concurrency and 24 retained turns. Keep
+  explicit KV byte-size and memory-reservation overrides available. The reduced
+  default leaves runtime space for full graph retention.
 - Preserve FP4 compressed KV, FP8 SWA, exact reuse, retained snapshots,
   constraints, tool calling, cancellation, and rapid startup.
 - Release concurrency tables must include counting, code, and topic at

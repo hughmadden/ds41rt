@@ -5,6 +5,7 @@
 // Dual-RTX owners preallocate execution storage before sizing the pool.
 // Keep room for request-time graphs and transient admission allocations.
 pub(crate) const RUNTIME_HEADROOM: usize = 800 * 1024 * 1024;
+const DEFAULT_POOL_TOKENS: usize = 14 * 1_048_576;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SourcePoolPlan {
@@ -106,10 +107,12 @@ impl PoolPlan {
         } else if reservation.is_some() {
             low
         } else {
-            // Snapshot arenas are already charged to fixed occupancy. Retain
-            // complete context capacity for each admitted request, independently
-            // of those arenas, plus partial-tail/copy-on-write page allowance.
-            (context.div_ceil(512) * slots + slots + 2 * retained_turns).max(minimum)
+            // Snapshot arenas are already charged to fixed occupancy. Cap the
+            // default shared pool at 14M tokens, leaving runtime graph space;
+            // concurrency and per-request context limits remain independent.
+            // Explicit byte/reservation overrides retain their existing meaning.
+            ((context.div_ceil(512) * slots).min(DEFAULT_POOL_TOKENS / 512)
+                + slots + 2 * retained_turns).max(minimum)
         };
         ensure!(desired_groups >= minimum && desired_groups <= MAX_GROUPS,
             "distributed KV pool is outside admission or physical page limits");
@@ -131,14 +134,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn measured_dual_budget_covers_sixteen_full_contexts_and_tails() -> anyhow::Result<()> {
+    fn measured_dual_budget_reserves_fourteen_full_contexts_and_graph_headroom() -> anyhow::Result<()> {
         let totals = [101_973_491_712usize, 101_970_345_984];
         let occupied = [92_070_477_824usize, 94_956_158_976];
         let memory = std::array::from_fn(|gpu| (totals[gpu] - occupied[gpu], totals[gpu]));
         let plan = PoolPlan::new(crate::v41_backbone_cache::CachePlacement::encoder_decoder(),
             16, 1_048_576, 24, 146_150_400, None, None, memory)?;
-        assert_eq!(plan.pages, [32_832, 32_832, 32_832, 65_664]);
-        assert_eq!(plan.global_bytes, 14_960_885_760);
+        assert_eq!(plan.pages, [28_736, 28_736, 28_736, 57_472]);
+        assert_eq!(plan.global_bytes, 13_094_420_480);
+        assert!(plan.unused_bytes[1] >= 2 * 373_293_056);
+        // The new default is not a hard cap on explicit user pool requests.
+        let explicit = PoolPlan::new(crate::v41_backbone_cache::CachePlacement::encoder_decoder(),
+            16, 1_048_576, 24, 146_150_400, Some(super::super::ByteSize(14_960_885_760)), None, memory)?;
+        assert_eq!(explicit.pages, [32_832, 32_832, 32_832, 65_664]);
+        let smaller = PoolPlan::new(crate::v41_backbone_cache::CachePlacement::encoder_decoder(),
+            8, 1_048_576, 24, 146_150_400, None, None, memory)?;
+        assert_eq!(smaller.pages[0], 8 * 2048 + 8 + 48);
         for gpu in 0..2 {
             assert!(occupied[gpu] + plan.cache_bytes[gpu] + RUNTIME_HEADROOM <= totals[gpu]);
         }

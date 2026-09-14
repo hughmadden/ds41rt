@@ -237,5 +237,70 @@ arm, temperature zero, 2,000-token limit) measured 120.26 / 119.43 / 122.85 tok/
 responses stopped naturally at 802 tokens and produced the same Python function.
 Each passed an independent trial-division prime oracle at limits -1, 0, 1, 2,
 3, 10, 997, and 10,000. K7's approximately 2% Sieve improvement is modest;
-this check does not resolve the intermittent mixed-stream failure. A focused
-six-sweep mixed repetition is running with failed-response capture enabled.
+this check does not resolve the intermittent mixed-stream failure. The focused
+six-sweep repetition failed during C8 of sweep two. All eight responses had
+started producing normal text, then ended within roughly 10 ms of one another
+without finish, usage, or DONE events. This rules out empty generated answers.
+The native API intentionally aborts streams on backend errors, but the scheduler
+did not log the decode error before forwarding it. A full-chain error log is
+being added at that boundary to identify the underlying failure. The captured
+failure summary and artifact hash are retained alongside the throughput data.
+
+
+### Graph-memory failure and bounded retention candidate
+
+A subsequent reproduction with scheduler error logging identified the failure:
+`cudaGraphInstantiate failed: out of memory`. It occurred at C16 in the third
+mixed sweep and aborted all sixteen responses. The coordinator process remained
+alive and `/health` returned 200 before collector cleanup. This is a backend
+memory failure, not an empty model answer or a semantic evaluation failure.
+GPU1 free memory had fallen from approximately 300 MiB after code warmup to
+48 MiB as additional mixed shapes accumulated. The scheduler now logs the full
+decode error chain before forwarding failures to clients.
+
+The candidate separates **supported row extent** from **retained shape count**.
+Backbone graph banks retain up to 48 recently used decode shapes, including
+widths through 64, plus at most one current large-prefill graph. Sparse attention
+also retains at most 48 graph variants while preserving its 64-row K7 scratch
+and dispatch. Hits retain their graph handles; misses evict an inactive least
+recently used shape. There is no additional allocation or CUDA synchronization
+on a cache hit and no lane join. KV planning and runtime reserve are unchanged.
+
+The optimized build passed. CUDA graph tests cover changed-input replay,
+weight-owner isolation, eviction of old shapes, protection of a recently reused
+shape, and continued reuse of wide shapes. Sparse reservation tests on both RTX
+cards confirm the batch still supports 64 rows while the graph count stays 48,
+with unchanged byte accounting. The code-plus-six-mixed-sweep sequence
+`cost-bounded-placement-v3-rtx2-k7` passed all sweeps, but mixed throughput
+declined across the sequence. It did not establish a performance benefit.
+The bounded-retention candidate was therefore removed; its patch and data remain
+in the experiment cache, and the raw comparison records every sweep.
+
+
+### Updated default: 14M shared pool, full graph retention
+
+The requested dual-RTX default is now 14×1,048,576 shared pool tokens, while
+keeping 16 concurrent requests, a 1,048,576 per-request context limit, and 24
+retained turns. With tail/COW allowance this is 28,736 source groups,
+**13,094,420,480 bytes (13.09 GB) / 14,712,832 source-token positions**.
+Explicit KV byte requests and memory-reservation overrides retain their existing
+meaning; smaller concurrency/context settings can still request a smaller pool.
+
+Compared with the earlier fitting K7 pool, this frees approximately 469 MiB on
+RTX1 for runtime graph memory (and approximately 712 MiB versus the earlier K5
+pool). Full graph retention through 64 rows is restored. The seven planner tests
+pass, including a larger explicit pool override, the eight-request case,
+per-device limits and rounding. The optimized serving comparison
+`cost-pool14m-placement-v4-rtx2-k7` passed three code samples per concurrency and
+all three mixed sweeps without a decode error. Startup took 10.77 seconds;
+its log confirms the planned 13.09 GB pool. This replaces the 16M default target;
+the earlier tables remain records of their actual measured configurations.
+
+| 14M pool / full graph retention | C1 | C2 | C4 | C8 | C16 |
+|---|---:|---:|---:|---:|---:|
+| code aggregate tok/s | 156.7 | 260.1 | 467.3 | 741.5 | 1192.3 |
+| mixed aggregate tok/s | 150.9 | 138.1 | 159.3 | 199.1 | 291.6 |
+
+The full graph cache is kept. The bounded-cache experiment is not part of the
+implementation. Placement-aware costs and K7 remain experimental pending the
+single-RTX comparison; the dual-RTX pool default changes independently.
