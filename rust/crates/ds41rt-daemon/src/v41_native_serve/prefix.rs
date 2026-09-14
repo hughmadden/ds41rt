@@ -6,16 +6,21 @@ mod images;
 pub(super) use images::ImageKeys;
 use images::ImageKeySpace;
 pub(super) use ds41rt_core::prefix::{Radix, Retention, SnapshotKind};
+mod host_cache;
+pub(super) use host_cache::HostCacheBinding;
 struct Saved<'a> {
     _images: ImageKeys,
     target: RequestPrefix<'a>,
     draft: Option<DraftPrefix<'a>>,
     next: TokenScores,
+    /// The host cache's write-behind copy of this snapshot, if one was issued.
+    ticket: Option<ds41rt_hostcache::cache::StoreTicket>,
 }
 pub(super) struct PrefixCache<'a> {
     retained: Retention<Saved<'a>>,
     images: ImageKeySpace,
     pending: [Option<PendingRetention>; 2],
+    host: Option<HostCacheBinding<'a>>,
 }
 struct PendingRetention {
     kind: SnapshotKind,
@@ -32,7 +37,76 @@ impl<'a> PrefixCache<'a> {
             retained: Retention::new(limit),
             images: ImageKeySpace::default(),
             pending: [None, None],
+            host: None,
         }
+    }
+    /// Attach the host snapshot cache (`None` keeps every path exactly as before).
+    pub fn with_host_cache(mut self, host: Option<HostCacheBinding<'a>>) -> Self {
+        self.host = host;
+        self
+    }
+    /// Poll the host cache's copies; called once per scheduler step.
+    pub fn tick(&mut self) {
+        if let Some(host) = &mut self.host {
+            host.tick();
+        }
+    }
+    pub fn host_metrics(&self) -> Option<ds41rt_hostcache::metrics::Snapshot> {
+        self.host.as_ref().map(HostCacheBinding::metrics)
+    }
+    /// Replace a same-key snapshot or evict the oldest when the bank is full, before another
+    /// arena slot is taken; every dropped snapshot passes through the host cache first.
+    fn make_bank_room(&mut self, kind: SnapshotKind, keys: &[u32]) {
+        let bank = self.retained.bank_mut(kind);
+        let dropped = match bank.remove_exact(keys) {
+            Some(replaced) => Some(replaced),
+            None if bank.entries() >= bank.limit() => bank.evict_oldest(),
+            None => None,
+        };
+        if let Some(saved) = dropped {
+            self.host_dropped(saved);
+        }
+    }
+    /// Issue the write-behind copy, then insert; an insertion-time eviction also passes through
+    /// the host cache.
+    fn insert_saved(&mut self, kind: SnapshotKind, keys: &[u32], mut saved: Saved<'a>, requests: &Requests<'a>) {
+        if let Some(host) = &mut self.host {
+            saved.ticket = match host.store(kind, keys, &saved, requests) {
+                Ok(ticket) => ticket,
+                Err(error) => {
+                    tracing::warn!(target: "ds41rt::host_cache", %error, "snapshot not stored in the host cache");
+                    None
+                }
+            };
+        }
+        if let Some(evicted) = self.retained.bank_mut(kind).insert(keys, saved) {
+            self.host_dropped(evicted);
+        }
+    }
+    /// A snapshot leaves the device: let its host copy finish within budget, then drop it.
+    fn host_dropped(&mut self, saved: Saved<'a>) {
+        if let Some(host) = &mut self.host {
+            host.before_evict(saved.ticket);
+        }
+        drop(saved);
+    }
+    /// On a device-bank miss, rebuild the best host snapshot into the bank so the engine's own
+    /// restore finds it.
+    fn host_restore(&mut self, keys: &[u32], requests: &Requests<'a>, draft: Option<&DraftRuntime<'_, 'a>>) -> Result<()> {
+        let Some(host) = &mut self.host else {
+            return Ok(());
+        };
+        let Some(hit) = host.lookup(keys) else {
+            return Ok(());
+        };
+        let Some(saved) = host.restore(&hit, requests, draft)? else {
+            return Ok(());
+        };
+        let tokens = host.snapshot_tokens(hit.key).context("restored host snapshot has no tokens")?;
+        if let Some(evicted) = self.retained.bank_mut(hit.kind).insert(&tokens, saved) {
+            self.host_dropped(evicted);
+        }
+        Ok(())
     }
     pub fn prepare_key(&mut self, tokens: &[u32], images: &[ds41rt_loader::V41ImageSpan]) -> Result<ImageKeys> {
         self.images.prepare(tokens, images)
@@ -60,20 +134,17 @@ impl<'a> PrefixCache<'a> {
         let keys = images.encode(&tokens[..end as usize])?;
         // Evict before allocating another tail, keeping peak retained residency
         // within the configured number of completed states.
-        if bank.remove_exact(&keys).is_none() && bank.entries() >= bank.limit() {
-            bank.evict_one();
-        }
+        self.make_bank_room(kind, &keys);
         let target = requests.retain_prefix(lease, BackbonePrefix::device_bytes())?;
         let draft = draft.map(|d| d.retain_prefix(id, end)).transpose()?;
-        bank.insert(
-            &keys,
-            Saved {
-                _images: images.through(end as usize),
-                target,
-                draft,
-                next: next.clone(),
-            },
-        );
+        let saved = Saved {
+            _images: images.through(end as usize),
+            target,
+            draft,
+            next: next.clone(),
+            ticket: None,
+        };
+        self.insert_saved(kind, &keys, saved, requests);
         Ok(())
     }
     pub fn queue_retain(&mut self, lane: usize, kind: SnapshotKind, tokens: &[u32],
@@ -85,7 +156,7 @@ impl<'a> PrefixCache<'a> {
         let end = requests.cache().committed_end(lease)?;
         ensure!(end > 0 && end as usize <= tokens.len(), "retained token frontier differs");
         let keys = images.encode(&tokens[..end as usize])?;
-        if bank.remove_exact(&keys).is_none() && bank.entries() >= bank.limit() { bank.evict_one(); }
+        self.make_bank_room(kind, &keys);
         requests.queue_prefix(lane, lease)?;
         if let Some(draft) = draft.as_deref_mut() {
             if let Err(error) = draft.queue_prefix(lane, id, end) {
@@ -112,9 +183,8 @@ impl<'a> PrefixCache<'a> {
         let pending = self.pending[lane].take().unwrap();
         // Another lane may have inserted while these copies ran. Radix insertion
         // enforces the bank limit again; two extra arena slots cover both pending copies.
-        self.retained.bank_mut(pending.kind).insert(&pending.keys, Saved {
-            _images: pending.images, target, draft: saved_draft, next: pending.next,
-        });
+        let saved = Saved { _images: pending.images, target, draft: saved_draft, next: pending.next, ticket: None };
+        self.insert_saved(pending.kind, &pending.keys, saved, requests);
         Ok(true)
     }
     pub fn abort_retain(&mut self, lane: usize, requests: &mut Requests<'a>,
@@ -134,6 +204,9 @@ impl<'a> PrefixCache<'a> {
         draft: Option<&mut DraftRuntime<'_, 'a>>,
     ) -> Result<Option<(usize, Option<TokenScores>)>> {
         let keys = images.encode(tokens)?;
+        if self.retained.lookup_reusable(&keys).is_none() {
+            self.host_restore(&keys, requests, draft.as_deref())?;
+        }
         let Some((end, frontier, saved)) = self.retained.lookup_reusable(&keys) else {
             return Ok(None);
         };
@@ -164,9 +237,12 @@ impl<'a> PrefixCache<'a> {
             match requests.cache().check_append_capacity(work) {
                 Ok(()) => return Ok(()),
                 Err(error) => {
-                    if error.downcast_ref::<crate::v41_compressor::SourcePoolExhausted>().is_none()
-                        || !self.retained.evict_one() {
+                    if error.downcast_ref::<crate::v41_compressor::SourcePoolExhausted>().is_none() {
                         return Err(error);
+                    }
+                    match self.retained.evict_oldest() {
+                        Some((_, saved)) => self.host_dropped(saved),
+                        None => return Err(error),
                     }
                 }
             }

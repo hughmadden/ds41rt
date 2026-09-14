@@ -140,14 +140,17 @@ impl<E: CopyEngine, P> HostCache<E, P> {
     pub fn tick(&mut self) -> TickReport {
         unimplemented!("HC-5")
     }
-    /// The engine is about to evict this device snapshot. With a pending ticket, wait within the
-    /// copy budget (issuing the copy first under `OnEvict`); without one, `Clean`.
-    pub fn before_device_evict(
-        &mut self,
-        ticket: Option<StoreTicket>,
-        snapshot: &DeviceSnapshot,
-    ) -> EvictDecision {
-        let _ = (ticket, snapshot);
+    /// The engine is about to drop a device snapshot. With a pending ticket, wait within the
+    /// copy budget (under `OnEvict`, issue the copy first from the plan recorded at store time,
+    /// whose device ranges are still valid because the snapshot is still alive); without a
+    /// ticket, `Clean`.
+    pub fn before_device_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
+        let _ = ticket;
+        unimplemented!("HC-5")
+    }
+    /// The key-space tokens of a resident snapshot (the sequence its radix entry is keyed by).
+    pub fn snapshot_tokens(&self, key: Key) -> Option<&[u32]> {
+        let _ = key;
         unimplemented!("HC-5")
     }
     pub fn device_page_freed(&mut self, id: DevicePageId) {

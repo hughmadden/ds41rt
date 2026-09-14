@@ -83,14 +83,27 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
     requests: &mut Requests<'a>, first_transport: &mut NativeTp4Wave<'a>,
     second_transport: &mut NativeTp4Wave<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>,
     vision: &mut crate::v41_vision::VisionRuntime<'a>,
+    stats: std::sync::Arc<std::sync::Mutex<serde_json::Value>>,
 ) -> Result<()> {
     let mut active: Vec<Option<Active<'a>>> = (0..args.concurrency).map(|_| None).collect();
     let mut compiler = super::constraints::Compiler::new(lib, args.snapshot.join("tokenizer.json"));
     let mut id = 0u64;
     let mut closed = false;
-    let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize);
+    let template = requests.cache().sources()[0].source_cache().page_segments(0)[0];
+    let host_cache = super::prefix::HostCacheBinding::new(lib, args.host_cache_config()?, template)?;
+    let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize).with_host_cache(host_cache);
+    let mut stats_published = Instant::now();
     let limits = ds41rt_api::native_v41::NativeLimits::new(args.max_context_tokens, args.max_output_tokens)?;
     loop {
+        prefixes.tick();
+        if stats_published.elapsed() >= std::time::Duration::from_secs(1) {
+            stats_published = Instant::now();
+            if let Some(metrics) = prefixes.host_metrics() {
+                if let Ok(mut slot) = stats.lock() {
+                    *slot = serde_json::json!({ "host_cache": metrics });
+                }
+            }
+        }
         // This point is reached only after both complete stacks have drained and
         // committed. No cache owner is migrated or retired inside a layer stack.
         for entry in &mut active {
