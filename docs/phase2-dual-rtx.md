@@ -1337,3 +1337,29 @@ the unpolled lane remains unpublished in its initial stage. This verifies that
 host progress on one lane does not require advancing the other. Normal serving
 still needs to construct and select the distributed runtime, and end-to-end
 throughput remains unmeasured.
+
+The request-level `DraftRuntime` now uses static `DraftChain` dispatch for its
+shared admission, proposal polling, adaptive history and cache-prefix lifecycle.
+The existing single-GPU constructor and synchronous proposal API remain
+specialized to the original chain. A distributed constructor creates GPU1 main
+contexts/windows plus independent distributed draft chains, returning an
+explicit GPU1 owner. Callers must scope synchronous runtime work and destruction
+to that device; retained prefixes also need GPU1 ownership at their consumer.
+The production worker/scheduler still needs that owner integration.
+
+The real-weight runtime fixture compares distributed and full-head runtimes at
+1, 3 and 8 requests per lane while changing committed cache contents, positions
+and seeds. Proposals and confidence match exactly, including completion of one
+lane while the other stays unpolled. Queued prefix snapshots, request release,
+re-admission under a new identity and prefix restoration passed
+(`distributed-runtime.log`, 2.62 seconds). The serving unit tests also passed
+(`distributed-runtime-serving-tests.log`). This is not yet end-to-end serving
+or a throughput qualification.
+
+A later latency optimization can prepare dSpark seed embeddings on RTX1 as soon
+as verification determines the next anchor, overlapping the transfer with cache
+commits. A permanent local mask row costs 10 KiB, and eight staged seed rows cost
+80 KiB per lane. The seed is not generally known before the relevant target
+verification; the available overlap must be measured at the actual selection
+point. Keep the full embedding table on RTX0 and keep preparation/completion
+dependencies lane-local.

@@ -2,13 +2,16 @@ use super::*;
 use crate::v41_dspark_cache::{DsparkWindow, WindowLease};
 use crate::v41_experts::dspark::{DsparkChain, DsparkMainContext, DsparkWeights};
 use crate::v41_requests::RequestBatch;
+mod chain;
+pub(crate) use chain::DraftChain;
+mod distributed;
 
 /// Execution workspaces share a request-indexed bank of persistent draft state.
-pub(crate) struct DraftRuntime<'w, 'a> {
+pub(crate) struct DraftRuntime<'w, 'a, C = DsparkChain<'w, 'a>> {
     mains: Vec<DsparkMainContext<'w, 'a>>,
     pending_commit_ids: Vec<Vec<u64>>,
     pending_prefix_ids: [Option<u64>; 2],
-    chains: Vec<DsparkChain<'w, 'a>>,
+    chains: Vec<C>,
     windows: [DsparkWindow<'a>; 3],
     requests: std::collections::BTreeMap<u64, DraftRequest>,
     pending: Vec<Option<(Vec<(u64, u32, u64, usize)>, Instant)>>,
@@ -74,6 +77,8 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
             reuse_floor: None,
         })
     }
+}
+impl<'w, 'a, C: DraftChain> DraftRuntime<'w, 'a, C> {
     pub fn admit(&mut self, id: u64) -> Result<()> {
         ensure!(!self.requests.contains_key(&id), "draft request already admitted");
         let slot = (0..self.request_limit).find(|slot| self.requests.values().all(|request| request.slot != *slot))
@@ -393,68 +398,6 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
         result
     }
 
-    /// Inputs are (request identity, anchor, committed end, remaining output budget).
-    /// Returned rows retain input order; short histories/budgets use the anchor only.
-    pub fn propose(&mut self, lib: &'a NativeLibrary,
-        inputs: &[(u64, u32, u64, usize)],
-    ) -> Result<Vec<Vec<u32>>> {
-        ensure!(self.pending.iter().all(Option::is_none), "shared draft proposal still pending");
-        ensure!(!inputs.is_empty() && inputs.len() <= 16, "invalid draft batch size");
-        let mut seen = std::collections::BTreeSet::new();
-        for &(id, anchor, _, remaining) in inputs {
-            ensure!(seen.insert(id) && self.requests.contains_key(&id), "invalid draft request identity");
-            ensure!(anchor < 129280 && remaining > 0, "invalid draft request input");
-        }
-        for &(id, _, _, _) in inputs {
-            self.confidence_trace.remove(&id);
-        }
-        let active: Vec<_> = inputs.iter().enumerate()
-            .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
-        let mut outputs: Vec<_> = inputs.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect();
-        if active.is_empty() { return Ok(outputs); }
-        let count = active.len();
-        let tokens: Vec<_> = active.iter().map(|(_, (_, anchor, _, _))| *anchor as i32).collect();
-        let bindings: [Vec<_>; 3] = std::array::from_fn(|stage| active.iter()
-            .map(|(_, (id, _, end, _))| (self.requests[id].leases[stage], *end)).collect());
-        self.chains[0].set_tokens(&tokens)?;
-        let mut rngs: Vec<_> = self.requests.iter_mut().filter_map(|(id, request)|
-            active.iter().position(|(_, (active_id, _, _, _))| active_id == id)
-                .map(|index| (index, &mut request.rng))).collect();
-        rngs.sort_by_key(|(index, _)| *index);
-        self.chains[0].prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
-            &vec![0.0; count])?;
-        let windows = self.windows.each_ref();
-        let bindings = bindings.each_ref().map(|rows| rows.as_slice());
-        if !self.chains[0].has_graph(count) {
-            unsafe { self.chains[0].capture(windows, bindings)?; }
-        }
-        unsafe { self.chains[0].replay(windows, bindings)?; }
-        let buffer = self.chains[0].draft_output()?[0];
-        let mut bytes = vec![0; buffer.bytes];
-        lib.copy_d2h(&mut bytes, buffer)?;
-        ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
-        let packed: Vec<_> = bytes.chunks_exact(4)
-            .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
-        if self.adaptive.is_some() || self.confidence_cutoff.is_some() || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
-            let confidence = self.chains[0].draft_output()?[2];
-            ensure!(confidence.bytes == 5 * count * 4, "draft confidence extent differs");
-            let mut bytes = vec![0; confidence.bytes];
-            lib.copy_d2h(&mut bytes, confidence)?;
-            let values: Vec<_> = bytes.chunks_exact(4)
-                .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
-            for (row, &(_, &(id, _, _, _))) in active.iter().enumerate() {
-                self.confidence_trace.insert(id,
-                    (0..5).map(|step| values[step * count + row]).collect());
-            }
-        }
-        for (row, &(output, &(_, anchor, _, remaining))) in active.iter().enumerate() {
-            let tokens: Vec<_> = (0..6).map(|step| packed[step * count + row]).collect();
-            ensure!(tokens[0] == anchor && tokens.iter().all(|&token| token < 129280), "invalid draft tokens");
-            outputs[output] = tokens[..remaining.min(self.draft_limit + 1)].to_vec();
-        }
-        Ok(outputs)
-    }
-
     /// Each lane owns its draft scratch and stream; both can replay concurrently.
     /// Short RefCell borrows never survive a scheduler yield.
     pub fn poll_propose(&mut self, lane: usize,
@@ -523,4 +466,69 @@ impl<'w, 'a> DraftRuntime<'w, 'a> {
     pub fn confidence_trace(&self, id: u64) -> Option<&[f32]> {
         self.confidence_trace.get(&id).map(Vec::as_slice)
     }
+}
+
+impl<'w, 'a> DraftRuntime<'w, 'a> {
+    /// Inputs are (request identity, anchor, committed end, remaining output budget).
+    /// Returned rows retain input order; short histories/budgets use the anchor only.
+    pub fn propose(&mut self, lib: &'a NativeLibrary,
+        inputs: &[(u64, u32, u64, usize)],
+    ) -> Result<Vec<Vec<u32>>> {
+        ensure!(self.pending.iter().all(Option::is_none), "shared draft proposal still pending");
+        ensure!(!inputs.is_empty() && inputs.len() <= 16, "invalid draft batch size");
+        let mut seen = std::collections::BTreeSet::new();
+        for &(id, anchor, _, remaining) in inputs {
+            ensure!(seen.insert(id) && self.requests.contains_key(&id), "invalid draft request identity");
+            ensure!(anchor < 129280 && remaining > 0, "invalid draft request input");
+        }
+        for &(id, _, _, _) in inputs {
+            self.confidence_trace.remove(&id);
+        }
+        let active: Vec<_> = inputs.iter().enumerate()
+            .filter(|(_, (_, _, end, remaining))| *end >= 2 && *remaining > 1).collect();
+        let mut outputs: Vec<_> = inputs.iter().map(|(_, anchor, _, _)| vec![*anchor]).collect();
+        if active.is_empty() { return Ok(outputs); }
+        let count = active.len();
+        let tokens: Vec<_> = active.iter().map(|(_, (_, anchor, _, _))| *anchor as i32).collect();
+        let bindings: [Vec<_>; 3] = std::array::from_fn(|stage| active.iter()
+            .map(|(_, (id, _, end, _))| (self.requests[id].leases[stage], *end)).collect());
+        self.chains[0].set_tokens(&tokens)?;
+        let mut rngs: Vec<_> = self.requests.iter_mut().filter_map(|(id, request)|
+            active.iter().position(|(_, (active_id, _, _, _))| active_id == id)
+                .map(|index| (index, &mut request.rng))).collect();
+        rngs.sort_by_key(|(index, _)| *index);
+        self.chains[0].prepare_sampling(&mut rngs.into_iter().map(|(_, rng)| rng).collect::<Vec<_>>(),
+            &vec![0.0; count])?;
+        let windows = self.windows.each_ref();
+        let bindings = bindings.each_ref().map(|rows| rows.as_slice());
+        if !self.chains[0].has_graph(count) {
+            unsafe { self.chains[0].capture(windows, bindings)?; }
+        }
+        unsafe { self.chains[0].replay(windows, bindings)?; }
+        let buffer = self.chains[0].draft_output()?[0];
+        let mut bytes = vec![0; buffer.bytes];
+        lib.copy_d2h(&mut bytes, buffer)?;
+        ensure!(bytes.len() == 6 * count * 4, "draft token extent differs");
+        let packed: Vec<_> = bytes.chunks_exact(4)
+            .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
+        if self.adaptive.is_some() || self.confidence_cutoff.is_some() || tracing::enabled!(target: "ds41rt::draft_policy", tracing::Level::DEBUG) {
+            let confidence = self.chains[0].draft_output()?[2];
+            ensure!(confidence.bytes == 5 * count * 4, "draft confidence extent differs");
+            let mut bytes = vec![0; confidence.bytes];
+            lib.copy_d2h(&mut bytes, confidence)?;
+            let values: Vec<_> = bytes.chunks_exact(4)
+                .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
+            for (row, &(_, &(id, _, _, _))) in active.iter().enumerate() {
+                self.confidence_trace.insert(id,
+                    (0..5).map(|step| values[step * count + row]).collect());
+            }
+        }
+        for (row, &(output, &(_, anchor, _, remaining))) in active.iter().enumerate() {
+            let tokens: Vec<_> = (0..6).map(|step| packed[step * count + row]).collect();
+            ensure!(tokens[0] == anchor && tokens.iter().all(|&token| token < 129280), "invalid draft tokens");
+            outputs[output] = tokens[..remaining.min(self.draft_limit + 1)].to_vec();
+        }
+        Ok(outputs)
+    }
+
 }
