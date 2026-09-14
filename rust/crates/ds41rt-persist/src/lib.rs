@@ -15,6 +15,7 @@
 pub mod arena;
 pub mod copy;
 pub mod events;
+pub mod index;
 pub mod metrics;
 pub mod object;
 pub mod pool;
@@ -44,3 +45,6 @@ pub const TAIL_BYTES: usize = 40 * WINDOW_PREFIX_BYTES + 4 * COMPRESSOR_PREFIX_B
 pub const DRAFT_BYTES: usize = 3 * 128 * 528;
 /// Maximum context, and therefore the largest prefix an object can describe.
 pub const MAX_CONTEXT_TOKENS: u64 = 1_048_576;
+
+/// Bytes of sha256 appended to every persisted part (page, tail, draft, scores, meta).
+pub const CHECKSUM_BYTES: usize = 32;

@@ -7,6 +7,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1"
+ds41rt-core = { path = "../ds41rt-core" }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -30,4 +31,7 @@ name = "storage"
 harness = false
 [[bench]]
 name = "sim"
+harness = false
+[[bench]]
+name = "index"
 harness = false
