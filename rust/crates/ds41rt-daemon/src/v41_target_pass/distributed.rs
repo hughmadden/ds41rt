@@ -530,6 +530,15 @@ impl<'w, 'a> DistributedTargetPass<'w, 'a> {
             }
             if self.capture_routes {
                 self.route_capture[layer].clone_from(&self.lanes[gpu].captured_routes()[layer]);
+                if tracing::enabled!(target: "ds41rt::timing", tracing::Level::DEBUG) {
+                    let mut seen = [false; 384];
+                    for &expert in self.route_capture[layer].iter().flatten() {
+                        if let Some(value) = seen.get_mut(expert as usize) { *value = true; }
+                    }
+                    tracing::debug!(target: "ds41rt::timing", layer, rows,
+                        distinct_experts=seen.iter().filter(|&&value| value).count(),
+                        "distributed routed expert reuse");
+                }
             }
             #[cfg(test)]
             if let Some(progress) = &self.observed_layer { progress.set(layer + 1); }

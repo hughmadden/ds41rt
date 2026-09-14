@@ -1,0 +1,395 @@
+{
+  "date": "2026-09-14",
+  "stage_comparison": {
+    "single": {
+      "encoder": {
+        "production_index_ms": 1.008405128205128,
+        "attention_ms": 2.657230769230769,
+        "experts_ms": 11.171035897435896,
+        "finish_ms": 0.14205128205128204
+      },
+      "decoder": {
+        "production_index_ms": 1.2050820512820515,
+        "attention_ms": 2.649974358974359,
+        "experts_ms": 12.633384615384617,
+        "finish_ms": 0.14009230769230768
+      },
+      "warm_request_median_seconds": 1.634755500475876,
+      "completion_tokens": [
+        205,
+        205,
+        205,
+        205,
+        205
+      ]
+    },
+    "dual": {
+      "encoder": {
+        "production_index_ms": 0.822135,
+        "attention_ms": 2.6543699999999997,
+        "experts_ms": 5.8351999999999995,
+        "finish_ms": 0.23305499999999998
+      },
+      "decoder": {
+        "production_index_ms": 1.024175,
+        "attention_ms": 2.62683,
+        "experts_ms": 12.685424999999999,
+        "finish_ms": 0.23223500000000002
+      },
+      "warm_request_median_seconds": 1.3799414539826103,
+      "completion_tokens": [
+        205,
+        205,
+        205,
+        205,
+        205
+      ]
+    },
+    "scope": "Same optimized coordinator and ARM worker binaries, same prompt, six-row verification layers, timing logging enabled without Nsight. Stage times are mean per-layer elapsed times scaled by 20; not standalone GPU kernel times."
+  },
+  "reuse_by_rows": [
+    {
+      "rows": 4,
+      "gpu": 0,
+      "samples": 600,
+      "mean_distinct": 15.85,
+      "mean_gpu_us": 156.62485340118408,
+      "effective_GB_s": 951.2862662885251
+    },
+    {
+      "rows": 4,
+      "gpu": 1,
+      "samples": 600,
+      "mean_distinct": 15.85,
+      "mean_gpu_us": 155.40554644266766,
+      "effective_GB_s": 958.750027979004
+    },
+    {
+      "rows": 6,
+      "gpu": 0,
+      "samples": 12020,
+      "mean_distinct": 22.660648918469217,
+      "mean_gpu_us": 189.01482060030972,
+      "effective_GB_s": 1126.987558778317
+    },
+    {
+      "rows": 6,
+      "gpu": 1,
+      "samples": 12020,
+      "mean_distinct": 22.660648918469217,
+      "mean_gpu_us": 188.2619741442993,
+      "effective_GB_s": 1131.494303135219
+    },
+    {
+      "rows": 8,
+      "gpu": 0,
+      "samples": 360,
+      "mean_distinct": 16,
+      "mean_gpu_us": 171.33751102023655,
+      "effective_GB_s": 877.8294904858036
+    },
+    {
+      "rows": 8,
+      "gpu": 1,
+      "samples": 360,
+      "mean_distinct": 16,
+      "mean_gpu_us": 155.51804389953614,
+      "effective_GB_s": 967.1232754005121
+    },
+    {
+      "rows": 12,
+      "gpu": 0,
+      "samples": 4760,
+      "mean_distinct": 22.141176470588235,
+      "mean_gpu_us": 214.71849402740222,
+      "effective_GB_s": 969.334965498771
+    },
+    {
+      "rows": 12,
+      "gpu": 1,
+      "samples": 4760,
+      "mean_distinct": 22.141176470588235,
+      "mean_gpu_us": 192.78366400133663,
+      "effective_GB_s": 1079.6254188765545
+    },
+    {
+      "rows": 13,
+      "gpu": 0,
+      "samples": 40,
+      "mean_distinct": 22.075,
+      "mean_gpu_us": 202.60479927062988,
+      "effective_GB_s": 1024.2208711098458
+    },
+    {
+      "rows": 13,
+      "gpu": 1,
+      "samples": 40,
+      "mean_distinct": 22.075,
+      "mean_gpu_us": 201.7639995574951,
+      "effective_GB_s": 1028.4890488645717
+    },
+    {
+      "rows": 14,
+      "gpu": 0,
+      "samples": 20,
+      "mean_distinct": 23.7,
+      "mean_gpu_us": 252.76800079345702,
+      "effective_GB_s": 881.3915657862295
+    },
+    {
+      "rows": 14,
+      "gpu": 1,
+      "samples": 20,
+      "mean_distinct": 23.7,
+      "mean_gpu_us": 307.92799911499026,
+      "effective_GB_s": 723.5054449102042
+    },
+    {
+      "rows": 16,
+      "gpu": 0,
+      "samples": 200,
+      "mean_distinct": 16.9,
+      "mean_gpu_us": 196.74223907470704,
+      "effective_GB_s": 807.479922700664
+    },
+    {
+      "rows": 16,
+      "gpu": 1,
+      "samples": 200,
+      "mean_distinct": 16.9,
+      "mean_gpu_us": 185.27647918701172,
+      "effective_GB_s": 857.4504907319979
+    },
+    {
+      "rows": 18,
+      "gpu": 0,
+      "samples": 40,
+      "mean_distinct": 30.25,
+      "mean_gpu_us": 231.61279678344727,
+      "effective_GB_s": 1227.7373441756324
+    },
+    {
+      "rows": 18,
+      "gpu": 1,
+      "samples": 40,
+      "mean_distinct": 30.25,
+      "mean_gpu_us": 229.78639907836913,
+      "effective_GB_s": 1237.495696614396
+    },
+    {
+      "rows": 20,
+      "gpu": 0,
+      "samples": 20,
+      "mean_distinct": 27.05,
+      "mean_gpu_us": 225.53919982910156,
+      "effective_GB_s": 1127.42554816491
+    },
+    {
+      "rows": 20,
+      "gpu": 1,
+      "samples": 20,
+      "mean_distinct": 27.05,
+      "mean_gpu_us": 217.110400390625,
+      "effective_GB_s": 1171.1951870684309
+    },
+    {
+      "rows": 22,
+      "gpu": 0,
+      "samples": 20,
+      "mean_distinct": 31.65,
+      "mean_gpu_us": 258.89919967651366,
+      "effective_GB_s": 1149.1736103152964
+    },
+    {
+      "rows": 22,
+      "gpu": 1,
+      "samples": 20,
+      "mean_distinct": 31.65,
+      "mean_gpu_us": 263.59359817504884,
+      "effective_GB_s": 1128.7077154370838
+    },
+    {
+      "rows": 24,
+      "gpu": 0,
+      "samples": 5100,
+      "mean_distinct": 23.049607843137256,
+      "mean_gpu_us": 239.13886767219094,
+      "effective_GB_s": 906.0580227260004
+    },
+    {
+      "rows": 24,
+      "gpu": 1,
+      "samples": 5100,
+      "mean_distinct": 23.049607843137256,
+      "mean_gpu_us": 224.5769726083793,
+      "effective_GB_s": 964.8081327458218
+    },
+    {
+      "rows": 32,
+      "gpu": 0,
+      "samples": 240,
+      "mean_distinct": 16.525,
+      "mean_gpu_us": 206.80040073394775,
+      "effective_GB_s": 751.1604786484332
+    },
+    {
+      "rows": 32,
+      "gpu": 1,
+      "samples": 240,
+      "mean_distinct": 16.525,
+      "mean_gpu_us": 193.39079977671307,
+      "effective_GB_s": 803.2454914057661
+    },
+    {
+      "rows": 40,
+      "gpu": 0,
+      "samples": 240,
+      "mean_distinct": 18.75,
+      "mean_gpu_us": 218.67706597646077,
+      "effective_GB_s": 806.0104483886429
+    },
+    {
+      "rows": 40,
+      "gpu": 1,
+      "samples": 240,
+      "mean_distinct": 18.75,
+      "mean_gpu_us": 201.16293296813964,
+      "effective_GB_s": 876.1852762800767
+    },
+    {
+      "rows": 48,
+      "gpu": 0,
+      "samples": 4080,
+      "mean_distinct": 22.71764705882353,
+      "mean_gpu_us": 276.9809177510879,
+      "effective_GB_s": 771.0031208428302
+    },
+    {
+      "rows": 48,
+      "gpu": 1,
+      "samples": 4080,
+      "mean_distinct": 22.71764705882353,
+      "mean_gpu_us": 223.22237645691516,
+      "effective_GB_s": 956.6834445077174
+    }
+  ],
+  "artifacts": {
+    "single-code-timing.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/single-code-timing.log",
+      "sha256": "d654a1c162f33067c6cfb28709d3951df2b1e8599a00a9f25467f02d598352a0"
+    },
+    "single-code-timing-requests.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/single-code-timing-requests.json",
+      "sha256": "7b0b6417981aa8f2baaaf09276710a0a25b6d8aec11ff66a1477e99892a59577"
+    },
+    "dual-code-timing.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-code-timing.log",
+      "sha256": "cc6d588f51715300916e4cd7a0fde8edf79ae0144bd9c1dbb884983013aa0991"
+    },
+    "dual-code-timing-requests.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-code-timing-requests.json",
+      "sha256": "719c11fa8f591cb07f45e50e7fb8329c8ea9d25707fc3d8157a554ffb75c5821"
+    },
+    "dual-reuse-timing.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-reuse-timing.log",
+      "sha256": "7e25bde55ab90a1f9c786d14843bb9be5a31cb5e7cf75105b95f085acc158432"
+    },
+    "dual-reuse-timing-requests.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-reuse-timing-requests.json",
+      "sha256": "25d5e4f14afb882faf15d30c1fd74e056be9303d34373b778ffe6fbe0155c8a4"
+    },
+    "dual-reuse-curve.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-reuse-curve.json",
+      "sha256": "a7b95d414f927d2c23ebcb25bcc9df30051f7c1ad468a7588d2a02b6a6541a13"
+    },
+    "tp2-graphs-same-code.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/tp2-graphs-same-code.json",
+      "sha256": "a773dd92c1eefd71977e5213c0289b7595150c4a657ef4f7b7687482b072bbb3"
+    },
+    "tp2-graphs-mixed-1.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/tp2-graphs-mixed-1.json",
+      "sha256": "b13cb10d1a62eb1bb5b8fdcb320b7bea229398b32c6e6e7a2dfc1872ef2aa645"
+    },
+    "tp2-graphs-mixed-2.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/tp2-graphs-mixed-2.json",
+      "sha256": "894d98a9761ebb447f6282c9baad5971d0b9eb76a714d703ca870ce54d89f257"
+    },
+    "tp2-graphs-mixed-3.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/tp2-graphs-mixed-3.json",
+      "sha256": "a8b4843857d22de55e513be7536fb2145c270490a3d0ead948b5d61919303f8d"
+    },
+    "dual-sieve-reference.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-sieve-reference.json",
+      "sha256": "147d508c05b1358bc158b31df8cc18e9f08630a33ecc0c99f916bb23361a68b4"
+    }
+  },
+  "sieve_reference": {
+    "request": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Write a Python script that implements the Sieve of Eratosthenes."
+        }
+      ],
+      "reasoning_effort": "high",
+      "temperature": 0,
+      "max_tokens": 2000,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "runs": [
+      {
+        "first_token_seconds": 0.0014830989530310035,
+        "finish_seconds": 6.672473932965659,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 120.07211821009133
+      },
+      {
+        "first_token_seconds": 0.0013705489691346884,
+        "finish_seconds": 6.660088235978037,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 120.29343150600057
+      },
+      {
+        "first_token_seconds": 0.0013543450040742755,
+        "finish_seconds": 6.662394370068796,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 120.25149180697456
+      }
+    ],
+    "external_source": "https://github.com/local-inference-lab/rtx6kpro/blob/master/models/deepseek-v4.1-flash.md"
+  }
+}

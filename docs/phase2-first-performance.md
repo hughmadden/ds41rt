@@ -6,8 +6,9 @@ load decoder expert layers 20–39 only. Prefill batches remain 2048 rows, dSpar
 is enabled, and the pool holds 14.96 GB / 16,809,984 source-token positions.
 
 These are initial measurements, not release qualification. The earlier debug
-daemon results are excluded. A current controlled single-RTX comparison and
-profiling remain outstanding; no 2x decode or 3x prefill claim is supported.
+daemon results are excluded. A focused [controlled C1 comparison and decode
+investigation](phase2-decode-analysis.md) is now available. Broader controlled
+single-RTX comparisons remain outstanding; no 2x decode or 3x prefill claim is supported.
 
 | Concurrency | Counting tok/s | Same-code tok/s | Mixed tok/s |
 |---:|---:|---:|---:|

@@ -100,6 +100,20 @@ impl<'a> ExpertWave<'a> {
         let remote = &guard.ranks[1-destination];
         let output = unsafe { self.reductions[destination].reduce(&local.output, &remote.output,
             &local.stream, &remote.stream, rows, layouts[0]).await? };
+        for rank in guard.ranks.iter() {
+            if let Some([start, end]) = &rank.timing {
+                // Reduction completion already proves both producers complete.
+                // Timing reads add no device wait or cross-lane dependency.
+                let gpu_ms = rank.stream.device.run(|| unsafe {
+                    rank.stream.device.library.cuda_event_elapsed_ms(start.raw, end.raw)
+                })?;
+                tracing::debug!(target: "ds41rt::timing", layer, rows,
+                    gpu=rank.stream.device.id, gpu_us=gpu_ms * 1000.0,
+                    bytes_per_expert=rank.weights.weights[layer].budget().resident_bytes
+                        / rank.states[0].kernel.info().experts as usize,
+                    "TP2 routed rank GPU execution");
+            }
+        }
         guard.complete = true;
         Ok(output)
     }
@@ -108,6 +122,7 @@ impl<'a> ExpertWave<'a> {
 pub(crate) struct RankWave<'a> {
     pub stream: Stream<'a>,
     ready: Event<'a>,
+    timing: Option<[Event<'a>; 2]>,
     states: Vec<RankState<'a>>,
     _scratch: Allocation<'a>,
     weights: Rc<RankWeights<'a>>,
@@ -147,7 +162,10 @@ impl<'a> RankWave<'a> {
             initialized.and(drained)?;
             states.push(RankState { kernel, slots });
         }
-        Ok(Self { stream, ready: Event::new(device)?, states, _scratch: scratch, weights,
+        let timing = if std::env::var_os("DS41RT_TP2_TIMING").is_some() {
+            Some([Event::new(device)?, Event::new(device)?])
+        } else { None };
+        Ok(Self { stream, ready: Event::new(device)?, timing, states, _scratch: scratch, weights,
             output: Allocation::new(device, capacity as usize * 5120 * 6 * 4)?, capacity })
     }
     /// # Safety
@@ -176,11 +194,18 @@ impl<'a> RankWave<'a> {
             max_active_clusters: info.max_active_clusters, stream: self.stream.raw };
         let queued = device.run(|| unsafe {
             device.library.cuda_stream_wait_event(self.stream.raw, self.ready.raw)?;
+            if let Some([start, _]) = &self.timing {
+                device.library.cuda_event_record(start.raw, self.stream.raw)?;
+            }
             state.kernel.launch(&args)?;
             let mut source = self.output.buffer;
             source.ptr = state.slots[41];
             source.bytes = rows as usize * 5120 * if token_sums { 4 } else { 24 };
-            device.library.copy_d2d_async(self.output.buffer, source, source.bytes, self.stream.raw)
+            device.library.copy_d2d_async(self.output.buffer, source, source.bytes, self.stream.raw)?;
+            if let Some([_, end]) = &self.timing {
+                device.library.cuda_event_record(end.raw, self.stream.raw)?;
+            }
+            Ok(())
         });
         if let Err(error) = queued { self.stream.drain()?; return Err(error); }
         Ok(token_sums)
@@ -226,7 +251,10 @@ impl<'a> PeerReduction<'a> {
             && std::ptr::eq(local.device.library, self.output.device.library), "local rank owner mismatch");
         // Keep not-yet-ready transfers off the copy engine. This cooperative
         // wait belongs only to this operation's producer, never another lane.
+        let started = tracing::enabled!(target: "ds41rt::timing", tracing::Level::DEBUG)
+            .then(std::time::Instant::now);
         remote_producer.wait().await?;
+        let producer_us = started.map(|s| s.elapsed().as_micros() as u64);
         self.local_ready.record(local_producer)?;
         let ready = &self.local_ready;
         let output = &mut self.output;
@@ -237,6 +265,12 @@ impl<'a> PeerReduction<'a> {
                 let (rank0, rank1) = if local.device.id == 0 { (local.buffer, peer) } else { (peer, local.buffer) };
                 reducer.reduce(rank0, rank1, output.buffer, rows, token_sums, stream)
             }).await?; }
+        if let Some(started) = started {
+            tracing::debug!(target: "ds41rt::timing", rows, token_sums,
+                producer_us=producer_us.unwrap(),
+                copy_reduce_us=started.elapsed().as_micros() as u64-producer_us.unwrap(),
+                "TP2 routed completion");
+        }
         let mut result = self.output.buffer;
         result.bytes = rows as usize * 5120 * 2;
         Ok(result)
