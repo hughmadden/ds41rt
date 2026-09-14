@@ -5,18 +5,19 @@
 mod common;
 mod common_hc_5;
 
-use common::Model;
+use common::{reconcile, Model};
 use common_hc_5::{
-    cache, config, default_cache, device_pages, restored_bytes, settle, snapshot, stored_bytes,
-    target, tokens, write_snapshot, Device, DEVICE_BYTES,
+    cache, config, default_cache, device_pages, restored_bytes, settle, snapshot, store_resident,
+    stored_bytes, target, tokens, write_snapshot, Device, FailAfter, Payload, DEVICE_BYTES,
 };
 use ds41rt_hostcache::cache::{
-    DeviceSnapshot, EvictDecision, RestoreOutcome, SkipReason, StoreOutcome, StoreTicket,
-    TickReport,
+    DeviceSnapshot, EvictDecision, HostCache, RestoreOutcome, SkipReason, StoreOutcome,
+    StoreTicket, TickReport,
 };
 use ds41rt_hostcache::config::StoreMode;
-use ds41rt_hostcache::copy::{CopyFault, CopyModel, DeviceRange, Stream};
-use ds41rt_hostcache::pool::testing::CHUNK;
+use ds41rt_hostcache::copy::{CopyFault, CopyModel, DeviceRange, Stream, StubCopyEngine};
+use ds41rt_hostcache::pool::testing::{layout, CHUNK};
+use ds41rt_hostcache::pool::Layout;
 use ds41rt_hostcache::snapshot::{DevicePageId, Key};
 use ds41rt_hostcache::SnapshotKind;
 use proptest::prelude::*;
@@ -24,22 +25,20 @@ use std::collections::{HashMap, HashSet};
 
 #[test]
 fn store_tick_lookup_restore_happy_path() {
-    let mut cache = default_cache(4 * CHUNK as u64, StoreMode::OnRetain);
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        happy_path(mode);
+    }
+}
+
+fn happy_path(mode: StoreMode) {
+    let mut cache = default_cache(4 * CHUNK as u64, mode);
     let mut device = Device::new(DEVICE_BYTES);
     let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 2, true, 1);
     write_snapshot(cache.engine_mut(), &snapshot);
     let expected = stored_bytes(cache.engine_mut(), &snapshot);
 
-    let StoreOutcome::Issued(ticket) = cache.store(&snapshot, 42) else {
-        panic!("expected an issued store");
-    };
+    let _ticket = store_resident(&mut cache, &snapshot, 42);
     assert_eq!(cache.metrics().stores_issued, 1);
-    assert_eq!(cache.metrics().stores_completed, 0);
-
-    settle(&mut cache);
-    let report = cache.tick();
-    assert_eq!(report.completed, vec![ticket]);
-    assert!(report.failed.is_empty());
     assert_eq!(cache.metrics().stores_completed, 1);
     assert!(cache.metrics().bytes_used > 0);
 
@@ -147,48 +146,40 @@ fn disabled_cache_is_a_no_op() {
 
 #[test]
 fn shared_device_pages_are_copied_once() {
-    let mut cache = default_cache(8 * CHUNK as u64, StoreMode::OnRetain);
-    let mut device = Device::new(DEVICE_BYTES);
-    let first = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 2, false, 1);
-    write_snapshot(cache.engine_mut(), &first);
-    let StoreOutcome::Issued(_) = cache.store(&first, 1) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    assert_eq!(cache.metrics().pages_copied, 8);
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let mut cache = default_cache(8 * CHUNK as u64, mode);
+        let mut device = Device::new(DEVICE_BYTES);
+        let first = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 2, false, 1);
+        write_snapshot(cache.engine_mut(), &first);
+        store_resident(&mut cache, &first, 1);
+        assert_eq!(cache.metrics().pages_copied, 8);
 
-    // The second snapshot shares the first two pages of every compressor and adds one.
-    let second = snapshot(&mut device, SnapshotKind::Turn, &tokens(9), 3, false, 1);
-    write_snapshot(cache.engine_mut(), &second);
-    let StoreOutcome::Issued(_) = cache.store(&second, 2) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    assert_eq!(cache.metrics().pages_copied, 12);
-    assert_eq!(cache.metrics().pages_shared, 8);
+        // The second snapshot shares the first two pages of every compressor and adds one.
+        let second = snapshot(&mut device, SnapshotKind::Turn, &tokens(9), 3, false, 1);
+        write_snapshot(cache.engine_mut(), &second);
+        store_resident(&mut cache, &second, 2);
+        assert_eq!(cache.metrics().pages_copied, 12);
+        assert_eq!(cache.metrics().pages_shared, 8);
+    }
 }
 
 #[test]
 fn content_fidelity_through_store_and_restore() {
-    let mut cache = default_cache(4 * CHUNK as u64, StoreMode::OnRetain);
-    let mut device = Device::new(DEVICE_BYTES);
-    let snapshot = snapshot(&mut device, SnapshotKind::Prompt, &tokens(16), 2, true, 1);
-    write_snapshot(cache.engine_mut(), &snapshot);
-    let expected = stored_bytes(cache.engine_mut(), &snapshot);
-    let StoreOutcome::Issued(_) = cache.store(&snapshot, 7) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    let key = cache.lookup(&tokens(16)).expect("host hit").key;
-    let target = target(&mut device, &snapshot, 2);
-    assert!(matches!(
-        cache.restore(key, &target),
-        RestoreOutcome::Done { .. }
-    ));
-    assert_eq!(restored_bytes(cache.engine_mut(), &target), expected);
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let mut cache = default_cache(4 * CHUNK as u64, mode);
+        let mut device = Device::new(DEVICE_BYTES);
+        let snapshot = snapshot(&mut device, SnapshotKind::Prompt, &tokens(16), 2, true, 1);
+        write_snapshot(cache.engine_mut(), &snapshot);
+        let expected = stored_bytes(cache.engine_mut(), &snapshot);
+        store_resident(&mut cache, &snapshot, 7);
+        let key = cache.lookup(&tokens(16)).expect("host hit").key;
+        let target = target(&mut device, &snapshot, 2);
+        assert!(matches!(
+            cache.restore(key, &target),
+            RestoreOutcome::Done { .. }
+        ));
+        assert_eq!(restored_bytes(cache.engine_mut(), &target), expected);
+    }
 }
 
 #[test]
@@ -280,47 +271,43 @@ fn an_issue_failure_is_reported_by_tick() {
 
 #[test]
 fn restore_timeout_leaves_the_snapshot_resident() {
-    let slow = CopyModel {
-        d2h_bytes_per_ns: 25.0,
-        h2d_bytes_per_ns: 0.001,
-        per_copy_latency_ns: 10_000,
-    };
-    let mut config = config(4 * CHUNK as u64, StoreMode::OnRetain);
-    config.restore_budget_ns = 1_000;
-    let mut cache = cache(config, slow, DEVICE_BYTES);
-    let mut device = Device::new(DEVICE_BYTES);
-    let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
-    write_snapshot(cache.engine_mut(), &snapshot);
-    let StoreOutcome::Issued(_) = cache.store(&snapshot, 1) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    let key = cache.lookup(&tokens(8)).expect("host hit").key;
-    let target = target(&mut device, &snapshot, 2);
-    assert_eq!(cache.restore(key, &target), RestoreOutcome::TimedOut);
-    assert!(cache.snapshot_tokens(key).is_some());
-    assert_eq!(cache.metrics().restore_timeouts, 1);
-    assert_eq!(cache.metrics().restores, 0);
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let slow = CopyModel {
+            d2h_bytes_per_ns: 25.0,
+            h2d_bytes_per_ns: 0.001,
+            per_copy_latency_ns: 10_000,
+        };
+        let mut config = config(4 * CHUNK as u64, mode);
+        config.restore_budget_ns = 1_000;
+        let mut cache = cache(config, slow, DEVICE_BYTES);
+        let mut device = Device::new(DEVICE_BYTES);
+        let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
+        write_snapshot(cache.engine_mut(), &snapshot);
+        store_resident(&mut cache, &snapshot, 1);
+        let key = cache.lookup(&tokens(8)).expect("host hit").key;
+        let target = target(&mut device, &snapshot, 2);
+        assert_eq!(cache.restore(key, &target), RestoreOutcome::TimedOut);
+        assert!(cache.snapshot_tokens(key).is_some());
+        assert_eq!(cache.metrics().restore_timeouts, 1);
+        assert_eq!(cache.metrics().restores, 0);
+    }
 }
 
 #[test]
 fn a_mismatched_restore_target_fails() {
-    let mut cache = default_cache(4 * CHUNK as u64, StoreMode::OnRetain);
-    let mut device = Device::new(DEVICE_BYTES);
-    let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
-    write_snapshot(cache.engine_mut(), &snapshot);
-    let StoreOutcome::Issued(_) = cache.store(&snapshot, 1) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    let key = cache.lookup(&tokens(8)).expect("host hit").key;
-    let mut target = target(&mut device, &snapshot, 2);
-    target.pages[0].pop();
-    assert_eq!(cache.restore(key, &target), RestoreOutcome::Failed);
-    assert_eq!(cache.metrics().restore_failures, 1);
-    assert!(cache.snapshot_tokens(key).is_some());
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let mut cache = default_cache(4 * CHUNK as u64, mode);
+        let mut device = Device::new(DEVICE_BYTES);
+        let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
+        write_snapshot(cache.engine_mut(), &snapshot);
+        store_resident(&mut cache, &snapshot, 1);
+        let key = cache.lookup(&tokens(8)).expect("host hit").key;
+        let mut target = target(&mut device, &snapshot, 2);
+        target.pages[0].pop();
+        assert_eq!(cache.restore(key, &target), RestoreOutcome::Failed);
+        assert_eq!(cache.metrics().restore_failures, 1);
+        assert!(cache.snapshot_tokens(key).is_some());
+    }
 }
 
 #[test]
@@ -332,7 +319,9 @@ fn on_evict_defers_until_the_device_evicts() {
     let StoreOutcome::Deferred(ticket) = cache.store(&snapshot, 1) else {
         panic!("expected a deferred store");
     };
+    // Nothing is planned or copied until the engine evicts the snapshot.
     assert_eq!(cache.engine_mut().pending(Stream::Store), 0);
+    assert_eq!(cache.metrics().bytes_used, 0);
     assert_eq!(cache.tick(), TickReport::default());
     assert!(cache.lookup(&tokens(8)).is_none());
     assert!(matches!(
@@ -345,39 +334,108 @@ fn on_evict_defers_until_the_device_evicts() {
 
 #[test]
 fn payload_follows_the_snapshot() {
-    let mut cache = default_cache(4 * CHUNK as u64, StoreMode::OnRetain);
-    let mut device = Device::new(DEVICE_BYTES);
-    let first = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
-    write_snapshot(cache.engine_mut(), &first);
-    let StoreOutcome::Issued(_) = cache.store(&first, 10) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    let key = cache.lookup(&tokens(8)).expect("host hit").key;
-    assert_eq!(cache.payload(key), Some(&10));
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let mut cache = default_cache(4 * CHUNK as u64, mode);
+        let mut device = Device::new(DEVICE_BYTES);
+        let first = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
+        write_snapshot(cache.engine_mut(), &first);
+        store_resident(&mut cache, &first, 10);
+        let key = cache.lookup(&tokens(8)).expect("host hit").key;
+        assert_eq!(cache.payload(key), Some(&10));
 
-    // A same-tokens store replaces the snapshot and drops the old payload.
-    let second = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 2);
-    write_snapshot(cache.engine_mut(), &second);
-    let StoreOutcome::Issued(_) = cache.store(&second, 20) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    let new_key = cache.lookup(&tokens(8)).expect("host hit").key;
-    assert_ne!(new_key, key);
-    assert_eq!(cache.payload(new_key), Some(&20));
-    assert_eq!(cache.payload(key), None);
-    assert_eq!(cache.metrics().stores_replaced, 1);
+        // A same-tokens store replaces the snapshot and drops the old payload.
+        let second = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 2);
+        write_snapshot(cache.engine_mut(), &second);
+        store_resident(&mut cache, &second, 20);
+        let new_key = cache.lookup(&tokens(8)).expect("host hit").key;
+        assert_ne!(new_key, key);
+        assert_eq!(cache.payload(new_key), Some(&20));
+        assert_eq!(cache.payload(key), None);
+        assert_eq!(cache.metrics().stores_replaced, 1);
+    }
 }
 
 #[test]
 fn host_eviction_keeps_bytes_within_quota() {
-    let quota = 4 * CHUNK as u64;
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let quota = 4 * CHUNK as u64;
+        let mut cache = default_cache(quota, mode);
+        let mut device = Device::new(DEVICE_BYTES);
+        for generation in 0..40u32 {
+            let snapshot = snapshot(
+                &mut device,
+                SnapshotKind::Turn,
+                &tokens(8 + generation as usize),
+                1,
+                false,
+                generation,
+            );
+            write_snapshot(cache.engine_mut(), &snapshot);
+            store_resident(&mut cache, &snapshot, generation as u64);
+            assert!(cache.metrics().bytes_used <= quota);
+        }
+        assert!(cache.metrics().host_evictions > 0);
+        assert!(cache.metrics().resident_snapshots > 0);
+        assert!(cache.metrics().host_evicted_bytes > 0);
+    }
+}
+
+#[test]
+fn a_restored_page_is_shared_by_a_later_store() {
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let mut cache = default_cache(8 * CHUNK as u64, mode);
+        let mut device = Device::new(DEVICE_BYTES);
+        let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
+        write_snapshot(cache.engine_mut(), &snapshot);
+        store_resident(&mut cache, &snapshot, 1);
+        let copied = cache.metrics().pages_copied;
+        let key = cache.lookup(&tokens(8)).expect("host hit").key;
+        let target = target(&mut device, &snapshot, 2);
+        assert!(matches!(
+            cache.restore(key, &target),
+            RestoreOutcome::Done { .. }
+        ));
+        // A store of the restored identities shares every page: nothing is copied again.
+        let restored = DeviceSnapshot {
+            meta: snapshot.meta.clone(),
+            pages: target.pages.clone(),
+            tail: target.tail.clone(),
+            draft: target.draft.clone(),
+            scores: target.scores.clone(),
+        };
+        store_resident(&mut cache, &restored, 2);
+        assert_eq!(cache.metrics().pages_copied, copied);
+    }
+}
+
+#[test]
+fn device_page_freed_forgets_the_share() {
+    for mode in [StoreMode::OnRetain, StoreMode::OnEvict] {
+        let mut cache = default_cache(8 * CHUNK as u64, mode);
+        let mut device = Device::new(DEVICE_BYTES);
+        let first = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
+        write_snapshot(cache.engine_mut(), &first);
+        store_resident(&mut cache, &first, 1);
+        let copied = cache.metrics().pages_copied;
+        cache.device_page_freed(first.pages[0][0].id);
+        let second = snapshot(&mut device, SnapshotKind::Turn, &tokens(9), 1, false, 1);
+        write_snapshot(cache.engine_mut(), &second);
+        store_resident(&mut cache, &second, 2);
+        // The freed identity is copied again; the other three pages stay shared.
+        assert_eq!(cache.metrics().pages_copied, copied + 1);
+    }
+}
+
+/// A class can be exhausted while `bytes_used` is under quota (chunks are carved per class).
+/// Stores then evict the least recently used unpinned snapshot and retry, and only skip once
+/// every resident snapshot is pinned.
+#[test]
+fn class_exhaustion_evicts_until_it_fits() {
+    let quota = 3 * CHUNK as u64;
     let mut cache = default_cache(quota, StoreMode::OnRetain);
     let mut device = Device::new(DEVICE_BYTES);
-    for generation in 0..40u32 {
+    // The page class fills first: four one-page-per-compressor snapshots fill the page chunk.
+    for generation in 0..4u32 {
         let snapshot = snapshot(
             &mut device,
             SnapshotKind::Turn,
@@ -387,72 +445,167 @@ fn host_eviction_keeps_bytes_within_quota() {
             generation,
         );
         write_snapshot(cache.engine_mut(), &snapshot);
-        let _ = cache.store(&snapshot, generation as u64);
+        let StoreOutcome::Issued(_) = cache.store(&snapshot, generation as u64) else {
+            panic!("store {generation} skipped");
+        };
+        settle(&mut cache);
+        cache.tick();
+    }
+    let evictions_before = cache.metrics().host_evictions;
+    // Further stores keep succeeding by evicting, never skipping.
+    for generation in 4..12u32 {
+        let snapshot = snapshot(
+            &mut device,
+            SnapshotKind::Turn,
+            &tokens(8 + generation as usize),
+            1,
+            false,
+            generation,
+        );
+        write_snapshot(cache.engine_mut(), &snapshot);
+        let StoreOutcome::Issued(_) = cache.store(&snapshot, generation as u64) else {
+            panic!("store {generation} skipped");
+        };
         settle(&mut cache);
         cache.tick();
         assert!(cache.metrics().bytes_used <= quota);
     }
-    assert!(cache.metrics().host_evictions > 0);
-    assert!(cache.metrics().resident_snapshots > 0);
-    assert!(cache.metrics().host_evicted_bytes > 0);
-}
+    assert!(cache.metrics().host_evictions > evictions_before);
 
-#[test]
-fn a_restored_page_is_shared_by_a_later_store() {
-    let mut cache = default_cache(8 * CHUNK as u64, StoreMode::OnRetain);
-    let mut device = Device::new(DEVICE_BYTES);
-    let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
+    // Pin every resident snapshot: a store now has nothing to evict and skips.
+    for generation in 0..12u32 {
+        if let Some(hit) = cache.lookup(&tokens(8 + generation as usize)) {
+            cache.pin(hit.key);
+        }
+    }
+    let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(64), 1, false, 99);
     write_snapshot(cache.engine_mut(), &snapshot);
-    let StoreOutcome::Issued(_) = cache.store(&snapshot, 1) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    let copied = cache.metrics().pages_copied;
-    let key = cache.lookup(&tokens(8)).expect("host hit").key;
-    let target = target(&mut device, &snapshot, 2);
-    assert!(matches!(
-        cache.restore(key, &target),
-        RestoreOutcome::Done { .. }
-    ));
-    // A store of the restored identities shares every page: nothing is copied again.
-    let restored = DeviceSnapshot {
-        meta: snapshot.meta.clone(),
-        pages: target.pages.clone(),
-        tail: target.tail.clone(),
-        draft: target.draft.clone(),
-        scores: target.scores.clone(),
-    };
-    let StoreOutcome::Issued(_) = cache.store(&restored, 2) else {
-        panic!("expected an issued store");
-    };
-    settle(&mut cache);
-    cache.tick();
-    assert_eq!(cache.metrics().pages_copied, copied);
+    assert_eq!(
+        cache.store(&snapshot, 99),
+        StoreOutcome::Skipped(SkipReason::Exhausted)
+    );
 }
 
+/// A stub that fails the `skip + 1`-th store-stream copy, with a configurable copy budget.
+fn fail_after_cache(
+    bytes: u64,
+    model: CopyModel,
+    skip: usize,
+    copy_budget_ns: u64,
+) -> HostCache<FailAfter, Payload> {
+    let mut config = config(bytes, StoreMode::OnRetain);
+    config.copy_budget_ns = copy_budget_ns;
+    let engine = FailAfter::new(
+        StubCopyEngine::new(model, DEVICE_BYTES, bytes as usize),
+        skip,
+    );
+    HostCache::new(config, layout(), engine).expect("cache")
+}
+
+/// A mid-plan issue failure must drain the copies already issued before the plan's slabs are
+/// released; when the drain times out the slabs stay held so no later store reuses them.
 #[test]
-fn device_page_freed_forgets_the_share() {
-    let mut cache = default_cache(8 * CHUNK as u64, StoreMode::OnRetain);
+fn a_mid_plan_issue_failure_drains_before_releasing_slabs() {
+    // Fast copies: the already-issued copy drains within the budget, so the plan is released.
+    let mut cache = fail_after_cache(4 * CHUNK as u64, CopyModel::default(), 1, 50_000_000);
     let mut device = Device::new(DEVICE_BYTES);
-    let first = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
-    write_snapshot(cache.engine_mut(), &first);
-    let StoreOutcome::Issued(_) = cache.store(&first, 1) else {
+    let snap = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 2, false, 1);
+    write_snapshot(cache.engine_mut().inner_mut(), &snap);
+    let StoreOutcome::Issued(ticket) = cache.store(&snap, 1) else {
         panic!("expected an issued store");
     };
-    settle(&mut cache);
-    cache.tick();
-    let copied = cache.metrics().pages_copied;
-    cache.device_page_freed(first.pages[0][0].id);
-    let second = snapshot(&mut device, SnapshotKind::Turn, &tokens(9), 1, false, 1);
-    write_snapshot(cache.engine_mut(), &second);
-    let StoreOutcome::Issued(_) = cache.store(&second, 2) else {
+    let report = cache.tick();
+    assert_eq!(report.failed, vec![ticket]);
+    assert_eq!(cache.metrics().stores_failed, 1);
+    assert_eq!(cache.metrics().store_drain_timeouts, 0);
+    assert_eq!(cache.metrics().bytes_used, 0);
+
+    // Slow copies and a tiny budget: the drain times out, so the plan's slabs stay held.
+    let slow = CopyModel {
+        d2h_bytes_per_ns: 0.001,
+        h2d_bytes_per_ns: 25.0,
+        per_copy_latency_ns: 10_000,
+    };
+    let mut cache = fail_after_cache(4 * CHUNK as u64, slow, 1, 1_000);
+    let mut device = Device::new(DEVICE_BYTES);
+    let snap = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 2, false, 1);
+    write_snapshot(cache.engine_mut().inner_mut(), &snap);
+    let StoreOutcome::Issued(ticket) = cache.store(&snap, 1) else {
         panic!("expected an issued store");
     };
-    settle(&mut cache);
-    cache.tick();
-    // The freed identity is copied again; the other three pages stay shared.
-    assert_eq!(cache.metrics().pages_copied, copied + 1);
+    let held = cache.metrics().bytes_used;
+    assert!(held > 0);
+    let report = cache.tick();
+    assert_eq!(report.failed, vec![ticket]);
+    assert_eq!(cache.metrics().stores_failed, 1);
+    assert_eq!(cache.metrics().store_drain_timeouts, 1);
+    // The slabs stay held after the copy completes: no later store can reuse them.
+    cache.engine_mut().inner_mut().advance(1_000_000_000);
+    assert_eq!(cache.metrics().bytes_used, held);
+}
+
+/// Every shape inconsistency `parts_fit` documents is a `Malformed` skip.
+#[test]
+fn malformed_shapes_are_skipped() {
+    let mut cache = default_cache(4 * CHUNK as u64, StoreMode::OnRetain);
+    let mut device = Device::new(DEVICE_BYTES);
+
+    // Draft present without `has_draft`.
+    let mut snap = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 1);
+    snap.draft = Some(device.ranges(1, layout().draft));
+    assert_eq!(
+        cache.store(&snap, 1),
+        StoreOutcome::Skipped(SkipReason::Malformed)
+    );
+
+    // Draft absent with `has_draft`.
+    let mut snap = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, true, 2);
+    snap.draft = None;
+    assert_eq!(
+        cache.store(&snap, 2),
+        StoreOutcome::Skipped(SkipReason::Malformed)
+    );
+
+    // Empty tail.
+    let mut snap = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 3);
+    snap.tail.clear();
+    assert_eq!(
+        cache.store(&snap, 3),
+        StoreOutcome::Skipped(SkipReason::Malformed)
+    );
+
+    // Empty scores with the class enabled.
+    let mut snap = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, false, 4);
+    snap.scores.clear();
+    assert_eq!(
+        cache.store(&snap, 4),
+        StoreOutcome::Skipped(SkipReason::Malformed)
+    );
+}
+
+/// A part the layout disables must be absent, not merely empty.
+#[test]
+fn disabled_classes_reject_present_parts() {
+    for layout in [
+        Layout {
+            scores: 0,
+            ..layout()
+        },
+        Layout {
+            draft: 0,
+            ..layout()
+        },
+    ] {
+        let config = config(4 * CHUNK as u64, StoreMode::OnRetain);
+        let engine = StubCopyEngine::new(CopyModel::default(), DEVICE_BYTES, config.bytes as usize);
+        let mut cache = HostCache::new(config, layout, engine).expect("cache");
+        let mut device = Device::new(DEVICE_BYTES);
+        let snapshot = snapshot(&mut device, SnapshotKind::Turn, &tokens(8), 1, true, 1);
+        assert_eq!(
+            cache.store(&snapshot, 1),
+            StoreOutcome::Skipped(SkipReason::Malformed)
+        );
+    }
 }
 
 /// Order-of-magnitude floor: a broken fast path fails `cargo test`, not a human. Debug build,
@@ -548,8 +701,8 @@ proptest! {
     #[test]
     fn random_sequences_keep_the_invariants(ops in prop::collection::vec(operation(), 1..40)) {
         let quota = 8 * CHUNK as u64;
-        // The facade leaves one chunk of headroom below the pool's quota.
-        let evict_quota = quota - 2 * CHUNK as u64;
+        // The facade evicts to the pool's quota exactly after every commit.
+        let evict_quota = quota;
         let mut cache = default_cache(quota, StoreMode::OnRetain);
         let mut model = Model::new();
         let mut device = Device::new(DEVICE_BYTES);
@@ -566,9 +719,12 @@ proptest! {
                     generation += 1;
                     let snapshot = snapshot(&mut device, kind, &tokens, pages, has_draft, generation);
                     write_snapshot(cache.engine_mut(), &snapshot);
-                    if let StoreOutcome::Issued(ticket) | StoreOutcome::Deferred(ticket) =
-                        cache.store(&snapshot, generation as u64)
-                    {
+                    let outcome = cache.store(&snapshot, generation as u64);
+                    // The cache may evict unpinned snapshots while planning under class
+                    // exhaustion; mirror that before planning the model's copy.
+                    reconcile(&cache, &mut model);
+                    stored.retain(|key, _| model.snapshots.contains_key(key));
+                    if let StoreOutcome::Issued(ticket) | StoreOutcome::Deferred(ticket) = outcome {
                         let key = model.plan(&snapshot.meta, &device_pages(&snapshot));
                         planned.insert(key, snapshot);
                         pending.push((ticket, key));

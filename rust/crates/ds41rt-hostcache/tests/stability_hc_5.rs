@@ -4,7 +4,7 @@
 mod common;
 mod common_hc_5;
 
-use common::Model;
+use common::{reconcile, Model};
 use common_hc_5::{
     default_cache, device_pages, restored_bytes, settle, snapshot, stored_bytes, target, tokens,
     write_snapshot, Device, Payload, DEVICE_BYTES,
@@ -68,7 +68,7 @@ impl Soak {
             model: Model::new(),
             device: Device::new(DEVICE_BYTES),
             quota,
-            evict_quota: quota - 2 * CHUNK as u64,
+            evict_quota: quota,
             pending: Vec::new(),
             stored: HashMap::new(),
             issued: HashSet::new(),
@@ -102,9 +102,11 @@ impl Soak {
         );
         write_snapshot(self.cache.engine_mut(), &snapshot);
         let expected = stored_bytes(self.cache.engine_mut(), &snapshot);
-        if let StoreOutcome::Issued(ticket) | StoreOutcome::Deferred(ticket) =
-            self.cache.store(&snapshot, self.generation as u64)
-        {
+        let outcome = self.cache.store(&snapshot, self.generation as u64);
+        // The cache may evict unpinned snapshots while planning under class exhaustion.
+        reconcile(&self.cache, &mut self.model);
+        self.prune_stored();
+        if let StoreOutcome::Issued(ticket) | StoreOutcome::Deferred(ticket) = outcome {
             let key = self.model.plan(&snapshot.meta, &device_pages(&snapshot));
             self.pending.push(Pending {
                 ticket,

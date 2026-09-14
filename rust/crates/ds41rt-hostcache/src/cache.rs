@@ -132,28 +132,70 @@ pub struct HostCache<E: CopyEngine, P> {
 }
 
 /// Where a store in flight is in its life.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PendingState {
+enum PendingKind {
     /// Copies are on the store stream; `event` completes when they land.
-    Issued { event: Event },
-    /// `OnEvict`: the plan is recorded and the copies are issued by `before_device_evict`.
-    Deferred,
-    /// An issue failed; `tick` reports the ticket and aborts the plan.
+    Issued {
+        plan: StorePlan,
+        bytes: u64,
+        event: Event,
+    },
+    /// `OnEvict`: the device snapshot is recorded and nothing is planned until the engine
+    /// evicts it.
+    Deferred { snapshot: DeviceSnapshot },
+    /// An issue failed; the plan's slabs were already released or held, and `tick` reports the
+    /// ticket.
     Failed,
 }
 
-/// A store in flight: its plan, the device ranges it must copy (kept only while deferred), the
-/// payload that becomes resident at commit, the bytes it copies, and its state.
-struct PendingStore<P> {
-    ticket: StoreTicket,
-    plan: StorePlan,
-    parts: Option<StoreParts>,
-    payload: P,
-    bytes: u64,
-    state: PendingState,
+impl PendingKind {
+    /// Take the deferred device snapshot, leaving `Failed`; `None` when the store is not
+    /// deferred.
+    fn take_deferred(&mut self) -> Option<DeviceSnapshot> {
+        match std::mem::replace(self, PendingKind::Failed) {
+            PendingKind::Deferred { snapshot } => Some(snapshot),
+            other => {
+                *self = other;
+                None
+            }
+        }
+    }
 }
 
-/// The device ranges a store copies, captured at store time so `OnEvict` can issue them later.
+/// A store in flight: what it is doing and the payload that becomes resident at commit.
+struct PendingStore<P> {
+    ticket: StoreTicket,
+    kind: PendingKind,
+    payload: P,
+}
+
+/// The result of issuing a store's copies.
+enum IssueOutcome {
+    /// Every copy is on the stream; the event completes when they land.
+    Issued(Event),
+    /// A copy failed to issue and the already-issued copies drained within the budget, so the
+    /// plan's slabs may be released.
+    FailedDrained,
+    /// A copy failed to issue and the already-issued copies did not drain within the budget, so
+    /// the plan's slabs must stay held.
+    FailedHeld,
+}
+
+/// The result of planning and issuing a store.
+enum StoreIssue {
+    /// The copies are on the store stream.
+    Issued {
+        plan: Box<StorePlan>,
+        bytes: u64,
+        event: Event,
+    },
+    /// A copy failed to issue; the plan's slabs were released or held by the issuer.
+    Failed,
+    /// Every unpinned snapshot was evicted and a class is still exhausted.
+    Exhausted,
+}
+
+/// The device ranges a store copies, captured from the plan and the device snapshot so the
+/// copies can be issued.
 struct StoreParts {
     /// Segments per copied page, in `StorePlan::copies` order.
     pages: Vec<Vec<DeviceRange>>,
@@ -225,7 +267,7 @@ impl<'a> RestorePlan<'a> {
             for (page, device_page) in list.iter().zip(targets) {
                 let host = snapshots.page_location(*page)?;
                 let total = segment_bytes(&device_page.segments);
-                if total > layout.page {
+                if total == 0 || total > layout.page {
                     return None;
                 }
                 bytes += total as u64;
@@ -234,7 +276,7 @@ impl<'a> RestorePlan<'a> {
             }
         }
         let tail_total = segment_bytes(&target.tail);
-        if tail_total > layout.tail {
+        if tail_total == 0 || tail_total > layout.tail {
             return None;
         }
         bytes += tail_total as u64;
@@ -242,7 +284,7 @@ impl<'a> RestorePlan<'a> {
             (None, None) | (None, Some([])) => None,
             (Some(slab), Some(segments)) => {
                 let total = segment_bytes(segments);
-                if total > layout.draft {
+                if total == 0 || total > layout.draft {
                     return None;
                 }
                 bytes += total as u64;
@@ -254,7 +296,7 @@ impl<'a> RestorePlan<'a> {
             (None, []) => None,
             (Some(slab), segments) => {
                 let total = segment_bytes(segments);
-                if total > layout.scores {
+                if total == 0 || total > layout.scores {
                     return None;
                 }
                 bytes += total as u64;
@@ -304,7 +346,9 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         self.config.enabled()
     }
 
-    /// Plan and issue the store; `payload` travels with the snapshot until it is evicted.
+    /// Plan and issue the store; `payload` travels with the snapshot until it is evicted. Under
+    /// `OnEvict` nothing is planned or copied here: the snapshot is recorded and the copy is
+    /// issued by `before_device_evict`.
     pub fn store(&mut self, snapshot: &DeviceSnapshot, payload: P) -> StoreOutcome {
         if !self.enabled() {
             return StoreOutcome::Skipped(SkipReason::KindOff);
@@ -313,49 +357,37 @@ impl<E: CopyEngine, P> HostCache<E, P> {
             self.metrics.get_mut().stores_skipped += 1;
             return StoreOutcome::Skipped(reason);
         }
-        let device_pages: [Vec<DevicePageId>; COMPRESSORS] =
-            std::array::from_fn(|c| snapshot.pages[c].iter().map(|page| page.id).collect());
-        let plan = match self.snapshots.as_mut() {
-            Some(snapshots) => match snapshots.plan_store(snapshot.meta.clone(), &device_pages) {
-                Ok(plan) => plan,
-                Err(_) => {
+        let kind = match self.config.store {
+            StoreMode::OnRetain => match self.plan_and_issue(snapshot) {
+                StoreIssue::Issued { plan, bytes, event } => PendingKind::Issued {
+                    plan: *plan,
+                    bytes,
+                    event,
+                },
+                StoreIssue::Failed => PendingKind::Failed,
+                StoreIssue::Exhausted => {
                     self.metrics.get_mut().stores_skipped += 1;
                     return StoreOutcome::Skipped(SkipReason::Exhausted);
                 }
             },
-            None => return StoreOutcome::Skipped(SkipReason::KindOff),
+            StoreMode::OnEvict => PendingKind::Deferred {
+                snapshot: snapshot.clone(),
+            },
         };
         let ticket = StoreTicket(self.next_ticket);
         self.next_ticket += 1;
         self.metrics.get_mut().stores_issued += 1;
-        let (state, parts, bytes) = match self.config.store {
-            StoreMode::OnRetain => {
-                let parts = StoreParts::capture(&plan, snapshot);
-                let bytes = parts.bytes();
-                let state = match self.issue_store(&plan, &parts) {
-                    Ok(event) => PendingState::Issued { event },
-                    Err(_) => PendingState::Failed,
-                };
-                (state, None, bytes)
-            }
-            StoreMode::OnEvict => {
-                let parts = StoreParts::capture(&plan, snapshot);
-                let bytes = parts.bytes();
-                (PendingState::Deferred, Some(parts), bytes)
-            }
-        };
+        let deferred = matches!(kind, PendingKind::Deferred { .. });
         self.pending.push(PendingStore {
             ticket,
-            plan,
-            parts,
+            kind,
             payload,
-            bytes,
-            state,
         });
         self.refresh_gauges();
-        match state {
-            PendingState::Deferred => StoreOutcome::Deferred(ticket),
-            _ => StoreOutcome::Issued(ticket),
+        if deferred {
+            StoreOutcome::Deferred(ticket)
+        } else {
+            StoreOutcome::Issued(ticket)
         }
     }
 
@@ -373,29 +405,34 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         let now = self.engine.now_ns();
         let mut index = 0;
         while index < self.pending.len() {
-            match self.pending[index].state {
-                PendingState::Deferred => index += 1,
-                PendingState::Failed => {
+            let event = match &self.pending[index].kind {
+                PendingKind::Deferred { .. } => {
+                    index += 1;
+                    continue;
+                }
+                PendingKind::Failed => {
+                    let pending = self.pending.remove(index);
+                    self.metrics.get_mut().stores_failed += 1;
+                    report.failed.push(pending.ticket);
+                    continue;
+                }
+                PendingKind::Issued { event, .. } => *event,
+            };
+            match self.engine.completed(event) {
+                Ok(true) => {
                     let pending = self.pending.remove(index);
                     let ticket = pending.ticket;
-                    self.abort_pending(pending);
+                    self.commit_pending(pending, now);
+                    report.completed.push(ticket);
+                }
+                Ok(false) => break,
+                Err(_) => {
+                    let pending = self.pending.remove(index);
+                    let ticket = pending.ticket;
+                    self.release_pending(pending);
+                    self.metrics.get_mut().stores_failed += 1;
                     report.failed.push(ticket);
                 }
-                PendingState::Issued { event } => match self.engine.completed(event) {
-                    Ok(true) => {
-                        let pending = self.pending.remove(index);
-                        let ticket = pending.ticket;
-                        self.commit_pending(pending, now);
-                        report.completed.push(ticket);
-                    }
-                    Ok(false) => break,
-                    Err(_) => {
-                        let pending = self.pending.remove(index);
-                        let ticket = pending.ticket;
-                        self.abort_pending(pending);
-                        report.failed.push(ticket);
-                    }
-                },
             }
         }
         self.refresh_gauges();
@@ -403,9 +440,9 @@ impl<E: CopyEngine, P> HostCache<E, P> {
     }
 
     /// The engine is about to drop a device snapshot. With a pending ticket, wait within the
-    /// copy budget (under `OnEvict`, issue the copy first from the plan recorded at store time,
-    /// whose device ranges are still valid because the snapshot is still alive); without a
-    /// ticket, `Clean`.
+    /// copy budget (under `OnEvict`, plan and issue the copy first from the device snapshot
+    /// recorded at store time, whose ranges are still valid because the snapshot is still
+    /// alive); without a ticket, `Clean`.
     pub fn before_device_evict(&mut self, ticket: Option<StoreTicket>) -> EvictDecision {
         let decision = self.decide_evict(ticket);
         self.refresh_gauges();
@@ -428,30 +465,33 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         else {
             return EvictDecision::Clean;
         };
-        if matches!(self.pending[index].state, PendingState::Deferred) {
+        if let Some(snapshot) = self.pending[index].kind.take_deferred() {
             let mut pending = self.pending.remove(index);
-            let Some(parts) = pending.parts.take() else {
-                self.abort_pending(pending);
-                self.metrics.get_mut().evict_drops_uncached += 1;
-                return EvictDecision::DroppedUncached;
-            };
-            match self.issue_store(&pending.plan, &parts) {
-                Ok(event) => {
-                    pending.state = PendingState::Issued { event };
+            match self.plan_and_issue(&snapshot) {
+                StoreIssue::Issued { plan, bytes, event } => {
+                    pending.kind = PendingKind::Issued {
+                        plan: *plan,
+                        bytes,
+                        event,
+                    };
                     self.pending.insert(index, pending);
                 }
-                Err(_) => {
-                    self.abort_pending(pending);
+                StoreIssue::Failed | StoreIssue::Exhausted => {
+                    self.metrics.get_mut().stores_failed += 1;
                     self.metrics.get_mut().evict_drops_uncached += 1;
                     return EvictDecision::DroppedUncached;
                 }
             }
         }
-        let PendingState::Issued { event } = self.pending[index].state else {
-            let pending = self.pending.remove(index);
-            self.abort_pending(pending);
-            self.metrics.get_mut().evict_drops_uncached += 1;
-            return EvictDecision::DroppedUncached;
+        let event = match &self.pending[index].kind {
+            PendingKind::Issued { event, .. } => *event,
+            _ => {
+                let pending = self.pending.remove(index);
+                self.release_pending(pending);
+                self.metrics.get_mut().stores_failed += 1;
+                self.metrics.get_mut().evict_drops_uncached += 1;
+                return EvictDecision::DroppedUncached;
+            }
         };
         let start = self.engine.now_ns();
         let completed = self
@@ -469,7 +509,8 @@ impl<E: CopyEngine, P> HostCache<E, P> {
             EvictDecision::WaitedClean { ns }
         } else {
             let pending = self.pending.remove(index);
-            self.abort_pending(pending);
+            self.release_pending(pending);
+            self.metrics.get_mut().stores_failed += 1;
             self.metrics.get_mut().evict_drops_uncached += 1;
             EvictDecision::DroppedUncached
         }
@@ -533,11 +574,16 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         }
         let start = self.engine.now_ns();
         let event = match self.issue_restore(&plan) {
-            Ok(event) => event,
-            Err(_) => {
+            IssueOutcome::Issued(event) => event,
+            IssueOutcome::FailedDrained => {
                 self.unpin(key);
                 self.metrics.get_mut().restore_failures += 1;
                 return RestoreOutcome::Failed;
+            }
+            IssueOutcome::FailedHeld => {
+                self.unpin(key);
+                self.metrics.get_mut().restore_timeouts += 1;
+                return RestoreOutcome::TimedOut;
             }
         };
         let completed = self
@@ -580,6 +626,14 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         &mut self.metrics
     }
 
+    /// Add one pin to a resident snapshot; test support for the class-exhaustion retry.
+    #[doc(hidden)]
+    pub fn pin(&mut self, key: Key) {
+        if let Some(snapshots) = self.snapshots.as_mut() {
+            snapshots.pin(key);
+        }
+    }
+
     /// Why `snapshot` is not cached, or `None` when it is.
     fn skip_reason(&self, snapshot: &DeviceSnapshot) -> Option<SkipReason> {
         let tokens = snapshot.meta.tokens.len();
@@ -606,66 +660,91 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         }
     }
 
-    /// Whether every part's segments fit the slab class the layout gives it.
+    /// Whether every part's segments fit the slab class the layout gives it and the snapshot's
+    /// shape is consistent: draft present exactly when the snapshot has it and the class is
+    /// enabled, tail non-empty, scores non-empty when its class is enabled.
     fn parts_fit(&self, snapshot: &DeviceSnapshot) -> bool {
-        let fits = |segments: &[DeviceRange], class: usize| segment_bytes(segments) <= class;
+        let bytes = |segments: &[DeviceRange]| segment_bytes(segments);
+        let draft_expected = snapshot.meta.has_draft && self.layout.draft > 0;
+        let draft_ok = match snapshot.draft.as_deref() {
+            Some(draft) => draft_expected && bytes(draft) > 0 && bytes(draft) <= self.layout.draft,
+            None => !draft_expected,
+        };
+        let scores_ok = if self.layout.scores > 0 {
+            bytes(&snapshot.scores) > 0 && bytes(&snapshot.scores) <= self.layout.scores
+        } else {
+            snapshot.scores.is_empty()
+        };
         snapshot.pages.iter().all(|list| {
             list.iter()
-                .all(|page| fits(&page.segments, self.layout.page))
-        }) && fits(&snapshot.tail, self.layout.tail)
-            && snapshot
-                .draft
-                .as_deref()
-                .is_none_or(|draft| fits(draft, self.layout.draft))
-            && fits(&snapshot.scores, self.layout.scores)
+                .all(|page| bytes(&page.segments) <= self.layout.page)
+        }) && bytes(&snapshot.tail) > 0
+            && bytes(&snapshot.tail) <= self.layout.tail
+            && draft_ok
+            && scores_ok
     }
 
-    /// Issue every copy `plan` owes on the store stream and record its event.
-    fn issue_store(&mut self, plan: &StorePlan, parts: &StoreParts) -> anyhow::Result<Event> {
+    /// Issue every copy `plan` owes on the store stream. On a mid-issue failure, drain the
+    /// copies already issued within the copy budget before returning; the caller must keep the
+    /// plan's slabs held when the drain did not complete.
+    fn issue_store(&mut self, plan: &StorePlan, parts: &StoreParts) -> IssueOutcome {
         let Some(snapshots) = self.snapshots.as_ref() else {
-            anyhow::bail!("cache is disabled");
+            return IssueOutcome::FailedDrained;
         };
-        for (index, &(_, _, _, slab)) in plan.copies.iter().enumerate() {
-            copy_out(
-                &mut self.engine,
-                &parts.pages[index],
-                snapshots.location(slab),
-            )?;
+        match issue_store_copies(&mut self.engine, snapshots, plan, parts) {
+            Ok(()) => match self.engine.record(Stream::Store) {
+                Ok(event) => IssueOutcome::Issued(event),
+                Err(_) => IssueOutcome::FailedHeld,
+            },
+            Err(_) => {
+                if self.drain(Stream::Store) {
+                    IssueOutcome::FailedDrained
+                } else {
+                    IssueOutcome::FailedHeld
+                }
+            }
         }
-        copy_out(&mut self.engine, &parts.tail, snapshots.location(plan.tail))?;
-        if let (Some(slab), Some(segments)) = (plan.draft, parts.draft.as_deref()) {
-            copy_out(&mut self.engine, segments, snapshots.location(slab))?;
-        }
-        if let (Some(slab), segments) = (plan.scores, parts.scores.as_slice()) {
-            copy_out(&mut self.engine, segments, snapshots.location(slab))?;
-        }
-        self.engine.record(Stream::Store)
     }
 
-    /// Issue every copy a restore owes on the restore stream and record its event.
-    fn issue_restore(&mut self, plan: &RestorePlan) -> anyhow::Result<Event> {
-        for (host, segments) in &plan.pages {
-            copy_in(&mut self.engine, segments, *host)?;
+    /// Issue every copy a restore owes on the restore stream. On a mid-issue failure, drain the
+    /// copies already issued within the copy budget; a failed drain is a timeout, because the
+    /// target may still be written.
+    fn issue_restore(&mut self, plan: &RestorePlan) -> IssueOutcome {
+        match issue_restore_copies(&mut self.engine, plan) {
+            Ok(()) => match self.engine.record(Stream::Restore) {
+                Ok(event) => IssueOutcome::Issued(event),
+                Err(_) => IssueOutcome::FailedHeld,
+            },
+            Err(_) => {
+                if self.drain(Stream::Restore) {
+                    IssueOutcome::FailedDrained
+                } else {
+                    IssueOutcome::FailedHeld
+                }
+            }
         }
-        copy_in(&mut self.engine, plan.tail.1, plan.tail.0)?;
-        if let Some((host, segments)) = plan.draft {
-            copy_in(&mut self.engine, segments, host)?;
+    }
+
+    /// Record an event on `stream` and wait up to the copy budget for the copies already issued
+    /// to drain. `true` when they drained (or nothing was issued); `false` when the wait timed
+    /// out or the event could not be recorded, so the caller must keep the source slabs held.
+    fn drain(&mut self, stream: Stream) -> bool {
+        match self.engine.record(stream) {
+            Ok(event) => self
+                .engine
+                .wait(event, self.config.copy_budget_ns)
+                .unwrap_or(false),
+            Err(_) => false,
         }
-        if let Some((host, segments)) = plan.scores {
-            copy_in(&mut self.engine, segments, host)?;
-        }
-        self.engine.record(Stream::Restore)
     }
 
     /// Make a completed store resident, drop the payload it replaced, and bring the pool under
     /// quota. Invariant: the payload is resident exactly while its snapshot is.
     fn commit_pending(&mut self, pending: PendingStore<P>, now: u64) {
-        let PendingStore {
-            plan,
-            payload,
-            bytes,
-            ..
-        } = pending;
+        let PendingStore { kind, payload, .. } = pending;
+        let PendingKind::Issued { plan, bytes, .. } = kind else {
+            return;
+        };
         let copied = plan.copies.len() as u64;
         let total: u64 = plan.pages.iter().map(|list| list.len() as u64).sum();
         let before = self.snapshots.as_ref().map_or(0, Snapshots::len);
@@ -695,41 +774,117 @@ impl<E: CopyEngine, P> HostCache<E, P> {
         self.evict_to_quota();
     }
 
-    /// Release a failed store's plan and count it.
-    fn abort_pending(&mut self, pending: PendingStore<P>) {
+    /// Release a pending store's plan, if it still holds one.
+    fn release_pending(&mut self, pending: PendingStore<P>) {
+        if let PendingKind::Issued { plan, .. } = pending.kind {
+            self.release_plan(plan);
+        }
+    }
+
+    /// Return a plan's slabs to the pool; its copies have drained or never landed.
+    fn release_plan(&mut self, plan: StorePlan) {
         if let Some(snapshots) = self.snapshots.as_mut() {
-            snapshots.abort_store(pending.plan);
+            snapshots.abort_store(plan);
         }
-        self.metrics.get_mut().stores_failed += 1;
     }
 
-    /// Evict in the engine's order until the pool is under `quota`, dropping the payloads of the
-    /// evicted snapshots.
+    /// Drop a plan whose copies may still be in flight: its slabs stay held so no later store
+    /// can reuse memory a live copy writes into. Counted so the leak is visible.
+    fn hold_plan(&mut self, plan: StorePlan) {
+        drop(plan);
+        self.metrics.get_mut().store_drain_timeouts += 1;
+    }
+
+    /// Evict in the engine's order until the pool is at or under `quota`, dropping the payloads
+    /// of the evicted snapshots.
     fn evict_to(&mut self, quota: u64) {
-        let Some(snapshots) = self.snapshots.as_mut() else {
-            return;
-        };
-        let (evicted, freed) = snapshots.evict_to(quota);
-        if evicted.is_empty() {
-            return;
+        while self
+            .snapshots
+            .as_ref()
+            .is_some_and(|snapshots| snapshots.bytes_used() > quota)
+        {
+            if !self.evict_one() {
+                break;
+            }
         }
-        for key in &evicted {
-            self.payloads.remove(key);
-        }
-        let metrics = self.metrics.get_mut();
-        metrics.host_evictions += evicted.len() as u64;
-        metrics.host_evicted_bytes += freed;
     }
 
-    /// The quota a commit evicts to: two chunks below the pool's quota, so the next plan has
-    /// headroom in every class. Without the headroom `evict_to(config.bytes)` could never evict,
-    /// because the pool guarantees `bytes_used <= config.bytes`.
+    /// Evict the least recently used unpinned snapshot, dropping its payload; `false` when only
+    /// pinned snapshots remain. Invariant: a pinned snapshot is never evicted.
+    fn evict_one(&mut self) -> bool {
+        let Some(snapshots) = self.snapshots.as_mut() else {
+            return false;
+        };
+        let Some((key, freed)) = snapshots.evict_one() else {
+            return false;
+        };
+        self.payloads.remove(&key);
+        let metrics = self.metrics.get_mut();
+        metrics.host_evictions += 1;
+        metrics.host_evicted_bytes += freed;
+        true
+    }
+
+    /// The quota a commit evicts to: the configured quota exactly. The pool guarantees
+    /// `bytes_used <= config.bytes`, so this is the LRU trim for a full pool; class-level
+    /// exhaustion is handled by the retry loop in `plan_store_evicting`.
     fn evict_to_quota(&mut self) {
-        let quota = self
-            .config
-            .bytes
-            .saturating_sub(2 * self.config.chunk_bytes);
-        self.evict_to(quota);
+        self.evict_to(self.config.bytes);
+    }
+
+    /// Plan a store, evicting the least recently used unpinned snapshot on `PoolExhausted` and
+    /// retrying, bounded by the resident snapshot count. `None` when every unpinned snapshot has
+    /// been evicted and a class is still exhausted.
+    fn plan_store_evicting(
+        &mut self,
+        meta: &SnapshotMeta,
+        device_pages: &[Vec<DevicePageId>; COMPRESSORS],
+    ) -> Option<StorePlan> {
+        let mut attempts = self.snapshots.as_ref().map_or(0, Snapshots::len);
+        let mut pending_meta = Some(meta.clone());
+        loop {
+            let result = self
+                .snapshots
+                .as_mut()?
+                .plan_store(pending_meta.take()?, device_pages);
+            match result {
+                Ok(plan) => return Some(plan),
+                Err(_) if attempts > 0 => {
+                    attempts -= 1;
+                    if !self.evict_one() {
+                        return None;
+                    }
+                    pending_meta = Some(meta.clone());
+                }
+                Err(_) => return None,
+            }
+        }
+    }
+
+    /// Plan and issue a store's copies, evicting unpinned snapshots if a class is exhausted.
+    fn plan_and_issue(&mut self, snapshot: &DeviceSnapshot) -> StoreIssue {
+        let device_pages: [Vec<DevicePageId>; COMPRESSORS] =
+            std::array::from_fn(|c| snapshot.pages[c].iter().map(|page| page.id).collect());
+        let Some(plan) = self.plan_store_evicting(&snapshot.meta, &device_pages) else {
+            return StoreIssue::Exhausted;
+        };
+        let parts = StoreParts::capture(&plan, snapshot);
+        let bytes = parts.bytes();
+        match self.issue_store(&plan, &parts) {
+            IssueOutcome::Issued(event) => StoreIssue::Issued {
+                plan: Box::new(plan),
+                bytes,
+                event,
+            },
+            IssueOutcome::FailedDrained => {
+                self.release_plan(plan);
+                StoreIssue::Failed
+            }
+            IssueOutcome::FailedHeld => {
+                self.hold_plan(plan);
+                StoreIssue::Failed
+            }
+        }
     }
 
     /// Drop one pin from `key`; an unknown key is a no-op.
@@ -802,6 +957,41 @@ fn copy_in<E: CopyEngine>(
     Ok(())
 }
 
+/// Issue every copy `plan` owes on the store stream, concatenated in order.
+fn issue_store_copies<E: CopyEngine>(
+    engine: &mut E,
+    snapshots: &Snapshots,
+    plan: &StorePlan,
+    parts: &StoreParts,
+) -> anyhow::Result<()> {
+    for (index, &(_, _, _, slab)) in plan.copies.iter().enumerate() {
+        copy_out(engine, &parts.pages[index], snapshots.location(slab))?;
+    }
+    copy_out(engine, &parts.tail, snapshots.location(plan.tail))?;
+    if let (Some(slab), Some(segments)) = (plan.draft, parts.draft.as_deref()) {
+        copy_out(engine, segments, snapshots.location(slab))?;
+    }
+    if let (Some(slab), segments) = (plan.scores, parts.scores.as_slice()) {
+        copy_out(engine, segments, snapshots.location(slab))?;
+    }
+    Ok(())
+}
+
+/// Issue every copy a restore owes on the restore stream, concatenated in order.
+fn issue_restore_copies<E: CopyEngine>(engine: &mut E, plan: &RestorePlan) -> anyhow::Result<()> {
+    for (host, segments) in &plan.pages {
+        copy_in(engine, segments, *host)?;
+    }
+    copy_in(engine, plan.tail.1, plan.tail.0)?;
+    if let Some((host, segments)) = plan.draft {
+        copy_in(engine, segments, host)?;
+    }
+    if let Some((host, segments)) = plan.scores {
+        copy_in(engine, segments, host)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -850,12 +1040,18 @@ mod tests {
                 bytes: layout.tail,
             }],
             draft: None,
-            scores: vec![],
+            scores: vec![DeviceRange {
+                addr: 0,
+                bytes: layout.scores,
+            }],
         };
         let plan = RestorePlan::build(&store, snapshot, &target, &layout).expect("plan");
         assert_eq!(plan.pages.len(), 1);
         assert_eq!(plan.pages[0].0, host);
-        assert_eq!(plan.bytes, (layout.page + layout.tail) as u64);
+        assert_eq!(
+            plan.bytes,
+            (layout.page + layout.tail + layout.scores) as u64
+        );
         assert_eq!(plan.shared, vec![(id(9), snapshot.pages[0][0])]);
 
         // A target with the wrong page count is rejected.
@@ -869,5 +1065,16 @@ mod tests {
             bytes: layout.page + 1,
         }];
         assert!(RestorePlan::build(&store, snapshot, &oversized, &layout).is_none());
+        // A part the stored snapshot has must receive bytes: a zero-length page, tail or scores
+        // list is rejected so a `Done` never registers a page that received nothing.
+        let mut empty_page = target.clone();
+        empty_page.pages[0][0].segments.clear();
+        assert!(RestorePlan::build(&store, snapshot, &empty_page, &layout).is_none());
+        let mut empty_tail = target.clone();
+        empty_tail.tail.clear();
+        assert!(RestorePlan::build(&store, snapshot, &empty_tail, &layout).is_none());
+        let mut empty_scores = target.clone();
+        empty_scores.scores.clear();
+        assert!(RestorePlan::build(&store, snapshot, &empty_scores, &layout).is_none());
     }
 }

@@ -200,7 +200,7 @@ fn lookup(c: &mut Criterion) {
             pages: lists,
             tail: vec![ranges.range(small_layout().tail)],
             draft: None,
-            scores: vec![],
+            scores: vec![ranges.range(small_layout().scores)],
         };
         let _ = cache.store(&snapshot, generation as u64);
         cache.engine_mut().advance(1_000_000_000);

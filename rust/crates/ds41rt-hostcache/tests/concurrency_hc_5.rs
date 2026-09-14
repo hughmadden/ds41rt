@@ -7,7 +7,7 @@
 mod common;
 mod common_hc_5;
 
-use common::Model;
+use common::{reconcile, Model};
 use common_hc_5::{
     default_cache, device_pages, restored_bytes, settle, snapshot, stored_bytes, target, tokens,
     write_snapshot, Device, Payload, DEVICE_BYTES,
@@ -16,7 +16,7 @@ use ds41rt_hostcache::cache::{
     DeviceSnapshot, EvictDecision, HostCache, RestoreOutcome, StoreOutcome, StoreTicket,
 };
 use ds41rt_hostcache::config::StoreMode;
-use ds41rt_hostcache::copy::StubCopyEngine;
+use ds41rt_hostcache::copy::{CopyEngine, StubCopyEngine};
 use ds41rt_hostcache::pool::testing::CHUNK;
 use ds41rt_hostcache::snapshot::Key;
 use ds41rt_hostcache::{SnapshotKind, COMPRESSORS};
@@ -58,6 +58,8 @@ struct Pending {
     key: Key,
     snapshot: DeviceSnapshot,
     expected: Vec<u8>,
+    /// The virtual clock when the copies were issued; a later clock means they may have run.
+    issued_at: u64,
 }
 
 /// The interleaver's whole state: the cache, the model, the fake device and the bookkeeping the
@@ -73,6 +75,8 @@ struct State {
     issued: HashSet<StoreTicket>,
     reported: HashSet<StoreTicket>,
     generation: u32,
+    /// Device-page overwrites that landed before their copy executed.
+    overwrites: usize,
 }
 
 impl State {
@@ -82,12 +86,13 @@ impl State {
             model: Model::new(),
             device: Device::new(DEVICE_BYTES),
             quota,
-            evict_quota: quota - 2 * CHUNK as u64,
+            evict_quota: quota,
             pending: Vec::new(),
             stored: HashMap::new(),
             issued: HashSet::new(),
             reported: HashSet::new(),
             generation: 0,
+            overwrites: 0,
         }
     }
 
@@ -116,15 +121,19 @@ impl State {
         );
         write_snapshot(self.cache.engine_mut(), &snapshot);
         let expected = stored_bytes(self.cache.engine_mut(), &snapshot);
-        if let StoreOutcome::Issued(ticket) | StoreOutcome::Deferred(ticket) =
-            self.cache.store(&snapshot, self.generation as u64)
-        {
+        let issued_at = self.cache.engine_mut().now_ns();
+        let outcome = self.cache.store(&snapshot, self.generation as u64);
+        // The cache may evict unpinned snapshots while planning under class exhaustion.
+        reconcile(&self.cache, &mut self.model);
+        self.prune_stored();
+        if let StoreOutcome::Issued(ticket) | StoreOutcome::Deferred(ticket) = outcome {
             let key = self.model.plan(&snapshot.meta, &device_pages(&snapshot));
             self.pending.push(Pending {
                 ticket,
                 key,
                 snapshot,
                 expected,
+                issued_at,
             });
             self.issued.insert(ticket);
         }
@@ -221,13 +230,22 @@ impl State {
     }
 
     fn overwrite(&mut self, rng: &mut Rng) {
-        // Commit every completed store first, so a pending store's copy has not executed yet and
-        // the overwrite is what the copy will read.
-        self.tick();
-        if self.pending.is_empty() {
+        // Only a store issued since the last clock advance still has its copy in flight: any
+        // advance (a tick, an evict wait or a restore wait) may already have run it. Overwrite
+        // such a store's device bytes so the copy reads the overwritten ones, and record that
+        // expectation.
+        let now = self.cache.engine_mut().now_ns();
+        let eligible: Vec<usize> = self
+            .pending
+            .iter()
+            .enumerate()
+            .filter(|(_, pending)| pending.issued_at == now)
+            .map(|(index, _)| index)
+            .collect();
+        if eligible.is_empty() {
             return;
         }
-        let index = rng.below(self.pending.len() as u64) as usize;
+        let index = eligible[rng.below(eligible.len() as u64) as usize];
         let pending = &mut self.pending[index];
         let compressor = rng.below(COMPRESSORS as u64) as usize;
         if pending.snapshot.pages[compressor].is_empty() {
@@ -240,6 +258,7 @@ impl State {
         let bytes: Vec<u8> = (0..range.bytes).map(|offset| 0x5A ^ offset as u8).collect();
         self.cache.engine_mut().write_device(range, &bytes);
         pending.expected = stored_bytes(self.cache.engine_mut(), &pending.snapshot);
+        self.overwrites += 1;
     }
 
     fn take_pending(&mut self, ticket: StoreTicket) -> Pending {
@@ -351,6 +370,10 @@ fn run_seed(seed: u64) -> Vec<String> {
         state.cache.metrics().host_evictions > 0,
         "the schedule never evicted from the host cache: {:?}",
         state.cache.metrics()
+    );
+    assert!(
+        state.overwrites > 0,
+        "the schedule never overwrote a pending store's device page"
     );
     log
 }

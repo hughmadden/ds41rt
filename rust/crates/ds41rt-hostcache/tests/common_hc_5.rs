@@ -2,10 +2,13 @@
 //! restore-target builders over the pool suites' layout, a cache over the stub engine, and the
 //! content pattern the fidelity checks compare.
 #![allow(dead_code)]
-use ds41rt_hostcache::cache::{DevicePage, DeviceSnapshot, HostCache, RestoreTarget};
+use ds41rt_hostcache::cache::{
+    DevicePage, DeviceSnapshot, EvictDecision, HostCache, RestoreTarget, StoreOutcome, StoreTicket,
+};
 use ds41rt_hostcache::config::{Config, StoreMode};
-use ds41rt_hostcache::copy::{CopyModel, DeviceRange, StubCopyEngine};
+use ds41rt_hostcache::copy::{CopyEngine, CopyModel, DeviceRange, Event, Stream, StubCopyEngine};
 use ds41rt_hostcache::pool::testing::{layout, CHUNK};
+use ds41rt_hostcache::pool::{HostChunk, HostRange, PinnedMemory};
 use ds41rt_hostcache::snapshot::{DevicePageId, SnapshotMeta};
 use ds41rt_hostcache::{SnapshotKind, COMPRESSORS};
 
@@ -241,4 +244,92 @@ pub fn tokens(count: usize) -> Vec<u32> {
 /// Advance the virtual clock far enough that every issued copy has completed.
 pub fn settle(cache: &mut HostCache<StubCopyEngine, Payload>) {
     cache.engine_mut().advance(1_000_000_000);
+}
+
+/// Store `snapshot` and make it resident, whichever mode the cache uses: `OnRetain` issues at
+/// store time and `tick` commits; `OnEvict` issues and commits on the device-evict path.
+pub fn store_resident(
+    cache: &mut HostCache<StubCopyEngine, Payload>,
+    snapshot: &DeviceSnapshot,
+    payload: Payload,
+) -> StoreTicket {
+    match cache.store(snapshot, payload) {
+        StoreOutcome::Issued(ticket) => {
+            settle(cache);
+            cache.tick();
+            ticket
+        }
+        StoreOutcome::Deferred(ticket) => {
+            assert!(matches!(
+                cache.before_device_evict(Some(ticket)),
+                EvictDecision::WaitedClean { .. }
+            ));
+            ticket
+        }
+        StoreOutcome::Skipped(reason) => panic!("store skipped: {reason:?}"),
+    }
+}
+
+/// A stub that lets `skip` store-stream copies through and then fails the next one, so a
+/// mid-plan issue failure can be exercised with earlier copies already in flight.
+pub struct FailAfter {
+    inner: StubCopyEngine,
+    remaining: usize,
+}
+
+impl FailAfter {
+    /// A stub that fails the `skip + 1`-th store-stream `d2h`.
+    pub fn new(inner: StubCopyEngine, skip: usize) -> Self {
+        Self {
+            inner,
+            remaining: skip,
+        }
+    }
+
+    /// The wrapped stub, for clock control and content checks.
+    pub fn inner_mut(&mut self) -> &mut StubCopyEngine {
+        &mut self.inner
+    }
+}
+
+impl PinnedMemory for FailAfter {
+    fn allocate_chunk(&mut self, bytes: usize) -> anyhow::Result<HostChunk> {
+        self.inner.allocate_chunk(bytes)
+    }
+
+    fn release_chunk(&mut self, chunk: HostChunk) -> anyhow::Result<()> {
+        self.inner.release_chunk(chunk)
+    }
+}
+
+impl CopyEngine for FailAfter {
+    fn d2h(&mut self, stream: Stream, src: DeviceRange, dst: HostRange) -> anyhow::Result<()> {
+        if stream == Stream::Store {
+            if self.remaining == 0 {
+                anyhow::bail!("injected mid-plan issue failure");
+            }
+            self.remaining -= 1;
+        }
+        self.inner.d2h(stream, src, dst)
+    }
+
+    fn h2d(&mut self, stream: Stream, src: HostRange, dst: DeviceRange) -> anyhow::Result<()> {
+        self.inner.h2d(stream, src, dst)
+    }
+
+    fn record(&mut self, stream: Stream) -> anyhow::Result<Event> {
+        self.inner.record(stream)
+    }
+
+    fn completed(&mut self, event: Event) -> anyhow::Result<bool> {
+        self.inner.completed(event)
+    }
+
+    fn wait(&mut self, event: Event, budget_ns: u64) -> anyhow::Result<bool> {
+        self.inner.wait(event, budget_ns)
+    }
+
+    fn now_ns(&self) -> u64 {
+        self.inner.now_ns()
+    }
 }

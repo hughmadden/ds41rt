@@ -316,6 +316,25 @@ impl Snapshots {
         }
     }
 
+    /// Evict the least recently used unpinned snapshot; returns its key and the bytes freed, or
+    /// `None` when only pinned snapshots remain. Invariant: a pinned snapshot is never evicted.
+    pub fn evict_one(&mut self) -> Option<(Key, u64)> {
+        loop {
+            let next = {
+                let snapshots = &self.snapshots;
+                self.retention.evict_one_where(&|key: &Key| {
+                    snapshots.get(key).is_some_and(|snapshot| snapshot.pins > 0)
+                })
+            };
+            let (_kind, key) = next?;
+            let before = self.pool.bytes_used();
+            if let Some(snapshot) = self.snapshots.remove(&key) {
+                self.release_snapshot(snapshot);
+                return Some((key, before - self.pool.bytes_used()));
+            }
+        }
+    }
+
     /// Evict in the engine's order until `bytes_used() <= quota`, skipping pinned snapshots;
     /// returns the evicted keys and the bytes freed. Invariant: a pinned snapshot is never
     /// evicted; stops early if only pinned snapshots remain.
@@ -323,21 +342,11 @@ impl Snapshots {
         let mut evicted = Vec::new();
         let mut freed = 0;
         while self.pool.bytes_used() > quota {
-            let next = {
-                let snapshots = &self.snapshots;
-                self.retention.evict_one_where(&|key: &Key| {
-                    snapshots.get(key).is_some_and(|snapshot| snapshot.pins > 0)
-                })
-            };
-            let Some((_kind, key)) = next else {
+            let Some((key, bytes)) = self.evict_one() else {
                 break;
             };
-            let before = self.pool.bytes_used();
-            if let Some(snapshot) = self.snapshots.remove(&key) {
-                self.release_snapshot(snapshot);
-                freed += before - self.pool.bytes_used();
-                evicted.push(key);
-            }
+            evicted.push(key);
+            freed += bytes;
         }
         (evicted, freed)
     }
@@ -871,6 +880,60 @@ mod tests {
         let page = store.get(first_key).expect("first").pages[0][0];
         assert_eq!(store.get(second_key).expect("second").pages[0][0], page);
         assert_eq!(store.page_ref_count(page), 2);
+    }
+
+    #[test]
+    fn register_device_page_aliases_an_identity_to_the_newer_page() {
+        let mut store = snapshots(1 << 30);
+        let first = store
+            .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&[id(1)]))
+            .expect("plan");
+        let first_key = store.commit_store(first, 0);
+        let second = store
+            .plan_store(meta(SnapshotKind::Turn, &[2], false), &pages(&[id(2)]))
+            .expect("plan");
+        let second_key = store.commit_store(second, 1);
+        let page_a = store.get(first_key).expect("first").pages[0][0];
+        let page_b = store.get(second_key).expect("second").pages[0][0];
+        assert_eq!(store.page_device(page_a), Some(id(1)));
+        assert_eq!(store.page_device(page_b), Some(id(2)));
+
+        // Restoring page B's bytes onto identity id(1): the newer mapping wins and the older
+        // page loses its identity, while both reference counts stay exact.
+        store.register_device_page(id(1), page_b);
+        assert_eq!(store.page_device(page_b), Some(id(1)));
+        assert_eq!(store.page_device(page_a), None);
+        assert_eq!(store.page_ref_count(page_a), 1);
+        assert_eq!(store.page_ref_count(page_b), 1);
+
+        // A store of id(1) now shares page B, not page A.
+        let third = store
+            .plan_store(meta(SnapshotKind::Turn, &[3], false), &pages(&[id(1)]))
+            .expect("plan");
+        assert!(third.copies.is_empty());
+        assert_eq!(third.pages[0][0], page_b);
+    }
+
+    #[test]
+    fn register_device_page_maps_an_unmapped_identity() {
+        let mut store = snapshots(1 << 30);
+        let plan = store
+            .plan_store(meta(SnapshotKind::Turn, &[1], false), &pages(&[id(1)]))
+            .expect("plan");
+        let key = store.commit_store(plan, 0);
+        let page = store.get(key).expect("snapshot").pages[0][0];
+        store.device_page_freed(id(1));
+        assert_eq!(store.page_device(page), None);
+
+        store.register_device_page(id(7), page);
+        assert_eq!(store.page_device(page), Some(id(7)));
+        assert_eq!(store.page_ref_count(page), 1);
+
+        let second = store
+            .plan_store(meta(SnapshotKind::Turn, &[2], false), &pages(&[id(7)]))
+            .expect("plan");
+        assert!(second.copies.is_empty());
+        assert_eq!(second.pages[0][0], page);
     }
 
     #[test]

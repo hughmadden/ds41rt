@@ -10,6 +10,9 @@ pub struct Snapshot {
     /// Completed stores that replaced a resident snapshot with the same kind and tokens.
     pub stores_replaced: u64,
     pub stores_failed: u64,
+    /// Failed issues whose already-issued copies did not drain within the copy budget, so the
+    /// plan's slabs stay held.
+    pub store_drain_timeouts: u64,
     pub stores_skipped: u64,
     pub store_bytes: u64,
     pub pages_copied: u64,
