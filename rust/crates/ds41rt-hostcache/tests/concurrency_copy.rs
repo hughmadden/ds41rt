@@ -5,7 +5,8 @@
 //! reproduces from its seed.
 mod common;
 
-use common::{Rng, Shadow};
+use common::Rng;
+use ds41rt_hostcache::copy::testing::Shadow;
 use ds41rt_hostcache::copy::{CopyEngine, CopyModel, DeviceRange, Event, Stream, StubCopyEngine};
 use ds41rt_hostcache::pool::{HostRange, PinnedMemory};
 
@@ -19,7 +20,8 @@ const STEPS: usize = 120;
 fn run_schedule(seed: u64) -> Vec<String> {
     let model = CopyModel::default();
     let mut engine = StubCopyEngine::new(model, DEVICE_BYTES, HOST_BYTES);
-    let chunk = engine.allocate_chunk(HOST_BYTES).unwrap();
+    let msg = format!("seed {seed}: allocate host chunk");
+    let chunk = engine.allocate_chunk(HOST_BYTES).expect(&msg);
     let mut shadow = Shadow::new(model, DEVICE_BYTES, HOST_BYTES);
     let mut rng = Rng::new(seed);
     let mut log = Vec::new();
@@ -47,6 +49,7 @@ fn run_schedule(seed: u64) -> Vec<String> {
                         &pattern,
                     );
                     shadow.write_device(addr, &pattern);
+                    let msg = format!("seed {seed} step {step}: d2h issue");
                     engine
                         .d2h(
                             lane,
@@ -60,9 +63,10 @@ fn run_schedule(seed: u64) -> Vec<String> {
                                 bytes,
                             },
                         )
-                        .unwrap();
+                        .expect(&msg);
                     shadow.issue(lane, true, addr, addr, bytes);
                 } else {
+                    let msg = format!("seed {seed} step {step}: h2d issue");
                     engine
                         .h2d(
                             lane,
@@ -76,13 +80,14 @@ fn run_schedule(seed: u64) -> Vec<String> {
                                 bytes,
                             },
                         )
-                        .unwrap();
+                        .expect(&msg);
                     shadow.issue(lane, false, addr, addr, bytes);
                 }
                 log.push(format!("{step}: issue {lane:?} {bytes}B at {addr}"));
             }
             1 => {
-                let event = engine.record(lane).unwrap();
+                let msg = format!("seed {seed} step {step}: record {lane:?}");
+                let event = engine.record(lane).expect(&msg);
                 let shadow_event = shadow.record(lane);
                 assert_eq!(event.0 as usize, shadow_event, "event ids diverged");
                 events.push((lane, event));
@@ -95,21 +100,24 @@ fn run_schedule(seed: u64) -> Vec<String> {
                 log.push(format!("{step}: advance {nanos}"));
             }
             3 => {
-                if let Some((event_lane, event)) = events.last().copied() {
+                if events.is_empty() {
+                    log.push(format!("{step}: wait skipped (no events)"));
+                } else {
+                    let pick = rng.below(events.len() as u64) as usize;
+                    let (event_lane, event) = events[pick];
                     let budget = rng.below(20_000);
-                    let got = engine.wait(event, budget).unwrap();
+                    let msg = format!("seed {seed} step {step}: wait {event:?}");
+                    let got = engine.wait(event, budget).expect(&msg);
                     let want = shadow.wait(event.0 as usize, budget);
                     assert_eq!(got, want, "wait mismatch on {event:?}");
                     log.push(format!(
                         "{step}: wait {event_lane:?} {event:?} budget {budget} -> {got}"
                     ));
-                } else {
-                    log.push(format!("{step}: wait skipped (no events)"));
                 }
             }
             _ => log.push(format!("{step}: now {}", engine.now_ns())),
         }
-        check_invariants(&mut engine, &shadow, &events, &log);
+        check_invariants(&mut engine, &shadow, &events, &log, seed, step);
     }
     log
 }
@@ -120,6 +128,8 @@ fn check_invariants(
     shadow: &Shadow,
     events: &[(Stream, Event)],
     log: &[String],
+    seed: u64,
+    step: usize,
 ) {
     assert_eq!(engine.now_ns(), shadow.now, "clock diverged\n{log:?}");
     for stream in [Stream::Store, Stream::Restore] {
@@ -147,7 +157,9 @@ fn check_invariants(
             if *event_stream != stream {
                 continue;
             }
-            if engine.completed(*event).unwrap() {
+            let msg = format!("seed {seed} step {step}: completed {event:?}");
+            let done = engine.completed(*event).expect(&msg);
+            if done {
                 assert!(
                     !incomplete,
                     "event {event:?} completed after an incomplete one on {stream:?}\n{log:?}"

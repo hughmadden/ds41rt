@@ -69,7 +69,9 @@ impl Default for CopyModel {
 pub enum CopyFault {
     /// The next `d2h`/`h2d` issue fails.
     IssueFails(Stream),
-    /// The next event on the stream never completes (models a wedged stream); `wait` times out.
+    /// The next event on the stream wedges it: that event and every later copy and event on the
+    /// stream never complete (the stub's model of a wedged stream); `wait` times out. The other
+    /// stream is unaffected.
     StreamStalls(Stream),
 }
 
@@ -97,21 +99,22 @@ impl MemRange {
     }
 }
 
-/// A copy waiting for its completion time on the virtual clock. `seq` breaks ties between the
-/// two streams so execution order is total and deterministic.
+/// A copy waiting for its completion time on the virtual clock. The map key's `seq` breaks ties
+/// between the two streams so execution order is total and deterministic.
 struct PendingCopy {
     stream: Stream,
     direction: Direction,
     src: MemRange,
     dst: MemRange,
     completion_ns: u64,
-    seq: u64,
 }
 
 /// The virtual-clock engine. Fake device memory is a flat byte array of `device_bytes`; fake
 /// host chunks are allocated on demand up to `host_bytes`. `advance` moves the clock and
-/// executes every copy whose completion time has passed, in stream order, moving bytes between
-/// the fake memories; `wait` advances the clock itself up to the budget.
+/// executes every copy whose completion time has passed, in completion order, ties broken by
+/// issue order, moving bytes between the fake memories; `wait` advances the clock itself up to
+/// the budget. A stream wedged by [`CopyFault::StreamStalls`] accepts later copies but never
+/// executes them and never completes later events.
 pub struct StubCopyEngine {
     model: CopyModel,
     device: Vec<u8>,
@@ -124,10 +127,14 @@ pub struct StubCopyEngine {
     /// Pending copies keyed by `(completion_ns, seq)`, so the first entry is the next to execute.
     pending: BTreeMap<(u64, u64), PendingCopy>,
     pending_count: [usize; 2],
+    /// Copies accepted on a wedged stream: counted as pending, never inserted into `pending`.
+    held_count: [usize; 2],
     /// Completion time of each recorded event; `None` is a stalled event that never completes.
     events: Vec<Option<u64>>,
     issue_fault: [bool; 2],
     stall_fault: [bool; 2],
+    /// A stream wedged by a fired `StreamStalls` fault: later copies and events never complete.
+    stalled: [bool; 2],
     seq: u64,
 }
 
@@ -145,9 +152,11 @@ impl StubCopyEngine {
             last_completion: [0; 2],
             pending: BTreeMap::new(),
             pending_count: [0; 2],
+            held_count: [0; 2],
             events: Vec::new(),
             issue_fault: [false; 2],
             stall_fault: [false; 2],
+            stalled: [false; 2],
             seq: 0,
         }
     }
@@ -198,7 +207,9 @@ impl StubCopyEngine {
         chunk[range.offset..end].to_vec()
     }
 
-    /// Arm `fault`; it fires on the next matching operation and is then disarmed.
+    /// Arm `fault`; it fires on the next matching operation and is then disarmed. An issue that
+    /// fails validation (length or range) is not a matching operation and does not consume an
+    /// armed fault.
     pub fn inject(&mut self, fault: CopyFault) {
         match fault {
             CopyFault::IssueFails(stream) => self.issue_fault[stream_index(stream)] = true,
@@ -206,13 +217,17 @@ impl StubCopyEngine {
         }
     }
 
-    /// Copies issued but not yet executed, per stream (for the suites' invariants).
+    /// Copies issued but not yet executed, per stream (for the suites' invariants). Copies held
+    /// on a wedged stream are counted: they were issued and will never execute.
     pub fn pending(&self, stream: Stream) -> usize {
-        self.pending_count[stream_index(stream)]
+        let index = stream_index(stream);
+        self.pending_count[index] + self.held_count[index]
     }
 
-    /// Queue one copy: charge the model, advance the stream's tail, and remember the source and
-    /// destination so the bytes move when the copy executes.
+    /// Queue one copy: validate it, charge the model, advance the stream's tail, and remember the
+    /// source and destination so the bytes move when the copy executes. Validation runs before the
+    /// issue fault is consumed, so an invalid issue leaves the engine (and any armed fault)
+    /// untouched. On a wedged stream the copy is accepted and counted as pending but never queued.
     fn issue(
         &mut self,
         stream: Stream,
@@ -221,10 +236,6 @@ impl StubCopyEngine {
         dst: MemRange,
     ) -> Result<()> {
         let index = stream_index(stream);
-        if self.issue_fault[index] {
-            self.issue_fault[index] = false;
-            bail!("injected issue fault on {stream:?}");
-        }
         if src.bytes() != dst.bytes() {
             bail!(
                 "copy length mismatch: source {} bytes, destination {} bytes",
@@ -234,6 +245,14 @@ impl StubCopyEngine {
         }
         self.check_range(src)?;
         self.check_range(dst)?;
+        if self.issue_fault[index] {
+            self.issue_fault[index] = false;
+            bail!("injected issue fault on {stream:?}");
+        }
+        if self.stalled[index] {
+            self.held_count[index] += 1;
+            return Ok(());
+        }
         let rate = match direction {
             Direction::D2h => self.model.d2h_bytes_per_ns,
             Direction::H2d => self.model.h2d_bytes_per_ns,
@@ -253,7 +272,6 @@ impl StubCopyEngine {
                 src,
                 dst,
                 completion_ns,
-                seq: self.seq,
             },
         );
         Ok(())
@@ -300,12 +318,16 @@ impl StubCopyEngine {
     }
 
     /// Execute every pending copy whose completion time the clock has reached, earliest first.
+    /// The next entry is peeked before it is removed, so a copy that is not due yet stays put
+    /// instead of being popped and reinserted on every advance.
     fn execute_due(&mut self) {
-        while let Some((_, copy)) = self.pending.pop_first() {
+        while let Some((_, copy)) = self.pending.first_key_value() {
             if copy.completion_ns > self.now_ns {
-                self.pending.insert((copy.completion_ns, copy.seq), copy);
                 break;
             }
+            let Some((_, copy)) = self.pending.pop_first() else {
+                break;
+            };
             self.pending_count[stream_index(copy.stream)] -= 1;
             self.execute(copy);
         }
@@ -410,6 +432,9 @@ impl CopyEngine for StubCopyEngine {
         let index = stream_index(stream);
         let completion = if self.stall_fault[index] {
             self.stall_fault[index] = false;
+            self.stalled[index] = true;
+            None
+        } else if self.stalled[index] {
             None
         } else {
             Some(self.last_completion[index])
@@ -458,6 +483,132 @@ fn transfer_ns(bytes: usize, bytes_per_ns: f64) -> u64 {
     (bytes as f64 / bytes_per_ns).ceil() as u64
 }
 
+/// Test support shared by the unit and integration suites: an independent shadow model of the
+/// stub's documented behaviour. It lives in the crate (not in `tests/`) so both suites exercise
+/// one implementation instead of duplicating it through `include!`/`#[path]`; it is hidden from
+/// the public docs.
+#[doc(hidden)]
+pub mod testing {
+    use super::{stream_index, transfer_ns, CopyModel, Stream};
+
+    /// A copy the shadow model has queued.
+    struct ShadowCopy {
+        stream: Stream,
+        d2h: bool,
+        src: usize,
+        dst: usize,
+        bytes: usize,
+        completion: u64,
+        seq: u64,
+    }
+
+    /// An independent model of the stub: the same completion formula, the same execution-time
+    /// byte movement, and the same global completion order. It exists to disagree with the engine
+    /// when the engine is wrong.
+    pub struct Shadow {
+        pub device: Vec<u8>,
+        pub host: Vec<u8>,
+        pub now: u64,
+        pub events: Vec<Option<u64>>,
+        last: [u64; 2],
+        pending: Vec<ShadowCopy>,
+        seq: u64,
+        model: CopyModel,
+    }
+
+    impl Shadow {
+        pub fn new(model: CopyModel, device_bytes: usize, host_bytes: usize) -> Self {
+            Self {
+                device: vec![0; device_bytes],
+                host: vec![0; host_bytes],
+                now: 0,
+                events: Vec::new(),
+                last: [0; 2],
+                pending: Vec::new(),
+                seq: 0,
+                model,
+            }
+        }
+
+        pub fn write_device(&mut self, addr: usize, bytes: &[u8]) {
+            self.device[addr..addr + bytes.len()].copy_from_slice(bytes);
+        }
+
+        pub fn issue(&mut self, stream: Stream, d2h: bool, src: usize, dst: usize, bytes: usize) {
+            let index = stream_index(stream);
+            let rate = if d2h {
+                self.model.d2h_bytes_per_ns
+            } else {
+                self.model.h2d_bytes_per_ns
+            };
+            let start = self.last[index].max(self.now);
+            let completion = start
+                .saturating_add(self.model.per_copy_latency_ns)
+                .saturating_add(transfer_ns(bytes, rate));
+            self.last[index] = completion;
+            self.seq += 1;
+            self.pending.push(ShadowCopy {
+                stream,
+                d2h,
+                src,
+                dst,
+                bytes,
+                completion,
+                seq: self.seq,
+            });
+        }
+
+        pub fn record(&mut self, stream: Stream) -> usize {
+            self.events.push(Some(self.last[stream_index(stream)]));
+            self.events.len() - 1
+        }
+
+        pub fn advance(&mut self, nanos: u64) {
+            self.now = self.now.saturating_add(nanos);
+            self.execute_due();
+        }
+
+        pub fn wait(&mut self, event: usize, budget: u64) -> bool {
+            let completion = self.events[event];
+            let target = match completion {
+                Some(completion) => completion.min(self.now.saturating_add(budget)),
+                None => self.now.saturating_add(budget),
+            };
+            if target > self.now {
+                self.now = target;
+                self.execute_due();
+            }
+            matches!(completion, Some(completion) if self.now >= completion)
+        }
+
+        pub fn pending(&self, stream: Stream) -> usize {
+            self.pending
+                .iter()
+                .filter(|copy| copy.stream == stream)
+                .count()
+        }
+
+        fn execute_due(&mut self) {
+            self.pending.sort_by_key(|copy| (copy.completion, copy.seq));
+            let mut i = 0;
+            while i < self.pending.len() {
+                if self.pending[i].completion <= self.now {
+                    let copy = self.pending.remove(i);
+                    if copy.d2h {
+                        self.host[copy.dst..copy.dst + copy.bytes]
+                            .copy_from_slice(&self.device[copy.src..copy.src + copy.bytes]);
+                    } else {
+                        self.device[copy.dst..copy.dst + copy.bytes]
+                            .copy_from_slice(&self.host[copy.src..copy.src + copy.bytes]);
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499,5 +650,268 @@ mod tests {
             .bytes(),
             5
         );
+    }
+
+    /// An issue that fails validation must leave the engine exactly as it was: no pending copy,
+    /// no moved stream tail, and any armed fault still armed.
+    #[test]
+    fn invalid_issue_leaves_no_trace() {
+        type IssueCase = (&'static str, fn(&mut StubCopyEngine, HostChunk));
+        let mut engine = StubCopyEngine::new(CopyModel::default(), 100, 100);
+        let chunk = engine.allocate_chunk(100).unwrap();
+        let cases: [IssueCase; 4] = [
+            ("device range out of bounds", |engine, chunk| {
+                assert!(engine
+                    .d2h(
+                        Stream::Store,
+                        DeviceRange {
+                            addr: 50,
+                            bytes: 100
+                        },
+                        HostRange {
+                            chunk: chunk.id,
+                            offset: 0,
+                            bytes: 100,
+                        },
+                    )
+                    .is_err());
+            }),
+            ("host range out of bounds", |engine, chunk| {
+                assert!(engine
+                    .d2h(
+                        Stream::Store,
+                        DeviceRange {
+                            addr: 0,
+                            bytes: 100
+                        },
+                        HostRange {
+                            chunk: chunk.id,
+                            offset: 50,
+                            bytes: 100,
+                        },
+                    )
+                    .is_err());
+            }),
+            ("unknown host chunk", |engine, _chunk| {
+                assert!(engine
+                    .d2h(
+                        Stream::Store,
+                        DeviceRange {
+                            addr: 0,
+                            bytes: 100
+                        },
+                        HostRange {
+                            chunk: 99,
+                            offset: 0,
+                            bytes: 100,
+                        },
+                    )
+                    .is_err());
+            }),
+            ("length mismatch", |engine, chunk| {
+                assert!(engine
+                    .d2h(
+                        Stream::Store,
+                        DeviceRange {
+                            addr: 0,
+                            bytes: 100
+                        },
+                        HostRange {
+                            chunk: chunk.id,
+                            offset: 0,
+                            bytes: 50,
+                        },
+                    )
+                    .is_err());
+            }),
+        ];
+        for (name, issue) in cases {
+            let tail = engine.last_completion;
+            let pending = [
+                engine.pending(Stream::Store),
+                engine.pending(Stream::Restore),
+            ];
+            engine.inject(CopyFault::IssueFails(Stream::Store));
+            issue(&mut engine, chunk);
+            assert_eq!(engine.last_completion, tail, "{name} moved the stream tail");
+            assert_eq!(
+                [
+                    engine.pending(Stream::Store),
+                    engine.pending(Stream::Restore)
+                ],
+                pending,
+                "{name} changed the pending counts"
+            );
+            assert!(
+                engine.issue_fault[stream_index(Stream::Store)],
+                "{name} consumed the armed issue fault"
+            );
+            engine.issue_fault[stream_index(Stream::Store)] = false;
+        }
+    }
+
+    /// A copy that is not due yet must survive an advance untouched and execute at its own time.
+    #[test]
+    fn execute_due_keeps_not_due_copies() {
+        let mut engine = StubCopyEngine::new(CopyModel::default(), 1024, 1024);
+        let chunk = engine.allocate_chunk(1024).unwrap();
+        engine.write_device(
+            DeviceRange {
+                addr: 0,
+                bytes: 100,
+            },
+            &[1u8; 100],
+        );
+        for offset in [0, 100] {
+            engine
+                .d2h(
+                    Stream::Store,
+                    DeviceRange {
+                        addr: 0,
+                        bytes: 100,
+                    },
+                    HostRange {
+                        chunk: chunk.id,
+                        offset,
+                        bytes: 100,
+                    },
+                )
+                .unwrap();
+        }
+        let first_key = *engine.pending.first_key_value().unwrap().0;
+        engine.advance(10_003);
+        assert_eq!(engine.pending(Stream::Store), 2);
+        assert_eq!(*engine.pending.first_key_value().unwrap().0, first_key);
+        engine.advance(1);
+        assert_eq!(engine.pending(Stream::Store), 1);
+        assert_eq!(
+            engine.read_host(HostRange {
+                chunk: chunk.id,
+                offset: 0,
+                bytes: 100
+            }),
+            vec![1u8; 100]
+        );
+        assert_eq!(
+            engine.read_host(HostRange {
+                chunk: chunk.id,
+                offset: 100,
+                bytes: 100
+            }),
+            vec![0u8; 100]
+        );
+        engine.advance(10_004);
+        assert_eq!(engine.pending(Stream::Store), 0);
+        assert_eq!(
+            engine.read_host(HostRange {
+                chunk: chunk.id,
+                offset: 100,
+                bytes: 100
+            }),
+            vec![1u8; 100]
+        );
+    }
+
+    /// A fired stall wedges the stream: later copies are held, not queued, and later events never
+    /// complete; the other stream is untouched.
+    #[test]
+    fn stall_holds_later_copies_and_events() {
+        let mut engine = StubCopyEngine::new(CopyModel::default(), 1024, 1024);
+        let chunk = engine.allocate_chunk(1024).unwrap();
+        engine.write_device(
+            DeviceRange {
+                addr: 0,
+                bytes: 100,
+            },
+            &[1u8; 100],
+        );
+        engine.inject(CopyFault::StreamStalls(Stream::Store));
+        let stalled = engine.record(Stream::Store).unwrap();
+        assert!(!engine.completed(stalled).unwrap());
+        engine
+            .d2h(
+                Stream::Store,
+                DeviceRange {
+                    addr: 0,
+                    bytes: 100,
+                },
+                HostRange {
+                    chunk: chunk.id,
+                    offset: 0,
+                    bytes: 100,
+                },
+            )
+            .unwrap();
+        assert_eq!(engine.held_count[stream_index(Stream::Store)], 1);
+        assert!(engine.pending.first_key_value().is_none());
+        assert_eq!(engine.pending(Stream::Store), 1);
+        let later = engine.record(Stream::Store).unwrap();
+        assert!(!engine.wait(later, 1_000_000).unwrap());
+        assert_eq!(
+            engine.read_host(HostRange {
+                chunk: chunk.id,
+                offset: 0,
+                bytes: 100
+            }),
+            vec![0u8; 100]
+        );
+    }
+
+    /// The peeked `execute_due` must still agree with the independent shadow model across partial
+    /// advances that leave copies pending.
+    #[test]
+    fn partial_advances_match_the_shadow() {
+        let model = CopyModel::default();
+        let mut engine = StubCopyEngine::new(model, 1024, 1024);
+        let chunk = engine.allocate_chunk(1024).unwrap();
+        let mut shadow = testing::Shadow::new(model, 1024, 1024);
+        for step in 0..8u64 {
+            let bytes = 1 + (step as usize * 13) % 200;
+            let addr = (step as usize * 64) % 512;
+            let pattern: Vec<u8> = (0..bytes).map(|i| (i as u8) ^ (step as u8)).collect();
+            engine.write_device(
+                DeviceRange {
+                    addr: addr as u64,
+                    bytes,
+                },
+                &pattern,
+            );
+            shadow.write_device(addr, &pattern);
+            engine
+                .d2h(
+                    Stream::Store,
+                    DeviceRange {
+                        addr: addr as u64,
+                        bytes,
+                    },
+                    HostRange {
+                        chunk: chunk.id,
+                        offset: addr,
+                        bytes,
+                    },
+                )
+                .unwrap();
+            shadow.issue(Stream::Store, true, addr, addr, bytes);
+            let nanos = 1 + (step * 997) % 5_000;
+            engine.advance(nanos);
+            shadow.advance(nanos);
+            assert_eq!(engine.now_ns(), shadow.now);
+            assert_eq!(engine.pending(Stream::Store), shadow.pending(Stream::Store));
+            assert_eq!(
+                engine.read_device(DeviceRange {
+                    addr: 0,
+                    bytes: 1024
+                }),
+                shadow.device
+            );
+            assert_eq!(
+                engine.read_host(HostRange {
+                    chunk: chunk.id,
+                    offset: 0,
+                    bytes: 1024
+                }),
+                shadow.host
+            );
+        }
     }
 }

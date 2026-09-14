@@ -1,13 +1,11 @@
 //! Functional suite for the copy engine (packet HC-3): per-stream ordering, stream independence,
 //! completion timing against the model, content fidelity, the late-overwrite hazard, event
 //! semantics, faults, the host allocation limit, and proptest properties over random sequences.
-mod common;
-
-use common::Shadow;
+use ds41rt_hostcache::copy::testing::Shadow;
 use ds41rt_hostcache::copy::{
     CopyEngine, CopyFault, CopyModel, DeviceRange, Event, Stream, StubCopyEngine,
 };
-use ds41rt_hostcache::pool::{HostRange, PinnedMemory};
+use ds41rt_hostcache::pool::{HostChunk, HostRange, PinnedMemory};
 use proptest::prelude::*;
 
 const DEVICE_BYTES: usize = 1 << 12;
@@ -97,6 +95,69 @@ fn completion_timing_matches_model() {
     assert!(engine.wait(event, 1).unwrap());
     assert_eq!(engine.now_ns(), 10_010);
     assert!(engine.completed(event).unwrap());
+}
+
+/// The two directions charge their own bandwidth: 250 bytes cost 10 ns d2h at 25 B/ns but 25 ns
+/// h2d at 10 B/ns, so swapping the rates fails the hand-computed completion times.
+#[test]
+fn asymmetric_bandwidth_is_pinned() {
+    let model = CopyModel {
+        d2h_bytes_per_ns: 25.0,
+        h2d_bytes_per_ns: 10.0,
+        per_copy_latency_ns: 10_000,
+    };
+    let mut engine = StubCopyEngine::new(model, DEVICE_BYTES, HOST_BYTES);
+    let chunk = engine.allocate_chunk(4096).unwrap();
+    engine.write_device(dev(0, 250), &[1u8; 250]);
+    engine
+        .d2h(Stream::Store, dev(0, 250), host(chunk.id, 0, 250))
+        .unwrap();
+    engine
+        .h2d(Stream::Restore, host(chunk.id, 0, 250), dev(2000, 250))
+        .unwrap();
+    let d2h = engine.record(Stream::Store).unwrap();
+    let h2d = engine.record(Stream::Restore).unwrap();
+
+    // d2h: 250 B at 25 B/ns = 10 ns -> 10_010. h2d: 250 B at 10 B/ns = 25 ns -> 10_025.
+    assert!(!engine.wait(d2h, 10_009).unwrap());
+    assert!(engine.wait(d2h, 1).unwrap());
+    assert_eq!(engine.now_ns(), 10_010);
+    assert!(!engine.completed(h2d).unwrap());
+    assert!(!engine.wait(h2d, 14).unwrap());
+    assert_eq!(engine.now_ns(), 10_024);
+    assert!(engine.wait(h2d, 1).unwrap());
+    assert_eq!(engine.now_ns(), 10_025);
+}
+
+/// Copies on different streams that complete at the same instant execute in issue order: the
+/// store issued first reads the device before the restore overwrites it.
+#[test]
+fn cross_stream_ties_break_by_issue_order() {
+    let mut engine = engine();
+    let chunk = engine.allocate_chunk(4096).unwrap();
+    engine.write_device(dev(0, 100), &[1u8; 100]);
+    // Both copies are 100 bytes at 25 B/ns and start at zero, so both complete at 10_004.
+    engine
+        .d2h(Stream::Store, dev(0, 100), host(chunk.id, 0, 100))
+        .unwrap();
+    engine
+        .h2d(Stream::Restore, host(chunk.id, 0, 100), dev(0, 100))
+        .unwrap();
+    engine.advance(10_004);
+
+    // Store ran first, so the host holds the original device bytes and the restore writes them
+    // back; had the restore run first the device would hold the zeroed host chunk.
+    assert_eq!(engine.read_host(host(chunk.id, 0, 100)), vec![1u8; 100]);
+    assert_eq!(engine.read_device(dev(0, 100)), vec![1u8; 100]);
+}
+
+/// Unknown events and out-of-range chunk ids are errors, not panics or silent successes.
+#[test]
+fn unknown_event_and_chunk_are_errors() {
+    let mut engine = engine();
+    assert!(engine.completed(Event(0)).is_err());
+    assert!(engine.wait(Event(0), 0).is_err());
+    assert!(engine.release_chunk(HostChunk { id: 7, bytes: 1 }).is_err());
 }
 
 #[test]
@@ -212,8 +273,10 @@ fn issue_fault_fires_once() {
         .is_err());
 }
 
+/// A fired stall wedges the stream: the stalled event and every later copy and event on that
+/// stream never complete, while the other stream proceeds.
 #[test]
-fn stream_stall_fires_once() {
+fn stream_stall_wedges_the_stream() {
     let mut engine = engine();
     let chunk = engine.allocate_chunk(4096).unwrap();
     engine.write_device(dev(0, 100), &[1u8; 100]);
@@ -226,9 +289,23 @@ fn stream_stall_fires_once() {
     assert!(!engine.completed(stalled).unwrap());
     assert!(!engine.wait(stalled, 1_000_000).unwrap());
 
-    // The fault is consumed, so the next event completes normally.
-    let healthy = engine.record(Stream::Store).unwrap();
+    // A later copy on the wedged stream is accepted but never executes.
+    engine
+        .d2h(Stream::Store, dev(0, 100), host(chunk.id, 100, 100))
+        .unwrap();
+    let later = engine.record(Stream::Store).unwrap();
+    assert!(!engine.completed(later).unwrap());
+    assert!(!engine.wait(later, 1_000_000).unwrap());
+    assert_eq!(engine.pending(Stream::Store), 1);
+    assert_eq!(engine.read_host(host(chunk.id, 100, 100)), vec![0u8; 100]);
+
+    // The other stream is unaffected.
+    engine
+        .h2d(Stream::Restore, host(chunk.id, 0, 100), dev(2000, 100))
+        .unwrap();
+    let healthy = engine.record(Stream::Restore).unwrap();
     assert!(engine.wait(healthy, 1_000_000).unwrap());
+    assert_eq!(engine.read_device(dev(2000, 100)), vec![1u8; 100]);
 }
 
 #[test]
