@@ -548,6 +548,19 @@ pub(crate) struct NativeServeArgs {
     #[arg(long, default_value = "prompt,turn", env = "DS41RT_HOST_CACHE_KINDS")]
     pub host_cache_kinds: String,
 
+    /// How long an admission starved by the compressed-KV pool may wait queued before the
+    /// request fails; zero disables the deferred queue (fail immediately, the old behaviour).
+    #[arg(long, default_value_t = 300_000, env = "DS41RT_ADMISSION_QUEUE_TIMEOUT_MS")]
+    pub admission_queue_timeout_ms: u64,
+
+    /// Maximum length of the deferred admission queue. The queue holds fully prepared
+    /// prompts (~MBs each: tokenised context, expanded images, decoder state), so this cap
+    /// bounds scheduler RSS to roughly `concurrency + admission_queue_max` prepared
+    /// requests; a fresh arrival beyond the cap fails immediately with
+    /// "admission queue full (N)" and counts under `admission_queue_rejects`.
+    #[arg(long, default_value_t = 64, env = "DS41RT_ADMISSION_QUEUE_MAX")]
+    pub admission_queue_max: u32,
+
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
     /// Maximum verified draft tokens per request; fixed-length policy control.
