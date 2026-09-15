@@ -4580,3 +4580,4 @@ async fn invalid_role_returns_openai_error_metadata() {
 mod upstream_protocol_errors;
 mod upstream_stop_strings;
 mod upstream_streaming;
+mod upstream_tool_calls;

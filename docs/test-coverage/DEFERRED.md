@@ -13,6 +13,24 @@ names the unblocking condition. Owner runs them only in the designated window.
 - **UC-4 weights present**: specific HF checkpoints downloaded (vision/STT/pooling models ds41rt does not normally stage).
 - **UC-5 reference packages**: `b12x` reference package + generated fixtures (e.g. tests/fixtures/nvfp4/real_tensor_decode.json) available on the GPU dev host.
 
+## Semantic-parity questions (need real model output to resolve)
+
+Characterized by the ported tool-call suite (`upstream_tool_calls.rs`, MAPPING
+DIVERGENCE comments); do NOT change parser semantics until validated against real
+DeepSeek-V4.1-Flash outputs in the fleet window (**UC-3**):
+
+1. **Missing `<｜DSML｜tool_calls>` wrapper recovery** — vLLM recovers a bare
+   `<｜DSML｜invoke>` block (vllm#48931); ds41rt does not (non-stream stays content;
+   stream leaks raw invoke syntax into content deltas).
+2. **`arguments`-wrapper nesting** — vLLM unwraps `<｜DSML｜parameter name="arguments" ...>`;
+   ds41rt's schema-free parser nests one level (`{"arguments":{...}}`). Could bite real
+   tool consumers; consistent with ds41rt's no-schema design today.
+3. **Stream parser anchor strictness** — ds41rt anchors on `"\n\n<｜DSML｜tool_calls"`
+   (leading blank line required); vLLM detects the bare marker.
+
+Each has a pinned-behavior test in `upstream_tool_calls.rs`; if the fleet window shows
+real outputs that trip these, fix the parser and flip the tests to the vLLM semantics.
+
 
 ## C1 — OpenAI protocol / API surface (186 rows)
 
