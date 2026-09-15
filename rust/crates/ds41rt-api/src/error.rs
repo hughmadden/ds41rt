@@ -52,6 +52,21 @@ pub(crate) fn runtime_error(message: impl std::fmt::Display) -> ApiError {
     }
 }
 
+/// Bound an upstream parse/validation detail before it reaches the response
+/// body or logs. Long attacker-controlled inputs (e.g. a 100 KB string in a
+/// wrongly-typed field) must not be echoed back verbatim — the
+/// unbounded-error-body class upstream vLLM fixed in #49239.
+pub(crate) fn bounded_error_detail(detail: &str) -> String {
+    const MAX_DETAIL_CHARS: usize = 512;
+    let mut chars = detail.chars();
+    let head: String = chars.by_ref().take(MAX_DETAIL_CHARS).collect();
+    if chars.next().is_some() {
+        format!("{head}... (truncated)")
+    } else {
+        head
+    }
+}
+
 pub(crate) fn openai_error(
     status: StatusCode,
     message: String,
