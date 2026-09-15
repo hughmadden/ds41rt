@@ -18,7 +18,9 @@ use deepseek_recipe::{
 use deepseek_recipe_encoding::{v4::dsv41::DeepseekV41Encoding, PromptEncoding};
 use futures::StreamExt;
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::sync::mpsc;
 
 pub const MODEL: &str = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -56,12 +58,110 @@ pub struct NativeRequest {
 }
 /// Serving statistics the CUDA owner publishes (a JSON object; `null` until the first publish).
 pub type SharedStats = Arc<Mutex<Value>>;
+/// HTTP queue admission policy: how long a submission may wait for a free slot before the
+/// front door answers 429, and the `Retry-After` hint (whole seconds) sent with that answer.
+/// `wait == 0` keeps the immediate `try_send` behaviour (no waiting), but a full queue still
+/// answers 429 with `Retry-After`; only a closed channel earns 503.
+///
+/// Fairness note: every submission attempts an immediate `try_send` before it will wait, so
+/// a fresh arrival can leapfrog requests already parked in the send-waiter FIFO (the waiters
+/// are FIFO only among themselves). That is deliberate: the fast path never queues behind
+/// parked requests, the leapfrog window is a single channel slot, and the bounded wait still
+/// expires deterministically.
+#[derive(Debug, Clone, Copy)]
+pub struct QueuePolicy {
+    /// How long a submission may wait for a free queue slot before the front door answers
+    /// 429; `Duration::ZERO` fails immediately (the old try-send behaviour, but a full queue
+    /// still answers 429, not 503).
+    pub wait: Duration,
+    /// `Retry-After` hint for 429 queue-full answers, in whole seconds. The header rounds any
+    /// positive duration up to at least one second, so even a sub-second value yields `1`
+    /// rather than a useless `Retry-After: 0` ("retry immediately").
+    pub retry_after: Duration,
+}
+impl Default for QueuePolicy {
+    fn default() -> Self {
+        Self {
+            wait: Duration::ZERO,
+            retry_after: Duration::from_secs(2),
+        }
+    }
+}
+/// Atomic counters for the HTTP admission queue, merged into `/v1/stats` on every read.
+#[derive(Debug, Default)]
+struct HttpQueueMetrics {
+    /// Submissions that found the queue full and waited for a slot.
+    waits: AtomicU64,
+    /// Total milliseconds spent waiting for a slot (accepted and rejected waits).
+    wait_ms_sum: AtomicU64,
+    /// Submissions refused with 429 because the queue stayed full.
+    rejects_429: AtomicU64,
+}
+/// HTTP job queue capacity in jobs. `None` (the flag default) is `4 × concurrency`;
+/// `Some(0)` preserves the pre-HC-13 size of exactly `concurrency` jobs.
+pub fn http_queue_depth(concurrency: u32, depth: Option<u32>) -> usize {
+    match depth {
+        None => 4 * concurrency as usize,
+        Some(0) => concurrency as usize,
+        Some(depth) => depth as usize,
+    }
+}
 #[derive(Clone)]
 struct NativeState {
     queue: mpsc::Sender<NativeRequest>,
     limits: NativeLimits,
     images: images::ImageDecoder,
     stats: SharedStats,
+    policy: QueuePolicy,
+    metrics: Arc<HttpQueueMetrics>,
+}
+/// Where a queue submission ended up: delivered, refused after waiting, or the channel closed.
+#[derive(Debug)]
+enum Submission {
+    Accepted,
+    Full { waited_ms: u64 },
+    Closed,
+}
+impl NativeState {
+    /// Hand `job` to the CUDA owner under the policy. A full queue either waits up to
+    /// `policy.wait` for a slot or is refused immediately; a closed channel is reported
+    /// separately so the caller can keep 503 for shutdown only.
+    ///
+    /// The immediate `try_send` prefers fresh arrivals over already-parked waiters (see
+    /// [`QueuePolicy`]'s fairness note). Cancellation-safety: the bounded `send` is a
+    /// `reserve().await` + `permit.send`, so a future dropped by the timeout or by a
+    /// disconnected client never takes a slot and never delivers its job.
+    async fn submit(&self, job: NativeRequest) -> Submission {
+        use mpsc::error::TrySendError;
+        let job = match self.queue.try_send(job) {
+            Ok(()) => return Submission::Accepted,
+            Err(TrySendError::Closed(_)) => return Submission::Closed,
+            Err(TrySendError::Full(job)) => job,
+        };
+        if self.policy.wait.is_zero() {
+            self.metrics.rejects_429.fetch_add(1, Ordering::Relaxed);
+            return Submission::Full { waited_ms: 0 };
+        }
+        self.metrics.waits.fetch_add(1, Ordering::Relaxed);
+        let started = std::time::Instant::now();
+        match tokio::time::timeout(self.policy.wait, self.queue.send(job)).await {
+            Ok(Ok(())) => {
+                self.metrics
+                    .wait_ms_sum
+                    .fetch_add(started.elapsed().as_millis() as u64, Ordering::Relaxed);
+                Submission::Accepted
+            }
+            Ok(Err(_)) => Submission::Closed,
+            Err(_) => {
+                let waited_ms = started.elapsed().as_millis() as u64;
+                self.metrics.rejects_429.fetch_add(1, Ordering::Relaxed);
+                self.metrics
+                    .wait_ms_sum
+                    .fetch_add(waited_ms, Ordering::Relaxed);
+                Submission::Full { waited_ms }
+            }
+        }
+    }
 }
 pub fn router(queue: mpsc::Sender<NativeRequest>) -> Router {
     router_with_limits(queue, NativeLimits::default())
@@ -70,6 +170,15 @@ pub fn router_with_limits(queue: mpsc::Sender<NativeRequest>, limits: NativeLimi
     router_with_limits_and_stats(queue, limits, Arc::new(Mutex::new(Value::Null)))
 }
 pub fn router_with_limits_and_stats(queue: mpsc::Sender<NativeRequest>, limits: NativeLimits, stats: SharedStats) -> Router {
+    router_with_limits_stats_and_policy(queue, limits, stats, QueuePolicy::default())
+}
+/// Serve with an explicit HTTP queue admission policy (see [`QueuePolicy`]).
+pub fn router_with_limits_stats_and_policy(
+    queue: mpsc::Sender<NativeRequest>,
+    limits: NativeLimits,
+    stats: SharedStats,
+    policy: QueuePolicy,
+) -> Router {
     let images = images::ImageDecoder::new(queue.max_capacity());
     Router::new()
         .route("/health", get(health))
@@ -77,10 +186,41 @@ pub fn router_with_limits_and_stats(queue: mpsc::Sender<NativeRequest>, limits: 
         .route("/v1/stats", get(stats_route))
         .route("/v1/chat/completions", post(chat))
         .layer(axum::extract::DefaultBodyLimit::max(images::BODY_BYTES))
-        .with_state(NativeState { queue, limits, images, stats })
+        .with_state(NativeState {
+            queue,
+            limits,
+            images,
+            stats,
+            policy,
+            metrics: Arc::default(),
+        })
 }
 async fn stats_route(State(state): State<NativeState>) -> Json<Value> {
-    Json(state.stats.lock().map(|stats| stats.clone()).unwrap_or(Value::Null))
+    let mut value = match state.stats.lock() {
+        Ok(stats) if stats.is_object() => stats.clone(),
+        _ => json!({}),
+    };
+    let Some(stats) = value.as_object_mut() else {
+        return Json(value);
+    };
+    stats.insert(
+        "http_queue_waits".into(),
+        json!(state.metrics.waits.load(Ordering::Relaxed)),
+    );
+    stats.insert(
+        "http_queue_wait_ms_sum".into(),
+        json!(state.metrics.wait_ms_sum.load(Ordering::Relaxed)),
+    );
+    stats.insert(
+        "http_queue_rejects_429".into(),
+        json!(state.metrics.rejects_429.load(Ordering::Relaxed)),
+    );
+    // tokio's bounded Sender has no `len()`; occupancy is the complement of its live capacity.
+    stats.insert(
+        "http_queue_len".into(),
+        json!(state.queue.max_capacity() - state.queue.capacity()),
+    );
+    Json(value)
 }
 async fn models(State(state): State<NativeState>) -> Json<Value> {
     Json(json!({"object":"list","data":[{"id":MODEL,"object":"model","owned_by":"deepseek-ai",
@@ -99,6 +239,26 @@ fn error(status: StatusCode, message: impl ToString) -> Response {
         Json(json!({"error":{"message":message.to_string(),"type":"native_v41_error"}})),
     )
         .into_response()
+}
+/// 429 for a queue that stayed full: the JSON error body plus a `Retry-After` hint so
+/// bursting clients back off instead of reading the refusal as backend failure.
+fn queue_full(state: &NativeState, waited_ms: u64) -> Response {
+    let message = format!(
+        "request queue full ({}) after {} ms",
+        state.queue.max_capacity(),
+        waited_ms
+    );
+    let mut response = error(StatusCode::TOO_MANY_REQUESTS, message);
+    // Ceil to whole seconds: any positive duration must hint at least one second, because
+    // `Retry-After: 0` means "retry immediately" and would defeat the hint.
+    let retry_after_secs =
+        state.policy.retry_after.as_secs() + u64::from(state.policy.retry_after.subsec_nanos() > 0);
+    if let Ok(retry_after) = retry_after_secs.to_string().parse() {
+        response
+            .headers_mut()
+            .insert(axum::http::header::RETRY_AFTER, retry_after);
+    }
+    response
 }
 async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> Response {
     let assistance = match body.get("tool_decoding_assistance") {
@@ -202,9 +362,16 @@ async fn chat(State(state): State<NativeState>, Json(mut body): Json<Value>) -> 
         max_tokens,
         events,
     };
-    if let Some(permit) = permit { permit.send(job); }
-    else if let Err(e) = state.queue.try_send(job) {
-        return error(StatusCode::SERVICE_UNAVAILABLE, e);
+    if let Some(permit) = permit {
+        permit.send(job);
+    } else {
+        match state.submit(job).await {
+            Submission::Accepted => {}
+            Submission::Full { waited_ms } => return queue_full(&state, waited_ms),
+            Submission::Closed => {
+                return error(StatusCode::SERVICE_UNAVAILABLE, "request queue is closed")
+            }
+        }
     }
     // Admission errors must retain their cause and HTTP status, including for
     // SSE, before a protocol processor can turn early EOF into a finish chunk.
@@ -511,5 +678,347 @@ mod tests {
             let response = router(tx).oneshot(request(false)).await.unwrap();
             assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         }
+    }
+    fn dummy_job() -> NativeRequest {
+        let (events, _receive) = mpsc::channel(1);
+        NativeRequest {
+            prompt: String::new(),
+            constraint: None,
+            images: Vec::new(),
+            max_tokens: 1,
+            events,
+        }
+    }
+    /// A dummy job whose prompt identifies it, so FIFO service order can be asserted.
+    fn tagged_job(tag: &str) -> NativeRequest {
+        let mut job = dummy_job();
+        job.prompt = tag.to_string();
+        job
+    }
+    async fn stats_json(app: Router) -> Value {
+        let response = app
+            .oneshot(
+                axum::http::Request::get("/v1/stats")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+    #[test]
+    fn http_queue_depth_defaults_to_four_times_concurrency_and_zero_means_concurrency() {
+        assert_eq!(http_queue_depth(16, None), 64);
+        assert_eq!(http_queue_depth(1, None), 4);
+        assert_eq!(http_queue_depth(16, Some(0)), 16);
+        assert_eq!(http_queue_depth(16, Some(8)), 8);
+        assert_eq!(http_queue_depth(16, Some(256)), 256);
+    }
+    #[tokio::test]
+    async fn full_queue_without_wait_returns_429_with_retry_after_and_body_message() {
+        let stats = Arc::new(Mutex::new(Value::Null));
+        let (send, mut receive) = mpsc::channel::<NativeRequest>(1);
+        let app = router_with_limits_stats_and_policy(
+            send.clone(),
+            NativeLimits::default(),
+            stats.clone(),
+            QueuePolicy::default(),
+        );
+        // Occupy the only slot; no consumer drains it.
+        send.try_send(dummy_job()).unwrap();
+        let response = app.clone().oneshot(request(false)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::RETRY_AFTER)
+                .unwrap(),
+            "2"
+        );
+        let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let value: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            value["error"]["message"],
+            "request queue full (1) after 0 ms"
+        );
+        assert_eq!(value["error"]["type"], "native_v41_error");
+        let published = stats_json(app).await;
+        assert_eq!(published["http_queue_rejects_429"], 1);
+        assert_eq!(published["http_queue_waits"], 0);
+        assert_eq!(published["http_queue_wait_ms_sum"], 0);
+        assert_eq!(published["http_queue_len"], 1);
+        // The parked job was never consumed and the refusal is counted once.
+        assert!(receive.try_recv().is_ok());
+    }
+    #[tokio::test]
+    async fn closed_queue_returns_503_not_429() {
+        let (tx, rx) = mpsc::channel::<NativeRequest>(1);
+        let app = router_with_limits_stats_and_policy(
+            tx,
+            NativeLimits::default(),
+            Arc::new(Mutex::new(Value::Null)),
+            QueuePolicy::default(),
+        );
+        drop(rx);
+        let response = app.oneshot(request(false)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(response
+            .headers()
+            .get(axum::http::header::RETRY_AFTER)
+            .is_none());
+    }
+    #[tokio::test]
+    async fn queued_submission_waits_for_a_slot_then_proceeds_and_counts_the_wait() {
+        let stats = Arc::new(Mutex::new(Value::Null));
+        let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+        // The budget is far above any scheduling latency because the consumer drains
+        // event-driven (as soon as the submission has parked), not after a fixed sleep.
+        let app = router_with_limits_stats_and_policy(
+            tx.clone(),
+            NativeLimits::default(),
+            stats.clone(),
+            QueuePolicy {
+                wait: Duration::from_secs(5),
+                retry_after: Duration::from_secs(2),
+            },
+        );
+        tx.try_send(dummy_job()).unwrap();
+        let consumer = tokio::spawn({
+            let app = app.clone();
+            async move {
+                // Wait until the submission has parked in the wait list (the `waits` metric
+                // is bumped just before), then drain the parked dummy and serve the queued
+                // real job. If the drain lands before the send's first poll, the send takes
+                // the freed slot immediately; either way the outcome is a delivery.
+                let mut observed = false;
+                for _ in 0..100 {
+                    let published = stats_json(app.clone()).await;
+                    if published["http_queue_waits"].as_u64().unwrap_or(0) >= 1 {
+                        observed = true;
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+                assert!(observed, "submission never reached the wait list");
+                let parked = rx.recv().await.unwrap();
+                assert!(parked.prompt.is_empty());
+                let job = rx.recv().await.unwrap();
+                job.events
+                    .send(Ok(InferenceChunk::Ready {
+                        system_fingerprint: None,
+                        prompt_usage: PromptUsage {
+                            prompt_tokens: 1,
+                            prompt_cache_hit_tokens: 0,
+                        },
+                    }))
+                    .await
+                    .unwrap();
+                job.events
+                    .send(Ok(InferenceChunk::Finish {
+                        finish_reason: InferenceFinishReason::Stop,
+                    }))
+                    .await
+                    .unwrap();
+            }
+        });
+        let response = app.clone().oneshot(request(false)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        consumer.await.unwrap();
+        let published = stats_json(app).await;
+        assert_eq!(published["http_queue_waits"], 1);
+        assert_eq!(published["http_queue_rejects_429"], 0);
+    }
+    #[tokio::test]
+    async fn queued_submission_times_out_with_429_after_the_wait() {
+        let stats = Arc::new(Mutex::new(Value::Null));
+        let (tx, _rx) = mpsc::channel::<NativeRequest>(1);
+        let app = router_with_limits_stats_and_policy(
+            tx.clone(),
+            NativeLimits::default(),
+            stats.clone(),
+            QueuePolicy {
+                wait: Duration::from_millis(20),
+                retry_after: Duration::from_secs(7),
+            },
+        );
+        tx.try_send(dummy_job()).unwrap();
+        let started = std::time::Instant::now();
+        let response = app.clone().oneshot(request(false)).await.unwrap();
+        assert!(started.elapsed() >= Duration::from_millis(20));
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::RETRY_AFTER)
+                .unwrap(),
+            "7"
+        );
+        let published = stats_json(app).await;
+        assert_eq!(published["http_queue_rejects_429"], 1);
+        assert_eq!(published["http_queue_waits"], 1);
+        assert!(published["http_queue_wait_ms_sum"].as_u64().unwrap() >= 20);
+    }
+    #[tokio::test]
+    async fn stats_route_merges_http_queue_keys_without_disturbing_owner_keys() {
+        let owner = json!({
+            "host_cache": {"bytes": 1},
+            "host_cache_config": {"store": "on_retain"},
+            "admission_waits": 3,
+            "admission_rejects": 1,
+        });
+        let (tx, _rx) = mpsc::channel::<NativeRequest>(1);
+        let app = router_with_limits_stats_and_policy(
+            tx,
+            NativeLimits::default(),
+            Arc::new(Mutex::new(owner)),
+            QueuePolicy::default(),
+        );
+        let published = stats_json(app).await;
+        assert_eq!(published["host_cache"]["bytes"], 1);
+        assert_eq!(published["host_cache_config"]["store"], "on_retain");
+        assert_eq!(published["admission_waits"], 3);
+        assert_eq!(published["admission_rejects"], 1);
+        for key in [
+            "http_queue_waits",
+            "http_queue_wait_ms_sum",
+            "http_queue_rejects_429",
+            "http_queue_len",
+        ] {
+            assert!(published[key].is_u64(), "missing numeric key {key}");
+        }
+    }
+    #[tokio::test]
+    async fn stats_route_serves_http_queue_keys_even_before_the_owner_publishes() {
+        let (tx, _rx) = mpsc::channel::<NativeRequest>(1);
+        let app = router_with_limits_stats_and_policy(
+            tx,
+            NativeLimits::default(),
+            Arc::new(Mutex::new(Value::Null)),
+            QueuePolicy::default(),
+        );
+        let published = stats_json(app).await;
+        assert_eq!(published["http_queue_waits"], 0);
+        assert_eq!(published["http_queue_len"], 0);
+    }
+    #[tokio::test]
+    async fn timed_out_submission_is_never_delivered_and_the_client_gets_one_outcome() {
+        let stats = Arc::new(Mutex::new(Value::Null));
+        let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+        let app = router_with_limits_stats_and_policy(
+            tx.clone(),
+            NativeLimits::default(),
+            stats.clone(),
+            QueuePolicy {
+                wait: Duration::from_millis(20),
+                retry_after: Duration::from_secs(3),
+            },
+        );
+        // Occupy the only slot; no consumer drains it while the submission waits.
+        tx.try_send(dummy_job()).unwrap();
+        // The bounded wait expires on the real clock; the single-outcome and no-delivery
+        // assertions below hold from the moment the 429 is produced, with no timing margin.
+        let response = app.clone().oneshot(request(false)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::RETRY_AFTER)
+                .unwrap(),
+            "3"
+        );
+        let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let value: Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(value["error"]["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("request queue full (1)"));
+        // The engine saw only the parked dummy; the timed-out job never arrived.
+        let parked = rx.recv().await.unwrap();
+        assert!(parked.prompt.is_empty());
+        assert!(rx.try_recv().is_err());
+        // Exactly one client outcome was produced and counted.
+        let published = stats_json(app).await;
+        assert_eq!(published["http_queue_rejects_429"], 1);
+        assert_eq!(published["http_queue_waits"], 1);
+    }
+    #[tokio::test]
+    async fn retry_after_rounds_up_sub_second_policies_to_one_second() {
+        let (tx, _rx) = mpsc::channel::<NativeRequest>(1);
+        let app = router_with_limits_stats_and_policy(
+            tx.clone(),
+            NativeLimits::default(),
+            Arc::new(Mutex::new(Value::Null)),
+            QueuePolicy {
+                wait: Duration::ZERO,
+                retry_after: Duration::from_millis(250),
+            },
+        );
+        tx.try_send(dummy_job()).unwrap();
+        let response = app.oneshot(request(false)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::RETRY_AFTER)
+                .unwrap(),
+            "1"
+        );
+    }
+    #[tokio::test]
+    async fn multi_waiter_fifo_service_and_mid_wait_disconnect_cancels_cleanly() {
+        const WAITERS: usize = 4;
+        let (tx, mut rx) = mpsc::channel::<NativeRequest>(1);
+        let state = NativeState {
+            queue: tx.clone(),
+            limits: NativeLimits::default(),
+            images: images::ImageDecoder::new(1),
+            stats: Arc::new(Mutex::new(Value::Null)),
+            policy: QueuePolicy {
+                wait: Duration::from_secs(60),
+                retry_after: Duration::from_secs(2),
+            },
+            metrics: Arc::default(),
+        };
+        // Occupy the only slot, then park WAITERS submissions in spawn order.
+        tx.try_send(dummy_job()).unwrap();
+        let mut handles = Vec::new();
+        for index in 0..WAITERS {
+            let state = state.clone();
+            let tag = format!("w{index}");
+            handles.push(tokio::spawn(
+                async move { state.submit(tagged_job(&tag)).await },
+            ));
+        }
+        // Let every waiter register in the send-waiter FIFO before any slot frees.
+        for _ in 0..WAITERS * 4 {
+            tokio::task::yield_now().await;
+        }
+        // Simulated client disconnect: the front door drops the handler future mid-wait.
+        // `abort` is the same cancellation a dropped axum handler applies to its future;
+        // the cancelled reservation must leave the FIFO without ever delivering its job.
+        handles[1].abort();
+        assert!(handles.remove(1).await.unwrap_err().is_cancelled());
+        // Free one slot at a time; the remaining waiters must be served in FIFO order.
+        let parked = rx.recv().await.unwrap();
+        assert!(parked.prompt.is_empty());
+        for expected in ["w0", "w2", "w3"] {
+            let job = rx.recv().await.unwrap();
+            assert_eq!(job.prompt, expected);
+        }
+        assert!(rx.try_recv().is_err());
+        for handle in handles {
+            assert!(matches!(handle.await.unwrap(), Submission::Accepted));
+        }
+        // The disconnected waiter registered its wait but was never delivered or refused.
+        assert_eq!(state.metrics.waits.load(Ordering::Relaxed), WAITERS as u64);
+        assert_eq!(state.metrics.rejects_429.load(Ordering::Relaxed), 0);
     }
 }
