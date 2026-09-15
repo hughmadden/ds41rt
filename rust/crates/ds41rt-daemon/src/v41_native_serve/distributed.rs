@@ -289,7 +289,8 @@ mod tests {
         }
         drop(send);
         let (ready, mut readiness) = oneshot::channel();
-        super::super::worker(args, receive, &mut Some(ready))?;
+        let stats = std::sync::Arc::new(std::sync::Mutex::new(serde_json::Value::Null));
+        super::super::worker(args, receive, &mut Some(ready), stats)?;
         readiness.try_recv()?.map_err(anyhow::Error::msg)?;
         for (i, mut output) in outputs.into_iter().enumerate() {
             let mut ready = 0;

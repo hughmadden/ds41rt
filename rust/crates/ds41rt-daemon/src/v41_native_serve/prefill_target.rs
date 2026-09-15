@@ -18,7 +18,7 @@ pub(crate) fn exercise_prefill<'a, P: PrefillTarget<'a>, C: DraftChain<'a>>(
     let job = NativeRequest { prompt: String::new(), constraint: None, images: Vec::new(), max_tokens: 16, events };
     let [first_transport, second_transport] = transports;
     super::prefill(lib, runtime, pass, other, requests, first_transport, second_transport,
-        lease, tokens, chunk_rows, &job, draft)?.select(None)
+        lease, tokens, chunk_rows, &job, draft, &mut || Ok(()))?.select(None)
 }
 
 pub(crate) trait PrefillTarget<'a>: VerificationTarget<'a> + Sized {
