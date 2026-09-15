@@ -429,6 +429,69 @@ mod tests {
             assert_eq!(super::Cli::try_parse_from(command).is_ok(), valid);
         }
     }
+    #[test]
+    fn http_queue_flags_default_parse_and_env_plumb() {
+        use clap::Parser;
+        let envs = [
+            "DS41RT_HTTP_QUEUE_DEPTH",
+            "DS41RT_HTTP_QUEUE_WAIT_MS",
+            "DS41RT_HTTP_RETRY_AFTER_S",
+        ];
+        for var in envs {
+            std::env::remove_var(var);
+        }
+        let base = [
+            "ds41rt",
+            "serve-native",
+            "--snapshot",
+            "/model",
+            "--native-lib",
+            "/native.so",
+            "--peers",
+            "127.0.0.1:19441",
+        ];
+        let super::Commands::ServeNative(args) = super::Cli::try_parse_from(base).unwrap().command
+        else {
+            panic!("expected native serving");
+        };
+        assert_eq!(args.http_queue_depth, None);
+        assert_eq!(args.http_queue_wait_ms, 30_000);
+        assert_eq!(args.http_retry_after_s, 2);
+        let super::Commands::ServeNative(args) =
+            super::Cli::try_parse_from(base.into_iter().chain([
+                "--http-queue-depth",
+                "0",
+                "--http-queue-wait-ms",
+                "250",
+                "--http-retry-after-s",
+                "7",
+            ]))
+            .unwrap()
+            .command
+        else {
+            panic!("expected native serving");
+        };
+        assert_eq!(args.http_queue_depth, Some(0));
+        assert_eq!(args.http_queue_wait_ms, 250);
+        assert_eq!(args.http_retry_after_s, 7);
+        for (var, value) in [
+            ("DS41RT_HTTP_QUEUE_DEPTH", "12"),
+            ("DS41RT_HTTP_QUEUE_WAIT_MS", "750"),
+            ("DS41RT_HTTP_RETRY_AFTER_S", "9"),
+        ] {
+            std::env::set_var(var, value);
+        }
+        let parsed = super::Cli::try_parse_from(base);
+        for var in envs {
+            std::env::remove_var(var);
+        }
+        let super::Commands::ServeNative(args) = parsed.unwrap().command else {
+            panic!("expected native serving");
+        };
+        assert_eq!(args.http_queue_depth, Some(12));
+        assert_eq!(args.http_queue_wait_ms, 750);
+        assert_eq!(args.http_retry_after_s, 9);
+    }
     use super::*;
 
     #[test]
@@ -560,6 +623,23 @@ pub(crate) struct NativeServeArgs {
     /// "admission queue full (N)" and counts under `admission_queue_rejects`.
     #[arg(long, default_value_t = 64, env = "DS41RT_ADMISSION_QUEUE_MAX")]
     pub admission_queue_max: u32,
+
+    /// Capacity of the HTTP job queue in front of the CUDA worker. Defaults to 4 ×
+    /// concurrency; 0 uses the concurrency (the pre-HC-13 size). With depth 0 and
+    /// `--http-queue-wait-ms 0` the only behavioural change is a full queue answering
+    /// 429 + Retry-After instead of 503.
+    #[arg(long, env = "DS41RT_HTTP_QUEUE_DEPTH")]
+    pub http_queue_depth: Option<u32>,
+
+    /// How long the HTTP front door holds a request waiting for a free queue slot before
+    /// answering 429 Too Many Requests with a Retry-After hint; zero fails immediately
+    /// (the old try_send behaviour, but a full queue still answers 429, not 503).
+    #[arg(long, default_value_t = 30_000, env = "DS41RT_HTTP_QUEUE_WAIT_MS")]
+    pub http_queue_wait_ms: u64,
+
+    /// Retry-After value (whole seconds) sent with 429 queue-full responses.
+    #[arg(long, default_value_t = 2, env = "DS41RT_HTTP_RETRY_AFTER_S")]
+    pub http_retry_after_s: u64,
 
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
