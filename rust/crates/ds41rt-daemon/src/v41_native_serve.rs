@@ -468,8 +468,7 @@ fn prefill<'a, P: PrefillTarget<'a>, C: DraftChain<'a>>(
 fn prefill_continuation<'a, P: PrefillTarget<'a>, C: DraftChain<'a>>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
     pass: &mut P, requests: &mut Requests<'a>, transport: &mut P::Transport,
     lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
-    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a, C>>) -> Result<TokenScores> {
-    hold: &mut dyn FnMut() -> Result<()>) -> Result<TokenScores> {
+    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a, C>>, hold: &mut dyn FnMut() -> Result<()>) -> Result<TokenScores> {
     ensure!(!tokens.is_empty(), "prefix continuation has no uncached rows");
     let mut anchor = None;
     for chunk in tokens.chunks(chunk_rows) {
