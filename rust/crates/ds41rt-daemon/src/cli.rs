@@ -143,6 +143,9 @@ pub(crate) struct ExpertDaemonArgs {
 
 #[derive(Debug, Args)]
 pub(crate) struct NativeExpertDaemonArgs {
+    /// First resident backbone layer; use 20 when both RTX GPUs host the encoder.
+    #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..40))]
+    pub(crate) first_layer: u32,
     /// Official local snapshot directory, including all shard headers.
     #[arg(long)]
     pub(crate) snapshot: PathBuf,
@@ -407,10 +410,21 @@ mod tests {
             ["--dspark", "--dspark-fixed", "--dspark-confidence-cutoff", "0.5"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-adaptive"])).is_err());
         assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark", "--dspark-adaptive"])).is_ok());
-        for limit in ["1", "2", "3", "4", "5"] {
+        for (flags, expected) in [
+            (vec!["--dspark"], 5),
+            (vec!["--dspark", "--rtx-gpus", "1"], 5),
+            (vec!["--dspark", "--rtx-gpus", "2"], 5),
+            (vec!["--dspark", "--dspark-draft-limit", "5"], 5),
+            (vec!["--dspark", "--rtx-gpus", "2", "--dspark-draft-limit", "7"], 7),
+        ] {
+            let super::Commands::ServeNative(args) = super::Cli::try_parse_from(
+                base.into_iter().chain(flags)).unwrap().command else { panic!("expected native serving"); };
+            assert_eq!(args.dspark_draft_limit, expected);
+        }
+        for limit in ["1", "2", "3", "4", "5", "6", "7"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_ok());
         }
-        for limit in ["0", "6"] {
+        for limit in ["0", "8"] {
             assert!(super::Cli::try_parse_from(base.into_iter().chain(["--dspark-draft-limit", limit])).is_err());
         }
         for entries in ["0", "2", "24", "128"] {
@@ -481,6 +495,10 @@ mod tests {
 
 #[derive(Debug, Args)]
 pub(crate) struct NativeServeArgs {
+    /// Force one RTX or the distributed two-RTX layout (automatic launcher selection is pending).
+    #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..=2))]
+    pub rtx_gpus: u32,
+
     /// Maximum tokens per prefill step. Storage rounds up to an AOT capacity
     /// (80, 256, 1024, or 4096); all expert peers must support that capacity.
     #[arg(long, default_value_t = 80, value_parser = clap::value_parser!(u32).range(80..=4096))]
@@ -550,8 +568,8 @@ pub(crate) struct NativeServeArgs {
 
     /// Enable greedy RTX dSpark proposal generation and target verification.
     #[arg(long)] pub dspark: bool,
-    /// Maximum verified draft tokens per request; fixed-length policy control.
-    #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=5))]
+    /// Maximum draft tokens per request, for adaptive or fixed verification.
+    #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..=7))]
     pub dspark_draft_limit: u8,
     /// Compatibility spelling: dSpark uses lane-local adaptive selection by default.
     #[arg(long, requires = "dspark", hide = true)]

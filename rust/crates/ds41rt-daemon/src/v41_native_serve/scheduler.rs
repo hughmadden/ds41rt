@@ -1,11 +1,62 @@
+use super::speculative::DraftChain;
 use super::*;
+use crate::v41_target_pass::VerificationTarget;
 mod independent;
+mod layout;
+use layout::ServingTarget;
 use super::scores::BatchScores;
 use crate::v41_backbone_cache::CacheLease;
 use crate::v41_requests::RequestBatch;
 use super::prefix::{ImageKeys, PrefixCache, SnapshotKind};
 
-struct Active<'a> {
+#[cfg(test)]
+pub(crate) fn exercise_distributed_decode<'t, 'd, 'a: 'd>(lib: &'a NativeLibrary,
+    runtime: &tokio::runtime::Runtime, snapshot: &std::path::Path,
+    first: &mut crate::v41_target_pass::DistributedTargetPass<'t, 'a>,
+    second: &mut crate::v41_target_pass::DistributedTargetPass<'t, 'a>,
+    requests: &mut Requests<'a>,
+    transports: [&mut crate::v41_memory::device::DeviceOwner<'a, NativeTp4Wave<'a>>; 2],
+    lease: CacheLease, id: u64, tokens: &[u32], anchor: u32,
+    draft: &mut DraftRuntime<'d, 'a, crate::v41_experts::dspark::DistributedDsparkChain<'d, 'a>>,
+) -> Result<()> {
+    let (events, mut output) = mpsc::channel(64);
+    let (_submit, receive) = mpsc::channel(1);
+    let mut prefixes = PrefixCache::new(2);
+    let image_keys = prefixes.prepare_key(tokens, &[])?;
+    let mut request = Active { constraint: None, id, lease,
+        job: NativeRequest { prompt: String::new(), constraint: None, images: Vec::new(), max_tokens: 4, events },
+        decoder: ds41rt_loader::streaming_token_decoder(snapshot, false)?, anchor,
+        generated: 0, buffered: 0, lane: 0, finished: false, cacheable: false,
+        tokens: tokens.to_vec(), image_keys, next_after_commit: None };
+    request.emit(&[anchor])?;
+    ensure!(!request.finished, "fixture requires a nonterminal continuation anchor");
+    let mut active = [Some(request), None];
+    let [first_transport, second_transport] = transports;
+    type Pass<'w, 'a> = crate::v41_target_pass::DistributedTargetPass<'w, 'a>;
+    Pass::begin_request(first_transport)?;
+    Pass::begin_request(second_transport)?;
+    Pass::decode_round(lib, runtime, first, second, requests, first_transport, second_transport,
+        &mut active, &[vec![0], vec![]], Some(draft), &mut prefixes, &receive)?;
+    ensure!(active.iter().all(Option::is_none), "distributed serving round did not retire its request");
+    ensure!(requests.cache().request_id(lease).is_err(), "retired target lease remains live");
+    let mut finished = 0;
+    while let Ok(chunk) = output.try_recv() {
+        match chunk {
+            Ok(InferenceChunk::Finish { .. }) => finished += 1,
+            Err(error) => anyhow::bail!("distributed serving output failed: {error:?}"),
+            _ => (),
+        }
+    }
+    ensure!(finished == 1, "distributed serving did not emit exactly one finish");
+    // Reusing the same ID verifies that retirement released the draft owner too.
+    draft.admit(id)?;
+    draft.release(id)?;
+    Pass::reset_connections(first_transport)?;
+    Pass::reset_connections(second_transport)?;
+    Ok(())
+}
+
+pub(super) struct Active<'a> {
     constraint: Option<super::constraints::State<'a>>,
     id: u64,
     lease: CacheLease,
@@ -63,8 +114,8 @@ impl Active<'_> {
     }
 }
 
-fn retire_request<'a>(request: Active<'a>, requests: &mut Requests<'a>,
-    prefixes: &mut PrefixCache<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<()> {
+fn retire_request<'a, C: DraftChain<'a>>(request: Active<'a>, requests: &mut Requests<'a>,
+    prefixes: &mut PrefixCache<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a, C>>) -> Result<()> {
     if request.cacheable && requests.cache().request_id(request.lease).is_ok() {
         let retained = request.next_after_commit.as_ref().context("finished request has no retained logits")
             .and_then(|next| prefixes.retain(SnapshotKind::Turn, &request.tokens, &request.image_keys,
@@ -77,11 +128,11 @@ fn retire_request<'a>(request: Active<'a>, requests: &mut Requests<'a>,
     target.and(speculative.map(|_| ()))
 }
 
-pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeServeArgs,
+pub(super) fn serve<'w, 'a, P: ServingTarget<'w, 'a>>(lib: &'a NativeLibrary, args: &crate::cli::NativeServeArgs,
     runtime: &tokio::runtime::Runtime, receive: &mut mpsc::Receiver<NativeRequest>,
-    first: &mut TargetPass<'w, 'a>, second: &mut TargetPass<'w, 'a>,
-    requests: &mut Requests<'a>, first_transport: &mut NativeTp4Wave<'a>,
-    second_transport: &mut NativeTp4Wave<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>,
+    first: &mut P, second: &mut P,
+    requests: &mut Requests<'a>, first_transport: &mut P::Transport,
+    second_transport: &mut P::Transport, mut draft: Option<&mut DraftRuntime<'w, 'a, P::Chain>>,
     vision: &mut crate::v41_vision::VisionRuntime<'a>,
     stats: std::sync::Arc<std::sync::Mutex<serde_json::Value>>,
 ) -> Result<()> {
@@ -188,7 +239,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                         else { "ds41rt-native-fp4-kv" }.into()),
                     prompt_usage: PromptUsage { prompt_tokens: prompt.len(), prompt_cache_hit_tokens: cached },
                 }))?;
-                first_transport.begin_request(); second_transport.begin_request();
+                P::begin_request(first_transport)?; P::begin_request(second_transport)?;
                 let scores = if cached == prompt.len() { hit.expect("complete prefix hit").1.context("exact prefix has no logits")? }
                 else { prefill(lib, runtime, first, second, requests, first_transport,
                     second_transport, lease, &prompt, args.prefill_batch_tokens as usize, &job,
@@ -220,7 +271,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                     tracing::warn!(%error, "native request admission failed");
                     requests.release_if_present(lease)?;
                     if let Some(draft) = draft.as_deref_mut() { draft.release(id)?; }
-                    first_transport.reset_connections(); second_transport.reset_connections();
+                    P::reset_connections(first_transport)?; P::reset_connections(second_transport)?;
                 }
             }
         }
@@ -231,7 +282,7 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
         if members.iter().all(Vec::is_empty) { continue; }
         let capacity: Vec<_> = members.iter().flatten().map(|&slot| {
             let r = active[slot].as_ref().unwrap();
-            (r.lease, if draft.is_some() { (r.job.max_tokens - r.generated).min(6) as u32 } else { 1 })
+            (r.lease, (r.job.max_tokens - r.generated).min(draft.as_ref().map_or(1, |d| d.max_verify_rows())) as u32)
         }).collect();
         let room = prefixes.make_room(requests, &capacity);
         if let Err(error) = &room {
@@ -247,23 +298,12 @@ pub(super) fn serve<'w, 'a>(lib: &'a NativeLibrary, args: &crate::cli::NativeSer
                 continue;
             }
         }
-        // With one active lane there is no peer to overlap. Retain the
-        // ordinary C1 path and avoid shared-bank/async-delivery overhead.
-        // Decode rounds are deliberately unheld (packet HC-9): the store-pace pacing hold
-        // paces prefill chunk dispatch against pending store copies; decode steps issue no
-        // stores and never hold.
-        let result = room.and_then(|_| if members.iter().all(|lane| !lane.is_empty()) {
-            independent::run(lib, runtime, first, second, requests, first_transport,
-                second_transport, &mut active, draft.as_deref_mut(), &mut prefixes, receive)
-        } else {
-            let lane = usize::from(members[0].is_empty());
-            let (pass, transport) = if lane == 0 { (&mut *first, &mut *first_transport) }
-                else { (&mut *second, &mut *second_transport) };
-            single_lane_round(lib, runtime, lane, pass, requests, transport,
-                &mut active, &members[lane], draft.as_deref_mut())
-        });
+        let result = room.and_then(|_| P::decode_round(lib, runtime, first, second,
+            requests, first_transport, second_transport, &mut active, &members,
+            draft.as_deref_mut(), &mut prefixes, receive));
         if let Err(error) = result {
-            first_transport.reset_connections(); second_transport.reset_connections();
+            tracing::error!(error=%format!("{error:#}"), "native decode round failed");
+            P::reset_connections(first_transport)?; P::reset_connections(second_transport)?;
             for request in active.iter_mut().flatten() {
                 let _ = request.job.events.blocking_send(Err(format!("{error:#}").into()));
                 request.finished = true;
@@ -345,10 +385,21 @@ fn single_lane_round<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::R
     let prepared_us = started.elapsed().as_micros() as u64;
     let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
         && members.iter().all(|&slot| active[slot].as_ref().unwrap().constraint.is_none());
+    let batch_id = batch.as_ref().unwrap().cache()?.identity();
+    if tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG) {
+        if let Some(draft) = draft.as_deref() {
+            let candidates: Vec<_> = members.iter().zip(&inputs).map(|(&slot, input)|
+                (active[slot].as_ref().unwrap().id, lane, input.len()-1)).collect();
+            draft.trace_cost_forecast(batch_id, &candidates);
+        }
+    }
     let next = runtime.block_on(execute_logits(lib, pass, requests, &mut batch, transport, capture_routes, compact));
     let executed_us = started.elapsed().as_micros() as u64;
     let result = (|| -> Result<()> {
         let next = next?;
+        tracing::debug!(target: "ds41rt::cost_model", batch=batch_id, lane,
+            requests=members.len(), rows=inputs.iter().map(Vec::len).sum::<usize>(),
+            prepared_us, verify_us=executed_us-prepared_us, "verification round cost");
         let (accepted, emitted, emissions) = commit_lane(lib, lane, pass, requests, active, members,
             &inputs, &mut batch, &next, draft.as_deref_mut(), capture_routes, executed_us-prepared_us)?;
         for (&slot, tokens) in members.iter().zip(emissions) {
@@ -381,9 +432,9 @@ struct CommitDecision {
     next_after_commit: Vec<Option<TokenScores>>,
     frontier_downloads: Vec<(usize, usize)>,
 }
-fn prepare_commit_lane<'a>(lane: usize,
+fn prepare_commit_lane<'a, C: DraftChain<'a>>(lane: usize,
     requests: &Requests<'a>, active: &[Option<Active<'a>>], members: &[usize], inputs: &[Vec<u32>],
-    next: &BatchScores, draft: Option<&DraftRuntime<'_, 'a>>, verify_us: u64,
+    next: &BatchScores, draft: Option<&DraftRuntime<'_, 'a, C>>, verify_us: u64,
 ) -> Result<CommitDecision> {
     let mut accepted_drafts = 0u32;
     let mut emitted = 0usize;
@@ -443,9 +494,9 @@ fn prepare_commit_lane<'a>(lane: usize,
     }
     Ok(CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit, frontier_downloads })
 }
-fn publish_commit_lane<'a>(pass: &TargetPass<'_, 'a>, active: &mut [Option<Active<'a>>],
+fn publish_commit_lane<'a, C: DraftChain<'a>>(pass: &impl VerificationTarget<'a>, active: &mut [Option<Active<'a>>],
     members: &[usize], inputs: &[Vec<u32>], owned_batch: &mut Option<RequestBatch>,
-    mut draft: Option<&mut DraftRuntime<'_, 'a>>, capture_routes: bool, decision: CommitDecision,
+    mut draft: Option<&mut DraftRuntime<'_, 'a, C>>, capture_routes: bool, decision: CommitDecision,
 ) -> Result<(u32, usize, Vec<Vec<u32>>)> {
     let CommitDecision { accepted_drafts, emitted, accepted, emissions, next_after_commit, frontier_downloads } = decision;
     ensure!(frontier_downloads.is_empty(), "retained frontier downloads are incomplete");

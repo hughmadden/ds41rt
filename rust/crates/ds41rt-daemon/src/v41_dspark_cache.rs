@@ -118,6 +118,9 @@ pub(crate) struct DsparkWindow<'a> {
     owner: u64,
 }
 impl<'a> DsparkWindow<'a> {
+    pub fn device(&self) -> crate::v41_memory::device::Device<'a> {
+        crate::v41_memory::device::Device { library: self.stream.library, id: self.ring.buffer.device_id }
+    }
     pub fn device_bytes(slots: usize, source_rows: u32) -> Result<usize> {
         ensure!(
             (1..=16).contains(&slots) && (1..=4096).contains(&source_rows),
@@ -345,6 +348,10 @@ impl<'a> DsparkWindow<'a> {
     /// Reserve the validated slots through GPU completion. The caller must keep
     /// the window owner alive; disjoint slots remain available to other lanes.
     pub fn attention_read(&self, requests: &[(WindowLease, u64)]) -> Result<WindowRead> {
+        self.attention_read_with_width(requests, 5)
+    }
+    pub fn attention_read_with_width(&self, requests: &[(WindowLease, u64)], width: usize) -> Result<WindowRead> {
+        ensure!(matches!(width, 5 | 7), "draft width must be five or seven");
         ensure!(
             (1..=16).contains(&requests.len()),
             "invalid attention request count"
@@ -361,7 +368,7 @@ impl<'a> DsparkWindow<'a> {
                 "attention cache position changed"
             );
             ensure!(
-                expected_end >= 2 && expected_end.checked_add(5).is_some(),
+                expected_end >= 2 && expected_end.checked_add(width as u64).is_some(),
                 "invalid attention draft positions"
             );
             descriptors[i] = V41AttentionWindow {

@@ -18,6 +18,12 @@ int32_t ds41rt_v41_dspark_attention_initialize(void);
 int32_t ds41rt_v41_dspark_attention_fp8(const uint16_t* query, const uint8_t* ring,
     const uint16_t* draft, const float* sink, const ds41rt_v41_attention_window_t* windows,
     uint16_t* output, int32_t requests, int32_t slots, void* stream);
+// Width-specialized variants: width is 5 or 7. Replace every draft dimension
+// above by width. Initialize the chosen specialization before graph capture.
+int32_t ds41rt_v41_dspark_attention_initialize_width(int32_t width);
+int32_t ds41rt_v41_dspark_attention_fp8_width(const uint16_t* query, const uint8_t* ring,
+    const uint16_t* draft, const float* sink, const ds41rt_v41_attention_window_t* windows,
+    uint16_t* output, int32_t requests, int32_t slots, int32_t width, void* stream);
 #ifdef __cplusplus
 }
 #endif

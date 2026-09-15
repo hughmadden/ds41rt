@@ -143,6 +143,8 @@ pub(crate) struct AttentionQueryOutput<'a> {
     pub raw_rank: Ds41rtDeviceBuffer,
     pub normalized_rank: Ds41rtDeviceBuffer,
     pub projected: Ds41rtDeviceBuffer,
+    #[cfg(test)]
+    pub qb_scratch: Ds41rtDeviceBuffer,
     pub rotated: Ds41rtDeviceBuffer,
     pub positions: Ds41rtDeviceBuffer,
     pub frequencies: Ds41rtDeviceBuffer,
@@ -463,6 +465,8 @@ impl AttentionQueryWave<'_, '_> {
             raw_rank: b(1),
             normalized_rank: b(2),
             projected: b(3),
+            #[cfg(test)]
+            qb_scratch: self.scratch[1].buffer,
             rotated: b(4),
             positions: b(5),
             frequencies: b(6),

@@ -12,13 +12,14 @@ pub(crate) struct DsparkStage<'weights, 'library> {
     library: &'library NativeLibrary,
     graph: Option<(*mut c_void, usize, u64)>,
     requests: u32,
+    width: usize,
     ready: bool,
 }
 impl<'library> DsparkWeights<'library> {
     pub fn stage_bytes(&self, requests: u32) -> Result<usize> {
-        let capacity = DsparkAttentionWave::projection_capacity(requests)?;
+        let capacity = DsparkAttentionWave::projection_capacity_with_width(requests, self.draft_width)?;
         let library = self.experts[0].buffers[0].library;
-        let attention = DsparkAttentionWave::device_bytes(library, requests)?;
+        let attention = DsparkAttentionWave::device_bytes_with_width(library, requests, self.draft_width)?;
         self.ffn_bytes(capacity)?
             .checked_add(HcSublayer::device_bytes(capacity as usize)?)
             .and_then(|v| v.checked_add(attention))
@@ -36,7 +37,7 @@ impl<'library> DsparkWeights<'library> {
             self.stage_bytes(requests)? <= budget,
             "dSpark stage exceeds budget"
         );
-        let capacity = DsparkAttentionWave::projection_capacity(requests)?;
+        let capacity = DsparkAttentionWave::projection_capacity_with_width(requests, self.draft_width)?;
         let library = self.experts[0].buffers[0].library;
         Ok(DsparkStage {
             ffn: self.ffn(stage, capacity, self.ffn_bytes(capacity)?)?,
@@ -49,11 +50,12 @@ impl<'library> DsparkWeights<'library> {
             attention: self.attention_wave(
                 stage,
                 requests,
-                DsparkAttentionWave::device_bytes(library, requests)?,
+                DsparkAttentionWave::device_bytes_with_width(library, requests, self.draft_width)?,
             )?,
             library,
             graph: None,
             requests,
+            width: self.draft_width,
             ready: false,
         })
     }
@@ -103,7 +105,7 @@ impl DsparkStage<'_, '_> {
         requests: usize,
         stream: *mut c_void,
     ) -> Result<()> {
-        let rows = requests as u32 * 5;
+        let rows = requests as u32 * self.width as u32;
         unsafe {
             self.boundary
                 .enqueue_begin(rows as usize, Some(self.attention.input()), stream)?;
@@ -124,7 +126,7 @@ impl DsparkStage<'_, '_> {
         }
     }
     /// # Safety
-    /// Initialize finite residual [requests,5,4,5120] and incoming pre [requests,5,4];
+    /// Initialize finite residual [requests,K,4,5120] and incoming pre [requests,K,4];
     /// complete producer writes and serialize all raw buffer use through completion.
     /// Committed windows must contain accepted main-model tokens on this device.
     pub unsafe fn execute(
@@ -141,7 +143,7 @@ impl DsparkStage<'_, '_> {
             return Err(error);
         }
         unsafe {
-            self.ffn.complete_replay(requests.len() as u32 * 5)?;
+            self.ffn.complete_replay(requests.len() as u32 * self.width as u32)?;
         }
         self.ready = true;
         self.output()
@@ -198,7 +200,7 @@ impl DsparkStage<'_, '_> {
         let drained = self.ffn.synchronize();
         launched.and(drained)?;
         unsafe {
-            self.ffn.complete_replay(count as u32 * 5)?;
+            self.ffn.complete_replay(count as u32 * self.width as u32)?;
         }
         self.ready = true;
         self.output()

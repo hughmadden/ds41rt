@@ -83,6 +83,22 @@ impl<'a> Requests<'a> {
             image_requests: 0,
         })
     }
+    pub fn new_distributed(
+        library: &'a NativeLibrary,
+        pipeline: EngramPipeline,
+        slots: usize,
+        pages: [usize; 4],
+        map: crate::v41_backbone_cache::CachePlacement,
+        budgets: [usize; 2],
+    ) -> Result<Self> {
+        Ok(Self {
+            cache: BackboneCache::new_distributed(library, map, slots, pages, budgets)?,
+            prefix_histories: [None, None],
+            pipeline,
+            slots: (0..slots).map(|_| None).collect(),
+            image_requests: 0,
+        })
+    }
     pub fn cache(&self) -> &BackboneCache<'a> {
         &self.cache
     }
@@ -483,10 +499,40 @@ impl<'a> Requests<'a> {
         execution: &mut BackboneExecution<'_, '_>,
         accepted: &[u32],
     ) -> Result<()> {
+        self.commit_with(batch, accepted, |cache, batch, accepted| {
+            execution.commit(cache, batch, accepted)
+        })
+    }
+    pub fn commit_distributed(
+        &mut self,
+        batch: &mut RequestBatch,
+        execution: &mut crate::v41_backbone_execution::DistributedExecution<'_, '_>,
+        accepted: &[u32],
+    ) -> Result<()> {
+        self.commit_with(batch, accepted, |cache, batch, accepted| {
+            execution.finish_cache_commit(cache, batch, accepted)
+        })
+    }
+    pub fn abort_distributed_cache_commit(
+        &mut self,
+        execution: &mut crate::v41_backbone_execution::DistributedExecution<'_, '_>,
+    ) -> Result<()> {
+        execution.abort_cache_commit(&mut self.cache)
+    }
+    fn commit_with(
+        &mut self,
+        batch: &mut RequestBatch,
+        accepted: &[u32],
+        publish: impl FnOnce(
+            &mut BackboneCache<'a>,
+            &crate::v41_backbone_cache::CacheBatch,
+            &[u32],
+        ) -> Result<()>,
+    ) -> Result<()> {
         self.validate_acceptance(batch, accepted)?;
         let counts = accepted.iter().map(|&n| n as usize).collect::<Vec<_>>();
         let result = (|| -> Result<()> {
-            execution.commit(&mut self.cache, &batch.cache, accepted)?;
+            publish(&mut self.cache, &batch.cache, accepted)?;
             let mut histories = self
                 .slots
                 .iter_mut()

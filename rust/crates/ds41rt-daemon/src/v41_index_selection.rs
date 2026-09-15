@@ -7,7 +7,7 @@ use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{
     Ds41rtDeviceBuffer, NativeLibrary, V41CandidateBlocks, V41IndexScores, V41IndexTopK,
 };
-use std::{ffi::c_void, marker::PhantomData};
+use std::{cell::Cell, ffi::c_void, marker::PhantomData, rc::Rc};
 const WIDTH: usize = 16384;
 const BLOCKS: usize = WIDTH / 8;
 
@@ -63,7 +63,8 @@ impl IndexSelectionOutput<'_> {
 }
 pub(crate) struct IndexSelectionWave<'a> {
     stream: LoadStream<'a>,
-    buffers: Vec<DeviceAllocation<'a>>,
+    buffers: Vec<Rc<DeviceAllocation<'a>>>,
+    shared_scratch_busy: Option<Rc<Cell<bool>>>,
     staging: HostAllocation<'a>,
     capacity: usize,
     score: V41IndexScores<'a>,
@@ -118,8 +119,9 @@ impl<'a> IndexSelectionWave<'a> {
             },
             buffers: Self::sizes(capacity)?
                 .into_iter()
-                .map(|n| DeviceAllocation::new(library, n))
+                .map(|n| DeviceAllocation::new(library, n).map(Rc::new))
                 .collect::<Result<_>>()?,
+            shared_scratch_busy: None,
             staging: HostAllocation::new(library, capacity * 56)?,
             capacity,
             score: library.v41_index_scores()?,
@@ -130,6 +132,37 @@ impl<'a> IndexSelectionWave<'a> {
             pending: None,
             in_flight: false,
         })
+    }
+    /// Only selected IDs and source candidate blocks survive another stage.
+    pub fn shared_device_bytes(capacity: usize) -> Result<usize> {
+        let sizes = Self::sizes(capacity)?;
+        Ok(sizes[9] + sizes[12])
+    }
+    /// Create a follower in the same lane. Both owners retain independent
+    /// outputs/graphs; their temporary scores and top-k workspace are shared.
+    /// An outstanding queued selection excludes the other owner until polled
+    /// complete or explicitly drained. No cross-lane storage is involved.
+    pub fn sharing_scratch(source: &mut Self, budget: usize) -> Result<Self> {
+        ensure!(!source.in_flight && source.shared_scratch_busy.is_none(), "index scratch already shared or pending");
+        source.stream.require_complete()?;
+        let capacity = source.capacity;
+        ensure!(Self::shared_device_bytes(capacity)? <= budget, "shared index outputs exceed budget");
+        let library = source.stream.library;
+        ensure!(library.cuda_get_device()? == source.b(0).device_id, "shared index workspace device differs");
+        let sizes = Self::sizes(capacity)?;
+        let buffers = source.buffers.iter().enumerate().map(|(i, allocation)| {
+            if [9, 12].contains(&i) { DeviceAllocation::new(library, sizes[i]).map(Rc::new) }
+            else { Ok(allocation.clone()) }
+        }).collect::<Result<Vec<_>>>()?;
+        let busy = Rc::new(Cell::new(false));
+        let value = Self {
+            stream: LoadStream { library, raw: library.cuda_stream_create()? }, buffers,
+            shared_scratch_busy: Some(busy.clone()), staging: HostAllocation::new(library, capacity * 56)?,
+            capacity, score: library.v41_index_scores()?, top: library.v41_index_topk()?,
+            candidates: library.v41_candidate_blocks()?, graph: None, ready: None, pending: None, in_flight: false,
+        };
+        source.shared_scratch_busy = Some(busy);
+        Ok(value)
     }
     fn b(&self, i: usize) -> Ds41rtDeviceBuffer {
         self.buffers[i].buffer
@@ -277,7 +310,9 @@ impl<'a> IndexSelectionWave<'a> {
         let ready = unsafe { self.stream.library.cuda_stream_query(self.stream.raw) };
         match ready {
             Ok(false) => Ok(false),
-            Ok(true) => { self.ready = self.pending.take(); self.in_flight = false; Ok(true) }
+            Ok(true) => { self.ready = self.pending.take(); self.in_flight = false;
+                if let Some(busy) = &self.shared_scratch_busy { busy.set(false); }
+                Ok(true) }
             Err(error) => { self.abort_pending()?; Err(error) }
         }
     }
@@ -285,6 +320,7 @@ impl<'a> IndexSelectionWave<'a> {
         if self.in_flight {
             self.synchronize()?;
             self.in_flight = false; self.pending = None; self.ready = None;
+            if let Some(busy) = &self.shared_scratch_busy { busy.set(false); }
         }
         Ok(())
     }
@@ -292,6 +328,7 @@ impl<'a> IndexSelectionWave<'a> {
         requests: &[SelectionRequest<'_>], shared: Option<&IndexSelectionOutput<'_>>,
         defer: bool) -> Result<()> {
         ensure!(!self.in_flight, "index selection pending");
+        ensure!(!self.shared_scratch_busy.as_ref().is_some_and(|busy| busy.get()), "shared index scratch is pending");
         self.ready = None;
         ensure!(
             [2, 8, 14, 20, 24, 28, 32, 36].contains(&query.layer),
@@ -406,6 +443,7 @@ impl<'a> IndexSelectionWave<'a> {
         if self.graph.as_ref().map(|(_, f)| f) != Some(&fingerprint) { self.clear_graph()?; }
         if defer {
             self.in_flight = true;
+            if let Some(busy) = &self.shared_scratch_busy { busy.set(true); }
             let host = self.staging.buffer;
             unsafe {
                 self.stream.library.copy_host_buffer_h2d_async(self.b(0), host, rows * 48, self.stream.raw)?;

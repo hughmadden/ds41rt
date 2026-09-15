@@ -1,4 +1,6 @@
 //! Final target mHC collapse, RMS norm and the vocabulary shared with dSpark.
+pub(crate) mod distributed;
+pub(crate) mod distributed_target;
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_block::BlockOutput;
 use crate::v41_memory::{DeviceAllocation, HostAllocation, LoadStream};

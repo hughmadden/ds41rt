@@ -21,10 +21,17 @@ type Embed =
     unsafe extern "C" fn(*const u16, *const i32, *mut u16, *mut f32, i32, *mut c_void) -> i32;
 type TerminalLayout =
     unsafe extern "C" fn(*const u16, *const f32, *mut u16, *mut f32, i32, *mut c_void) -> i32;
+type EmbedWidth = unsafe extern "C" fn(
+    *const u16, *const i32, *mut u16, *mut f32, i32, i32, *mut c_void) -> i32;
+type TerminalLayoutWidth = unsafe extern "C" fn(
+    *const u16, *const f32, *mut u16, *mut f32, i32, i32, *mut c_void) -> i32;
 pub struct V41AttentionOps<'a> {
     _library: &'a NativeLibrary,
     norm: Norm,
     embed: Embed,
+    embed_width: Option<EmbedWidth>,
+    terminal_layout_width: Option<TerminalLayoutWidth>,
+    draft_width: usize,
     target_embed: Embed,
     terminal_layout: TerminalLayout,
     frequencies: Frequencies,
@@ -42,8 +49,20 @@ fn buffer(value: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
 }
 impl NativeLibrary {
     pub fn v41_attention_ops(&self) -> Result<V41AttentionOps<'_>> {
+        self.v41_attention_ops_width(5)
+    }
+    /// Draft width is fixed for this owner and all of its captured graphs.
+    pub fn v41_attention_ops_width(&self, width: usize) -> Result<V41AttentionOps<'_>> {
+        ensure!(matches!(width, 5 | 7), "draft width must be five or seven");
         Ok(V41AttentionOps {
             _library: self,
+            draft_width: width,
+            embed_width: if width == 5 { None } else {
+                Some(unsafe { *self.lib.get(b"ds41rt_v41_dspark_embed_width")? })
+            },
+            terminal_layout_width: if width == 5 { None } else {
+                Some(unsafe { *self.lib.get(b"ds41rt_v41_dspark_terminal_layout_width")? })
+            },
             terminal_layout: unsafe { *self.lib.get(b"ds41rt_v41_dspark_terminal_layout")? },
             embed: unsafe { *self.lib.get(b"ds41rt_v41_dspark_embed")? },
             target_embed: unsafe { *self.lib.get(b"ds41rt_v41_target_embed")? },
@@ -105,28 +124,34 @@ impl V41AttentionOps<'_> {
             "invalid terminal layout request count"
         );
         for b in [residual, output] {
-            buffer(b, requests as usize * 5 * 40960)?;
+            buffer(b, requests as usize * self.draft_width * 40960)?;
         }
         for b in [pre, output_pre] {
-            buffer(b, requests as usize * 5 * 16)?;
+            buffer(b, requests as usize * self.draft_width * 16)?;
         }
         let status = unsafe {
-            (self.terminal_layout)(
+            if let Some(launch) = self.terminal_layout_width {
+                launch(residual.ptr.cast(), pre.ptr.cast(), output.ptr.cast(), output_pre.ptr.cast(),
+                    requests as i32, self.draft_width as i32, stream)
+            } else { (self.terminal_layout)(
                 residual.ptr.cast(),
                 pre.ptr.cast(),
                 output.ptr.cast(),
                 output_pre.ptr.cast(),
                 requests as i32,
                 stream,
-            )
+            ) }
         };
         ensure!(status == 0, "native terminal layout CUDA status {status}");
         Ok(())
     }
 
     /// # Safety
-    /// Shared BF16 embedding weights and I32 seed IDs are initialized on the
-    /// stream device; all input/output storage is live and outputs are disjoint.
+    /// BF16 embedding rows are initialized and immutable for the launch. The
+    /// table may reside on a peer GPU whose access was enabled during planning;
+    /// its producer must complete before this stream reads it. I32 seed IDs and
+    /// outputs belong to the stream device. All storage stays live and outputs
+    /// are disjoint until completion, including captured graph replays.
     pub unsafe fn embed(
         &self,
         table: Ds41rtDeviceBuffer,
@@ -142,17 +167,22 @@ impl V41AttentionOps<'_> {
         );
         buffer(table, 129280 * 5120 * 2)?;
         buffer(tokens, requests as usize * 4)?;
-        buffer(residual, requests as usize * 5 * 40960)?;
-        buffer(pre, requests as usize * 5 * 16)?;
+        buffer(residual, requests as usize * self.draft_width * 40960)?;
+        buffer(pre, requests as usize * self.draft_width * 16)?;
+        ensure!(tokens.device_id == residual.device_id && pre.device_id == residual.device_id,
+            "draft embedding token/output devices differ");
         let status = unsafe {
-            (self.embed)(
+            if let Some(launch) = self.embed_width {
+                launch(table.ptr.cast(), tokens.ptr.cast(), residual.ptr.cast(), pre.ptr.cast(),
+                    requests as i32, self.draft_width as i32, stream)
+            } else { (self.embed)(
                 table.ptr.cast(),
                 tokens.ptr.cast(),
                 residual.ptr.cast(),
                 pre.ptr.cast(),
                 requests as i32,
                 stream,
-            )
+            ) }
         };
         ensure!(status == 0, "native embedding CUDA status {status}");
         Ok(())

@@ -109,7 +109,10 @@ __global__ __launch_bounds__(128*Groups,1) void attend(const __nv_bfloat16* quer
     m[2]<=1048576-m[0] && m[1]<=v.window_proposal_capacity &&
     m[2]<=v.window_proposal_capacity-m[1] && m[3]>=m[0] && m[3]-m[0]<m[2] &&
     uint64_t(width)>=(m[3]+1<128?m[3]+1:128);
-  if(valid && v.compressed)valid=m[4]==0 && m[6]==*v.source_end && m[6]<=1048576 &&
+  // A committed-only causal prefix remains valid when another encoder chunk
+  // appends rows. Private overlays still require their exact committed boundary.
+  if(valid && v.compressed)valid=m[4]==0 &&
+    (m[7]==0?m[6]<=*v.source_end:m[6]==*v.source_end) && m[6]<=1048576 &&
     m[7]<=1048576-m[6] && m[5]<=m[6]+m[7] && (m[9]==1 || m[9]==2) &&
     m[8]<=v.source_proposal_capacity && (!m[7] || (m[8]<v.source_proposal_capacity &&
       m[7]-1<=(v.source_proposal_capacity-1-m[8])/m[9]));
@@ -443,7 +446,7 @@ extern "C" int32_t ds41rt_v41_sparse_attention_batch_validate(
     const int32_t* selected,uint16_t* output,int32_t rows,
     const ds41rt_v41_sparse_kv_t* host_views,const ds41rt_v41_sparse_kv_t* device_views,
     const uint64_t* begins,float* partial,uint64_t scratch_bytes,int32_t parts,int32_t compressed) {
-  if(rows<1 || rows>48 || !host_views || !begins || !partial || compressed<0 || compressed>2 ||
+  if(rows<1 || rows>64 || !host_views || !begins || !partial || compressed<0 || compressed>2 ||
       parts!=(compressed?10:2))return cudaErrorInvalidValue;
   const uint64_t descriptor_bytes=uint64_t(rows)*sizeof(*device_views);
   if(!span(device_views,descriptor_bytes,8))return cudaErrorInvalidValue;
@@ -491,7 +494,7 @@ extern "C" int32_t ds41rt_v41_sparse_attention_batch(
     const ds41rt_v41_sparse_kv_t* device_views,void* stream,const uint64_t* begins,
     float* partial,int32_t parts,int32_t compressed) {
   // Contents were host-validated before upload/replay; never download metadata.
-  if(rows<1 || rows>48 || compressed<0 || compressed>2 || parts!=(compressed?10:2) ||
+  if(rows<1 || rows>64 || compressed<0 || compressed>2 || parts!=(compressed?10:2) ||
       !device_views || !begins || !partial)return cudaErrorInvalidValue;
   return compressed==2?dispatch_batch<true>(query,sink,metadata,selected,output,rows,device_views,stream,begins,partial,parts):
       dispatch_batch<false>(query,sink,metadata,selected,output,rows,device_views,stream,begins,partial,parts);

@@ -60,13 +60,14 @@ extern "C" int32_t ds41rt_v41_dspark_confidence(const uint16_t* hidden,
 #include <cublas_v2.h>
 #include <new>
 namespace {
-struct MarkovHandle { cublasHandle_t blas; int device; void* workspace; int width; int max_rows; };
+struct MarkovHandle { cublasHandle_t blas; int device; void* workspace; int width; int max_rows; int vocab_rows; };
 constexpr uint64_t kMarkovWorkspace = 4 * 1024 * 1024;
 int32_t blas_status(cublasStatus_t status) { return status == CUBLAS_STATUS_SUCCESS ? 0 : -int32_t(status); }
 }
-static int32_t create_head(void* workspace, uint64_t bytes, void** output, int width, int max_rows) {
+static int32_t create_head(void* workspace, uint64_t bytes, void** output, int width, int max_rows, int vocab_rows = 129280) {
   if (!output) return cudaErrorInvalidValue;
   *output = nullptr;
+  if (vocab_rows < 1 || vocab_rows > 129280) return cudaErrorInvalidValue;
   if (bytes < kMarkovWorkspace || !span(workspace, kMarkovWorkspace, 256)) return cudaErrorInvalidValue;
   auto* handle = new (std::nothrow) MarkovHandle{};
   if (!handle) return cudaErrorMemoryAllocation;
@@ -77,6 +78,7 @@ static int32_t create_head(void* workspace, uint64_t bytes, void** output, int w
   handle->workspace = workspace;
   handle->width = width;
   handle->max_rows = max_rows;
+  handle->vocab_rows = vocab_rows;
   *output = handle;
   return 0;
 }
@@ -84,7 +86,11 @@ extern "C" int32_t ds41rt_v41_markov_create(void* workspace, uint64_t bytes, voi
   return create_head(workspace, bytes, output, 256, 16);
 }
 extern "C" int32_t ds41rt_v41_vocabulary_head_create(void* workspace, uint64_t bytes, void** output) {
-  return create_head(workspace, bytes, output, 5120, 80);
+  return create_head(workspace, bytes, output, 5120, 128);
+}
+extern "C" int32_t ds41rt_v41_vocabulary_shard_create(void* workspace, uint64_t bytes,
+    int32_t vocab_rows, void** output) {
+  return create_head(workspace, bytes, output, 5120, 128, vocab_rows);
 }
 extern "C" int32_t ds41rt_v41_markov_destroy(void* opaque) {
   if (!opaque) return cudaErrorInvalidValue;
@@ -102,8 +108,8 @@ static int32_t launch_head(void* opaque, const uint16_t* embedding,
   auto status = cudaGetDevice(&device);
   if (status != cudaSuccess) return status;
   if (device != handle->device) return cudaErrorInvalidDevice;
-  const uint64_t e = uint64_t(rows) * width * 2, w = uint64_t(129280) * width * 2;
-  const uint64_t o = uint64_t(rows) * 129280 * 4;
+  const uint64_t e = uint64_t(rows) * width * 2, w = uint64_t(handle->vocab_rows) * width * 2;
+  const uint64_t o = uint64_t(rows) * handle->vocab_rows * 4;
   if (!span(embedding, e, 2) || !span(weight, w, 2) || !span(logits, o, 4) ||
       !disjoint(logits, o, embedding, e) || !disjoint(logits, o, weight, w) ||
       !disjoint(handle->workspace, kMarkovWorkspace, embedding, e) ||
@@ -121,8 +127,8 @@ static int32_t launch_head(void* opaque, const uint16_t* embedding,
   const auto compute = width == 5120 ? CUBLAS_COMPUTE_32F_PEDANTIC : CUBLAS_COMPUTE_32F;
   const auto algorithm = width == 5120 ? CUBLAS_GEMM_DEFAULT : CUBLAS_GEMM_DEFAULT_TENSOR_OP;
   return blas_status(cublasGemmEx(handle->blas, CUBLAS_OP_T, CUBLAS_OP_N,
-      129280, rows, width, &alpha, weight, CUDA_R_16BF, width,
-      embedding, CUDA_R_16BF, width, &beta, logits, CUDA_R_32F, 129280,
+      handle->vocab_rows, rows, width, &alpha, weight, CUDA_R_16BF, width,
+      embedding, CUDA_R_16BF, width, &beta, logits, CUDA_R_32F, handle->vocab_rows,
       compute, algorithm));
 }
 
@@ -133,6 +139,40 @@ extern "C" int32_t ds41rt_v41_markov_launch(void* handle, const uint16_t* input,
 extern "C" int32_t ds41rt_v41_vocabulary_head_launch(void* handle, const uint16_t* input,
     const uint16_t* weight, float* output, int32_t rows, void* stream) {
   return launch_head(handle, input, weight, output, rows, stream, 5120);
+}
+
+namespace {
+__global__ void vocabulary_merge_greedy(const uint32_t* ids0, const float* scores0,
+    const uint32_t* ids1, const float* scores1, uint32_t* ids, float* scores,
+    int rows, uint32_t split) {
+  const int row = threadIdx.x;
+  if (row >= rows) return;
+  const auto a = ids0[row], b = ids1[row];
+  const float x = scores0[row], y = scores1[row];
+  if (a >= split || b >= 129280u - split || !isfinite(x) || !isfinite(y)) {
+    ids[row] = UINT32_MAX;
+    scores[row] = CUDART_NAN_F;
+  } else {
+    const bool first = x >= y;
+    ids[row] = first ? a : split + b;
+    scores[row] = first ? x : y;
+  }
+}
+}
+extern "C" int32_t ds41rt_v41_vocabulary_merge_greedy(const uint32_t* ids0,
+    const float* scores0, const uint32_t* ids1, const float* scores1,
+    uint32_t* ids, float* scores, int32_t rows, int32_t split, void* stream) {
+  if (rows < 1 || rows > 128 || split < 1 || split >= 129280) return cudaErrorInvalidValue;
+  const uint64_t bytes = uint64_t(rows) * 4;
+  const void* buffers[] = {ids0, scores0, ids1, scores1, ids, scores};
+  for (int i = 0; i < 6; ++i) {
+    if (!span(buffers[i], bytes, 4)) return cudaErrorInvalidValue;
+    if (i >= 4) for (int j = 0; j < i; ++j)
+      if (!disjoint(buffers[i], bytes, buffers[j], bytes)) return cudaErrorInvalidValue;
+  }
+  vocabulary_merge_greedy<<<1, 128, 0, reinterpret_cast<cudaStream_t>(stream)>>>(
+      ids0, scores0, ids1, scores1, ids, scores, rows, uint32_t(split));
+  return cudaGetLastError();
 }
 
 namespace {
@@ -220,7 +260,7 @@ __global__ void draft_step_finish(const float* shared, const float* bias,
 extern "C" int32_t ds41rt_v41_draft_step_rng(const float* shared, const float* bias,
     const uint64_t* rng, const float* temperatures, float* adjusted, uint32_t* tokens,
     int32_t rows, int32_t position, void* stream) {
-  if (rows < 1 || rows > 16 || position < 0 || position > 4) return cudaErrorInvalidValue;
+  if (rows < 1 || rows > 16 || position < 0 || position > 6) return cudaErrorInvalidValue;
   const uint64_t logits = uint64_t(rows) * 129280 * 4, small = uint64_t(rows) * 4;
   const void* pointers[] = {shared, bias, rng, temperatures, adjusted, tokens};
   const uint64_t bytes[] = {logits, logits, small*4, small, logits, small};

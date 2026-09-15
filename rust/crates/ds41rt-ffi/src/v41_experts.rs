@@ -1,5 +1,5 @@
 //! Native V4.1 expert AOT launch handles; weight/scratch ownership stays with the caller.
-use crate::NativeLibrary;
+use crate::{Ds41rtDeviceBuffer, NativeLibrary};
 use anyhow::{ensure, Context, Result};
 use std::ffi::c_void;
 use std::ptr::NonNull;
@@ -359,20 +359,25 @@ impl NativeLibrary {
     }
 
     pub fn v41_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
-        self.expert_info_for(capacity, false)
+        self.expert_info_for(capacity, 0)
     }
 
     pub fn v41_local_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
-        self.expert_info_for(capacity, true)
+        self.expert_info_for(capacity, 2)
     }
 
-    fn expert_info_for(&self, capacity: u32, local: bool) -> Result<V41ExpertInfo> {
-        let function = unsafe { self.lib.get::<InfoFn>(if local {
-            b"ds41rt_v41_local_expert_info" as &[u8]
-        } else { b"ds41rt_v41_expert_info" }) }
-            .context(if local {
-                "native library must be built with DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT=ON"
-            } else { "native library must be built with DS41RT_ENABLE_V41_EXPERT_AOT=ON" })?;
+    pub fn v41_tp2_expert_info(&self, capacity: u32) -> Result<V41ExpertInfo> {
+        self.expert_info_for(capacity, 3)
+    }
+
+    fn expert_info_for(&self, capacity: u32, interface: u8) -> Result<V41ExpertInfo> {
+        let name: &[u8] = match interface {
+            2 => b"ds41rt_v41_local_expert_info",
+            3 => b"ds41rt_v41_tp2_expert_info",
+            _ => b"ds41rt_v41_expert_info",
+        };
+        let function = unsafe { self.lib.get::<InfoFn>(name) }
+            .with_context(|| format!("native library lacks expert interface {interface}; enable its AOT build"))?;
         let mut info = V41ExpertInfo::default();
         let status = unsafe { function(i32::try_from(capacity)?, &mut info) };
         ensure!(
@@ -384,13 +389,14 @@ impl NativeLibrary {
             "unsupported V4.1 native expert ABI"
         );
         ensure!(
-            info.input_dtype == 1 || (matches!(info.role, 1 | 2) && info.input_dtype == 7),
+            info.input_dtype == 1 || (matches!(info.role, 1 | 2 | 3) && info.input_dtype == 7),
             "unsupported native expert input representation"
         );
         let expected = match info.role {
             0 => (128, 2304, 2304, 3),
             1 => (384, 576, 640, 6),
             2 => (384, 2304, 2304, 6),
+            3 => (384, 1152, 1152, 6),
             _ => anyhow::bail!("unknown V4.1 expert role {}", info.role),
         };
         ensure!(
@@ -406,36 +412,42 @@ impl NativeLibrary {
             info.capacity_rows == capacity && info.scratch_bytes > 0,
             "native expert capacity does not match requested variant"
         );
-        ensure!(!local || info.role == 2, "local expert entry has incompatible role");
+        ensure!(if interface == 0 { info.role <= 1 } else { info.role == u32::from(interface) },
+            "expert entry has incompatible role");
         Ok(info)
     }
 
     /// Load the chosen variant on the current CUDA device before graph capture.
     pub fn v41_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
-        self.expert_kernel_for(capacity, false)
+        self.expert_kernel_for(capacity, 0)
     }
 
     pub fn v41_local_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
-        self.expert_kernel_for(capacity, true)
+        self.expert_kernel_for(capacity, 2)
     }
 
-    fn expert_kernel_for(&self, capacity: u32, local: bool) -> Result<V41ExpertKernel<'_>> {
-        let info = self.expert_info_for(capacity, local)?;
-        let symbol = |ordinary: &'static [u8], full: &'static [u8]| if local { full } else { ordinary };
+    pub fn v41_tp2_expert_kernel(&self, capacity: u32) -> Result<V41ExpertKernel<'_>> {
+        self.expert_kernel_for(capacity, 3)
+    }
+
+    fn expert_kernel_for(&self, capacity: u32, interface: u8) -> Result<V41ExpertKernel<'_>> {
+        let info = self.expert_info_for(capacity, interface)?;
+        let symbol = |ordinary: &'static [u8], full: &'static [u8], tp2: &'static [u8]|
+            match interface { 2 => full, 3 => tp2, _ => ordinary };
         let initialize = unsafe {
             self.lib
-                .get::<InitializeFn>(symbol(b"ds41rt_v41_expert_initialize", b"ds41rt_v41_local_expert_initialize"))?
+                .get::<InitializeFn>(symbol(b"ds41rt_v41_expert_initialize", b"ds41rt_v41_local_expert_initialize", b"ds41rt_v41_tp2_expert_initialize"))?
         };
-        let launch = unsafe { *self.lib.get::<LaunchFn>(symbol(b"ds41rt_v41_expert_launch", b"ds41rt_v41_local_expert_launch"))? };
+        let launch = unsafe { *self.lib.get::<LaunchFn>(symbol(b"ds41rt_v41_expert_launch", b"ds41rt_v41_local_expert_launch", b"ds41rt_v41_tp2_expert_launch"))? };
         let bind_scratch = unsafe {
             *self
                 .lib
-                .get::<BindScratchFn>(symbol(b"ds41rt_v41_expert_bind_scratch", b"ds41rt_v41_local_expert_bind_scratch"))?
+                .get::<BindScratchFn>(symbol(b"ds41rt_v41_expert_bind_scratch", b"ds41rt_v41_local_expert_bind_scratch", b"ds41rt_v41_tp2_expert_bind_scratch"))?
         };
         let initialize_scratch = unsafe {
             *self
                 .lib
-                .get::<InitScratchFn>(symbol(b"ds41rt_v41_expert_initialize_scratch_async", b"ds41rt_v41_local_expert_initialize_scratch_async"))?
+                .get::<InitScratchFn>(symbol(b"ds41rt_v41_expert_initialize_scratch_async", b"ds41rt_v41_local_expert_initialize_scratch_async", b"ds41rt_v41_tp2_expert_initialize_scratch_async"))?
         };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { initialize(i32::try_from(capacity)?, &mut handle) };
@@ -445,10 +457,10 @@ impl NativeLibrary {
         );
         let token_accumulation = if info.abi_version == 3 {
             type OutputKindFn = unsafe extern "C" fn(i32, *mut u32) -> i32;
-            let query = unsafe { self.lib.get::<OutputKindFn>(symbol(b"ds41rt_v41_expert_output_kind", b"ds41rt_v41_local_expert_output_kind"))? };
+            let query = unsafe { self.lib.get::<OutputKindFn>(symbol(b"ds41rt_v41_expert_output_kind", b"ds41rt_v41_local_expert_output_kind", b"ds41rt_v41_tp2_expert_output_kind"))? };
             let mut kind = u32::MAX;
             let status = unsafe { query(i32::try_from(capacity)?, &mut kind) };
-            ensure!(status == 0 && kind == 1 && matches!(info.role, 1 | 2), "unsupported V4.1 ABI 3 output layout");
+            ensure!(status == 0 && kind == 1 && matches!(info.role, 1 | 2 | 3), "unsupported V4.1 ABI 3 output layout");
             // Reject incomplete libraries at plan time, before any graph or request.
             unsafe { self.lib.get::<CompactFn>(b"ds41rt_v41_compact_tokens_bf16_async")?; }
             true
@@ -649,6 +661,37 @@ impl V41ExpertInputQuantizer<'_> {
 
 
 type FinishLocalFn = unsafe extern "C" fn(*const f32, *const u16, *mut u16, u32, u32, *mut c_void) -> i32;
+type ReduceTp2Fn = unsafe extern "C" fn(*const f32, *const f32, *mut u16, u32, u32, *mut c_void) -> i32;
+pub struct V41Tp2ExpertReducer<'a> {
+    _library: &'a NativeLibrary,
+    reduce: ReduceTp2Fn,
+}
+impl NativeLibrary {
+    pub fn v41_tp2_expert_reducer(&self) -> Result<V41Tp2ExpertReducer<'_>> {
+        Ok(V41Tp2ExpertReducer { _library: self,
+            reduce: unsafe { *self.lib.get::<ReduceTp2Fn>(b"ds41rt_v41_reduce_tp2_experts_async")? } })
+    }
+}
+impl V41Tp2ExpertReducer<'_> {
+    /// # Safety
+    /// Both FP32 rank buffers and the BF16 destination must remain live on the
+    /// current device through stream completion. Producers (including peer copy)
+    /// must be ordered before this launch. No conflicting aliases are permitted.
+    pub unsafe fn reduce(&self, rank0: Ds41rtDeviceBuffer, rank1: Ds41rtDeviceBuffer,
+        output: Ds41rtDeviceBuffer, rows: u32, token_sums: bool, stream: *mut c_void) -> Result<()> {
+        ensure!((1..=4096).contains(&rows), "invalid TP2 reduction rows");
+        let count = rows as usize * 5120;
+        let bytes = count * if token_sums { 4 } else { 24 };
+        ensure!(rank0.device_id == output.device_id && rank1.device_id == output.device_id
+            && rank0.bytes >= bytes && rank1.bytes >= bytes && output.bytes >= count * 2,
+            "TP2 reduction buffers have incompatible device or extent");
+        let status = unsafe { (self.reduce)(rank0.ptr.cast(), rank1.ptr.cast(), output.ptr.cast(),
+            rows, u32::from(token_sums), stream) };
+        ensure!(status == 0, "TP2 expert reduction failed with CUDA status {status}");
+        Ok(())
+    }
+}
+
 pub struct V41LocalExpertReducer<'a> {
     _library: &'a NativeLibrary,
     finish: FinishLocalFn,

@@ -11,7 +11,10 @@ use crate::v41_experts::coordinator::{NativeFfnOutput, NativeTp4Wave};
 use crate::v41_index_selection::IndexSelectionOutput;
 use crate::v41_sparse_attention::{AttentionRequest, SparseAttentionWave};
 use crate::v41_target_embedding::TargetEmbedding;
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
+use crate::v41_backbone_cache::CachePlacement;
+use crate::v41_memory::device::{Device, DeviceOwner};
+mod placement;
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 use ds41rt_loader::OfficialV41Catalog;
 
@@ -19,7 +22,7 @@ struct LayerWeights<'a> {
     hc: BackboneHcWeights<'a>,
     query: AttentionQueryWeights<'a>,
     projection: AttentionOutputWeights<'a>,
-    shared: BackboneSharedWeights<'a>,
+    shared: Option<BackboneSharedWeights<'a>>,
     router: BackboneRouterWeights<'a>,
 }
 
@@ -27,7 +30,8 @@ struct LayerWeights<'a> {
 /// excludes window/compressor/index weights, engram, vision and dSpark.
 pub(crate) struct BackboneLaneWeights<'a> {
     library: &'a NativeLibrary,
-    layers: Vec<LayerWeights<'a>>,
+    layers: Vec<DeviceOwner<'a, LayerWeights<'a>>>,
+    placement: Option<CachePlacement>,
 }
 impl<'a> BackboneLaneWeights<'a> {
     fn layer_bytes(
@@ -64,21 +68,7 @@ impl<'a> BackboneLaneWeights<'a> {
             Self::device_bytes(library, catalog)? <= budget,
             "backbone lane weights exceed budget"
         );
-        let mut layers = Vec::with_capacity(40);
-        for layer in 0..40 {
-            let [hc, query, projection, shared, router] =
-                Self::layer_bytes(library, catalog, layer)?;
-            layers.push(LayerWeights {
-                hc: BackboneHcWeights::load(library, catalog, layer, hc, staging)?,
-                query: AttentionQueryWeights::load(library, catalog, layer, query, staging)?,
-                projection: AttentionOutputWeights::load(
-                    library, catalog, layer, projection, staging,
-                )?,
-                shared: BackboneSharedWeights::load(library, catalog, layer, shared, staging)?,
-                router: BackboneRouterWeights::load(library, catalog, layer, router, staging)?,
-            });
-        }
-        Ok(Self { library, layers })
+        Self::load_placed(library, catalog, staging, None)
     }
 }
 
@@ -163,7 +153,7 @@ impl Drop for PendingLaneFfn<'_, '_, '_> {
 pub(crate) struct LaneFfn<'s, 'w, 'a> {
     pub input: FfnInput<'s>,
     cooperative: bool,
-    shared: &'s mut BackboneSharedWave<'w, 'a>,
+    shared: &'s mut Option<BackboneSharedWave<'w, 'a>>,
     router: &'s mut BackboneRouterWave<'w, 'a>,
     library: &'a NativeLibrary,
     phase: &'s mut Phase,
@@ -198,17 +188,18 @@ impl LaneFfn<'_, '_, '_> {
                 assert_eq!(ids.iter().flatten().flat_map(|v| v.to_ne_bytes()).collect::<Vec<_>>(), reference[0]);
             }
         }
-        let shared = unsafe { self.shared.execute_ffn(&self.input)? };
+        let shared_wave = self.shared.as_mut().context("local shared workspace absent")?;
+        let shared = unsafe { shared_wave.execute_ffn(&self.input)? };
         let reference = read(&[shared.values])?;
-        self.shared.clear_graph()?;
-        cancelled += cancel_once(unsafe { self.shared.execute_ffn_cooperative(&self.input) }).await as usize;
+        shared_wave.clear_graph()?;
+        cancelled += cancel_once(unsafe { shared_wave.execute_ffn_cooperative(&self.input) }).await as usize;
         for _ in 0..2 {
-            let shared = unsafe { self.shared.execute_ffn_cooperative(&self.input).await? };
+            let shared = unsafe { shared_wave.execute_ffn_cooperative(&self.input).await? };
             assert_eq!(read(&[shared.values])?, reference);
         }
         if let Some(local) = local.as_deref_mut() {
             let routed = self.router.output()?;
-            let shared = self.shared.output()?;
+            let shared = shared_wave.output()?;
             let reference = read(&[unsafe { local.execute(&routed, &shared)? }])?;
             cancelled += cancel_once(unsafe { local.execute_cooperative(&routed, &shared) }).await as usize;
             for _ in 0..2 {
@@ -250,10 +241,15 @@ impl LaneFfn<'_, '_, '_> {
                     unsafe { routed.capture_route_ids(library, output)?; }
                 }
                 let routed_us = timing.elapsed().as_micros() as u64;
-                let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
-                    else { shared.execute_ffn(input)? } };
-                let result = unsafe { if cooperative { transport.execute_local_ffn_cooperative(&routed, &contribution).await }
-                    else { transport.execute_local_ffn(&routed, &contribution) } };
+                let result = if transport.has_tp2_layer(input.layer) {
+                    unsafe { transport.execute_tp2_ffn(input, &routed).await }
+                } else {
+                    let shared = shared.as_mut().context("local shared workspace absent; TP2 required")?;
+                    let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
+                        else { shared.execute_ffn(input)? } };
+                    unsafe { if cooperative { transport.execute_local_ffn_cooperative(&routed, &contribution).await }
+                        else { transport.execute_local_ffn(&routed, &contribution) } }
+                };
                 let ffn_us = timing.elapsed().as_micros() as u64;
                 tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
                     total_us=ffn_us, "target local experts");
@@ -268,6 +264,8 @@ impl LaneFfn<'_, '_, '_> {
                 }
                 return result;
             }
+            let tp2_shared = transport.has_tp2_shared_layer(input.layer);
+            ensure!(shared.is_some() || tp2_shared, "decoder shared TP2 execution required");
             let request = unsafe { routed.expert_request(library, placement, rows)? };
             if let Some(capture) = route_capture.as_deref_mut() {
                 let output = &mut capture[input.layer];
@@ -278,6 +276,14 @@ impl LaneFfn<'_, '_, '_> {
             let routed_us = timing.elapsed().as_micros() as u64;
             let pending = transport.dispatch_ffn(&request).await?;
             let dispatched_us = timing.elapsed().as_micros() as u64;
+            if tp2_shared {
+                let result = unsafe { pending.finish_tp2(input).await };
+                tracing::debug!(target: "ds41rt::timing", layer=input.layer, rows=rows.len(), routed_us,
+                    dispatch_us=dispatched_us-routed_us, shared_and_collect_us=timing.elapsed().as_micros() as u64-dispatched_us,
+                    "target experts with TP2 shared");
+                return result;
+            }
+            let shared = shared.as_mut().context("decoder shared TP2 execution required")?;
             let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
                     else { shared.execute_ffn(input)? } };
             let shared_us = timing.elapsed().as_micros() as u64;
@@ -306,7 +312,7 @@ impl LaneFfn<'_, '_, '_> {
     pub unsafe fn execute_shared(&mut self) -> Result<SharedOutput<'_>> {
         let prior = std::mem::replace(self.phase, Phase::Invalid);
         ensure!(prior == Phase::Ffn, "lane shared FFN is not pending");
-        let output = unsafe { self.shared.execute_ffn(&self.input)? };
+        let output = unsafe { self.shared.as_mut().context("local shared workspace absent")?.execute_ffn(&self.input)? };
         *self.phase = Phase::SharedReady;
         Ok(output)
     }
@@ -332,7 +338,7 @@ pub(crate) struct BackboneLane<'w, 'a> {
     block: BackboneBlockWave<'w, 'a>,
     query: AttentionQueryWave<'w, 'a>,
     projection: AttentionOutputWave<'w, 'a>,
-    shared: BackboneSharedWave<'w, 'a>,
+    shared: Option<BackboneSharedWave<'w, 'a>>,
     router: BackboneRouterWave<'w, 'a>,
     layer: usize,
     phase: Phase,
@@ -357,7 +363,12 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     /// One lane owns one allocation of each workspace group. Independent lanes
     /// borrow the same immutable weights and allocate distinct mutable storage.
     pub fn new(weights: &'w BackboneLaneWeights<'a>, capacity: u32, budget: usize) -> Result<Self> {
-        let sizes = Self::workspace_bytes(weights.library, capacity)?;
+        ensure!(weights.placement.is_none(), "placed backbone weights require GPU-owned lanes");
+        Self::new_inner(weights, capacity, budget, 0)
+    }
+    fn new_inner(weights: &'w BackboneLaneWeights<'a>, capacity: u32, budget: usize, first_layer: usize) -> Result<Self> {
+        let mut sizes = Self::workspace_bytes(weights.library, capacity)?;
+        if weights.placement.is_some() { sizes[3] = 0; }
         let total = sizes.into_iter().try_fold(0usize, |n, b| {
             n.checked_add(b)
                 .ok_or_else(|| anyhow::anyhow!("backbone lane budget overflow"))
@@ -367,16 +378,16 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             weights.layers.len() == 40,
             "backbone lane requires all 40 layers"
         );
-        let first = &weights.layers[0];
+        let first = &weights.layers[first_layer];
         Ok(Self {
             weights,
             block: first.hc.block(capacity as usize, sizes[0])?,
             query: first.query.wave(capacity, sizes[1])?,
             projection: first.projection.wave(capacity, sizes[2])?,
-            shared: first.shared.wave(capacity, sizes[3])?,
+            shared: first.shared.as_ref().map(|w| w.wave(capacity,sizes[3])).transpose()?,
             sparse: SparseAttentionWave::new(weights.library, capacity as usize, sizes[4])?,
             router: first.router.wave(capacity, sizes[5])?,
-            layer: 0,
+            layer: first_layer,
             phase: Phase::Idle,
             capture_routes: false,
             route_capture: Vec::new(),
@@ -392,13 +403,19 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     }
     /// Cancel or start another wave. External consumers must have finished;
     /// borrowed outputs prevent safe callers from restarting during consumption.
+    pub fn invalidate(&mut self) {
+        self.phase = Phase::Invalid;
+        self.block.reset();
+    }
+    /// Start a new sequence on the GPU owning layer zero after consumers drain.
     pub fn restart(&mut self) -> Result<()> {
         self.phase = Phase::Invalid;
         self.block.reset();
+        ensure!(self.weights.layers[0].device.id == self.block.inputs()[0].device_id, "layer zero belongs to another GPU");
         let first = &self.weights.layers[0];
         self.query.rebind(&first.query)?;
         self.projection.rebind(&first.projection)?;
-        self.shared.rebind(&first.shared)?;
+        if let Some(shared) = &mut self.shared { shared.rebind(first.shared.as_ref().context("local shared weights absent")?)?; }
         self.router.rebind(&first.router)?;
         self.block.restart(&first.hc)?;
         self.layer = 0;
@@ -408,10 +425,11 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     pub fn restart_decoder(&mut self, encoder: &BlockOutput<'_>) -> Result<()> {
         self.phase = Phase::Invalid;
         self.block.reset();
+        ensure!(self.weights.layers[20].device.id == self.block.inputs()[0].device_id, "decoder belongs to another GPU");
         let decoder = &self.weights.layers[20];
         self.query.rebind(&decoder.query)?;
         self.projection.rebind(&decoder.projection)?;
-        self.shared.rebind(&decoder.shared)?;
+        if let Some(shared) = &mut self.shared { shared.rebind(decoder.shared.as_ref().context("local shared weights absent")?)?; }
         self.router.rebind(&decoder.router)?;
         self.block.initialize_decoder(&decoder.hc, encoder)?;
         self.layer = 20;
@@ -553,6 +571,20 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         index: &crate::v41_index_lane::IndexLane<'_, '_>) -> Result<PendingLaneFfn<'_, 'w, 'a>> {
         self.enter(Phase::Query)?;
         let selection = if self.layer >= 2 { Some(index.output(self.layer, cache)?) } else { None };
+        unsafe { self.enqueue_attention_with_selection(sink,cache,selection.as_ref()) }
+    }
+    /// # Safety
+    /// Retain all cache/query/selection storage until the returned consumer completes or drains.
+    pub unsafe fn enqueue_attention_cached_ffn(&mut self,sink:Ds41rtDeviceBuffer,
+        cache:&crate::v41_backbone_cache::CacheAttention<'_>,selection:Option<&IndexSelectionOutput<'_>>)
+        ->Result<PendingLaneFfn<'_,'w,'a>> {
+        self.enter(Phase::Query)?;
+        unsafe { self.enqueue_attention_with_selection(sink,cache,selection) }
+    }
+    unsafe fn enqueue_attention_with_selection(&mut self,sink:Ds41rtDeviceBuffer,
+        cache:&crate::v41_backbone_cache::CacheAttention<'_>,selection:Option<&IndexSelectionOutput<'_>>)
+        ->Result<PendingLaneFfn<'_,'w,'a>> {
+        ensure!(selection.is_some() == (self.layer >= 2), "attention index selection presence differs");
         let requests = cache.attention_requests();
         let query = self.query.output()?;
         let binding = query.binding()?;
@@ -564,7 +596,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         let query = lane.query.output()?;
         let mut tail = AttentionTail { projection: &mut lane.projection, block: &mut lane.block,
             binding, tokens: query.tokens()? };
-        if unsafe { lane.sparse.enqueue_query_prepared(&query, sink, &requests, selection.as_ref(), true, Some(&mut tail))? }.is_some() {
+        if unsafe { lane.sparse.enqueue_query_prepared(&query, sink, &requests, selection, true, Some(&mut tail))? }.is_some() {
             pending.values = Some(lane.block.graph_normalized_storage(query.rows));
         }
         Ok(pending)
@@ -627,7 +659,10 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     pub async unsafe fn finish_ffn_cooperative(&mut self, binding: QueryBinding,
         result: Ds41rtDeviceBuffer) -> Result<BlockOutput<'_>> {
         self.enter(Phase::SharedReady)?;
-        let output = unsafe { self.block.finish_ffn_cooperative(binding, result).await? };
+        let handoff=self.weights.placement.is_some() && self.layer<39
+            && self.weights.layers[self.layer+1].device.id != self.block.inputs()[0].device_id;
+        let output = unsafe { if handoff { self.block.finish_ffn_for_handoff_cooperative(binding,result).await? }
+            else { self.block.finish_ffn_cooperative(binding, result).await? } };
         self.phase = Phase::Complete;
         Ok(output)
     }
@@ -644,19 +679,33 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         );
         self.block.output()
     }
+    #[cfg(test)]
+    pub fn trace_stream(&self) -> *mut std::ffi::c_void { self.block.trace_stream() }
     pub fn set_route_capture(&mut self, enabled: bool) {
         self.capture_routes = enabled;
         if enabled {
             self.query.enable_small_graph_shapes();
             self.sparse.enable_small_graph_shapes();
             self.projection.enable_small_graph_shapes();
-            self.shared.enable_small_graph_shapes();
+            if let Some(shared) = &mut self.shared { shared.enable_small_graph_shapes(); }
             self.router.enable_small_graph_shapes();
             self.route_capture.resize_with(40, Vec::new);
             for rows in &mut self.route_capture { rows.clear(); }
         }
     }
     pub fn captured_routes(&self) -> &[Vec<[u32; 6]>] { &self.route_capture }
+    pub fn reserve_sparse_decode_rows(&mut self, rows: usize) -> Result<()> {
+        self.sparse.reserve_decode_rows(rows)
+    }
+    /// Reserve adaptive route history during planning, before lane execution.
+    pub fn reserve_route_capture(&mut self, layers: std::ops::Range<usize>, rows: usize) -> Result<()> {
+        ensure!(layers.end <= 40 && rows <= 4096, "route history reservation exceeds model bounds");
+        self.route_capture.resize_with(40, Vec::new);
+        for layer in layers {
+            self.route_capture[layer].reserve(rows);
+        }
+        Ok(())
+    }
     /// Opt-in diagnostic at a completed layer boundary; never used by normal serving.
     pub fn trace_output(&self, directory: &std::path::Path) -> Result<()> {
         use std::io::Write;
@@ -674,9 +723,10 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.enter(Phase::Complete)?;
         ensure!(self.layer < 39, "backbone lane is at final layer");
         let next = &self.weights.layers[self.layer + 1];
+        ensure!(next.device.id == self.block.inputs()[0].device_id, "next layer needs a peer handoff");
         self.query.rebind(&next.query)?;
         self.projection.rebind(&next.projection)?;
-        self.shared.rebind(&next.shared)?;
+        if let Some(shared) = &mut self.shared { shared.rebind(next.shared.as_ref().context("local shared weights absent")?)?; }
         self.router.rebind(&next.router)?;
         self.block.advance(&next.hc)?;
         self.layer += 1;
@@ -763,11 +813,13 @@ mod tests {
         let empty = BackboneLaneWeights {
             library: &library,
             layers: vec![],
+            placement: None,
         };
-        for (capacity, expected) in [(1, 2_301_989usize), (80, 80_607_196), (4096, 2_985_263_116)] {
+        // Native AOT variants supply scratch extents; validate budget boundaries
+        // against this library instead of totals from an older export build.
+        for capacity in [1, 80, 4096] {
             let groups = BackboneLane::workspace_bytes(&library, capacity)?;
             let total: usize = groups.iter().sum();
-            assert_eq!(total, expected);
             // Both paths must reject without attempting a CUDA allocation. The
             // CPU-only qualification container exposes no GPU devices.
             let rejected = BackboneLane::new(&empty, capacity, total - 1);

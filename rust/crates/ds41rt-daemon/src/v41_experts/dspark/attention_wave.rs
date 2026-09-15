@@ -21,6 +21,7 @@ pub(crate) struct DsparkAttentionWave<'weights, 'library> {
     descriptors: DeviceAllocation<'library>,
     staging: HostAllocation<'library>,
     requests: u32,
+    width: usize,
     graph: Option<(*mut c_void, u32, u64)>,
     ready: Option<u32>,
 }
@@ -34,11 +35,11 @@ impl<'library> DsparkWeights<'library> {
         ensure!(stage < 3, "invalid dSpark attention stage");
         let library = self.experts[stage].buffers[0].library;
         ensure!(
-            DsparkAttentionWave::device_bytes(library, requests)? <= budget,
+            DsparkAttentionWave::device_bytes_with_width(library, requests, self.draft_width)? <= budget,
             "dSpark attention wave exceeds budget"
         );
-        let rows = requests * 5;
-        let capacity = DsparkAttentionWave::projection_capacity(requests)?;
+        let rows = requests * self.draft_width as u32;
+        let capacity = DsparkAttentionWave::projection_capacity_with_width(requests, self.draft_width)?;
         let projection = |kind| {
             self.projection(
                 kind,
@@ -59,8 +60,8 @@ impl<'library> DsparkWeights<'library> {
                 capacity,
                 DsparkAttentionOutput::device_bytes(library, capacity)?,
             )?,
-            ops: library.v41_attention_ops()?,
-            attention: library.v41_dspark_attention()?,
+            ops: library.v41_attention_ops_width(self.draft_width)?,
+            attention: library.v41_dspark_attention_width(self.draft_width)?,
             q_norm: self.tensor(&format!("mtp.{stage}.attn.q_norm.weight"))?,
             kv_norm: self.tensor(&format!("mtp.{stage}.attn.kv_norm.weight"))?,
             sink: self.tensor(&format!("mtp.{stage}.attn.attn_sink"))?,
@@ -69,6 +70,7 @@ impl<'library> DsparkWeights<'library> {
             descriptors: DeviceAllocation::new(library, 128)?,
             staging: HostAllocation::new(library, 128 + rows as usize * 8)?,
             requests,
+            width: self.draft_width,
             graph: None,
             ready: None,
         })
@@ -76,24 +78,32 @@ impl<'library> DsparkWeights<'library> {
 }
 impl DsparkAttentionWave<'_, '_> {
     pub(super) fn projection_capacity(requests: u32) -> Result<u32> {
+        Self::projection_capacity_with_width(requests, 5)
+    }
+    pub(super) fn projection_capacity_with_width(requests: u32, width: usize) -> Result<u32> {
+        ensure!(matches!(width, 5 | 7), "draft width must be five or seven");
         ensure!(
             (1..=16).contains(&requests),
             "invalid attention request capacity"
         );
-        // Compiled storage buckets; every launch still uses requests*5 live rows.
-        Ok(if requests <= 3 { 16 } else if requests <= 8 { 40 } else { 80 })
+        // Storage follows compiled buckets; launches use the actual live rows.
+        let rows = requests as usize * width;
+        Ok(if rows <= 16 { 16 } else if rows <= 40 { 40 } else if rows <= 80 { 80 } else { 256 })
     }
     pub fn additional_bytes(rows: u32) -> Result<usize> {
         ensure!((1..=4096).contains(&rows), "invalid attention wave rows");
         Ok(rows as usize * (1024 + 8) + 128)
     }
     pub fn device_bytes(library: &NativeLibrary, requests: u32) -> Result<usize> {
+        Self::device_bytes_with_width(library, requests, 5)
+    }
+    pub fn device_bytes_with_width(library: &NativeLibrary, requests: u32, width: usize) -> Result<usize> {
         ensure!(
             (1..=16).contains(&requests),
             "invalid attention wave request capacity"
         );
-        let rows = requests * 5;
-        let capacity = Self::projection_capacity(requests)?;
+        let rows = requests * width as u32;
+        let capacity = Self::projection_capacity_with_width(requests, width)?;
         let mut bytes =
             Self::additional_bytes(rows)? + DsparkAttentionOutput::device_bytes(library, capacity)?;
         for kind in [
@@ -123,7 +133,7 @@ impl DsparkAttentionWave<'_, '_> {
             !requests.is_empty() && requests.len() <= self.requests as usize,
             "attention wave exceeds request capacity"
         );
-        window.attention_read(requests)
+        window.attention_read_with_width(requests, self.width)
     }
     pub(super) fn upload(
         &mut self,
@@ -152,9 +162,9 @@ impl DsparkAttentionWave<'_, '_> {
         staging[..128].copy_from_slice(bytes);
         staging[128..].fill(0);
         for (request, &(_, end)) in requests.iter().enumerate() {
-            for draft in 0..5 {
-                let offset = 128 + (request * 5 + draft) * 8;
-                // attention_read checked end+5 before this upload.
+            for draft in 0..self.width {
+                let offset = 128 + (request * self.width + draft) * 8;
+                // attention_read checked end+width before this upload.
                 staging[offset..offset + 8].copy_from_slice(&(end + draft as u64).to_ne_bytes());
             }
         }
@@ -168,7 +178,7 @@ impl DsparkAttentionWave<'_, '_> {
         requests: u32,
         stream: *mut c_void,
     ) -> Result<()> {
-        let rows = requests * 5;
+        let rows = requests * self.width as u32;
         unsafe {
             self.ops.frequencies(
                 self.positions.buffer,
@@ -223,7 +233,7 @@ impl DsparkAttentionWave<'_, '_> {
         }
     }
     /// # Safety
-    /// Initialize finite normalized BF16 hidden rows [requests,5,5120];
+    /// Initialize finite normalized BF16 hidden rows [requests,K,5120];
     /// complete producer writes and serialize raw input view reuse. Frequencies
     /// are generated from the generation-checked committed ends on this stream.
     pub unsafe fn execute(
@@ -301,7 +311,7 @@ impl DsparkAttentionWave<'_, '_> {
     pub fn output(&self) -> Result<Ds41rtDeviceBuffer> {
         let requests = self.ready.context("attention wave output incomplete")?;
         let mut output = self.output.output_storage();
-        output.bytes = requests as usize * 5 * 10240;
+        output.bytes = requests as usize * self.width * 10240;
         Ok(output)
     }
 }

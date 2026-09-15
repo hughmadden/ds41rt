@@ -16,6 +16,12 @@ pub(crate) struct EngramLayerWeights<'a> {
     names: [String; 4],
 }
 impl<'a> EngramLayerWeights<'a> {
+    pub fn device_bytes(library:&NativeLibrary,catalog:&OfficialV41Catalog,layer_index:usize)->Result<usize> {
+        let layer=*ds41rt_core::ENGRAM_LAYERS.get(layer_index).context("invalid engram layer index")?;
+        let names=["wkv.weight","wkv.scale","q_weight","k_weight"].map(|suffix| format!("layers.{layer}.engram.{suffix}"));
+        NativeRtxTensors::plan(catalog,&names)?.checked_add(library.v41_fp8_kernel(16)?.info().packed_weight_scale_bytes as usize)
+            .context("engram resident budget overflow")
+    }
     pub fn load(
         library: &'a NativeLibrary,
         catalog: &OfficialV41Catalog,
@@ -99,6 +105,12 @@ impl<'weights, 'library> EngramGate<'weights, 'library> {
             unsafe { self.capture(residual, gathered)?; }
         }
         unsafe { self.replay(residual, gathered) }
+    }
+    pub fn device_bytes(library:&NativeLibrary,capacity:usize)->Result<usize> {
+        ensure!(capacity>0 && capacity<=4096,"invalid engram gate capacity");
+        let scratch=library.v41_fp8_matrix_plan(capacity as u32,6144,25600)?.info().scratch_bytes as usize;
+        (capacity*(40960*2+51200+24*512+1)).checked_add(scratch).and_then(|b| b.checked_add(4))
+            .context("engram execution budget overflow")
     }
     pub fn new(
         weights: &'weights EngramLayerWeights<'library>,

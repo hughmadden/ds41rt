@@ -13,6 +13,7 @@ pub(crate) async fn run(args: crate::cli::NativeExpertDaemonArgs) -> Result<()> 
         library: args.native_lib,
         snapshot: args.snapshot,
         rank: args.rank as usize,
+        first_layer: args.first_layer as usize,
         capacity: args.capacity,
         device_budget: args.device_budget_bytes,
         max_frame_bytes: args.max_frame_bytes,
@@ -26,6 +27,7 @@ pub(crate) struct NativeExpertServiceConfig {
     pub library: PathBuf,
     pub snapshot: PathBuf,
     pub rank: usize,
+    pub first_layer: usize,
     pub capacity: u32,
     pub device_budget: usize,
     pub max_frame_bytes: usize,
@@ -38,7 +40,8 @@ fn load_weights<'a>(
     let catalog = read_official_v41_catalog(OFFICIAL_V41_MODEL_ID, &config.snapshot)?;
     let mut resident = 0usize;
     let mut staging = 0usize;
-    for layer in 0..40 {
+    ensure!(config.first_layer < 40, "native first layer must be 0..39");
+    for layer in config.first_layer..40 {
         let plan = ExpertWeights::plan(
             library,
             &catalog,
@@ -67,9 +70,9 @@ fn load_weights<'a>(
             <= config.device_budget,
         "native TP weights and execution workspace exceed device budget"
     );
-    let mut weights = Vec::with_capacity(40);
+    let mut weights = Vec::with_capacity(40 - config.first_layer);
     let mut remaining = config.device_budget;
-    for layer in 0..40 {
+    for layer in config.first_layer..40 {
         let started = std::time::Instant::now();
         let weight = ExpertWeights::load(
             library,

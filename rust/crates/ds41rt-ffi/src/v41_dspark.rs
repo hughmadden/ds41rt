@@ -73,6 +73,7 @@ pub struct V41VocabularyProjection<'a> {
     destroy: MarkovDestroy,
     width: usize,
     max_rows: usize,
+    vocab_rows: usize,
 }
 impl NativeLibrary {
     /// # Safety
@@ -91,6 +92,54 @@ impl NativeLibrary {
         workspace: Ds41rtDeviceBuffer,
     ) -> Result<V41VocabularyProjection<'_>> {
         unsafe { self.v41_head_projection(workspace, true) }
+    }
+    /// Create a projection for one contiguous set of vocabulary rows.
+    ///
+    /// # Safety
+    /// Same workspace/device/graph lifetime contract as v41_vocabulary_head.
+    /// The caller retains the shard's global token offset separately.
+    pub unsafe fn v41_vocabulary_shard(
+        &self,
+        workspace: Ds41rtDeviceBuffer,
+        vocab_rows: usize,
+    ) -> Result<V41VocabularyProjection<'_>> {
+        ensure!((1..=129280).contains(&vocab_rows), "invalid vocabulary shard rows");
+        type Create = unsafe extern "C" fn(*mut c_void, u64, i32, *mut *mut c_void) -> i32;
+        let create = unsafe { *self.lib.get::<Create>(b"ds41rt_v41_vocabulary_shard_create")? };
+        let launch = unsafe { *self.lib.get::<MarkovLaunch>(b"ds41rt_v41_vocabulary_head_launch")? };
+        let destroy = unsafe { *self.lib.get::<MarkovDestroy>(b"ds41rt_v41_markov_destroy")? };
+        let mut handle = std::ptr::null_mut();
+        let status = unsafe { create(workspace.ptr, workspace.bytes as u64, vocab_rows as i32, &mut handle) };
+        ensure!(status == 0 && !handle.is_null(), "vocabulary shard initialization status {status}");
+        Ok(V41VocabularyProjection { _library: self, handle, launch, destroy,
+            width: 5120, max_rows: 128, vocab_rows })
+    }
+    /// Merge local greedy candidates after the peer candidates arrive.
+    ///
+    /// # Safety
+    /// All six buffers belong to the stream's device and remain live through
+    /// completion. Inputs are complete and outputs are disjoint from each other
+    /// and the inputs. Invalid candidates publish UINT32_MAX/NaN.
+    pub unsafe fn v41_vocabulary_merge_greedy(
+        &self, candidates: [(Ds41rtDeviceBuffer, Ds41rtDeviceBuffer); 2],
+        output: (Ds41rtDeviceBuffer, Ds41rtDeviceBuffer), rows: usize,
+        split: usize, stream: *mut c_void,
+    ) -> Result<()> {
+        ensure!((1..=128).contains(&rows) && (1..129280).contains(&split),
+            "invalid vocabulary greedy merge shape");
+        for buffer in [candidates[0].0, candidates[0].1, candidates[1].0,
+            candidates[1].1, output.0, output.1] {
+            ensure!(!buffer.ptr.is_null() && buffer.bytes >= rows * 4
+                && buffer.device_id == output.0.device_id, "invalid vocabulary merge buffer");
+        }
+        type Merge = unsafe extern "C" fn(*const u32, *const f32, *const u32,
+            *const f32, *mut u32, *mut f32, i32, i32, *mut c_void) -> i32;
+        let launch = unsafe { *self.lib.get::<Merge>(b"ds41rt_v41_vocabulary_merge_greedy")? };
+        let status = unsafe { launch(candidates[0].0.ptr.cast(), candidates[0].1.ptr.cast(),
+            candidates[1].0.ptr.cast(), candidates[1].1.ptr.cast(), output.0.ptr.cast(),
+            output.1.ptr.cast(), rows as i32, split as i32, stream) };
+        ensure!(status == 0, "vocabulary greedy merge status {status}");
+        Ok(())
     }
     unsafe fn v41_head_projection(
         &self,
@@ -126,7 +175,8 @@ impl NativeLibrary {
             launch,
             destroy,
             width: if full { 5120 } else { 256 },
-            max_rows: if full { 80 } else { 16 },
+            max_rows: if full { 128 } else { 16 },
+            vocab_rows: 129280,
         })
     }
 }
@@ -149,8 +199,8 @@ impl V41VocabularyProjection<'_> {
         );
         for (buffer, bytes) in [
             (embedding, rows * self.width * 2),
-            (weight, 129280 * self.width * 2),
-            (logits, rows * 129280 * 4),
+            (weight, self.vocab_rows * self.width * 2),
+            (logits, rows * self.vocab_rows * 4),
         ] {
             ensure!(
                 !buffer.ptr.is_null() && buffer.bytes >= bytes,
@@ -208,7 +258,7 @@ impl V41DraftStep<'_> {
     /// # Safety
     /// All buffers must live on the stream device through completion. Shared+bias
     /// must be finite and temperatures finite/nonnegative. RNG [rows,2] contains
-    /// seeds and base Philox subsequences with room for 1280 subsequences each.
+    /// seeds and base Philox subsequences with room for (position+1)*256 draws.
     /// Output spans must not overlap each other or any input.
     pub unsafe fn launch(
         &self,
@@ -223,7 +273,7 @@ impl V41DraftStep<'_> {
         stream: *mut c_void,
     ) -> Result<()> {
         ensure!((1..=16).contains(&rows), "invalid draft sampling rows");
-        ensure!(position < 5, "invalid draft position");
+        ensure!(position < 7, "invalid draft position");
         for (buffer, bytes) in [
             (shared, rows * 129280 * 4),
             (bias, rows * 129280 * 4),

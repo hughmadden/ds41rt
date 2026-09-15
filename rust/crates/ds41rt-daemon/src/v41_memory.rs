@@ -9,6 +9,8 @@ pub(crate) use snapshot::{SnapshotCopies, SnapshotPool, SnapshotStorage};
 #[path = "v41_memory/download.rs"]
 mod download;
 pub(crate) use download::RowDownload;
+#[path = "v41_memory/device.rs"]
+pub(crate) mod device;
 
 pub(crate) struct DeviceAllocation<'a> {
     pub(crate) library: &'a NativeLibrary,

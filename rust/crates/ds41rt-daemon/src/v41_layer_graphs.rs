@@ -4,6 +4,8 @@ use ds41rt_ffi::NativeLibrary;
 use std::ffi::c_void;
 use std::collections::BTreeMap;
 
+const MAX_DECODE_ROWS: u32 = 8 * (ds41rt_core::MAX_DSPARK_PROPOSALS as u32 + 1);
+
 struct Entry<'w, W> {
     weights: &'w W,
     graph: *mut c_void,
@@ -31,7 +33,7 @@ impl<'w, 'a, W> LayerGraphs<'w, 'a, W> {
         let entry = self.entries.get(layer)?.as_ref()?;
         std::ptr::eq(entry.weights, weights).then_some((entry.graph, entry.rows))
     }
-    /// A decode lane contains at most eight requests with six rows each.
+    /// A decode lane contains at most eight requests with eight rows each.
     /// Retain those shapes plus at most one current large-prefill graph.
     pub fn enable_small_shapes(&mut self) { self.retain_small = true; }
     pub fn get_shape(&self, layer: usize, weights: &W, rows: u32) -> Option<(*mut c_void, u32)> {
@@ -63,7 +65,7 @@ impl<'w, 'a, W> LayerGraphs<'w, 'a, W> {
                 unsafe { self.library.cuda_graph_exec_destroy(old.graph)?; }
             }
             if let Some(old) = self.entries[layer].take() {
-                if old.rows <= 48 && old.rows != rows {
+                if old.rows <= MAX_DECODE_ROWS && old.rows != rows {
                     if let Some(replaced) = self.retained[layer].insert(old.rows, old) {
                         unsafe { self.library.cuda_graph_exec_destroy(replaced.graph)?; }
                     }
@@ -126,7 +128,7 @@ mod tests {
         let mut bank = LayerGraphs::new(&library);
         bank.enable_small_shapes();
         let mut handles = BTreeMap::new();
-        for (cycle, rows) in (1..=48).chain([80, 128, 2, 6, 3, 2, 6, 48]).enumerate() {
+        for (cycle, rows) in (1..=MAX_DECODE_ROWS).chain([80, 128, 2, 6, 3, 2, 6, 48, 64, 56, 63, 64]).enumerate() {
             let expected = vec![(cycle + 1) as u8; 128 * 4];
             library.copy_h2d(weights.buffer, &expected)?;
             if bank.get_shape(0, &weights, rows).is_none() {
@@ -138,7 +140,7 @@ mod tests {
                 }
             }
             let (graph, _) = bank.get_shape(0, &weights, rows).unwrap();
-            if rows <= 48 {
+            if rows <= MAX_DECODE_ROWS {
                 assert_eq!(*handles.entry(rows).or_insert(graph), graph);
             }
             assert!(bank.get_shape(0, &other, rows).is_none());
@@ -151,7 +153,7 @@ mod tests {
             view.bytes = actual.len();
             library.copy_d2h(&mut actual, view)?;
             assert_eq!(actual, expected[..actual.len()]);
-            assert!(bank.retained[0].len() + usize::from(bank.entries[0].is_some()) <= 49);
+            assert!(bank.retained[0].len() + usize::from(bank.entries[0].is_some()) <= MAX_DECODE_ROWS as usize + 1);
         }
         assert!(bank.get_shape(0, &weights, 80).is_none());
         assert!(bank.get_shape(0, &weights, 128).is_some());

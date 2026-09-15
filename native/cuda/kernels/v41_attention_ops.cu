@@ -234,13 +234,13 @@ extern "C" int32_t ds41rt_v41_dspark_tap(const uint16_t* input,
 }
 
 namespace {
-template<bool Draft>
+template<bool Draft, int Width = 5>
 __global__ void embed_kernel(const __nv_bfloat16* table, const int32_t* tokens,
     __nv_bfloat16* residual, float* pre) {
-  const uint64_t row=blockIdx.x,request=Draft?row/5:row;
+  const uint64_t row=blockIdx.x,request=Draft?row/Width:row;
   const int32_t seed=tokens[request];
   const bool ok=seed>=0 && seed<129280;
-  const int32_t token=Draft && row%5!=0?128799:seed;
+  const int32_t token=Draft && row%Width!=0?128799:seed;
   for(int col=threadIdx.x;col<5120;col+=256) {
     const auto value=ok?table[uint64_t(token)*5120+col]:__float2bfloat16_rn(0);
     #pragma unroll
@@ -249,18 +249,30 @@ __global__ void embed_kernel(const __nv_bfloat16* table, const int32_t* tokens,
   if(threadIdx.x<4)pre[row*4+threadIdx.x]=ok && threadIdx.x==0?1.0f:0.0f;
 }
 }
-extern "C" int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t* tokens,
+template<int Width>
+static int32_t launch_dspark_embed(const uint16_t* table, const int32_t* tokens,
     uint16_t* residual, float* pre, int32_t requests, void* stream) {
   if(requests<1 || requests>16)return cudaErrorInvalidValue;
   const uint64_t w=uint64_t(129280)*5120*2,t=uint64_t(requests)*4,
-      r=uint64_t(requests)*5*40960,p=uint64_t(requests)*5*16;
+      r=uint64_t(requests)*Width*40960,p=uint64_t(requests)*Width*16;
   if(!valid(table,w,2)||!valid(tokens,t,4)||!valid(residual,r,2)||!valid(pre,p,4)||
       !disjoint(table,w,residual,r)||!disjoint(table,w,pre,p)||
       !disjoint(tokens,t,residual,r)||!disjoint(tokens,t,pre,p)||!disjoint(residual,r,pre,p))
     return cudaErrorInvalidValue;
-  embed_kernel<true><<<requests*5,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+  embed_kernel<true, Width><<<requests*Width,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(table),tokens,reinterpret_cast<__nv_bfloat16*>(residual),pre);
   return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_dspark_embed_width(const uint16_t* table, const int32_t* tokens,
+    uint16_t* residual, float* pre, int32_t requests, int32_t width, void* stream) {
+  if(width==5)return launch_dspark_embed<5>(table,tokens,residual,pre,requests,stream);
+  if(width==7)return launch_dspark_embed<7>(table,tokens,residual,pre,requests,stream);
+  return cudaErrorInvalidValue;
+}
+extern "C" int32_t ds41rt_v41_dspark_embed(const uint16_t* table, const int32_t* tokens,
+    uint16_t* residual, float* pre, int32_t requests, void* stream) {
+  return launch_dspark_embed<5>(table,tokens,residual,pre,requests,stream);
 }
 
 extern "C" int32_t ds41rt_v41_target_embed(const uint16_t* table, const int32_t* tokens,
@@ -278,25 +290,38 @@ extern "C" int32_t ds41rt_v41_target_embed(const uint16_t* table, const int32_t*
 }
 
 namespace {
+template<int Width>
 __global__ void dspark_terminal_layout_kernel(const __nv_bfloat16* residual,
     const float* pre, __nv_bfloat16* output, float* output_pre, int requests) {
   const uint64_t row=blockIdx.x;
-  const uint64_t source=(row%requests)*5+row/requests;
+  const uint64_t source=(row%requests)*Width+row/requests;
   for(int col=threadIdx.x;col<20480;col+=256)output[row*20480+col]=residual[source*20480+col];
   if(threadIdx.x<4)output_pre[row*4+threadIdx.x]=pre[source*4+threadIdx.x];
 }
 }
-extern "C" int32_t ds41rt_v41_dspark_terminal_layout(const uint16_t* residual,
+template<int Width>
+static int32_t launch_dspark_terminal_layout(const uint16_t* residual,
     const float* pre, uint16_t* output, float* output_pre, int32_t requests, void* stream) {
   if(requests<1 || requests>16)return cudaErrorInvalidValue;
-  const uint64_t r=uint64_t(requests)*5*40960,p=uint64_t(requests)*5*16;
+  const uint64_t r=uint64_t(requests)*Width*40960,p=uint64_t(requests)*Width*16;
   if(!valid(residual,r,2)||!valid(pre,p,4)||!valid(output,r,2)||!valid(output_pre,p,4)||
       !disjoint(residual,r,output,r)||!disjoint(residual,r,output_pre,p)||
       !disjoint(pre,p,output,r)||!disjoint(pre,p,output_pre,p)||!disjoint(output,r,output_pre,p))
     return cudaErrorInvalidValue;
-  dspark_terminal_layout_kernel<<<requests*5,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
+  dspark_terminal_layout_kernel<Width><<<requests*Width,256,0,reinterpret_cast<cudaStream_t>(stream)>>>(
       reinterpret_cast<const __nv_bfloat16*>(residual),pre,reinterpret_cast<__nv_bfloat16*>(output),output_pre,requests);
   return cudaGetLastError();
+}
+
+extern "C" int32_t ds41rt_v41_dspark_terminal_layout_width(const uint16_t* residual,
+    const float* pre, uint16_t* output, float* output_pre, int32_t requests,int32_t width,void* stream) {
+  if(width==5)return launch_dspark_terminal_layout<5>(residual,pre,output,output_pre,requests,stream);
+  if(width==7)return launch_dspark_terminal_layout<7>(residual,pre,output,output_pre,requests,stream);
+  return cudaErrorInvalidValue;
+}
+extern "C" int32_t ds41rt_v41_dspark_terminal_layout(const uint16_t* residual,
+    const float* pre, uint16_t* output, float* output_pre, int32_t requests,void* stream) {
+  return launch_dspark_terminal_layout<5>(residual,pre,output,output_pre,requests,stream);
 }
 
 namespace {

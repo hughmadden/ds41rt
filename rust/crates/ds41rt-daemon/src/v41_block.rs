@@ -6,6 +6,8 @@ use crate::v41_hc::HcSublayer;
 use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 mod encoder_suffix;
+mod transfer;
+pub(crate) use transfer::BlockTransfer;
 pub(crate) use encoder_suffix::EncoderSuffix;
 #[derive(Clone, Copy)]
 enum Phase {
@@ -62,6 +64,8 @@ pub(crate) struct BackboneBlockWave<'w, 'a> {
     phase: Phase,
 }
 impl<'w, 'a> BackboneBlockWave<'w, 'a> {
+    #[cfg(test)]
+    pub fn trace_stream(&self) -> *mut std::ffi::c_void { self.ffn.stream_raw() }
     /// Reuse this lane's two mHC workspaces for the adjacent layer. Completed
     /// residual/pre values are copied before installing both validated bindings.
     /// No device allocation or graph capture occurs here.
@@ -149,7 +153,7 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
             attention,
             ffn,
             capacity,
-            tokens: Vec::new(),
+            tokens: Vec::with_capacity(capacity),
             phase: Phase::Idle,
         }
     }
@@ -490,7 +494,17 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
     /// completion or cancellation drain. Next-layer copies share the mHC stream.
     pub async unsafe fn finish_ffn_cooperative(&mut self, binding: QueryBinding,
         result: Ds41rtDeviceBuffer) -> Result<BlockOutput<'_>> {
-        let copy_next = self.layer < 39;
+        unsafe { self.finish_ffn_with_next_copy(binding,result,self.layer < 39).await }
+    }
+    /// # Safety
+    /// Same completed-result ownership as finish_ffn_cooperative. A peer handoff
+    /// consumes the output directly, so no local next-input copy is required.
+    pub async unsafe fn finish_ffn_for_handoff_cooperative(&mut self,binding:QueryBinding,
+        result:Ds41rtDeviceBuffer)->Result<BlockOutput<'_>> {
+        unsafe { self.finish_ffn_with_next_copy(binding,result,false).await }
+    }
+    async unsafe fn finish_ffn_with_next_copy(&mut self,binding:QueryBinding,
+        result:Ds41rtDeviceBuffer,copy_next:bool)->Result<BlockOutput<'_>> {
         let rows = unsafe { self.enqueue_finish_ffn(binding, result, copy_next)? };
         if let Err(error) = self.ffn.wait_chain().await { self.reset(); return Err(error); }
         unsafe { self.publish_finished_ffn(binding, rows, copy_next) }
@@ -571,5 +585,15 @@ impl<'w, 'a> BackboneBlockWave<'w, 'a> {
             layer: self.layer,
             tokens: &self.tokens,
         })
+    }
+}
+
+#[cfg(test)]
+impl<'a> BlockOutput<'a> {
+    /// # Safety
+    /// Test buffers contain complete residual/pre rows and outlive the output.
+    pub(crate) unsafe fn from_test_buffers(layer: usize, tokens: &'a [u64],
+        residual: Ds41rtDeviceBuffer, pre: Ds41rtDeviceBuffer) -> Result<Self> {
+        Ok(Self { binding: QueryBinding::new(layer)?, layer, tokens, residual, pre })
     }
 }

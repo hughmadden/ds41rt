@@ -185,15 +185,22 @@ impl<'a> CompressorState<'a> {
     /// Borrow an immutable committed source range after its producer is published.
     /// No private rows are produced; ratio-two encoder sources and ratio-one
     /// decoder sources retain their per-query causal counts. The caller owns
-    /// the snapshot identity across consumers and must drain them before append.
+    /// the snapshot identity across consumers. A committed-only causal prefix
+    /// can survive append; its backing rows must remain immutable and all
+    /// consumers must drain before request release or restoration.
     pub fn committed_proposal(&self, lease: CompressorLease, positions: std::ops::Range<u64>,
         snapshot: u64) -> Result<IndexProposal<'_>> {
         let end = self.committed_end(lease)?;
         let step = ratio(self.layer)? as u64;
         ensure!(snapshot != 0 && positions.start < positions.end
             && positions.end <= end, "invalid committed source range");
-        let cache = self.index_cache(lease)?;
-        let kv_cache = self.kv_cache(lease)?;
+        // Appends only write beyond this committed prefix. Read its published
+        // extent even while a follower owns the append reservation; mutation,
+        // restoration and release continue to require an idle slot.
+        let slot = self.validate_identity(lease)?;
+        let rows = end as usize / step as usize;
+        let cache = self.index.view(slot, rows);
+        let kv_cache = self.index.kv_view(slot, rows);
         // Valid read-only backing for zero-length private overlays. Their
         // metadata count is zero, so no private entry can be selected.
         Ok(IndexProposal {

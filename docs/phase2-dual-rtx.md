@@ -1,0 +1,1616 @@
+# Phase 2: two RTX coordinators and four Sparks
+
+Status: complete. Forced dual-GPU serving, automatic deployment selection,
+clean release-container startup, scoped one/two-RTX qualification, formal
+packaging, and v3 publication are complete.
+
+## Required outcome
+
+- Automatically choose two suitable RTX GPUs when their available memory can
+  support the planned deployment. Provide an explicit one/two GPU override.
+  Validate feasibility before stopping a running service; account for memory
+  owned by a deployment being replaced without counting unrelated processes.
+- Preserve the single-RTX serving path and qualify its performance against v2.
+- Keep independent adaptive dSpark lanes. GPU transfers and reductions may wait
+  on their own dependencies, but must not join the two request lanes. Allocate
+  execution and transfer storage before the decode loop.
+- Host all twenty encoder routed-expert layers on the RTX pair using TP2.
+  Partition shared experts with TP2 and vocabulary rows across both GPUs,
+  merging greedy winners deterministically with global token IDs.
+- Place attention and its compressed KV/index consumers together. Allocate
+  vision, embedding, and dSpark to balance the remaining per-device budget.
+- Reduce Spark residency for layers fully hosted on RTX, preserve decoder
+  execution and bounded replay, and measure the actual remote calls during
+  prefill and verification.
+- Default the dual-RTX shared pool to 14×1,048,576 tokens plus COW/tail
+  allowance, preserving 16-request concurrency and 24 retained turns. Keep
+  explicit KV byte-size and memory-reservation overrides available. The reduced
+  default leaves runtime space for full graph retention.
+- Preserve FP4 compressed KV, FP8 SWA, exact reuse, retained snapshots,
+  constraints, tool calling, cancellation, and rapid startup.
+- Release concurrency tables must include counting, code, and topic at
+  C1/C2/C4/C8/C16 for both one-RTX and two-RTX configurations, with three runs
+  per cell. Retain the mixed-traffic comparison alongside these tables.
+  Replicate all performance-report tables in the README with short descriptions;
+  state the 400 W RTX limit and standard memory speed before the results, and
+  accompany headline cache bytes with the corresponding token capacity.
+  `scripts/bench-ds41-concurrent-api.py --case counting|code|topic` now
+  supports each concurrency workload. Keep the label and nonce identical across
+  GPU layouts so their request prompts match. Code uses the existing objective
+  structure check; topic prose is not automatically scored.
+
+## Initial evidence and placement constraint
+
+The v2 baseline is tag `v2`, commit
+`bff7d2ee4044ab7a267585ef83d1a90d5f7f114a`. Both RTX PRO 6000 Blackwell cards
+report 97,887 MiB total and a 400 W power limit. At phase-2 entry GPU0 runs
+the qualified v2 service (96,946 MiB used); GPU1 reports 12 MiB used.
+
+Compressed sources originate at layers 2, 8, 14, and 20. The existing pool
+uses page counts `[g, g, g, 2g]`: placing sources 2/8/14 on one device and
+source 20 on the other divides compressed source and index bytes 60/40.
+Compute the shared page-group count from the tighter device budget after
+weights, workspaces, snapshots, staging, and runtime headroom. Do not treat
+free memory on the other device as additional capacity for the limiting source.
+
+The user's explicit placement map assigns vision, embeddings, encoder attention
+and SWA (0–19), and sources 2/8/14 to RTX0. RTX1 owns decoder attention and SWA
+(20–39), source 20, and dSpark. Both cards hold half the vocabulary rows, TP2
+encoder routed experts, and TP2 shared experts for all layers. CPU Engram stays
+unchanged; Sparks retain decoder routed experts only in two-GPU mode.
+The clarified deployment baseline keeps the 19/20 attention boundary: layers
+14–19 and compressed/index source 14 stay together on RTX0. Layers 15–19 are
+not an independent balancing knob; do not introduce remote cache reads or
+cache replication to move them. Keeping three sources on RTX0 leaves a smaller
+compressed pool on RTX1 to accommodate the planned unsplit dSpark model there.
+Vision placement remains flexible. Preserve expert TP2 and vocabulary
+partitioning. A reduced KV pool is acceptable for initial integration before
+selecting the final budget, which must include dSpark and all runtime storage.
+
+The layer-14 boundary used in the integration checkpoints below exercises
+source/cache ownership on GPU1. References to that map as "rebalanced" describe
+the test arrangement, not an established memory improvement or the deployment
+baseline. It moves source 14 onto the device already carrying dSpark and changes
+compressed/index pool ownership from 60/40 to 40/60, worsening that imbalance.
+Consumer placement must follow the actual CED/index dependency map, including
+bounded decoder replay, rather than treating encoder residency as proof that
+every prefill operation is local.
+
+## Implementation sequence
+
+1. Derive tensor, cache, and workspace byte accounting for both devices;
+   enumerate source consumers and transfer boundaries. Validate memory and
+   peer-copy capability on the available hardware.
+2. Add explicit topology/placement objects and asynchronous device-transfer
+   ownership. Preserve a direct single-device implementation.
+3. Implement TP2 routed/shared experts and vocabulary partitioning with
+   independent numerical checks, changed-input graph replay, and cancellation.
+4. Integrate per-source cache and attention placement, auxiliary components,
+   encoder residency, and reduced Spark loading into complete serving.
+5. Wire automatic GPU discovery and forced one/two mode into the standard
+   launcher only when both runtime paths are usable.
+6. Qualify complete two-GPU serving, asynchronous lane progress, startup,
+   memory, cache reuse, constrained/tool output, and weighted real workloads.
+   Compare one-GPU performance against v2 under matched settings and preserve
+   all results, including losses. Count remote encoder calls explicitly.
+
+## Automatic release launcher
+
+The standard launcher accepts `--rtx-gpus auto|1|2`, with `auto` in the release
+configuration. It keeps the configured physical coordinator as logical RTX0
+and chooses the highest-free-memory peer as logical RTX1 only when both cards
+fit the requested deployment and advertise peer reads in both directions. The
+feasibility ledger includes fixed weights and workspaces, 800 MiB runtime
+headroom, per-source cache ownership, the default 14M pool or an explicit pool,
+and an explicit occupancy ceiling. Its conservative fixed allocation is the
+measured K7 footprint, so the default K5 launch retains a small safety margin.
+
+Selection runs before any service is stopped. During `--restart`, only GPU
+memory attributed by `nvidia-smi` to PIDs inside the exact existing coordinator
+container is treated as reclaimable. Unrelated allocations remain charged.
+The selected physical UUID order is recorded in the release fingerprint and
+passed to both Docker and `CUDA_VISIBLE_DEVICES`. Dual mode passes
+`--rtx-gpus 2` to the coordinator and `--first-layer 20` to every Spark; single
+mode passes one GPU and keeps Spark layer zero. `--dry-run` reports the resolved
+host indices, UUIDs, and Spark boundary.
+
+The first clean standard launch exposed two packaging/lifecycle defects before
+model loading. The coordinator release artifact enabled full-width local expert
+AOT but omitted TP2 expert AOT, leaving `ds41rt_v41_tp2_expert_info` undefined.
+The release builder now enables both interfaces for the coordinator and checks
+both symbols before assembling the image. Launcher cleanup is attached to the
+shell `EXIT` path so an explicit startup failure also removes the partial
+coordinator and four already-started Spark containers; the earlier `ERR` trap
+did not run when `release_die` exited explicitly.
+
+Twelve launcher/selector tests pass. They cover automatic dual selection and
+single fallback, forced one/two behavior, peer rejection, exact-pool and
+reservation effects, replacement-process accounting, configuration defaults,
+and the generated coordinator/Spark arguments. The selector chooses both cards
+on the development host at the default C16/24/14M settings: its calibrated
+requirements are 96,176 MiB for logical RTX0 and 96,778 MiB for logical RTX1,
+against 97,249/97,236 MiB currently free. A temporary two-device Docker probe
+confirmed that the quoted UUID request and ordered visibility expose two CUDA
+devices.
+
+A clean `build.sh` at `f652dc848e24335242ae245d92f18f7d73cd0f39`
+compiled and packaged both expert interfaces, verified all release provenance
+and checksums, rebuilt both container roles, and distributed the Spark image to
+all four hosts. The standard `run.sh` then selected both RTX cards and reached
+API readiness in 10.771 seconds of coordinator startup. It loaded all twenty
+encoder expert layers as TP2, placed dSpark on RTX1 and vision on RTX0, and
+reserved source pages `[28736, 28736, 28736, 57472]` with 13,094,420,480 global
+cache bytes. Final device use was 95,338/95,578 MiB, leaving 1,913/1,670 MiB
+free. A no-thinking request returned the exact requested `READY` response.
+Every Spark command used `--first-layer 20`. A subsequent standard
+`run.sh --restart` also selected the two-card layout while the old deployment
+occupied both GPUs, reclaimed only its coordinator allocation, stopped all five
+containers, and returned the API to readiness. Single-card dry-run selection
+continues to choose GPU0 and Spark layer zero. Release performance and focused
+quality qualification are recorded in the [Phase 2 release performance
+report](phase2-release-performance.md). The exact final images, packages, and
+public registry identities are recorded in the [v3 build and registry
+report](release-v3-build-run.md) and [publication record](release-v3-publication.md).
+
+Commit and push each completed development increment on `dev`. Keep `main`,
+`release/v2`, and the published v2 images as the qualified rollback baseline.
+
+## First implementation checkpoint
+
+`v41_native_serve/memory/distributed.rs` now computes page-group capacity from
+per-device residual budgets and an explicit source-owner map. It preserves
+whole-group rounding, checks minimum admission and maximum physical capacity,
+and reports unused memory independently for each card. This is startup accounting
+only; it is not wired into allocation or serving yet. Four standalone Rust tests
+pass, covering either GPU as bottleneck, exact-size rounding, limits, invalid
+owners, and arithmetic overflow. The full daemon passes offline `cargo check`.
+
+The host reports a PCIe `NODE` connection between the two RTX cards, with peer
+read and write support in both directions (`nvidia-smi topo -p2p r/w`). This
+establishes advertised capability, not measured transfer bandwidth or asynchronous
+CUDA ownership correctness. Those require a real transfer fixture.
+
+Current cache binding selects the latest source at or before the attention
+layer: source 2 serves layers 2–7, source 8 serves 8–13, source 14 serves 14–19,
+and source 20 serves 20–39. Layers 0–1 use only their sliding windows. Therefore
+the requested 3/1 split naturally groups encoder attention on one device and
+decoder attention on the other; TP2 FFNs still require transfers within each
+layer. Existing local expert execution only accepts full-width weights, so TP2
+requires new packing/kernel ownership rather than relabeling existing buffers.
+
+## Device-transfer checkpoint
+
+Native and Rust FFI now expose explicit current-device selection, idempotent
+direct peer enablement, and asynchronous peer copies on a destination stream.
+The existing single-device copy path is unchanged. Source readiness can use the
+existing cross-device stream/event dependency; no device-wide wait is introduced.
+These low-level APIs still require caller-owned buffer lifetimes and are not yet
+wired into model execution.
+
+`ds41rt_cuda_peer_selftest` passes on the RTX pair: three changed byte patterns
+are copied and checked in each direction, with an unrelated stream deliberately
+held pending until the copy completes. It also checks invalid extents, null
+streams, wrong current devices, buffer device IDs, and repeated peer enablement.
+The full daemon passes offline `cargo check`. This proves the transfer primitive,
+not graph replay, cancellation ownership, bandwidth, or full serving performance.
+
+The first fixture launch could not create a CUDA context beside the v2 server
+(only 305 MiB free on RTX0). The v2 coordinator container was stopped to free
+the pair for phase-2 development; its image and container remain available.
+
+## Device ownership and weight accounting
+
+`v41_memory/device.rs` provides explicit allocation/stream/event owners and a
+preallocated peer-transfer direction per lane. Device selection is scoped to
+synchronous enqueue/query calls and restored before cooperative yields. The
+transfer future borrows source, destination, and producer; its drain guard runs
+on errors or cancellation. Legacy single-device owners are unchanged.
+
+The ignored CUDA owner test passes on both cards: simultaneous opposite-direction
+copies preserve three changed input patterns; device selection restores after an
+error, concurrent completion, and destruction. The test needs the local Python
+3.12 library directory in `LD_LIBRARY_PATH`. Cancellation drain behavior still
+needs an explicit pending-transfer test; model integration remains pending.
+
+Initial exact checkpoint-header sums (decimal bytes, **not runtime occupancy**):
+
+| Tensor group | Bytes |
+|---|---:|
+| Encoder routed experts, all 20 layers | 144,388,915,200 |
+| Encoder routed experts per TP2 half | 72,194,457,600 |
+| Shared experts, all 40 layers | 1,416,960,000 |
+| Encoder non-expert, excluding Engram namespace and shared experts | 2,741,203,936 |
+| Decoder non-expert, excluding shared experts | 2,725,876,192 |
+| dSpark (`mtp`) | 7,932,874,632 |
+| Embeddings | 1,323,827,200 |
+| Vocabulary head | 1,323,827,200 |
+| Vision, aligner, image marker vectors | 970,536,960 |
+
+Ordinary non-expert layers contribute 134,631,128 checkpoint bytes each.
+These sums come from all 48 safetensors headers in official snapshot
+`dba1be0a40aa45a94ad051997016db3960a90277`. Runtime planning must additionally
+account for transformed packing/scales, GPU Engram projections (separate from
+the host table), duplicate/aliased tensors, all lane and prefill workspaces,
+SWA/index/KV pools, snapshots, transfer buffers, and CUDA headroom. In particular,
+moving a few ordinary attention layers saves far less than the dSpark allocation;
+the final split must be chosen using the complete ledger.
+
+## TP2 expert staging
+
+The loader now supports `BackboneTp2` with 1,152 logical intermediate channels.
+It reads W1/W3 row halves and W2 column halves directly from the official payload,
+including matching scale slices, using bounded reusable scratch and prefetch.
+Each expert/rank needs 9,400,320 staging bytes. TP4, full-width, and dSpark reads
+retain their existing contracts. Synthetic byte-level tests cover both TP2 ranks,
+weights and scales, partial final read batches, invalid rank/layer/expert IDs,
+undersized staging/scratch, and untouched trailing storage. All four catalog tests
+and the full daemon offline check pass. This is loader support; TP2 packing,
+kernel exports, reductions, and serving integration remain unfinished.
+
+## TP2 packed layout and initial exports
+
+The native packer accepts 1,152-channel halves. Packed sizes per expert are
+`[5,898,240, 368,640, 2,949,120, 184,320]` bytes: 9,400,320 total, with no
+intermediate padding overhead. Thus all twenty encoder layers at 384 experts
+cost exactly 72,194,457,600 packed weight bytes per GPU before other allocations.
+
+`qualify_v41_expert_packing.py` compares all four native packed arrays against
+SparkInfer's independent tensor converters for widths 576, 1152, and 2304 on
+both GPUs, including trailing canaries. All six cases pass byte-for-byte. The
+scale test spans bytes 0–247; SparkInfer clamps larger values, whereas the native
+packer preserves raw checkpoint bytes, so that intentionally different domain
+is excluded from exact equality. Existing native representations are unchanged.
+
+The slice exporter supports role `rtx_tp2` (ABI role 3, 384 experts, top-6,
+FP8 K32 input, 1,152 intermediate channels). C1 and C16 SM120 kernels export
+successfully at width 192. They have not yet been executed or performance-qualified.
+The native expert handle table currently binds each variant to its first GPU;
+TP2 needs independent per-device handles before integration. Other capacities,
+shared-expert TP2, reductions, and complete serving remain pending.
+
+## TP2 native handle ownership
+
+A separate `ds41rt_v41_tp2_expert_*` interface now provides independent module
+tables for the two coordinator-visible devices (0/1). Each capacity has distinct
+GPU0/GPU1 handles; wrong-device scratch binding, scratch initialization, and
+launch are rejected. The two selected physical GPUs must be exposed as devices
+0/1 by the eventual launcher. Full-width and dSpark interfaces remain separate.
+
+The C1/C16 TP2 library builds against the exported objects. Its handle fixture
+passes on both cards, checking distinct handles, stable repeated initialization,
+owner-local scratch initialization, and rejection of crossed handles without
+slot mutation. C1 scratch is 877,600 bytes; C16 scratch is 13,925,776 bytes per
+execution workspace. CMake now offers `DS41RT_ENABLE_V41_TP2_EXPERT_AOT` alongside
+the coordinator expert build with capacities 1/16/80/256/1024/4096. The full
+enabled CMake build, remaining capacities, Rust bindings, and numerical expert
+execution have not yet been qualified.
+
+## Initial TP2 numerical execution
+
+Rust FFI now selects and validates the TP2 role and geometry, and the daemon's
+expert placement enum connects TP2 staging to its packer, metadata, and kernels.
+The full daemon passes offline `cargo check`; dual-device owner integration into
+the main serving loop remains pending.
+
+`qualify_v41_tp2_numerics.py` executes both native halves at C1 and C16 using
+synthetic full-width expert weights sliced consistently for W1/W3/W2 and scales.
+Summed rank output is compared with the unsplit FP32 oracle using the official
+BF16/FP8 projection sequence. All four initial/changed cases pass: relative L2
+is about 0.17%, cosine exceeds 0.999997. Changed-input graph replay updates
+input values, expert IDs, and routing weights without allocating during replay.
+Each GPU uses an explicit device-local capture stream; relying on the Python
+graph helper's default stream caused a wrong-device rejection on the second GPU.
+
+This validates C1/C16 synthetic expert numerics, not real checkpoint quality,
+parallel lane progress, device-side final reduction, prefill capacities, shared
+experts, or throughput. The fixture sums rank outputs on the host for comparison;
+serving must use an asynchronous device reduction.
+
+## Device-side TP2 reduction
+
+`ds41rt_v41_reduce_tp2_experts_async` and its Rust owner now reduce two FP32
+rank contributions on the destination GPU, supporting six route planes or one
+pre-accumulated token plane. Rank pairs and routes accumulate in FP32 before
+one BF16 output conversion. Both inputs must already be resident and ordered
+on the destination stream; serving still needs to connect the peer-copy events.
+The existing single-GPU local-expert reduction is unchanged.
+
+The reduction fixture passes 12 combinations across both GPUs, rows 1/16/4096,
+and both layouts. It checks exact BF16 results, changed-data graph replay,
+trailing canaries, input/output overlap rejection, and invalid row counts.
+The C1/C16 expert fixture now invokes native GPU reduction rather than host
+summation and still passes all four comparisons against the unsplit oracle:
+relative L2 is about 0.23% after final BF16 rounding. Its cross-device staging
+currently uses PyTorch for the fixture; it does not qualify the serving transfer
+loop or asynchronous lane progress. Native build and daemon offline check pass.
+
+## Chained peer reduction owner
+
+`PeerReduction` now connects the native peer-copy and FP32 reduction through one
+preallocated destination stream. A remote producer event orders the copy; a
+local producer event orders reduction after both inputs. The owner polls only
+after the whole chain is queued, with no host completion barrier between copy
+and reduction. Its callback and input/output storage remain retained through
+completion or cancellation drain. Separate owners can target either GPU.
+
+Worst-case destination storage is `capacity * 5120 * 26` bytes for six FP32
+peer routes plus BF16 output, excluding stream/event overhead. A rank that
+already emits token sums copies only its live FP32 token bytes. This owner is
+not yet connected to the serving layer loop; full lane progress and a deliberate
+pending-transfer cancellation test remain necessary.
+
+The Rust CUDA fixture passes with two opposite-direction reduction owners joined
+cooperatively on one host thread. It checks changed values, C1/C16, both route
+and token-sum layouts, correct BF16 results on both devices, and restoration of
+the caller's device. It does not deliberately stall either producer. The daemon
+offline check also passes.
+
+## Rust TP2 expert execution owner
+
+`RankWeights` loads encoder TP2 layers inside explicit device scopes and frees
+them on the same devices. Immutable rank weights can be shared by both lanes.
+`RankWave` owns independent streams, capacity variants, scratch, and FP32 output
+storage. `ExpertWave` enqueues both ranks, then chains peer transfer/reduction
+onto either requested output GPU. Error/cancellation guards drain partially
+enqueued ranks before input borrows can be released. Its execute path performs
+no allocation. This backend is not yet selected by the serving layer loop.
+
+The real-checkpoint Rust fixture passes with layer 0 loaded as two TP2 halves,
+two concurrent lane owners sharing those weights, and opposite output devices.
+C16 zero input produces zero; changed nonzero input produces finite nonzero
+outputs identical on either destination GPU. This verifies loading, execution,
+ownership and reduction plumbing; it is not a full-model quality or throughput
+qualification. Current rank workspaces copy FP32 kernel scratch output into a
+stable preallocated buffer before peer reduction; account for those copies and
+buffers when measuring and planning memory.
+
+A deliberate stalled-producer CUDA test also passes: the peer chain returns
+Pending, another stream remains ready, and dropping the future drains both copy
+and its queued follow-up before returning. The test releases the producer after
+50 ms and checks final data and device restoration. Cancellation can block for
+cleanup; normal progress still polls cooperatively with no cross-lane join.
+
+## Shared-expert TP2 kernels
+
+The FP8 exporter and native shape checks now support `[1152,5120]` up/gate
+weights and `[5120,1152]` down weights. A separate 1,152-wide SwiGLU entry
+preserves the full-width entry. FP8 matrix and mHC module ownership now allows
+two device-specific module tables; the first device may retain any CUDA ordinal.
+Module loading remains at initialization, not in graph replay.
+
+C1/C16 shared TP2 projections export and build. The official layer-0 shared
+weight fixture runs both halves on their own devices, including changed-input
+graph replay, and checks distinct matrix handles. Summed BF16 half outputs
+match the full-width quantized reference within about 0.23% relative L2, with
+cosine above 0.999992. The daemon offline check passes. This fixture stages
+weights and sums halves in Python; Rust shared-weight slicing, shared execution
+ownership, peer reduction, other capacities, and serving integration remain
+pending. No single-GPU throughput claim follows from these numerical checks.
+
+## Rust shared-expert ownership and AOT library fix
+
+The catalog supports bounded row/column TP2 reads for coordinator matrices,
+with tests covering both ranks and axes, offsets above 2 GiB, trailing canaries,
+and invalid extents/placement. Existing TP4 and full expert tests continue to pass.
+The shared rank loader keeps native FP8 weights and expanded packed scales,
+discarding temporary source scales after packing. Resident weights require
+18,247,680 bytes per layer per rank, or 729,907,200 bytes for all forty layers
+per GPU. Peak loading additionally reserves 5,760 device bytes for source scales;
+pinned staging, CPU read scratch, execution workspaces and CUDA state are separate.
+
+The Rust shared `RankWave` now preallocates FP8 capacity plans, activation buffers,
+scratch and producer events. Two waves can share immutable weights on each GPU.
+The official layer-0 C16 fixture passes with both cards loaded before execution,
+zero/nonzero inputs, two independent waves per card, finite outputs, same-rank
+lane agreement, and caller-device restoration. Shared cross-rank reduction and
+serving selection remain pending.
+
+This fixture exposed a limitation missed by the earlier Python ordering:
+generated AOT launch symbols are process-global. Initializing a second CUDA
+library overwrote the first GPU's kernel symbols and made its FP8 GEMM reject
+launches. The final implementation uses **one CUDA library per exported variant,
+configured on each GPU**, with separate device-bound handles. FP8, mHC and TP2
+routed expert initialization now follow that model. Separate module libraries
+per GPU described in earlier checkpoints are superseded. Both real shared and
+routed Rust layer fixtures pass after this fix, as does the daemon offline check.
+
+## Complete shared TP2 operation
+
+The Rust shared `Wave` now owns both rank workspaces plus preallocated peer
+staging and output on either GPU. It queues both halves, copies the remote
+partial, waits for the local partial on the reduction stream, and adds on GPU.
+Normal completion polls cooperatively; each lane owns its own streams, events,
+and buffers. Error/cancellation drains retain rank inputs through queued work.
+Reduction staging and output add 20,480 bytes per capacity row per GPU per lane,
+separate from the rank execution workspaces. No loop allocation is introduced.
+
+The combined official layer-0 fixture passes C1/C16, zero and changed nonzero
+inputs, and two concurrent lane owners returning on opposite GPUs. Destination
+results agree byte-for-byte, and each value matches a CPU round-to-nearest-even
+sum of the BF16 rank outputs. The first run caught that the existing residual
+addition truncates BF16; a dedicated TP2 addition entry now rounds to nearest,
+without changing that existing single-device kernel. Native build and the Rust
+fixture pass. These checks do not establish full-model quality, serving lane
+overlap, or throughput; integration and larger prefill capacities remain pending.
+
+## Prefill capacities and combined native build
+
+TP2 routed and shared exports now have numerical evidence for capacities
+1, 16, 80, 256, 1024, and 4096. The qualification tools accept `--rows` to select
+exported capacities; routed reduction follows the export's route/token output
+layout, including atomic token accumulation at 256 rows and above. Changed-input
+graph replay passes at every capacity. Against the unsplit references, maximum
+relative L2 is 0.239% for routed experts and 0.234% for shared experts, with
+minimum cosine above 0.999997. Metrics accumulate in FP64 to avoid inaccurate
+FP32 reductions over large prefill vectors.
+
+The real-checkpoint Rust lane fixtures accept `DS41RT_TP2_TEST_CAPACITY` (default
+16). At capacity 4096 they alternate one-row and full-capacity executions with
+zero/nonzero inputs and opposite output destinations. Shared results match
+exactly. Routed deterministic variants match exactly; independent atomic
+executions show about 8e-9 relative L2 variation, bounded to one BF16 encoding
+step per element and less than 1e-6 relative L2 by the fixture. Zero input still
+produces exact zero after a nonzero execution.
+
+A fresh CMake build with CUDA, coordinator expert AOT, full-width RTX expert
+AOT, TP2 expert AOT, and FP8 AOT enabled succeeds. Both 4096-capacity Rust lane
+fixtures also pass against that combined library, rather than only the isolated
+test libraries. This establishes build coexistence and expert workspace reuse;
+complete serving integration, distributed attention/cache placement, vocabulary
+partitioning, automatic launcher selection, and full-model qualification remain.
+
+## Serving FFN connection and copy-engine independence
+
+`v41_experts/tp2_ffn.rs` now combines routed and shared TP2 execution for one
+encoder FFN. It borrows the completed normalized/router buffers on the owning
+GPU, copies only the peer inputs, runs both contributions concurrently, and
+returns their rounded BF16 sum to the input GPU. Each request lane owns its
+streams, peer buffers, expert workspaces, and output. Immutable weights remain
+shared between lanes. Execution performs no allocation.
+
+`NativeTp4Wave::install_tp2` and the serving lane's local FFN branch now select
+this operation when installed, validating query binding, layer, row count and
+token identity. Startup does not install it yet: complete placement, distributed
+attention/cache ownership, decoder shared TP2, and the remaining phase-2 serving
+components must still be integrated before enabling two-GPU mode.
+
+The official layer-0 fixture passes C1/C16 changed inputs with distinct values,
+expert IDs, and routing weights in each lane. Each result exactly matches a
+rounded sum of independently executed routed and shared contributions. It also
+checks cancellation and subsequent reuse of the same workspace.
+
+A deliberately held upload exposed copy-engine head-of-line blocking: queuing
+copies behind the held dependency prevented unrelated peer copies and the other
+lane from finishing until the 500 ms gate released, despite separate streams.
+The TP2 path now polls its own upload/remote producer cooperatively before
+submitting a not-yet-ready copy. The gated test then finishes the other lane in
+about 0.23 ms, with the gate still held; independent peer copies also complete.
+This is an isolation test, not a throughput measurement. No cross-request lane
+join or blocking synchronization was added to normal execution. Cancellation
+still drains queued work before releasing borrowed storage.
+
+Per-GPU, per-lane workspace accounting now includes exported scratch sizes,
+stable routed outputs, peer reductions, shared projections, peer inputs, and the
+final FFN output. It excludes immutable weights, CUDA modules/streams, allocator
+rounding, and runtime headroom:
+
+| Row capacity | Explicit workspace bytes per GPU per lane |
+| --- | ---: |
+| 1 | 1,231,360 |
+| 16 | 19,200,672 |
+| 80 | 95,860,384 |
+| 256 | 153,787,808 |
+| 1024 | 404,235,680 |
+| 4096 | 1,460,135,984 |
+
+The transfer boundary adds 25,808 bytes per row per GPU per lane beyond the
+shared/routed backends. At capacity 4096, two complete FFN lanes require
+2,920,271,968 explicit workspace bytes on each GPU. Full placement must also
+account for attention, cache/snapshots, auxiliary components, loading peaks,
+weights, and CUDA overhead; these FFN numbers alone are not a serving budget.
+
+## Distributed cache storage and scoped device execution
+
+`BackboneCache::new_distributed` now allocates each layer's FP8 SWA and each
+compressed source's FP4 KV, index data, page tables, lengths, and pending carry
+on its assigned GPU. Per-device cache byte accounting checks both budgets before
+allocation. The existing constructor retains its single-device placement.
+Shared request leases, versions, and publication metadata remain one CPU bank.
+
+`CachePlacement` derives source owners from the attention map and validates
+colocation across each source's consumer group: 2–7, 8–13, 14–19, and 20–39.
+The original 0–19/20–39 split and a rebalanced map moving source 14 with its six
+consumers both pass allocation and request lease/reuse checks on the actual GPUs.
+Moving only part of a source's consumer group is rejected by this colocated path
+and is outside the deployment plan: source 14 and layers 14–19 remain colocated.
+
+Device owners now construct and destroy cache components in the proper context.
+`Device::future` scopes every future poll and cancellation cleanup, restoring the
+caller's device before yielding. A two-GPU fixture verifies alternating polls,
+owned stream cleanup on cancellation, and owner destruction without leaving the
+thread on another device. This allows existing attention components to be placed
+without holding a thread-local CUDA device selection across an await.
+
+Non-empty prefix fixtures also pass with cache storage on GPU1 and retained
+snapshot storage/streams on GPU0: wrapped SWA spans survive slot reuse, odd
+compressor carry rows survive, and complete-group compressed-prefix restoration
+preserves its bounds. The initial distributed constructor therefore retains
+snapshot-copy coordination on GPU0, while retained compressed pages stay on
+their source GPU. Snapshot arena bytes must be charged to GPU0 separately.
+
+The existing single-device request-bank lifecycle/isolation check and daemon
+compile check pass. Running that previously environment-gated lifecycle test
+exposed a stale assertion rejecting page counts above 65,536; it now checks the
+existing 262,144-page limit and accepts 65,537, matching the current source cache.
+The allocation and snapshot evidence does not yet cover full distributed
+attention execution, end-to-end cache reuse, startup selection, or performance.
+
+## Placed cache-producer weights and workspaces
+
+Cache producer loading now follows `CachePlacement`: each SWA projection,
+compressed-source weight set, and attention sink loads on its owning GPU.
+Per-device weight budgets are validated first, and device owners preserve the
+correct context during loading and destruction. Attention sink pointers are
+resolved once at startup instead of formatting a tensor name and looking it up
+at every layer.
+
+`PlacedProducerWaves` allocates all forty SWA producer workspaces and four
+compression workspaces on those same devices, independently for each lane.
+Its budget splits the existing workspace calculation without counting another
+GPU's free space. For the original encoder/decoder placement:
+
+| Component budget, bytes | GPU0 | GPU1 |
+| --- | ---: | ---: |
+| Cache-producer weights | 85,998,336 | 59,519,232 |
+| Producer workspaces per lane, C16 | 22,990,736 | 14,024,592 |
+
+These figures exclude attention query/output projections, FFNs, KV/SWA storage,
+snapshots, auxiliary components, and CUDA overhead. They are component budgets,
+not the complete serving memory requirement.
+
+The official-weight fixture verifies all producer/sink/input-buffer device
+assignments. Layer-20 SWA and source-20 compression graph replay on GPU1 match
+the same weights executing on GPU0 byte-for-byte, including changed inputs and
+FP4 KV/index packing. Device-scoped futures restore the calling context after
+each execution. The existing single-device loader and execution constructor also
+initialize with every producer and sink on GPU0 after the dual-device checks.
+
+The placed workspace owner is not yet selected by the complete layer loop.
+The old execution constructor rejects distributed weights to prevent silently
+allocating their workspaces on the caller's GPU. Integrating placed producer
+polling/commit with attention, index, and layer-state ownership remains next;
+no full-model quality or throughput claim follows from these component checks.
+
+## Placed cache commit and retained-prefix recovery
+
+The existing cache transaction validator and publication logic now accept both
+ordinary producer waves and device-owned waves through static dispatch. Ordinary
+waves retain their direct calls; placed waves enqueue, query, publish, and abort
+inside their GPU scope. Validation also rejects a producer/cache GPU mismatch
+before submitting accepted writes.
+
+Placed producer lanes expose separate enqueue, poll, finish, and abort methods.
+Only enqueue borrows the bank immutably; polling borrows the lane alone, and
+publication/abort take a short mutable bank borrow. No mutable request-bank
+borrow spans an async wait. A fixed-size acceptance record binds completion to
+the original batch/counts and introduces no allocation for that tracking state.
+The underlying existing commit operations retain their existing staging and
+reservation behavior.
+
+The real-weight two-lane fixture uses the rebalanced map with source 14 and its
+consumers on GPU1, covering both compression ratios there. Accepted bytes across
+all forty SWA windows and all four FP4 KV/index sources exactly match direct
+single-GPU execution. It verifies distinct requests/acceptance counts, deferred
+logical publication, rejection of changed acceptance, and continuation across an
+odd compressed frontier. After retaining a prefix, an aborted copy-on-write
+append revokes only the affected request; the peer remains byte-identical.
+Restoring the retained prefix and accepting the next row matches direct
+execution, including the saved carry state.
+
+The existing larger single-GPU commit fixture also passes: 16-request CED
+transactions, bounded replay, encoder reservations/publication, late source-pool
+exhaustion, lease revocation, and recovery. These checks cover cache transactions;
+the complete distributed layer loop, attention/index placement, startup mode
+selection, and serving performance qualification still remain.
+
+## Placed asynchronous query production
+
+Placed producer workspaces now accept completed attention-query outputs and
+return a pending owner that borrows only the current lane. Enqueue, stream
+queries, graph capture/replay, and cancellation cleanup run on the assigned GPU;
+each call restores the caller's CUDA device. The shared cache bank is supplied
+only during enqueue/poll and is not retained across waits. Device and batch
+checks reject mismatched inputs. Dropping unfinished production drains that
+layer's producers before their storage can be reused.
+
+Ordinary layers enqueue SWA and their compressed source when applicable. At the
+encoder boundary, layer 20 enqueues only source compression, preserving the CED
+separation from decoder SWA execution. Replayed phases keep their existing
+compressed sources. This owner adds no new cross-lane barrier; underlying
+producer preparation retains its existing staging behavior.
+
+The official-weight CUDA fixture passes for layers 2 on GPU0 and 14 on GPU1,
+and for source-only layer 20 on GPU1. Queued outputs match direct production
+byte-for-byte for SWA values/scales and compressed FP4 KV/index values/scales,
+including changed-input graph replay. Cancellation followed by immediate reuse,
+wrong-batch rejection, shared-bank access while pending, and caller-device
+restoration also pass. This is not an end-to-end serving or throughput result.
+The full execution loop still requires attention/index/layer-state placement
+and selection of these placed producers.
+
+## Placed learned index and producer overlap
+
+Index query weights now load beside their attention/cache consumer groups. Each
+request lane owns separate index workspaces on the participating GPUs, and each
+GPU advances only through its assigned index layers. Source 20 and layers
+24/28/32/36 retain their candidates on the same GPU. Decoder restart skips GPUs
+without decoder index work. The ordinary constructor retains all eight layers
+on its original device.
+
+The placed producer owner now also accepts a placed index lane: it enqueues
+index projection alongside SWA/compression, polls the three producers separately,
+and starts selection after their required outputs complete. It retains no bank
+borrow across a wait. Cancellation drains index consumers before cache producers.
+The producer and index weights have independent borrow lifetimes.
+
+The first hardware check exposed a single-device restriction in the native index
+scorer. Its initializer now configures one canonical AOT CUDA library on two
+devices, preserving the generated global launch symbols and already initialized
+devices if a later initialization fails. Normal initialized calls avoid the
+initialization mutex. Direct scorer graph tests initialize both devices, then
+execute on GPU0/GPU1/GPU0 with changed queries; exact expected finite scores and
+masked negative infinities pass.
+
+For the rebalanced boundary at layer 14, component budgets are:
+
+| Index component, bytes | GPU0 | GPU1 |
+| --- | ---: | ---: |
+| Query weights | 11,479,040 | 34,437,120 |
+| Workspace per lane, C16 | 11,259,012 | 17,911,940 |
+| Workspace per lane, 4096-row capacity | 1,809,562,628 | 3,512,712,196 |
+
+GPU0 omits the unused decoder reindex workspace, saving 1,703,149,568 bytes
+(1.59 GiB) per 4096-row lane compared with allocating both selection workspaces
+there. These budgets exclude attention, producers, FFNs, and persistent caches.
+
+The official-weight combined producer/index fixture passes all eight index
+layers across both GPUs, with changed hidden inputs, cancellation/restart,
+source-20 candidate retention through decoder reindex, and exact packed-query,
+head-weight, and selected-ID parity against direct execution. Its short context
+checks binding and placement; the separate scorer graph fixture explicitly runs
+the scoring kernel. Existing index budget checks also pass. Full distributed
+attention/layer-state execution and serving performance qualification remain.
+
+## Placed backbone state and adjacent-layer handoff
+
+Backbone mHC, attention query/output, and router weights now load on the GPU
+assigned to each attention layer. A placed lane allocates its reusable block,
+query, projection, sparse-attention, and router workspaces on that GPU. Full
+shared-expert weights and their workspace are absent from placed lanes: the TP2
+rank owners provide them separately. Ordinary loading still includes all forty
+full shared experts and their existing workspace.
+
+For the rebalanced layer-14 boundary, backbone weight budgets excluding shared
+experts are 1,902,329,296 bytes on GPU0 and 3,532,897,264 bytes on GPU1. Omitting
+the duplicate full shared weights avoids 1,461,196,800 additional bytes across
+the two GPUs; this does not remove the separately required TP2 shared weights.
+Placed backbone workspace at C16 is 32,742,680 bytes per GPU per request lane.
+This remains component accounting, not a complete startup memory ledger.
+
+Each directed layer handoff uses its own lane's transfer stream and copies
+completed residual/pre state directly into the destination block's existing
+input buffers. There is no intermediate device allocation or host staging.
+Stream polling scopes the destination CUDA device and restores it before yield;
+cancellation drains before borrowed buffers can be reused. Destination state is
+published only after both copies finish. Token storage is reserved with the
+block capacity at construction. Layer-14 inputs remain gated on Engram work.
+The reusable backbone lane now exposes this handoff and rebinds its attention
+query/output and router to the imported layer. Ordinary `advance` rejects a
+cross-device successor so it cannot accidentally execute the wrong placement.
+
+The official-weight handoff fixture checks 16/1/16 changed rows against direct
+same-device initialization, through both the block and placed backbone lane.
+Normalized/projected/rotated attention-query bytes match exactly. A deliberately
+held stream proves pending cancellation drains, leaves no published prepared
+state, and permits immediate reuse with unchanged buffer addresses and token
+capacity. The Engram gate at the rebalanced boundary is also preserved.
+
+Router execution exposed additional single-device native ownership in the
+router-score and expert-input quantizer exports. They now configure canonical
+CUDA libraries on both devices; quantizer handles retain their device identity.
+Router graph fixtures for layers 0, 14, and 20 compare scores, expert IDs, routing
+weights, and quantized inputs byte-for-byte against direct execution, including
+changed 16/1/16 rows. Both-GPU checks and ordinary loader/lane initialization and
+restart pass. The lane allocation guard test now uses the linked AOT library's
+scratch extents instead of stale totals from an older export build.
+
+The complete serving layer loop still needs to select these placed lanes and
+producers, use the peer handoff at placement boundaries, and wire decoder shared
+TP2 before distributed decoder FFNs can execute. The existing FFN finish path
+also still copies next-layer inputs locally; a boundary-specific finish can
+omit that redundant local copy when integrating the handoff. End-to-end serving,
+loading speed, and one-/two-GPU throughput remain unqualified.
+
+## Decoder shared TP2 with dispatched Spark work
+
+The existing TP2 FFN lane now exposes a shared-only operation for decoder layers.
+It reuses its shared rank workspaces and normalized-input peer buffer, so this
+adds no GPU scratch allocation. Only normalized BF16 rows cross to the other
+rank; router IDs, routing weights, and expert-wire inputs stay out of this copy.
+Both shared ranks reduce onto the input GPU. The upload waits cooperatively for
+its own stream before submitting peer DMA, preserving the independent-lane rule.
+
+`NativePendingFfn` now retains access to the lane's TP2 workspace after Spark
+routed-work dispatch. Its TP2 completion path validates the block/request/device,
+executes the shared contribution, then uses the existing ordered Spark-plane
+reduction with that completed shared buffer. The placed backbone lane selects
+this path when shared TP2 weights cover the decoder layer. The ordinary full
+shared-expert path remains available. The coordinator must be allocated on the
+same GPU as the decoder input/output; startup selection still needs to enforce
+that placement.
+
+The real-weight fixture now loads all forty shared rank weights and checks
+layers 20 and 39 with changed 1/16/1-row inputs from either GPU. Shared-only peer
+broadcast and reduction match the independently invoked shared TP2 operation
+byte-for-byte. A held upload in one lane leaves the other lane's decoder shared
+work free to complete; pending cancellation drains and subsequent reuse passes.
+The existing encoder FFN parity and independent-lane checks pass in the same
+fixture. These tests establish the local computation and ownership behavior;
+the new coordinator completion branch still needs a live Spark-backed decoder
+run after the distributed serving loop and startup are connected. No end-to-end
+throughput or tool-quality claim follows from this checkpoint.
+
+The existing rank-upload/reduction regression also passes through 4096 rows,
+including interleaved chunks, bounds rejection, cooperative cancellation, and
+reuse. The daemon compile check passes.
+
+## Connected distributed layer execution
+
+`DistributedExecution` now owns one lane's placed cache producers and pass
+progress. It connects asynchronous producer/index work to the GPU-owned
+attention lane, returns prepared FFN work without retaining a cache-bank borrow,
+and completes the layer on its owning device. Batch/layer progress prevents a
+partial pass from publishing accepted cache writes. Encoder boundary source-only
+production has an explicit completion transition. Reserved encoder batches are
+rejected until their early-publication flow is connected, rather than silently
+changing publication semantics.
+
+Prepared attention has device-scoped destruction as well as device-scoped future
+polling: cancelling before the FFN future's first poll must still drain queued
+GPU1 attention on GPU1. Ordinary non-indexed attention now shares the same queued
+consumer implementation as indexed attention. At a placement boundary, mHC
+completion omits the local next-input copy; the directed peer transfer consumes
+its output and fills the next GPU's existing block storage directly. Same-GPU
+completion retains its local copy path.
+
+A real-weight fixture executes layer zero entirely on GPU1 through embedding,
+cache production, sparse attention, query/output projections, routed/shared TP2,
+and final mHC. Changed 1/16/1-row residual/pre outputs match the ordinary GPU0
+execution path using the same TP2 arithmetic byte-for-byte. It then transfers
+the output to GPU0 layer one and verifies the required Engram gate. Dropping an
+unpolled prepared-layer execution and restarting also passes, with caller-device
+restoration; partial-pass cache commit is rejected. The fixture supplies distinct dummy transport
+endpoints and executes the local encoder branch without using a Spark result.
+
+This is a connected single-layer check, not a complete forty-layer serving run.
+The target-pass loop still needs placed Engram/taps/head ownership, all layer
+transitions, reserved encoder publication, and startup mode selection. Indexed
+attention and live Spark-backed decoder execution need qualification through the
+connected execution owner. Full-model performance and release tables remain
+pending.
+
+## Placed Engram projection and upload
+
+Engram gate weights now follow attention layers 1 and 14. `PlacedEngram` owns
+two device-scoped gates and one gathered-row upload workspace per participating
+GPU, per request lane. Gates on the same GPU reuse that lane's upload workspace;
+split gates have separate uploads. CPU table gathering and its request/history
+validation remain unchanged. The caller retains the gather lease while upload
+and residual gating run under a device-scoped future.
+
+Application validates the gathered layer index, the lane's pending Engram layer,
+and the GPU assignment before upload. It invokes the existing cooperative
+upload and gate operations, preserving cancellation cleanup and the prepared
+state transition. No cross-lane owner or wait is introduced.
+
+Actual weight allocations and exact-budget workspace construction pass for the
+original split and the rebalanced layer-14 boundary:
+
+| Engram component, bytes | Original GPU0 | Original GPU1 | Rebalanced GPU0 | Rebalanced GPU1 |
+| --- | ---: | ---: | ---: | ---: |
+| Gate weights | 324,874,240 | 0 | 162,437,120 | 162,437,120 |
+| Per-lane workspace, C16 | 5,266,488 | 0 | 2,782,244 | 2,782,244 |
+
+The original placement saves one 298,000-byte C16 upload workspace by sharing
+it between its two gates. A budget one byte below the required GPU0 allocation
+is rejected before gate/workspace allocation.
+
+The existing real-weight block/lane handoff fixture now continues through the
+GPU1 layer-14 Engram gate. With synthetic gathered FP8 rows and mixed text masks,
+changed 16/1/16-row residual/pre outputs exactly match the ordinary upload/gate
+path and become available for subsequent attention. This verifies placed GPU
+projection/application; it is not a new CPU table-lookup or full-model quality
+evaluation. The forty-layer target-pass loop still needs to invoke this owner
+along with placed taps/head and reserved encoder publication.
+
+## Full distributed pass integration
+
+`DistributedTargetPass` now sequences all forty layers through placed embedding,
+Engram, cache/index production, attention, TP2 FFNs, peer handoffs, decoder taps,
+and the target head. Each request lane owns its pass and transport; request-bank
+borrows end before asynchronous waits. The full vocabulary head is temporarily
+on the decoder GPU. Reserved encoder early publication and normal serving
+startup integration remain pending.
+
+The real-model `distributed_target_prefill_decode_commit_smoke` fixture passes
+with two RTX cards and all four live Spark endpoints. It loads all twenty encoder
+expert layers and all forty shared experts as TP2, places the attention boundary
+at layer 14, runs a four-token prefill and one-token decode, and publishes both
+cache/history commits. It also discards a subsequent completed proposal without
+advancing committed history, then successfully executes and commits another
+decode using the same owners. Discard invalidates each GPU's local lane rather
+than attempting to restart GPU1 at GPU0's layer zero. The fixture uses a small
+cache and synthetic token IDs: it establishes execution and lifecycle behavior,
+not semantic quality, throughput, or concurrent-lane performance. Its native
+build requires `DS41RT_ENABLE_RDMA=ON` for the live decoder path.
+
+## Queued encoder cache publication
+
+Early encoder publication now accepts device-owned window and compressor waves.
+It can enqueue writes on their assigned GPU, return the request-bank borrow,
+and publish after cooperative polling. Publication rejects unfinished writes
+before changing publication masks or request completion. Direct single-GPU
+callers retain their synchronous path; accepted prompt counts use a fixed
+sixteen-request array.
+
+The placed cache transaction fixture verifies two reserved chunks of three and
+four tokens against direct publication, including ratio-two carry across the odd
+boundary. All twenty encoder windows and four compressed sources match exactly
+with source 14 and source 20 on GPU1. Publication leaves request completion
+unchanged until the enclosing commit. Duplicate publication is rejected, and
+aborting queued GPU1 window/source writes preserves a disjoint peer request.
+The distributed target loop still rejects reserved chunks until this primitive
+is connected to its chunk scheduling and cancellation guards.
+
+## Reserved chunks through the distributed target loop
+
+The distributed loop now accepts reserved encoder chunks. Compressed sources
+publish cooperatively before index selection, so selection and subsequent
+attention consumers share the committed causal snapshot. Window publication
+follows the completed layer. Each poll releases the request-bank borrow; the
+reserved-pass cancellation guard drains pending writes before revoking admission
+and invalidating both GPU-local lanes. Source 20 publishes at the encoder
+boundary, and final chunk commit advances cache and Engram history together.
+
+The full real-model fixture passes reserved chunks of three and four tokens,
+then replays the seven retained encoder rows through the live Spark decoder.
+Its greedy token matches a full seven-token prefill, with the winning score
+within 0.25 logits. Cancelling at a cooperative suspension revokes the reserved
+request; the same GPU owners then successfully execute and commit a fresh full
+pass. Ordinary full prefill/decode, commit, and discard/reuse checks also pass.
+These are short integration checks, not release quality or throughput results.
+Interleaving encoder chunks across two request lanes and connecting the normal
+serving scheduler remain pending.
+
+## Interleaved distributed encoder chunks
+
+The two distributed lanes can now reserve, execute and commit alternating chunks
+of one prompt. A chunk waits for its predecessor's per-layer cache publication;
+suffix capture, source-20 publication and history completion remain ordered for
+that prompt. Each lane reserves its next chunk after its own commit, without a
+pair barrier. Request-bank borrows end before waits. Suffix capture uses a stream
+owned by that lane on the encoder-output GPU, with cooperative completion and
+drained cancellation. Stream failure revokes the prompt after both active chunk
+guards drain their work.
+
+Interleaving exposed a sparse-attention validation bug: a committed source's
+device length can advance after an earlier causal view is queued. Requiring
+exact length equality caused valid prefix readers to return zero attention.
+Committed-only views now accept an appended source; private overlays still
+require an exact boundary. A focused native regression on both GPUs checks
+ordinary and split attention, equal output after append, rejection of shortened
+backing, and rejection of stale private overlays.
+
+The real-model integration fixture compares sequential and interleaved execution
+for identical 3+4 and 1+2+1+3 chunk partitions. Winning token and score match
+exactly after live Spark decoder replay. Disconnecting during active encoder
+work revokes both chunks, and subsequent execution reuses the owners. These
+short fixtures do not establish release quality or throughput. Publication still
+follows each layer's FFN completion; overlapping a follower's attention with that
+FFN and connecting the normal serving scheduler remain further work.
+
+### Follow-up: interleaving remains under correctness investigation
+
+A subsequent untraced integration run failed the four-chunk comparison: both
+paths selected token 200, but the winning scores were 17.553558 and 21.930965.
+The earlier passing runs therefore do not establish reliable interleaved
+execution. Layer tracing, first synchronous and then lane-local asynchronous,
+passed without reproducing the failure. Diagnostic readback changes timing and
+is not qualification evidence. `DS41RT_TRACE_ENCODER` enables the temporary
+test-only trace; ordinary runs leave it disabled. The failure log is
+`~/.cache/ds41rt-experiments/phase2-planner/distributed-serving-output.log`.
+Resolve this intermittent difference before treating the stream as qualified
+or connecting it to production serving.
+
+The investigation also exposed an independent host validation error: an older
+chunk's committed-prefix view was rejected while a follower held an append
+reservation. `committed_proposal` now permits that immutable published prefix;
+future extents and mutation/release during a pending append remain rejected.
+The native ratio-two/ratio-one compressor commit regression passes, including
+those guards and existing carry, direct-value, and abort comparisons. A later
+16-case untraced integration run passed, but a prior run with this prefix fix
+still failed. The numeric interleaving issue therefore remains unresolved;
+no throughput improvement is claimed for this correctness change.
+
+Removing the temporary native invalid-attention logging reproduced failures
+with both placements. The deployment boundary at 20 failed the 3+4 partition
+(token 200 in both paths, scores 15.589296 versus 16.83005); boundary 14 failed
+the four-chunk partition with different winning tokens (74 versus 200).
+Logs are `interleave20-clean.log` and `interleave14-clean.log` in the same
+experiment directory. The fixture now defaults to boundary 20 and accepts
+`DS41RT_ATTENTION_BOUNDARY=14` for alternate ownership coverage. Neither
+placement is qualified for interleaved execution yet.
+
+Deferred test tracing now queues pinned readback on each lane's mHC producer
+stream without a per-layer host wait, and collects after execution. Selecting
+only layer 19 reproduced differing encoder residuals for every chunk; selecting
+layer 14 likewise reproduced differing residuals. A layer-0-only capture
+reproduced the final mismatch with identical layer-0 residuals. This places the
+observed divergence after initialization and before completion of the encoder;
+decoder replay and the vocabulary head are not its first cause. Full-layer
+tracing still masks reproduction. Logs are `interleave20-deferred19.log`,
+`interleave20-deferred14.log`, and `interleave20-deferred0.log`.
+
+Single-layer captures at 1/2/3/4 matched exactly in runs that still failed at
+the head. Layer 5 captured a differing first-chunk residual, but capturing 4
+and 5 together changed the schedule and both matched despite a later failure.
+Thus the first affected layer depends on overlap timing; the evidence does not
+prove a fixed layer-5 defect. A temporary invalid-view trap in sparse attention
+did not fire in another reproducing run (`interleave20-invalid-trap.log`),
+ruling out that kernel's descriptor rejection for that failure. The trap was
+removed after the experiment. Continue with data ownership and overlap checks.
+
+An independent-request comparison now gives each lane a separate cache lease
+and compares retained encoder residuals against sequential execution. Four
+concurrent pairs passed exactly for equal three-token requests and again for
+unequal three/seven-token requests (`independent-encoder.log` and
+`independent-encoder-unequal.log`). The current fixture enables the unequal case
+with `DS41RT_INDEPENDENT_ENCODER_CHECK=1`. These short checks point toward
+same-request cache overlap; they do not establish general concurrency quality.
+
+The distributed pass also exposes device-scoped greedy/logit downloads and a
+statically dispatched target-cache interface for queued dSpark commits. The
+fixture checks finite full-vocabulary downloads, exact agreement with GPU
+argmax, compact-row bounds, and restoration of the caller's GPU. Ordinary
+serving still selects its existing target pass; installing the distributed
+pass and placing the actual draft runtime remain outstanding.
+
+Further isolation: separate-cache encoder requests also match exactly when the
+second starts only after the first completes five layers
+(`independent-encoder-staggered.log`). The native prefix test now queues 64
+attention reads while another stream stores different FP4 values beyond the
+prefix and updates its length; all outputs match on both GPUs, with ordinary
+and split attention. This checks the primitive, not the complete cache
+publication lifecycle. Capturing mHC pre output at layers 1 and 4 also matched
+in runs that later failed (`interleave-pre1.log`, `interleave-pre4.log`). The
+next useful boundary is attention/projection versus FFN within an affected
+encoder layer; a residual-only end-of-layer trace cannot distinguish them.
+
+Paired tracing now retains captures in GPU memory and downloads after the run,
+avoiding diagnostic PCIe reads between layers. `DS41RT_TRACE_FFN=1` captures
+normalized FFN input plus each layer's residual/pre output. This reproduced the
+failure with complete traces: `interleave-vram-paired.log` first differs at
+layer 7's FFN input; `interleave-vram-full-state.log` first differs at layer 8's
+FFN input, with layer 7 residual and FP32 pre bytes both matching exactly.
+The latter localizes that run's first difference before expert execution,
+within attention/query/projection or its input preparation. It does not prove
+a fixed offending layer or establish the root cause. Earlier trace logs
+represented paired output stages as layer+40; the current formatter labels
+stages and reports BF16 and FP32 differences separately.
+
+Query tracing further narrows one failing execution to the second query
+projection (QB). `DS41RT_TRACE_QUERY=1` captures query components before and
+after cache production; `DS41RT_QUERY_COMPONENT=qb_pair` retains both projected
+output and normalized input. In `interleave-qb-pair.log`, layer 13 has identical
+three-row normalized inputs but differing projected outputs. All 274 differing
+BF16 elements lie in columns 24832–24959, one 128-column tile. Both captures
+already contain the difference before cache production. This supersedes the
+earlier cache-overlap hypothesis for this particular failure; the underlying
+cause is not yet established.
+
+`DS41RT_TRACE_DUMP_DIR` optionally saves that first equal-input mismatch as
+`qb.json`, `input.bf16`, `expected.bf16`, and `actual.bf16`, without overwriting
+an existing capture. The local `qb-pair-capture` artifact reproduces the
+sequential result exactly in an isolated native QB test, including paired
+streams and graph replay. The isolated race check reports no hazards. Full
+fixture memory checking (`interleave-memcheck.log`) reports only 20 repeated
+`cudaErrorPeerAccessAlreadyEnabled` API results, with no reported invalid
+memory access; the instrumented fixture passes, so this is not proof that the
+concurrent mismatch is resolved. Full dense-kernel race checking with tensor
+operation checks is the next investigation. An initial filter written as
+`kns=regex:.*dense_gemm.*` matched no kernels and provides no race coverage;
+the corrected filter is `kns=dense_gemm`.
+
+The paired QB diagnostic also retains its complete quantization scratch before
+cache production and reports byte differences, without interpreting FP8/scale
+bytes as BF16. New equal-input mismatch dumps include `actual-scratch.bin` and
+`expected-scratch.bin`. Scratch includes padding and possibly inactive rows;
+a difference alone is not evidence of corrupted live inputs. Identical scratch
+would further narrow an equal-input/different-output capture to the GEMM or
+its weight/output lifetime. This additional diagnostic is test-only and has
+compiled successfully; reproduction with it remains pending while the full
+race check uses the preceding binary.
+
+Vocabulary projection now has a native/FFI contiguous-shard constructor. Each
+rank owns its cuBLAS handle and 4 MiB workspace; the existing full-head and
+Markov constructors retain their dimensions and accumulation policy. The
+standalone `native/tests/v41_vocabulary_shard_selftest.py` compared two
+64,640-token shards on separate GPUs/streams against the full 129,280-token
+projection using synthetic BF16 inputs/weights. Rows 1/3/16/80 and three graph
+replays matched full logits exactly (maximum error zero); a separate FP32
+reference checked columns on both sides of the boundary. CPU merging of local
+winners reproduced global greedy IDs. Invalid shard sizes, row overflow, and
+wrong-device launch were rejected. This is a projection primitive check, not
+real-model quality or speed qualification. Distributed weight loading, GPU
+winner merging, sampling/constrained outputs, and target/draft integration
+remain required. Native compilation and `cargo check -p ds41rt-ffi` passed.
+
+`VocabularyShard` now admits and loads only its contiguous checkpoint token
+range using bounded pinned staging. For the equal split, each GPU owns
+661,913,600 bytes (631.25 MiB); no full-head device staging is allocated.
+`dual_vocabulary_shards_match_complete_checkpoint_ranges` loaded both real
+checkpoint halves with 7 MiB staging and compared every uploaded byte back to
+the corresponding checkpoint range. Both halves matched exactly, budget and
+range rejection passed, and owner destruction restored GPU 0. This validates
+shard loading, not end-to-end two-GPU head execution or startup performance.
+
+The vocabulary primitive now merges two checked local greedy candidates on the
+GPU after their peer transfer. Only per-row token/score candidates are needed;
+no full-logit download or host decision is required. Ties select the lower
+global token; a nonfinite score or out-of-range local token on either rank
+publishes the existing invalid-candidate representation (UINT32_MAX/NaN).
+The synthetic two-GPU self-test now checks this native merge against full-head
+winners/scores at rows 1/3/16/80, graph replay, ties, shard-boundary offsets,
+invalid IDs/scores, and output alias rejection. All passed; shard/full logits
+still match exactly. Native compilation and FFI checking passed. The normal
+distributed target/draft head must still be wired to these primitives.
+
+`DistributedVocabularyWave` now composes the shards into a per-lane operation:
+copy completed normalized rows from RTX1, project both ranks concurrently,
+copy RTX0's compact candidates as soon as that rank completes, and merge on
+RTX1. Each lane owns its rank streams, projection handles/workspaces, input and
+logit buffers, candidate buffers, merge stream, and shape graphs. All waits are
+cooperative; cancellation drains submitted work before reuse. The rank join
+belongs to one vocabulary operation and does not join independent lanes.
+
+`distributed_vocabulary_real_weights_match_full_and_cancel_safely` loaded real
+checkpoint weights and ran two such waves concurrently with different inputs.
+All logits matched full-head references exactly for rows 1/3/16/3 (including
+cached graph reuse), and global greedy IDs/scores matched. Cancellation at a
+submitted wait left output unpublished; subsequent execution succeeded and
+restored the caller's GPU. The test used an isolated native overlay linked to
+the existing build, leaving the running full-model sanitizer library untouched.
+This validates the normalized-input vocabulary wave; final mHC/norm selection,
+target-pass integration, draft integration and sampling remain outstanding.
+
+`DistributedTargetHead` now selects final-layer rows on RTX1, performs mHC
+collapse and RMS normalization there, runs the split vocabulary wave, and
+reads back only compact greedy IDs/scores. Selection/token metadata and the
+block binding publish only after completion. Row uniqueness checking uses
+preallocated selection storage without a temporary set; shape graphs and
+output vectors are retained per lane.
+
+The real-weight complete-head fixture compared selections [5], [4,1,3],
+[0,1,2,3,4,5], and [3,0,5] against `TargetHeadWave`. All logits, greedy results,
+and row/token/binding metadata matched exactly, including repeated-shape graph
+reuse. Empty, duplicated and out-of-range selections rejected and unpublished
+prior output; a later valid call succeeded. Compilation and the fixture passed
+using the isolated native overlay. Installing this head into
+`DistributedTargetPass`, full-logit sampling adapters and dSpark integration
+are still required; this is not a serving or performance qualification.
+
+`DistributedTargetPass` now owns `DistributedTargetHead`; its fixture loads
+both vocabulary halves instead of a full RTX1 head. Explicit compact-row logit
+downloads read the shards concurrently and concatenate each selected row in
+global token order. Greedy reads only compact candidates; non-greedy head calls
+skip compact readback. The head fixture verifies reordered downloads, bounds,
+and non-greedy publication; all passed. The complete native build also passed.
+The full-model fixture passes initial full/decode/discard/replay stages with
+this head, but concurrent encoder qualification remains failing as below.
+
+The full dense-kernel tensor race check was stopped as inconclusive after its
+log stopped advancing for over five minutes in the final four-chunk
+interleaving (last logged layer pair 14/13). The process remained alive, GPU0
+busy, and a separate two-GPU head test still completed. No hazard report was
+emitted before stopping; this is not a clean race-check result. Debugger attach
+was restricted by ptrace policy; launching a child under GDB works without
+changing that policy.
+
+The subsequent uninstrumented `interleave-qb-scratch.log` reproduced a final
+mismatch at case 19 (token 200 in both paths, scores 18.999233 versus 17.553558).
+Its earlier equal-input QB capture at case 5, layer 10, position 0 contains one
+row: 32 output elements differ in columns 16960–17007, within tile 132. All
+8,192 bytes of the active capacity-1 scratch slice match exactly. The 3,841
+scratch differences occur exclusively in the inactive capacity-16 slice
+(offsets 8192–34339). This rules out differing quantized scratch inputs for
+that captured projection and directs the next check toward GEMM execution or
+weight/output lifetime. Artifacts are in local `qb-scratch-capture`; no claim
+of resolved concurrency or performance qualification follows from this test.
+
+A small standalone reproducer now triggers the QB defect without target-pass
+or cache machinery: `native/tests/v41_fp8_overlap_stress.py` accepts the native
+library, checkpoint and paired capture directory. It retains each projection
+and replays graphs explicitly on distinct streams. This corrects the older
+standalone graph test, whose default-stream replays did not establish overlap.
+
+Without eviction traffic, 8,192 captured projections each matched exactly for
+capacity pairs 1/16, 1/80, 16/80 (three live target rows), and 1/4096. Adding a
+256 MiB tensor update on the competing stream reproduced 122 bad projections
+in the first 256 on each GPU. The GPU1 serial-eviction control passed all
+8,192. Removing the competing GEMM still reproduced 243/256 bad projections
+on GPU1, so a second GEMM is not required. The repository script's short
+32-step concurrent run reproduced 31 bad projections (during the ongoing
+sanitizer experiments); it exits 1 on a numeric mismatch by design. These are
+correctness experiments, not throughput measurements.
+
+Standalone tensor race checking and initialization checking were stopped
+deliberately after confirming the processes remained live; neither completed
+a clean qualification. Race instrumentation masked the numeric failure through
+trial 10. Shared-memory initcheck, including `--check-tensor-ops yes`, reported
+uninitialized 16-byte reads at the QB kernel's `LDSM` instruction (PC `0x950`,
+first shared address `0x800`). Whether these reports describe live operands,
+padded rows, or instrumentation limitations remains unresolved.
+Filtered initialization checking emitted host-copy uninitialized-access
+reports; these have not been established as kernel defects and must not be
+reported as proof of the underlying bug. The strong result is the small
+uninstrumented concurrent-memory-traffic reproduction, with a passing serial
+control. Next investigation should use it rather than another long full-model
+sanitizer run.
+
+The reproducer now supports `--no-graphs` (round-robin host submission on the
+two streams) and `--check-inputs` (byte-exact input, weight, and packed-scale
+verification after each synchronized trial). On GPU0, direct concurrent
+eviction reproduced 255/256 bad projections, with all three immutable buffers
+unchanged; the first failing projection had 6,993 differing values and maximum
+absolute error 1.875. The direct serial control passed all 8,192 projections
+and every integrity check. Thus graph replay is not necessary for this failure.
+Logs: `qb-direct-integrity.log` and `qb-direct-serial-integrity.log` in the
+local phase2 experiment directory.
+
+A diagnostic SparkInfer worktree added a consumer-only named barrier before
+both shared-stage releases and exported fresh QB capacity-1/16 objects. Its
+standalone native overlay still failed 248/256 projections under concurrent
+eviction on GPU0 (`qb-handoff-stress.log`). An unchanged GPU1 recheck failed
+249/256 (`qb-baseline-recheck.log`). These counts are timing-sensitive correctness
+observations, not comparative performance measurements. The extra barriers
+have not been applied to the pinned production source. Next investigation
+must localize the live operand or pipeline failure without joining request lanes.
+
+The subsequent `--gemm-only` probe reuses quantization from the synchronized
+warmup and calls the initialized AOT GEMM using its manifest-declared ABI.
+Both quantized scratch buffers are checked byte-for-byte after each trial.
+Concurrent eviction still caused 253/256 differing projections on GPU0, with
+unchanged scratch, input, weight, and packed scales (`qb-gemm-only.log`). The
+serial GPU1 control passed 8,192 projections, and a capacity-16/three-live-row
+serial control passed 32 (`qb-gemm-only-serial.log` and
+`qb-gemm-only-rows3-serial.log`). Repeated activation quantization is therefore
+not necessary to trigger the defect.
+
+Further isolated kernel probes have not produced a fix:
+
+| Probe | Concurrent result | Diagnostic observation |
+| --- | --- | --- |
+| Remove the explicit TMA cache hint | 243/256 differ | Immutable operands unchanged |
+| Compare each acquired activation stage against global input | 88/256 differ | No shared activation mismatch reported |
+| Compare each acquired weight stage against global weight | 9/256 differ | No shared weight mismatch reported |
+| Compare acquired activation/weight scale stages against global scales | 142/256 differ | Neither scale checker reported a mismatch |
+| Store accumulators directly to output, bypassing the shared-memory epilogue | 250/256 differ | Standalone baseline still matches |
+
+These are separate, timing-changing diagnostics, not a combined operand proof
+or performance comparison. The checker flags also need positive-control
+coverage before relying on their silence as a conclusive exclusion. Sources
+and exported objects for the operand/output probes remain in local
+`qb-check-a`, `qb-check-b`, `qb-check-sf`, and `qb-direct-output` directories;
+logs use the corresponding `*-stress.log` names. No diagnostic kernel replaces
+the pinned production source. The next useful boundary is the register
+fragments consumed by MMA, with checker coverage verified explicitly.
+
+The register trace subsequently found the first concrete corruption boundary.
+It retained A/B/scale register words immediately before MMA for the first 16
+output tiles. Serial traced output matched; concurrent output differed. In
+`qb-fragments-detail.log`, changed A/B words occur only at K blocks
+3, 7, 11, ..., 35. For example, the second compute warp's K-block-7 operands
+exactly match the serial K-block-23 operands: the same shared-memory slot after
+four stages of ring reuse. The sparse paired words are in local
+`qb-fragments-diff.json`. A positive control flips one expected scale byte in
+each scale checker: both report exactly one affected thread, while the real
+projection output remains unchanged (`qb-check-sf-positive.log`).
+
+Moving the release after MMA in source still failed, and disassembly showed
+release instructions before final MMA instructions. A warp barrier also
+failed. Adding `cute.arch.fence_view_async_shared()` before both consumer
+releases passed the captured stress:
+
+| Fixed-kernel stress | Result |
+| --- | --- |
+| GPU0, one row, concurrent 256 MiB memory traffic | 8,192/8,192 exact |
+| GPU1, one row, competing GEMM plus memory traffic | 8,192/8,192 exact |
+| GPU0, three rows/capacity 16, concurrent memory traffic | 8,192/8,192 exact |
+
+The fork regression `tests/gemm/test_dense_gemm_concurrent_reuse.py` uses
+synthetic weights and independent replay streams, without model captures.
+Both row cases fail on the old source (14.2% and 0.2% differing elements in
+the observed first trials) and pass with the fences. All 13 targeted regression
+and V4.1 block-FP8 correctness tests passed. The change is pushed to the fork's
+master at `3882b935ede761d6c73a5d6fd68e690f1e3f5380`; DS41RT pins that revision.
+
+This does not yet establish end-to-end completion or throughput. The full
+target fixture with only QB replaced still failed reserved encoder/replay
+comparison (`16.83005` versus `16.138021`). All projection kernels must be
+rebuilt from the fixed source, followed by the full distributed fixture and
+performance checks. The fix introduces no cross-lane synchronization or replay
+allocation. Rebuild log: local `native-proxy-release-build.log`.
+
+The complete native rebuild subsequently succeeded, and
+`distributed_target_prefill_decode_commit_smoke` passed with two RTX GPUs,
+four live Sparks, the split vocabulary head, and `DS41RT_STREAM_CASES=32`.
+The uninstrumented run completed in 19.36 seconds with zero failed tests
+(`interleave-all-proxy-release.log`). This clears the reproduced target-pass
+concurrency correctness gate; it is not a serving throughput measurement or
+completion of the remaining phase-2 startup/scheduler/release work. The prior
+native library is preserved locally as `libds41rt-before-proxy-release.so`
+(SHA-256 `1d7b0aeb2a6b47bdbb98605959c068b6ab639ea5b6fcc1a9f8e8811feef8c590`)
+for matched performance checks.
+
+A matched, cache-hot QB timing probe used the preserved old library and rebuilt
+library in before/after/after/before order, 128 projections per graph, 16 graph
+replays per timed sample, and 15 samples per arm. Outputs matched exactly in
+the serial timing workload. Mean arm medians were 17.336 versus 17.337 µs for
+one row and 16.899 versus 16.899 µs for three rows. No measurable difference
+appeared in this probe. These are local projection timings, without a formal
+clock/throttle qualification, and do not replace single-RTX serving regression
+or real/weighted throughput tables. Commands/scripts and raw samples remain in
+local `bench-qb-fence.py`, `run-qb-fence-bench.py`, and `qb-fence-bench-*.log`.
+
+The distributed target pass now assembles adaptive route history for all 40
+layers from the router output already present in each owning GPU's completed
+host staging. Host vectors are reserved during pass construction; collection
+adds no CUDA transfer or wait. Together the lane-owned and assembled vectors
+reserve 7.5 MiB of host row storage per pass at the maximum 4,096-row bound.
+The single-GPU serving path is unchanged. Normal serving still needs the
+distributed pass and transport connected to its independent scheduler and
+dSpark runtime; exposing route history is one prerequisite for that connection.
+The distributed fixture verifies per-layer row counts, unique expert IDs in
+the official 384-expert range, exact agreement with each GPU owner's history,
+unchanged history-vector capacities, and rejection of resetting a ready pass.
+The complete fixture, including 32 interleaved cases and cancellation cleanup,
+passed in 18.39 seconds (`distributed-route-history.log`).
+
+The independent scheduler now uses `VerificationTarget`, a statically
+dispatched interface implemented by both target passes. Its associated
+transport remains the ordinary Spark wave for one RTX and the GPU-owned wave
+for two RTX. Verification futures are not boxed, and no common stream or new
+lane join is introduced. Compact greedy results, selected full-logit downloads,
+route history, queued cache commit/poll/abort, and discard use the same scheduler
+body. Cleanup attempts both stopping capture and discarding the batch before
+propagating an execution error.
+
+The distributed fixture alternates compact greedy and full-logit verification
+through this interface, checks logits against the returned greedy result,
+checks missing compact output in the full-logit mode, and exercises the shared
+commit/discard interface. It passed with 32 interleaved cases in 18.56 seconds
+(`verification-distributed-fixture.log`); all 25 serving unit tests passed
+(`verification-serving-tests.log`). This does not yet connect dual-GPU startup
+to the scheduler. dSpark still needs GPU1 draft execution and split-head
+integration before complete speculative serving can run.
+
+dSpark chain construction now enables peer access when its shared embedding
+table resides on the other GPU. The table remains on RTX0; seed IDs, draft
+residuals and transformer execution stay on RTX1. The embedding operation's
+safety contract requires immutable, completed table data and local token/output
+buffers. `native/tests/v41_dspark_peer_embedding_selftest.py` passed at 1, 3, 8
+and 16 requests, including two independent streams and captured graphs, changed
+token IDs, invalid seeds and no additional GPU allocations during replay
+(`dspark-peer-embedding.log`). This tests the peer embedding operation, not yet
+the complete distributed draft pipeline.
+
+The distributed vocabulary wave also supports projection-only execution for
+dSpark's subsequent Markov correction and sampling. Each rank has separate
+graph entries for projection-only and greedy execution. Projection-only work
+skips candidate reduction, candidate transfer and winner merging; it publishes
+only the two logits shards and rejects access to stale greedy output. Neither
+mode introduces a dependency on the other request lane. The distributed draft
+terminal connection is described below.
+
+The real-checkpoint vocabulary fixture passed for 1, 3, 16, 40 and 80 rows,
+with two independent waves, cold/captured execution and repeated changes
+between greedy and projection-only modes. Every shard logit matched the full
+head exactly (maximum error zero); greedy results, cancellation, unpublished
+output guards, reuse and device restoration passed. The fixture completed in
+11.92 seconds (`vocabulary-projection-only.log`). This is correctness evidence,
+not a serving throughput measurement.
+
+Published vocabulary shards can now be assembled directly into RTX1's full
+row-major logits buffer. The wave enqueues one pitched peer copy from RTX0 and
+one pitched local copy on its own stream, then waits cooperatively for that
+stream. It performs no host logits transfer or temporary GPU allocation. Error
+and cancellation cleanup drain submitted copies before destination reuse.
+The native row-copy API validates pitches, spans, address overflow, overlap and
+the destination device before submission. Its bidirectional/local selftest
+checks changed data, untouched padding and invalid extents, and proves copies
+complete while an unrelated stream remains deliberately blocked
+(`device-rows-selftest.log`).
+
+The real-checkpoint vocabulary fixture compares GPU-assembled logits byte for
+byte with the full head at 1, 3, 16, 40 and 80 rows across both independent waves
+and both projection modes. It also checks undersized/foreign destinations and
+cancellation followed by copy reuse. All checks passed in 12.18 seconds
+(`vocabulary-assembly.log`). End-to-end draft integration and transfer-cost
+measurement remain outstanding.
+
+`DistributedDsparkTerminal` now connects RTX1 normalization, TP2 vocabulary
+projection, GPU1 logits assembly and RTX1 Markov correction/sampling/confidence.
+It owns per-lane streams and per-shape normalization/sampling graphs; waits are
+cooperative and scoped only to its own dependencies. Sampling metadata uploads
+are ordered with normalization without a separate upload-completion wait. The
+shared terminal implementation keeps the same single-GPU operation order. A
+distributed terminal omits the local full-head workspace and budgets the two
+shard projection workspaces separately.
+
+The real-checkpoint terminal fixture passed at 1, 3, 8 and 16 requests, including
+two concurrent lanes, cold execution, graph replay, changed inputs, greedy and
+0.7-temperature sampling, cancellation/reuse and device restoration. Tokens,
+all corrected logits and raw confidence matched the full-head terminal byte
+for byte. It completed in 3.45 seconds (`distributed-terminal.log`). This does
+not establish a throughput improvement. The draft-chain connection is described
+below; serving scheduler integration remains outstanding.
+
+The existing single-RTX target/draft fixture also passed after this refactor:
+three 16-request draft cycles, greedy and 0.7-temperature sampling, graph-exact
+outputs, queued cancellation/reuse, accepted-prefix cache checks, and target
+prefill/decode commits (`terminal-single-chain-regression.log`, 8.32 seconds).
+Both the target and transport must select the CUDA library in this fixture;
+the initial invocation omitted `DS41RT_NATIVE_LIB` and selected the non-CUDA
+transport fallback before any draft execution. The corrected invocation passed.
+This verifies behavior, not single-RTX serving throughput.
+
+`DistributedDsparkChain` connects the sole GPU0 embedding table, three GPU1
+draft transformer stages and the distributed terminal. Each lane owns its chain
+graphs, staging and terminal workspaces. Cache read reservations are acquired
+before submission and released after transformer completion; cancellation drops
+the reservation guard under the GPU1 device scope after draining submitted work.
+Completed transformer outputs are reordered into terminal layout on GPU1. The
+head stages then run cooperatively without holding a shared request-lane join.
+
+The complete-chain fixture uses real checkpoint weights and synthetic committed
+FP8 cache contents. At 1, 3, 8 and 16 requests, it compares two concurrent lanes
+against the full-head chain while changing cache contents/positions, seed IDs,
+request order and temperatures. Tokens, every corrected logit and confidence
+matched exactly on cold execution and graph replay; floating-point outputs were
+finite. Cancellation, reuse, cache lease release and device restoration also
+passed (`distributed-chain.log`, 5.30 seconds). This is a component fixture,
+not an agentic serving or performance qualification. The normal serving runtime
+still needs to drive the distributed chain through its independent scheduler.
+
+The distributed vocabulary, terminal and complete draft chain now expose
+begin/poll/cancel operations for that scheduler connection. Pending stages are
+stored directly in each lane owner, without a boxed future or a shared borrow
+across a scheduler yield. The chain progresses through transformer completion,
+terminal work and compact token/confidence downloads using its existing pinned
+storage. Ordinary polling queries only the relevant lane streams; blocking
+drains are reserved for errors, cancellation and destruction. Projection/copy
+reuse while pending is rejected, and assembly drains before its source rank
+buffers can be destroyed. The async component APIs use these same polling paths.
+
+The vocabulary fixture passed its existing exact-output checks through 80 rows
+plus explicit begin/poll, pending-reuse rejection and cancellation/reuse checks
+(`vocabulary-poll.log`, 12.37 seconds). Terminal and complete-chain fixtures
+passed together (`draft-poll.log`, 7.78 seconds), including exact compact output.
+Both fixtures also submit two lanes, leave one unpolled and complete the other;
+the unpolled lane remains unpublished in its initial stage. This verifies that
+host progress on one lane does not require advancing the other. Normal serving
+still needs to construct and select the distributed runtime, and end-to-end
+throughput remains unmeasured.
+
+The request-level `DraftRuntime` now uses static `DraftChain` dispatch for its
+shared admission, proposal polling, adaptive history and cache-prefix lifecycle.
+The existing single-GPU constructor and synchronous proposal API remain
+specialized to the original chain. A distributed constructor creates GPU1 main
+contexts/windows plus independent distributed draft chains, returning an
+explicit GPU1 owner. Synchronous runtime methods now scope their own GPU work;
+the owner scopes destruction, and retained prefixes carry their GPU ownership
+to the consumer. Production worker construction remains outstanding.
+
+The real-weight runtime fixture compares distributed and full-head runtimes at
+1, 3 and 8 requests per lane while changing committed cache contents, positions
+and seeds. Proposals and confidence match exactly, including completion of one
+lane while the other stays unpolled. Queued prefix snapshots, request release,
+re-admission under a new identity and prefix restoration passed
+(`distributed-runtime.log`, 2.62 seconds). The serving unit tests also passed
+(`distributed-runtime-serving-tests.log`). This is not yet end-to-end serving
+or a throughput qualification.
+
+A later latency optimization can prepare dSpark seed embeddings on RTX1 as soon
+as verification determines the next anchor, overlapping the transfer with cache
+commits. A permanent local mask row costs 10 KiB, and eight staged seed rows cost
+80 KiB per lane. The seed is not generally known before the relevant target
+verification; the available overlap must be measured at the actual selection
+point. Keep the full embedding table on RTX0 and keep preparation/completion
+dependencies lane-local.
+
+Retained `DraftPrefix` values carry a device owner for their three window
+snapshots, so eviction or final destruction from a different current device
+uses the originating GPU. Restore rejects a different GPU/library before
+touching cache storage. The runtime fixture now drops the GPU1 runtime first,
+then releases its retained prefix while GPU0 is current, checking device
+restoration after both destructors. This closes the snapshot ownership handoff
+needed by the shared serving prefix cache; runtime/scheduler construction is
+still outstanding. The fixture passed in 2.61 seconds (`draft-prefix-owner.log`).
+
+The independent scheduler and its commit/publication and prefix helpers now
+accept either static draft-chain type. Distributed request-runtime methods
+select GPU1 for their synchronous CUDA work and restore the caller's device
+before returning. The single-RTX specialization returns no execution-device
+scope, so it adds no CUDA device-query/selection calls. No scope is retained
+across scheduler yields. Production startup still needs to construct the
+distributed target, cache, draft and transport owners and invoke this path.
+
+The runtime fixture now calls proposal polling, queued snapshots, release and
+restore directly with GPU0 current, checking device restoration while comparing
+outputs with the full-head runtime. It passed (`scheduler-draft-device.log`,
+2.62 seconds); all 25 serving unit tests passed. The existing single-RTX
+target/draft fixture passed its three 16-request cycles, graph-exact output,
+queued commits and cancellation/reuse checks (`scheduler-draft-single-regression.log`,
+8.41 seconds). These checks do not yet exercise complete dual-RTX serving or
+establish throughput gains.
+
+The shared serving prefill/continuation function now uses static `PrefillTarget`
+operations for either target layout. It covers bounded encoder-prefix replay,
+short encoder chunks, paired encoder streaming, decoder suffix replay and full
+cached-context continuation. The distributed suffix is allocated on the device
+owning layer 19. Distributed replay/continuation commits queue the target and
+dSpark cache writes, poll both cooperatively and publish their accepted frontier;
+error/cancellation cleanup drains the pending transactions. The single-GPU
+implementation retains its existing projection/download and commit operations.
+
+The distributed fixture now invokes the actual shared serving-prefill function
+with chunk sizes 3 and 16, checks its anchor against sequential execution with
+matching chunks, runs the first dSpark proposal from the resulting context, and
+continues from seven to nine cached tokens. Target and all three draft cache
+frontiers agree. The complete fixture, including 32 interleaved cases and
+cancellation checks, passed in 19.84 seconds (`prefill-interface-distributed.log`).
+The initial comparison against a one-shot pass exposed chunk-size sensitivity
+for the synthetic token sequence: three-row chunks produce anchor 74 in both
+sequential and serving-streamed execution, while the one-shot pass produces 200.
+The test therefore compares matching partitions; this is not a production
+quality qualification or evidence of an end-to-end speedup. Production worker
+construction and selection of the distributed serving loop remain outstanding.
+
+All 25 serving unit tests passed, and the existing single-RTX target/draft
+correctness fixture passed in 8.62 seconds (`prefill-interface-single.log`).
+These checks do not replace the required serving performance regression tests.
+
+
+The outer serving loop now accepts a static `ServingTarget` layout, including
+admission prefill, prefix restoration/retention, request retirement and transport
+reset. The layout ties each target to its matching draft-chain type while keeping
+target and draft weight lifetimes independent. The single-RTX layout retains the
+existing C1 round and uses independent scheduling when both lanes have work. The
+distributed layout uses independent polling even at C1; an empty peer returns
+without adding per-token synchronization. Distributed transport reset runs on its
+owning GPU. This adds no boxed dispatch or common execution stream.
+
+The distributed fixture now follows both shared-prefill chunk configurations
+with the actual layout-selected decode round: cached continuation enters dSpark
+verification, streaming emits exactly one finish, the scheduler retires the target
+and draft owners, the draft request ID can be admitted again, and transport reset
+restores the caller's GPU. The fixture and its 32 interleaved cases passed
+(`outer-serving-distributed.log`, 20.81 seconds); all 25 serving unit tests passed
+(`outer-serving-unit.log`). This exercises the decode/retirement selection, not
+complete production startup or the outer admission loop. Worker construction,
+vision ownership and deployment selection remain outstanding; no serving speedup
+is established by these fixture timings.
+
+The existing single-RTX target/draft correctness fixture also passed
+(`outer-serving-single.log`, 8.27 seconds). This is not a throughput regression
+measurement; end-to-end single-RTX performance remains a release gate.
+
+
+Production worker construction is now connected to `serve-native --rtx-gpus 2`.
+The binary still defaults to one RTX until automatic deployment preflight is
+implemented. Two-GPU mode requires `auto` or exactly 20 routed encoder layers;
+it validates bidirectional peer access before loading. Both target lanes use the
+20/20 attention map, all encoder routed and all shared experts use TP2, vocabulary
+rows are split, dSpark lives on GPU1, and vision plus target snapshot arenas live
+on GPU0. Both draft policy and the configured prompt/turn retention limits feed
+the shared serving loop. The launcher has not yet been changed to expose both
+cards or select this mode, and Sparks still need decoder-only loading.
+
+The new complete-cache planner uses measured free/total memory after both target
+lanes, transports, draft runtime, vision and snapshot arenas are live. It counts
+per-device SWA, compressor scratch and page tables as well as global source data,
+then searches the tighter device's whole-group capacity with 2 GiB runtime
+headroom per GPU. Explicit KV byte budgets must fit after rounding; the ordinary
+aggregate-context default may shrink to fit and logs its desired group count.
+Explicit occupancy reservations maximize the fitting pool. The source-only
+planner remains available for preliminary accounting. Eleven memory tests passed,
+including complete-cache limits on either GPU and exact-budget rejection/rounding.
+
+The actual forced-mode worker served two real text requests through admission,
+prefill, adaptive dSpark verification, streaming and retirement at prefill step
+80 (workspace capacity 256), default C16 admission capacity and 24 entries in each
+retention bank. The arithmetic response was `Four.`; the eight-token code response
+began with a Python function heading. This is a startup/lifecycle check, not a
+quality or throughput qualification. In `dual-worker-serving-forced.log`, startup
+reported 12.903 seconds to worker readiness; complete fixture time was 16.60
+seconds. The global source pool was 16,681,077,760 bytes (15.535 GiB), representing
+18,742,784 source-token positions including tail/COW allowance. Fixed occupancy
+before cache allocation was 83,625,246,720 bytes on GPU0 and 88,597,594,112 on GPU1;
+cache allocations added 10,031,259,520 and 6,694,322,816 bytes respectively. These
+are intermediate short-step settings, not the final release memory headline.
+
+The release prefill step 2048 (workspace capacity 4096) currently fails before KV
+allocation. `dual-worker-serving-2048-diagnostic.log` shows fixed model weights at
+78,814,380,032 / 77,153,435,648 bytes, each full-capacity target lane adding about
+8.5 GB per GPU, and occupancy after TP2 transports reaching 98,726,838,272 /
+97,577,598,976 bytes. The following dSpark load runs out of memory. Reducing KV
+cannot repair this: next work must right-size stage-specific workspaces and
+examine live-row capacity versus AOT allocation padding while preserving lane
+independence. The release prefill configuration has not been reduced to hide this
+failure. Both success and failure logs are retained.
+
+
+The expanded forced-worker fixture adds a third request repeating the first
+prompt. Its admission reports a complete prompt-cache hit, and the response is
+again `Four.`. All three requests finish and retire successfully
+(`dual-worker-serving-reuse.log`, 16.47 seconds). The serving unit filter passed
+27 tests with two hardware fixtures ignored (`dual-worker-unit.log`). These
+checks still do not exercise images, constrained tools, large prompts or sustained
+C16 traffic, and do not establish a throughput improvement.
+
+The existing single-RTX target/draft correctness fixture passed in 8.24 seconds
+(`dual-worker-single-regression.log`); single-RTX throughput remains unmeasured
+for this integration increment.
+
+
+Live row capacity is now separate from compiled FP8 and TP2 kernel capacity.
+For a 2048-row serving step, the target, TP2 transfer/output and dSpark main-context
+buffers hold 2048 live rows while the selected 4096-row AOT kernels retain their
+full required scratch. FP8 plans and TP2 rank plans select the covering compiled
+shape; their live-row bounds reject oversized launches. Existing supported
+capacities keep the same kernel choices and scratch layouts. Single-RTX startup
+continues using its existing rounded capacities. No allocation or synchronization
+was added to the decode loop, and lane owners remain independent.
+
+This resolves the prior 2048-step startup OOM. Reducing target row buffers first
+lowered occupancy after both target lanes from 95,788,728,320 / 94,136,172,544 to
+88,731,811,840 / 86,875,832,320 bytes. Extending live-row sizing to TP2 buffers and
+dSpark main context then lowered GPU1 occupancy before cache allocation from
+99,553,116,160 to 97,873,297,408 bytes. The fitting global pool grew from
+619,724,800 bytes (696,320 source-token positions) to 4,818,816,000 bytes
+(5,414,400 positions, both including tail/COW allowance). This is still an interim
+pool below the intended aggregate capacity, with GPU1 limiting it and about
+4.54 GB left unused on GPU0 beyond reserved runtime headroom. These are memory
+measurements, not throughput gains.
+
+`live-capacity-all-worker-long.log` passed the actual forced worker at the release
+2048 prefill step: the first prompt has 3013 tokens and runs paired encoder chunks
+of 2048 and 965 rows, followed by decoder replay, adaptive dSpark generation and
+retirement. A second code request and a third exact-repeat prompt also complete;
+the repeated arithmetic prompt reports a full cache hit and both arithmetic
+responses are `Four.`. The full fixture took 16.96 seconds. Earlier target-only
+live-row checks are in `live-capacity-worker-2048.log` and
+`live-capacity-worker-long.log`. FP8 scratch/layout unit tests passed
+(`live-capacity-plan-tests.log`), as did 27 serving unit tests with two hardware
+fixtures ignored (`live-capacity-unit.log`). This is not tool/vision qualification
+or a serving throughput benchmark.
+
+Further GPU1 workspace reductions must account for full cached continuation:
+`prefill_continuation` can currently submit an entire requested chunk through all
+forty layers. Fresh-prompt decoder replay is bounded, but that alone does not
+justify a 128-row decoder workspace. Do not silently truncate or overrun cached
+continuation when introducing stage-specific capacities.
+
+The single-RTX target/draft correctness fixture passed in 8.40 seconds
+(`live-capacity-single-regression.log`). End-to-end single-RTX throughput and
+startup comparisons are still required.

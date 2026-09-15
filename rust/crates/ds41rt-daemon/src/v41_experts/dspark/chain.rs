@@ -7,9 +7,12 @@ use anyhow::{ensure, Context, Result};
 use ds41rt_core::DsparkRng;
 use ds41rt_ffi::{Ds41rtDeviceBuffer, V41AttentionOps};
 use std::ffi::c_void;
+mod distributed;
+pub(crate) use distributed::DistributedDsparkChain;
 
 pub(crate) struct DsparkChain<'weights, 'library> {
     stream: LoadStream<'library>,
+    width: usize,
     stages: [DsparkStage<'weights, 'library>; 3],
     graphs: std::collections::BTreeMap<usize, (*mut c_void, [u64; 3])>,
     ready: Option<usize>,
@@ -44,7 +47,7 @@ impl Drop for PendingDraft<'_> {
 impl<'library> DsparkWeights<'library> {
     pub fn draft_bytes(&self, requests: u32) -> Result<usize> {
         self.chain_bytes(requests)?
-            .checked_add(DsparkTerminal::device_bytes(requests as usize)?)
+            .checked_add(DsparkTerminal::device_bytes_with_width(requests as usize, self.draft_width)?)
             .context("dSpark complete draft budget overflow")
     }
     /// Complete seed embedding, three-stage transformer and terminal proposal
@@ -64,7 +67,7 @@ impl<'library> DsparkWeights<'library> {
         chain.terminal = Some(self.terminal(
             head,
             requests as usize,
-            DsparkTerminal::device_bytes(requests as usize)?,
+            DsparkTerminal::device_bytes_with_width(requests as usize, self.draft_width)?,
         )?);
         Ok(chain)
     }
@@ -81,6 +84,12 @@ impl<'library> DsparkWeights<'library> {
             "invalid shared embedding extent"
         );
         let mut chain = self.chain(requests, budget)?;
+        let table_device = embedding.get("embed.weight")?.device_id;
+        if table_device != chain.tokens.buffer.device_id {
+            // Plan peer access once. Draft graphs only read the shared table;
+            // tokens, residuals and all transformer work stay on this device.
+            chain.stream.library.cuda_enable_peer(table_device)?;
+        }
         chain.embedding = Some(embedding);
         Ok(chain)
     }
@@ -99,6 +108,7 @@ impl<'library> DsparkWeights<'library> {
         let library = self.experts[0].buffers[0].library;
         let bytes = self.stage_bytes(requests)?;
         Ok(DsparkChain {
+            width: self.draft_width,
             stream: LoadStream {
                 library,
                 raw: library.cuda_stream_create()?,
@@ -111,13 +121,13 @@ impl<'library> DsparkWeights<'library> {
             graphs: Default::default(),
             ready: None,
             pending: None,
-            download: HostAllocation::new(library, requests as usize * 44)?,
+            download: HostAllocation::new(library, requests as usize * (2 * self.draft_width + 1) * 4)?,
             embedding: None,
             tokens: DeviceAllocation::new(library, requests as usize * 4)?,
             token_staging: HostAllocation::new(library, requests as usize * 4)?,
             token_count: None,
             terminal: None,
-            ops: library.v41_attention_ops()?,
+            ops: library.v41_attention_ops_width(self.draft_width)?,
         })
     }
 }
@@ -143,8 +153,8 @@ impl DsparkChain<'_, '_> {
             .stage_sampling(rngs, temperatures)
     }
     pub fn has_graph(&self, count: usize) -> bool { self.graphs.contains_key(&count) }
-    /// Borrowed anchor + five tokens [6,R], corrected raw logits [5,R,V] and
-    /// raw confidence [5,R], live until reuse/drop. No target history is committed.
+    /// Borrowed anchor + K tokens [K+1,R], corrected raw logits [K,R,V] and
+    /// raw confidence [K,R], live until reuse/drop. No target history is committed.
     pub fn draft_output(&self) -> Result<[Ds41rtDeviceBuffer; 3]> {
         let requests = self.ready.context("dSpark draft output incomplete")?;
         self.terminal
@@ -273,13 +283,13 @@ impl DsparkChain<'_, '_> {
                     self.stream.library.copy_d2d_async(
                         destination[0],
                         source[0],
-                        requests * 5 * 40960,
+                        requests * self.width * 40960,
                         self.stream.raw,
                     )?;
                     self.stream.library.copy_d2d_async(
                         destination[1],
                         source[1],
-                        requests * 5 * 16,
+                        requests * self.width * 16,
                         self.stream.raw,
                     )?;
                 }
@@ -432,8 +442,8 @@ impl DsparkChain<'_, '_> {
         unsafe {
             self.stream.library.cuda_graph_launch(graph, self.stream.raw)?;
             let bytes = self.download.bytes_mut();
-            self.stream.library.copy_d2h_async(&mut bytes[..count * 24], output[0], self.stream.raw)?;
-            self.stream.library.copy_d2h_async(&mut bytes[count * 24..count * 44], output[2], self.stream.raw)
+            self.stream.library.copy_d2h_async(&mut bytes[..count * (self.width + 1) * 4], output[0], self.stream.raw)?;
+            self.stream.library.copy_d2h_async(&mut bytes[count * (self.width + 1) * 4..count * (2 * self.width + 1) * 4], output[2], self.stream.raw)
         }
     }
     /// Cold warmup and final replay both poll. Capture itself never suspends.
@@ -458,9 +468,9 @@ impl DsparkChain<'_, '_> {
         pending.armed = false;
         self.ready = Some(count);
         let bytes = self.download.bytes_mut();
-        let tokens = bytes[..count * 24].chunks_exact(4)
+        let tokens = bytes[..count * (self.width + 1) * 4].chunks_exact(4)
             .map(|b| u32::from_ne_bytes(b.try_into().unwrap())).collect();
-        let confidence = bytes[count * 24..count * 44].chunks_exact(4)
+        let confidence = bytes[count * (self.width + 1) * 4..count * (2 * self.width + 1) * 4].chunks_exact(4)
             .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
         Ok(Some((tokens, confidence)))
     }
@@ -472,8 +482,8 @@ impl DsparkChain<'_, '_> {
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {
         let requests = self.ready.context("dSpark chain output incomplete")?;
         let mut output = self.stages[2].output_storage();
-        output[0].bytes = requests * 5 * 40960;
-        output[1].bytes = requests * 5 * 16;
+        output[0].bytes = requests * self.width * 40960;
+        output[1].bytes = requests * self.width * 16;
         Ok(output)
     }
 }

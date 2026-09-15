@@ -15,6 +15,8 @@ pub enum V41ExpertSelection {
         layer: usize,
         expert: usize,
     },
+    /// Half-width encoder expert on one member of an RTX pair.
+    BackboneTp2 { layer: usize, expert: usize, rank: usize },
     Dspark {
         stage: usize,
         expert: usize,
@@ -38,6 +40,12 @@ impl OfficialV41Catalog {
     pub fn expert_staging(&self, selection: V41ExpertSelection) -> Result<V41ExpertStaging<'_>> {
         let config = self.config().text();
         let (prefix, rank, intermediate) = match selection {
+            V41ExpertSelection::BackboneTp2 { layer, expert, rank } => {
+                ensure!(layer < config.num_hidden_layers, "backbone layer out of range");
+                ensure!(expert < config.n_routed_experts, "backbone expert out of range");
+                ensure!(rank < 2, "backbone TP2 rank must be in 0..2");
+                (format!("layers.{layer}.ffn.experts.{expert}"), Some(rank), config.moe_intermediate_size / 2)
+            }
             V41ExpertSelection::Backbone {
                 layer,
                 expert,
@@ -98,6 +106,8 @@ impl OfficialV41Catalog {
         for (slot, name) in names.iter().enumerate() {
             let size = usize::try_from(if matches!(selection, V41ExpertSelection::BackboneFull { .. }) {
                 self.tensor(name)?.metadata.byte_length
+            } else if matches!(selection, V41ExpertSelection::BackboneTp2 { .. }) {
+                self.tensor(name)?.metadata.byte_length / 2
             } else {
                 self.device_tensor_bytes(name, rank)?
             })?;
@@ -214,6 +224,9 @@ impl V41ExpertStaging<'_> {
                 std::fs::File::open(self.catalog.snapshot().join(&tensor.shard))?
                     .read_exact_at(&mut staging[range.clone()], tensor.metadata.byte_offset)
                     .with_context(|| format!("staging full official backbone expert tensor {name}"))?;
+            } else if let V41ExpertSelection::BackboneTp2 { rank, .. } = self.selection {
+                self.catalog.read_backbone_tp2_into(name, rank, &mut staging[range.clone()], scratch)
+                    .with_context(|| format!("staging TP2 backbone expert tensor {name}"))?;
             } else {
                 self.catalog
                     .read_device_tensor_into(name, self.rank, &mut staging[range.clone()], scratch)

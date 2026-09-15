@@ -9,6 +9,7 @@ endif()
 
 option(DS41RT_ENABLE_CUDA "Build CUDA kernels and CUDA-backed ABI functions" OFF)
 option(DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT "Build full RTX backbone expert kernels alongside dSpark" OFF)
+option(DS41RT_ENABLE_V41_TP2_EXPERT_AOT "Build dual RTX TP2 encoder expert kernels" OFF)
 option(DS41RT_ENABLE_V41_EXPERT_AOT "Build native V4.1 expert AOT kernels" OFF)
 option(DS41RT_ENABLE_V41_FP8_AOT "Build native V4.1 coordinator FP8 AOT kernels" OFF)
 option(DS41RT_ENABLE_RDMA "Build RDMA helper components when libibverbs is available" OFF)
@@ -146,7 +147,8 @@ endif()
 set(DS41RT_BUILD_SPARKINFER_AOT OFF)
 if(DS41RT_ENABLE_SPARKINFER_AOT OR DS41RT_ENABLE_DS4_FLASH_AOT OR
    DS41RT_ENABLE_SPARKINFER_COORDINATOR_AOT OR DS41RT_ENABLE_W8A16_AOT OR
-   DS41RT_ENABLE_V41_EXPERT_AOT OR DS41RT_ENABLE_V41_FP8_AOT)
+   DS41RT_ENABLE_V41_EXPERT_AOT OR DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT OR
+   DS41RT_ENABLE_V41_TP2_EXPERT_AOT OR DS41RT_ENABLE_V41_FP8_AOT)
   set(DS41RT_BUILD_SPARKINFER_AOT ON)
 endif()
 if(DS41RT_BUILD_SPARKINFER_AOT)
@@ -756,7 +758,8 @@ endif()
 
 if(DS41RT_ENABLE_SPARKINFER_AOT OR DS41RT_ENABLE_DS4_FLASH_AOT OR
    DS41RT_ENABLE_SPARKINFER_COORDINATOR_AOT OR DS41RT_ENABLE_W8A16_AOT OR
-   DS41RT_ENABLE_V41_EXPERT_AOT OR DS41RT_ENABLE_V41_FP8_AOT)
+   DS41RT_ENABLE_V41_EXPERT_AOT OR DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT OR
+   DS41RT_ENABLE_V41_TP2_EXPERT_AOT OR DS41RT_ENABLE_V41_FP8_AOT)
   execute_process(
     COMMAND "${Python3_EXECUTABLE}" -m cutlass.cute.export.aot_config --libdir
     OUTPUT_VARIABLE DS41RT_B12X_AOT_RUNTIME_DIR
@@ -776,6 +779,9 @@ if(DS41RT_ENABLE_V41_EXPERT_AOT)
 endif()
 if(DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT)
   include(cmake/v41_local_experts.cmake)
+endif()
+if(DS41RT_ENABLE_V41_TP2_EXPERT_AOT)
+  include(cmake/v41_tp2_experts.cmake)
 endif()
 if(DS41RT_ENABLE_V41_FP8_AOT)
   include(cmake/v41_fp8.cmake)
@@ -798,6 +804,10 @@ endif()
 if(DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT)
   add_dependencies(ds41rt_native ds41rt_v41_local_experts_export)
   target_include_directories(ds41rt_native PRIVATE "${DS41RT_V41_LOCAL_EXPERT_DIR}")
+endif()
+if(DS41RT_ENABLE_V41_TP2_EXPERT_AOT)
+  add_dependencies(ds41rt_native ds41rt_v41_tp2_experts_export)
+  target_include_directories(ds41rt_native PRIVATE "${DS41RT_V41_TP2_EXPERT_DIR}")
 endif()
 target_include_directories(ds41rt_native PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -862,7 +872,8 @@ else()
 endif()
 if(DS41RT_ENABLE_SPARKINFER_AOT OR DS41RT_ENABLE_DS4_FLASH_AOT OR
    DS41RT_ENABLE_SPARKINFER_COORDINATOR_AOT OR DS41RT_ENABLE_W8A16_AOT OR
-   DS41RT_ENABLE_V41_EXPERT_AOT OR DS41RT_ENABLE_V41_FP8_AOT)
+   DS41RT_ENABLE_V41_EXPERT_AOT OR DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT OR
+   DS41RT_ENABLE_V41_TP2_EXPERT_AOT OR DS41RT_ENABLE_V41_FP8_AOT)
   target_link_libraries(ds41rt_native PUBLIC "${DS41RT_B12X_AOT_RUNTIME_LIBRARY}")
   set_property(TARGET ds41rt_native APPEND PROPERTY BUILD_RPATH "${DS41RT_B12X_AOT_RUNTIME_DIR}")
 endif()
@@ -941,6 +952,10 @@ if(DS41RT_ENABLE_CUDA)
   target_link_libraries(ds41rt_cuda_stream_query_selftest PRIVATE ds41rt_native CUDA::cudart)
   add_test(NAME ds41rt_cuda_stream_query_selftest COMMAND ds41rt_cuda_stream_query_selftest)
   set_tests_properties(ds41rt_cuda_stream_query_selftest PROPERTIES TIMEOUT 15)
+  add_executable(ds41rt_cuda_peer_selftest tests/cuda_peer_selftest.cc)
+  target_link_libraries(ds41rt_cuda_peer_selftest PRIVATE ds41rt_native CUDA::cudart)
+  add_test(NAME ds41rt_cuda_peer_selftest COMMAND ds41rt_cuda_peer_selftest)
+  set_tests_properties(ds41rt_cuda_peer_selftest PROPERTIES TIMEOUT 30 SKIP_RETURN_CODE 77)
   add_executable(ds41rt_cuda_selftest tests/cuda_selftest.cc)
   target_link_libraries(ds41rt_cuda_selftest PRIVATE ds41rt_native CUDA::cudart CUDA::cublas CUDA::cuda_driver)
   add_test(NAME ds41rt_cuda_selftest COMMAND ds41rt_cuda_selftest)

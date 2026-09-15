@@ -51,7 +51,8 @@ bool overlaps(const void* a, uint64_t an, const void* b, uint64_t bn) {
 
 extern "C" int32_t ds41rt_v41_expert_packed_sizes(uint32_t intermediate,
     uint64_t bytes[4]) {
-  if (!bytes || (intermediate != 576 && intermediate != 2304)) return cudaErrorInvalidValue;
+  if (!bytes || (intermediate != 576 && intermediate != 1152 && intermediate != 2304))
+    return cudaErrorInvalidValue;
   const uint64_t padded = (intermediate + 127) / 128 * 128;
   bytes[0] = padded * hidden;
   bytes[1] = padded * hidden / 16;

@@ -60,6 +60,8 @@ impl NativeLibrary {
                 (6144, 25600)
                     | (5120, 2304)
                     | (2304, 5120)
+                    | (5120, 1152)
+                    | (1152, 5120)
                     | (15360, 5120)
                     | (5120, 1280)
                     | (1280, 32768)
@@ -299,18 +301,24 @@ type SwiGluFn = unsafe extern "C" fn(*const u16, *const u16, *mut u16, i32, *mut
 pub struct V41SharedSwiGlu<'a> {
     _library: &'a NativeLibrary,
     launch: SwiGluFn,
+    width: usize,
 }
 impl NativeLibrary {
     pub fn v41_shared_swiglu(&self) -> Result<V41SharedSwiGlu<'_>> {
         Ok(V41SharedSwiGlu {
             _library: self,
             launch: unsafe { *self.lib.get(b"ds41rt_v41_shared_swiglu")? },
+            width: 2304,
         })
+    }
+    pub fn v41_shared_tp2_swiglu(&self) -> Result<V41SharedSwiGlu<'_>> {
+        Ok(V41SharedSwiGlu { _library: self,
+            launch: unsafe { *self.lib.get(b"ds41rt_v41_shared_tp2_swiglu")? }, width: 1152 })
     }
 }
 impl V41SharedSwiGlu<'_> {
     /// # Safety
-    /// Inputs are initialized finite BF16 [rows,2304] on the stream device.
+    /// Inputs are initialized finite BF16 [rows,width] on the stream device.
     /// Output is distinct; all storage remains live and ordered through completion.
     pub unsafe fn launch(
         &self,
@@ -322,7 +330,7 @@ impl V41SharedSwiGlu<'_> {
     ) -> Result<()> {
         ensure!((1..=4096).contains(&rows), "invalid shared SwiGLU rows");
         for buffer in [gate, up, output] {
-            require(buffer, rows as usize * 2304 * 2)?;
+            require(buffer, rows as usize * self.width * 2)?;
         }
         let status = unsafe {
             (self.launch)(

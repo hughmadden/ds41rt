@@ -109,6 +109,7 @@ cmake \
   -DDS41RT_ENABLE_CUDA=ON \
   -DDS41RT_ENABLE_V41_EXPERT_AOT=ON \
   -DDS41RT_ENABLE_V41_LOCAL_EXPERT_AOT="$coordinator_aot" \
+  -DDS41RT_ENABLE_V41_TP2_EXPERT_AOT="$coordinator_aot" \
   -DDS41RT_ENABLE_V41_FP8_AOT="$coordinator_aot" \
   -DDS41RT_ENABLE_RDMA=ON \
   -DDS41RT_ENABLE_SPARKINFER_AOT="$sparkinfer_aot" \
@@ -134,7 +135,9 @@ if [[ "$coordinator_aot" == ON ]]; then
   python3 - "$output_dir/libds41rt_native.so" <<'PY_CHECK'
 import ctypes
 import sys
-getattr(ctypes.CDLL(sys.argv[1]), "ds41rt_v41_local_expert_info")
+library = ctypes.CDLL(sys.argv[1])
+getattr(library, "ds41rt_v41_local_expert_info")
+getattr(library, "ds41rt_v41_tp2_expert_info")
 PY_CHECK
   install -m 0644 "$build_root/native/v41_fp8/v41_fp8.json" "$output_dir/V41_FP8_AOT.json"
 else

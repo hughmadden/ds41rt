@@ -2,10 +2,10 @@
 use super::*;
 use std::cell::{Cell, RefCell};
 
-pub(super) fn run<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
-    first: &mut TargetPass<'w, 'a>, second: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>,
-    first_transport: &mut NativeTp4Wave<'a>, second_transport: &mut NativeTp4Wave<'a>,
-    active: &mut [Option<Active<'a>>], draft: Option<&mut DraftRuntime<'_, 'a>>,
+pub(super) fn run<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    first: &mut P, second: &mut P, requests: &mut Requests<'a>,
+    first_transport: &mut P::Transport, second_transport: &mut P::Transport,
+    active: &mut [Option<Active<'a>>], draft: Option<&mut DraftRuntime<'_, 'a, C>>,
     prefixes: &mut PrefixCache<'a>, receive: &mpsc::Receiver<NativeRequest>,
 ) -> Result<()> {
     let requests = RefCell::new(requests);
@@ -22,9 +22,9 @@ pub(super) fn run<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runt
     Ok(())
 }
 
-async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass<'w, 'a>,
-    transport: &mut NativeTp4Wave<'a>, requests: &RefCell<&mut Requests<'a>>,
-    active: &RefCell<&mut [Option<Active<'a>>]>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a>>>,
+async fn lane<'a, P: VerificationTarget<'a>, C: DraftChain<'a>>(lane: usize, lib: &'a NativeLibrary, pass: &mut P,
+    transport: &mut P::Transport, requests: &RefCell<&mut Requests<'a>>,
+    active: &RefCell<&mut [Option<Active<'a>>]>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a, C>>>,
     prefixes: &RefCell<&mut PrefixCache<'a>>, receive: &mpsc::Receiver<NativeRequest>, drain: &Cell<bool>,
 ) -> Result<()> {
     let result = async {
@@ -60,10 +60,10 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             let seeds = {
                 let active = active.borrow();
                 let mut requests = requests.borrow_mut();
-                let speculative = draft.borrow().is_some();
+                let verify_rows = draft.borrow().as_ref().map_or(1, |d| d.max_verify_rows());
                 let capacity: Vec<_> = members.iter().map(|&slot| {
                     let r = active[slot].as_ref().unwrap();
-                    (r.lease, if speculative { (r.job.max_tokens-r.generated).min(6) as u32 } else { 1 })
+                    (r.lease, (r.job.max_tokens-r.generated).min(verify_rows) as u32)
                 }).collect();
                 prefixes.borrow_mut().make_room(&mut requests, &capacity)?;
                 members.iter().map(|&slot| {
@@ -115,9 +115,17 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
             round_id += 1;
             tracing::debug!(target: "ds41rt::lane_schedule", lane, round_id, requests=members.len(),
                 "independent verifier issued");
-            pass.set_route_capture(capture_routes);
             let operation: Result<()> = async {
+                pass.set_route_capture(capture_routes)?;
                 let current = batch.as_mut().unwrap();
+                let batch_id = current.cache()?.identity();
+                if tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG) {
+                    if let Some(draft) = draft.borrow().as_deref() {
+                        let candidates: Vec<_> = members.iter().zip(&inputs).map(|(&slot, input)|
+                            (active.borrow()[slot].as_ref().unwrap().id, lane, input.len()-1)).collect();
+                        draft.trace_cost_forecast(batch_id, &candidates);
+                    }
+                }
                 let selected: Vec<_> = (0..current.cache()?.positions().len()).collect();
                 let compact = !tracing::enabled!(target: "ds41rt::logit_trace", tracing::Level::DEBUG)
                     && members.iter().all(|&slot| active.borrow()[slot].as_ref().unwrap().constraint.is_none());
@@ -130,6 +138,9 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                     BatchScores::new(pass.download_logits(current, &selected).await?)?
                 };
                 let verify_us = started.elapsed().as_micros() as u64 - prepared_us;
+                tracing::debug!(target: "ds41rt::cost_model", batch=batch_id, lane, round_id,
+                    requests=members.len(), rows=selected.len(), prepared_us, verify_us,
+                    "verification round cost");
                 let mut decision = prepare_commit_lane(lane, &requests.borrow(),
                     &active.borrow(), &members, &inputs, &next, draft.borrow().as_deref(), verify_us)?;
                 if !decision.frontier_downloads.is_empty() {
@@ -200,13 +211,15 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
                     "native independent lane round");
                 Ok(())
             }.await;
-            pass.set_route_capture(false);
-            if let Some(batch) = &mut batch {
+            let stopped_capture = pass.set_route_capture(false);
+            let discarded = if let Some(batch) = &mut batch {
                 // Successful commits relinquish ownership. Failed execution or
                 // commit must drain/discard this lane before the outer reset.
-                pass.discard(batch)?;
-            }
+                pass.discard(batch)
+            } else { Ok(()) };
             operation?;
+            stopped_capture?;
+            discarded?;
             // Give already-ready remote completions an opportunity to run before
             // queuing another draft on the shared RTX.
             tokio::task::yield_now().await;
@@ -216,8 +229,8 @@ async fn lane<'w, 'a>(lane: usize, lib: &'a NativeLibrary, pass: &mut TargetPass
     result
 }
 
-async fn retire<'a>(lane: usize, request: Active<'a>, requests: &RefCell<&mut Requests<'a>>,
-    prefixes: &RefCell<&mut PrefixCache<'a>>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a>>>) -> Result<()> {
+async fn retire<'a, C: DraftChain<'a>>(lane: usize, request: Active<'a>, requests: &RefCell<&mut Requests<'a>>,
+    prefixes: &RefCell<&mut PrefixCache<'a>>, draft: &RefCell<Option<&mut DraftRuntime<'_, 'a, C>>>) -> Result<()> {
     let cacheable = request.cacheable && requests.borrow().cache().request_id(request.lease).is_ok();
     if cacheable {
         let retained: Result<()> = async {

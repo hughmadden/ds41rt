@@ -3,21 +3,32 @@
 #include "v41_index_score.h"
 namespace {
 ds41rt_v41_index_score_Kernel_Module_t module{};
-std::atomic<int> loaded_device{-1};
+std::atomic<int> loaded_device[2]{{-1},{-1}};
 std::mutex initialization;
 }
 extern "C" int32_t ds41rt_v41_index_scores_initialize() {
   int device=-1;
   auto status=cudaGetDevice(&device); if(status)return status;
-  if(loaded_device.load(std::memory_order_acquire)==device)return 0;
+  for(auto& owner:loaded_device)if(owner.load(std::memory_order_acquire)==device)return 0;
   std::lock_guard<std::mutex> lock(initialization);
-  if(loaded_device.load()>=0)return loaded_device.load()==device?0:cudaErrorInvalidDevice;
+  int slot=-1;
+  for(int i=0;i<2;++i) {
+    if(loaded_device[i].load()==device)return 0;
+    if(slot<0 && loaded_device[i].load()<0)slot=i;
+  }
+  if(slot<0)return cudaErrorInvalidDevice;
   auto* ptr=&module.module;
+  // Generated launch symbols are process-global. Configure the same CUDA
+  // library on both devices rather than overwriting them with a second library.
+  const bool existing=module.module!=nullptr;
   void* init[]={&ptr,&status};
-  _mlir_ds41rt_v41_index_score_cuda_init(init);
+  if(!existing)_mlir_ds41rt_v41_index_score_cuda_init(init);
   if(!status) {void* load[]={&ptr,&device,&status}; _mlir_ds41rt_v41_index_score_cuda_load_to_device(load);}
-  if(status) {if(module.module)cudaLibraryUnload(module.module);module.module=nullptr;return status;}
-  loaded_device.store(device,std::memory_order_release);
+  if(status) {
+    if(!existing) {if(module.module)cudaLibraryUnload(module.module);module.module=nullptr;}
+    return status;
+  }
+  loaded_device[slot].store(device,std::memory_order_release);
   return 0;
 }
 extern "C" int32_t ds41rt_v41_index_scores_overlay_aot(

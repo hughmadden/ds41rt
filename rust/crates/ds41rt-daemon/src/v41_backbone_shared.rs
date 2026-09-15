@@ -1,4 +1,6 @@
 //! Real backbone shared experts, with immutable weights and exclusive captured waves.
+#[path = "v41_backbone_shared/tp2.rs"]
+pub(crate) mod tp2;
 use crate::v41_attention_binding::QueryBinding;
 use crate::v41_block::FfnInput;
 use crate::v41_layer_graphs::LayerGraphs;

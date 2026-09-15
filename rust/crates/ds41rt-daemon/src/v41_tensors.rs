@@ -4,6 +4,9 @@ use anyhow::{ensure, Context, Result};
 use ds41rt_ffi::{Ds41rtDeviceBuffer, NativeLibrary};
 use ds41rt_loader::OfficialV41Catalog;
 use std::collections::{BTreeMap, BTreeSet};
+#[path = "v41_tensors/vocabulary_shard.rs"]
+mod vocabulary_shard;
+pub(crate) use vocabulary_shard::VocabularyShard;
 
 pub(crate) struct NativeRtxTensors<'a> {
     tensors: BTreeMap<String, DeviceAllocation<'a>>,

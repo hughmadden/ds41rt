@@ -272,6 +272,13 @@ mod tests {
                 waves[0].execute(&state, &[chunk(leases[0], 3)])?;
                 waves[0].enqueue_commit(&state, &[2])?;
             }
+            let prefix = state.committed_proposal(leases[0], 0..3, reserve_source_snapshot()?)?;
+            assert_eq!(prefix.cache.rows, 3 / ratio(layer)?);
+            assert_eq!(prefix.metadata(2)?[1], 3 / ratio(layer)? as u64);
+            assert!(state.committed_proposal(leases[0], 0..4, reserve_source_snapshot()?).is_err());
+            drop(prefix);
+            assert!(state.index_cache(leases[0]).is_err());
+            assert!(state.release(leases[0]).is_err());
             waves[0].abort_commit(&mut state)?;
             assert!(state.request_id(leases[0]).is_err());
             assert_eq!(state.committed_end(leases[1])?, 4);

@@ -1,0 +1,170 @@
+{
+  "dual-sieve-adaptive-trace.json": {
+    "request": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Write a Python script that implements the Sieve of Eratosthenes."
+        }
+      ],
+      "reasoning_effort": "high",
+      "temperature": 0,
+      "max_tokens": 2000,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "runs": [
+      {
+        "first_token_seconds": 0.0013307000044733286,
+        "finish_seconds": 6.65246226999443,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 120.43063523418009
+      },
+      {
+        "first_token_seconds": 0.0016192418988794088,
+        "finish_seconds": 6.6428836189443246,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 120.60956386084234
+      },
+      {
+        "first_token_seconds": 0.0017281969776377082,
+        "finish_seconds": 6.647422929061577,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 120.52915944708532
+      }
+    ]
+  },
+  "dual-sieve-fixed5.json": {
+    "request": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Write a Python script that implements the Sieve of Eratosthenes."
+        }
+      ],
+      "reasoning_effort": "high",
+      "temperature": 0,
+      "max_tokens": 2000,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "runs": [
+      {
+        "first_token_seconds": 0.0013687660684809089,
+        "finish_seconds": 6.641644190065563,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 120.62752654886744
+      },
+      {
+        "first_token_seconds": 0.0017325329827144742,
+        "finish_seconds": 6.609322577947751,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 121.22422767592242
+      },
+      {
+        "first_token_seconds": 0.0014439299702644348,
+        "finish_seconds": 6.585564855020493,
+        "finish_reason": "stop",
+        "usage": {
+          "prompt_tokens": 45,
+          "completion_tokens": 802,
+          "total_tokens": 847,
+          "prompt_tokens_details": {
+            "cached_tokens": 45
+          },
+          "prompt_cache_hit_tokens": 45,
+          "prompt_cache_miss_tokens": 0
+        },
+        "tokens_per_second": 121.65633181986088
+      }
+    ]
+  },
+  "policy_counts": {
+    "decisions": 824,
+    "trimmed": 348,
+    "lengths": {
+      "5": 476,
+      "4": 88,
+      "2": 84,
+      "3": 176
+    }
+  },
+  "artifacts": {
+    "dual-sieve-adaptive-trace.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-sieve-adaptive-trace.json",
+      "sha256": "faaff68090c16be99a4705ee34bd4d39eb0a754b041eebf0e3e38e900d5bd543"
+    },
+    "dual-sieve-adaptive-trace.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-sieve-adaptive-trace.log",
+      "sha256": "8b3788cd837192022ac0c17eba37a4a554382e3ae95ce4b58ef314eb113bf0ca"
+    },
+    "dual-sieve-fixed5.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-sieve-fixed5.json",
+      "sha256": "bfe9012cc0d7e121a510b8d08f709eac7e7f4c3b0c4e3d14edbb7870f42a00df"
+    },
+    "dual-fixed5-server.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-fixed5-server.log",
+      "sha256": "7621b02b1aac9c1e427a3fa954b4a65cc5eec868bcf4a888b6237904a7d5bc06"
+    },
+    "vllm-adaptive-66c2935.py": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/vllm-adaptive-66c2935.py",
+      "sha256": "d345366a6efb3297f2c3fe1c57a6e98cbfd0cb4912b7446aadab53f8a91d7ae1"
+    }
+  }
+}

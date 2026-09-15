@@ -20,10 +20,10 @@ __global__ void shared_swiglu(const __nv_bfloat16* gate, const __nv_bfloat16* up
   output[i] = __float2bfloat16_rn((g / (1.0f + expf(-g))) * u);
 }
 }
-extern "C" int32_t ds41rt_v41_shared_swiglu(const uint16_t* gate, const uint16_t* up,
-    uint16_t* output, int32_t rows, void* stream) {
+static int32_t shared_swiglu_width(const uint16_t* gate, const uint16_t* up,
+    uint16_t* output, int32_t rows, uint32_t width, void* stream) {
   if (rows < 1 || rows > 4096) return cudaErrorInvalidValue;
-  const uint64_t count = uint64_t(rows) * 2304, bytes = count * 2;
+  const uint64_t count = uint64_t(rows) * width, bytes = count * 2;
   const uintptr_t g = reinterpret_cast<uintptr_t>(gate), u = reinterpret_cast<uintptr_t>(up),
       o = reinterpret_cast<uintptr_t>(output);
   if (!g || !u || !o || (g | u | o) % 2 || g > UINTPTR_MAX - bytes ||
@@ -35,9 +35,18 @@ extern "C" int32_t ds41rt_v41_shared_swiglu(const uint16_t* gate, const uint16_t
       reinterpret_cast<__nv_bfloat16*>(output), count);
   return cudaGetLastError();
 }
+extern "C" int32_t ds41rt_v41_shared_swiglu(const uint16_t* gate, const uint16_t* up,
+    uint16_t* output, int32_t rows, void* stream) {
+  return shared_swiglu_width(gate, up, output, rows, 2304, stream);
+}
+extern "C" int32_t ds41rt_v41_shared_tp2_swiglu(const uint16_t* gate, const uint16_t* up,
+    uint16_t* output, int32_t rows, void* stream) {
+  return shared_swiglu_width(gate, up, output, rows, 1152, stream);
+}
 extern "C" int32_t ds41rt_v41_fp8_matrix_pack_scales(
     const uint8_t* source, uint8_t* destination, int32_t k, int32_t n, void* stream) {
   if (!((k == 6144 && n == 25600) || (k == 5120 && n == 2304) || (k == 2304 && n == 5120) ||
+        (k == 5120 && n == 1152) || (k == 1152 && n == 5120) ||
         (k == 15360 && n == 5120) || (k == 5120 && n == 1280) || (k == 1280 && n == 32768) ||
         (k == 1280 && n == 4096) || (k == 5120 && n == 512) || (k == 8192 && n == 5120) || (k == 32768 && n == 8192)))
     return cudaErrorInvalidValue;

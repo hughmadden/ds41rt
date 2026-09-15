@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""Choose the physical GPUs for a one- or two-RTX release launch."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
+
+
+MIB = 1 << 20
+GIB = 1 << 30
+GROUP_BYTES = 455_680
+DEFAULT_POOL_TOKENS = 14 * 1_048_576
+
+# Fixed owners include weights, execution workspaces, snapshots, CUDA contexts,
+# and the constant (window/state) part of the C16 cache. These are conservative
+# K7 measurements; K5 needs slightly less memory. Per-group storage follows the
+# 3/2 compressed-source ownership split on logical GPUs 0/1.
+DUAL_FIXED_WITH_HEADROOM = (93_078_948_736, 96_299_387_520)
+DUAL_GROUP_BYTES = (270_336, 180_224)
+
+
+class SelectionError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class Gpu:
+    index: int
+    uuid: str
+    pci: str
+    total_mib: int
+    free_mib: int
+    reclaim_mib: int = 0
+
+    @property
+    def effective_free_mib(self) -> int:
+        return min(self.total_mib, self.free_mib + self.reclaim_mib)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=("auto", "1", "2"), required=True)
+    parser.add_argument("--primary-uuid", required=True)
+    parser.add_argument("--concurrency", type=int, required=True)
+    parser.add_argument("--max-context-tokens", type=int, required=True)
+    parser.add_argument("--retained-turns", type=int, required=True)
+    parser.add_argument("--kv-pool-size", default="")
+    parser.add_argument("--memory-reservation", default="")
+    parser.add_argument("--reclaim-pid", action="append", type=int, default=[])
+    parser.add_argument("--nvidia-smi", default="nvidia-smi")
+    return parser.parse_args()
+
+
+def run(command: list[str]) -> str:
+    try:
+        return subprocess.run(command, check=True, text=True, capture_output=True).stdout
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = getattr(error, "stderr", "").strip()
+        raise SelectionError(f"GPU query failed: {' '.join(command)}{': ' + detail if detail else ''}") from error
+
+
+def inventory(tool: str, reclaim_pids: set[int]) -> list[Gpu]:
+    raw = run([tool, "--query-gpu=index,uuid,pci.bus_id,memory.total,memory.free", "--format=csv,noheader,nounits"])
+    reclaim: dict[str, int] = {}
+    if reclaim_pids:
+        apps = run([tool, "--query-compute-apps=gpu_uuid,pid,used_memory", "--format=csv,noheader,nounits"])
+        for line in apps.splitlines():
+            fields = [field.strip() for field in line.split(",")]
+            if len(fields) != 3 or not fields[1].isdigit() or not fields[2].isdigit():
+                continue
+            if int(fields[1]) in reclaim_pids:
+                reclaim[fields[0]] = reclaim.get(fields[0], 0) + int(fields[2])
+    result = []
+    for line in raw.splitlines():
+        fields = [field.strip() for field in line.split(",")]
+        if len(fields) != 5:
+            raise SelectionError(f"invalid nvidia-smi GPU row: {line}")
+        index, uuid, pci, total, free = fields
+        if not (index.isdigit() and total.isdigit() and free.isdigit()):
+            raise SelectionError(f"non-numeric nvidia-smi GPU row: {line}")
+        result.append(Gpu(int(index), uuid, pci, int(total), int(free), reclaim.get(uuid, 0)))
+    if not result:
+        raise SelectionError("nvidia-smi reported no GPUs")
+    return result
+
+
+def p2p_read_pairs(tool: str) -> set[tuple[int, int]]:
+    raw = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", run([tool, "topo", "-p2p", "r"]))
+    lines = [line.split() for line in raw.splitlines() if line.strip()]
+    header = next((line for line in lines if len(line) >= 2 and all(re.fullmatch(r"GPU\d+", item) for item in line)), None)
+    if header is None:
+        raise SelectionError("cannot parse nvidia-smi peer-access matrix")
+    pairs: set[tuple[int, int]] = set()
+    for row in lines:
+        if not row or not re.fullmatch(r"GPU\d+", row[0]) or len(row) < len(header) + 1:
+            continue
+        source = int(row[0][3:])
+        for target_name, status in zip(header, row[1:]):
+            if status == "OK":
+                pairs.add((source, int(target_name[3:])))
+    return pairs
+
+
+def parse_bytes(value: str) -> int:
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]{1,6})?)(B|MB|GB|MiB|GiB)?", value)
+    if not match:
+        raise SelectionError(f"invalid KV pool size: {value}")
+    scale = {None: 1, "B": 1, "MB": 10**6, "GB": 10**9, "MiB": MIB, "GiB": GIB}[match.group(2)]
+    try:
+        result = int(Decimal(match.group(1)) * scale)
+    except InvalidOperation as error:
+        raise SelectionError(f"invalid KV pool size: {value}") from error
+    if result <= 0:
+        raise SelectionError(f"memory size rounds to zero bytes: {value}")
+    return result
+
+
+def reservation_bytes(value: str, total_mib: int) -> int:
+    if value.endswith("%"):
+        try:
+            percent = Decimal(value[:-1])
+        except InvalidOperation as error:
+            raise SelectionError(f"invalid memory reservation: {value}") from error
+        result = int(total_mib * MIB * percent / Decimal(100))
+    else:
+        result = parse_bytes(value)
+    if result <= 0 or result > total_mib * MIB:
+        raise SelectionError(f"memory reservation exceeds device total or rounds to zero: {value}")
+    return result
+
+
+def desired_groups(args: argparse.Namespace) -> int:
+    minimum = 2 * args.concurrency + 2 * args.retained_turns
+    if args.kv_pool_size:
+        groups = parse_bytes(args.kv_pool_size) // GROUP_BYTES
+        if groups < minimum:
+            raise SelectionError(
+                f"explicit KV pool provides {groups} groups but minimum admission needs {minimum}"
+            )
+        return groups
+    if args.memory_reservation:
+        return minimum
+    groups = math.ceil(args.max_context_tokens / 512) * args.concurrency
+    return min(groups, DEFAULT_POOL_TOKENS // 512) + args.concurrency + 2 * args.retained_turns
+
+
+def required_mib(role: int, groups: int) -> int:
+    required = DUAL_FIXED_WITH_HEADROOM[role] + DUAL_GROUP_BYTES[role] * groups
+    return math.ceil(required / MIB)
+
+
+def fits(gpu: Gpu, role: int, groups: int, reservation: str) -> bool:
+    required = required_mib(role, groups)
+    if gpu.total_mib < required or gpu.effective_free_mib < required:
+        return False
+    return not reservation or reservation_bytes(reservation, gpu.total_mib) >= required * MIB
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        gpus = inventory(args.nvidia_smi, set(args.reclaim_pid))
+        primary = next((gpu for gpu in gpus if gpu.uuid == args.primary_uuid), None)
+        if primary is None:
+            raise SelectionError(f"configured primary GPU is absent: {args.primary_uuid}")
+        if args.mode == "1":
+            if args.kv_pool_size:
+                parse_bytes(args.kv_pool_size)
+            if args.memory_reservation:
+                reservation_bytes(args.memory_reservation, primary.total_mib)
+            print(json.dumps({
+                "count": 1,
+                "groups": None,
+                "required_mib": None,
+                "gpus": [primary.__dict__ | {"effective_free_mib": primary.effective_free_mib}],
+                "decision": "forced",
+            }))
+            return 0
+        groups = desired_groups(args)
+        requirements = [required_mib(role, groups) for role in (0, 1)]
+        peers: set[tuple[int, int]] = set()
+        if len(gpus) > 1:
+            try:
+                peers = p2p_read_pairs(args.nvidia_smi)
+            except SelectionError:
+                if args.mode == "2":
+                    raise
+        candidates = sorted(
+            (
+                gpu for gpu in gpus
+                if gpu.uuid != primary.uuid
+                and (primary.index, gpu.index) in peers
+                and (gpu.index, primary.index) in peers
+                and fits(gpu, 1, groups, args.memory_reservation)
+            ),
+            key=lambda gpu: (gpu.effective_free_mib, gpu.total_mib, -gpu.index),
+            reverse=True,
+        )
+        dual = fits(primary, 0, groups, args.memory_reservation) and bool(candidates)
+        if args.mode == "2" and not dual:
+            details = ", ".join(
+                f"GPU {gpu.index}: {gpu.effective_free_mib}/{gpu.total_mib} MiB effective-free/total"
+                for gpu in gpus
+            )
+            raise SelectionError(
+                f"forced two-RTX mode is infeasible; logical GPUs need {requirements[0]}/{requirements[1]} MiB; {details}"
+            )
+        count = 2 if args.mode == "2" or (args.mode == "auto" and dual) else 1
+        selected = [primary] + ([candidates[0]] if count == 2 else [])
+        print(json.dumps({
+            "count": count,
+            "groups": groups if count == 2 else None,
+            "required_mib": requirements if count == 2 else None,
+            "gpus": [gpu.__dict__ | {"effective_free_mib": gpu.effective_free_mib} for gpu in selected],
+            "decision": "forced" if args.mode != "auto" else ("automatic-dual" if count == 2 else "automatic-single"),
+        }))
+        return 0
+    except SelectionError as error:
+        print(f"ds41rt release: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

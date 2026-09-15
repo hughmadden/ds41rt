@@ -135,7 +135,8 @@ mod tests {
     #[ignore = "requires DS41RT_NATIVE_LIB and CUDA"]
     fn native_window_prefix_restores_after_slot_reuse() -> Result<()> {
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
-        let mut state = WindowState::new(&lib, 20, 2, usize::MAX)?;
+        let device = crate::v41_memory::device::cache_test_device(&lib)?;
+        let mut state = device.own(|| WindowState::new(&lib, 20, 2, usize::MAX))?;
         let saved = DeviceAllocation::new(&lib, WINDOW_PREFIX_BYTES)?;
         let stream = LoadStream {
             library: &lib,
@@ -147,6 +148,8 @@ mod tests {
             state.slots[0].end = end;
             lib.copy_h2d(slice(state.ends.buffer, 0, 8), &end.to_ne_bytes())?;
             let view = state.view(old)?;
+            assert_eq!(view.values.device_id,device.id);
+            assert_eq!(saved.buffer.device_id,0);
             let values: Vec<u8> = (0..128 * 512).map(|i| (i % 251) as u8).collect();
             let scales: Vec<u8> = (0..128 * 16).map(|i| (i % 137) as u8).collect();
             lib.copy_h2d(view.values, &values)?;

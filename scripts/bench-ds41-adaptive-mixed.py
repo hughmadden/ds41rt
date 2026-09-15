@@ -61,6 +61,8 @@ def main():
         admitted = [threading.Event() for _ in range(concurrency+1)]
         admitted[0].set()
         failed = threading.Event()
+        failures = []
+        failure_lock = threading.Lock()
 
         def work(item):
             index, (case, body) = item
@@ -72,14 +74,22 @@ def main():
                     barrier.wait(timeout=30)
                 return dict(case=case, admission_index=index, **request(body,
                     on_first_content=admitted[index+1].set if args.ordered_admission else None))
-            except BaseException:
+            except BaseException as error:
+                with failure_lock:
+                    failures.append(dict(case=case, admission_index=index, request=body,
+                                         error=str(error), response=getattr(error, 'record', None)))
                 failed.set()
                 for gate in admitted:
                     gate.set()
                 raise
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
-            rows = list(pool.map(work, enumerate(bodies)))
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
+                rows = list(pool.map(work, enumerate(bodies)))
+        except BaseException:
+            report['failed_batch'] = dict(concurrency=concurrency, failures=failures)
+            save()
+            raise
         begin = min(r['start'] + r['result']['first_content_seconds'] for r in rows)
         end = max(r['start'] + r['result']['finish_seconds'] for r in rows)
         tokens = sum(r['result']['usage']['completion_tokens'] - 1 for r in rows)

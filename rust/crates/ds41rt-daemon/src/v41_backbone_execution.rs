@@ -1,5 +1,10 @@
 //! Cache producers and the complete per-layer backbone execution handoff.
-use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage};
+use crate::v41_backbone_cache::{BackboneCache, CacheBatch, CacheStage, CachePlacement};
+use crate::v41_memory::device::{Device, DeviceOwner};
+mod placement;
+mod distributed;
+pub(crate) use distributed::{DistributedExecution, PendingDistributedProduction};
+pub(crate) use placement::PlacedProducerWaves;
 use crate::v41_backbone_lane::{BackboneLane, LaneFfn, PendingLaneFfn};
 use crate::v41_backbone_router::ExpertRow;
 use crate::v41_compressor::{CompressorWave, CompressorWeights};
@@ -39,8 +44,55 @@ pub(crate) struct CompletedLayer<'t> {
     indexed_us: u64,
     attended_us: u64,
     experts_us: u64,
+    routed_backend: &'static str,
+    shared_tp: usize,
+}
+impl CompletedLayer<'_> {
+    /// Opt-in calibration uses routes already captured by the lane. These are
+    /// elapsed stage times (including scheduling/transport), not GPU kernel times.
+    fn log_cost(&self, captured: &[Vec<[u32; 6]>]) {
+        if !tracing::enabled!(target: "ds41rt::cost_model", tracing::Level::DEBUG) { return; }
+        let Some(routes) = captured.get(self.layer).filter(|r| r.len() == self.rows) else { return; };
+        let mut counts = [0usize; 384];
+        for &expert in routes.iter().flatten() {
+            let Some(count) = counts.get_mut(expert as usize) else { return; };
+            *count += 1;
+        }
+        let total_us = self.started.elapsed().as_micros() as u64;
+        tracing::debug!(target: "ds41rt::cost_model", batch=self.batch, layer=self.layer,
+            rows=self.rows, routed_backend=self.routed_backend, shared_tp=self.shared_tp,
+            distinct_experts=counts.iter().filter(|&&n| n != 0).count(),
+            expert_groups_16=counts.iter().map(|&n| n.div_ceil(16)).sum::<usize>(),
+            produced_us=self.produced_us, index_us=self.indexed_us-self.produced_us,
+            attention_us=self.attended_us-self.indexed_us,
+            experts_us=self.experts_us-self.attended_us,
+            finish_us=total_us-self.experts_us, total_us, "verification layer cost");
+    }
 }
 impl PreparedLayer<'_, '_, '_> {
+    #[cfg(test)]
+    pub async unsafe fn trace_ffn_input(mut self, library: &ds41rt_ffi::NativeLibrary,
+        destination: ds41rt_ffi::Ds41rtDeviceBuffer, stream: *mut std::ffi::c_void)
+        -> Result<(Self, (u64, usize, usize))> {
+        let ffn = match self.ffn {
+            PreparedFfn::Ready(ffn) => ffn,
+            PreparedFfn::Pending(pending) => pending.complete().await?,
+        };
+        let position = ffn.input.tokens[0];
+        let bytes = ffn.input.tokens.len() * 10240;
+        ensure!(position as usize + ffn.input.tokens.len() <= 16, "FFN trace extent exceeded");
+        let offset = (self.layer * 16 + position as usize) * 40976;
+        let mut input = ffn.input.values;
+        input.bytes = bytes;
+        ensure!(offset + bytes <= destination.bytes, "FFN trace buffer exceeded");
+        let destination = ds41rt_ffi::Ds41rtDeviceBuffer {
+            ptr: unsafe { destination.ptr.cast::<u8>().add(offset).cast() }, bytes, ..destination
+        };
+        unsafe { library.copy_d2d_async(destination, input, bytes, stream)?; }
+        self.ffn = PreparedFfn::Ready(ffn);
+        let record = (position, self.layer, bytes);
+        Ok((self, record))
+    }
     #[cfg(test)]
     async unsafe fn check_queued_ffn(mut self, image_mask: &[u8],
         local: Option<&mut crate::v41_experts::local::LocalExpertWave<'_>>) -> Result<Self> {
@@ -64,8 +116,12 @@ impl PreparedLayer<'_, '_, '_> {
                 (ffn, self.started.elapsed().as_micros() as u64)
             }
         };
+        let routed_backend = if transport.has_tp2_layer(self.layer) { "rtx_tp2" }
+            else if transport.has_local_layer(self.layer) { "rtx_local" } else { "spark_tp4" };
+        let shared_tp = if transport.has_tp2_shared_layer(self.layer) { 2 } else { 1 };
         let result = unsafe { ffn.execute_tp4(transport, placement, image_mask, &self.rows).await? };
         Ok(CompletedLayer { result, batch: self.batch, layer: self.layer, rows: self.rows.len(),
+            routed_backend, shared_tp,
             started: self.started, produced_us: self.produced_us, indexed_us: self.indexed_us,
             attended_us, experts_us: self.started.elapsed().as_micros() as u64 })
     }
@@ -83,9 +139,11 @@ impl<'a> LayerCache<'_, 'a> {
 
 pub(crate) struct CacheProducerWeights<'a> {
     library: &'a NativeLibrary,
-    windows: Vec<WindowWeights<'a>>,
-    sources: Vec<CompressorWeights<'a>>,
-    sinks: NativeRtxTensors<'a>,
+    windows: Vec<DeviceOwner<'a, WindowWeights<'a>>>,
+    sources: Vec<DeviceOwner<'a, CompressorWeights<'a>>>,
+    _sinks: Vec<DeviceOwner<'a, NativeRtxTensors<'a>>>,
+    sink_views: [ds41rt_ffi::Ds41rtDeviceBuffer; 40],
+    placement: Option<CachePlacement>,
 }
 impl<'a> CacheProducerWeights<'a> {
     fn sinks() -> Vec<String> {
@@ -118,44 +176,9 @@ impl<'a> CacheProducerWeights<'a> {
             Self::device_bytes(library, catalog)? <= budget,
             "cache producer weights exceed budget"
         );
-        let windows = (0..40)
-            .map(|layer| {
-                WindowWeights::load(
-                    library,
-                    catalog,
-                    layer,
-                    WindowWeights::device_bytes(library, catalog, layer)?,
-                    staging,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let sources = SOURCES
-            .into_iter()
-            .map(|layer| {
-                CompressorWeights::load(
-                    library,
-                    catalog,
-                    layer,
-                    CompressorWeights::device_bytes(catalog, layer)?,
-                    staging,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let names = Self::sinks();
-        let sinks = NativeRtxTensors::load(
-            library,
-            catalog,
-            &names,
-            NativeRtxTensors::plan(catalog, &names)?,
-            staging,
-        )?;
-        Ok(Self {
-            library,
-            windows,
-            sources,
-            sinks,
-        })
+        Self::load_placed(library, catalog, staging, None)
     }
+
 }
 
 #[derive(Default)]
@@ -307,6 +330,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         capacity: u32,
         budget: usize,
     ) -> Result<Self> {
+        ensure!(weights.placement.is_none(), "distributed producer weights require placed execution workspaces");
         ensure!(
             Self::workspace_bytes(weights.library, capacity)? <= budget,
             "cache producer workspace exceeds budget"
@@ -525,10 +549,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             }
         }
         let indexed_us = timing.elapsed().as_micros() as u64;
-        let sink = self
-            .weights
-            .sinks
-            .get(&format!("layers.{layer}.attn.attn_sink"))?;
+        let sink = self.weights.sink_views[layer];
         let rows = batch.expert_rows();
         let ffn = if cooperative {
             PreparedFfn::Pending(unsafe { lane.enqueue_attention_indexed_ffn(sink, &cache, index)? })
@@ -551,6 +572,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             && batch.identity() == completed.batch && self.progress.next == completed.layer
             && self.progress.stage == batch.stage(), "completed backbone layer identity differs");
         unsafe { lane.finish_ffn(completed.result.binding(), completed.result.values)?; }
+        completed.log_cost(lane.captured_routes());
         tracing::debug!(target: "ds41rt::timing", layer=completed.layer, rows=completed.rows,
             produced_us=completed.produced_us, index_us=completed.indexed_us-completed.produced_us,
             attention_us=completed.attended_us-completed.indexed_us,
@@ -568,6 +590,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             && batch.identity() == completed.batch && self.progress.next == completed.layer
             && self.progress.stage == batch.stage(), "completed backbone layer identity differs");
         unsafe { lane.finish_ffn_cooperative(completed.result.binding(), completed.result.values).await?; }
+        completed.log_cost(lane.captured_routes());
         tracing::debug!(target: "ds41rt::timing", layer=completed.layer, rows=completed.rows,
             produced_us=completed.produced_us, index_us=completed.indexed_us-completed.produced_us,
             attention_us=completed.attended_us-completed.indexed_us,

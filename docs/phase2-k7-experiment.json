@@ -1,0 +1,98 @@
+{
+  "scope": "Initial fixed K7 experiment; no adaptive K7 or recalibrated cost model measurements.",
+  "same_code": [
+    {
+      "concurrency": 1,
+      "median_aggregate_tps": 166.97270061476019
+    },
+    {
+      "concurrency": 2,
+      "median_aggregate_tps": 272.4505027153515
+    },
+    {
+      "concurrency": 4,
+      "median_aggregate_tps": 479.8047057423864
+    },
+    {
+      "concurrency": 8,
+      "median_aggregate_tps": 759.7892118529393
+    },
+    {
+      "concurrency": 16,
+      "median_aggregate_tps": 1142.4863718582224
+    }
+  ],
+  "same_code_checks_passed": true,
+  "mixed": [
+    {
+      "concurrency": 1,
+      "median_aggregate_tps": 156.3096835439241
+    },
+    {
+      "concurrency": 2,
+      "median_aggregate_tps": 140.17048097897563
+    },
+    {
+      "concurrency": 4,
+      "median_aggregate_tps": 156.1641283309501
+    },
+    {
+      "concurrency": 8,
+      "median_aggregate_tps": 174.74530541061793
+    },
+    {
+      "concurrency": 16,
+      "median_aggregate_tps": 261.1552187407372
+    }
+  ],
+  "sieve_median_tps": 122.06871038678642,
+  "sieve_completion_tokens": [
+    778,
+    778,
+    778
+  ],
+  "kv_pool_bytes": 14429107200,
+  "raw_source_token_positions": 16212480,
+  "artifacts": {
+    "dual-fixed7-same-code.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-fixed7-same-code.json",
+      "sha256": "57adcf6d12a1c967c8df64e80a25220e82a80bdf8e337d2a7ffeab2d1350e758"
+    },
+    "dual-fixed7-lifecycle.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-fixed7-lifecycle.json",
+      "sha256": "230d7d848622abbfbbc50eef8a69eddd0aa66a3e8d7ee01563ac240addab02e3"
+    },
+    "dual-fixed7-server.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-fixed7-server.log",
+      "sha256": "89d958e47b959294a3ca9d67436925836fd4503ce0b17e34130be522f261c811"
+    },
+    "dual-sieve-fixed7.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-sieve-fixed7.json",
+      "sha256": "2766e181b93ee24b7fae1aeb23c31aaf1c3615a494d27a0ada00a45f7ccde6f9"
+    },
+    "k5-k7-sieve-functional-checks.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/k5-k7-sieve-functional-checks.json",
+      "sha256": "5f946ff2afccada7662afa2c4b4466b402f151839bc8a46d6ea8a371ef3af537"
+    },
+    "k5-k7-terminal-tests.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/k5-k7-terminal-tests.log",
+      "sha256": "c55c4a08264cdc84b576340e3e5764ee449428636ad38b09f760ba98acfe194f"
+    },
+    "k7-core-tests.log": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/k7-core-tests.log",
+      "sha256": "492fbe15577589bbaac3fff37453e2935bf86348db7667317110bd965cd726b0"
+    },
+    "dual-fixed7-mixed-1.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-fixed7-mixed-1.json",
+      "sha256": "a84f310dbe4cf69c1cad75fe79a3c36bdd736220853f82a172c0b0c3210c8e64"
+    },
+    "dual-fixed7-mixed-2.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-fixed7-mixed-2.json",
+      "sha256": "b3e7150ec9aa1e5b183eaf4925549562a7cac0247fcc6c649defe2b61c011e4c"
+    },
+    "dual-fixed7-mixed-3.json": {
+      "path": "/home/tj/.cache/ds41rt-experiments/phase2-planner/dual-fixed7-mixed-3.json",
+      "sha256": "3dc8e4555239878347196e81c5d214092c25b76363474b23c8bdc4f42b393c00"
+    }
+  }
+}

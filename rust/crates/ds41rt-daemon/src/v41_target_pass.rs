@@ -12,9 +12,31 @@ use crate::v41_target_head::{TargetHeadWave, TargetLogits};
 use anyhow::{ensure, Context, Result};
 use std::time::{Duration, Instant};
 mod taps;
+mod distributed;
+pub(crate) use distributed::DistributedTargetPass;
+mod verification;
+pub(crate) use verification::VerificationTarget;
 mod encoder_pair;
 mod encoder_stream;
 pub(crate) use taps::{TargetTapWave, TargetTaps};
+
+/// Target cache publication used by the independent scheduler's queued dSpark
+/// transaction. Static dispatch keeps ordinary serving on its existing path.
+pub(crate) trait TargetCache<'a> {
+    fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>>;
+    fn commit(&mut self, requests: &mut Requests<'a>, batch: &mut RequestBatch,
+        accepted: &[u32]) -> Result<()>;
+}
+impl<'a> TargetCache<'a> for TargetPass<'_, 'a> {
+    fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> { TargetPass::taps(self, batch) }
+    fn commit(&mut self, requests: &mut Requests<'a>, batch: &mut RequestBatch,
+        accepted: &[u32]) -> Result<()> { TargetPass::commit(self, requests, batch, accepted) }
+}
+impl<'a> TargetCache<'a> for DistributedTargetPass<'_, 'a> {
+    fn taps(&self, batch: &RequestBatch) -> Result<TargetTaps<'_>> { DistributedTargetPass::taps(self, batch) }
+    fn commit(&mut self, requests: &mut Requests<'a>, batch: &mut RequestBatch,
+        accepted: &[u32]) -> Result<()> { DistributedTargetPass::commit(self, requests, batch, accepted) }
+}
 
 // A remote FFN wait owns its prepared lane state, never a request-bank borrow.
 // Both ordinary serving and independent lane scheduling use the same execution
@@ -92,6 +114,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         if enabled { self.index.enable_small_graph_shapes(); }
     }
     pub fn captured_routes(&self) -> &[Vec<[u32; 6]>] { self.lane.captured_routes() }
+    pub fn reserve_sparse_decode_rows(&mut self, rows: usize) -> Result<()> {
+        self.lane.reserve_sparse_decode_rows(rows)
+    }
     pub fn new(
         embedding: TargetEmbeddingWave<'w, 'a>,
         lane: BackboneLane<'w, 'a>,

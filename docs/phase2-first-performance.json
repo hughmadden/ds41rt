@@ -1,0 +1,95 @@
+{
+  "scope": "Initial optimized dual-RTX measurements, not final release qualification",
+  "daemon_profile": "release",
+  "native_build_type": "Release",
+  "source_base": "a213d55 with decoder-only Spark and sixteen-context pool changes",
+  "pool_bytes": 14960885760,
+  "source_token_positions": 16809984,
+  "runtime_reserve_bytes_per_gpu": 838860800,
+  "power_limit_watts_per_gpu": 400,
+  "memory_clock_mhz": 13365,
+  "prefill_batch_tokens": 2048,
+  "spark_layers": [
+    20,
+    39
+  ],
+  "decode": [
+    {
+      "concurrency": 1,
+      "counting_tps": 186.58877468177417,
+      "same_code_tps": 148.45513686942869,
+      "mixed_tps": 147.04361998527753
+    },
+    {
+      "concurrency": 2,
+      "counting_tps": 296.9795328603297,
+      "same_code_tps": 240.33474784615606,
+      "mixed_tps": 135.19971005831948
+    },
+    {
+      "concurrency": 4,
+      "counting_tps": 533.9717530509038,
+      "same_code_tps": 445.2839864138927,
+      "mixed_tps": 172.3775237890807
+    },
+    {
+      "concurrency": 8,
+      "counting_tps": 823.8806337206067,
+      "same_code_tps": 715.4013529489329,
+      "mixed_tps": 191.2701481820891
+    },
+    {
+      "concurrency": 16,
+      "counting_tps": 1345.7683684735173,
+      "same_code_tps": 1167.5533551402011,
+      "mixed_tps": 286.6726771817538
+    }
+  ],
+  "prefill": [
+    {
+      "base_context_tokens": 0,
+      "suffix_tokens": 1024,
+      "samples": 3,
+      "median_effective_prefill_tokens_per_second": 5002.878218341524,
+      "min_effective_prefill_tokens_per_second": 4939.859168838341,
+      "max_effective_prefill_tokens_per_second": 5022.950886589881
+    },
+    {
+      "base_context_tokens": 0,
+      "suffix_tokens": 4096,
+      "samples": 3,
+      "median_effective_prefill_tokens_per_second": 7888.392131692943,
+      "min_effective_prefill_tokens_per_second": 7866.672999117634,
+      "max_effective_prefill_tokens_per_second": 7906.560805116536
+    },
+    {
+      "base_context_tokens": 0,
+      "suffix_tokens": 16384,
+      "samples": 3,
+      "median_effective_prefill_tokens_per_second": 8393.492209642845,
+      "min_effective_prefill_tokens_per_second": 8382.271853982738,
+      "max_effective_prefill_tokens_per_second": 8407.432353479195
+    },
+    {
+      "base_context_tokens": 0,
+      "suffix_tokens": 32768,
+      "samples": 3,
+      "median_effective_prefill_tokens_per_second": 8322.899633738234,
+      "min_effective_prefill_tokens_per_second": 8322.155163316165,
+      "max_effective_prefill_tokens_per_second": 8333.29236143961
+    }
+  ],
+  "artifacts": {
+    "dual-release-counting.json": "71a56a91dbd34d43880955cd6d7eed178ebe8b25b77be83b8c120e2b5be984b6",
+    "dual-release-same-code.json": "c949f2f0f7a13681ec7329496c26064333d5ab38123dd316a93d7ebefbd01af0",
+    "dual-release-mixed-1.json": "ae6dd09ea3674a9362f18bc913f1d97c435c71a7a3e1c576b0d8eeee04d7ed9a",
+    "dual-release-mixed-2.json": "54d5870ea05bf5ad20159b8fb9112d5804f08055488c1b9ca6e304b460b38d8f",
+    "dual-release-mixed-3.json": "3a270bcae1e9d8e1693fbc77bcaf4e78c62aa9e3961f1207796c80af53f283cf",
+    "dual-release-prefill.json": "0f6cdc504090e6c1aaf79d60dd5eeb4a5145ab5b0bc2c43a0270c5219bac0302",
+    "dual-release-lifecycle.json": "9def91f90be15668e842bcf5ed0e5dbb3e7c21d41e6b939432b82e7d674d32ee",
+    "dual-release-vision.json": "b8c55a8dcbc19428c668d4ca0625ef2607e68e99f09cec70b2a3c8d56ee1e16f",
+    "dual-release-server.log": "3de644e822fb8db1f925e31a8b74e204f0d2b60a87d8134d16b5b18e92349132",
+    "decoder-only-workers.json": "7bc8cf4b5296c489211ea7ae7d09a1827136134a800dfb05134d7c46cfc718d9"
+  },
+  "daemon_sha256": "a6001c35ce55fae3421c3eca2a171af2f49b28a48ff6745b1fd97483c6443312"
+}

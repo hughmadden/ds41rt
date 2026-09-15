@@ -1,5 +1,9 @@
+pub(crate) mod prefill_target;
+use prefill_target::PrefillTarget;
+use speculative::DraftChain;
 pub(crate) mod speculative;
 mod scheduler;
+mod distributed;
 mod scores;
 mod constraints;
 use scores::TokenScores;
@@ -118,6 +122,7 @@ fn worker(
     ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>,
     stats: std::sync::Arc<std::sync::Mutex<serde_json::Value>>,
 ) -> Result<()> {
+    if args.rtx_gpus == 2 { return distributed::worker(args, receive, ready); }
     let capacity = prefill_capacity(args.prefill_batch_tokens)?;
     let rows = capacity as usize;
     let lib = unsafe { NativeLibrary::load(&args.native_lib)? };
@@ -200,7 +205,7 @@ fn worker(
         TargetHeadWeights::device_bytes(&catalog)?,
         16 * 1024 * 1024,
     )?;
-    let head = head_weights.wave(&vocabulary, 48, TargetHeadWave::device_bytes(48)?)?;
+    let head = head_weights.wave(&vocabulary, if args.dspark_draft_limit > 5 { 64 } else { 48 }, TargetHeadWave::device_bytes(if args.dspark_draft_limit > 5 { 64 } else { 48 })?)?;
     let mut pass = TargetPass::new(
         embedding,
         lane,
@@ -237,22 +242,27 @@ fn worker(
         EngramDeviceRows::new(&lib, rows, EngramDeviceRows::device_bytes(rows)?)?,
         [EngramGate::new(&engram_weights[0], rows, 1024 * 1024 * 1024)?,
          EngramGate::new(&engram_weights[1], rows, 1024 * 1024 * 1024)?],
-        head_weights.wave(&vocabulary, 48, TargetHeadWave::device_bytes(48)?)?,
+        head_weights.wave(&vocabulary, if args.dspark_draft_limit > 5 { 64 } else { 48 }, TargetHeadWave::device_bytes(if args.dspark_draft_limit > 5 { 64 } else { 48 })?)?,
         crate::v41_target_pass::TargetTapWave::new(&lib, rows, crate::v41_target_pass::TargetTapWave::device_bytes(rows)?)?,
         Duration::from_secs(120),
     )?;
+    if args.dspark && args.dspark_draft_limit > 5 {
+        pass.reserve_sparse_decode_rows(64)?;
+        prefill_pass.reserve_sparse_decode_rows(64)?;
+    }
     let prefill_roce = V41Tp4Roce::new(args.peers.clone().try_into()
         .map_err(|_| anyhow::anyhow!("four Spark peers required"))?, [1, 2, 3, 4], capacity,
         TcpTransportConfig { timeout: Duration::from_secs(120), max_frame_bytes: 64 * 1024 * 1024 })?;
     let mut prefill_transport = NativeTp4Wave::new(&lib, prefill_roce, NativeTp4Wave::device_bytes(capacity)?)?;
     let draft_weights = if args.dspark {
-        Some(crate::v41_experts::dspark::DsparkWeights::load_serving(
+        Some(crate::v41_experts::dspark::DsparkWeights::load_serving_with_width(
             &lib,
             &catalog,
             capacity,
             args.concurrency,
             32 * 1024 * 1024 * 1024,
             16 * 1024 * 1024,
+            if args.dspark_draft_limit > 5 { 7 } else { 5 },
         )?)
     } else {
         None
@@ -316,6 +326,7 @@ fn worker(
         tracing::info!(layers=plan.layers, elapsed_ms=local_started.elapsed().as_millis(),
             "local RTX experts ready");
     }
+    if let Some(draft) = &mut draft { draft.configure_cost_model(&transport)?; }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
@@ -336,23 +347,22 @@ fn prefill_hold(hold: &mut dyn FnMut() -> Result<()>) {
     }
 }
 
-fn prefill<'w, 'a>(
+fn prefill<'a, P: PrefillTarget<'a>, C: DraftChain<'a>>(
     lib: &'a NativeLibrary,
     runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'w, 'a>,
-    other: &mut TargetPass<'w, 'a>,
+    pass: &mut P,
+    other: &mut P,
     requests: &mut Requests<'a>,
-    transport: &mut NativeTp4Wave<'a>,
-    other_transport: &mut NativeTp4Wave<'a>,
+    transport: &mut P::Transport,
+    other_transport: &mut P::Transport,
     lease: crate::v41_backbone_cache::CacheLease,
     tokens: &[u32],
     chunk_rows: usize,
     job: &NativeRequest,
-    draft: Option<&mut DraftRuntime<'_, 'a>>,
+    draft: Option<&mut DraftRuntime<'_, 'a, C>>,
     hold: &mut dyn FnMut() -> Result<()>,
 ) -> Result<TokenScores> {
     use crate::v41_backbone_cache::{CacheStage, CacheWork};
-    use crate::v41_block::EncoderSuffix;
     let end = tokens.len() as u64;
     let cached = requests.cache().committed_end(lease)? as usize;
     let stage = requests.cache().stage(lease)?;
@@ -372,7 +382,7 @@ fn prefill<'w, 'a>(
             hold,
         );
     }
-    let mut suffix = EncoderSuffix::new(lib, end, EncoderSuffix::device_bytes(end)?)?;
+    let mut suffix = pass.new_suffix(lib, end)?;
     if replay {
         let start = requests.cache().history_end(lease)? as usize;
         ensure!(
@@ -390,10 +400,10 @@ fn prefill<'w, 'a>(
             }])?;
             let result = (|| -> Result<()> {
                 runtime.block_on(unsafe {
-                    pass.execute_encoder_replay(requests, &mut batch, transport, 0, &mut suffix)
+                    pass.encoder_part(requests, &mut batch, transport, &mut suffix)
                 })?;
                 ensure!(!job.events.is_closed(), "client disconnected");
-                pass.commit(requests, &mut batch, &[chunk.len() as u32])
+                runtime.block_on(pass.commit_prefill::<C>(requests, &mut batch, None, chunk.len() as u32))
             })();
             if result.is_err() {
                 pass.discard(&mut batch)?;
@@ -413,9 +423,9 @@ fn prefill<'w, 'a>(
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
         let started = Instant::now();
         let result = (|| -> Result<()> {
-            runtime.block_on(unsafe { pass.execute_encoder(requests, &mut batch, transport, 0, &mut suffix) })?;
+            runtime.block_on(unsafe { pass.encoder_part(requests, &mut batch, transport, &mut suffix) })?;
             ensure!(!job.events.is_closed(), "client disconnected");
-            pass.commit(requests, &mut batch, &[chunk.len() as u32])
+            runtime.block_on(pass.commit_prefill::<C>(requests, &mut batch, None, chunk.len() as u32))
         })();
         if result.is_err() { pass.discard(&mut batch)?; }
         result?;
@@ -443,14 +453,11 @@ fn prefill<'w, 'a>(
     let mut batch = requests.prepare_replay(&[CacheWork { lease, tokens: rows, kind: ExpertV2SourceKind::Prefill }])?;
     let started = Instant::now();
     let result = (|| -> Result<TokenScores> {
-        let encoder = suffix.output()?;
-        let logits = runtime.block_on(unsafe { pass.execute_replay(requests, &mut batch,
-            transport, 0, &[rows as usize - 1], &encoder) })?;
-        let mut bytes = vec![0; logits.logits.bytes]; lib.copy_d2h(&mut bytes, logits.logits)?;
+        let bytes = runtime.block_on(unsafe { pass.prefill_logits(lib, requests, &mut batch,
+            transport, &[rows as usize - 1], Some(&suffix)) })?;
         let scores = TokenScores::new(bytes)?;
         ensure!(!job.events.is_closed(), "client disconnected");
-        if let Some(draft) = draft { draft.commit(pass, requests, &mut batch, rows)?; }
-        else { pass.commit(requests, &mut batch, &[rows])?; }
+        runtime.block_on(pass.commit_prefill(requests, &mut batch, draft, rows))?;
         Ok(scores)
     })();
     if result.is_err() { pass.discard(&mut batch)?; }
@@ -458,10 +465,10 @@ fn prefill<'w, 'a>(
     result
 }
 
-fn prefill_continuation<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
-    pass: &mut TargetPass<'w, 'a>, requests: &mut Requests<'a>, transport: &mut NativeTp4Wave<'a>,
+fn prefill_continuation<'a, P: PrefillTarget<'a>, C: DraftChain<'a>>(lib: &'a NativeLibrary, runtime: &tokio::runtime::Runtime,
+    pass: &mut P, requests: &mut Requests<'a>, transport: &mut P::Transport,
     lease: crate::v41_backbone_cache::CacheLease, tokens: &[u32], chunk_rows: usize,
-    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a>>,
+    job: &NativeRequest, mut draft: Option<&mut DraftRuntime<'_, 'a, C>>) -> Result<TokenScores> {
     hold: &mut dyn FnMut() -> Result<()>) -> Result<TokenScores> {
     ensure!(!tokens.is_empty(), "prefix continuation has no uncached rows");
     let mut anchor = None;
@@ -471,14 +478,11 @@ fn prefill_continuation<'w, 'a>(lib: &'a NativeLibrary, runtime: &tokio::runtime
         let mut batch = requests.prepare(&[RequestTokens { lease, tokens: chunk,
             image_mask: None, kind: ExpertV2SourceKind::Prefill }])?;
         let result = (|| -> Result<TokenScores> {
-            let logits = runtime.block_on(unsafe { pass.execute(requests, &mut batch, transport,
-                0, &[chunk.len() - 1]) })?;
-            let mut bytes = vec![0; logits.logits.bytes];
-            lib.copy_d2h(&mut bytes, logits.logits)?;
+            let bytes = runtime.block_on(unsafe { pass.prefill_logits(lib, requests, &mut batch, transport,
+                &[chunk.len() - 1], None) })?;
             let scores = TokenScores::new(bytes)?;
             ensure!(!job.events.is_closed(), "client disconnected");
-            if let Some(draft) = draft.as_deref_mut() { draft.commit(pass, requests, &mut batch, chunk.len() as u32)?; }
-            else { pass.commit(requests, &mut batch, &[chunk.len() as u32])?; }
+            runtime.block_on(pass.commit_prefill(requests, &mut batch, draft.as_deref_mut(), chunk.len() as u32))?;
             Ok(scores)
         })();
         if result.is_err() { pass.discard(&mut batch)?; }

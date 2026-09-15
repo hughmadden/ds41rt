@@ -1,3 +1,4 @@
+use super::speculative::DraftChain;
 use super::*;
 use crate::v41_backbone_cache::{BackbonePrefix, CacheLease};
 use crate::v41_requests::RequestPrefix;
@@ -161,7 +162,7 @@ impl<'a> PrefixCache<'a> {
     pub fn prepare_key(&mut self, tokens: &[u32], images: &[ds41rt_loader::V41ImageSpan]) -> Result<ImageKeys> {
         self.images.prepare(tokens, images)
     }
-    pub fn retain(
+    pub fn retain<C: DraftChain<'a>>(
         &mut self,
         kind: SnapshotKind,
         tokens: &[u32],
@@ -170,7 +171,7 @@ impl<'a> PrefixCache<'a> {
         id: u64,
         lease: CacheLease,
         requests: &mut Requests<'a>,
-        draft: Option<&mut DraftRuntime<'_, 'a>>,
+        draft: Option<&mut DraftRuntime<'_, 'a, C>>,
     ) -> Result<()> {
         let bank = self.retained.bank_mut(kind);
         if bank.limit() == 0 {
@@ -197,9 +198,9 @@ impl<'a> PrefixCache<'a> {
         self.insert_saved(kind, &keys, saved, requests);
         Ok(())
     }
-    pub fn queue_retain(&mut self, lane: usize, kind: SnapshotKind, tokens: &[u32],
+    pub fn queue_retain<C: DraftChain<'a>>(&mut self, lane: usize, kind: SnapshotKind, tokens: &[u32],
         images: &ImageKeys, next: &TokenScores, id: u64, lease: CacheLease,
-        requests: &mut Requests<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<bool> {
+        requests: &mut Requests<'a>, mut draft: Option<&mut DraftRuntime<'_, 'a, C>>) -> Result<bool> {
         ensure!(self.pending.get(lane).context("invalid retention lane")?.is_none(), "retention lane occupied");
         let bank = self.retained.bank_mut(kind);
         if bank.limit() == 0 { return Ok(false); }
@@ -220,8 +221,8 @@ impl<'a> PrefixCache<'a> {
             next: next.clone(), id, lease, draft: draft.is_some() });
         Ok(true)
     }
-    pub fn poll_retain(&mut self, lane: usize, requests: &mut Requests<'a>,
-        mut draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<bool> {
+    pub fn poll_retain<C: DraftChain<'a>>(&mut self, lane: usize, requests: &mut Requests<'a>,
+        mut draft: Option<&mut DraftRuntime<'_, 'a, C>>) -> Result<bool> {
         let pending = self.pending.get(lane).and_then(Option::as_ref).context("retention is not pending")?;
         ensure!(pending.draft == draft.is_some(), "pending retention execution mode differs");
         if !requests.prefix_ready(lane, pending.lease)? { return Ok(false); }
@@ -237,21 +238,21 @@ impl<'a> PrefixCache<'a> {
         self.insert_saved(pending.kind, &pending.keys, saved, requests);
         Ok(true)
     }
-    pub fn abort_retain(&mut self, lane: usize, requests: &mut Requests<'a>,
-        draft: Option<&mut DraftRuntime<'_, 'a>>) -> Result<()> {
+    pub fn abort_retain<C: DraftChain<'a>>(&mut self, lane: usize, requests: &mut Requests<'a>,
+        draft: Option<&mut DraftRuntime<'_, 'a, C>>) -> Result<()> {
         let target = requests.abort_prefix(lane);
         let speculative = draft.map(|d| d.abort_prefix(lane)).transpose();
         if let Some(pending) = self.pending.get_mut(lane) { *pending = None; }
         target.and(speculative.map(|_| ()))
     }
-    pub fn restore(
+    pub fn restore<C: DraftChain<'a>>(
         &mut self,
         tokens: &[u32],
         images: &ImageKeys,
         id: u64,
         lease: CacheLease,
         requests: &mut Requests<'a>,
-        draft: Option<&mut DraftRuntime<'_, 'a>>,
+        draft: Option<&mut DraftRuntime<'_, 'a, C>>,
     ) -> Result<Option<(usize, Option<TokenScores>)>> {
         let keys = images.encode(tokens)?;
         if self.retained.lookup_reusable(&keys).is_none() {

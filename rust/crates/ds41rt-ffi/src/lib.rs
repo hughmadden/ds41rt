@@ -1,4 +1,6 @@
 mod v41_candidate_blocks;
+mod v41_device_ops;
+pub use v41_device_ops::V41Bf16Add;
 pub use v41_candidate_blocks::V41CandidateBlocks;
 mod v41_index_topk;
 pub use v41_index_topk::V41IndexTopK;
@@ -33,7 +35,7 @@ pub use v41_fp8_plan::{V41Fp8Plan, V41Fp8PlanInfo};
 mod v41_experts;
 pub use v41_experts::{
     V41ExpertInfo, V41ExpertInputQuantizer, V41ExpertKernel, V41ExpertLaunchArgs, V41ExpertPacker, V41ExpertPointer,
-    V41CompactReducer, V41LocalExpertReducer, V41RouteReducer, V41_EXPERT_POINTER_COUNT,
+    V41CompactReducer, V41LocalExpertReducer, V41Tp2ExpertReducer, V41RouteReducer, V41_EXPERT_POINTER_COUNT,
 };
 mod cuda_runtime;
 pub use cuda_runtime::{select_copy_mechanism, CopyMechanism, CudaRuntime};
@@ -3823,6 +3825,65 @@ impl NativeLibrary {
         self.status_to_result("ds41rt_cuda_memory_info", unsafe { info(&mut free, &mut total) })?;
         anyhow::ensure!(free <= total && total > 0, "invalid CUDA memory information");
         Ok((free, total))
+    }
+
+    pub fn cuda_get_device(&self) -> Result<i32> {
+        let call: Symbol<unsafe extern "C" fn(*mut i32) -> Ds41rtStatus> =
+            unsafe { self.lib.get(b"ds41rt_cuda_get_device")? };
+        let mut device = -1;
+        self.status_to_result("ds41rt_cuda_get_device", unsafe { call(&mut device) })?;
+        Ok(device)
+    }
+
+    /// Host-thread-local selection. Restore the previous device before yielding.
+    pub fn cuda_set_device(&self, device: i32) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(i32) -> Ds41rtStatus> =
+            unsafe { self.lib.get(b"ds41rt_cuda_set_device")? };
+        self.status_to_result("ds41rt_cuda_set_device", unsafe { call(device) })
+    }
+
+    pub fn cuda_enable_peer(&self, peer: i32) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(i32) -> Ds41rtStatus> =
+            unsafe { self.lib.get(b"ds41rt_cuda_enable_peer")? };
+        self.status_to_result("ds41rt_cuda_enable_peer", unsafe { call(peer) })
+    }
+
+    /// Enqueue a cross-device transfer without joining other streams.
+    ///
+    /// # Safety
+    /// `stream` must be live on the current, destination device. Source writes
+    /// must precede the copy (use a stream event dependency). Both allocations
+    /// must remain live, with no conflicting access, until the copy completes.
+    pub unsafe fn copy_peer_async(
+        &self,
+        dst: Ds41rtDeviceBuffer,
+        src: Ds41rtDeviceBuffer,
+        bytes: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(
+            Ds41rtDeviceBuffer, Ds41rtDeviceBuffer, usize, *mut c_void,
+        ) -> Ds41rtStatus> = unsafe { self.lib.get(b"ds41rt_copy_peer_async")? };
+        self.status_to_result("ds41rt_copy_peer_async", unsafe { call(dst, src, bytes, stream) })
+    }
+
+    /// Copy pitched byte rows locally or between peer GPUs without synchronization.
+    ///
+    /// # Safety
+    /// The stream belongs to the current destination device. Source writes are
+    /// complete or ordered before this copy. Buffers remain live and disjoint,
+    /// without conflicting access, until stream completion.
+    pub unsafe fn copy_device_rows_async(
+        &self, dst: Ds41rtDeviceBuffer, src: Ds41rtDeviceBuffer,
+        width: usize, rows: usize, dst_pitch: usize, src_pitch: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let call: Symbol<unsafe extern "C" fn(
+            Ds41rtDeviceBuffer, Ds41rtDeviceBuffer, usize, usize, usize, usize, *mut c_void,
+        ) -> Ds41rtStatus> = unsafe { self.lib.get(b"ds41rt_copy_device_rows_async")? };
+        self.status_to_result("ds41rt_copy_device_rows_async", unsafe {
+            call(dst, src, width, rows, dst_pitch, src_pitch, stream)
+        })
     }
 
     pub fn alloc_device_buffer(&self, bytes: usize) -> Result<Ds41rtDeviceBuffer> {

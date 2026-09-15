@@ -9,6 +9,11 @@ from pathlib import Path
 
 MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash'
 
+class IncompleteStreamError(AssertionError):
+    def __init__(self, record):
+        self.record = record
+        super().__init__(f"incomplete SSE: done={record['done']}, first={record['first_content_seconds']}, finish={record['finish_seconds']}, usage={record['usage']}")
+
 def payload(prompt, stream=False):
     return dict(model=MODEL, messages=[dict(role='user', content=prompt)],
                 thinking=dict(type='disabled'), temperature=0, max_tokens=96,
@@ -49,7 +54,9 @@ def stream_case(base, body, cancel=False, api_key=None, on_first_content=None):
                         return dict(cancelled_after_content=True, first_content_seconds=first, text=text)
                 if choice.get('finish_reason'):
                     finish = elapsed
-    assert done and first is not None and finish is not None and usage, 'incomplete SSE or missing requested usage'
+    if not (done and first is not None and finish is not None and usage):
+        raise IncompleteStreamError(dict(done=done, text=text, first_content_seconds=first,
+                                         finish_seconds=finish, usage=usage, events=events))
     # Includes EOS and HTTP overhead; excludes time through first content.
     tps = (usage['completion_tokens'] - 1) / (finish - first) if finish > first else None
     return dict(text=text, first_content_seconds=first, finish_seconds=finish,

@@ -1,0 +1,1029 @@
+{
+  "scope": "Matched uninstrumented dual-RTX comparison; three code samples and three mixed sweeps per arm. K7 third mixed C16 failed the streaming gate; no complete C16 median is reported.",
+  "profile": "phase2-adaptive-cost-profile.json",
+  "arms": {
+    "cost-qualified-legacy-v2-rtx2-k5": {
+      "code": {
+        "1": {
+          "samples": [
+            149.05643494908676,
+            149.55090138507092,
+            149.07190995613226
+          ],
+          "median": 149.07190995613226
+        },
+        "2": {
+          "samples": [
+            199.39182599176198,
+            250.70098006113017,
+            248.17579672850266
+          ],
+          "median": 248.17579672850266
+        },
+        "4": {
+          "samples": [
+            435.4505057250216,
+            437.33126313118765,
+            445.4161658972371
+          ],
+          "median": 437.33126313118765
+        },
+        "8": {
+          "samples": [
+            701.4767514561631,
+            715.1006757784892,
+            714.902805812925
+          ],
+          "median": 714.902805812925
+        },
+        "16": {
+          "samples": [
+            1127.9403973476008,
+            1155.0928277573726,
+            1160.9654161950173
+          ],
+          "median": 1155.0928277573726
+        }
+      },
+      "mixed": {
+        "1": {
+          "samples": [
+            155.05214574338052,
+            151.31313878952744,
+            151.96332853865297
+          ],
+          "median": 151.96332853865297
+        },
+        "2": {
+          "samples": [
+            150.70943021378164,
+            133.86936574371245,
+            143.7286109715646
+          ],
+          "median": 143.7286109715646
+        },
+        "4": {
+          "samples": [
+            180.83714224585367,
+            174.0867791421317,
+            166.27094772997552
+          ],
+          "median": 174.0867791421317
+        },
+        "8": {
+          "samples": [
+            204.74468891099542,
+            181.9883952789684,
+            194.11573532536883
+          ],
+          "median": 194.11573532536883
+        },
+        "16": {
+          "samples": [
+            292.9970479026706,
+            325.8510398098299,
+            289.1035935398031
+          ],
+          "median": 292.9970479026706
+        }
+      },
+      "mixed_passed": [
+        true,
+        true,
+        true
+      ],
+      "artifact_sha256": {
+        "code.json": "9abd0b4330f787195a2ed4a08f0259df5fe66ffdca2fb7ac47b74535814b78c5",
+        "mixed1.json": "4c0f744a8ecc95d7904e879cf79b78b07a9c029da6bbe2b83a1fa34736a7aaa8",
+        "mixed2.json": "4b2710687e047bdf8c35ade73125d237f80cc5f0444873dbbbba9d8b86385c0d",
+        "mixed3.json": "faf93a86ad1756ffe33a092634c85a07d29107e71d99f67711b49ae3dcb966c5",
+        "server.log": "ba9f888703403d10cd1a261af22bf764b04902967196c9fe418441162ebec0b4"
+      }
+    },
+    "cost-qualified-placement-v2-rtx2-k5": {
+      "code": {
+        "1": {
+          "samples": [
+            148.8214163404315,
+            149.56465501322006,
+            148.81171482538937
+          ],
+          "median": 148.8214163404315
+        },
+        "2": {
+          "samples": [
+            198.1960469670817,
+            240.05185161778417,
+            248.27078711154954
+          ],
+          "median": 240.05185161778417
+        },
+        "4": {
+          "samples": [
+            429.20967958401445,
+            440.8850343058807,
+            443.4222448389915
+          ],
+          "median": 440.8850343058807
+        },
+        "8": {
+          "samples": [
+            701.6939397692225,
+            714.3460758728032,
+            716.5888704695914
+          ],
+          "median": 714.3460758728032
+        },
+        "16": {
+          "samples": [
+            1124.9894017274432,
+            1164.038617241775,
+            1157.232634366633
+          ],
+          "median": 1157.232634366633
+        }
+      },
+      "mixed": {
+        "1": {
+          "samples": [
+            157.0842440922295,
+            144.8291420815993,
+            152.3746331138163
+          ],
+          "median": 152.3746331138163
+        },
+        "2": {
+          "samples": [
+            149.12183857438072,
+            141.21198723989994,
+            146.83709091044736
+          ],
+          "median": 146.83709091044736
+        },
+        "4": {
+          "samples": [
+            182.62677355902676,
+            170.54066856822377,
+            174.88288620937848
+          ],
+          "median": 174.88288620937848
+        },
+        "8": {
+          "samples": [
+            213.40815107463175,
+            213.86384026868672,
+            203.6163720922504
+          ],
+          "median": 213.40815107463175
+        },
+        "16": {
+          "samples": [
+            289.26185199668373,
+            297.9615357522989,
+            311.97668500180134
+          ],
+          "median": 297.9615357522989
+        }
+      },
+      "mixed_passed": [
+        true,
+        true,
+        true
+      ],
+      "artifact_sha256": {
+        "code.json": "0894b2b46c2e381f68c043fb388b8a77f1310d5bbc6130fc0573fbd2acb89e58",
+        "mixed1.json": "702bb1291dd17f2242bf01ec30cc4c86cc2e1654d0dd3382339289910e1d1e31",
+        "mixed2.json": "f62200aca590f5d1192318f5201cc3a421f3d1c33926a64aa126153c9c432a41",
+        "mixed3.json": "1d2412fecc50d81a28ab30fe7afbab44b358c84978109ba90552ad8d2a90451f",
+        "server.log": "3662ed072b959531278f6bfe753648a0f3da6d33da1ea1129c2e6405d72f40ff"
+      }
+    },
+    "cost-qualified-placement-v2-rtx2-k7": {
+      "code": {
+        "1": {
+          "samples": [
+            155.3988621169814,
+            155.89374244307788,
+            155.62600871206868
+          ],
+          "median": 155.62600871206868
+        },
+        "2": {
+          "samples": [
+            195.88387231222706,
+            260.1827962630096,
+            257.3728179661906
+          ],
+          "median": 257.3728179661906
+        },
+        "4": {
+          "samples": [
+            450.72113333296306,
+            465.4224110341454,
+            465.8099175447749
+          ],
+          "median": 465.4224110341454
+        },
+        "8": {
+          "samples": [
+            713.6737169429258,
+            741.4193137778877,
+            737.6093000656131
+          ],
+          "median": 737.6093000656131
+        },
+        "16": {
+          "samples": [
+            1141.756443763214,
+            1176.0632078343933,
+            1186.289369117531
+          ],
+          "median": 1176.0632078343933
+        }
+      },
+      "mixed": {
+        "1": {
+          "samples": [
+            155.30207076091295,
+            130.98874854525357,
+            140.77067280151388
+          ],
+          "median": 140.77067280151388
+        },
+        "2": {
+          "samples": [
+            143.16061505242232,
+            109.38154180167078,
+            118.21323434906505
+          ],
+          "median": 118.21323434906505
+        },
+        "4": {
+          "samples": [
+            175.90177103775815,
+            139.47177969964383,
+            158.2052772915805
+          ],
+          "median": 158.2052772915805
+        },
+        "8": {
+          "samples": [
+            212.88693891570773,
+            176.09042707104953,
+            191.50638647871193
+          ],
+          "median": 191.50638647871193
+        },
+        "16": {
+          "samples": [
+            271.2429525769,
+            298.8322874446101
+          ],
+          "median": null
+        }
+      },
+      "mixed_passed": [
+        true,
+        true,
+        false
+      ],
+      "artifact_sha256": {
+        "code.json": "a97396ea5d4441ebe8c882b154ae6ed57e5fee3b3b5da3506822d46d2c1f345a",
+        "mixed1.json": "164f00728321943e11dc3f70beb0ef3a1a740fe71c071a2bd96c5a5b012bc2c9",
+        "mixed2.json": "2e9db7f76400cda2e0aaa119902ecea61ad0e894ed263da14d449a6d97f236a8",
+        "mixed3.json": "c5ee3bdd527aa5c7cebe05edb3565766c502a5c5e97f50aa6534afcf0a084057",
+        "server.log": "12dd6d3e1fa96a6a9f54c916a4d14800a0e585e0852e52af050e2cf90c721c42"
+      }
+    }
+  },
+  "diagnostic_repeat": {
+    "scope": "Diagnostic repeat of the original K7 code plus three mixed sweeps, same binary/profile/prompts. All passed; this does not resolve the earlier unrecorded failed SSE.",
+    "mixed_passed": [
+      true,
+      true,
+      true
+    ],
+    "mixed": {
+      "1": {
+        "samples": [
+          156.47463431161344,
+          157.18442275741592,
+          154.17130072288478
+        ],
+        "median": 156.47463431161344
+      },
+      "2": {
+        "samples": [
+          141.73872014622515,
+          145.3174703340216,
+          139.89007983049882
+        ],
+        "median": 141.73872014622515
+      },
+      "4": {
+        "samples": [
+          180.22141647179984,
+          177.8931126200008,
+          169.7331503865327
+        ],
+        "median": 177.8931126200008
+      },
+      "8": {
+        "samples": [
+          211.58844078939055,
+          212.10232723963455,
+          196.30181203058618
+        ],
+        "median": 211.58844078939055
+      },
+      "16": {
+        "samples": [
+          295.4062686304461,
+          307.53582012157887,
+          279.97921966750164
+        ],
+        "median": 295.4062686304461
+      }
+    },
+    "artifact_sha256": {
+      "code.json": "d44ffaf1756cb2728a5d2a34cac4e4c74973dfb4644b1d1a2939a6ed42639656",
+      "mixed1.json": "2d9c7cd6236ceac4382863e7c490e8c982f41536a51aac71e21eab2e66b984db",
+      "mixed2.json": "96f249a214536bbd4f4d9f72caa54b0d4a9a856aa92582d42fd107ea53d652b8",
+      "mixed3.json": "82e13930e7582d4173ba4156356f4bab388e50815295834570d7eac2076ee421",
+      "server.log": "e3c2d319de271665fb321d41a5acf7dcdd97431b1f42cc83b337272f1140c1f2"
+    }
+  },
+  "high_thinking_sieve": {
+    "cost-sieve-legacy-v2-rtx2-k5": {
+      "runs": [
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 120.17484107027452,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 120.26436808964931,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 120.27520502088623,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        }
+      ],
+      "median_tokens_per_second": 120.26436808964931,
+      "limits": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        10,
+        997,
+        10000
+      ],
+      "artifact_sha256": "bac139e9fb032e5a31c0bfedf156e2a446807b357a2682a593f07e8e83159024"
+    },
+    "cost-sieve-placement-v2-rtx2-k5": {
+      "runs": [
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 119.13562095346394,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 119.6241400741949,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 119.43494126726736,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        }
+      ],
+      "median_tokens_per_second": 119.43494126726736,
+      "limits": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        10,
+        997,
+        10000
+      ],
+      "artifact_sha256": "088f7cc132398d9c4a94e274bd381e00d0609085f306a4c7dac79405e7a44825"
+    },
+    "cost-sieve-placement-v2-rtx2-k7": {
+      "runs": [
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 122.84724231335068,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 122.99118884640207,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        },
+        {
+          "completion_tokens": 802,
+          "tokens_per_second": 122.83459905769585,
+          "function_sha256": "281009100daa3144d0191fa9d7f6b1b45befb5fad78c7769c7887ba840393ad7",
+          "passed": true
+        }
+      ],
+      "median_tokens_per_second": 122.84724231335068,
+      "limits": [
+        -1,
+        0,
+        1,
+        2,
+        3,
+        10,
+        997,
+        10000
+      ],
+      "artifact_sha256": "3246777ad3c810f0f7aea3fa4189d6f52d46aa348da21b09b139f71f62d58044"
+    }
+  },
+  "captured_failure": {
+    "artifact": "/home/tj/.cache/ds41rt-experiments/phase2-planner/cost-repeated-placement-v2-rtx2-k7/mixed2.json",
+    "sha256": "f48104ba23a1fe249e614035f4ba076322f8989175a91183d56b2d8e7b0f4ca5",
+    "concurrency": 8,
+    "sweep": 2,
+    "failures": [
+      {
+        "case": "topic",
+        "admission_index": 5,
+        "error": "incomplete SSE: done=False, first=0.09995661792345345, finish=None, usage=None",
+        "text": "- **Virtual memory gives each process its own fake address space**, so programs don't need to know where data physically lives in RAM. The OS +",
+        "last_event_seconds": 1.98113651399035,
+        "events": 31
+      },
+      {
+        "case": "fable",
+        "admission_index": 7,
+        "error": "incomplete SSE: done=False, first=0.19980695599224418, finish=None, usage=None",
+        "text": "Two parrots shared a mango tree. One scouted ripe fruit; the other cracked the hard shells. Each morning",
+        "last_event_seconds": 1.972545285942033,
+        "events": 24
+      },
+      {
+        "case": "fable",
+        "admission_index": 4,
+        "error": "incomplete SSE: done=False, first=0.6988005880266428, finish=None, usage=None",
+        "text": "Two parrots, crimson and gold, found a fig tree heavy with fruit. \u201cI spotted it first,\u201d said Crimson. \u201cBut",
+        "last_event_seconds": 1.9814756929408759,
+        "events": 28
+      },
+      {
+        "case": "code",
+        "admission_index": 3,
+        "error": "incomplete SSE: done=False, first=0.8005754880141467, finish=None, usage=None",
+        "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged =",
+        "last_event_seconds": 1.9713004550430924,
+        "events": 62
+      },
+      {
+        "case": "code",
+        "admission_index": 6,
+        "error": "incomplete SSE: done=False, first=0.3087258890736848, finish=None, usage=None",
+        "text": "```python\nfrom typing import List, Tuple\n\ndef merge_intervals(intervals: List[Tuple[int, int]]) -> List[Tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return sorted, non-overlapping intervals.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals, key=lambda x: x[0",
+        "last_event_seconds": 1.9815767250256613,
+        "events": 75
+      },
+      {
+        "case": "fable",
+        "admission_index": 1,
+        "error": "incomplete SSE: done=False, first=0.604670925065875, finish=None, usage=None",
+        "text": "Two parrots, Kito and Luma, found a fig tree heavy with fruit. Kito flew to the highest",
+        "last_event_seconds": 1.971695748041384,
+        "events": 25
+      },
+      {
+        "case": "topic",
+        "admission_index": 2,
+        "error": "incomplete SSE: done=False, first=0.49710761895403266, finish=None, usage=None",
+        "text": "Here's virtual memory explained in five concise bullets:\n\n- **It's an illusion of a huge, private address space.** Each process sees",
+        "last_event_seconds": 1.9806545899482444,
+        "events": 28
+      },
+      {
+        "case": "code",
+        "admission_index": 0,
+        "error": "incomplete SSE: done=False, first=0.4050395539961755, finish=None, usage=None",
+        "text": "```python\ndef merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    \"\"\"Merge overlapping integer intervals and return them sorted by start.\"\"\"\n    if not intervals:\n        return []\n    sorted_intervals = sorted(intervals)\n    merged = [sorted_intervals[0]]\n    for start, end in sorted_intervals[1:",
+        "last_event_seconds": 1.9727431030478328,
+        "events": 81
+      }
+    ]
+  },
+  "logged_failure": {
+    "scope": "Full error logging identifies graph instantiation OOM in mixed sweep three at C16. All 16 streams failed; coordinator process remained alive and health returned 200.",
+    "error": "ds41rt_cuda_graph_end_capture returned status 6: cudaGraphInstantiate failed: out of memory",
+    "artifact_sha256": {
+      "server.log": "6d5c4bf1357e5a446b78fa408b1e1c2c947bbd11d5355792cfe87dc02c48c991",
+      "mixed3.json": "73d78c4916187998ab96e91c6be2dd1db98f4bcc459bc2082d500b29d7184d91",
+      "failure-status.json": "e4fec7b978da9ef241467503c591cda70a76ca807520e520699ffe1192d769d8"
+    }
+  },
+  "bounded_retention_experiment": {
+    "scope": "48-shape LRU candidate at the earlier K7 pool. All six sweeps passed but mixed throughput declined across sweeps; candidate discarded in favor of the user-approved 14M pool and full graph retention.",
+    "mixed_passed": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "samples_by_concurrency": {
+      "1": [
+        148.17615490419803,
+        142.10421126530036,
+        129.8460961157396,
+        117.31102251723678,
+        125.50739014157348,
+        125.61079791497804
+      ],
+      "2": [
+        136.89965851443057,
+        119.70884370006642,
+        108.2676706468402,
+        100.50732638080822,
+        105.95650376101753,
+        111.72286935642113
+      ],
+      "4": [
+        171.4962017890895,
+        140.19925186084865,
+        140.68826841620216,
+        124.5025189806361,
+        131.39984773143726,
+        140.77776723065605
+      ],
+      "8": [
+        203.05285046707633,
+        170.8843131170623,
+        167.38062831790918,
+        165.28052387257154,
+        165.25297495953996,
+        176.61764674128955
+      ],
+      "16": [
+        279.81876268326437,
+        277.84892988757645,
+        268.35879467711004,
+        244.56945151304402,
+        262.73953681214596,
+        248.9682950703338
+      ]
+    },
+    "artifact_sha256": {
+      "code.json": "6b5be0b88657881c925071b7eb77009c68a266697c262b35cadb13a3a8202865",
+      "server.log": "dc97d3d66e3cdef6bb917a40bc5cc2d6ee5f7b8f064450a0fa0578f9a163fc65",
+      "mixed1.json": "416547d2a26c000d2e819d4fadaca67bee77f71d418bb091872110b1f6e6c911",
+      "mixed2.json": "ca77a91a9fb3a99fb2ebe0bd33957f5b57e11716e9c797d7b92f5ebbbbb11a20",
+      "mixed3.json": "4c04d019bfebfec786ed1b4caf8264cf4d11a9fb559d884e352b84a8cd014802",
+      "mixed4.json": "a58efe1512a68c3e28b4021a0bbc9f7c9f7318579b83322b0f337afc39076566",
+      "mixed5.json": "ec90e8ebd9f5f97583991eff6fab9fb99356432e4663ab008b9a7ac81f832b8e",
+      "mixed6.json": "bc1723fdc91ef07565363037165f6bd3cbd5027689f405e4b42b2b05b9c21400"
+    }
+  },
+  "pool14m_full_retention": {
+    "scope": "Full graph retention, user-approved dual-RTX default 14M pool, placement-aware adaptive K7. Same optimized runtime and prompts; three code samples per concurrency and three mixed sweeps. These are focused qualification measurements, not the release tables.",
+    "code": {
+      "1": {
+        "samples": [
+          156.33269000493914,
+          157.0649576841378,
+          156.71593172446362
+        ],
+        "median": 156.71593172446362
+      },
+      "2": {
+        "samples": [
+          193.54959401917426,
+          260.13434173687244,
+          266.3284426083935
+        ],
+        "median": 260.13434173687244
+      },
+      "4": {
+        "samples": [
+          447.5144563992582,
+          467.44739750953676,
+          467.3372656147915
+        ],
+        "median": 467.3372656147915
+      },
+      "8": {
+        "samples": [
+          705.0838236037428,
+          742.7233646195112,
+          741.4597232985415
+        ],
+        "median": 741.4597232985415
+      },
+      "16": {
+        "samples": [
+          1140.9648118084265,
+          1192.2992523067328,
+          1192.511406314728
+        ],
+        "median": 1192.2992523067328
+      }
+    },
+    "mixed": {
+      "1": {
+        "samples": [
+          156.08240183333862,
+          150.91464059355434,
+          129.8466446597277
+        ],
+        "median": 150.91464059355434
+      },
+      "2": {
+        "samples": [
+          139.77303594854604,
+          138.0681982376072,
+          121.6089045820476
+        ],
+        "median": 138.0681982376072
+      },
+      "4": {
+        "samples": [
+          176.0476404992149,
+          159.27578452166975,
+          145.227678314022
+        ],
+        "median": 159.27578452166975
+      },
+      "8": {
+        "samples": [
+          207.69406292244892,
+          199.0911113533239,
+          186.36129118345954
+        ],
+        "median": 199.0911113533239
+      },
+      "16": {
+        "samples": [
+          297.0056201748545,
+          291.63754981219824,
+          281.8035630859337
+        ],
+        "median": 291.63754981219824
+      }
+    },
+    "mixed_passed": [
+      true,
+      true,
+      true
+    ],
+    "pool_bytes": 13094420480,
+    "source_positions_including_allowance": 14712832,
+    "startup_ms": 10774,
+    "artifact_sha256": {
+      "code.json": "5a4d6720f8410d14e24381c7e7127ba3ffe05cbde1f7da71bdc8b33e1f2f81be",
+      "mixed1.json": "c41a85a6405d4b9606ddc56b07247262b660022bfd082b0ea6267214f74e5db1",
+      "mixed2.json": "dd3aea3a8462fa3c5f395da9bf12d79c13081c013be3d0a6c12b735bd1a26065",
+      "mixed3.json": "f3b78bdc227c1a693ac7bdad22ee68f46462fd5c62b2e5a79e19d9df3e79125c",
+      "server.log": "e13a3d416a0309510865170c36a770b30f3c37ca80b7acd151991aeb7aefb6bb"
+    }
+  },
+  "single_rtx_comparison": {
+    "scope": "Single-RTX optimized uninstrumented comparison: three code samples per concurrency and three mixed sweeps per arm; mixed lifecycle probes skipped. Default single-RTX pool unchanged. K7 fits four local expert layers, versus five for K5, so this is a deployment comparison, not an isolated width comparison.",
+    "arms": {
+      "cost-single-legacy-v4-rtx1-k5": {
+        "local_expert_layers": 5,
+        "artifacts": {
+          "code.json": {
+            "sha256": "508383a2d26d65d07c72a134a0378d1fb8f1d8e4b58acc928b6e8f31cd1c6303"
+          },
+          "mixed1.json": {
+            "sha256": "c4a8474d5fa9c86a8f237db29361709e4bb0cdf429453040793791a79829b97b"
+          },
+          "mixed2.json": {
+            "sha256": "1331803fec6d0a9686f8be1c672bbc37e13308853f3e3f796ff7777e4f1e6f42"
+          },
+          "mixed3.json": {
+            "sha256": "cfa62a5941f867daea74adc2aa5d13d078ca81d63b08f211e291e7767727dcf2"
+          },
+          "server.log": {
+            "sha256": "02ea65b3a37fc05d03c1b460299d07e7aaeecec48f3f0b3c890b1ceada72ec1d"
+          }
+        },
+        "code_contract_checks_passed": 93,
+        "code": {
+          "1": {
+            "samples": [
+              126.21273673642729,
+              126.3306087203639,
+              126.09876974722042
+            ],
+            "median": 126.21273673642729
+          },
+          "2": {
+            "samples": [
+              169.49568198156032,
+              202.901095373747,
+              203.2192972100459
+            ],
+            "median": 202.901095373747
+          },
+          "4": {
+            "samples": [
+              360.2184084914894,
+              364.4932827976038,
+              361.15416635355655
+            ],
+            "median": 361.15416635355655
+          },
+          "8": {
+            "samples": [
+              463.3202228777887,
+              554.7448125059219,
+              558.6880645479328
+            ],
+            "median": 554.7448125059219
+          },
+          "16": {
+            "samples": [
+              896.0670632627225,
+              918.344583813068,
+              922.5192161283028
+            ],
+            "median": 918.344583813068
+          }
+        },
+        "mixed": {
+          "1": {
+            "samples": [
+              128.98275689505994,
+              108.8841722019856,
+              121.05738910173746
+            ],
+            "median": 121.05738910173746
+          },
+          "2": {
+            "samples": [
+              103.4255447701615,
+              70.62898584455648,
+              64.91680557006106
+            ],
+            "median": 70.62898584455648
+          },
+          "4": {
+            "samples": [
+              148.4508524157452,
+              95.31662948945554,
+              77.9028009818628
+            ],
+            "median": 95.31662948945554
+          },
+          "8": {
+            "samples": [
+              171.8412586910127,
+              87.4339931254085,
+              118.44442954127217
+            ],
+            "median": 118.44442954127217
+          },
+          "16": {
+            "samples": [
+              202.87171331830461,
+              201.56545432473604,
+              142.1255387123396
+            ],
+            "median": 201.56545432473604
+          }
+        },
+        "server_errors_or_warnings": false
+      },
+      "cost-single-placement-v4-rtx1-k5": {
+        "local_expert_layers": 5,
+        "artifacts": {
+          "code.json": {
+            "sha256": "d25195f20d0b030fa70c901326a29ab05dd4ee220cca9ede25b46f3f69f676a7"
+          },
+          "mixed1.json": {
+            "sha256": "e8db386eae0e03f86e580b4bec4afe003c5e9eb44858a4647225def396ac8c75"
+          },
+          "mixed2.json": {
+            "sha256": "613edab1a1c35fbef35923e8e14f6b3dfefabe06b95dfe9f031ce80100518bac"
+          },
+          "mixed3.json": {
+            "sha256": "fc25e22f52f688540b2f728636c2f2374054b5e2f42291065f5996ccc78d2ccb"
+          },
+          "server.log": {
+            "sha256": "12c23493b3cdc6537a5a7d44598d90a6dc9d88e348e3724fc3de0fab40daadc9"
+          }
+        },
+        "code_contract_checks_passed": 93,
+        "code": {
+          "1": {
+            "samples": [
+              123.98978102910195,
+              124.13035339231992,
+              124.44064206500127
+            ],
+            "median": 124.13035339231992
+          },
+          "2": {
+            "samples": [
+              168.43185715716572,
+              203.4121092020763,
+              203.00364511125898
+            ],
+            "median": 203.00364511125898
+          },
+          "4": {
+            "samples": [
+              358.95668642298205,
+              368.8045593151856,
+              366.0641257038183
+            ],
+            "median": 366.0641257038183
+          },
+          "8": {
+            "samples": [
+              548.948270209658,
+              539.7358093173287,
+              539.4176627622572
+            ],
+            "median": 539.7358093173287
+          },
+          "16": {
+            "samples": [
+              924.9635256016131,
+              945.6613544053348,
+              932.9610339169068
+            ],
+            "median": 932.9610339169068
+          }
+        },
+        "mixed": {
+          "1": {
+            "samples": [
+              127.85536850894326,
+              103.62348763000476,
+              105.46418597258655
+            ],
+            "median": 105.46418597258655
+          },
+          "2": {
+            "samples": [
+              106.94647597388735,
+              78.63199059795896,
+              87.23625284244687
+            ],
+            "median": 87.23625284244687
+          },
+          "4": {
+            "samples": [
+              146.36652546622048,
+              112.20823628420526,
+              120.24860086052924
+            ],
+            "median": 120.24860086052924
+          },
+          "8": {
+            "samples": [
+              176.97157370391832,
+              136.90430948159602,
+              170.55763648011677
+            ],
+            "median": 170.55763648011677
+          },
+          "16": {
+            "samples": [
+              215.51222366008295,
+              212.12698569923228,
+              204.59770312809673
+            ],
+            "median": 212.12698569923228
+          }
+        },
+        "server_errors_or_warnings": false
+      },
+      "cost-single-placement-v4-rtx1-k7": {
+        "local_expert_layers": 4,
+        "artifacts": {
+          "code.json": {
+            "sha256": "2d7e4d71b60f61c16f3eaef24edfcc3fa2bdcf8d86f44ad82ac5f8aa4015cb3a"
+          },
+          "mixed1.json": {
+            "sha256": "a2ee98c767cbf77b2fe0ed6181ff7097ab5ff62cf9c1b85c3c47be9c4b6d4df8"
+          },
+          "mixed2.json": {
+            "sha256": "5554941e1d656952e8795123194ea4417592080d4c9c63d42edef9e528ffa40b"
+          },
+          "mixed3.json": {
+            "sha256": "835cfe51d5635e2f9aedcdfe94d4aa71523e9764bfbd74c7565c88f397f231ba"
+          },
+          "server.log": {
+            "sha256": "ad5eca6036eddb7bf151e2ce4516c458cbb847b8c5dda089c3e77418bf3f085f"
+          }
+        },
+        "code_contract_checks_passed": 93,
+        "code": {
+          "1": {
+            "samples": [
+              124.83468820400783,
+              125.08420335746716,
+              124.66886780089958
+            ],
+            "median": 124.83468820400783
+          },
+          "2": {
+            "samples": [
+              158.67558788622895,
+              193.81570659981074,
+              193.14233026770756
+            ],
+            "median": 193.14233026770756
+          },
+          "4": {
+            "samples": [
+              354.4965258579797,
+              356.7785357992761,
+              359.4122065587897
+            ],
+            "median": 356.7785357992761
+          },
+          "8": {
+            "samples": [
+              572.5773953921417,
+              605.8723731924583,
+              607.1621283161868
+            ],
+            "median": 605.8723731924583
+          },
+          "16": {
+            "samples": [
+              969.7207633856503,
+              999.7107383172378,
+              963.183817925177
+            ],
+            "median": 969.7207633856503
+          }
+        },
+        "mixed": {
+          "1": {
+            "samples": [
+              126.84954717548375,
+              82.50988459066963,
+              113.74938460862245
+            ],
+            "median": 113.74938460862245
+          },
+          "2": {
+            "samples": [
+              100.25061788203134,
+              58.967461769427835,
+              81.1948564720539
+            ],
+            "median": 81.1948564720539
+          },
+          "4": {
+            "samples": [
+              139.33214131678417,
+              97.84517130106693,
+              109.7170691038362
+            ],
+            "median": 109.7170691038362
+          },
+          "8": {
+            "samples": [
+              165.4390086148972,
+              155.2510893745734,
+              135.7340984318826
+            ],
+            "median": 155.2510893745734
+          },
+          "16": {
+            "samples": [
+              172.36393462017017,
+              162.1992662477468,
+              196.40377079154413
+            ],
+            "median": 172.36393462017017
+          }
+        },
+        "server_errors_or_warnings": false
+      }
+    }
+  }
+}

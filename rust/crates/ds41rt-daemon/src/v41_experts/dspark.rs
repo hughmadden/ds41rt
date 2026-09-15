@@ -1,6 +1,6 @@
 //! RTX-only ownership for every native dSpark tensor and independent stage experts.
 mod chain;
-pub(crate) use chain::DsparkChain;
+pub(crate) use chain::{DsparkChain, DistributedDsparkChain};
 mod stage;
 pub(crate) use stage::DsparkStage;
 mod main_context;
@@ -24,7 +24,7 @@ mod terminal;
 pub(crate) use confidence::DsparkConfidence;
 pub(crate) use markov::DsparkMarkov;
 pub(crate) use router::DsparkRouter;
-pub(crate) use terminal::DsparkTerminal;
+pub(crate) use terminal::{DsparkTerminal, DistributedDsparkTerminal};
 
 use super::{ExpertExecution, ExpertLayer, ExpertWeights};
 use crate::v41_dspark_cache::DsparkWindow;
@@ -100,6 +100,7 @@ impl DsparkBudget {
 }
 
 pub(crate) struct DsparkWeights<'library> {
+    draft_width: usize,
     experts: [ExpertWeights<'library>; 3],
     auxiliary: NativeRtxTensors<'library>,
     budget: DsparkBudget,
@@ -108,6 +109,7 @@ pub(crate) struct DsparkWeights<'library> {
     projection_scales: [crate::v41_memory::DeviceAllocation<'library>; 13],
 }
 impl<'library> DsparkWeights<'library> {
+    pub fn draft_width(&self) -> usize { self.draft_width }
     fn auxiliary_names(catalog: &OfficialV41Catalog) -> Vec<String> {
         catalog
             .tensors()
@@ -122,6 +124,11 @@ impl<'library> DsparkWeights<'library> {
         catalog: &OfficialV41Catalog,
         capacity: u32,
     ) -> Result<DsparkBudget> {
+        Self::plan_with_width(library, catalog, capacity, 5)
+    }
+    fn plan_with_width(library: &NativeLibrary, catalog: &OfficialV41Catalog,
+        capacity: u32, width: usize) -> Result<DsparkBudget> {
+        ensure!(matches!(width, 5 | 7), "draft width must be five or seven");
         let mut expert_resident_bytes = 0usize;
         let mut load_staging_bytes = 0usize;
         for stage in 0..3 {
@@ -156,9 +163,9 @@ impl<'library> DsparkWeights<'library> {
             hc_bytes_per_wave: HcSublayer::device_bytes(capacity as usize)?
                 .checked_mul(6)
                 .context("mHC wave budget overflow")?,
-            confidence_bytes_per_wave: DsparkConfidence::device_bytes((capacity as usize).max(80))?,
+            confidence_bytes_per_wave: DsparkConfidence::device_bytes((capacity as usize).max(16 * width))?,
             markov_bytes_per_wave: DsparkMarkov::device_bytes(16)?,
-            terminal_additional_bytes_per_wave: DsparkTerminal::additional_bytes(16)?,
+            terminal_additional_bytes_per_wave: DsparkTerminal::additional_bytes_with_width(16, width)?,
         })
     }
     /// Serving retains a large target-context projection buffer, but expert
@@ -173,11 +180,17 @@ impl<'library> DsparkWeights<'library> {
         device_budget: usize,
         pinned_staging_bytes: usize,
     ) -> Result<Self> {
-        let draft_capacity = DsparkAttentionWave::projection_capacity(requests)?;
+        Self::load_serving_with_width(library, catalog, context_capacity, requests,
+            device_budget, pinned_staging_bytes, 5)
+    }
+    pub fn load_serving_with_width(library: &'library NativeLibrary, catalog: &OfficialV41Catalog,
+        context_capacity: u32, requests: u32, device_budget: usize,
+        pinned_staging_bytes: usize, width: usize) -> Result<Self> {
+        let draft_capacity = DsparkAttentionWave::projection_capacity_with_width(requests, width)?;
         let context_bytes = DsparkMainContext::device_bytes(library, context_capacity)?;
         let draft_budget = device_budget.checked_sub(context_bytes)
             .context("dSpark main context exceeds device budget")?;
-        Self::load(library, catalog, draft_capacity, 1, draft_budget, pinned_staging_bytes)
+        Self::load_with_width(library, catalog, draft_capacity, 1, draft_budget, pinned_staging_bytes, width)
     }
 
     /// Admit all three stages and the requested expert wave workspaces before
@@ -190,7 +203,12 @@ impl<'library> DsparkWeights<'library> {
         device_budget: usize,
         pinned_staging_bytes: usize,
     ) -> Result<Self> {
-        let budget = Self::plan(library, catalog, capacity)?;
+        Self::load_with_width(library, catalog, capacity, waves, device_budget, pinned_staging_bytes, 5)
+    }
+    fn load_with_width(library: &'library NativeLibrary, catalog: &OfficialV41Catalog,
+        capacity: u32, waves: usize, device_budget: usize, pinned_staging_bytes: usize,
+        width: usize) -> Result<Self> {
+        let budget = Self::plan_with_width(library, catalog, capacity, width)?;
         ensure!(
             budget.peak_device_bytes(waves)? <= device_budget,
             "dSpark RTX residency and expert waves exceed device budget"
@@ -232,6 +250,7 @@ impl<'library> DsparkWeights<'library> {
         let projection_scales = projection::pack_scales(library, &auxiliary)?;
         let grouped_output_scales = attention_output::pack_grouped_scales(library, &auxiliary)?;
         Ok(Self {
+            draft_width: width,
             grouped_output_scales,
             shared_scales,
             projection_scales,
