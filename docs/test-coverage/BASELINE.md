@@ -26,6 +26,7 @@ embedded pyo3 planner.
 | ds41rt-api | 146 passed, 1 ignored |
 | ds41rt-daemon | 773 passed, **6 failed (all pre-existing environment limits, not product bugs)**, 40 ignored |
 | ds41rt-ffi / loader / transport / hostcache (+ integration tests) | all green (770+ tests incl. hostcache HC-2..HC-13 concurrency/functional/soak suites) |
+| python (`python/tests`, venv) | 254 passed, 0 failed — requires `git submodule update --init --recursive` (sparkinfer/xgrammar pins) |
 
 ## The 6 pre-existing daemon failures (environment-limited)
 
