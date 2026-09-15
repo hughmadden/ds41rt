@@ -27,7 +27,18 @@ pub(crate) struct ApiError {
 
 impl ApiError {
     pub(crate) fn into_response(self) -> Response {
-        openai_error(self.status, self.message, self.param, self.code)
+        // Bound centrally: request-derived strings (model id, message role,
+        // tool_call_id, ...) are interpolated into several ApiError messages
+        // (request.rs unsupported-role, completion.rs unknown-model). Without
+        // this bound a validly typed 100 KB string produces a ~100 KB response
+        // body — the same unbounded-echo class as the JsonRejection fix
+        // (upstream vLLM #49239).
+        openai_error(
+            self.status,
+            bounded_error_detail(&self.message),
+            self.param,
+            self.code,
+        )
     }
 }
 

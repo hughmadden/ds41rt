@@ -450,3 +450,38 @@ async fn native_v41_long_offending_input_is_bounded_in_the_error_body() {
     let text = String::from_utf8(body.to_vec()).unwrap();
     assert!(text.contains("truncated"), "bounded body must carry the truncation marker");
 }
+
+/// BLOCKER regression (review 2026-09-15): validly typed attacker-controlled
+/// fields (model id, message role) are interpolated into ApiError messages;
+/// the central ApiError::into_response bound must keep the 400 body small.
+#[tokio::test]
+async fn huge_valid_model_string_yields_bounded_400() {
+    let body = json!({
+        "model": "M".repeat(100_000),
+        "messages": [{"role": "user", "content": "hello"}],
+    })
+    .to_string();
+    let (status, text) = post_raw(&body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        text.len() < 4_000,
+        "error body must be bounded, was {} bytes",
+        text.len()
+    );
+}
+
+#[tokio::test]
+async fn huge_valid_role_string_yields_bounded_400() {
+    let body = json!({
+        "model": "ds41rt-tiny",
+        "messages": [{"role": &"R".repeat(100_000), "content": "hello"}],
+    })
+    .to_string();
+    let (status, text) = post_raw(&body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        text.len() < 4_000,
+        "error body must be bounded, was {} bytes",
+        text.len()
+    );
+}
