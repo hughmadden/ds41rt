@@ -37,3 +37,25 @@ Final rust workspace: see BASELINE.md known-env failures only (6, UC-5).
 - DSML parser divergences + unset-temperature-greedy: DEFERRED.md semantic-parity
   questions 1-4 (UC-3 fleet window).
 - xgrammar 0.2.6 unsupported invariants: skip-recorded in the C2 test file.
+
+## Phase 5 — DEPLOYED 2026-09-15/16 (Hugh go)
+- Pushed test-coverage/upstream-port to the fork via gh HTTPS.
+- Running fleet service identified: ds41rt-afd on Romeo, image ds41rt-coordinator-5090:v3rc4,
+  engine commit 1b62a76 on hostcache/rc4-v3 (rc6 ⊕ upstream v3 ⊕ port fixes; rc6 and
+  5173e44 both ancestors — clean merge).
+- Merged test-coverage into hostcache/rc4-v3 (49740d61, no conflicts); full suite in the
+  dev image on Romeo: 940+ tests green except the 6 pre-existing b12x-API env failures
+  (identical on the unmerged base; merge diff on daemon/reference/submodules empty).
+- Rust-only image builds (AOT reused, guard-verified): v3rc5 first, then v3rc6 after
+  post-deploy smoke found the production serving path (api native_v41 router mounted by
+  the daemon) had its OWN unbounded serde echo — fixed at the error() constructor
+  (7bf38d4c, back-ported to test-coverage/upstream-port as 60787e5).
+- Deploy: afd-launch-coordinator.sh --apply, byte-identical config (batch 1024, C16,
+  prefix 24, dspark, 97% resv, draft-limit 5, 24 GiB host cache). v3rc4 image retained
+  for rollback.
+- Smoke on v3rc6, all green: chat 'abcdef'/stop; 400 body bounded 100,089 -> 578 bytes;
+  non-object body clean 400; SSE [DONE]; stop probe content 'ab' (completion-position
+  semantics CONFIRMED in the native engine path — fix #2 was already correct there);
+  concurrency 16/16 x 200.
+- Fork state: hostcache/rc4-v3 = 7bf38d4c (deployed), test-coverage/upstream-port =
+  60787e5. Both pushed via gh.
