@@ -289,7 +289,6 @@ fn row_window_byte_math_has_no_usize_wraparound() {
 }
 
 #[test]
-#[ignore = "BUG(candidate): ds41rt-loader's safetensors header parser accepts arbitrarily high tensor rank (no GGML_MAX_DIMS-style bound); upstream test_gguf_reader_validation.py pins an n_dims upper bound"]
 fn absurd_tensor_rank_is_rejected() {
     // Ported invariant: a header declaring an absurd number of dimensions
     // (upstream: n_dims = 1_000_000) must be rejected.
