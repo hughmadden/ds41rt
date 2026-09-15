@@ -4581,3 +4581,4 @@ mod upstream_protocol_errors;
 mod upstream_stop_strings;
 mod upstream_streaming;
 mod upstream_tool_calls;
+mod upstream_sampler;

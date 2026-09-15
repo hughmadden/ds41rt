@@ -55,10 +55,26 @@ fn assert_invalid(request: &crate::ChatCompletionRequest, param: &str) {
 // ---------------------------------------------------------------------------
 
 /// Upstream: `test_sampling_params_trace_field_defaults_to_none`.
-/// Unset sampling fields fall back to the ds41rt sampling defaults.
+/// A request with every sampling field unset uses ds41rt's greedy default
+/// (note: ds41rt treats an unset temperature as 0.0, i.e. greedy — unlike
+/// vLLM, whose default temperature is 1.0).
 #[test]
 fn sampling_params_defaults_when_unset() {
     let request = sampling_request();
+    assert_valid(&request);
+    assert!(request_uses_greedy_sampling(&request));
+    let params = request_sampling_params(&request);
+    assert!(params.is_greedy());
+}
+
+/// Opting into sampling (here via an explicit `temperature`) without
+/// pinning every field falls back to the documented sampling defaults:
+/// top_p 0.95 and top_k 50. (Note: `top_k` alone cannot opt out of greedy —
+/// an unset temperature is treated as 0.0 by `request_uses_greedy_sampling`.)
+#[test]
+fn sampling_params_defaults_apply_once_sampling_is_opted_into() {
+    let mut request = sampling_request();
+    request.temperature = Some(1.0);
     assert_valid(&request);
     assert!(!request_uses_greedy_sampling(&request));
     let params = request_sampling_params(&request);
@@ -261,10 +277,13 @@ fn greedy_sampling_contract() {
     assert!(!request_sampling_params(&request).is_greedy());
 }
 
-/// Unset seeds are generated per request rather than pinned to zero.
+/// Unset seeds are generated per request rather than pinned to zero (only
+/// reachable once sampling is opted into — a greedy request short-circuits
+/// to `RealFullSamplingParams::greedy()` with seed 0).
 #[test]
 fn unset_seed_is_generated() {
-    let request = sampling_request();
+    let mut request = sampling_request();
+    request.temperature = Some(1.0);
     let first = request_sampling_params(&request);
     let second = request_sampling_params(&request);
     assert_ne!(first.seed(), 0);
@@ -353,7 +372,9 @@ fn reference_min_tokens_mask(
     if structured_output {
         // Restore stop tokens that would leave the entire row masked, but
         // only where the original logit was finite.
-        let row_all_masked = logits.iter().all(|logit| logit.is_neg_infinite());
+        let row_all_masked = logits
+            .iter()
+            .all(|logit| logit.is_sign_negative() && logit.is_infinite());
         if row_all_masked {
             for token in stop_token_ids {
                 if originals[*token].is_finite() {
@@ -365,7 +386,7 @@ fn reference_min_tokens_mask(
 }
 
 fn masked(logit: f32) -> bool {
-    logit.is_neg_infinite()
+    logit.is_sign_negative() && logit.is_infinite()
 }
 
 // --- Logit bias (upstream `_logit_bias_validate`) ---

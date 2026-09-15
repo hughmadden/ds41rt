@@ -50,8 +50,7 @@ use ds41rt_transport::{
     ExpertProtocolV2Request, ExpertProtocolV2Response, ExpertProtocolV2RouteEntry,
     ExpertProtocolV2RowDescriptor, ExpertProtocolV2Status, ExpertV2Dtype, ExpertV2SourceKind,
     TcpProtocolV2HostBatchSetPersistentClient, TcpProtocolV2HostBatchTarget,
-    TcpProtocolV2PersistentClient, TcpTransportConfig, EXPERT_PROTOCOL_V2_FLAG_RESPONSE_MORE_CHUNKS,
-    EXPERT_PROTOCOL_V2_REQUEST_HEADER_LEN,
+    TcpProtocolV2PersistentClient, TcpTransportConfig, EXPERT_PROTOCOL_V2_REQUEST_HEADER_LEN,
 };
 use std::collections::{HashSet, VecDeque};
 use std::net::SocketAddr;
@@ -123,31 +122,58 @@ fn echo_response(request: &ExpertProtocolV2Request) -> Result<ExpertProtocolV2Re
     )
 }
 
-/// Healthy reference worker: serves every request on a persistent connection.
-async fn spawn_echo_server() -> Result<(SocketAddr, JoinHandle<()>, Arc<AtomicUsize>)> {
+/// One healthy worker connection: serves requests until the peer goes away.
+async fn serve_echo_connection(mut stream: TcpStream) {
+    while let Ok(request) = read_request(&mut stream).await {
+        let Ok(frame) = echo_response(&request).and_then(|r| r.encode()) else {
+            break;
+        };
+        if stream.write_all(&frame).await.is_err() || stream.flush().await.is_err() {
+            break;
+        }
+    }
+}
+
+/// Accept loop that owns its connection tasks. Signalling `shutdown_rx`
+/// (or dropping its sender) closes the listener AND every accepted
+/// connection, modelling whole-worker death rather than a bare accept-loop
+/// abort that would leave orphaned handlers serving existing sockets.
+fn spawn_echo_accept_loop(
+    listener: TcpListener,
+    accepts: Arc<AtomicUsize>,
+    mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut handlers = tokio::task::JoinSet::new();
+        loop {
+            tokio::select! {
+                _ = &mut shutdown_rx => break,
+                accepted = listener.accept() => {
+                    let Ok((stream, _peer)) = accepted else {
+                        break;
+                    };
+                    accepts.fetch_add(1, Ordering::SeqCst);
+                    handlers.spawn(serve_echo_connection(stream));
+                }
+            }
+        }
+        handlers.abort_all();
+    })
+}
+
+/// Healthy reference worker: serves every request on a persistent connection
+/// until shut down via the returned sender.
+async fn spawn_echo_server() -> Result<(
+    SocketAddr,
+    tokio::sync::oneshot::Sender<()>,
+    Arc<AtomicUsize>,
+)> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
     let accepts = Arc::new(AtomicUsize::new(0));
-    let accepts_server = Arc::clone(&accepts);
-    let handle = tokio::spawn(async move {
-        loop {
-            let Ok((mut stream, _peer)) = listener.accept().await else {
-                break;
-            };
-            accepts_server.fetch_add(1, Ordering::SeqCst);
-            tokio::spawn(async move {
-                while let Ok(request) = read_request(&mut stream).await {
-                    let Ok(frame) = echo_response(&request).and_then(|r| r.encode()) else {
-                        break;
-                    };
-                    if stream.write_all(&frame).await.is_err() || stream.flush().await.is_err() {
-                        break;
-                    }
-                }
-            });
-        }
-    });
-    Ok((addr, handle, accepts))
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+    spawn_echo_accept_loop(listener, Arc::clone(&accepts), shutdown_rx);
+    Ok((addr, shutdown_tx, accepts))
 }
 
 async fn wait_for_port_closed(addr: SocketAddr) {
@@ -301,7 +327,7 @@ fn response_pump_drains_earlier_pending_futures_first() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn hanging_upstream_times_out_within_configured_deadline() {
+async fn hanging_upstream_times_out_within_configured_deadline() -> Result<()> {
     // Worker accepts, reads the request, then sleeps far past the deadline.
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
@@ -344,10 +370,11 @@ async fn hanging_upstream_times_out_within_configured_deadline() {
         "expected a deadline-expiry error, got: {message}"
     );
     server.abort();
+    Ok(())
 }
 
 #[tokio::test]
-async fn response_header_then_stall_times_out_on_payload_read() {
+async fn response_header_then_stall_times_out_on_payload_read() -> Result<()> {
     // Partial message: valid header, then the payload never arrives. The
     // deadline must also cover the payload phase, not just the header.
     let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -398,10 +425,11 @@ async fn response_header_then_stall_times_out_on_payload_read() {
         "expected payload-phase deadline error, got: {message}"
     );
     server.abort();
+    Ok(())
 }
 
 #[tokio::test]
-async fn truncated_response_payload_is_rejected_without_wedging() {
+async fn truncated_response_payload_is_rejected_without_wedging() -> Result<()> {
     // Partial message: peer closes mid-payload. read_exact must surface the
     // truncation immediately (EOF), not spin or succeed.
     let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -449,6 +477,7 @@ async fn truncated_response_payload_is_rejected_without_wedging() {
         "expected truncation on the payload read, got: {message}"
     );
     server.abort();
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -456,7 +485,7 @@ async fn truncated_response_payload_is_rejected_without_wedging() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn killed_first_connection_is_retried_on_a_fresh_connection() {
+async fn killed_first_connection_is_retried_on_a_fresh_connection() -> Result<()> {
     // Worker dies mid-traffic: the first connection is dropped by the server
     // right after it consumes the request. The persistent client must surface
     // the disconnect, discard the dead stream, and transparently retry the
@@ -505,19 +534,21 @@ async fn killed_first_connection_is_retried_on_a_fresh_connection() {
         "killed connection plus the retry connection"
     );
     server.abort();
+    Ok(())
 }
 
 #[tokio::test]
-async fn dead_server_fails_fast_and_recovers_after_listener_restart() {
+async fn dead_server_fails_fast_and_recovers_after_listener_restart() -> Result<()> {
     // Full worker death: the listener goes away between requests. The next
     // call must fail fast with a connect error (not wedge), and once a worker
     // is listening again the same client must recover via reconnect.
-    let (addr, server, _accepts) = spawn_echo_server().await?;
+    let (addr, shutdown, _accepts) = spawn_echo_server().await?;
     let mut client = TcpProtocolV2PersistentClient::new(addr, TcpTransportConfig::default());
     let request = test_request(6_110)?;
     client.roundtrip(&request).await?;
 
-    server.abort();
+    // Whole-worker death: listener and every accepted connection go away.
+    let _ = shutdown.send(());
     wait_for_port_closed(addr).await;
 
     let started = Instant::now();
@@ -538,39 +569,26 @@ async fn dead_server_fails_fast_and_recovers_after_listener_restart() {
 
     // Worker restart on the same address: the client reconnects transparently.
     let listener = rebind_listener(addr).await?;
-    let restarted = tokio::spawn(async move {
-        loop {
-            let Ok((mut stream, _peer)) = listener.accept().await else {
-                break;
-            };
-            tokio::spawn(async move {
-                while let Ok(request) = read_request(&mut stream).await {
-                    let Ok(frame) = echo_response(&request).and_then(|r| r.encode()) else {
-                        break;
-                    };
-                    if stream.write_all(&frame).await.is_err() || stream.flush().await.is_err() {
-                        break;
-                    }
-                }
-            });
-        }
-    });
+    let (restart_shutdown, restart_rx) = tokio::sync::oneshot::channel::<()>();
+    let restarted = spawn_echo_accept_loop(listener, Arc::new(AtomicUsize::new(0)), restart_rx);
     let recovered = client
         .roundtrip(&request)
         .await
         .expect("client must recover once the worker is reachable again");
     assert_eq!(recovered.header.request_id, request.header.request_id);
-    restarted.abort();
+    let _ = restart_shutdown.send(());
+    let _ = restarted.await;
+    Ok(())
 }
 
 #[tokio::test]
-async fn host_batch_dispatch_recovers_after_single_host_death() {
+async fn host_batch_dispatch_recovers_after_single_host_death() -> Result<()> {
     // Multi-worker fan-out (failover.rs shape): two workers serve one host
     // batch set each. One worker dies; the dispatch must fail cleanly; after
     // it is restarted the persistent fan-out client must recover (its
     // reset-on-error contract drops all dead connections).
-    let (addr_a, server_a, accepts_a) = spawn_echo_server().await?;
-    let (addr_b, server_b, accepts_b) = spawn_echo_server().await?;
+    let (addr_a, shutdown_a, accepts_a) = spawn_echo_server().await?;
+    let (addr_b, shutdown_b, accepts_b) = spawn_echo_server().await?;
     let targets = vec![
         TcpProtocolV2HostBatchTarget {
             host: "ostrich".to_owned(),
@@ -594,7 +612,7 @@ async fn host_batch_dispatch_recovers_after_single_host_death() {
     assert_eq!(first.stats.hosts, 2);
 
     // Kill worker "dodo" mid-traffic.
-    server_b.abort();
+    let _ = shutdown_b.send(());
     wait_for_port_closed(addr_b).await;
 
     let err = client
@@ -610,23 +628,8 @@ async fn host_batch_dispatch_recovers_after_single_host_death() {
     // Restart the dead worker; the failed dispatch reset every pooled
     // connection, so this dispatch reconnects both hosts from scratch.
     let listener = rebind_listener(addr_b).await?;
-    let restarted_b = tokio::spawn(async move {
-        loop {
-            let Ok((mut stream, _peer)) = listener.accept().await else {
-                break;
-            };
-            tokio::spawn(async move {
-                while let Ok(request) = read_request(&mut stream).await {
-                    let Ok(frame) = echo_response(&request).and_then(|r| r.encode()) else {
-                        break;
-                    };
-                    if stream.write_all(&frame).await.is_err() || stream.flush().await.is_err() {
-                        break;
-                    }
-                }
-            });
-        }
-    });
+    let (restart_b_shutdown, restart_b_rx) = tokio::sync::oneshot::channel::<()>();
+    let restarted_b = spawn_echo_accept_loop(listener, Arc::clone(&accepts_b), restart_b_rx);
     let recovered = client
         .dispatch_bf16(&set, &global_hidden, 6_220)
         .await
@@ -638,16 +641,18 @@ async fn host_batch_dispatch_recovers_after_single_host_death() {
         "dead worker saw the first dispatch and the post-restart dispatch only"
     );
 
-    restarted_b.abort();
-    server_a.abort();
+    let _ = restart_b_shutdown.send(());
+    let _ = restarted_b.await;
+    let _ = shutdown_a.send(());
     let _ = accepts_a;
+    Ok(())
 }
 
 fn host_batch_fixture() -> Result<(ExpertHostBatchSet, Vec<u8>)> {
     let batch = ExpertBatch {
         layer_id: LayerId(3),
         placement_version: PlacementVersion("upstream-fault-injection".to_owned()),
-        hidden_dim: TEST_HIDDEN_DIM,
+        hidden_dim: TEST_HIDDEN_DIM as usize,
         hidden_bytes_per_row: TEST_HIDDEN_DIM as usize * 2,
         hidden_dtype: DType::Bf16,
         routed_experts: DS4_FLASH_ROUTED_EXPERTS,
@@ -707,7 +712,7 @@ fn host_batch_fixture() -> Result<(ExpertHostBatchSet, Vec<u8>)> {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn mid_stream_stall_fails_and_never_replays_the_partial_wave() {
+async fn mid_stream_stall_fails_and_never_replays_the_partial_wave() -> Result<()> {
     // Worker streams chunk 1 of 2, then stalls past the deadline. The chunked
     // receive must fail; the sink saw the partial chunk but the call is an
     // error; the next request runs on a fresh connection.
@@ -728,10 +733,12 @@ async fn mid_stream_stall_fails_and_never_replays_the_partial_wave() {
                 if connection == 0 {
                     // Deliver a non-final chunk, then hang: the stream stalls
                     // mid-flight like a worker stopped mid-drain.
-                    let Ok(mut chunk) = echo_response(&request) else {
-                        return;
+                    // (The more-chunks flag requires the row-index table;
+                    // set it via the constructor rather than raw header bits.)
+                    let chunk = match echo_response(&request).and_then(|r| r.with_row_indices(vec![0], true)) {
+                        Ok(chunk) => chunk,
+                        Err(_) => return,
                     };
-                    chunk.header.flags |= EXPERT_PROTOCOL_V2_FLAG_RESPONSE_MORE_CHUNKS;
                     let Ok(frame) = chunk.encode() else {
                         return;
                     };
@@ -787,10 +794,11 @@ async fn mid_stream_stall_fails_and_never_replays_the_partial_wave() {
         "stalled connection discarded; follow-up reconnected"
     );
     server.abort();
+    Ok(())
 }
 
 #[tokio::test]
-async fn close_before_final_chunk_errors_instead_of_completing() {
+async fn close_before_final_chunk_errors_instead_of_completing() -> Result<()> {
     // Worker sends a non-final chunk and then dies (connection closed before
     // the final chunk). The receive must fail rather than report success on a
     // partially delivered wave.
@@ -809,10 +817,10 @@ async fn close_before_final_chunk_errors_instead_of_completing() {
                     return;
                 };
                 if connection == 0 {
-                    let Ok(mut chunk) = echo_response(&request) else {
-                        return;
+                    let chunk = match echo_response(&request).and_then(|r| r.with_row_indices(vec![0], true)) {
+                        Ok(chunk) => chunk,
+                        Err(_) => return,
                     };
-                    chunk.header.flags |= EXPERT_PROTOCOL_V2_FLAG_RESPONSE_MORE_CHUNKS;
                     let Ok(frame) = chunk.encode() else {
                         return;
                     };
@@ -855,10 +863,11 @@ async fn close_before_final_chunk_errors_instead_of_completing() {
     assert_eq!(response.header.request_id, follow_up.header.request_id);
     assert_eq!(accepts.load(Ordering::SeqCst), 2);
     server.abort();
+    Ok(())
 }
 
 #[tokio::test]
-async fn dropping_pending_dispatch_cancels_the_in_flight_request() {
+async fn dropping_pending_dispatch_cancels_the_in_flight_request() -> Result<()> {
     // Cancellation propagation: `dispatch_chunks` hands out exclusive
     // ownership of the in-flight socket; dropping the guard cancels the
     // request without replay, and the next roundtrip reconnects cleanly.
@@ -878,8 +887,14 @@ async fn dropping_pending_dispatch_cancels_the_in_flight_request() {
             tokio::spawn(async move {
                 // Count requests; the first connection must observe exactly
                 // one request before the client's cancel closes the socket.
-                while let Ok(_request) = read_request(&mut stream).await {
+                while let Ok(request) = read_request(&mut stream).await {
                     observed_requests.fetch_add(1, Ordering::SeqCst);
+                    let Ok(frame) = echo_response(&request).and_then(|r| r.encode()) else {
+                        break;
+                    };
+                    if stream.write_all(&frame).await.is_err() || stream.flush().await.is_err() {
+                        break;
+                    }
                 }
             });
         }
@@ -891,11 +906,15 @@ async fn dropping_pending_dispatch_cancels_the_in_flight_request() {
         .dispatch_chunks(&request, 2)
         .await
         .expect("request write succeeds");
-    assert_eq!(
-        observed_requests.load(Ordering::SeqCst),
-        1,
-        "the worker consumed the fully written request"
-    );
+    // The write completing does not guarantee the worker task has been
+    // polled yet; wait until it has consumed the fully written request.
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while observed_requests.load(Ordering::SeqCst) == 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("worker consumed the fully written request");
     drop(pending); // client cancels mid-flight, before any response chunk
 
     // Give the worker a beat to observe the socket close.
@@ -918,4 +937,5 @@ async fn dropping_pending_dispatch_cancels_the_in_flight_request() {
         "cancelled connection discarded; follow-up reconnected"
     );
     server.abort();
+    Ok(())
 }
